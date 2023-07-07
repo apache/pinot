@@ -36,7 +36,7 @@
   <packaging>maven-plugin</packaging>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <maven.version>3.3.3</maven.version>
+    <maven.version>3.8.2</maven.version>
     <fmpp.version>0.9.16</fmpp.version>
     <freemarker.version>2.3.30</freemarker.version>
   </properties>
@@ -55,12 +55,22 @@
           <groupId>org.codehaus.plexus</groupId>
           <artifactId>plexus-utils</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.sisu</groupId>
+          <artifactId>org.eclipse.sisu.plexus</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-plugin-api</artifactId>
       <version>${maven.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.eclipse.sisu</groupId>
+          <artifactId>org.eclipse.sisu.plexus</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>net.sourceforge.fmpp</groupId>
