@@ -73,7 +73,7 @@ public class PinotBufferIndexInput extends IndexInput {
   @Override
   public byte readByte()
       throws IOException {
-    Byte b = _pinotDataBuffer.getByte(_readPointerOffset);
+    byte b = _pinotDataBuffer.getByte(_readPointerOffset);
     _readPointerOffset += 1;
     return b;
   }
