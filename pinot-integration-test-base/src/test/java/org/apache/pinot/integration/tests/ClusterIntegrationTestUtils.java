@@ -973,11 +973,10 @@ public class ClusterIntegrationTestUtils {
   private static String removeTrailingZeroForNumber(String value, String type) {
     String upperCaseType = StringUtils.upperCase(type);
     // remove trailing zero after decimal point to compare decimal numbers with h2 data
-    if (upperCaseType.equals("FLOAT") || upperCaseType.equals("DECFLOAT")
-        || upperCaseType.equals("DOUBLE") || upperCaseType.equals("DOUBLE PRECISION")) {
+    if (upperCaseType.equals("FLOAT") || upperCaseType.equals("DECFLOAT") || upperCaseType.equals("DOUBLE")
+        || upperCaseType.equals("DOUBLE PRECISION")) {
       try {
-        String result = (new BigDecimal(value)).stripTrailingZeros().toPlainString();
-        return result + ".0";
+        return (new BigDecimal(value)).stripTrailingZeros().toPlainString();
       } catch (NumberFormatException ignored) {
         // ignoring the exception
       }
