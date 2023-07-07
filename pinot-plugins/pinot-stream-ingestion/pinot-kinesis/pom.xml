@@ -36,7 +36,7 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
-    <aws.version>2.20.83</aws.version>
+    <aws.version>2.20.87</aws.version>
     <easymock.version>4.2</easymock.version>
     <reactive.version>1.0.2</reactive.version>
     <localstack-utils.version>0.2.19</localstack-utils.version>

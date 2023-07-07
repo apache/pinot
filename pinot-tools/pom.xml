@@ -33,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <aws.version>2.20.83</aws.version>
+    <aws.version>2.20.87</aws.version>
     <scala.version>2.12</scala.version>
     <spark.version>3.2.1</spark.version>
     <airlift.version>0.16</airlift.version>
