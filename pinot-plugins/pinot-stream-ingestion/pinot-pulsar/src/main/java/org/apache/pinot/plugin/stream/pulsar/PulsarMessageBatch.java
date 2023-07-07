@@ -61,8 +61,8 @@ public class PulsarMessageBatch implements MessageBatch<PulsarStreamMessage> {
 
   @Override
   public int getMessageLengthAtIndex(int index) {
-    return _messageList.get(index).getValue().length; //if _enableKeyValueStitch is true, then they are already stitched
-    //if false, then the value is the raw value
+    return _messageList.get(index).getValue().length; //if _enableKeyValueStitch is true,
+    // then they are already stitched in the consumer. If false, then the value is the raw value
   }
 
   /**

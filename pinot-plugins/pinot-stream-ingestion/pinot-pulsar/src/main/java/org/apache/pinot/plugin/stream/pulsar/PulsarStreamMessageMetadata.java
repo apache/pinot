@@ -23,6 +23,12 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
+
+/**
+ * Pulsar specific implementation of {@link StreamMessageMetadata}
+ * Pulsar makes many metadata values available for each message. Please see the pulsar documentation for more details.
+ * @see <a href="https://pulsar.apache.org/docs/en/concepts-messaging/#message-properties">Pulsar Message Properties</a>
+ */
 public class PulsarStreamMessageMetadata extends StreamMessageMetadata {
     public static final String PUBLISH_TIME_KEY = "publishTime";
     public static final String EVENT_TIME_KEY = "eventTime";
