@@ -221,12 +221,12 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtime.segment.deepStoreUploadRetry.timeoutMs";
     public static final String ENABLE_TMP_SEGMENT_ASYNC_DELETION =
         "controller.realtime.split.commit.segment.tmp.cleanup.async.enable";
-    public static final String SPLIT_COMMIT_END_PHASE_TIMEOUT_SECOND =
-        "controller.realtime.split.commit.end.timeout.second";
+    public static final String SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND =
+        "controller.realtime.split.commit.segment.tmp.lifetime.second";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
-    public static final int DEFAULT_SPLIT_COMMIT_END_PHASE_TIMEOUT_SECOND = 600;
+    public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 600;
 
     private static final Random RANDOM = new Random();
 
@@ -962,8 +962,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getTmpSegmentRetentionInSeconds() {
-    return getProperty(ControllerPeriodicTasksConf.SPLIT_COMMIT_END_PHASE_TIMEOUT_SECOND,
-        ControllerPeriodicTasksConf.DEFAULT_SPLIT_COMMIT_END_PHASE_TIMEOUT_SECOND);
+    return getProperty(ControllerPeriodicTasksConf.SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND,
+        ControllerPeriodicTasksConf.DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {

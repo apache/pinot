@@ -88,12 +88,13 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION;
-import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.SPLIT_COMMIT_END_PHASE_TIMEOUT_SECOND;
+import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND;
 import static org.apache.pinot.controller.ControllerConf.ENABLE_SPLIT_COMMIT;
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -1087,9 +1088,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     ControllerConf config = new ControllerConf();
     config.setDataDir(TEMP_DIR.toString());
     config.setProperty(ENABLE_SPLIT_COMMIT, true);
-    config.setProperty(SPLIT_COMMIT_END_PHASE_TIMEOUT_SECOND, -1);
+    config.setProperty(SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND, -1);
     config.setProperty(ENABLE_TMP_SEGMENT_ASYNC_DELETION, true);
 
+    // simulate there's an orphan tmp file in localFS
     PinotFSFactory.init(new PinotConfiguration());
     File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
     String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
@@ -1104,8 +1106,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(helixResourceManager.getTableConfig(REALTIME_TABLE_NAME))
         .thenReturn(new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setLLC(true)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build());
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(
-        helixResourceManager, config);
+    PinotLLCRealtimeSegmentManager segmentManager = spy(new PinotLLCRealtimeSegmentManager(helixResourceManager,
+        config, mock(ControllerMetrics.class)));
 
     long deletedTmpSegCount;
     // case 1: the segmentMetadata download uri is identical to the uri of the tmp segment. Should not delete
