@@ -132,7 +132,7 @@
     <jersey.version>2.39</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.6.1</hk2.version>
-    <swagger.version>1.6.6</swagger.version>
+    <swagger.version>1.6.9</swagger.version>
     <hadoop.version>2.10.1</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.7.0</jsonpath.version>
