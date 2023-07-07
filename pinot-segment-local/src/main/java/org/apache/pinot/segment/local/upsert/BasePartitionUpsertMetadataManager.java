@@ -180,18 +180,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip preloading segment: {} because metadata manager is already stopped", segmentName);
       return;
     }
-    if (!_enableSnapshot) {
-      _logger.info("Skip preloading segment: {} because snapshot is not enabled", segmentName);
-      return;
-    }
-    if (segment instanceof EmptyIndexSegment) {
-      _logger.info("Skip preloading empty segment: {}", segmentName);
-      return;
-    }
+    Preconditions.checkArgument(_enableSnapshot, "Snapshot must be enabled to preload segment: {}, table: {}",
+        segmentName, _tableNameWithType);
+    // Note that EmptyIndexSegment should not reach here either, as it doesn't have validDocIds snapshot.
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
         "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
         _tableNameWithType);
-
     _snapshotLock.readLock().lock();
     startOperation();
     try {

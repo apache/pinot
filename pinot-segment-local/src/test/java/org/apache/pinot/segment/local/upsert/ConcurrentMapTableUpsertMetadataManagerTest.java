@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixDataAccessor;
@@ -45,8 +47,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -63,20 +63,21 @@ import static org.testng.Assert.assertTrue;
 
 
 public class ConcurrentMapTableUpsertMetadataManagerTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ConcurrentMapTableUpsertMetadataManagerTest.class);
-
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), "ConcurrentMapTableUpsertMetadataManagerTest");
+  private ExecutorService _segmentPreloadExecutor;
 
   @BeforeClass
   public void setUp()
       throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
+    _segmentPreloadExecutor = Executors.newFixedThreadPool(1);
   }
 
   @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(TEMP_DIR);
+    _segmentPreloadExecutor.shutdownNow();
   }
 
   @Test
@@ -92,7 +93,7 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     ConcurrentMapTableUpsertMetadataManager mgr = new ConcurrentMapTableUpsertMetadataManager();
     assertFalse(mgr.isPreloading());
     mgr.init(tableConfig, schema, mock(TableDataManager.class), mock(ServerMetrics.class), mock(HelixManager.class),
-        null);
+        _segmentPreloadExecutor);
     assertFalse(mgr.isPreloading());
 
     // Preloading is skipped as preloading is not turned on.
@@ -100,7 +101,7 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     mgr = new ConcurrentMapTableUpsertMetadataManager();
     assertFalse(mgr.isPreloading());
     mgr.init(tableConfig, schema, mock(TableDataManager.class), mock(ServerMetrics.class), mock(HelixManager.class),
-        null);
+        _segmentPreloadExecutor);
     assertFalse(mgr.isPreloading());
 
     upsertConfig.setEnablePreload(true);
@@ -109,7 +110,7 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     // The preloading logic will hit on error as the HelixManager mock is not fully setup. But failure of preloading
     // should not fail the init() method.
     mgr.init(tableConfig, schema, mock(TableDataManager.class), mock(ServerMetrics.class), mock(HelixManager.class),
-        null);
+        _segmentPreloadExecutor);
     assertFalse(mgr.isPreloading());
   }
 
@@ -201,7 +202,7 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     when(tableDataManager.getSegmentDataDir("online_seg02", null, tableConfig)).thenReturn(seg02IdxDir);
 
     assertFalse(mgr.isPreloading());
-    mgr.init(tableConfig, schema, tableDataManager, mock(ServerMetrics.class), helixManager, null);
+    mgr.init(tableConfig, schema, tableDataManager, mock(ServerMetrics.class), helixManager, _segmentPreloadExecutor);
     assertEquals(preloadedSegments.size(), 1);
     assertTrue(preloadedSegments.contains("online_seg02"));
     assertTrue(wasPreloading.get());

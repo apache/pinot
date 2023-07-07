@@ -68,8 +68,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected PartialUpsertHandler _partialUpsertHandler;
   protected boolean _enableSnapshot;
   protected ServerMetrics _serverMetrics;
-  private HelixManager _helixManager;
-  private ExecutorService _segmentPreloadExecutor;
   private volatile boolean _isPreloading = false;
 
   @Override
@@ -107,9 +105,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();
     _serverMetrics = serverMetrics;
-    _helixManager = helixManager;
-    _segmentPreloadExecutor = segmentPreloadExecutor;
-    if (_enableSnapshot && upsertConfig.isEnablePreload()) {
+    if (_enableSnapshot && segmentPreloadExecutor != null && upsertConfig.isEnablePreload()) {
       // Preloading the segments with snapshots for fast upsert metadata recovery.
       // Note that there is an implicit waiting logic between the thread doing the segment preloading here and the
       // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).
@@ -119,13 +115,13 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       // happens as the lambda of ConcurrentHashMap.computeIfAbsent() method, which ensures the waiting logic.
       try {
         _isPreloading = true;
-        preloadSegments();
+        preloadSegments(helixManager, segmentPreloadExecutor);
       } catch (Exception e) {
         // Even if preloading fails, we should continue to complete the initialization, so that TableDataManager can be
         // created. Once TableDataManager is created, no more segment preloading would happen, and the normal segment
         // loading logic would be used. The segments not being preloaded successfully here would be loaded via the
         // normal segment loading logic, the one doing more costly checks on the upsert metadata.
-        LOGGER.warn("Failed to preload segments for table: {}", _tableNameWithType, e);
+        LOGGER.warn("Failed to preload segments from table: {}, skipping", _tableNameWithType, e);
         if (e instanceof InterruptedException) {
           // Restore the interrupted status in case the upper callers want to check.
           Thread.currentThread().interrupt();
@@ -141,11 +137,11 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
    * Skip those without the snapshots and those whose crc has changed, as they will be handled by normal Helix state
    * transitions, which will proceed after the preloading phase fully completes.
    */
-  private void preloadSegments()
+  private void preloadSegments(HelixManager helixManager, ExecutorService segmentPreloadExecutor)
       throws Exception {
-    LOGGER.info("Preload segments in table: {} for fast upsert metadata recovery", _tableNameWithType);
-    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, _tableNameWithType);
-    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
+    LOGGER.info("Preload segments from table: {} for fast upsert metadata recovery", _tableNameWithType);
+    IdealState idealState = HelixHelper.getTableIdealState(helixManager, _tableNameWithType);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = helixManager.getHelixPropertyStore();
     String instanceId = getInstanceId();
     IndexLoadingConfig indexLoadingConfig = createIndexLoadingConfig();
     List<Future<?>> futures = new ArrayList<>();
@@ -156,12 +152,12 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         LOGGER.info("Skip segment: {} as its ideal state: {} is not ONLINE", segmentName, state);
         continue;
       }
-      if (_segmentPreloadExecutor == null) {
-        preloadSegment(segmentName, indexLoadingConfig, propertyStore);
-        continue;
-      }
-      futures.add(_segmentPreloadExecutor.submit(() -> {
-        preloadSegment(segmentName, indexLoadingConfig, propertyStore);
+      futures.add(segmentPreloadExecutor.submit(() -> {
+        try {
+          preloadSegment(segmentName, indexLoadingConfig, propertyStore);
+        } catch (Exception e) {
+          LOGGER.warn("Failed to preload segment: {} from table: {}, skipping", segmentName, _tableNameWithType, e);
+        }
       }));
     }
     try {
@@ -175,7 +171,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         }
       }
     }
-    LOGGER.info("Preloaded segments in table: {} for fast upsert metadata recovery", _tableNameWithType);
+    LOGGER.info("Preloaded segments from table: {} for fast upsert metadata recovery", _tableNameWithType);
   }
 
   private String getInstanceId() {
@@ -203,6 +199,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       return;
     }
     preloadSegmentWithSnapshot(segmentName, indexLoadingConfig, zkMetadata);
+    LOGGER.info("Preloaded segment: {} from table: {}", segmentName, _tableNameWithType);
   }
 
   @VisibleForTesting
@@ -214,7 +211,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       segmentLock.lock();
       // This method checks segment crc and if it has changed, the segment is not loaded.
       _tableDataManager.tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata);
-      LOGGER.info("Preloaded segment: {} from table: {}", segmentName, _tableNameWithType);
     } finally {
       segmentLock.unlock();
     }
