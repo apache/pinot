@@ -1642,6 +1642,7 @@
             <exclude>**/*.generated</exclude>
             <exclude>**/*.json</exclude>
             <exclude>**/*.schema</exclude>
+            <exclude>**/*.sql</exclude>
 
             <!-- JDBC Drivers -->
             <exclude>**/java.sql.*</exclude>
@@ -1755,6 +1756,7 @@
             <exclude>**/*.generated</exclude>
             <exclude>**/*.json</exclude>
             <exclude>**/*.schema</exclude>
+            <exclude>**/*.sql</exclude>
 
             <!-- JDBC Drivers -->
             <exclude>**/java.sql.*</exclude>
