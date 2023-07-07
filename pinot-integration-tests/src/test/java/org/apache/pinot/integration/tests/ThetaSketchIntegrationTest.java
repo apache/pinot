@@ -232,7 +232,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
 
   private void runAndAssert(String query, int expected)
       throws Exception {
-    JsonNode jsonNode = postQuery(query, _brokerBaseApiUrl);
+    JsonNode jsonNode = postQuery(query);
     int actual = Integer.parseInt(jsonNode.get("resultTable").get("rows").get(0).get(0).asText());
     assertEquals(actual, expected);
   }
@@ -240,7 +240,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
   private void runAndAssert(String query, Map<String, Integer> expectedGroupToValueMap)
       throws Exception {
     Map<String, Integer> actualGroupToValueMap = new HashMap<>();
-    JsonNode jsonNode = postQuery(query, _brokerBaseApiUrl);
+    JsonNode jsonNode = postQuery(query);
     jsonNode.get("resultTable").get("rows").forEach(node -> {
       String group = node.get(0).textValue();
       int value = node.get(1).intValue();

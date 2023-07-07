@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -95,6 +96,8 @@ public abstract class ClusterTest extends ControllerTest {
   protected List<BaseServerStarter> _serverStarters;
   protected List<Integer> _brokerPorts;
   protected BaseMinionStarter _minionStarter;
+
+  protected boolean _useMultiStageQueryEngine = true;
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
     return new PinotConfiguration();
@@ -425,23 +428,8 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(query, _brokerBaseApiUrl);
-  }
-
-  /**
-   * Queries the broker's sql query endpoint (/sql)
-   */
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl)
-      throws Exception {
-    return postQuery(query, brokerBaseApiUrl, null);
-  }
-
-  /**
-   * Queries the broker's sql query endpoint (/sql)
-   */
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
-      throws Exception {
-    return postQuery(query, brokerBaseApiUrl, headers, null);
+    return postQuery(query, _brokerBaseApiUrl, null,
+        ImmutableMap.of("queryOptions", "useMultistageEngine=" + _useMultiStageQueryEngine));
   }
 
   /**
@@ -453,7 +441,7 @@ public abstract class ClusterTest extends ControllerTest {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
     if (MapUtils.isNotEmpty(extraJsonProperties)) {
-      for (Map.Entry<String, String> extraProperty :extraJsonProperties.entrySet()) {
+      for (Map.Entry<String, String> extraProperty : extraJsonProperties.entrySet()) {
         payload.put(extraProperty.getKey(), extraProperty.getValue());
       }
     }
@@ -463,7 +451,8 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
    */
-  protected JsonNode postQueryWithOptions(String query, String queryOptions) throws Exception {
+  protected JsonNode postQueryWithOptions(String query, String queryOptions)
+      throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
     payload.put("queryOptions", queryOptions);
@@ -495,7 +484,7 @@ public abstract class ClusterTest extends ControllerTest {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
     if (MapUtils.isNotEmpty(extraJsonProperties)) {
-      for (Map.Entry<String, String> extraProperty :extraJsonProperties.entrySet()) {
+      for (Map.Entry<String, String> extraProperty : extraJsonProperties.entrySet()) {
         payload.put(extraProperty.getKey(), extraProperty.getValue());
       }
     }
