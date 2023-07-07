@@ -743,7 +743,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
-    ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
+    ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
         getH2Connection());
   }
 }

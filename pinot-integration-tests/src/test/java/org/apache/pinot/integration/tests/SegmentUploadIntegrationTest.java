@@ -140,7 +140,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
-    clusterSpec.setControllerURI(_controllerBaseApiUrl);
+    clusterSpec.setControllerURI(getControllerBaseApiUrl());
     jobSpec.setPinotClusterSpecs(new PinotClusterSpec[]{clusterSpec});
 
     File dataDir = new File(_controllerConfig.getDataDir());
@@ -241,7 +241,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
-    clusterSpec.setControllerURI(_controllerBaseApiUrl);
+    clusterSpec.setControllerURI(getControllerBaseApiUrl());
     jobSpec.setPinotClusterSpecs(new PinotClusterSpec[]{clusterSpec});
 
     File dataDir = new File(_controllerConfig.getDataDir());
@@ -267,7 +267,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Fetch segment lineage entry after running segment metadata push with consistent push enabled.
     String segmentLineageResponse = ControllerTest.sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl)
+        ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
             .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
     // Segment lineage should be in completed state.
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
@@ -316,7 +316,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Fetch segment lineage entry after running segment tar push with consistent push enabled.
     segmentLineageResponse = ControllerTest.sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl)
+        ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
             .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
     // Segment lineage should be in completed state.
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));

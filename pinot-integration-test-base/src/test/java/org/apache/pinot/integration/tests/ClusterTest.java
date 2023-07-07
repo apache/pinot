@@ -68,7 +68,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Minion;
@@ -90,14 +89,17 @@ public abstract class ClusterTest extends ControllerTest {
   protected static final int DEFAULT_BROKER_PORT = 18099;
   protected static final Random RANDOM = new Random(System.currentTimeMillis());
 
-  protected String _brokerBaseApiUrl;
-
   protected List<BaseBrokerStarter> _brokerStarters;
   protected List<BaseServerStarter> _serverStarters;
   protected List<Integer> _brokerPorts;
   protected BaseMinionStarter _minionStarter;
 
-  protected boolean _useMultiStageQueryEngine = true;
+  private String _brokerBaseApiUrl;
+  private boolean _useMultiStageQueryEngine;
+
+  protected String getBrokerBaseApiUrl() {
+    return _brokerBaseApiUrl;
+  }
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
     return new PinotConfiguration();
@@ -321,8 +323,7 @@ public abstract class ClusterTest extends ControllerTest {
     int numSegments = segmentTarFiles.size();
     assertTrue(numSegments > 0);
 
-    URI uploadSegmentHttpURI =
-        FileUploadDownloadClient.getUploadSegmentURI(CommonConstants.HTTP_PROTOCOL, LOCAL_HOST, _controllerPort);
+    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles.get(0);
@@ -420,7 +421,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected JsonNode getDebugInfo(final String uri)
       throws Exception {
-    return JsonUtils.stringToJsonNode(sendGetRequest(_brokerBaseApiUrl + "/" + uri));
+    return JsonUtils.stringToJsonNode(sendGetRequest(getBrokerBaseApiUrl() + "/" + uri));
   }
 
   /**
@@ -428,8 +429,11 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(query, _brokerBaseApiUrl, null,
-        ImmutableMap.of("queryOptions", "useMultistageEngine=" + _useMultiStageQueryEngine));
+    return postQuery(query, getBrokerBaseApiUrl(), null, getMultiStageQueryProperties(_useMultiStageQueryEngine));
+  }
+
+  private static Map<String, String> getMultiStageQueryProperties(boolean useMultiStageQueryEngine) {
+    return ImmutableMap.of("queryOptions", "useMultistageEngine=" + useMultiStageQueryEngine);
   }
 
   /**
@@ -453,26 +457,16 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQueryWithOptions(String query, String queryOptions)
       throws Exception {
-    ObjectNode payload = JsonUtils.newObjectNode();
-    payload.put("sql", query);
-    payload.put("queryOptions", queryOptions);
-    return JsonUtils.stringToJsonNode(sendPostRequest(_brokerBaseApiUrl + "/query/sql", payload.toString(), null));
+    return postQuery(query, getBrokerBaseApiUrl(), null, ImmutableMap.of("queryOptions", queryOptions));
   }
 
   /**
    * Queries the controller's sql query endpoint (/sql)
    */
-  public static JsonNode postQueryToController(String query, String controllerBaseApiUrl)
+  public JsonNode postQueryToController(String query)
       throws Exception {
-    return postQueryToController(query, controllerBaseApiUrl, null);
-  }
-
-  /**
-   * Queries the controller's sql query endpoint (/sql)
-   */
-  public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers)
-      throws Exception {
-    return postQueryToController(query, controllerBaseApiUrl, headers, null);
+    return postQueryToController(query, getInstance().getControllerBaseApiUrl(), null,
+        getMultiStageQueryProperties(_useMultiStageQueryEngine));
   }
 
   /**

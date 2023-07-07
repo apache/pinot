@@ -401,7 +401,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         TableNameBuilder.extractRawTableName(offlineTableName));
     parameters.add(tableNameParameter);
 
-    URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       // Refresh non-existing segment
       File segmentTarFile = segmentTarFiles[0];
@@ -2616,57 +2616,57 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testAggregateMetadataAPI()
       throws IOException {
     JsonNode oneSVColumnResponse = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
+        sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DestCityMarketID"));
     // DestCityMarketID is a SV column
     validateMetadataResponse(oneSVColumnResponse, 1, 0);
 
     JsonNode oneMVColumnResponse = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DivLongestGTimes"));
+        sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DivLongestGTimes"));
     // DivLongestGTimes is a MV column
     validateMetadataResponse(oneMVColumnResponse, 1, 1);
 
-    JsonNode threeSVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+    JsonNode threeSVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
         + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
     validateMetadataResponse(threeSVColumnsResponse, 3, 0);
 
     JsonNode threeSVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "DivActualElapsedTime%26columns%3DCRSElapsedTime%26columns%3DOriginStateName"));
     validateMetadataResponse(threeSVColumnsWholeEncodedResponse, 3, 0);
 
-    JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+    JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
         + "/tables/mytable/metadata?columns=DivLongestGTimes&columns=DivWheelsOns&columns=DivAirports"));
     validateMetadataResponse(threeMVColumnsResponse, 3, 3);
 
     JsonNode threeMVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "DivLongestGTimes%26columns%3DDivWheelsOns%26columns%3DDivAirports"));
     validateMetadataResponse(threeMVColumnsWholeEncodedResponse, 3, 3);
 
     JsonNode zeroColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata"));
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata"));
     validateMetadataResponse(zeroColumnResponse, 0, 0);
 
     JsonNode starColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=*"));
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=*"));
     validateMetadataResponse(starColumnResponse, 82, 9);
 
     JsonNode starEncodedColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=%2A"));
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=%2A"));
     validateMetadataResponse(starEncodedColumnResponse, 82, 9);
 
     JsonNode starWithExtraColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=*&columns=OriginStateName"));
     validateMetadataResponse(starWithExtraColumnResponse, 82, 9);
 
     JsonNode starWithExtraEncodedColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
     validateMetadataResponse(starWithExtraEncodedColumnResponse, 82, 9);
 
     JsonNode starWithExtraColumnWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime%26columns%3D%2A%26columns%3DOriginStateName"));
     validateMetadataResponse(starWithExtraColumnWholeEncodedResponse, 82, 9);
   }

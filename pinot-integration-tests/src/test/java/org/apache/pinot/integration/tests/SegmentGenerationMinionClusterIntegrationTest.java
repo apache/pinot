@@ -88,7 +88,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
     AdhocTaskConfig adhocTaskConfig =
         new AdhocTaskConfig("SegmentGenerationAndPushTask", tableNameWithType, null, taskConfigs);
 
-    String url = _controllerBaseApiUrl + "/tasks/execute";
+    String url = getControllerBaseApiUrl() + "/tasks/execute";
     TestUtils.waitForCondition(aVoid -> {
       try {
         if (getTotalDocs(tableName) < rowCnt) {
@@ -134,7 +134,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
     TestUtils.waitForCondition(aVoid -> {
       try {
         if (getTotalDocs(tableName) < rowCnt) {
-          JsonNode response = queryController ? postQueryToController(insertFileStatement, _controllerBaseApiUrl)
+          JsonNode response = queryController ? postQueryToController(insertFileStatement)
               : postQuery(insertFileStatement);
           Assert.assertEquals(response.get("resultTable").get("rows").get(0).get(0).asText(),
               tableName + "_OFFLINE");

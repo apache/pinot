@@ -95,7 +95,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     String pinotQuery = "SET multistageLeafLimit = 1; SELECT * FROM mytable;";
     String h2Query = "SELECT * FROM mytable limit 1";
-    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, _brokerBaseApiUrl, getPinotConnection(),
+    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
         h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
   }
 
@@ -107,7 +107,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
             + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
     String h2Query =
         "SELECT DivAirportIDs[1], DivAirports[1] FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
-    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, _brokerBaseApiUrl, getPinotConnection(),
+    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
         h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
   }
 
@@ -124,7 +124,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Override
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
-    ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
+    ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
         getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
   }
 

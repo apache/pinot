@@ -88,7 +88,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, _tarDir.getAbsolutePath());
     batchConfigMap.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
-    batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _controllerBaseApiUrl);
+    batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, getControllerBaseApiUrl());
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(
         new BatchIngestionConfig(Collections.singletonList(batchConfigMap), "APPEND", "HOURLY"));

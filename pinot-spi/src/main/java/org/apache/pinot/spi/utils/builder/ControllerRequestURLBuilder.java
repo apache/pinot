@@ -542,4 +542,8 @@ public class ControllerRequestURLBuilder {
       throw new RuntimeException(e);
     }
   }
+
+  public String forSegmentUpload() {
+    return StringUtil.join("/", _baseUrl, "v2/segments");
+  }
 }

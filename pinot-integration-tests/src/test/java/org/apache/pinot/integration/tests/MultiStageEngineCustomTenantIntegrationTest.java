@@ -114,9 +114,8 @@ public class MultiStageEngineCustomTenantIntegrationTest extends MultiStageEngin
       throws Exception {
     String pinotQuery = "SET multistageLeafLimit = 1; SELECT * FROM mytable;";
     String h2Query = "SELECT * FROM mytable limit 1";
-    ClusterIntegrationTestUtils
-        .testQueryWithMatchingRowCount(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query, getH2Connection(),
-            null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
+        h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
   }
 
   @Override
@@ -130,11 +129,9 @@ public class MultiStageEngineCustomTenantIntegrationTest extends MultiStageEngin
   }
 
   @Override
-  protected void testQuery(String pinotQuery, String h2Query)
-      throws Exception {
-    ClusterIntegrationTestUtils
-        .testQueryViaController(pinotQuery, _controllerBaseApiUrl, getPinotConnection(), h2Query, getH2Connection(),
-            null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+  protected void testQuery(String pinotQuery, String h2Query) {
+    ClusterIntegrationTestUtils.testQueryViaController(pinotQuery, getControllerBaseApiUrl(), getPinotConnection(),
+        h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
   }
 
   @AfterClass
