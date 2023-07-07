@@ -1513,11 +1513,10 @@ public class PinotLLCRealtimeSegmentManager {
           orphanTmpSegments++;
         }
       }
-      return orphanTmpSegments;
     } catch (Exception e) {
       LOGGER.warn("Caught exception while deleting temporary files for table: {}", rawTableName, e);
-      return orphanTmpSegments;
     }
+    return orphanTmpSegments;
   }
 
   private boolean isTmpAndCanDelete(URI uri, Set<String> deepURIs, PinotFS pinotFS) throws Exception {

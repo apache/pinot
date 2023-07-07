@@ -94,7 +94,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FO
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -1088,7 +1087,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     ControllerConf config = new ControllerConf();
     config.setDataDir(TEMP_DIR.toString());
     config.setProperty(ENABLE_SPLIT_COMMIT, true);
-    config.setProperty(SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND, -1);
+    config.setProperty(SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND, Integer.MIN_VALUE);
     config.setProperty(ENABLE_TMP_SEGMENT_ASYNC_DELETION, true);
 
     // simulate there's an orphan tmp file in localFS
@@ -1106,8 +1105,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(helixResourceManager.getTableConfig(REALTIME_TABLE_NAME))
         .thenReturn(new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setLLC(true)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build());
-    PinotLLCRealtimeSegmentManager segmentManager = spy(new PinotLLCRealtimeSegmentManager(helixResourceManager,
-        config, mock(ControllerMetrics.class)));
+    PinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(
+        helixResourceManager, config);
 
     long deletedTmpSegCount;
     // case 1: the segmentMetadata download uri is identical to the uri of the tmp segment. Should not delete
