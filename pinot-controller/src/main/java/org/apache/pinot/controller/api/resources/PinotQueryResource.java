@@ -239,8 +239,8 @@ public class PinotQueryResource {
     String tableName;
     try {
       String inputTableName =
-          sqlNode != null ? RequestUtils.getTableName(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode))
-              : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
+          sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
+              .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
       tableName = _pinotHelixResourceManager.getActualTableName(inputTableName);
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
@@ -274,7 +274,7 @@ public class PinotQueryResource {
   // given a list of tables, returns the list of tableConfigs
   private List<TableConfig> getListTableConfigs(List<String> tableNames) {
     List<TableConfig> allTableConfigList = new ArrayList<>();
-    for (String tableName: tableNames) {
+    for (String tableName : tableNames) {
       List<TableConfig> tableConfigList = new ArrayList<>();
       if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         tableConfigList.add(Objects.requireNonNull(_pinotHelixResourceManager.getRealtimeTableConfig(tableName)));
