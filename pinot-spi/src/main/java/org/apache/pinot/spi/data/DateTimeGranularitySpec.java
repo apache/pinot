@@ -33,6 +33,7 @@ public class DateTimeGranularitySpec {
   private static final char COLON_SEPARATOR = ':';
   private static final int COLON_FORMAT_SIZE_POSITION = 0;
   private static final int COLON_FORMAT_TIME_UNIT_POSITION = 1;
+  private static final int COLON_FORMAT_NUM_TOKENS = 2;
 
   // Pipe format: 'timeUnit|size'
   private static final char PIPE_SEPARATOR = '|';
@@ -40,8 +41,6 @@ public class DateTimeGranularitySpec {
   private static final int PIPE_FORMAT_SIZE_POSITION = 1;
   private static final int PIPE_FORMAT_MIN_TOKENS = 1;
   private static final int PIPE_FORMAT_MAX_TOKENS = 2;
-
-  private static final int NUM_TOKENS = 2;
 
   private final int _size;
   private final TimeUnit _timeUnit;
@@ -55,14 +54,17 @@ public class DateTimeGranularitySpec {
     char separator;
     int sizePosition;
     int timeUnitPosition;
-    int minTokens = NUM_TOKENS;
-    int maxTokens = NUM_TOKENS;
+    int minTokens;
+    int maxTokens;
 
     if (Character.isDigit(granularity.charAt(0))) {
       // Colon format: 'size:timeUnit'
       separator = COLON_SEPARATOR;
       sizePosition = COLON_FORMAT_SIZE_POSITION;
       timeUnitPosition = COLON_FORMAT_TIME_UNIT_POSITION;
+
+      minTokens = COLON_FORMAT_NUM_TOKENS;
+      maxTokens = COLON_FORMAT_NUM_TOKENS;
     } else {
       // Pipe format: 'timeUnit(|size)'
       separator = PIPE_SEPARATOR;
@@ -86,7 +88,7 @@ public class DateTimeGranularitySpec {
     }
 
     // New format without explicitly setting size - use default size = 1
-    if (granularityTokens.length == 1) {
+    if (granularityTokens.length == PIPE_FORMAT_MIN_TOKENS) {
       _size = 1;
       return;
     }
