@@ -57,6 +57,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,6 +86,7 @@ public class PinotRunningQueryResource {
 
   @DELETE
   @Path("query/{brokerId}/{queryId}")
+  @RBACAuthorization(targetType = "cluster", permission = "DeleteQuery")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Cancel a query as identified by the queryId", notes = "No effect if no query exists for the "
       + "given queryId on the requested broker. Query may continue to run for a short while after calling cancel as "
@@ -143,6 +145,7 @@ public class PinotRunningQueryResource {
 
   @GET
   @Path("/queries")
+  @RBACAuthorization(targetType = "cluster", permission = "GetRunningQueries")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get running queries from all brokers", notes = "The queries are returned with brokers "
       + "running them")

@@ -48,6 +48,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -92,6 +93,7 @@ public class PinotAccessControlUserRestletResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users")
+    @RBACAuthorization(targetType = "cluster", permission = "ListUsers")
     @ApiOperation(value = "List all uses in cluster", notes = "List all users in cluster")
     public String listUers() {
         try {
@@ -106,6 +108,7 @@ public class PinotAccessControlUserRestletResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users/{username}")
+    @RBACAuthorization(targetType = "cluster", permission = "ListUser")
     @ApiOperation(value = "Get an user in cluster", notes = "Get an user in cluster")
     public String getUser(@PathParam("username") String username, @QueryParam("component") String componentTypeStr) {
         try {
@@ -123,6 +126,7 @@ public class PinotAccessControlUserRestletResource {
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users")
+    @RBACAuthorization(targetType = "cluster", permission = "AddUser")
     @ApiOperation(value = "Add a user", notes = "Add a user")
     public SuccessResponse addUser(String userConfigStr) {
         // TODO introduce a table config ctor with json string.
@@ -153,6 +157,7 @@ public class PinotAccessControlUserRestletResource {
 
     @DELETE
     @Path("/users/{username}")
+    @RBACAuthorization(targetType = "cluster", permission = "DeleteUser")
     @Authenticate(AccessType.DELETE)
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "Delete a user", notes = "Delete a user")
@@ -185,6 +190,7 @@ public class PinotAccessControlUserRestletResource {
 
     @PUT
     @Path("/users/{username}")
+    @RBACAuthorization(targetType = "cluster", permission = "UpdateUser")
     @Authenticate(AccessType.UPDATE)
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "Update user config for a user", notes = "Update user config for user")

@@ -54,6 +54,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -87,6 +88,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances")
+  @RBACAuthorization(targetType = "cluster", permission = "GetInstances")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all instances")
   @ApiResponses(value = {
@@ -99,6 +101,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances/{instanceName}")
+  @RBACAuthorization(targetType = "cluster", permission = "GetInstance")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get instance information", produces = MediaType.APPLICATION_JSON)
   @ApiResponses(value = {
@@ -189,6 +192,7 @@ public class PinotInstanceRestletResource {
 
   @POST
   @Path("/instances")
+  @RBACAuthorization(targetType = "cluster", permission = "CreateInstance")
   @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -260,6 +264,7 @@ public class PinotInstanceRestletResource {
   @Deprecated
   @POST
   @Path("/instances/{instanceName}/state")
+  @RBACAuthorization(targetType = "cluster", permission = "UpdateInstance")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
@@ -308,6 +313,7 @@ public class PinotInstanceRestletResource {
 
   @DELETE
   @Path("/instances/{instanceName}")
+  @RBACAuthorization(targetType = "cluster", permission = "DeleteInstance")
   @Authenticate(AccessType.DELETE)
   @Consumes(MediaType.TEXT_PLAIN)
   @Produces(MediaType.APPLICATION_JSON)
@@ -340,6 +346,7 @@ public class PinotInstanceRestletResource {
 
   @PUT
   @Path("/instances/{instanceName}")
+  @RBACAuthorization(targetType = "cluster", permission = "UpdateInstance")
   @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -370,6 +377,7 @@ public class PinotInstanceRestletResource {
 
   @PUT
   @Path("/instances/{instanceName}/updateTags")
+  @RBACAuthorization(targetType = "cluster", permission = "UpdateTags")
   @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -407,6 +415,7 @@ public class PinotInstanceRestletResource {
 
   @POST
   @Path("/instances/{instanceName}/updateBrokerResource")
+  @RBACAuthorization(targetType = "cluster", permission = "UpdateResource")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the tables served by the specified broker instance in the broker resource", notes =
@@ -436,6 +445,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances/dropInstance/validate")
+  @RBACAuthorization(targetType = "cluster", permission = "GetInstances")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check if it's safe to drop the given instances. If not list all the reasons why its not safe.")
   @ApiResponses(value = {

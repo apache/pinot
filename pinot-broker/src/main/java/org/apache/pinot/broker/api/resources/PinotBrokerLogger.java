@@ -43,6 +43,7 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
+import org.apache.pinot.core.auth.RBACAuthorization;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -61,6 +62,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLoggers")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all the loggers", notes = "Return all the logger names")
   public List<String> getLoggers() {
@@ -69,6 +71,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers/{loggerName}")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLogger")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get logger configs", notes = "Return logger info")
   public Map<String, String> getLogger(
@@ -82,6 +85,7 @@ public class PinotBrokerLogger {
 
   @PUT
   @Path("/loggers/{loggerName}")
+  @RBACAuthorization(targetType = "cluster", permission = "PutLogger")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Set logger level", notes = "Set logger level for a given logger")
   public Map<String, String> setLoggerLevel(@ApiParam(value = "Logger name") @PathParam("loggerName") String loggerName,
@@ -91,6 +95,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers/files")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLogFiles")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all local log files")
   public Set<String> getLocalLogFiles() {
@@ -106,6 +111,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers/download")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLogFile")
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @ApiOperation(value = "Download a log file")
   public Response downloadLogFile(

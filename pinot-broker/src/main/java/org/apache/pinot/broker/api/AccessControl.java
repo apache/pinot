@@ -59,8 +59,8 @@ public interface AccessControl {
    */
   boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables);
 
-  default boolean hasRBACAccess(RequesterIdentity requesterIdentity, String targetId,
-                                String targetType, String permission) {
+  default boolean hasRBACAccess(RequesterIdentity requesterIdentity, String targetType,
+      String targetId, String permission) {
     return true;
   }
 
@@ -70,7 +70,7 @@ public interface AccessControl {
    * If the return is false, then API will be terminated by the filter.
    * @return true to allow
    */
-  default boolean defaultAuthorization(RequesterIdentity requesterIdentity) {
+  default boolean defaultRBACAuthorization(RequesterIdentity requesterIdentity) {
     return true;
   }
 }

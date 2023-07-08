@@ -32,6 +32,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -52,6 +53,7 @@ public class PinotControllerAppConfigs {
 
   @GET
   @Path("/appconfigs")
+  @RBACAuthorization(targetType = "cluster", permission = "GetAppConfigs")
   @Produces(MediaType.APPLICATION_JSON)
   public String getAppConfigs() {
     PinotConfiguration pinotConfiguration =

@@ -85,6 +85,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.apache.pinot.core.metadata.DefaultMetadataExtractor;
 import org.apache.pinot.core.metadata.MetadataExtractorFactory;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -141,6 +142,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableName}/{segmentName}")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "DownloadSegment")
   @ApiOperation(value = "Download a segment", notes = "Download a segment")
   @TrackInflightRequestMetrics
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_DOWNLOADS_IN_PROGRESS)
@@ -459,6 +461,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/segments")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "UploadSegment")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   @ApiResponses(value = {
@@ -499,6 +502,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segments")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "UploadSegment")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   @ApiResponses(value = {
@@ -537,6 +541,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/v2/segments")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "UploadSegment")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   @ApiResponses(value = {
@@ -578,6 +583,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/v2/segments")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "UploadSegment")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   @ApiResponses(value = {
@@ -613,6 +619,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @POST
   @Path("segments/{tableName}/startReplaceSegments")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ReplaceSegments")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Start to replace segments", notes = "Start to replace segments")
@@ -642,6 +649,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @POST
   @Path("segments/{tableName}/endReplaceSegments")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ReplaceSegments")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "End to replace segments", notes = "End to replace segments")
@@ -673,6 +681,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @POST
   @Path("segments/{tableName}/revertReplaceSegments")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ReplaceSegments")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Revert segments replacement", notes = "Revert segments replacement")

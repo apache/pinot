@@ -59,8 +59,8 @@ public interface AccessControl {
     return true;
   }
 
-  default boolean hasRBACAccess(HttpHeaders httpHeaders, String targetId,
-                                String targetType, String permission) {
+  default boolean hasRBACAccess(HttpHeaders httpHeaders, String targetType,
+      String targetId, String permission) {
     return true;
   }
 
@@ -70,7 +70,7 @@ public interface AccessControl {
    * If the return is false, then API will be terminated by the filter.
    * @return true to allow
    */
-  default boolean defaultAuthorization(HttpHeaders httpHeaders) {
+  default boolean defaultRBACAuthorization(HttpHeaders httpHeaders) {
     return true;
   }
 

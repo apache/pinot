@@ -58,6 +58,7 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -92,6 +93,7 @@ public class ZookeeperResource {
 
   @GET
   @Path("/zk/get")
+  @RBACAuthorization(targetType = "cluster", permission = "GetZnode")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get content of the znode")
   @ApiResponses(value = {
@@ -120,6 +122,7 @@ public class ZookeeperResource {
 
   @DELETE
   @Path("/zk/delete")
+  @RBACAuthorization(targetType = "cluster", permission = "DeleteZnode")
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete the znode at this path")
@@ -145,6 +148,7 @@ public class ZookeeperResource {
 
   @PUT
   @Path("/zk/putChildren")
+  @RBACAuthorization(targetType = "cluster", permission = "UpdateZnode")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
@@ -199,6 +203,7 @@ public class ZookeeperResource {
 
   @PUT
   @Path("/zk/put")
+  @RBACAuthorization(targetType = "cluster", permission = "UpdateZnode")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
@@ -251,6 +256,7 @@ public class ZookeeperResource {
 
   @GET
   @Path("/zk/ls")
+  @RBACAuthorization(targetType = "cluster", permission = "ListZnode")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the child znodes")
   @ApiResponses(value = {
@@ -273,6 +279,7 @@ public class ZookeeperResource {
 
   @GET
   @Path("/zk/getChildren")
+  @RBACAuthorization(targetType = "cluster", permission = "GetZnodes")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all child znodes")
   @ApiResponses(value = {
@@ -307,6 +314,7 @@ public class ZookeeperResource {
 
   @GET
   @Path("/zk/lsl")
+  @RBACAuthorization(targetType = "cluster", permission = "ListZnodes")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the child znodes along with Stats")
   @ApiResponses(value = {
@@ -330,6 +338,7 @@ public class ZookeeperResource {
 
   @GET
   @Path("/zk/stat")
+  @RBACAuthorization(targetType = "cluster", permission = "ListZnode")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the stat",
       notes = " Use this api to fetch additional details of a znode such as creation time, modified time, numChildren"

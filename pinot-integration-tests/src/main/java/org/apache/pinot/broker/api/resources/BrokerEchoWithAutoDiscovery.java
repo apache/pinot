@@ -27,6 +27,8 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.core.api.AutoLoadedServiceForTest;
+import org.apache.pinot.core.auth.RBACAuthorization;
+
 
 /**
  * This class is a typical "echo" service that will return whatever string you call GET with a path.
@@ -40,6 +42,7 @@ public class BrokerEchoWithAutoDiscovery {
     public AutoLoadedServiceForTest _injectedService;
     @GET
     @Path("/echo/{table}")
+    @RBACAuthorization(targetType = "table", targetId = "table", permission = "Echo")
     @Produces(MediaType.TEXT_PLAIN)
     public String echo(@PathParam("table") String table) {
         return _injectedService.echo(table);

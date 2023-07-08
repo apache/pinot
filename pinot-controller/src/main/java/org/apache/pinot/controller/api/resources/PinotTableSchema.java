@@ -56,9 +56,9 @@ public class PinotTableSchema {
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @GET
-  @RBACAuthorization(targetId = "tableName", targetType = "table", permission = "GetSchema")
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/schema")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetSchema")
   @ApiOperation(value = "Get table schema", notes = "Read table schema")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),

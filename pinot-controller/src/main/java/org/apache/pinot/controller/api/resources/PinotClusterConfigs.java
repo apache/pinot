@@ -52,6 +52,7 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,7 @@ public class PinotClusterConfigs {
 
   @GET
   @Path("/cluster/info")
+  @RBACAuthorization(targetType = "cluster", permission = "GetClusterInfo")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get cluster Info", notes = "Get cluster Info")
   @ApiResponses(value = {
@@ -85,6 +87,7 @@ public class PinotClusterConfigs {
 
   @GET
   @Path("/cluster/configs")
+  @RBACAuthorization(targetType = "cluster", permission = "GetClusterConfig")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List cluster configurations", notes = "List cluster level configurations")
   @ApiResponses(value = {
@@ -106,6 +109,7 @@ public class PinotClusterConfigs {
 
   @POST
   @Path("/cluster/configs")
+  @RBACAuthorization(targetType = "cluster", permission = "UpdateClusterConfig")
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)
@@ -140,6 +144,7 @@ public class PinotClusterConfigs {
 
   @DELETE
   @Path("/cluster/configs/{configName}")
+  @RBACAuthorization(targetType = "cluster", permission = "DeleteClusterConfig")
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)

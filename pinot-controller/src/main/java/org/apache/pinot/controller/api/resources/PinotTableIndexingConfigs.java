@@ -39,6 +39,7 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -62,6 +63,7 @@ public class PinotTableIndexingConfigs {
   @Deprecated
   @PUT
   @Path("/tables/{tableName}/indexingConfigs")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "UpdateConfigs")
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update table indexing configuration")
   @Produces(MediaType.APPLICATION_JSON)

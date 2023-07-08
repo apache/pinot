@@ -41,6 +41,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.core.auth.RBACAuthorization;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -63,6 +64,7 @@ public class PinotControllerHealthCheck {
 
   @GET
   @Path("pinot-controller/admin")
+  @RBACAuthorization(targetType = "cluster", permission = "GetInfo")
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)
@@ -75,6 +77,7 @@ public class PinotControllerHealthCheck {
 
   @GET
   @Path("health")
+  @RBACAuthorization(targetType = "cluster", permission = "GetInfo")
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)

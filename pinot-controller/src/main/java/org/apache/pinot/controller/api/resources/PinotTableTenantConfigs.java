@@ -41,6 +41,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +65,7 @@ public class PinotTableTenantConfigs {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebuildBrokerResourceFromHelixTags")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "RebuildBrokerResource")
   @ApiOperation(value = "Rebuild broker resource for table", notes = "when new brokers are added")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),

@@ -39,6 +39,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.core.auth.RBACAuthorization;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -66,6 +67,7 @@ public class PinotControllerAuthResource {
    */
   @GET
   @Path("auth/verify")
+  @RBACAuthorization(targetType = "cluster", permission = "GetAuth")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check whether authentication is enabled")
   @ApiResponses(value = {
@@ -87,6 +89,7 @@ public class PinotControllerAuthResource {
    */
   @GET
   @Path("auth/info")
+  @RBACAuthorization(targetType = "cluster", permission = "GetAuth")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Retrieve auth workflow info")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Auth workflow info provided")})

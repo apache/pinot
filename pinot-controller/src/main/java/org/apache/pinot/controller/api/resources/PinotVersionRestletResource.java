@@ -33,6 +33,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -48,6 +49,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 public class PinotVersionRestletResource {
 
   @GET
+  @RBACAuthorization(targetType = "cluster", permission = "GetVersion")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get version number of Pinot components")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success")})

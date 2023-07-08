@@ -32,10 +32,14 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,14 +61,19 @@ public class PinotControllerPeriodicTaskRestletResource {
   @Inject
   PeriodicTaskScheduler _periodicTaskScheduler;
 
+  @Inject
+  AccessControlFactory _accessControlFactory;
+
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
+  @ManualAuthorization
   @ApiOperation(value = "Run periodic task against table. If table name is missing, task will run against all tables.")
   public Response runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
       @ApiParam(value = "Name of the table") @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType) {
+      @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType,
+      @Context HttpHeaders httpHeaders) {
 
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
@@ -84,6 +93,13 @@ public class PinotControllerPeriodicTaskRestletResource {
       }
 
       tableName = matchingTableNamesWithType.get(0);
+      if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, "RunTask")) {
+        return Response.status(Response.Status.FORBIDDEN).build();
+      }
+    } else {
+      if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "cluster", null, "RunTask")) {
+        return Response.status(Response.Status.FORBIDDEN).build();
+      }
     }
 
     return Response.ok()
@@ -94,6 +110,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/names")
+  @RBACAuthorization(targetType = "cluster", permission = "GetTaskNames")
   @ApiOperation(value = "Get comma-delimited list of all available periodic task names.")
   public List<String> getPeriodicTaskNames() {
     return _periodicTaskScheduler.getTaskNames();

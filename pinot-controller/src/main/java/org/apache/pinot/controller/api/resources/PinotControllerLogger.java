@@ -62,6 +62,7 @@ import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.RBACAuthorization;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -85,6 +86,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLoggers")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all the loggers", notes = "Return all the logger names")
   public List<String> getLoggers() {
@@ -93,6 +95,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/{loggerName}")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLogger")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get logger configs", notes = "Return logger info")
   public Map<String, String> getLogger(
@@ -106,6 +109,7 @@ public class PinotControllerLogger {
 
   @PUT
   @Path("/loggers/{loggerName}")
+  @RBACAuthorization(targetType = "cluster", permission = "PutLogger")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Set logger level", notes = "Set logger level for a given logger")
   public Map<String, String> setLoggerLevel(@ApiParam(value = "Logger name") @PathParam("loggerName") String loggerName,
@@ -115,6 +119,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/files")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLogFiles")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all local log files")
   public Set<String> getLocalLogFiles() {
@@ -130,6 +135,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/download")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLogFile")
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Download a log file")
@@ -144,6 +150,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/instances")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLogFiles")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Collect log files from all the instances")
   public Map<String, Set<String>> getLogFilesFromAllInstances(
@@ -166,6 +173,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/instances/{instanceName}")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLogFiles")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Collect log files from a given instance")
   public Set<String> getLogFilesFromInstance(
@@ -192,6 +200,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/instances/{instanceName}/download")
+  @RBACAuthorization(targetType = "cluster", permission = "GetLogFile")
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Download a log file from a given instance")

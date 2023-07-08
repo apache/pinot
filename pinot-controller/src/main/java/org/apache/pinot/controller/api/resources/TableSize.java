@@ -42,6 +42,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.core.auth.RBACAuthorization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +70,7 @@ public class TableSize {
 
   @GET
   @Path("/tables/{tableName}/size")
+  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetSize")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Read table sizes", notes = "Get table size details. Table size is the size of untarred "
       + "segments including replication")
