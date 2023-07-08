@@ -28,7 +28,7 @@ import java.util.Properties;
  * Creates connections to Pinot, given various initialization methods.
  */
 public class ConnectionFactory {
-  private static PinotClientTransport _defaultTransport;
+  private static volatile PinotClientTransport _defaultTransport;
 
   private ConnectionFactory() {
   }
