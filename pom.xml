@@ -138,7 +138,7 @@
     <jsonpath.version>2.7.0</jsonpath.version>
     <jsonsmart.version>2.4.10</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
-    <calcite.version>1.29.0</calcite.version>
+    <calcite.version>1.30.0</calcite.version>
     <lucene.version>8.2.0</lucene.version>
     <reflections.version>0.9.11</reflections.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
