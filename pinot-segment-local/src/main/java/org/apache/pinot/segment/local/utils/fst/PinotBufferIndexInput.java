@@ -31,11 +31,11 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
  */
 public class PinotBufferIndexInput extends IndexInput {
   private final PinotDataBuffer _pinotDataBuffer;
-  private final Long _sliceOffset;
-  private final Long _length;
-  private Long _readPointerOffset;
+  private final long _sliceOffset;
+  private final long _length;
+  private long _readPointerOffset;
 
-  public PinotBufferIndexInput(PinotDataBuffer pinotDataBuffer, Long offset, Long length) {
+  public PinotBufferIndexInput(PinotDataBuffer pinotDataBuffer, long offset, long length) {
     super("");
     _pinotDataBuffer = pinotDataBuffer;
     _sliceOffset = offset;
@@ -73,7 +73,7 @@ public class PinotBufferIndexInput extends IndexInput {
   @Override
   public byte readByte()
       throws IOException {
-    Byte b = _pinotDataBuffer.getByte(_readPointerOffset);
+    byte b = _pinotDataBuffer.getByte(_readPointerOffset);
     _readPointerOffset += 1;
     return b;
   }
