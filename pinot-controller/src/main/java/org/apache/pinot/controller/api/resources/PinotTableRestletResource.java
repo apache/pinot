@@ -201,7 +201,7 @@ public class PinotTableRestletResource {
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
-      if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, "AddTable")) {
+      if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, "AddTable")) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -393,7 +393,7 @@ public class PinotTableRestletResource {
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
-      if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, stateStr)) {
+      if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, stateStr)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -574,7 +574,7 @@ public class PinotTableRestletResource {
     String endpointUrl = request.getRequestURL().toString();
     AccessControlUtils.validatePermission(tableName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, "Validate")) {
+    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, "Validate")) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -612,7 +612,7 @@ public class PinotTableRestletResource {
     String endpointUrl = request.getRequestURL().toString();
     AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schemaName, "Validate")) {
+    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schemaName, "Validate")) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 

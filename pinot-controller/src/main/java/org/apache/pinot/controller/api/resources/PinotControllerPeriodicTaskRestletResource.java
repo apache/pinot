@@ -93,11 +93,11 @@ public class PinotControllerPeriodicTaskRestletResource {
       }
 
       tableName = matchingTableNamesWithType.get(0);
-      if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, "RunTask")) {
+      if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, "RunTask")) {
         return Response.status(Response.Status.FORBIDDEN).build();
       }
     } else {
-      if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "cluster", null, "RunTask")) {
+      if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "cluster", null, "RunTask")) {
         return Response.status(Response.Status.FORBIDDEN).build();
       }
     }

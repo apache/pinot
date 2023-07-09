@@ -214,7 +214,7 @@ public class TableConfigsRestletResource {
                 accessControl);
       }
 
-      if(!accessControl.hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "AddConfigs")) {
+      if (!accessControl.hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "AddConfigs")) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -429,8 +429,7 @@ public class TableConfigsRestletResource {
               accessControl);
     }
 
-    if(!accessControl.hasRBACAccess(httpHeaders, "table", schema.getSchemaName(),
-        "ValidateConfigs")) {
+    if (!accessControl.hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "ValidateConfigs")) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 

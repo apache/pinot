@@ -234,8 +234,7 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema.getSchemaName());
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(),
-        "CreateSchema")) {
+    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "CreateSchema")) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
     SuccessResponse successResponse = addSchema(schema, override, force);
@@ -275,8 +274,7 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema.getSchemaName());
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(),
-        "CreateSchema")) {
+    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "CreateSchema")) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
     SuccessResponse successResponse = addSchema(schema, override, force);
@@ -303,8 +301,7 @@ public class PinotSchemaRestletResource {
     validateSchemaInternal(schema);
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(),
-        "ValidateSchema")) {
+    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "ValidateSchema")) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
     ObjectNode response = schema.toJsonObject();
@@ -341,8 +338,7 @@ public class PinotSchemaRestletResource {
     validateSchemaInternal(schema);
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if(!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(),
-        "ValidateSchema")) {
+    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "ValidateSchema")) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
     ObjectNode response = schema.toJsonObject();

@@ -22,6 +22,10 @@ package org.apache.pinot.core.auth;
 import javax.ws.rs.core.MultivaluedMap;
 
 public class RBACAuthUtils {
+
+    private RBACAuthUtils() {
+    }
+
     public static String getTargetId(String targetIdTemplate,
                                      MultivaluedMap<String, String> pathParams,
                                      MultivaluedMap<String, String> queryParams) {

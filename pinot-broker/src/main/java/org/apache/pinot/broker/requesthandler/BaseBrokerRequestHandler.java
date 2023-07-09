@@ -383,8 +383,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       BrokerRequest serverBrokerRequest =
           serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
       AccessControl accessControl = _accessControlFactory.create();
-      boolean hasTableAccess = accessControl.hasAccess(requesterIdentity, serverBrokerRequest) &&
-              accessControl.hasRBACAccess(requesterIdentity, "table", tableName, "query");
+      boolean hasTableAccess =
+          accessControl.hasAccess(requesterIdentity, serverBrokerRequest) && accessControl.hasRBACAccess(
+              requesterIdentity, "table", tableName, "query");
       if (!hasTableAccess) {
         _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);
