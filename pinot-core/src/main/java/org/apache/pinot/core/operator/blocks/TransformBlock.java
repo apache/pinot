@@ -54,7 +54,7 @@ public class TransformBlock implements ValueBlock {
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
       return _sourceBlock.getBlockValueSet(expression);
     } else {
-      return new TransformBlockValSet(_sourceBlock, _transformFunctionMap.get(expression), expression);
+      return new TransformBlockValSet(_sourceBlock, _transformFunctionMap.get(expression));
     }
   }
 

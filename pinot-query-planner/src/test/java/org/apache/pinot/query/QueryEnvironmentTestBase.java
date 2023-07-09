@@ -52,9 +52,11 @@ public class QueryEnvironmentTestBase {
     SCHEMA_BUILDER = new Schema.SchemaBuilder()
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
+        .addSingleValueDimension("col5", FieldSpec.DataType.BOOLEAN, false)
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
         .addMetric("col3", FieldSpec.DataType.INT, 0)
         .addMetric("col4", FieldSpec.DataType.BIG_DECIMAL, 0)
+        .addMetric("col6", FieldSpec.DataType.INT, 0)
         .setSchemaName("defaultSchemaName");
     TABLE_SCHEMAS.put("a_REALTIME", SCHEMA_BUILDER.setSchemaName("a").build());
     TABLE_SCHEMAS.put("b_REALTIME", SCHEMA_BUILDER.setSchemaName("b").build());
@@ -89,6 +91,17 @@ public class QueryEnvironmentTestBase {
             + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0"},
         new Object[]{"SELECT a.col1, a.col3 + a.ts FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'"},
         new Object[]{"SELECT SUM(a.col3), COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'"},
+        new Object[]{"SELECT AVG(a.col3), SUM(a.col3), COUNT(a.col3) FROM a"},
+        new Object[]{"SELECT a.col1, AVG(a.col3), SUM(a.col3), COUNT(a.col3) FROM a GROUP BY a.col1"},
+        new Object[]{"SELECT BOOL_AND(a.col5), BOOL_OR(a.col5) FROM a"},
+        new Object[]{"SELECT a.col3, BOOL_AND(a.col5), BOOL_OR(a.col5) FROM a GROUP BY a.col3"},
+        new Object[]{"SELECT KURTOSIS(a.col2), COUNT(DISTINCT a.col3), SKEWNESS(a.col3) FROM a"},
+        new Object[]{"SELECT a.col1, KURTOSIS(a.col2), SKEWNESS(a.col3) FROM a GROUP BY a.col1"},
+        new Object[]{"SELECT COUNT(a.col3), AVG(a.col3), SUM(a.col3), MIN(a.col3), MAX(a.col3) FROM a"},
+        new Object[]{"SELECT DISTINCTCOUNT(a.col3), COUNT(a.col4), COUNT(*), COUNT(DISTINCT a.col1) FROM a"},
+        new Object[]{"SELECT a.col2, DISTINCTCOUNT(a.col3), COUNT(a.col4), COUNT(*), COUNT(DISTINCT a.col1) FROM a "
+            + "GROUP BY a.col2 ORDER BY a.col2"},
+        new Object[]{"SELECT a.col1, SKEWNESS(a.col3), KURTOSIS(a.col3), DISTINCTCOUNT(a.col1) FROM a GROUP BY a.col1"},
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
         new Object[]{"SELECT a.col1, COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
         new Object[]{"SELECT a.col2, a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col1 = 'a' "
@@ -117,22 +130,33 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (ORDER BY a.col2, a.col1), MIN(a.col3) OVER (ORDER BY a.col2, "
             + "a.col1) FROM a"},
         new Object[]{"SELECT a.col1, ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col3) FROM a"},
+        new Object[]{"SELECT RANK() OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a"},
+        new Object[]{"SELECT col1, total, rank FROM (SELECT a.col1 as col1, count(*) as total, "
+            + "RANK() OVER(ORDER BY count(*) DESC) AS rank FROM a GROUP BY a.col1) WHERE rank < 5"},
+        new Object[]{"SELECT RANK() OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a"},
+        new Object[]{"SELECT DENSE_RANK() OVER(ORDER BY a.col1) FROM a"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (ORDER BY a.col2), MIN(a.col3) OVER (ORDER BY a.col2) FROM a"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0"
-            + " AND a.col2 = 'a' GROUP BY a.col1"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, COUNT(*) FROM a WHERE a.col3 >= 0 "
-            + "AND a.col2 = 'a' GROUP BY a.col1"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, a.col1, SUM(a.col3) FROM a WHERE a"
-            + ".col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 "
-            + "= b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col1 as v1, a.col1 as v2, AVG(a.col3) FROM"
-            + " a GROUP BY v1, v2"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) "
-            + "FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 "
-            + "AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
-        new Object[]{"SELECT /*+ skipLeafStageGroupByAggregation */ a.col2, a.col3 FROM a JOIN b ON a.col1 = b"
-            + ".col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
+        new Object[]{"SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), "
+            + "aggOptions(is_partitioned_by_group_by_keys='true') */ a.col3, a.col1, SUM(b.col3) FROM a JOIN b "
+            + "ON a.col3 = b.col3 GROUP BY a.col3, a.col1"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, COUNT(*), SUM(a.col3), "
+            + "SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 "
+            + "AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a "
+            + "WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, COUNT(*) FROM a "
+            + "WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col1, SUM(a.col3) FROM a "
+            + "WHERE a.col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, AVG(b.col3) FROM a JOIN b "
+            + "ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1 as v1, a.col1 as v2, "
+            + "AVG(a.col3) FROM a GROUP BY v1, v2"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, COUNT(*), SUM(a.col3), "
+            + "SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 "
+            + "AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
+        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col3 FROM a JOIN b "
+            + "ON a.col1 = b.col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
     };
   }
 

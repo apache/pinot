@@ -134,6 +134,7 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
+import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
@@ -335,6 +336,15 @@ public class PinotHelixResourceManager {
    */
   public String getHelixZkURL() {
     return _helixZkURL;
+  }
+
+  /**
+   * Get the tablecache object.
+   *
+   * @return TableCache object
+   */
+  public TableCache getTableCache() {
+    return _tableCache;
   }
 
   /**
@@ -3113,20 +3123,9 @@ public class PinotHelixResourceManager {
    * </ul>
    */
   public PinotResourceManagerResponse dropInstance(String instanceName) {
-    // Check if the instance is live
-    if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName)) != null) {
-      return PinotResourceManagerResponse.failure("Instance " + instanceName + " is still live");
-    }
-
-    // Check if any ideal state includes the instance
-    for (String resource : getAllResources()) {
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
-      for (String partition : idealState.getPartitionSet()) {
-        if (idealState.getInstanceSet(partition).contains(instanceName)) {
-          return PinotResourceManagerResponse.failure(
-              "Instance " + instanceName + " exists in ideal state for " + resource);
-        }
-      }
+    OperationValidationResponse check = instanceDropSafetyCheck(instanceName);
+    if (!check.isSafe()) {
+      return PinotResourceManagerResponse.failure(check.getIssueMessage(0));
     }
 
     // Remove '/INSTANCES/<instanceName>'
@@ -3146,6 +3145,31 @@ public class PinotHelixResourceManager {
     }
 
     return PinotResourceManagerResponse.success("Instance " + instanceName + " dropped");
+  }
+
+  /**
+   * Utility to perform a safety check of the operation to drop an instance.
+   * If the resource is not safe to drop the utility lists all the possible reasons.
+   * @param instanceName Pinot instance name
+   * @return {@link OperationValidationResponse}
+   */
+  public OperationValidationResponse instanceDropSafetyCheck(String instanceName) {
+    OperationValidationResponse response = new OperationValidationResponse().setInstanceName(instanceName);
+    // Check if the instance is live
+    if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName)) != null) {
+      response.putIssue(OperationValidationResponse.ErrorCode.IS_ALIVE, instanceName);
+    }
+    // Check if any ideal state includes the instance
+    getAllResources().forEach(resource -> {
+      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
+      for (String partition : idealState.getPartitionSet()) {
+        if (idealState.getInstanceSet(partition).contains(instanceName)) {
+          response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
+          break;
+        }
+      }
+    });
+    return response.setSafe(response.getIssues().isEmpty());
   }
 
   /**

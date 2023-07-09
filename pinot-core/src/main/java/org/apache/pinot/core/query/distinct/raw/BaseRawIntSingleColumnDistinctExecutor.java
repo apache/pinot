@@ -62,7 +62,7 @@ abstract class BaseRawIntSingleColumnDistinctExecutor implements DistinctExecuto
   public DistinctTable getResult() {
     DataSchema dataSchema = new DataSchema(new String[]{_expression.toString()},
         new ColumnDataType[]{ColumnDataType.fromDataTypeSV(_dataType)});
-    List<Record> records = new ArrayList<>(_valueSet.size());
+    List<Record> records = new ArrayList<>(_valueSet.size() + (_hasNull ? 1 : 0));
     IntIterator valueIterator = _valueSet.iterator();
     while (valueIterator.hasNext()) {
       records.add(new Record(new Object[]{valueIterator.nextInt()}));
@@ -70,7 +70,7 @@ abstract class BaseRawIntSingleColumnDistinctExecutor implements DistinctExecuto
     if (_hasNull) {
       records.add(new Record(new Object[]{null}));
     }
-    assert records.size() <= _limit;
+    assert records.size() - (_hasNull ? 1 : 0) <= _limit;
     return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
 

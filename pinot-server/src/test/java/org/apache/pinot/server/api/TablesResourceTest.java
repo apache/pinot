@@ -293,7 +293,7 @@ public class TablesResourceTest extends BaseResourceTest {
     for (int docId: docIds) {
       validDocIds.add(docId);
     }
-    segment.enableUpsert(upsertMetadataManager, validDocIds);
+    segment.enableUpsert(upsertMetadataManager, validDocIds, null);
 
     // Download the snapshot in byte[] format.
     Response response = _webTarget.path(snapshotPath).request().get(Response.class);

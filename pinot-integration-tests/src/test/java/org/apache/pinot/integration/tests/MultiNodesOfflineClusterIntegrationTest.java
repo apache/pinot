@@ -178,11 +178,12 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
       JsonNode exceptions = queryResult.get("exceptions");
       assertEquals(exceptions.size(), 2);
       JsonNode firstException = exceptions.get(0);
+      // NOTE:
+      // Only verify the error code but not the exception message because there can be different messages:
+      // - Connection refused
+      // - Connection reset
+      // - Channel is inactive
       assertEquals(firstException.get("errorCode").intValue(), QueryException.BROKER_REQUEST_SEND_ERROR_CODE);
-      String firstExceptionMessage = firstException.get("message").textValue();
-      assertTrue(
-          firstExceptionMessage.contains("Connection refused") || firstExceptionMessage.contains("Connection reset"),
-          "Got unexpected first exception message: " + firstExceptionMessage);
       JsonNode secondException = exceptions.get(1);
       assertEquals(secondException.get("errorCode").intValue(), QueryException.SERVER_NOT_RESPONDING_ERROR_CODE);
     } else {

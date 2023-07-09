@@ -92,7 +92,6 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -102,6 +101,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -159,10 +159,11 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
 
-  private final UpsertConfig.Mode _upsertMode;
-  private final List<String> _upsertComparisonColumns;
-  private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
+
+  private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private final List<String> _upsertComparisonColumns;
+  private final String _deleteRecordColumn;
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
   // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
   //    ids for the consuming segment.
@@ -172,6 +173,7 @@ public class MutableSegmentImpl implements MutableSegment {
   //        consumption with newer timestamp (late event in consuming segment), the record location will be updated, but
   //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
+  private final ThreadSafeMutableRoaringBitmap _queryableDocIds;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -356,22 +358,27 @@ public class MutableSegmentImpl implements MutableSegment {
       realtimeLuceneIndexRefreshState.addRealtimeReadersToQueue(_realtimeLuceneReaders);
     }
 
-    // init upsert-related data structure
-    _upsertMode = config.getUpsertMode();
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
 
-    if (isUpsertEnabled()) {
+    _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
+    if (_partitionUpsertMetadataManager != null) {
       Preconditions.checkState(!isAggregateMetricsEnabled(),
           "Metrics aggregation and upsert cannot be enabled together");
-      _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
-      _validDocIds = new ThreadSafeMutableRoaringBitmap();
       List<String> upsertComparisonColumns = config.getUpsertComparisonColumns();
       _upsertComparisonColumns =
           upsertComparisonColumns != null ? upsertComparisonColumns : Collections.singletonList(_timeColumnName);
+      _deleteRecordColumn = config.getUpsertDeleteRecordColumn();
+      _validDocIds = new ThreadSafeMutableRoaringBitmap();
+      if (_deleteRecordColumn != null) {
+        _queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+      } else {
+        _queryableDocIds = null;
+      }
     } else {
-      _partitionUpsertMetadataManager = null;
-      _validDocIds = null;
       _upsertComparisonColumns = null;
+      _deleteRecordColumn = null;
+      _validDocIds = null;
+      _queryableDocIds = null;
     }
   }
 
@@ -459,21 +466,18 @@ public class MutableSegmentImpl implements MutableSegment {
     boolean canTakeMore;
     int numDocsIndexed = _numDocsIndexed;
 
-    RecordInfo recordInfo = null;
-
-    if (isDedupEnabled() || isUpsertEnabled()) {
-      recordInfo = getRecordInfo(row, numDocsIndexed);
-    }
-
-    if (isDedupEnabled() && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo.getPrimaryKey(),
-        this)) {
-      if (_serverMetrics != null) {
-        _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
+    if (isDedupEnabled()) {
+      PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+      if (_partitionDedupMetadataManager.checkRecordPresentOrUpdate(primaryKey, this)) {
+        if (_serverMetrics != null) {
+          _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
+        }
+        return true;
       }
-      return true;
     }
 
     if (isUpsertEnabled()) {
+      RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
       updateDictionary(updatedRow);
       addNewRow(numDocsIndexed, updatedRow);
@@ -512,7 +516,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private boolean isUpsertEnabled() {
-    return _upsertMode != UpsertConfig.Mode.NONE;
+    return _partitionUpsertMetadataManager != null;
   }
 
   private boolean isDedupEnabled() {
@@ -521,22 +525,18 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
-
-    if (isUpsertEnabled()) {
-      if (_upsertComparisonColumns.size() > 1) {
-        return multiComparisonRecordInfo(primaryKey, docId, row);
-      }
-      Comparable comparisonValue = (Comparable) row.getValue(_upsertComparisonColumns.get(0));
-      return new RecordInfo(primaryKey, docId, comparisonValue);
-    }
-
-    return new RecordInfo(primaryKey, docId, null);
+    Comparable comparisonValue = getComparisonValue(row);
+    boolean deleteRecord = _deleteRecordColumn != null && BooleanUtils.toBoolean(row.getValue(_deleteRecordColumn));
+    return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
   }
 
-  private RecordInfo multiComparisonRecordInfo(PrimaryKey primaryKey, int docId, GenericRow row) {
+  private Comparable getComparisonValue(GenericRow row) {
     int numComparisonColumns = _upsertComparisonColumns.size();
-    Comparable[] comparisonValues = new Comparable[numComparisonColumns];
+    if (numComparisonColumns == 1) {
+      return (Comparable) row.getValue(_upsertComparisonColumns.get(0));
+    }
 
+    Comparable[] comparisonValues = new Comparable[numComparisonColumns];
     int comparableIndex = -1;
     for (int i = 0; i < numComparisonColumns; i++) {
       String columnName = _upsertComparisonColumns.get(i);
@@ -557,9 +557,8 @@ public class MutableSegmentImpl implements MutableSegment {
         comparisonValues[i] = (Comparable) comparisonValue;
       }
     }
-    Preconditions.checkState(comparableIndex != -1,
-        "Documents must have exactly 1 non-null comparison column value");
-    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues, comparableIndex));
+    Preconditions.checkState(comparableIndex != -1, "Documents must have exactly 1 non-null comparison column value");
+    return new ComparisonColumns(comparisonValues, comparableIndex);
   }
 
   private void updateDictionary(GenericRow row) {
@@ -861,6 +860,12 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public ThreadSafeMutableRoaringBitmap getValidDocIds() {
     return _validDocIds;
+  }
+
+  @Nullable
+  @Override
+  public ThreadSafeMutableRoaringBitmap getQueryableDocIds() {
+    return _queryableDocIds;
   }
 
   @Override

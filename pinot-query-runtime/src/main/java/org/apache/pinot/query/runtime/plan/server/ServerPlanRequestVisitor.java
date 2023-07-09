@@ -43,6 +43,7 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -109,8 +110,9 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       staticSide = node.getInputs().get(1);
     }
     staticSide.visit(this, context);
-    int resultMapId = context.getPipelineBreakerResult().getNodeIdMap().get(dynamicSide);
-    List<TransferableBlock> transferableBlocks = context.getPipelineBreakerResult().getResultMap().getOrDefault(
+    PipelineBreakerResult pipelineBreakerResult = context.getPlanContext().getPipelineBreakerResult();
+    int resultMapId = pipelineBreakerResult.getNodeIdMap().get(dynamicSide);
+    List<TransferableBlock> transferableBlocks = pipelineBreakerResult.getResultMap().getOrDefault(
         resultMapId, Collections.emptyList());
     List<Object[]> resultDataContainer = new ArrayList<>();
     DataSchema dataSchema = dynamicSide.getDataSchema();

@@ -29,8 +29,6 @@ public class PhysicalPlanContext {
   protected final MailboxService _mailboxService;
   protected final long _requestId;
   protected final int _stageId;
-  // TODO: Timeout is not needed since deadline is already present.
-  private final long _timeoutMs;
   private final long _deadlineMs;
   protected final VirtualServerAddress _server;
   protected final StageMetadata _stageMetadata;
@@ -39,13 +37,12 @@ public class PhysicalPlanContext {
   private final OpChainExecutionContext _opChainExecutionContext;
   private final boolean _traceEnabled;
 
-  public PhysicalPlanContext(MailboxService mailboxService, long requestId, int stageId, long timeoutMs,
-      long deadlineMs, VirtualServerAddress server, StageMetadata stageMetadata,
-      PipelineBreakerResult pipelineBreakerResult, boolean traceEnabled) {
+  public PhysicalPlanContext(MailboxService mailboxService, long requestId, int stageId, long deadlineMs,
+      VirtualServerAddress server, StageMetadata stageMetadata, PipelineBreakerResult pipelineBreakerResult,
+      boolean traceEnabled) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
-    _timeoutMs = timeoutMs;
     _deadlineMs = deadlineMs;
     _server = server;
     _stageMetadata = stageMetadata;
@@ -60,10 +57,6 @@ public class PhysicalPlanContext {
 
   public int getStageId() {
     return _stageId;
-  }
-
-  public long getTimeoutMs() {
-    return _timeoutMs;
   }
 
   public long getDeadlineMs() {

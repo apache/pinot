@@ -163,6 +163,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "brokers", "tables", "?state=" + state);
   }
 
+  public String forTenantInstancesToggle(String tenant, String tenantType, String state) {
+    return StringUtil.join("/", _baseUrl, "tenants", tenant)
+        + "?type=" + tenantType + "&state=" + state;
+  }
+
   public String forLiveBrokerTablesGet() {
     return StringUtil.join("/", _baseUrl, "tables", "livebrokers");
   }

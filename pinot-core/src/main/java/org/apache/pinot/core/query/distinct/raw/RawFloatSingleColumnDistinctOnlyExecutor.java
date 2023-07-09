@@ -36,6 +36,6 @@ public class RawFloatSingleColumnDistinctOnlyExecutor extends BaseRawFloatSingle
   @Override
   protected boolean add(float value) {
     _valueSet.add(value);
-    return _valueSet.size() >= _limit - (_hasNull ? 1 : 0);
+    return _valueSet.size() >= _limit;
   }
 }

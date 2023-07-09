@@ -25,6 +25,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -55,6 +56,9 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -335,6 +339,76 @@ public class ClusterIntegrationTestUtils {
     File indexDir = new File(segmentDir, segmentName);
     File segmentTarFile = new File(tarDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
+  }
+
+  /**
+   * Push the records from the given Avro files into a Kafka stream.
+   *
+   * @param csvFile CSV File name
+   * @param kafkaTopic Kafka topic
+   * @param partitionColumnIndex Optional Index of the partition column
+   * @throws Exception
+   */
+  public static void pushCsvIntoKafka(File csvFile, String kafkaTopic,
+      @Nullable Integer partitionColumnIndex, boolean injectTombstones, StreamDataProducer producer)
+      throws Exception {
+
+    if (injectTombstones) {
+      // publish lots of tombstones to livelock the consumer if it can't handle this properly
+      for (int i = 0; i < 1000; i++) {
+        // publish a tombstone first
+        producer.produce(kafkaTopic, Longs.toByteArray(System.currentTimeMillis()), null);
+      }
+    }
+    CSVFormat csvFormat = CSVFormat.DEFAULT.withSkipHeaderRecord(true);
+    try (CSVParser parser = CSVParser.parse(csvFile, StandardCharsets.UTF_8, csvFormat)) {
+      for (CSVRecord csv : parser) {
+        byte[] keyBytes = (partitionColumnIndex == null) ? Longs.toByteArray(System.currentTimeMillis())
+            : csv.get(partitionColumnIndex).getBytes(StandardCharsets.UTF_8);
+        List<String> cols = new ArrayList<>();
+        for (String col : csv) {
+          cols.add(col);
+        }
+        byte[] bytes = String.join(",", cols).getBytes(StandardCharsets.UTF_8);
+        producer.produce(kafkaTopic, keyBytes, bytes);
+      }
+    }
+  }
+
+  /**
+   * Push the records from the given Avro files into a Kafka stream.
+   *
+   * @param csvRecords List of CSV record string
+   * @param kafkaTopic Kafka topic
+   * @param partitionColumnIndex Optional Index of the partition column
+   * @throws Exception
+   */
+  public static void pushCsvIntoKafka(List<String> csvRecords, String kafkaTopic,
+      @Nullable Integer partitionColumnIndex, boolean injectTombstones, StreamDataProducer producer)
+      throws Exception {
+
+    if (injectTombstones) {
+      // publish lots of tombstones to livelock the consumer if it can't handle this properly
+      for (int i = 0; i < 1000; i++) {
+        // publish a tombstone first
+        producer.produce(kafkaTopic, Longs.toByteArray(System.currentTimeMillis()), null);
+      }
+    }
+    CSVFormat csvFormat = CSVFormat.DEFAULT.withSkipHeaderRecord(true);
+    for (String recordCsv: csvRecords) {
+      try (CSVParser parser = CSVParser.parse(recordCsv, csvFormat)) {
+        for (CSVRecord csv : parser) {
+          byte[] keyBytes = (partitionColumnIndex == null) ? Longs.toByteArray(System.currentTimeMillis())
+              : csv.get(partitionColumnIndex).getBytes(StandardCharsets.UTF_8);
+          List<String> cols = new ArrayList<>();
+          for (String col : csv) {
+            cols.add(col);
+          }
+          byte[] bytes = String.join(",", cols).getBytes(StandardCharsets.UTF_8);
+          producer.produce(kafkaTopic, keyBytes, bytes);
+        }
+      }
+    }
   }
 
   /**
@@ -899,11 +973,10 @@ public class ClusterIntegrationTestUtils {
   private static String removeTrailingZeroForNumber(String value, String type) {
     String upperCaseType = StringUtils.upperCase(type);
     // remove trailing zero after decimal point to compare decimal numbers with h2 data
-    if (upperCaseType.equals("FLOAT") || upperCaseType.equals("DECFLOAT")
-        || upperCaseType.equals("DOUBLE") || upperCaseType.equals("DOUBLE PRECISION")) {
+    if (upperCaseType.equals("FLOAT") || upperCaseType.equals("DECFLOAT") || upperCaseType.equals("DOUBLE")
+        || upperCaseType.equals("DOUBLE PRECISION")) {
       try {
-        String result = (new BigDecimal(value)).stripTrailingZeros().toPlainString();
-        return result + ".0";
+        return (new BigDecimal(value)).stripTrailingZeros().toPlainString();
       } catch (NumberFormatException ignored) {
         // ignoring the exception
       }

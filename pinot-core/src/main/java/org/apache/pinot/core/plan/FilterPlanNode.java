@@ -81,24 +81,33 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public BaseFilterOperator run() {
-    // NOTE: Snapshot the validDocIds before reading the numDocs to prevent the latest updates getting lost
-    ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
-    MutableRoaringBitmap validDocIdsSnapshot =
-        validDocIds != null && !_queryContext.isSkipUpsert() ? validDocIds.getMutableRoaringBitmap() : null;
+    // NOTE: Snapshot the queryableDocIds before reading the numDocs to prevent the latest updates getting lost
+    MutableRoaringBitmap queryableDocIdSnapshot = null;
+    if (!_queryContext.isSkipUpsert()) {
+      ThreadSafeMutableRoaringBitmap queryableDocIds = _indexSegment.getQueryableDocIds();
+      if (queryableDocIds != null) {
+        queryableDocIdSnapshot = queryableDocIds.getMutableRoaringBitmap();
+      } else {
+        ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
+        if (validDocIds != null) {
+          queryableDocIdSnapshot = validDocIds.getMutableRoaringBitmap();
+        }
+      }
+    }
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
 
     FilterContext filter = _filter != null ? _filter : _queryContext.getFilter();
     if (filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(filter, numDocs);
-      if (validDocIdsSnapshot != null) {
-        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(validDocIdsSnapshot, false, numDocs);
+      if (queryableDocIdSnapshot != null) {
+        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
             numDocs);
       } else {
         return filterOperator;
       }
-    } else if (validDocIdsSnapshot != null) {
-      return new BitmapBasedFilterOperator(validDocIdsSnapshot, false, numDocs);
+    } else if (queryableDocIdSnapshot != null) {
+      return new BitmapBasedFilterOperator(queryableDocIdSnapshot, false, numDocs);
     } else {
       return new MatchAllFilterOperator(numDocs);
     }
@@ -250,9 +259,8 @@ public class FilterPlanNode implements PlanNode {
               return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
               textIndexReader = dataSource.getTextIndex();
-              Preconditions
-                  .checkState(textIndexReader != null, "Cannot apply TEXT_MATCH on column: %s without text index",
-                      column);
+              Preconditions.checkState(textIndexReader != null,
+                  "Cannot apply TEXT_MATCH on column: %s without text index", column);
               // We could check for real time and segment Lucene reader, but easier to check the other way round
               if (textIndexReader instanceof NativeTextIndexReader
                   || textIndexReader instanceof NativeMutableTextIndex) {
@@ -300,8 +308,8 @@ public class FilterPlanNode implements PlanNode {
                 return new MatchAllFilterOperator(numDocs);
               }
             default:
-              predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource,
-                  _queryContext);
+              predicateEvaluator =
+                  PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
               return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs,
                   _queryContext.isNullHandlingEnabled());

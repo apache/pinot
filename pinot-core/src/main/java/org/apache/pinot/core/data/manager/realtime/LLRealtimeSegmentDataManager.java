@@ -232,6 +232,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // consuming.
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final ServerMetrics _serverMetrics;
+  private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final BooleanSupplier _isReadyToConsumeData;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset;
@@ -399,13 +400,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
     // anymore. Remove the file if it exists.
     removeSegmentFile();
-
-    if (!_isReadyToConsumeData.getAsBoolean()) {
-      do {
-        //noinspection BusyWait
-        Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
-      } while (!_shouldStop && !endCriteriaReached() && !_isReadyToConsumeData.getAsBoolean());
-    }
 
     _numRowsErrored = 0;
     final long idlePipeSleepTimeMillis = 100;
@@ -662,6 +656,27 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       long catchUpTimeMillis = 0L;
       _startTimeMs = now();
       try {
+        if (!_isReadyToConsumeData.getAsBoolean()) {
+          do {
+            //noinspection BusyWait
+            Thread.sleep(RealtimeTableDataManager.READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS);
+          } while (!_shouldStop && !_isReadyToConsumeData.getAsBoolean());
+        }
+
+        // TODO:
+        //   When reaching here, the current consuming segment has already acquired the consumer semaphore, but there is
+        //   no guarantee that the previous consuming segment is already persisted (replaced with immutable segment). It
+        //   can potentially cause the following problems:
+        //   1. The snapshot for the previous consuming segment might not be taken since it is not persisted yet
+        //   2. If the previous consuming segment is dropped but immutable segment is not downloaded and replaced yet,
+        //      it might cause inconsistency (especially for partial upsert because events are not consumed in sequence)
+        //   To address this problem, we should consider releasing the consumer semaphore after the consuming segment is
+        //   persisted.
+        // Take upsert snapshot before starting consuming events
+        if (_partitionUpsertMetadataManager != null) {
+          _partitionUpsertMetadataManager.takeSnapshot();
+        }
+
         while (!_state.isFinal()) {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
@@ -687,7 +702,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           _state = State.HOLDING;
           SegmentCompletionProtocol.Response response = postSegmentConsumedMsg();
           SegmentCompletionProtocol.ControllerResponseStatus status = response.getStatus();
-          StreamPartitionMsgOffset rspOffset = extractOffset(response);
           boolean success;
           switch (status) {
             case NOT_LEADER:
@@ -696,6 +710,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               hold();
               break;
             case CATCH_UP:
+              StreamPartitionMsgOffset rspOffset = extractOffset(response);
               if (rspOffset.compareTo(_currentOffset) <= 0) {
                 // Something wrong with the controller. Back off and try again.
                 _segmentLogger.error("Invalid catchup offset {} in controller response, current offset {}", rspOffset,
@@ -863,7 +878,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("Get Partition Lag State");
     }
-    ;
     return _partitionMetadataProvider.getCurrentPartitionLagState(consumerPartitionStateMap);
   }
 
@@ -1309,6 +1323,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _serverMetrics = serverMetrics;
+    _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _isReadyToConsumeData = isReadyToConsumeData;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getServerInstance();
@@ -1410,6 +1425,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setUpsertComparisonColumns(tableConfig.getUpsertComparisonColumns())
+            .setUpsertDeleteRecordColumn(tableConfig.getUpsertDeleteRecordColumn())
             .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder

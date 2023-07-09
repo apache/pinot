@@ -91,21 +91,14 @@ public class OpChainTest {
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
     _serverAddress = new VirtualServerAddress("localhost", 123, 0);
-    _receivingStageMetadata = new StageMetadata.Builder()
-        .setWorkerMetadataList(Stream.of(_serverAddress).map(
-            s -> new WorkerMetadata.Builder()
-                .setVirtualServerAddress(s)
-                .addMailBoxInfoMap(0, new MailboxMetadata(
-                    ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
-                    ImmutableList.of(s), ImmutableMap.of()))
-                .addMailBoxInfoMap(1, new MailboxMetadata(
-                    ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
-                    ImmutableList.of(s), ImmutableMap.of()))
-                .addMailBoxInfoMap(2, new MailboxMetadata(
-                    ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
-                    ImmutableList.of(s), ImmutableMap.of()))
-                .build()).collect(Collectors.toList()))
-        .build();
+    _receivingStageMetadata = new StageMetadata.Builder().setWorkerMetadataList(Stream.of(_serverAddress).map(
+        s -> new WorkerMetadata.Builder().setVirtualServerAddress(s).addMailBoxInfoMap(0,
+            new MailboxMetadata(ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)), ImmutableList.of(s),
+                ImmutableMap.of())).addMailBoxInfoMap(1,
+            new MailboxMetadata(ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)), ImmutableList.of(s),
+                ImmutableMap.of())).addMailBoxInfoMap(2,
+            new MailboxMetadata(ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)), ImmutableList.of(s),
+                ImmutableMap.of())).build()).collect(Collectors.toList())).build();
 
     when(_mailboxService1.getReceivingMailbox(any())).thenReturn(_mailbox1);
     when(_mailboxService2.getReceivingMailbox(any())).thenReturn(_mailbox2);
@@ -198,9 +191,8 @@ public class OpChainTest {
 
     int receivedStageId = 2;
     int senderStageId = 1;
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, true);
+    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress,
+        System.currentTimeMillis() + 1000, _receivingStageMetadata, null, true);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -214,7 +206,7 @@ public class OpChainTest {
 
     OpChainExecutionContext secondStageContext =
         new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress,
-            1000, System.currentTimeMillis() + 1000, _receivingStageMetadata, true);
+            System.currentTimeMillis() + 1000, _receivingStageMetadata, null, true);
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId + 1);
@@ -238,9 +230,8 @@ public class OpChainTest {
 
     int receivedStageId = 2;
     int senderStageId = 1;
-    OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, false);
+    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress,
+        System.currentTimeMillis() + 1000, _receivingStageMetadata, null, false);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
@@ -251,8 +242,8 @@ public class OpChainTest {
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, 1000,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, false);
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress,
+            System.currentTimeMillis() + 1000, _receivingStageMetadata, null, false);
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId);
 
@@ -290,8 +281,8 @@ public class OpChainTest {
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
         new SelectionResultsBlock(upStreamSchema, Arrays.asList(new Object[]{1}, new Object[]{2})), queryContext));
     LeafStageTransferableBlockOperator leafOp = new LeafStageTransferableBlockOperator(context,
-            LeafStageTransferableBlockOperatorTest.getStaticBlockProcessor(resultsBlockList),
-            Collections.singletonList(mock(ServerQueryRequest.class)), upStreamSchema);
+        LeafStageTransferableBlockOperatorTest.getStaticBlockProcessor(resultsBlockList),
+        Collections.singletonList(mock(ServerQueryRequest.class)), upStreamSchema);
 
     //Transform operator
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);

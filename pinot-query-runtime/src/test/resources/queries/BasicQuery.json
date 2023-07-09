@@ -61,6 +61,11 @@
       {
         "description": "Correlated subquery test",
         "sql": "SELECT {tbl1}.col1 FROM {tbl1} WHERE {tbl1}.col2 > (SELECT 0.5 * SUM({tbl2}.col3) FROM {tbl2} WHERE {tbl1}.col2 = {tbl1}.col2 AND {tbl1}.col1 = {tbl2}.col1)"
+      },
+      {
+        "description": "Lateral join query test",
+        "sql": "SELECT {tbl1}.col1, newb.sum_col3 FROM {tbl1} JOIN LATERAL (SELECT SUM(col3) as sum_col3 FROM {tbl2} WHERE col2 = {tbl1}.col2) AS newb ON TRUE",
+        "h2Sql": "SELECT {tbl1}.col1, newb.sum_col3 FROM {tbl1} JOIN (SELECT {tbl2}.col2, SUM({tbl2}.col3) AS sum_col3 FROM {tbl2} GROUP BY {tbl2}.col2) AS newb ON newb.col2 = {tbl1}.col2"
       }
     ],
     "extraProps": {

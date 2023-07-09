@@ -21,6 +21,7 @@ package org.apache.pinot.query;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -233,7 +234,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       throws Exception {
     // Hinting the query to use final stage aggregation makes server directly return final result
     // This is useful when data is already partitioned by col1
-    String query = "SELECT /*+ aggFinalStage */ col1, COUNT(*) FROM b GROUP BY col1";
+    String query = "SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ col1, COUNT(*) FROM b GROUP BY col1";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
     Assert.assertEquals(dispatchableSubPlan.getQueryStageList().size(), 2);
     for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
@@ -251,6 +252,112 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
       }
     }
+  }
+
+  @Test
+  public void testGetTableNamesForQuery() {
+    // A simple filter query with one table
+    String query = "Select * from a where col1 = 'a'";
+    List<String> tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 1);
+    Assert.assertEquals(tableNames.get(0), "a");
+
+    // query with IN / NOT IN clause
+    query = "SELECT COUNT(*) FROM a WHERE col1 IN (SELECT col1 FROM b) "
+        + "and col1 NOT IN (SELECT col1 from c)";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 3);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+    Assert.assertEquals(tableNames.get(2), "c");
+
+    // query with JOIN clause
+    query = "SELECT a.col1, b.col2 FROM a JOIN b ON a.col3 = b.col3 WHERE a.col1 = 'a'";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // query with WHERE clause JOIN
+    query = "SELECT a.col1, b.col2 FROM a, b WHERE a.col3 = b.col3 AND a.col1 = 'a'";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // query with JOIN clause and table alias
+    query = "SELECT A.col1, B.col2 FROM a AS A JOIN b AS B ON A.col3 = B.col3 WHERE A.col1 = 'a'";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // query with UNION clause
+    query = "SELECT * FROM a UNION ALL SELECT * FROM b UNION ALL SELECT * FROM c";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 3);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+    Assert.assertEquals(tableNames.get(2), "c");
+
+    // query with UNION clause and table alias
+    query = "SELECT * FROM (SELECT * FROM a) AS t1 UNION SELECT * FROM ( SELECT * FROM b) AS t2";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // query with UNION clause and table alias using WITH clause
+    query = "WITH tmp1 AS (SELECT * FROM a), \n"
+        + "tmp2 AS (SELECT * FROM b) \n"
+        + "SELECT * FROM tmp1 UNION ALL SELECT * FROM tmp2";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // query with aliases, JOIN, IN/NOT-IN, group-by
+    query = "with tmp as (select col1, sum(col3) as col3, count(*) from a where col1 = 'a' group by col1), "
+        + "tmp2 as (select A.col1, B.col3 from b as A JOIN c AS B on A.col1 = B.col1) "
+        + "select sum(col3) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from d)";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 4);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+    Assert.assertEquals(tableNames.get(2), "c");
+    Assert.assertEquals(tableNames.get(3), "d");
+
+    // query with aliases, JOIN, IN/NOT-IN, group-by and explain
+    query = "explain plan for with tmp as (select col1, sum(col3) as col3, count(*) from a where col1 = 'a' "
+        + "group by col1), tmp2 as (select A.col1, B.col3 from b as A JOIN c AS B on A.col1 = B.col1) "
+        + "select sum(col3) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from d)";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 4);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+    Assert.assertEquals(tableNames.get(2), "c");
+    Assert.assertEquals(tableNames.get(3), "d");
+
+    // lateral join query
+    query = "EXPLAIN PLAN FOR SELECT a.col1, newb.sum_col3 FROM a JOIN LATERAL "
+        + "(SELECT SUM(col3) as sum_col3 FROM b WHERE col2 = a.col2) AS newb ON TRUE";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // test for self join queries
+    query = "SELECT a.col1 FROM a JOIN(SELECT col2 FROM a) as self ON a.col1=self.col2 ";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 1);
+    Assert.assertEquals(tableNames.get(0), "a");
   }
 
   // --------------------------------------------------------------------------
@@ -330,6 +437,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
               "Execution Plan\n"
             + "digraph {\n"
+            + "\"LogicalAggregate\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
             + "\"PinotLogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
             + "\"LogicalAggregate\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
             + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"

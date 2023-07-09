@@ -36,6 +36,8 @@ public class JoinNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RexExpression> _joinClause;
   @ProtoProperties
+  private boolean _isColocatedJoin;
+  @ProtoProperties
   private List<String> _leftColumnNames;
   @ProtoProperties
   private List<String> _rightColumnNames;
@@ -45,13 +47,14 @@ public class JoinNode extends AbstractPlanNode {
   }
 
   public JoinNode(int planFragmentId, DataSchema dataSchema, DataSchema leftSchema, DataSchema rightSchema,
-      JoinRelType joinRelType, JoinKeys joinKeys, List<RexExpression> joinClause) {
+      JoinRelType joinRelType, JoinKeys joinKeys, List<RexExpression> joinClause, boolean isColocatedJoin) {
     super(planFragmentId, dataSchema);
     _leftColumnNames = Arrays.asList(leftSchema.getColumnNames());
     _rightColumnNames = Arrays.asList(rightSchema.getColumnNames());
     _joinRelType = joinRelType;
     _joinKeys = joinKeys;
     _joinClause = joinClause;
+    _isColocatedJoin = isColocatedJoin;
   }
 
   public JoinRelType getJoinRelType() {
@@ -64,6 +67,10 @@ public class JoinNode extends AbstractPlanNode {
 
   public List<RexExpression> getJoinClauses() {
     return _joinClause;
+  }
+
+  public boolean isColocatedJoin() {
+    return _isColocatedJoin;
   }
 
   public List<String> getLeftColumnNames() {

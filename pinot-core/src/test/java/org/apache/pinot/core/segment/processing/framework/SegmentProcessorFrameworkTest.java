@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -204,7 +205,8 @@ public class SegmentProcessorFrameworkTest {
 
     SegmentProcessorConfig config =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema).build();
-    SegmentProcessorFramework framework = new SegmentProcessorFramework(config, workingDir, List.of(reader));
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(config, workingDir, ImmutableList.of(reader),
+        null);
     List<File> outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);

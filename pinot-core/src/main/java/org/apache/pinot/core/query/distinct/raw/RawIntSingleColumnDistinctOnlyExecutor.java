@@ -36,6 +36,6 @@ public class RawIntSingleColumnDistinctOnlyExecutor extends BaseRawIntSingleColu
   @Override
   protected boolean add(int val) {
     _valueSet.add(val);
-    return (_valueSet.size() >= _limit - (_hasNull ? 1 : 0));
+    return (_valueSet.size() >= _limit);
   }
 }

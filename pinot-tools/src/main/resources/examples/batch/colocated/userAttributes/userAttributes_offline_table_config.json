@@ -3,37 +3,13 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "userAttributes",
     "replication": 2
   },
-  "instanceAssignmentConfigMap": {
-    "OFFLINE": {
-      "tagPoolConfig": {
-        "tag": "DefaultTenant_OFFLINE",
-        "poolBased": false,
-        "numPools": 0
-      },
-      "replicaGroupPartitionConfig": {
-        "replicaGroupBased": true,
-        "numInstances": 0,
-        "numReplicaGroups": 2,
-        "numInstancesPerReplicaGroup": 2,
-        "numPartitions": 2,
-        "numInstancesPerPartition": 1,
-        "minimizeDataMovement": false,
-        "partitionColumn": "userUUID"
-      },
-      "partitionSelector": "INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR"
-    }
-  },
-  "routing": {
-    "instanceSelectorType": "multiStageReplicaGroup"
-  },
   "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
   },
   "tableIndexConfig": {
-    "loadMode": "HEAP",
     "invertedIndexColumns": [
       "userUUID"
     ],
@@ -45,6 +21,24 @@
         }
       }
     }
+  },
+  "instanceAssignmentConfigMap": {
+    "OFFLINE": {
+      "tagPoolConfig": {
+        "tag": "DefaultTenant_OFFLINE"
+      },
+      "replicaGroupPartitionConfig": {
+        "replicaGroupBased": true,
+        "numReplicaGroups": 2,
+        "numInstancesPerReplicaGroup": 2,
+        "numPartitions": 2,
+        "numInstancesPerPartition": 1,
+        "partitionColumn": "userUUID"
+      }
+    }
+  },
+  "routing": {
+    "instanceSelectorType": "multiStageReplicaGroup"
   },
   "metadata": {
     "customConfigs": {

@@ -32,13 +32,17 @@ import org.apache.http.HttpHeaders;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MinionMeter;
+import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
@@ -60,6 +64,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   // Tracking finer grained progress status.
   protected PinotTaskConfig _pinotTaskConfig;
   protected MinionEventObserver _eventObserver;
+  protected final MinionMetrics _minionMetrics = MinionContext.getInstance().getMinionMetrics();
 
   /**
    * Converts the segment based on the given task config and returns the conversion result.
@@ -101,7 +106,14 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       _eventObserver.notifyProgress(_pinotTaskConfig, "Downloading segment from: " + downloadURL);
       File tarredSegmentFile = new File(tempDataDir, "tarredSegment");
       LOGGER.info("Downloading segment from {} to {}", downloadURL, tarredSegmentFile.getAbsolutePath());
-      SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadURL, tarredSegmentFile, crypterName);
+      try {
+        SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadURL, tarredSegmentFile, crypterName);
+      } catch (Exception e) {
+        _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
+        LOGGER.error("Segment download failed for {}, crypter:{}", downloadURL, crypterName, e);
+        _eventObserver.notifyTaskError(_pinotTaskConfig, e);
+        Utils.rethrowException(e);
+      }
 
       // Un-tar the segment file
       _eventObserver.notifyProgress(_pinotTaskConfig, "Decompressing segment from: " + downloadURL);
@@ -177,13 +189,24 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
 
       // Upload the tarred segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Uploading segment: " + segmentName);
-      SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, segmentName, uploadURL,
-          convertedTarredSegmentFile);
+      boolean uploadSuccessful = true;
+      try {
+        SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, segmentName,
+            uploadURL, convertedTarredSegmentFile);
+      } catch (Exception e) {
+        uploadSuccessful = false;
+        _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT, 1L);
+        LOGGER.error("Segment upload failed for segment {}, table {}", segmentName, tableNameWithType, e);
+        _eventObserver.notifyTaskError(_pinotTaskConfig, e);
+      }
       if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
         LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
       }
 
-      LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
+      if (uploadSuccessful) {
+        LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
+      }
+
       return segmentConversionResult;
     } finally {
       FileUtils.deleteQuietly(tempDataDir);

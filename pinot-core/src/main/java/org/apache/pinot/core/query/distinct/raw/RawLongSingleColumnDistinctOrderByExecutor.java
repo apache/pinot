@@ -45,7 +45,7 @@ public class RawLongSingleColumnDistinctOrderByExecutor extends BaseRawLongSingl
   @Override
   protected boolean add(long value) {
     if (!_valueSet.contains(value)) {
-      if (_valueSet.size() < _limit - (_hasNull ? 1 : 0)) {
+      if (_valueSet.size() < _limit) {
         _valueSet.add(value);
         _priorityQueue.enqueue(value);
       } else {

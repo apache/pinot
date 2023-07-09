@@ -122,22 +122,23 @@
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.9.2</avro.version>
-    <parquet.version>1.11.1</parquet.version>
+    <parquet.version>1.11.2</parquet.version>
     <helix.version>1.0.4</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.12.7</jackson.version>
+    <jackson-databind.version>2.12.7.1</jackson-databind.version>
     <zookeeper.version>3.6.3</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
-    <jersey.version>2.35</jersey.version>
+    <jersey.version>2.39</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.6.1</hk2.version>
-    <swagger.version>1.6.6</swagger.version>
+    <swagger.version>1.6.9</swagger.version>
     <hadoop.version>2.10.1</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.7.0</jsonpath.version>
     <jsonsmart.version>2.4.10</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
-    <calcite.version>1.29.0</calcite.version>
+    <calcite.version>1.30.0</calcite.version>
     <lucene.version>8.2.0</lucene.version>
     <reflections.version>0.9.11</reflections.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
@@ -148,11 +149,11 @@
     <commons-net.version>3.1</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
-    <snappy-java.version>1.1.8.2</snappy-java.version>
+    <snappy-java.version>1.1.10.1</snappy-java.version>
     <zstd-jni.version>1.5.2-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <log4j.version>2.17.1</log4j.version>
-    <netty.version>4.1.79.Final</netty.version>
+    <netty.version>4.1.94.Final</netty.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.16.1</jts.version>
     <h3.version>4.1.1</h3.version>
@@ -734,6 +735,13 @@
         <scope>import</scope>
         <type>pom</type>
       </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson-databind.version}</version>
+        <scope>import</scope>
+        <type>pom</type>
+      </dependency>
 
       <!-- Hadoop -->
       <dependency>
@@ -900,7 +908,7 @@
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>3.3.0</version>
+        <version>4.0.0</version>
       </dependency>
       <dependency>
         <groupId>com.tdunning</groupId>
@@ -993,7 +1001,7 @@
       <dependency>
         <groupId>com.jcabi</groupId>
         <artifactId>jcabi-log</artifactId>
-        <version>0.17.1</version>
+        <version>0.18.1</version>
       </dependency>
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
@@ -1131,7 +1139,7 @@
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>2.1.214</version>
+        <version>2.2.220</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
@@ -1642,6 +1650,7 @@
             <exclude>**/*.generated</exclude>
             <exclude>**/*.json</exclude>
             <exclude>**/*.schema</exclude>
+            <exclude>**/*.sql</exclude>
 
             <!-- JDBC Drivers -->
             <exclude>**/java.sql.*</exclude>
@@ -1755,6 +1764,7 @@
             <exclude>**/*.generated</exclude>
             <exclude>**/*.json</exclude>
             <exclude>**/*.schema</exclude>
+            <exclude>**/*.sql</exclude>
 
             <!-- JDBC Drivers -->
             <exclude>**/java.sql.*</exclude>

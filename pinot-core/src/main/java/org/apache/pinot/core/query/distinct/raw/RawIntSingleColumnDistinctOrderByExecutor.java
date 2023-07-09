@@ -45,7 +45,7 @@ public class RawIntSingleColumnDistinctOrderByExecutor extends BaseRawIntSingleC
   @Override
   protected boolean add(int value) {
     if (!_valueSet.contains(value)) {
-      if (_valueSet.size() < _limit - (_hasNull ? 1 : 0)) {
+      if (_valueSet.size() < _limit) {
         _valueSet.add(value);
         _priorityQueue.enqueue(value);
       } else {

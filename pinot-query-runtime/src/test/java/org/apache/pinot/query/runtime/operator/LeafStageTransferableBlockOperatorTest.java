@@ -33,7 +33,6 @@ import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -210,7 +209,7 @@ public class LeafStageTransferableBlockOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"intCol", "strCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new DistinctResultsBlock(mock(DistinctAggregationFunction.class), new DistinctTable(schema,
+        new DistinctResultsBlock(new DistinctTable(schema,
             Arrays.asList(new Record(new Object[]{1, "foo"}), new Record(new Object[]{2, "bar"})))), queryContext));
     LeafStageTransferableBlockOperator operator =
         new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
@@ -232,7 +231,7 @@ public class LeafStageTransferableBlockOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
     List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new DistinctResultsBlock(mock(DistinctAggregationFunction.class), new DistinctTable(schema,
+        new DistinctResultsBlock(new DistinctTable(schema,
             Arrays.asList(new Record(new Object[]{"foo", 1}), new Record(new Object[]{"bar", 2})))), queryContext));
     LeafStageTransferableBlockOperator operator =
         new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
@@ -348,9 +347,9 @@ public class LeafStageTransferableBlockOperatorTest {
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
 
     // When:
-    List<InstanceResponseBlock> responseBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new DistinctResultsBlock(mock(DistinctAggregationFunction.class),
-            new DistinctTable(resultSchema, Collections.emptyList())), queryContext));
+    List<InstanceResponseBlock> responseBlockList = Collections.singletonList(
+        new InstanceResponseBlock(new DistinctResultsBlock(new DistinctTable(resultSchema, Collections.emptyList())),
+            queryContext));
     LeafStageTransferableBlockOperator operator =
         new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
             getStaticBlockProcessor(responseBlockList), getStaticServerQueryRequests(responseBlockList.size()),

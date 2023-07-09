@@ -80,13 +80,7 @@ public class PinotStatement extends AbstractBaseStatement {
   public boolean execute(String sql)
       throws SQLException {
     _resultSet = executeQuery(sql);
-    if (_resultSet.next()) {
-      _resultSet.beforeFirst();
-      return true;
-    } else {
-      _resultSet = null;
-      return false;
-    }
+    return _resultSet != null;
   }
 
   @Override

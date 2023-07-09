@@ -167,8 +167,11 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
             join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
             ImmutableList.copyOf(join.getSystemFieldList()));
     // adding pass-through exchange after join b/c currently leaf-stage doesn't support chaining operator(s) after JOIN
-    PinotLogicalExchange passThroughAfterJoinExchange =
-        PinotLogicalExchange.create(dynamicFilterJoin, RelDistributions.SINGLETON);
+    // TODO: support pass-through for singleton again when non-colocated.
+    // TODO: this is b/c #10886 alters the singleton exchange and it no longer works if join is not colocated.
+    PinotLogicalExchange passThroughAfterJoinExchange = isColocatedJoin
+        ? PinotLogicalExchange.create(dynamicFilterJoin, RelDistributions.SINGLETON)
+        : PinotLogicalExchange.create(dynamicFilterJoin, RelDistributions.hash(join.analyzeCondition().leftKeys));
     call.transformTo(passThroughAfterJoinExchange);
   }
 }
