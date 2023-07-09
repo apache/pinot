@@ -35,7 +35,6 @@
   <url>https://pinot.apache.org</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <aws.sdk.version>2.20.87</aws.sdk.version>
     <http.client.version>4.5.13</http.client.version>
     <http.core.version>4.4.13</http.core.version>
     <s3mock.version>2.12.2</s3mock.version>

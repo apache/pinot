@@ -35,9 +35,6 @@
 
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <localstack-utils.version>0.2.11</localstack-utils.version>
-    <awaitility.version>3.0.0</awaitility.version>
-    <aws.sdk.version>2.20.83</aws.sdk.version>
   </properties>
 
   <build>

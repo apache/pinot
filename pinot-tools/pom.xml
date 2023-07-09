@@ -33,7 +33,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <aws.version>2.20.87</aws.version>
     <scala.version>2.12</scala.version>
     <spark.version>3.2.1</spark.version>
     <airlift.version>0.16</airlift.version>
@@ -189,12 +188,12 @@
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>sdk-core</artifactId>
-      <version>${aws.version}</version>
+      <version>${aws.sdk.version}</version>
     </dependency>
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>s3</artifactId>
-      <version>${aws.version}</version>
+      <version>${aws.sdk.version}</version>
     </dependency>
     <dependency>
       <groupId>org.reactivestreams</groupId>
