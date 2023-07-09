@@ -22,11 +22,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -51,7 +54,7 @@ public class RequestUtils {
   }
 
   public static SqlNodeAndOptions parseQuery(String query)
-          throws SqlCompilationException {
+      throws SqlCompilationException {
     return parseQuery(query, EMPTY_OBJECT_NODE);
   }
 
@@ -265,11 +268,19 @@ public class RequestUtils {
     return null;
   }
 
-  public static String getTableName(PinotQuery pinotQuery) {
-    while (pinotQuery.getDataSource().getSubquery() != null) {
-      pinotQuery = pinotQuery.getDataSource().getSubquery();
+  private static Set<String> getTableNames(DataSource dataSource) {
+    if (dataSource.getSubquery() != null) {
+      return getTableNames(dataSource.getSubquery());
+    } else if (dataSource.isSetJoin()) {
+      return ImmutableSet.<String>builder()
+          .addAll(getTableNames(dataSource.getJoin().getLeft()))
+          .addAll(getTableNames(dataSource.getJoin().getLeft())).build();
     }
-    return pinotQuery.getDataSource().getTableName();
+    return ImmutableSet.of(dataSource.getTableName());
+  }
+
+  public static Set<String> getTableNames(PinotQuery pinotQuery) {
+    return getTableNames(pinotQuery.getDataSource());
   }
 
   public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {
