@@ -28,8 +28,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.GET;
@@ -53,7 +51,6 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("instance")
 public class InstanceResource {
-    private final ScheduledExecutorService _executorService = Executors.newScheduledThreadPool(3);
     @Inject
     @Named(AdminApiApplication.SERVER_INSTANCE_ID)
     private String _instanceId;
