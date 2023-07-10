@@ -45,7 +45,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 /**
  * This resource API can be used to retrieve instance level information like instance tags
  */
-@Api(value = "instance-tags", description = "Instance tags", tags = "instance-tags",
+@Api(description = "Metadata for this instance (like tenant tags)", tags = "instance",
     authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
@@ -63,7 +63,6 @@ public class InstanceResource {
     @ApiResponses(value = {
             @ApiResponse(code = 200, message = "Success"),
             @ApiResponse(code = 500, message = "Internal server error"),
-            @ApiResponse(code = 404, message = "Table not found")
     })
     @Produces(MediaType.APPLICATION_JSON)
     public List<String> getInstanceTags() {
