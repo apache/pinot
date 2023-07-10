@@ -196,14 +196,11 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     String bufferPeriod = compactionConfigs.getOrDefault(
         UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
     long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
-    long minRecordCount =
-        Long.parseLong(compactionConfigs.getOrDefault(UpsertCompactionTask.MIN_RECORD_COUNT,
-            String.valueOf(DEFAULT_MIN_RECORD_COUNT)));
     List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
     for (SegmentZKMetadata segment : allSegments) {
       CommonConstants.Segment.Realtime.Status status = segment.getStatus();
-      // initial segments selection based on status, record count, and age
-      if (status.isCompleted() && segment.getTotalDocs() >= minRecordCount) {
+      // initial segments selection based on status and age
+      if (status.isCompleted()) {
         boolean endedWithinBufferPeriod = segment.getEndTimeMs() <= (System.currentTimeMillis() - bufferMs);
         boolean endsInTheFuture = segment.getEndTimeMs() > System.currentTimeMillis();
         if (endedWithinBufferPeriod || endsInTheFuture) {

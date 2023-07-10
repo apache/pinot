@@ -80,7 +80,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     Map<String, String> tableTaskConfigs = new HashMap<>();
     tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "0d");
     tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT, "0");
-    tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.MIN_RECORD_COUNT, "100");
+    tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.MIN_RECORD_COUNT, "1000");
     return new TableTaskConfig(
         Collections.singletonMap(MinionConstants.UpsertCompactionTask.TASK_TYPE, tableTaskConfigs));
   }
