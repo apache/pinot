@@ -142,9 +142,9 @@ public enum AggregationFunctionType {
 
   // boolean aggregate functions
   BOOLAND("boolAnd", Collections.emptyList(), false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN, null,
-      OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.BOOLEAN, null, null, null),
+      OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.INTEGER, null, null, null),
   BOOLOR("boolOr", Collections.emptyList(), false, null, SqlKind.OTHER_FUNCTION, ReturnTypes.BOOLEAN, null,
-      OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.BOOLEAN, null, null, null),
+      OperandTypes.BOOLEAN, SqlFunctionCategory.USER_DEFINED_FUNCTION, null, ReturnTypes.INTEGER, null, null, null),
 
   // argMin and argMax
   ARGMIN("argMin"),

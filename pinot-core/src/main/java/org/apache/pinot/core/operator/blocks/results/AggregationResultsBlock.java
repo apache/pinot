@@ -140,6 +140,9 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       throws IOException {
     ColumnDataType columnDataType = columnDataTypes[index];
     switch (columnDataType) {
+      case INT:
+        dataTableBuilder.setColumn(index, (int) result);
+        break;
       case LONG:
         dataTableBuilder.setColumn(index, (long) result);
         break;
@@ -158,7 +161,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       Object result)
       throws IOException {
     ColumnDataType columnDataType = columnDataTypes[index];
-    switch (columnDataType) {
+    switch (columnDataType.getStoredType()) {
       case INT:
         dataTableBuilder.setColumn(index, (int) result);
         break;
