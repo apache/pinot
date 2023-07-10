@@ -78,14 +78,6 @@
       <version>${pulsar.version}</version>
       <exclusions>
         <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty-transport-native-unix-common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty-resolver</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>javax.ws.rs</groupId>
           <artifactId>javax.ws.rs-api</artifactId>
         </exclusion>
