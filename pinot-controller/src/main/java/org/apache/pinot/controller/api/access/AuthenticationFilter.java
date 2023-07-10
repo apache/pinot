@@ -129,9 +129,8 @@ public class AuthenticationFilter implements ContainerRequestFilter {
           if (!accessControl.hasRBACAccess(_httpHeaders, rbacAuthorization.targetType(), targetId,
               rbacAuthorization.permission())) {
             throw new ControllerApplicationException(LOGGER,
-                "Permission denied to " + rbacAuthorization.permission() + " for targetId: "
-                    + rbacAuthorization.targetId() + " of type: " + rbacAuthorization.targetType(),
-                Response.Status.FORBIDDEN);
+                "Permission denied to " + rbacAuthorization.permission() + " for targetId: " + targetId + " of type: "
+                    + rbacAuthorization.targetType(), Response.Status.FORBIDDEN);
           }
         } else {
           throw new ControllerApplicationException(LOGGER,
