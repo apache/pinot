@@ -43,34 +43,34 @@ import org.apache.pinot.server.api.AdminApiApplication;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
+
 /**
  * This resource API can be used to retrieve instance level information like instance tags
  */
-@Api(description = "Metadata for this instance (like tenant tags)", tags = "instance",
-    authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
+@Api(description = "Metadata for this instance (like tenant tags)", tags = "instance", authorizations =
+    {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("instance")
 public class InstanceResource {
-    @Inject
-    @Named(AdminApiApplication.SERVER_INSTANCE_ID)
-    private String _instanceId;
-    @Inject
-    private HelixManager _helixManager;
+  @Inject
+  @Named(AdminApiApplication.SERVER_INSTANCE_ID)
+  private String _instanceId;
+  @Inject
+  private HelixManager _helixManager;
 
-    @GET
-    @Path("tags")
-    @ApiOperation(value = "Tenant tags for current instance")
-    @ApiResponses(value = {
-            @ApiResponse(code = 200, message = "Success"),
-            @ApiResponse(code = 500, message = "Internal server error")
-    })
-    @Produces(MediaType.APPLICATION_JSON)
-    public List<String> getInstanceTags() {
-        InstanceConfig config = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
-        if (config != null && config.getTags() != null) {
-            return config.getTags();
-        }
-        return Collections.emptyList();
+  @GET
+  @Path("tags")
+  @ApiOperation(value = "Tenant tags for current instance")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
+  })
+  @Produces(MediaType.APPLICATION_JSON)
+  public List<String> getInstanceTags() {
+    InstanceConfig config = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
+    if (config != null && config.getTags() != null) {
+      return config.getTags();
     }
+    return Collections.emptyList();
+  }
 }
