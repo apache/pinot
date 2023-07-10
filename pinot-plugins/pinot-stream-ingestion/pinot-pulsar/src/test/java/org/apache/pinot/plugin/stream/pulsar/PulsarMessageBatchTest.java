@@ -201,7 +201,7 @@ public class PulsarMessageBatchTest {
     _random.nextBytes(_expectedKeyBytes);
     _msgWithKeyAndValue = new DummyPulsarMessage(_expectedKeyBytes, _expectedValueBytes);
     _messageList = new ArrayList<>();
-    _metadataExtractor = PulsarMetadataExtractor.build(true, false);
+    _metadataExtractor = PulsarMetadataExtractor.build(true);
     _messageList.add(_msgWithKeyAndValue);
   }
 

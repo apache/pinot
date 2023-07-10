@@ -29,11 +29,11 @@ import org.apache.pulsar.client.api.Message;
 
 
 public interface PulsarMetadataExtractor {
-  static PulsarMetadataExtractor build(boolean populateMetadata, boolean setRecordTimeFromEventTime) {
+  static PulsarMetadataExtractor build(boolean populateMetadata) {
     return message -> {
-      long eventTime = message.getEventTime();
       long publishTime = message.getPublishTime();
-      long recordTimestamp = setRecordTimeFromEventTime ? eventTime : publishTime;
+      long brokerPublishTime = message.getBrokerPublishTime().orElse(0L);
+      long recordTimestamp = brokerPublishTime != 0 ? brokerPublishTime : publishTime;
 
       Map<String, String> metadataMap = populateMetadataMap(populateMetadata, message);
 

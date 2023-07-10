@@ -37,7 +37,7 @@ public class PulsarMetadataExtractorTest {
 
   @BeforeClass
   public void setup() {
-    _metadataExtractor = PulsarMetadataExtractor.build(true, false);
+    _metadataExtractor = PulsarMetadataExtractor.build(true);
   }
 
   @Test

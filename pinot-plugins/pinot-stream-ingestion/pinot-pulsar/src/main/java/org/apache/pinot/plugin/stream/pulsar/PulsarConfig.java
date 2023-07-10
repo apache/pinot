@@ -45,10 +45,9 @@ public class PulsarConfig {
   private final SubscriptionInitialPosition _subscriptionInitialPosition;
   private final String _authenticationToken;
   private final String _tlsTrustCertsFilePath;
+  @Deprecated(since = "v0.13.* since pulsar supports record key extraction")
   private final boolean _enableKeyValueStitch;
   private final boolean _populateMetadata;
-  private final boolean _populateRecordTimeFromEventTime;
-
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
     _pulsarTopicName = streamConfig.getTopicName();
@@ -74,8 +73,6 @@ public class PulsarConfig {
     _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(offsetCriteria);
     _initialMessageId = PulsarUtils.offsetCriteriaToMessageId(offsetCriteria);
     _populateMetadata = Boolean.parseBoolean(streamConfig.getStreamConfigsMap().getOrDefault(
-            StreamConfigProperties.METADATA_POPULATE, "false"));
-    _populateRecordTimeFromEventTime = Boolean.parseBoolean(streamConfig.getStreamConfigsMap().getOrDefault(
             StreamConfigProperties.METADATA_POPULATE, "false"));
   }
 
@@ -112,7 +109,4 @@ public class PulsarConfig {
   public boolean isPopulateMetadata() {
     return _populateMetadata;
   }
-  public boolean isPopulateRecordTimeFromEventTime() {
-        return _populateRecordTimeFromEventTime;
-    }
 }
