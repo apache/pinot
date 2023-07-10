@@ -393,7 +393,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     //      -> {merged_100days_T5_0_myTable1_16400_16435_0}
 
     String sqlQuery = "SELECT count(*) FROM myTable1"; // 115545 rows for the test table
-    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode expectedJson = postQuery(sqlQuery);
     int[] expectedNumSubTasks = {1, 2, 2, 2, 1};
     int[] expectedNumSegmentsQueried = {13, 12, 13, 13, 12};
     long expectedWatermark = 16000 * 86_400_000L;
@@ -434,7 +434,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       TestUtils.waitForCondition(aVoid -> {
         try {
           // Check num total doc of merged segments are the same as the original segments
-          JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+          JsonNode actualJson = postQuery(sqlQuery);
           if (!SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery)) {
             return false;
           }
@@ -505,7 +505,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     //      -> {merged_100days_T5_0_myTable1_16400_16435_0}
 
     String sqlQuery = "SELECT count(*) FROM myTable4"; // 115545 rows for the test table
-    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode expectedJson = postQuery(sqlQuery);
     int[] expectedNumSubTasks = {1, 2, 2, 2, 1};
     int[] expectedNumSegmentsQueried = {13, 12, 13, 13, 12};
     long expectedWatermark = 16000 * 86_400_000L;
@@ -546,7 +546,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       TestUtils.waitForCondition(aVoid -> {
         try {
           // Check num total doc of merged segments are the same as the original segments
-          JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+          JsonNode actualJson = postQuery(sqlQuery);
           if (!SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery)) {
             return false;
           }
@@ -611,7 +611,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     //      -> {merged_150days_1628644105127_0_myTable2_16352_16429_0}
 
     String sqlQuery = "SELECT count(*) FROM myTable2"; // 115545 rows for the test table
-    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode expectedJson = postQuery(sqlQuery);
     int[] expectedNumSegmentsQueried = {16, 7, 3};
     long expectedWatermark = 16050 * 86_400_000L;
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(SINGLE_LEVEL_ROLLUP_TEST_TABLE);
@@ -651,7 +651,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       TestUtils.waitForCondition(aVoid -> {
         try {
           // Check total doc of merged segments are less than the original segments
-          JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+          JsonNode actualJson = postQuery(sqlQuery);
           if (actualJson.get("resultTable").get("rows").get(0).get(0).asInt() >= expectedJson.get("resultTable")
               .get("rows").get(0).get(0).asInt()) {
             return false;
@@ -666,7 +666,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     }
 
     // Check total doc is half of the original after all merge tasks are finished
-    JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode actualJson = postQuery(sqlQuery);
     assertEquals(actualJson.get("resultTable").get("rows").get(0).get(0).asInt(),
         expectedJson.get("resultTable").get("rows").get(0).get(0).asInt() / 2);
     // Check time column is rounded
@@ -750,7 +750,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     //    90days: [16380, 16470) is not a valid merge window because windowEndTime > 45days watermark, not scheduling
 
     String sqlQuery = "SELECT count(*) FROM myTable3"; // 115545 rows for the test table
-    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode expectedJson = postQuery(sqlQuery);
     int[] expectedNumSubTasks = {1, 2, 1, 2, 1, 2, 1, 2, 1};
     int[] expectedNumSegmentsQueried = {12, 12, 11, 10, 9, 8, 7, 6, 5};
     Long[] expectedWatermarks45Days = {16065L, 16110L, 16155L, 16200L, 16245L, 16290L, 16335L, 16380L};
@@ -805,7 +805,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       TestUtils.waitForCondition(aVoid -> {
         try {
           // Check total doc of merged segments are the same as the original segments
-          JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+          JsonNode actualJson = postQuery(sqlQuery);
           if (!SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery)) {
             return false;
           }
@@ -884,7 +884,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String tableName = getTableName();
 
     String sqlQuery = "SELECT count(*) FROM " + tableName; // 115545 rows for the test table
-    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode expectedJson = postQuery(sqlQuery);
     // disable some checks for now because github does not generate the same number of tasks sometimes
     // need to figure out why they work locally all the time but not on github
     // I feel it maybe related to resources or timestamps
@@ -929,7 +929,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
       TestUtils.waitForCondition(aVoid -> {
         try {
           // Check num total doc of merged segments are the same as the original segments
-          JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+          JsonNode actualJson = postQuery(sqlQuery);
           if (!SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery)) {
             return false;
           }
@@ -990,7 +990,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     String tableName = MULTI_LEVEL_CONCAT_PROCESS_ALL_REALTIME_TABLE;
 
     String sqlQuery = "SELECT count(*) FROM " + tableName;
-    JsonNode expectedJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode expectedJson = postQuery(sqlQuery);
     long[] expectedNumBucketsToProcess100Days = {3, 2, 1, 0, 3, 2, 1, 0};
     long[] expectedNumBucketsToProcess200Days = {0, 0, 1, 1, 0, 0, 1, 1};
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
@@ -1027,7 +1027,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     assertEquals(numTasks, 4);
 
     // Check query results
-    JsonNode actualJson = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode actualJson = postQuery(sqlQuery);
     assertTrue(SqlResultComparator.areEqual(actualJson, expectedJson, sqlQuery));
 
     // Upload historical data and schedule

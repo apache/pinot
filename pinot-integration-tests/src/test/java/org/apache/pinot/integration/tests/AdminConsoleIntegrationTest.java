@@ -63,21 +63,21 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
   public void testApiHelp()
       throws Exception {
     // test controller
-    String response = sendGetRequest(_controllerBaseApiUrl + "/help");
+    String response = sendGetRequest(getControllerBaseApiUrl() + "/help");
     String expected = IOUtils
         .toString(ControllerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"), "UTF-8");
     Assert.assertEquals(response, expected);
     // help and api map to the same content
-    response = sendGetRequest(_controllerBaseApiUrl + "/api");
+    response = sendGetRequest(getControllerBaseApiUrl() + "/api");
     Assert.assertEquals(response, expected);
 
     // test broker
-    response = sendGetRequest(_brokerBaseApiUrl + "/help");
+    response = sendGetRequest(getBrokerBaseApiUrl() + "/help");
     expected = IOUtils
         .toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"), "UTF-8");
     Assert.assertEquals(response, expected);
     // help and api map to the same content
-    response = sendGetRequest(_brokerBaseApiUrl + "/api");
+    response = sendGetRequest(getBrokerBaseApiUrl() + "/api");
     Assert.assertEquals(response, expected);
 
     String serverBaseApiUrl = "http://localhost:" + CommonConstants.Server.DEFAULT_ADMIN_API_PORT;

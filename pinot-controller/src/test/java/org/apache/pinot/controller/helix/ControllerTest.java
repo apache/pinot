@@ -119,8 +119,8 @@ public class ControllerTest {
 
   protected static HttpClient _httpClient = null;
 
-  protected int _controllerPort;
-  protected String _controllerBaseApiUrl;
+  private int _controllerPort;
+  private String _controllerBaseApiUrl;
   protected ControllerConf _controllerConfig;
   protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
 

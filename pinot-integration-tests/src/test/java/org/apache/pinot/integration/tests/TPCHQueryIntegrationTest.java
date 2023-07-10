@@ -29,13 +29,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Properties;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.pinot.client.Connection;
-import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -143,13 +140,8 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected Connection getPinotConnection() {
-    Properties properties = new Properties();
-    properties.put("queryOptions", "useMultistageEngine=true");
-    if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName());
-    }
-    return _pinotConnection;
+  protected boolean useMultiStageQueryEngine() {
+    return true;
   }
 
   @AfterClass
