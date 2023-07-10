@@ -18,21 +18,17 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.IntermediateStageBlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
@@ -123,7 +119,7 @@ public class MultistageAggregationExecutor {
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggregationFunction = _aggFunctions[i];
       Map<ExpressionContext, BlockValSet> blockValSetMap =
-          getBlockValSetMap(aggregationFunction, block, inputDataSchema);
+          AggregateOperator.getBlockValSetMap(aggregationFunction, block, inputDataSchema, _colNameToIndexMap);
       aggregationFunction.aggregate(block.getNumRows(), _aggregateResultHolder[i], blockValSetMap);
     }
   }
@@ -133,7 +129,8 @@ public class MultistageAggregationExecutor {
 
     for (int i = 0; i < _aggFunctions.length; i++) {
       for (Object[] row : container) {
-        Object intermediateResultToMerge = extractValueFromRow(_aggFunctions[i], row);
+        Object intermediateResultToMerge =
+            AggregateOperator.extractValueFromRow(_aggFunctions[i], row, _colNameToIndexMap);
 
         // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
         if (intermediateResultToMerge == null) {
@@ -147,55 +144,6 @@ public class MultistageAggregationExecutor {
 
         _mergeResultHolder[i] = _aggFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
       }
-    }
-  }
-
-  private Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggFunction,
-      TransferableBlock block, DataSchema inputDataSchema) {
-    List<ExpressionContext> expressions = aggFunction.getInputExpressions();
-    int numExpressions = expressions.size();
-    if (numExpressions == 0) {
-      return Collections.emptyMap();
-    }
-
-    Preconditions.checkState(numExpressions == 1, "Cannot handle more than one identifier in aggregation function.");
-    ExpressionContext expression = expressions.get(0);
-    Preconditions.checkState(expression.getType().equals(ExpressionContext.Type.IDENTIFIER));
-    int index = _colNameToIndexMap.get(expression.getIdentifier());
-
-    DataSchema.ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
-    Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
-    // TODO: If the previous block is not mailbox received, this method is not efficient.  Then getDataBlock() will
-    //  convert the unserialized format to serialized format of BaseDataBlock. Then it will convert it back to column
-    //  value primitive type.
-    return Collections.singletonMap(expression,
-        new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index));
-  }
-
-  private Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row) {
-    List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
-    Preconditions.checkState(expressions.size() == 1, "Only support single expression, got: %s", expressions.size());
-    ExpressionContext expr = expressions.get(0);
-    ExpressionContext.Type exprType = expr.getType();
-    if (exprType.equals(ExpressionContext.Type.IDENTIFIER)) {
-      String colName = expr.getIdentifier();
-      Object value = row[_colNameToIndexMap.get(colName)];
-      return toIntermediateType(value, aggregationFunction);
-    }
-    Preconditions.checkState(exprType == ExpressionContext.Type.LITERAL, "Unsupported expression type: %s", exprType);
-    return expr.getLiteral().getValue();
-  }
-
-  // TODO: remove this once planner correctly expects intermediate result type.
-  private Object toIntermediateType(Object value, AggregationFunction aggregationFunction) {
-    if (aggregationFunction.getType().equals(AggregationFunctionType.BOOLAND)
-        || aggregationFunction.getType().equals(AggregationFunctionType.BOOLOR)
-        || aggregationFunction.getType().equals(AggregationFunctionType.COUNT)) {
-      return (value instanceof Boolean) ? (((Boolean) value) ? 1 : 0)
-          : ((value instanceof Number) ? ((Number) value).intValue() : value);
-    } else {
-      return (value instanceof Boolean) ? (((Boolean) value) ? 1.0 : 0.0)
-          : ((value instanceof Number) ? ((Number) value).doubleValue() : value);
     }
   }
 }

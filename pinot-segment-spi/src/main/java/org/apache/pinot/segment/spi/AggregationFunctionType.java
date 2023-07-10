@@ -47,12 +47,17 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
-  COUNT("count", null, SqlKind.COUNT, SqlFunctionCategory.NUMERIC),
+  COUNT("count", null, SqlKind.COUNT, SqlFunctionCategory.NUMERIC, OperandTypes.ONE_OR_MORE,
+      ReturnTypes.explicit(SqlTypeName.BIGINT), ReturnTypes.explicit(SqlTypeName.BIGINT)),
   // TODO: min/max only supports NUMERIC in Pinot, where Calcite supports COMPARABLE_ORDERED
-  MIN("min", null, SqlKind.MIN, SqlFunctionCategory.SYSTEM, OperandTypes.NUMERIC, ReturnTypes.ARG0_NULLABLE_IF_EMPTY),
-  MAX("max", null, SqlKind.MAX, SqlFunctionCategory.SYSTEM, OperandTypes.NUMERIC, ReturnTypes.ARG0_NULLABLE_IF_EMPTY),
-  SUM("sum", null, SqlKind.SUM, SqlFunctionCategory.NUMERIC),
-  SUM0("$sum0", null, SqlKind.SUM0, SqlFunctionCategory.NUMERIC),
+  MIN("min", null, SqlKind.MIN, SqlFunctionCategory.SYSTEM, OperandTypes.NUMERIC, ReturnTypes.ARG0_NULLABLE_IF_EMPTY,
+      ReturnTypes.explicit(SqlTypeName.DOUBLE)),
+  MAX("max", null, SqlKind.MAX, SqlFunctionCategory.SYSTEM, OperandTypes.NUMERIC, ReturnTypes.ARG0_NULLABLE_IF_EMPTY,
+      ReturnTypes.explicit(SqlTypeName.DOUBLE)),
+  SUM("sum", null, SqlKind.SUM, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC, ReturnTypes.AGG_SUM,
+      ReturnTypes.explicit(SqlTypeName.DOUBLE)),
+  SUM0("$sum0", null, SqlKind.SUM0, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC,
+      ReturnTypes.AGG_SUM_EMPTY_IS_ZERO, ReturnTypes.explicit(SqlTypeName.DOUBLE)),
   SUMPRECISION("sumPrecision"),
   AVG("avg"),
   MODE("mode"),
@@ -65,7 +70,7 @@ public enum AggregationFunctionType {
    * (1) distinct_count only supports single argument;
    * (2) count(distinct ...) support multi-argument and will be converted into DISTINCT + COUNT
    */
-  DISTINCTCOUNT("distinctCount", Collections.emptyList(), SqlKind.OTHER_FUNCTION,
+  DISTINCTCOUNT("distinctCount", null, SqlKind.OTHER_FUNCTION,
       SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.ANY, ReturnTypes.BIGINT,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
   DISTINCTCOUNTBITMAP("distinctCountBitmap"),

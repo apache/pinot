@@ -45,9 +45,8 @@ import org.apache.calcite.sql.PinotSqlAggFunction;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.PinotOperatorTable;
-import org.apache.calcite.sql.fun.SqlCountAggFunction;
-import org.apache.calcite.sql.fun.SqlSumEmptyIsZeroAggFunction;
 import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -299,7 +298,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     validateAggregationFunctionIsSupported(functionType.getName(), aggKind);
     // create the aggFunction
     SqlAggFunction sqlAggFunction;
-    if (functionType.getReturnTypeInference() != null) {
+    if (functionType.getIntermediateReturnTypeInference() != null) {
       switch (aggType) {
         case LEAF:
           sqlAggFunction = new PinotSqlAggFunction(functionName.toUpperCase(Locale.ROOT), null,
@@ -313,14 +312,12 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
           break;
         case FINAL:
           sqlAggFunction = new PinotSqlAggFunction(functionName.toUpperCase(Locale.ROOT), null,
-              functionType.getSqlKind(), functionType.getReturnTypeInference(), null,
+              functionType.getSqlKind(), ReturnTypes.explicit(orgAggCall.getType()), null,
               OperandTypes.ANY, functionType.getSqlFunctionCategory());
           break;
         default:
           throw new UnsupportedOperationException("Unsuppoted aggType: " + aggType + " for " + functionName);
       }
-    } else if (oldAggFunction instanceof SqlCountAggFunction && aggType.isInputIntermediateFormat()) {
-      sqlAggFunction = new SqlSumEmptyIsZeroAggFunction();
     } else {
       sqlAggFunction = oldAggFunction;
     }
