@@ -27,6 +27,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -67,6 +68,9 @@ public class InstanceResource {
     @Produces(MediaType.APPLICATION_JSON)
     public List<String> getInstanceTags() {
         InstanceConfig config = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
-        return config.getTags();
+        if (config != null && config.getTags() != null) {
+            return config.getTags();
+        }
+        return Collections.emptyList();
     }
 }
