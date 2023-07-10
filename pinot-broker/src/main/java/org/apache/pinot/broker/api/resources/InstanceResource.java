@@ -62,7 +62,7 @@ public class InstanceResource {
   @ApiOperation(value = "Tenant tags for current instance")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 500, message = "Internal server error")
   })
   @Produces(MediaType.APPLICATION_JSON)
   public List<String> getInstanceTags() {
