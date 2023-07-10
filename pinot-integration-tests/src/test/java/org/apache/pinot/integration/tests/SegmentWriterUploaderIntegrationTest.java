@@ -88,7 +88,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
     Map<String, String> batchConfigMap = new HashMap<>();
     batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, _tarDir.getAbsolutePath());
     batchConfigMap.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
-    batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _controllerBaseApiUrl);
+    batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, getControllerBaseApiUrl());
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(
         new BatchIngestionConfig(Collections.singletonList(batchConfigMap), "APPEND", "HOURLY"));
@@ -162,7 +162,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
 
   private int getTotalDocsFromQuery()
       throws Exception {
-    JsonNode response = postQuery(String.format("select count(*) from %s", _tableNameWithType), _brokerBaseApiUrl);
+    JsonNode response = postQuery(String.format("select count(*) from %s", _tableNameWithType));
     return response.get("resultTable").get("rows").get(0).get(0).asInt();
   }
 
