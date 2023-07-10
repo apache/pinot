@@ -201,7 +201,9 @@ public class PinotTableRestletResource {
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
-      if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, "AddTable")) {
+      // Using schema name, since table name contains type (OFFLINE) suffix
+      if (!_accessControlFactory.create()
+          .hasRBACAccess(httpHeaders, "table", tableConfig.getValidationConfig().getSchemaName(), "AddTable")) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -574,7 +576,9 @@ public class PinotTableRestletResource {
     String endpointUrl = request.getRequestURL().toString();
     AccessControlUtils.validatePermission(tableName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, "Validate")) {
+    // Using schema name, since table name contains type (OFFLINE) suffix
+    if (!_accessControlFactory.create()
+        .hasRBACAccess(httpHeaders, "table", tableConfig.getLeft().getValidationConfig().getSchemaName(), "Validate")) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
