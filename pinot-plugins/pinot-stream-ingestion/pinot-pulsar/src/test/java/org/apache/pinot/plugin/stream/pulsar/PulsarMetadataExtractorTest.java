@@ -19,15 +19,16 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import org.apache.pulsar.client.api.MessageId;
 import org.bouncycastle.util.encoders.Base64;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.plugin.stream.pulsar.PulsarMessageBatchTest.DummyPulsarMessage;
-import static org.apache.pinot.plugin.stream.pulsar.PulsarStreamMessageMetadata.MESSAGE_ID_BYTES_B64_KEY;
-import static org.apache.pinot.plugin.stream.pulsar.PulsarStreamMessageMetadata.MESSAGE_ID_KEY;
-import static org.apache.pinot.plugin.stream.pulsar.PulsarStreamMessageMetadata.MESSAGE_KEY_KEY;
+import static org.apache.pinot.plugin.stream.pulsar.PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID;
+import static org.apache.pinot.plugin.stream.pulsar.PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID_BYTES_B64;
+import static org.apache.pinot.plugin.stream.pulsar.PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_KEY;
 import static org.testng.Assert.assertEquals;
 
 
@@ -37,7 +38,7 @@ public class PulsarMetadataExtractorTest {
 
   @BeforeClass
   public void setup() {
-    _metadataExtractor = PulsarMetadataExtractor.build(true);
+    _metadataExtractor = PulsarMetadataExtractor.build(true, Set.of(MESSAGE_ID, MESSAGE_ID_BYTES_B64, MESSAGE_KEY));
   }
 
   @Test
@@ -50,11 +51,11 @@ public class PulsarMetadataExtractorTest {
     PulsarStreamMessageMetadata metadata = (PulsarStreamMessageMetadata) _metadataExtractor.extract(pulsarMessage);
     assertEquals("test_value", metadata.getHeaders().getValue("test_key"));
     assertEquals("2", metadata.getHeaders().getValue("test_key2"));
-    assertEquals("key", metadata.getRecordMetadata().get(MESSAGE_KEY_KEY));
-    String messageIdStr = metadata.getRecordMetadata().get(MESSAGE_ID_KEY);
+    assertEquals("key", metadata.getRecordMetadata().get(MESSAGE_KEY.getKey()));
+    String messageIdStr = metadata.getRecordMetadata().get(MESSAGE_ID.getKey());
     assertEquals(pulsarMessage.getMessageId().toString(), messageIdStr);
 
-    byte[] messageIdBytes = Base64.decode(metadata.getRecordMetadata().get(MESSAGE_ID_BYTES_B64_KEY));
+    byte[] messageIdBytes = Base64.decode(metadata.getRecordMetadata().get(MESSAGE_ID_BYTES_B64.getKey()));
     MessageId messageId = MessageId.fromByteArray(messageIdBytes);
     assertEquals(MessageId.earliest, messageId);
   }

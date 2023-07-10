@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -201,7 +202,8 @@ public class PulsarMessageBatchTest {
     _random.nextBytes(_expectedKeyBytes);
     _msgWithKeyAndValue = new DummyPulsarMessage(_expectedKeyBytes, _expectedValueBytes);
     _messageList = new ArrayList<>();
-    _metadataExtractor = PulsarMetadataExtractor.build(true);
+    _metadataExtractor = PulsarMetadataExtractor.build(true,
+        EnumSet.allOf(PulsarStreamMessageMetadata.PulsarMessageMetadataValue.class));
     _messageList.add(_msgWithKeyAndValue);
   }
 

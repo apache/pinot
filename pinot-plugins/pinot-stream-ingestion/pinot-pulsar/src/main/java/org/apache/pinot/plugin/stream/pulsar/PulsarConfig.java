@@ -19,7 +19,13 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -37,6 +43,7 @@ public class PulsarConfig {
   public static final String AUTHENTICATION_TOKEN = "authenticationToken";
   public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
   public static final String ENABLE_KEY_VALUE_STITCH = "enableKeyValueStitch";
+  public static final String METADATA_FIELDS = "metadataFields"; //list of the metadata fields comma separated
 
   private final String _pulsarTopicName;
   private final String _subscriberId;
@@ -48,6 +55,7 @@ public class PulsarConfig {
   @Deprecated(since = "v0.13.* since pulsar supports record key extraction")
   private final boolean _enableKeyValueStitch;
   private final boolean _populateMetadata;
+  private final Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> _metadataFields;
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
     _pulsarTopicName = streamConfig.getTopicName();
@@ -73,7 +81,20 @@ public class PulsarConfig {
     _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(offsetCriteria);
     _initialMessageId = PulsarUtils.offsetCriteriaToMessageId(offsetCriteria);
     _populateMetadata = Boolean.parseBoolean(streamConfig.getStreamConfigsMap().getOrDefault(
-            StreamConfigProperties.METADATA_POPULATE, "false"));
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE), "false"));
+    String metadataFieldsToExtractCSV = streamConfig.getStreamConfigsMap().getOrDefault(
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, METADATA_FIELDS), "");
+    if (StringUtils.isBlank(metadataFieldsToExtractCSV) || !_populateMetadata) {
+      _metadataFields = Collections.emptySet();
+    } else {
+      String[] metadataFieldsArr = metadataFieldsToExtractCSV.split(",");
+      _metadataFields = Stream.of(metadataFieldsArr)
+          .map(String::trim)
+          .filter(StringUtils::isNotBlank)
+          .map(PulsarStreamMessageMetadata.PulsarMessageMetadataValue::findByKey)
+          .filter(Objects::nonNull)
+          .collect(Collectors.toSet());
+    }
   }
 
   public String getPulsarTopicName() {
@@ -108,5 +129,9 @@ public class PulsarConfig {
   }
   public boolean isPopulateMetadata() {
     return _populateMetadata;
+  }
+
+  public Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> getMetadataFields() {
+    return _metadataFields;
   }
 }

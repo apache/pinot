@@ -18,29 +18,30 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Base64;
+import java.util.Set;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pulsar.client.api.Message;
 
+import static org.apache.pinot.plugin.stream.pulsar.PulsarStreamMessageMetadata.PulsarMessageMetadataValue.*;
+
 
 public interface PulsarMetadataExtractor {
-  static PulsarMetadataExtractor build(boolean populateMetadata) {
+  static PulsarMetadataExtractor build(boolean populateMetadata,
+      Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataValuesToExtract) {
     return message -> {
       long publishTime = message.getPublishTime();
       long brokerPublishTime = message.getBrokerPublishTime().orElse(0L);
       long recordTimestamp = brokerPublishTime != 0 ? brokerPublishTime : publishTime;
 
-      Map<String, String> metadataMap = populateMetadataMap(populateMetadata, message);
+      Map<String, String> metadataMap = populateMetadataMap(populateMetadata, message, metadataValuesToExtract);
 
-      if (!populateMetadata) {
-        return new PulsarStreamMessageMetadata(recordTimestamp, null, metadataMap);
-      }
-      GenericRow headerGenericRow = buildGenericRow(message);
+      GenericRow headerGenericRow = populateMetadata ? buildGenericRow(message) : null;
       return new PulsarStreamMessageMetadata(recordTimestamp, headerGenericRow, metadataMap);
     };
   }
@@ -58,68 +59,110 @@ public interface PulsarMetadataExtractor {
     return genericRow;
   }
 
-  static Map<String, String> populateMetadataMap(boolean populateAllFields, Message<?> message) {
-    long eventTime = message.getEventTime();
-    long publishTime = message.getPublishTime();
+  static Map<String, String> populateMetadataMap(boolean populateAllFields, Message<?> message,
+      Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataValuesToExtract) {
 
     Map<String, String> metadataMap = new HashMap<>();
-    if (eventTime > 0) {
-      metadataMap.put(PulsarStreamMessageMetadata.EVENT_TIME_KEY, String.valueOf(eventTime));
-    }
-    if (publishTime > 0) {
-      metadataMap.put(PulsarStreamMessageMetadata.PUBLISH_TIME_KEY, String.valueOf(publishTime));
-    }
+    populateMetadataField(EVENT_TIME, message, metadataMap);
+    populateMetadataField(PUBLISH_TIME, message, metadataMap);
+    populateMetadataField(BROKER_PUBLISH_TIME, message, metadataMap);
+    populateMetadataField(MESSAGE_KEY, message, metadataMap);
 
-    message.getBrokerPublishTime().ifPresent(
-        brokerPublishTime -> metadataMap.put(PulsarStreamMessageMetadata.BROKER_PUBLISH_TIME_KEY,
-            String.valueOf(brokerPublishTime)));
-
-    String key = message.getKey();
-    if (StringUtils.isNotBlank(key)) {
-      metadataMap.put(PulsarStreamMessageMetadata.MESSAGE_KEY_KEY, key);
-    }
-    String messageIdStr = message.getMessageId().toString();
-    metadataMap.put(PulsarStreamMessageMetadata.MESSAGE_ID_KEY, messageIdStr);
-    byte[] messageIdBytes = message.getMessageId().toByteArray();
-    metadataMap.put(PulsarStreamMessageMetadata.MESSAGE_ID_BYTES_B64_KEY, Base64.getEncoder()
-        .encodeToString(messageIdBytes));
-
-    //From Kafka and Kensis metadata extractors we seem to still populate some timestamps,
-    // even if populateMetadata is false
+    // Populate some timestamps for lag calculation even if populateMetadata is false
 
     if (!populateAllFields) {
       return metadataMap;
     }
 
-    String producerName = message.getProducerName();
-    if (StringUtils.isNotBlank(producerName)) {
-      metadataMap.put(PulsarStreamMessageMetadata.PRODUCER_NAME_KEY, producerName);
+    for (PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue : metadataValuesToExtract){
+      populateMetadataField(metadataValue, message, metadataMap);
     }
 
-    byte[] schemaVersion = message.getSchemaVersion();
-    if (schemaVersion.length > 0) {
-      metadataMap.put(PulsarStreamMessageMetadata.SCHEMA_VERSION_KEY, Base64.getEncoder().encodeToString(schemaVersion));
-    }
-    long sequenceId = message.getSequenceId();
-    if (sequenceId > 0) {
-      metadataMap.put(PulsarStreamMessageMetadata.SEQUENCE_ID_KEY, String.valueOf(sequenceId));
-    }
-
-    if (message.hasOrderingKey()) {
-      metadataMap.put(PulsarStreamMessageMetadata.ORDERING_KEY_KEY,
-          Base64.getEncoder().encodeToString(message.getOrderingKey()));
-    }
-
-    int size = message.size();
-    metadataMap.put(PulsarStreamMessageMetadata.SIZE_KEY, String.valueOf(size));
-    String topicName = message.getTopicName();
-    if (StringUtils.isNotBlank(topicName)) {
-      metadataMap.put(PulsarStreamMessageMetadata.TOPIC_NAME_KEY, topicName);
-    }
-    message.getIndex()
-        .ifPresent(index -> metadataMap.put(PulsarStreamMessageMetadata.INDEX_KEY, String.valueOf(index)));
-    int redeliveryCount = message.getRedeliveryCount();
-    metadataMap.put(PulsarStreamMessageMetadata.REDELIVERY_COUNT_KEY, String.valueOf(redeliveryCount));
     return metadataMap;
+  }
+
+  private static void populateMetadataField(PulsarStreamMessageMetadata.PulsarMessageMetadataValue value,
+      Message<?> message, Map<String, String> metadataMap) {
+    switch (value) {
+      case PUBLISH_TIME:
+        long publishTime = message.getPublishTime();
+        if (publishTime > 0) {
+          setMetadataMapField(metadataMap, PUBLISH_TIME, publishTime);
+        }
+        break;
+      case EVENT_TIME:
+        long eventTime = message.getEventTime();
+        if (eventTime > 0) {
+          setMetadataMapField(metadataMap, EVENT_TIME, eventTime);
+        }
+        break;
+      case BROKER_PUBLISH_TIME:
+        message.getBrokerPublishTime()
+            .ifPresent(brokerPublishTime -> setMetadataMapField(metadataMap, BROKER_PUBLISH_TIME, brokerPublishTime));
+        break;
+      case MESSAGE_KEY:
+        setMetadataMapField(metadataMap, MESSAGE_KEY, message.getKey());
+        break;
+      case MESSAGE_ID:
+        setMetadataMapField(metadataMap, MESSAGE_ID, message.getMessageId().toString());
+        break;
+      case MESSAGE_ID_BYTES_B64:
+        setMetadataMapField(metadataMap, MESSAGE_ID_BYTES_B64, message.getMessageId().toByteArray());
+        break;
+      case PRODUCER_NAME:
+        setMetadataMapField(metadataMap, PRODUCER_NAME, message.getProducerName());
+        break;
+      case SCHEMA_VERSION:
+        setMetadataMapField(metadataMap, SCHEMA_VERSION, message.getSchemaVersion());
+        break;
+      case SEQUENCE_ID:
+        setMetadataMapField(metadataMap, SEQUENCE_ID, message.getSequenceId());
+        break;
+      case ORDERING_KEY:
+        if (message.hasOrderingKey()) {
+          setMetadataMapField(metadataMap, ORDERING_KEY, message.getOrderingKey());
+        }
+        break;
+      case SIZE:
+        setMetadataMapField(metadataMap, SIZE, message.size());
+        break;
+      case TOPIC_NAME:
+        setMetadataMapField(metadataMap, TOPIC_NAME, message.getTopicName());
+        break;
+      case INDEX:
+        message.getIndex().ifPresent(index -> setMetadataMapField(metadataMap, INDEX, index));
+        break;
+      case REDELIVERY_COUNT:
+        setMetadataMapField(metadataMap, REDELIVERY_COUNT, message.getRedeliveryCount());
+        break;
+    }
+  }
+
+  private static void setMetadataMapField(Map<String, String> metadataMap,
+      PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue,
+      String value) {
+    if (StringUtils.isNotBlank(value)) {
+      metadataMap.put(metadataValue.getKey(), value);
+    }
+  }
+
+  private static void setMetadataMapField(Map<String, String> metadataMap,
+      PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue,
+      int value) {
+    setMetadataMapField(metadataMap, metadataValue, String.valueOf(value));
+  }
+
+  private static void setMetadataMapField(Map<String, String> metadataMap,
+      PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue,
+      long value) {
+    setMetadataMapField(metadataMap, metadataValue, String.valueOf(value));
+  }
+
+  private static void setMetadataMapField(Map<String, String> metadataMap,
+      PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue,
+      byte[] value) {
+    if (value != null && value.length > 0) {
+      setMetadataMapField(metadataMap, metadataValue, Base64.getEncoder().encodeToString(value));
+    }
   }
 }
