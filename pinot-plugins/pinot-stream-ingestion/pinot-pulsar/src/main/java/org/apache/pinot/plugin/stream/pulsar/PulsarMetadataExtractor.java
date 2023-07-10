@@ -20,7 +20,7 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.codec.binary.Base64;
+import java.util.Base64;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -81,7 +81,8 @@ public interface PulsarMetadataExtractor {
     String messageIdStr = message.getMessageId().toString();
     metadataMap.put(PulsarStreamMessageMetadata.MESSAGE_ID_KEY, messageIdStr);
     byte[] messageIdBytes = message.getMessageId().toByteArray();
-    metadataMap.put(PulsarStreamMessageMetadata.MESSAGE_ID_BYTES_B64_KEY, Base64.encodeBase64String(messageIdBytes));
+    metadataMap.put(PulsarStreamMessageMetadata.MESSAGE_ID_BYTES_B64_KEY, Base64.getEncoder()
+        .encodeToString(messageIdBytes));
 
     //From Kafka and Kensis metadata extractors we seem to still populate some timestamps,
     // even if populateMetadata is false
@@ -97,7 +98,7 @@ public interface PulsarMetadataExtractor {
 
     byte[] schemaVersion = message.getSchemaVersion();
     if (schemaVersion.length > 0) {
-      metadataMap.put(PulsarStreamMessageMetadata.SCHEMA_VERSION_KEY, Base64.encodeBase64String(schemaVersion));
+      metadataMap.put(PulsarStreamMessageMetadata.SCHEMA_VERSION_KEY, Base64.getEncoder().encodeToString(schemaVersion));
     }
     long sequenceId = message.getSequenceId();
     if (sequenceId > 0) {
@@ -106,7 +107,7 @@ public interface PulsarMetadataExtractor {
 
     if (message.hasOrderingKey()) {
       metadataMap.put(PulsarStreamMessageMetadata.ORDERING_KEY_KEY,
-          Base64.encodeBase64String(message.getOrderingKey()));
+          Base64.getEncoder().encodeToString(message.getOrderingKey()));
     }
 
     int size = message.size();
