@@ -126,7 +126,6 @@
     <helix.version>1.0.4</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.13.5</jackson.version>
-    <jackson-databind.version>2.13.5</jackson-databind.version>
     <zookeeper.version>3.6.3</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
     <jersey.version>2.39</jersey.version>
@@ -738,7 +737,7 @@
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
-        <version>${jackson-databind.version}</version>
+        <version>${jackson.version}</version>
         <scope>import</scope>
         <type>pom</type>
       </dependency>
