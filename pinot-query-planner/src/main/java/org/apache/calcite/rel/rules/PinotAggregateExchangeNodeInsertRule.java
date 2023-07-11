@@ -18,7 +18,6 @@
  */
 package org.apache.calcite.rel.rules;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,7 +43,6 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.PinotSqlAggFunction;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.fun.PinotOperatorTable;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.tools.RelBuilder;
@@ -294,8 +292,6 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     final SqlKind aggKind = oldAggFunction.getKind();
     String functionName = getFunctionNameFromAggregateCall(orgAggCall);
     AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
-    // Check only the supported AGG functions are provided.
-    validateAggregationFunctionIsSupported(functionType.getName(), aggKind);
     // create the aggFunction
     SqlAggFunction sqlAggFunction;
     if (functionType.getIntermediateReturnTypeInference() != null) {
@@ -339,12 +335,6 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   private static String getFunctionNameFromAggregateCall(AggregateCall aggregateCall) {
     return aggregateCall.getAggregation().getName().equalsIgnoreCase("COUNT") && aggregateCall.isDistinct()
         ? "distinctCount" : aggregateCall.getAggregation().getName();
-  }
-
-  private static void validateAggregationFunctionIsSupported(String functionName, SqlKind aggKind) {
-    Preconditions.checkState(PinotOperatorTable.isAggregationFunctionRegisteredWithOperatorTable(functionName),
-        String.format("Failed to create aggregation. Unsupported SQL aggregation kind: %s or function name: %s. "
-                + "Only splittable aggregation functions are supported!", aggKind, functionName));
   }
 
   private static RelHint createAggHint(AggType aggType) {
