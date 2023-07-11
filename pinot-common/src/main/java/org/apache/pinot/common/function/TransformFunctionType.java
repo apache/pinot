@@ -90,10 +90,10 @@ public enum TransformFunctionType {
 
   // string functions
   JSONEXTRACTSCALAR("jsonExtractScalar",
-      ReturnTypes.cascade(opBinding -> inferJsonExtractScalarExplicitTypeSpec(opBinding),
-          SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(
-      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
-      ordinal -> ordinal > 2)),
+      ReturnTypes.cascade(opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2,
+          SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER), ordinal -> ordinal > 2)),
   JSONEXTRACTKEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER))),
 
@@ -238,17 +238,22 @@ public enum TransformFunctionType {
   }
 
   /** Returns the optional explicit returning type specification. */
-  private static RelDataType inferJsonExtractScalarExplicitTypeSpec(SqlOperatorBinding opBinding) {
-    if (opBinding.getOperandCount() > 2
-        && opBinding.isOperandLiteral(2, false)) {
-      String operandType = opBinding.getOperandLiteralValue(2, String.class).toUpperCase();
-      return inferExplicitTypeSpec(operandType, opBinding.getTypeFactory());
-    }
-    return null;
+  private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos) {
+    return positionalReturnTypeInferenceFromStringLiteral(opBinding, pos, SqlTypeName.ANY);
   }
 
-  private static RelDataType inferExplicitTypeSpec(String operandType, RelDataTypeFactory typeFactory) {
-    switch (operandType) {
+  private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos,
+      SqlTypeName defaultSqlType) {
+    if (opBinding.getOperandCount() > pos
+        && opBinding.isOperandLiteral(pos, false)) {
+      String operandType = opBinding.getOperandLiteralValue(pos, String.class).toUpperCase();
+      return inferTypeFromStringLiteral(operandType, opBinding.getTypeFactory());
+    }
+    return opBinding.getTypeFactory().createSqlType(defaultSqlType);
+  }
+
+  private static RelDataType inferTypeFromStringLiteral(String operandTypeStr, RelDataTypeFactory typeFactory) {
+    switch (operandTypeStr) {
       case "INT":
         return typeFactory.createSqlType(SqlTypeName.INTEGER);
       case "LONG":
@@ -258,9 +263,9 @@ public enum TransformFunctionType {
       case "BYTES":
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
       default:
-        SqlTypeName sqlTypeName = SqlTypeName.get(operandType);
+        SqlTypeName sqlTypeName = SqlTypeName.get(operandTypeStr);
         if (sqlTypeName == null) {
-          throw new IllegalArgumentException("Invalid type: " + operandType);
+          throw new IllegalArgumentException("Invalid type: " + operandTypeStr);
         }
         return typeFactory.createSqlType(sqlTypeName);
     }

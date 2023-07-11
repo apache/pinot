@@ -20,16 +20,11 @@ package org.apache.calcite.sql.fun;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.calcite.sql.PinotSqlAggFunction;
 import org.apache.calcite.sql.PinotSqlTransformFunction;
 import org.apache.calcite.sql.SqlFunction;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
 import org.apache.calcite.util.Util;
@@ -56,30 +51,6 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
 
   public static final SqlFunction COALESCE = new PinotSqlCoalesceFunction();
 
-  private static final Set<SqlKind> KINDS =
-      Stream.concat(
-              Arrays.stream(AggregationFunctionType.values())
-                  .filter(func -> func.getSqlKind() != null)
-                  .flatMap(func -> Stream.of(func.getSqlKind())),
-              Arrays.stream(TransformFunctionType.values())
-                  .filter(func -> func.getSqlKind() != null)
-                  .flatMap(func -> Stream.of(func.getSqlKind())))
-          .collect(Collectors.toSet());
-
-  private static final Set<String> CALCITE_OPERATOR_TABLE_REGISTERED_FUNCTIONS =
-      Stream.concat(
-              Arrays.stream(AggregationFunctionType.values())
-                  // TODO: remove below once all V1 AGG functions are registered
-                  .filter(func -> func.getSqlKind() != null)
-                  .flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toUpperCase(),
-                      func.getName().toLowerCase())),
-              Arrays.stream(TransformFunctionType.values())
-                  // TODO: remove below once all V1 Transform functions are registered
-                  .filter(func -> func.getSqlKind() != null)
-                  .flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toUpperCase(),
-                      func.getName().toLowerCase())))
-          .collect(Collectors.toSet());
-
   // TODO: clean up lazy init by using Suppliers.memorized(this::computeInstance) and make getter wrapped around
   // supplier instance. this should replace all lazy init static objects in the codebase
   public static synchronized PinotOperatorTable instance() {
@@ -91,10 +62,6 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
       _instance.initNoDuplicate();
     }
     return _instance;
-  }
-
-  public static boolean isAggregationFunctionRegisteredWithOperatorTable(String functionName) {
-    return CALCITE_OPERATOR_TABLE_REGISTERED_FUNCTIONS.contains(functionName);
   }
 
   /**
