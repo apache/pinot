@@ -769,9 +769,13 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     File inProgress = new File(indexDir, column + ".dict.inprogress");
     File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENSION);
+
+    AbstractColumnStatisticsCollector statsCollector =
+        getStatsCollector(column, existingColMetadata.getDataType().getStoredType());
+
     String fwdIndexFileExtension;
     if (isSingleValue) {
-      if (existingColMetadata.isSorted()) {
+      if (statsCollector.isSorted()) {
         fwdIndexFileExtension = V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
       } else {
         fwdIndexFileExtension = V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
@@ -793,8 +797,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
 
     LOGGER.info("Creating a new dictionary for segment={} and column={}", segmentName, column);
-    AbstractColumnStatisticsCollector statsCollector =
-        getStatsCollector(column, existingColMetadata.getDataType().getStoredType());
     SegmentDictionaryCreator dictionaryCreator =
         buildDictionary(column, existingColMetadata, segmentWriter, statsCollector);
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
