@@ -88,7 +88,10 @@ public class OperationValidationResponse {
   public enum ErrorCode {
     IS_ALIVE("Instance %s is still live"),
     CONTAINS_RESOURCE("Instance %s exists in ideal state for %s"),
-    MINIMUM_SERVERS_UNSATISFIED("Tenant %s will not satisfy minimum servers requirement if removed from server %s.");
+    MINIMUM_INSTANCE_UNSATISFIED(
+        "Tenant '%s' will not satisfy minimum '%s' requirement if tag '%s' is removed from %s instance '%s'."),
+    ALREADY_DEFICIENT_TENANT("Tenant '%s' is low on '%s' instances by %d even with given allocation"),
+    UNRECOGNISED_TAG_TYPE("The tag '%s' does not follow the suffix convention of either broker or server");
 
     public final String _description;
 

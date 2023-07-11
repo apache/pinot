@@ -30,7 +30,6 @@ public class InstanceTagUpdateRequest {
   @ApiModelProperty(example = "Server_a.b.com_20000")
   private String _instanceName;
   @JsonProperty("newTags")
-  @ApiModelProperty(example = "[Server_a.c.com_20000,Server_b.c.com_20000")
   private List<String> _newTags;
 
   public String getInstanceName() {

@@ -42,6 +42,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -4126,6 +4127,29 @@ public class PinotHelixResourceManager {
     LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
         messageCount);
     return new PeriodicTaskInvocationResponse(periodicTaskRequestId, messageCount > 0);
+  }
+
+  /**
+   * Construct a map of all the tenants and their respective minimum server requirements.
+   * The minimum server requirement is computed by iterating over all the tables of the tenant and
+   * find the table with maximum replication.
+   * @return map of tenants and their minimum server requirements
+   */
+  public Map<String, Integer> minimumServersRequiredForTenants() {
+    Map<String, Integer> tenantMinServerMap = new HashMap<>();
+    getAllServerTenantNames().forEach(tenant -> tenantMinServerMap.put(tenant, 0));
+    for (String table : getAllTables()) {
+      TableConfig tableConfig = getTableConfig(table);
+      if (tableConfig == null) {
+        LOGGER.error("Unable to retrieve table config for table: {}", table);
+        continue;
+      }
+      String tenant = tableConfig.getTenantConfig().getServer();
+      int maxReplication = Math.max(Objects.requireNonNullElse(tenantMinServerMap.get(tenant), 0),
+          tableConfig.getReplication());
+      tenantMinServerMap.put(tenant, maxReplication);
+    }
+    return tenantMinServerMap;
   }
 
   /*
