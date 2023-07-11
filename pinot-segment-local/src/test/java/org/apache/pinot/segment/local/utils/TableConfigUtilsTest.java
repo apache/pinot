@@ -1790,6 +1790,73 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateTTLConfigForUpsertConfig() {
+    // Default comparison column (timestamp)
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setMetadataTTL(3600);
+    upsertConfig.setEnableSnapshot(true);
+
+    TableConfig tableConfigWithoutComparisonColumn = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
+    TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithoutComparisonColumn, schema);
+
+    // Invalid comparison columns: "myCol"
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setComparisonColumns(Collections.singletonList("myCol"));
+    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setMetadataTTL(3600);
+    TableConfig tableConfigWithInvalidComparisonColumn = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(upsertConfig).build();
+
+    try {
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidComparisonColumn, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("The column myCol: STRING is not a numeric values"));
+    }
+
+    // Invalid comparison columns: multiple comparison columns are not supported for TTL-enabled uspert table.
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setComparisonColumns(Lists.newArrayList(TIME_COLUMN, "myCol"));
+    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setMetadataTTL(3600);
+    TableConfig tableConfigWithInvalidComparisonColumn2 = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(upsertConfig).build();
+
+    try {
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidComparisonColumn2, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("Currently upsert TTL only support 1 comparison columns"));
+    }
+
+    // Invalid config with TTLConfig but Snapshot is not enabled
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setMetadataTTL(3600);
+    upsertConfig.setEnableSnapshot(false);
+
+    TableConfig tableConfigWithBothSnapshotEnabledAndTTLConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
+
+    try {
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithBothSnapshotEnabledAndTTLConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("Snapshot has to be enabled for TTL feature."));
+    }
+  }
+
+  @Test
   public void testValidatePartitionedReplicaGroupInstance() {
     String partitionColumn = "testPartitionCol";
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =

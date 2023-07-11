@@ -26,6 +26,7 @@ public class V1Constants {
   public static final String INDEX_MAP_FILE_NAME = "index_map";
   public static final String INDEX_FILE_NAME = "columns.psf";
   public static final String VALID_DOC_IDS_SNAPSHOT_FILE_NAME = "validdocids.bitmap.snapshot";
+  public static final String TTL_WATERMARK_TABLE_PARTITION = ".ttl.watermark.partition.";
 
   public static class Str {
     public static final char DEFAULT_STRING_PAD_CHAR = '\0';

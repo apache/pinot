@@ -60,6 +60,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
 
+  @JsonPropertyDescription("Whether to use TTL for upsert metadata cleanup, it uses the same unit as comparison col")
+  private double _metadataTTL;
+
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
 
@@ -109,6 +112,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public boolean isEnableSnapshot() {
     return _enableSnapshot;
+  }
+
+  public double getMetadataTTL() {
+    return _metadataTTL;
   }
 
   public boolean isEnablePreload() {
@@ -177,6 +184,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setEnableSnapshot(boolean enableSnapshot) {
     _enableSnapshot = enableSnapshot;
+  }
+
+  public void setMetadataTTL(double metadataTTL) {
+    _metadataTTL = metadataTTL;
   }
 
   public void setEnablePreload(boolean enablePreload) {

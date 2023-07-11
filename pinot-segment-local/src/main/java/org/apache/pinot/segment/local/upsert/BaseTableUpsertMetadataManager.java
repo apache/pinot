@@ -67,6 +67,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected HashFunction _hashFunction;
   protected PartialUpsertHandler _partialUpsertHandler;
   protected boolean _enableSnapshot;
+  protected double _metadataTTL;
+  protected File _tableIndexDir;
   protected ServerMetrics _serverMetrics;
   private volatile boolean _isPreloading = false;
 
@@ -104,6 +106,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     }
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();
+    _metadataTTL = upsertConfig.getMetadataTTL();
+    _tableIndexDir = tableDataManager.getTableDataDir();
     _serverMetrics = serverMetrics;
     if (_enableSnapshot && segmentPreloadExecutor != null && upsertConfig.isEnablePreload()) {
       // Preloading the segments with snapshots for fast upsert metadata recovery.
@@ -229,5 +233,10 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   @Override
   public UpsertConfig.Mode getUpsertMode() {
     return _partialUpsertHandler == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
+  }
+
+  @Override
+  public double getMetadataTTL() {
+    return _metadataTTL;
   }
 }

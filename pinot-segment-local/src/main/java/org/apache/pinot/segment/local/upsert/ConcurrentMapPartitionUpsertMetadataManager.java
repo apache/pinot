@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.File;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -58,10 +59,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
-      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      ServerMetrics serverMetrics) {
+      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler,
+      boolean enableSnapshot, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction,
-        partialUpsertHandler, enableSnapshot, serverMetrics);
+        partialUpsertHandler, enableSnapshot, metadataTTL, tableIndexDir, serverMetrics);
   }
 
   @Override
@@ -226,6 +227,26 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     }
   }
 
+  /**
+   * When TTL is enabled for upsert, this function is used to remove expired keys from the primary key indexes.
+   * This function will be called before new consuming segment start to consume.
+   *
+   * @param largestSeenComparisonValueMs largest seen timestamp in comparison column timeunit.
+   * @return void
+   */
+  @Override
+  public void doRemoveExpiredPrimaryKeys(double largestSeenComparisonValueMs) {
+    // The expiredTimestamp is the timestamp in comparison column timeunit, used to keep the largest seen timestamp.
+    double expiredTimestamp = largestSeenComparisonValueMs - _metadataTTL;
+    _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
+      assert recordLocation.getComparisonValue() != null;
+      if (((Number) recordLocation.getComparisonValue()).doubleValue() < expiredTimestamp) {
+        _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
+      }
+    });
+    persistWatermark(largestSeenComparisonValueMs);
+  }
+
   @Override
   protected void doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
@@ -234,6 +255,14 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     Comparable newComparisonValue = recordInfo.getComparisonValue();
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
+          // Update the largestSeenComparisonValueMs when add new record. If records during addSegments has a newer
+          // comparison column values than addRecords, it's a bug and should not happen.
+          if (_metadataTTL > 0) {
+            Number recordComparisonValue = (Number) recordInfo.getComparisonValue();
+            if (recordComparisonValue.doubleValue() > _largestSeenComparisonValue) {
+              _largestSeenComparisonValue = recordComparisonValue.doubleValue();
+            }
+          }
           if (currentRecordLocation != null) {
             // Existing primary key
 

@@ -20,7 +20,12 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +37,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -41,6 +47,7 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -61,6 +68,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final HashFunction _hashFunction;
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
+  protected final double _metadataTTL;
+  protected final File _tableIndexDir;
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
 
@@ -78,10 +87,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected long _lastOutOfOrderEventReportTimeNs = Long.MIN_VALUE;
   protected int _numOutOfOrderEvents = 0;
 
+  // Used to maintain the largestSeenComparisonValue to avoid handling out-of-ttl segments/records.
+  // If upsertTTL enabled, we will keep track of largestSeenComparisonValue to compute expired segments.
+  protected volatile double _largestSeenComparisonValue;
+
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
-      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      ServerMetrics serverMetrics) {
+      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler,
+      boolean enableSnapshot, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
@@ -90,9 +103,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _hashFunction = hashFunction;
     _partialUpsertHandler = partialUpsertHandler;
     _enableSnapshot = enableSnapshot;
+    _metadataTTL = metadataTTL;
+    _tableIndexDir = tableIndexDir;
     _snapshotLock = enableSnapshot ? new ReentrantReadWriteLock() : null;
     _serverMetrics = serverMetrics;
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
+    if (metadataTTL > 0) {
+      _largestSeenComparisonValue = loadWatermark();
+    } else {
+      deleteWatermark();
+    }
   }
 
   @Override
@@ -247,6 +267,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
     segmentLock.lock();
     try {
+      // Skip adding segments that has segment EndTime in the comparison cols earlier than (largestSeenTimestamp - TTL).
+      // Note: We only update largestSeenComparisonValueMs when addRecord, and access the value when addSegments.
+      // We only support single comparison column for TTL-enabled upsert tables.
+      if (_largestSeenComparisonValue > 0) {
+        Number endTime =
+            (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
+        if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+          return;
+        }
+      }
       if (validDocIds == null) {
         validDocIds = new ThreadSafeMutableRoaringBitmap();
       }
@@ -367,6 +397,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
     segmentLock.lock();
     try {
+      // Skip adding segments that has segment EndTime in the comparison cols earlier than (largestSeenTimestamp - TTL).
+      // Note: We only update largestSeenComparisonValueMs when addRecord, and access the value when addSegments.
+      // We only support single comparison column for TTL-enabled upsert tables.
+      if (_largestSeenComparisonValue > 0) {
+        Number endTime =
+            (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
+        if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+          return;
+        }
+      }
       MutableRoaringBitmap validDocIdsForOldSegment =
           oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
       if (recordInfoIterator != null) {
@@ -544,6 +584,67 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numImmutableSegments, numTrackedSegments, System.currentTimeMillis() - startTimeMs);
   }
 
+  /**
+   * Note: Load watermark when the server is started/restarted.
+   * */
+  protected double loadWatermark() {
+    File watermarkFile = getWatermarkFile();
+    if (watermarkFile.exists()) {
+      try {
+        byte[] bytes = FileUtils.readFileToByteArray(watermarkFile);
+        double watermark = ByteBuffer.wrap(bytes).getDouble();
+        _logger.info("Loaded watermark: {} from file for table: {} partition_id: {}", watermark, _tableNameWithType,
+            _partitionId);
+        return watermark;
+      } catch (Exception e) {
+        _logger.warn("Caught exception while loading watermark file: {}, skipping",
+            watermarkFile);
+      }
+    }
+    return Double.MIN_VALUE;
+  }
+
+  /**
+   * Note: Persist watermark when the expired primary keys are cleanup from upsertMetadata.
+   * */
+  protected void persistWatermark(double watermark) {
+    File watermarkFile = getWatermarkFile();
+    try {
+      if (watermarkFile.exists()) {
+        if (!FileUtils.deleteQuietly(watermarkFile)) {
+          _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
+          return;
+        }
+      }
+      try (OutputStream outputStream = new FileOutputStream(watermarkFile, false)) {
+        DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+        dataOutputStream.writeDouble(watermark);
+      }
+      _logger.info("Persisted watermark {} to file for table: {} partition_id: {}", watermark,
+          _tableNameWithType, _partitionId);
+    } catch (Exception e) {
+      _logger.warn("Caught exception while persisting watermark file: {}, skipping",
+          watermarkFile);
+    }
+  }
+
+  /**
+   * Note: Watermark file need to be deleted when upsert TTL is disabled in the upsertConfig.
+   * */
+  protected void deleteWatermark() {
+    File watermarkFile = getWatermarkFile();
+    if (watermarkFile.exists()) {
+      if (!FileUtils.deleteQuietly(watermarkFile)) {
+        _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
+        return;
+      }
+    }
+  }
+
+  protected File getWatermarkFile() {
+    return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
+  }
+
   protected void startOperation() {
     _numPendingOperations.getAndIncrement();
   }
@@ -555,6 +656,28 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
   }
+
+  /**
+   * When TTL is enabled for upsert, this function is used to remove expired keys from the primary key indexes.
+   * Primary keys that has comparison value earlier than largestSeenComparisonValue - TTL value will be removed.
+   */
+  @Override
+  public void removeExpiredPrimaryKeys() {
+    if (_stopped) {
+      _logger.debug("Skip removing expired primary keys because metadata manager is already stopped");
+      return;
+    }
+    startOperation();
+    try {
+      if (_metadataTTL > 0) {
+        doRemoveExpiredPrimaryKeys(_largestSeenComparisonValue);
+      }
+    } finally {
+      finishOperation();
+    }
+  }
+
+  protected abstract void doRemoveExpiredPrimaryKeys(double timestamp);
 
   @Override
   public void stop() {

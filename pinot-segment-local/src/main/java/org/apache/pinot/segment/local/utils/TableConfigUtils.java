@@ -595,6 +595,39 @@ public final class TableConfigUtils {
       }
     }
     validateAggregateMetricsForUpsertConfig(tableConfig);
+    validateTTLForUpsertConfig(tableConfig, schema);
+  }
+
+  /**
+   * Validates whether the comparison columns is compatible with Upsert TTL feature.
+   * Validation fails when one of the comparison columns is not a numeric value.
+   */
+  @VisibleForTesting
+  static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
+    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE
+        || tableConfig.getUpsertConfig().getMetadataTTL() == 0) {
+      return;
+    }
+
+    // comparison columns should hold timestamp values in numeric values
+    List<String> comparisonColumns = tableConfig.getUpsertConfig().getComparisonColumns();
+    if (comparisonColumns != null && !comparisonColumns.isEmpty()) {
+
+      // currently we only support 1 comparison column since we need to fetch endTime in comparisonValue time unit from
+      // columnMetadata. If we have multiple comparison columns, we can only use the first comparison column as filter.
+      Preconditions.checkState(comparisonColumns.size() <= 1,
+          String.format("Currently upsert TTL only support 1 comparison columns."));
+
+      String column = comparisonColumns.size() == 1 ? comparisonColumns.get(0)
+          : tableConfig.getValidationConfig().getTimeColumnName();
+      Preconditions.checkState(schema.getFieldSpecFor(column).getDataType().isNumeric(), String.format(
+          "Upsert TTL must have numeric value for the comparison columns. The column %s: %s is not a "
+              + "numeric values", column, schema.getFieldSpecFor(column).getDataType()));
+    }
+
+    // snapshotEnabled has to be enabled for TTL feature
+    Preconditions.checkState(tableConfig.getUpsertConfig().isEnableSnapshot(),
+        String.format("Snapshot has to be enabled for TTL feature."));
   }
 
   /**
