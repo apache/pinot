@@ -64,6 +64,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.spi.config.instance.Instance;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -497,15 +498,23 @@ public class PinotInstanceRestletResource {
       Supplier<Integer> deltaCalculationHandler, Runnable unrecognisedTagHandler,
       BiConsumer<String, Integer> recordIssueHandler) {
     int delta = deltaCalculationHandler.get();
-    String tenant = TagNameUtils.getTenantFromTag(tag);
     int updatedInstanceCount;
     int minInstanceRequirement;
     String instanceType;
     if (TagNameUtils.isServerTag(tag)) {
-      updatedInstanceCount = _pinotHelixResourceManager.getAllInstancesForServerTenant(tenant).size() + delta;
+      String tenant = TagNameUtils.getTenantFromTag(tag);
+      List<InstanceConfig> instanceConfigList = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
       minInstanceRequirement = Objects.requireNonNullElse(tenantMinServerMap.get(tenant), 0);
       instanceType = "server";
+      if (TagNameUtils.isRealtimeServerTag(tag)) {
+        updatedInstanceCount = _pinotHelixResourceManager.getAllInstancesForServerTenantWithType(instanceConfigList,
+            tenant, TableType.REALTIME).size() + delta;
+      } else {
+        updatedInstanceCount = _pinotHelixResourceManager.getAllInstancesForServerTenantWithType(instanceConfigList,
+            tenant, TableType.OFFLINE).size() + delta;
+      }
     } else if (TagNameUtils.isBrokerTag(tag)) {
+      String tenant = TagNameUtils.getTenantFromTag(tag);
       updatedInstanceCount = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenant).size() + delta;
       minInstanceRequirement = 1;
       instanceType = "broker";
