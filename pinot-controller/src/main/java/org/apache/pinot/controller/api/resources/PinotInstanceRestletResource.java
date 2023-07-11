@@ -465,14 +465,15 @@ public class PinotInstanceRestletResource {
     removedInstances.forEach((tag, removed) -> instanceIssueHandling(tag, tenantMinServerMap,
         () -> Objects.requireNonNullElse(addedInstances.remove(tag), new ArrayList<>()).size() - removed.size(),
         // assumes existing tags are valid tenant tags
-        () -> {},
+        () -> { },
         (type, deficiency) -> {
       for (int i = 0; i < deficiency && i < removed.size(); i++) {
         String instance = removed.get(i);
         String tenant = TagNameUtils.getTenantFromTag(tag);
         responseMap.get(instance).add(new OperationValidationResponse.ErrorWrapper(
             OperationValidationResponse.ErrorCode.MINIMUM_INSTANCE_UNSATISFIED, tenant, type, tag, type, instance));
-      }}));
+      }
+    }));
     // record issue if even after adding new instance to a tenant, it still has instance deficiency
     addedInstances.forEach((tag, added) -> instanceIssueHandling(tag, tenantMinServerMap, added::size,
         () -> added.forEach(instance -> responseMap.get(instance).add(new OperationValidationResponse.ErrorWrapper(
