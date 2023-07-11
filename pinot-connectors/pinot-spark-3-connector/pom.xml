@@ -33,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <spark.version>3.2.1</spark.version>
+    <spark.version>3.4.0</spark.version>
     <antlr-runtime.version>4.8</antlr-runtime.version>
     <scalatest.version>3.1.1</scalatest.version>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
