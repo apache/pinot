@@ -45,7 +45,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 
 /**
- * This resource API can be used to retrieve instance level information like instance tags
+ * This resource API can be used to retrieve instance level information like instance tags.
  */
 @Api(description = "Metadata for this instance (like tenant tags)", tags = "instance", authorizations =
     {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
