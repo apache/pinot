@@ -22,6 +22,7 @@ import com.google.common.cache.LoadingCache;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.tuple.Pair;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -48,7 +50,9 @@ public interface TableDataManager {
    */
   void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache, TableDataManagerParams tableDataManagerParams);
+      @Nullable ExecutorService segmentPreloadExecutor,
+      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      TableDataManagerParams tableDataManagerParams);
 
   /**
    * Starts the table data manager. Should be called only once after table data manager gets initialized but before
@@ -125,6 +129,21 @@ public interface TableDataManager {
    * Removes a segment from the table.
    */
   void removeSegment(String segmentName);
+
+  /**
+   * Try to load a segment from an existing segment directory managed by the server. The segment loading may fail
+   * because the directory may not exist any more, or the segment data has a different crc now, or the existing segment
+   * data got corrupted etc.
+   *
+   * @return true if the segment is loaded successfully from the existing segment directory; false otherwise.
+   */
+  boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
+      SegmentZKMetadata zkMetadata);
+
+  /**
+   * Get the segment data directory, considering the segment tier if provided.
+   */
+  File getSegmentDataDir(String segmentName, @Nullable String segmentTier, TableConfig tableConfig);
 
   /**
    * Returns true if the segment was deleted in the last few minutes.

@@ -193,9 +193,8 @@ public abstract class BaseResourceTest {
     // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager requires
     //       table config.
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager
-        .init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class),
-            mock(HelixManager.class), null, new TableDataManagerParams(0, false, -1));
+    tableDataManager.init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
+        mock(ServerMetrics.class), mock(HelixManager.class), null, null, new TableDataManagerParams(0, false, -1));
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }

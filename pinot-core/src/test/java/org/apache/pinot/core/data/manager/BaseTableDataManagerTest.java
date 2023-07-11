@@ -719,7 +719,7 @@ public class BaseTableDataManagerTest {
 
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
         new TableDataManagerParams(0, false, -1));
     tableDataManager.start();
     return tableDataManager;
@@ -728,7 +728,7 @@ public class BaseTableDataManagerTest {
   private static BaseTableDataManager createTableManager(TableDataManagerConfig config, HelixManager helixManager) {
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), helixManager, null,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), helixManager, null, null,
         new TableDataManagerParams(0, false, -1));
     tableDataManager.start();
     return tableDataManager;
@@ -737,7 +737,7 @@ public class BaseTableDataManagerTest {
   private static OfflineTableDataManager createSpyOfflineTableManager(TableDataManagerConfig tableDataManagerConfig) {
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(tableDataManagerConfig, "dummyInstance", mock(ZkHelixPropertyStore.class),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
         new TableDataManagerParams(0, false, -1));
     tableDataManager.start();
     return Mockito.spy(tableDataManager);

@@ -57,6 +57,8 @@
     "instanceSelectorType": "strictReplicaGroup"
   },
   "upsertConfig": {
-    "mode": "FULL"
+    "mode": "FULL",
+    "enableSnapshot": "true",
+    "enablePreload": "true"
   }
 }
