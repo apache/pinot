@@ -262,10 +262,11 @@ public class TablesResourceTest extends BaseResourceTest {
         (ImmutableSegmentImpl) segment);
 
     String validDocIdMetadataPath =
-        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME)
-            + "/segments/" + segment.getSegmentName() + "/validDocIdMetadata";
-    String metadataResponse = _webTarget.path(validDocIdMetadataPath).request().get(String.class);
-    JsonNode validDocIdMetadata = JsonUtils.stringToJsonNode(metadataResponse);
+        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/validDocIdMetadata";
+    String metadataResponse = _webTarget.path(validDocIdMetadataPath)
+        .queryParam("segmentNames", segment.getSegmentName())
+        .request().get(String.class);
+    JsonNode validDocIdMetadata = JsonUtils.stringToJsonNode(metadataResponse).get(0);
 
     Assert.assertEquals(validDocIdMetadata.get("totalDocs").asInt(), 100000);
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
