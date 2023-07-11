@@ -18,23 +18,21 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.IntermediateStageBlockValSet;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+
 
 
 /**
@@ -45,6 +43,7 @@ public class MultistageGroupByExecutor {
   // The identifier operands for the aggregation function only store the column name. This map contains mapping
   // between column name to their index which is used in v2 engine.
   private final Map<String, Integer> _colNameToIndexMap;
+  private final DataSchema _resultSchema;
 
   private final List<ExpressionContext> _groupSet;
   private final AggregationFunction[] _aggFunctions;
@@ -52,22 +51,21 @@ public class MultistageGroupByExecutor {
   // Group By Result holders for each mode
   private final GroupByResultHolder[] _aggregateResultHolders;
   private final Map<Integer, Object[]> _mergeResultHolder;
-  private final List<Object[]> _finalResultHolder;
 
   // Mapping from the row-key to a zero based integer index. This is used when we invoke the v1 aggregation functions
   // because they use the zero based integer indexes to store results.
   private final Map<Key, Integer> _groupKeyToIdMap;
 
   public MultistageGroupByExecutor(List<ExpressionContext> groupByExpr, AggregationFunction[] aggFunctions,
-      AggType aggType, Map<String, Integer> colNameToIndexMap) {
+      AggType aggType, Map<String, Integer> colNameToIndexMap, DataSchema resultSchema) {
     _aggType = aggType;
     _colNameToIndexMap = colNameToIndexMap;
     _groupSet = groupByExpr;
     _aggFunctions = aggFunctions;
+    _resultSchema = resultSchema;
 
     _aggregateResultHolders = new GroupByResultHolder[_aggFunctions.length];
     _mergeResultHolder = new HashMap<>();
-    _finalResultHolder = new ArrayList<>();
 
     _groupKeyToIdMap = new HashMap<>();
 
@@ -84,10 +82,8 @@ public class MultistageGroupByExecutor {
   public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
     if (!_aggType.isInputIntermediateFormat()) {
       processAggregate(block, inputDataSchema);
-    } else if (_aggType.isOutputIntermediateFormat()) {
-      processMerge(block);
     } else {
-      collectResult(block);
+      processMerge(block);
     }
   }
 
@@ -95,10 +91,6 @@ public class MultistageGroupByExecutor {
    * Fetches the result.
    */
   public List<Object[]> getResult() {
-    if (_aggType == AggType.FINAL) {
-      return extractFinalGroupByResult();
-    }
-
     List<Object[]> rows = new ArrayList<>(_groupKeyToIdMap.size());
     int numKeys = _groupSet.size();
     int numFunctions = _aggFunctions.length;
@@ -111,39 +103,27 @@ public class MultistageGroupByExecutor {
       for (int i = 0; i < numFunctions; i++) {
         AggregationFunction func = _aggFunctions[i];
         int index = numKeys + i;
-        if (!_aggType.isInputIntermediateFormat()) {
-          Object intermediateResult = func.extractGroupByResult(_aggregateResultHolders[i], groupId);
-          if (_aggType.isOutputIntermediateFormat()) {
-            row[index] = intermediateResult;
-          } else {
-            Object finalResult = func.extractFinalResult(intermediateResult);
-            row[index] = finalResult == null ? null : func.getFinalResultColumnType().convert(finalResult);
-          }
-        } else {
-          assert _aggType == AggType.INTERMEDIATE;
-          row[index] = _mergeResultHolder.get(groupId)[i];
+        Object value;
+        switch (_aggType) {
+          case LEAF:
+            value = func.extractGroupByResult(_aggregateResultHolders[i], groupId);
+            break;
+          case INTERMEDIATE:
+            value = _mergeResultHolder.get(groupId)[i];
+            break;
+          case FINAL:
+            value = func.extractFinalResult(_mergeResultHolder.get(groupId)[i]);
+            break;
+          case DIRECT:
+            Object intermediate = _aggFunctions[i].extractGroupByResult(_aggregateResultHolders[i], groupId);
+            value = func.extractFinalResult(intermediate);
+            break;
+          default:
+            throw new UnsupportedOperationException("Unsupported aggTyp: " + _aggType);
         }
+        row[index] = value;
       }
-      rows.add(row);
-    }
-    return rows;
-  }
-
-  private List<Object[]> extractFinalGroupByResult() {
-    List<Object[]> rows = new ArrayList<>(_finalResultHolder.size());
-    int numKeys = _groupSet.size();
-    int numFunctions = _aggFunctions.length;
-    int numColumns = numKeys + numFunctions;
-    for (Object[] resultRow : _finalResultHolder) {
-      Object[] row = new Object[numColumns];
-      System.arraycopy(resultRow, 0, row, 0, numKeys);
-      for (int i = 0; i < numFunctions; i++) {
-        AggregationFunction func = _aggFunctions[i];
-        int index = numKeys + i;
-        Object finalResult = func.extractFinalResult(resultRow[index]);
-        row[index] = finalResult == null ? null : func.getFinalResultColumnType().convert(finalResult);
-      }
-      rows.add(row);
+      rows.add(TypeUtils.canonicalizeRow(row, _resultSchema));
     }
     return rows;
   }
@@ -154,7 +134,7 @@ public class MultistageGroupByExecutor {
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggregationFunction = _aggFunctions[i];
       Map<ExpressionContext, BlockValSet> blockValSetMap =
-          getBlockValSetMap(aggregationFunction, block, inputDataSchema);
+          AggregateOperator.getBlockValSetMap(aggregationFunction, block, inputDataSchema, _colNameToIndexMap);
       GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
       groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
       aggregationFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
@@ -172,7 +152,8 @@ public class MultistageGroupByExecutor {
         if (!_mergeResultHolder.containsKey(rowKey)) {
           _mergeResultHolder.put(rowKey, new Object[_aggFunctions.length]);
         }
-        Object intermediateResultToMerge = extractValueFromRow(_aggFunctions[i], row);
+        Object intermediateResultToMerge =
+            AggregateOperator.extractValueFromRow(_aggFunctions[i], row, _colNameToIndexMap);
 
         // Not all V1 aggregation functions have null-handling. So handle null values and call merge only if necessary.
         if (intermediateResultToMerge == null) {
@@ -186,22 +167,6 @@ public class MultistageGroupByExecutor {
 
         _mergeResultHolder.get(rowKey)[i] = _aggFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
       }
-    }
-  }
-
-  private void collectResult(TransferableBlock block) {
-    List<Object[]> container = block.getContainer();
-    for (Object[] row : container) {
-      assert row.length == _groupSet.size() + _aggFunctions.length;
-      Object[] resultRow = new Object[row.length];
-      System.arraycopy(row, 0, resultRow, 0, _groupSet.size());
-
-      for (int i = 0; i < _aggFunctions.length; i++) {
-        int index = _groupSet.size() + i;
-        resultRow[index] = extractValueFromRow(_aggFunctions[i], row);
-      }
-
-      _finalResultHolder.add(resultRow);
     }
   }
 
@@ -225,42 +190,5 @@ public class MultistageGroupByExecutor {
       rowIntKeys[i] = _groupKeyToIdMap.computeIfAbsent(rowKey, k -> _groupKeyToIdMap.size());
     }
     return rowIntKeys;
-  }
-
-  private Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggFunction,
-      TransferableBlock block, DataSchema inputDataSchema) {
-    List<ExpressionContext> expressions = aggFunction.getInputExpressions();
-    int numExpressions = expressions.size();
-    if (numExpressions == 0) {
-      return Collections.emptyMap();
-    }
-
-    Preconditions.checkState(numExpressions == 1, "Cannot handle more than one identifier in aggregation function.");
-    ExpressionContext expression = expressions.get(0);
-    Preconditions.checkState(expression.getType().equals(ExpressionContext.Type.IDENTIFIER));
-    int index = _colNameToIndexMap.get(expression.getIdentifier());
-
-    DataSchema.ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
-    Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
-    // TODO: If the previous block is not mailbox received, this method is not efficient.  Then getDataBlock() will
-    //  convert the unserialized format to serialized format of BaseDataBlock. Then it will convert it back to column
-    //  value primitive type.
-    return Collections.singletonMap(expression,
-        new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index));
-  }
-
-  private Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row) {
-    // TODO: Add support to handle aggregation functions where:
-    //       1. The identifier need not be the first argument
-    //       2. There are more than one identifiers.
-    List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
-    Preconditions.checkState(expressions.size() == 1, "Only support single expression, got: %s", expressions.size());
-    ExpressionContext expr = expressions.get(0);
-    ExpressionContext.Type exprType = expr.getType();
-    if (exprType == ExpressionContext.Type.IDENTIFIER) {
-      return row[_colNameToIndexMap.get(expr.getIdentifier())];
-    }
-    Preconditions.checkState(exprType == ExpressionContext.Type.LITERAL, "Unsupported expression type: %s", exprType);
-    return expr.getLiteral().getValue();
   }
 }
