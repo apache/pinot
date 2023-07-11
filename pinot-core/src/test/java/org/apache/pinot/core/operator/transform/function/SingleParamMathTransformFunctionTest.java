@@ -95,10 +95,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof AbsTransformFunction);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = Math.abs(_intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = Math.abs(_intSVValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
@@ -161,10 +161,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof CeilTransformFunction);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = Math.ceil(_intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = Math.ceil(_intSVValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
@@ -228,10 +228,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof ExpTransformFunction);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = Math.exp(_intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = Math.exp(_intSVValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
@@ -296,10 +296,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof FloorTransformFunction);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = Math.floor(_intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = Math.floor(_intSVValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
@@ -363,10 +363,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof LnTransformFunction);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = Math.log(_intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = Math.log(_intSVValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
@@ -430,10 +430,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = Math.sqrt(_intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = Math.sqrt(_intSVValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
@@ -465,10 +465,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = Math.sqrt(_intSVValues[i]) + Math.ceil(_intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = Math.sqrt(_intSVValues[i]) + Math.ceil(_intSVValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
@@ -522,10 +522,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = Math.log10(_intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = Math.log10(_intSVValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
@@ -579,10 +579,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = Math.log(_intSVValues[i]) / Math.log(2);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = Math.log(_intSVValues[i]) / Math.log(2);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
@@ -635,10 +635,10 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = Math.signum(_intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = Math.signum(_intSVValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);

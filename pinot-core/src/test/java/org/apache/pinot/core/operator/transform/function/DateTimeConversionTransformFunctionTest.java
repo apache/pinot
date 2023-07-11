@@ -87,10 +87,10 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
     long[] expectedValues = new long[NUM_ROWS];
     RoaringBitmap expectedNulls = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = TimeUnit.MILLISECONDS.toMinutes(_timeValues[i]);
-      } else {
+      if (isNullRow(i)) {
         expectedNulls.add(i);
+      } else {
+        expectedValues[i] = TimeUnit.MILLISECONDS.toMinutes(_timeValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, expectedNulls);

@@ -140,10 +140,10 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     expectedValues = new boolean[NUM_ROWS];
     bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = getExpectedValue(Integer.compare(_intSVValues[i], _intSVValues[0]));
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = getExpectedValue(Integer.compare(_intSVValues[i], _intSVValues[0]));
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);

@@ -33,10 +33,10 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
 
     long[] expectedResults = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedResults[i] = _intSVValues[i];
-      } else {
+      if (isNullRow(i)) {
         expectedResults[i] = _longSVValues[i];
+      } else {
+        expectedResults[i] = _intSVValues[i];
       }
     }
     testTransformFunction(coalesceFunc, expectedResults);
@@ -51,10 +51,10 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertEquals(coalesceFunc.getName(), "coalesce");
     int[] expectedResults = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedResults[i] = _intSVValues[i];
-      } else {
+      if (isNullRow(i)) {
         expectedResults[i] = intLiteral;
+      } else {
+        expectedResults[i] = _intSVValues[i];
       }
     }
     testTransformFunction(coalesceFunc, expectedResults);
@@ -67,10 +67,10 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
         _dataSourceMap);
     String[] expectedResults = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedResults[i] = _stringSVValues[i];
-      } else {
+      if (isNullRow(i)) {
         expectedResults[i] = "234";
+      } else {
+        expectedResults[i] = _stringSVValues[i];
       }
     }
     testTransformFunction(coalesceFunc, expectedResults);
@@ -85,10 +85,10 @@ public class CoalesceTransformFunctionTest extends BaseTransformFunctionTest {
     double[] expectedResults = new double[NUM_ROWS];
     RoaringBitmap expectedNull = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedResults[i] = _intSVValues[i];
-      } else {
+      if (isNullRow(i)) {
         expectedNull.add(i);
+      } else {
+        expectedResults[i] = _intSVValues[i];
       }
     }
     testTransformFunctionWithNull(coalesceFunc, expectedResults, expectedNull);
