@@ -33,13 +33,14 @@ public class DateTimeGranularitySpec {
   private static final char COLON_SEPARATOR = ':';
   private static final int COLON_FORMAT_SIZE_POSITION = 0;
   private static final int COLON_FORMAT_TIME_UNIT_POSITION = 1;
+  private static final int COLON_FORMAT_NUM_TOKENS = 2;
 
   // Pipe format: 'timeUnit|size'
   private static final char PIPE_SEPARATOR = '|';
   private static final int PIPE_FORMAT_TIME_UNIT_POSITION = 0;
   private static final int PIPE_FORMAT_SIZE_POSITION = 1;
-
-  private static final int NUM_TOKENS = 2;
+  private static final int PIPE_FORMAT_MIN_TOKENS = 1;
+  private static final int PIPE_FORMAT_MAX_TOKENS = 2;
 
   private final int _size;
   private final TimeUnit _timeUnit;
@@ -53,30 +54,30 @@ public class DateTimeGranularitySpec {
     char separator;
     int sizePosition;
     int timeUnitPosition;
+    int minTokens;
+    int maxTokens;
 
     if (Character.isDigit(granularity.charAt(0))) {
       // Colon format: 'size:timeUnit'
       separator = COLON_SEPARATOR;
       sizePosition = COLON_FORMAT_SIZE_POSITION;
       timeUnitPosition = COLON_FORMAT_TIME_UNIT_POSITION;
+
+      minTokens = COLON_FORMAT_NUM_TOKENS;
+      maxTokens = COLON_FORMAT_NUM_TOKENS;
     } else {
-      // Pipe format: 'timeUnit|size'
+      // Pipe format: 'timeUnit(|size)'
       separator = PIPE_SEPARATOR;
       sizePosition = PIPE_FORMAT_SIZE_POSITION;
       timeUnitPosition = PIPE_FORMAT_TIME_UNIT_POSITION;
+
+      minTokens = PIPE_FORMAT_MIN_TOKENS;
+      maxTokens = PIPE_FORMAT_MAX_TOKENS;
     }
 
     String[] granularityTokens = StringUtil.split(granularity, separator, 2);
-    Preconditions.checkArgument(granularityTokens.length >= NUM_TOKENS,
-            "Invalid granularity: %s, must be of format 'timeUnit|size' or 'size:timeUnit'", granularity);
-
-    try {
-      _size = Integer.parseInt(granularityTokens[sizePosition]);
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          String.format("Invalid size: %s in granularity: %s", granularityTokens[sizePosition], granularity));
-    }
-    Preconditions.checkArgument(_size > 0, "Invalid size: %s in granularity: %s, must be positive", _size, granularity);
+    Preconditions.checkArgument(granularityTokens.length >= minTokens && granularityTokens.length <= maxTokens,
+            "Invalid granularity: %s, must be of format 'timeUnit(|size)' or 'size:timeUnit'", granularity);
 
     try {
       _timeUnit = TimeUnit.valueOf(granularityTokens[timeUnitPosition]);
@@ -85,6 +86,20 @@ public class DateTimeGranularitySpec {
           String.format("Invalid time unit: %s in granularity: %s", granularityTokens[timeUnitPosition],
               granularity));
     }
+
+    // New format without explicitly setting size - use default size = 1
+    if (granularityTokens.length == PIPE_FORMAT_MIN_TOKENS) {
+      _size = 1;
+      return;
+    }
+
+    try {
+      _size = Integer.parseInt(granularityTokens[sizePosition]);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid size: %s in granularity: %s", granularityTokens[sizePosition], granularity));
+    }
+    Preconditions.checkArgument(_size > 0, "Invalid size: %s in granularity: %s, must be positive", _size, granularity);
   }
 
   /**
