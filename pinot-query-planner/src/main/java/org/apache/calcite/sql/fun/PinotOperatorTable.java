@@ -57,14 +57,27 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
   public static final SqlFunction COALESCE = new PinotSqlCoalesceFunction();
 
   private static final Set<SqlKind> KINDS =
-      Arrays.stream(AggregationFunctionType.values()).filter(func -> func.getSqlKind() != null)
-          .flatMap(func -> Stream.of(func.getSqlKind())).collect(Collectors.toSet());
+      Stream.concat(
+              Arrays.stream(AggregationFunctionType.values())
+                  .filter(func -> func.getSqlKind() != null)
+                  .flatMap(func -> Stream.of(func.getSqlKind())),
+              Arrays.stream(TransformFunctionType.values())
+                  .filter(func -> func.getSqlKind() != null)
+                  .flatMap(func -> Stream.of(func.getSqlKind())))
+          .collect(Collectors.toSet());
 
   private static final Set<String> CALCITE_OPERATOR_TABLE_REGISTERED_FUNCTIONS =
-      Arrays.stream(AggregationFunctionType.values())
-          .filter(func -> func.getSqlKind() != null) // TODO: remove this once all V1 AGG functions are registered
-          .flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toUpperCase(),
-              func.getName().toLowerCase()))
+      Stream.concat(
+              Arrays.stream(AggregationFunctionType.values())
+                  // TODO: remove below once all V1 AGG functions are registered
+                  .filter(func -> func.getSqlKind() != null)
+                  .flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toUpperCase(),
+                      func.getName().toLowerCase())),
+              Arrays.stream(TransformFunctionType.values())
+                  // TODO: remove below once all V1 Transform functions are registered
+                  .filter(func -> func.getSqlKind() != null)
+                  .flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toUpperCase(),
+                      func.getName().toLowerCase())))
           .collect(Collectors.toSet());
 
   // TODO: clean up lazy init by using Suppliers.memorized(this::computeInstance) and make getter wrapped around
@@ -75,31 +88,9 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
       // Uses two-phase construction, because we can't initialize the
       // table until the constructor of the sub-class has completed.
       _instance = new PinotOperatorTable();
-      _instance.initNoDuplicateFunctions();
-      _instance.initAggregationFunctions();
-      _instance.initTransformFunctions();
+      _instance.initNoDuplicate();
     }
     return _instance;
-  }
-
-  public static boolean isAggregationKindSupported(SqlKind sqlKind) {
-    return KINDS.contains(sqlKind);
-  }
-
-  public static boolean isAggregationReduceSupported(String functionName) {
-    if (AGGREGATION_REDUCE_SUPPORTED_FUNCTIONS.contains(functionName)) {
-      return true;
-    }
-    String upperCaseFunctionName = AggregationFunctionType.getNormalizedAggregationFunctionName(functionName);
-    return AGGREGATION_REDUCE_SUPPORTED_FUNCTIONS.contains(upperCaseFunctionName);
-  }
-
-  public static boolean isTransformFunctionRegisteredWithOperatorTable(String functionName) {
-    if (CALCITE_OPERATOR_TABLE_REGISTERED_FUNCTIONS.contains(functionName)) {
-      return true;
-    }
-    String upperCaseFunctionName = TransformFunctionType.getNormalizedTransformFunctionName(functionName);
-    return CALCITE_OPERATOR_TABLE_REGISTERED_FUNCTIONS.contains(upperCaseFunctionName);
   }
 
   public static boolean isAggregationFunctionRegisteredWithOperatorTable(String functionName) {
@@ -112,18 +103,18 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
    *
    * <p>This is a direct copy of the {@link org.apache.calcite.sql.util.ReflectiveSqlOperatorTable} and can be hard to
    * debug, suggest changing to a non-dynamic registration. Dynamic function support should happen via catalog.
+   *
+   * This also registers aggregation functions defined in {@link org.apache.pinot.segment.spi.AggregationFunctionType}
+   * which are multistage enabled.
    */
-  public final void initNoDuplicateFunctions() {
+  public final void initNoDuplicate() {
     // Use reflection to register the expressions stored in public fields.
     for (Field field : getClass().getFields()) {
       try {
         if (SqlFunction.class.isAssignableFrom(field.getType())) {
           SqlFunction op = (SqlFunction) field.get(this);
           if (op != null && notRegistered(op)) {
-            if (!isPinotAggregationFunction(op.getName()) && !isPinotTransformFunction(op.getName())) {
-              // Register the standard Calcite functions and those defined in this class only
-              register(op);
-            }
+            register(op);
           }
         } else if (
             SqlOperator.class.isAssignableFrom(field.getType())) {
@@ -136,14 +127,10 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
         throw Util.throwAsRuntime(Util.causeOrSelf(e));
       }
     }
-  }
 
-  // Walk through all the Pinot aggregation types and
-  //   1. register those that are supported in multistage in addition to calcite standard opt table.
-  //   2. register special handling that differs from calcite standard.
-  public final void initAggregationFunctions() {
-    // Walk through all the Pinot aggregation types and register those that are supported in multistage and which
-    // aren't standard Calcite functions such as SUM / MIN / MAX / COUNT etc.
+    // Walk through all the Pinot aggregation types and
+    //   1. register those that are supported in multistage in addition to calcite standard opt table.
+    //   2. register special handling that differs from calcite standard.
     for (AggregationFunctionType aggregationFunctionType : AggregationFunctionType.values()) {
       if (aggregationFunctionType.getSqlKind() != null) {
         // 1. Register the aggregation function with Calcite
@@ -155,79 +142,46 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
         }
       }
     }
-  }
 
-  /**
-   * This registers transform functions defined in {@link org.apache.pinot.common.function.TransformFunctionType}
-   * which are multistage enabled.
-   */
-  private void initTransformFunctions() {
-    // Walk through all the Pinot transform types and register those that are supported in multistage.
+    // Walk through all the Pinot transform types and
+    //   1. register those that are supported in multistage in addition to calcite standard opt table.
+    //   2. register special handling that differs from calcite standard.
     for (TransformFunctionType transformFunctionType : TransformFunctionType.values()) {
-      if (transformFunctionType.getSqlKind() == null) {
-        // Skip registering functions which are standard Calcite functions and functions which are not yet supported.
-        continue;
-      }
-
-      // Register the aggregation function with Calcite along with all alternative names
-      List<PinotSqlTransformFunction> sqlTransformFunctions = new ArrayList<>();
-      PinotSqlTransformFunction aggFunction = generatePinotSqlTransformFunction(transformFunctionType.getName(),
-          transformFunctionType, false);
-      sqlTransformFunctions.add(aggFunction);
-      List<String> alternativeFunctionNames = transformFunctionType.getAliases();
-      if (alternativeFunctionNames == null || alternativeFunctionNames.size() == 0) {
-        // If no alternative function names are specified, generate one which converts camel case to have underscores
-        // as delimiters instead. E.g. boolAnd -> BOOL_AND
-        String alternativeFunctionName =
-            convertCamelCaseToUseUnderscores(transformFunctionType.getName());
-        PinotSqlTransformFunction function =
-            generatePinotSqlTransformFunction(alternativeFunctionName, transformFunctionType,
-                false);
-        sqlTransformFunctions.add(function);
-      } else {
+      if (transformFunctionType.getSqlKind() != null) {
+        // 1. Register the aggregation function with Calcite
+        registerTransformFunction(transformFunctionType.getName(), transformFunctionType);
+        // 2. Register the aggregation function with Calcite on all alternative names
+        List<String> alternativeFunctionNames = transformFunctionType.getAlternativeNames();
         for (String alternativeFunctionName : alternativeFunctionNames) {
-          PinotSqlTransformFunction function =
-              generatePinotSqlTransformFunction(alternativeFunctionName, transformFunctionType,
-                  false);
-          sqlTransformFunctions.add(function);
-        }
-      }
-      for (PinotSqlTransformFunction sqlAggFunction : sqlTransformFunctions) {
-        if (notRegistered(sqlAggFunction)) {
-          register(sqlAggFunction);
+          registerTransformFunction(alternativeFunctionName, transformFunctionType);
         }
       }
     }
   }
 
-  private static String convertCamelCaseToUseUnderscores(String functionName) {
-    // Skip functions that have numbers for now and return their name as is
-    return functionName.matches(".*\\d.*")
-        ? functionName
-        : functionName.replaceAll("(.)(\\p{Upper}+|\\d+)", "$1_$2");
+  private void registerAggregateFunction(String functionName, AggregationFunctionType functionType) {
+    // register function behavior that's different from Calcite
+    if (functionType.getOperandTypeChecker() != null && functionType.getReturnTypeInference() != null) {
+      PinotSqlAggFunction sqlAggFunction = new PinotSqlAggFunction(functionName.toUpperCase(Locale.ROOT), null,
+          functionType.getSqlKind(), functionType.getReturnTypeInference(), null,
+          functionType.getOperandTypeChecker(), functionType.getSqlFunctionCategory());
+      if (notRegistered(sqlAggFunction)) {
+        register(sqlAggFunction);
+      }
+    }
   }
 
-  private static PinotSqlAggFunction generatePinotSqlAggFunction(String functionName,
-      AggregationFunctionType aggregationFunctionType, boolean isIntermediateStageFunction) {
-    return new PinotSqlAggFunction(functionName.toUpperCase(Locale.ROOT),
-        aggregationFunctionType.getSqlIdentifier(),
-        aggregationFunctionType.getSqlKind(),
-        isIntermediateStageFunction
-            ? aggregationFunctionType.getSqlIntermediateReturnTypeInference()
-            : aggregationFunctionType.getSqlReturnTypeInference(),
-        aggregationFunctionType.getSqlOperandTypeInference(),
-        aggregationFunctionType.getSqlOperandTypeChecker(),
-        aggregationFunctionType.getSqlFunctionCategory());
-  }
-
-  private static PinotSqlTransformFunction generatePinotSqlTransformFunction(String functionName,
-      TransformFunctionType transformFunctionType, boolean isIntermediateStageFunction) {
-    return new PinotSqlTransformFunction(functionName.toUpperCase(Locale.ROOT),
-        transformFunctionType.getSqlKind(),
-        transformFunctionType.getSqlReturnTypeInference(),
-        transformFunctionType.getSqlOperandTypeInference(),
-        transformFunctionType.getSqlOperandTypeChecker(),
-        transformFunctionType.getSqlFunctionCategory());
+  private void registerTransformFunction(String functionName, TransformFunctionType functionType) {
+    // register function behavior that's different from Calcite
+    if (functionType.getOperandTypeChecker() != null && functionType.getReturnTypeInference() != null) {
+      PinotSqlTransformFunction sqlTransformFunction =
+          new PinotSqlTransformFunction(functionName.toUpperCase(Locale.ROOT),
+              functionType.getSqlKind(), functionType.getReturnTypeInference(), null,
+              functionType.getOperandTypeChecker(), functionType.getSqlFunctionCategory());
+      if (notRegistered(sqlTransformFunction)) {
+        register(sqlTransformFunction);
+      }
+    }
   }
 
   private boolean notRegistered(SqlFunction op) {
@@ -242,20 +196,5 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
     lookupOperatorOverloads(op.getNameAsId(), null, op.getSyntax(), operatorList,
         SqlNameMatchers.withCaseSensitive(false));
     return operatorList.size() == 0;
-  }
-
-  private boolean isPinotAggregationFunction(String name) {
-    AggregationFunctionType aggFunctionType = null;
-    if (isAggregationFunctionRegisteredWithOperatorTable(name)) {
-      aggFunctionType = AggregationFunctionType.getAggregationFunctionType(name);
-    }
-    return aggFunctionType != null && !aggFunctionType.isNativeCalciteAggregationFunctionType();
-  }
-
-  private boolean isPinotTransformFunction(String name) {
-    if (isTransformFunctionRegisteredWithOperatorTable(name)) {
-      return TransformFunctionType.isTransformFunctionType(name);
-    }
-    return false;
   }
 }

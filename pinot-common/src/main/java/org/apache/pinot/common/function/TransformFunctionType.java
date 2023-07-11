@@ -31,12 +31,10 @@ import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
-import org.apache.calcite.sql.type.SqlOperandTypeInference;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
-import org.apache.commons.lang.StringUtils;
 
 
 public enum TransformFunctionType {
@@ -182,39 +180,36 @@ public enum TransformFunctionType {
   RADIANS("radians");
 
   private final String _name;
-  private final List<String> _aliases;
+  private final List<String> _alternativeNames;
   private final SqlKind _sqlKind;
-  private final SqlReturnTypeInference _sqlReturnTypeInference;
-  private final SqlOperandTypeInference _sqlOperandTypeInference;
-  private final SqlOperandTypeChecker _sqlOperandTypeChecker;
+  private final SqlReturnTypeInference _returnTypeInference;
+  private final SqlOperandTypeChecker _operandTypeChecker;
   private final SqlFunctionCategory _sqlFunctionCategory;
 
-  TransformFunctionType(String name, String... aliases) {
-    this(name, null, null, null, null, null, aliases);
+  TransformFunctionType(String name, String... alternativeNames) {
+    this(name, null, null, null, null, alternativeNames);
   }
 
-  TransformFunctionType(String name, SqlReturnTypeInference sqlReturnTypeInference,
-      SqlOperandTypeChecker sqlOperandTypeChecker, String... aliases) {
-    this(name, SqlKind.OTHER_FUNCTION, sqlReturnTypeInference, null, sqlOperandTypeChecker,
-        SqlFunctionCategory.USER_DEFINED_FUNCTION, aliases);
+  TransformFunctionType(String name, SqlReturnTypeInference returnTypeInference,
+      SqlOperandTypeChecker operandTypeChecker, String... alternativeNames) {
+    this(name, SqlKind.OTHER_FUNCTION, returnTypeInference, operandTypeChecker,
+        SqlFunctionCategory.USER_DEFINED_FUNCTION, alternativeNames);
   }
 
   /**
    * Constructor to use for transform functions which are supported in both v1 and multistage engines
    */
-  TransformFunctionType(String name, SqlKind sqlKind, SqlReturnTypeInference sqlReturnTypeInference,
-      SqlOperandTypeInference sqlOperandTypeInference, SqlOperandTypeChecker sqlOperandTypeChecker,
-      SqlFunctionCategory sqlFunctionCategory, String... aliases) {
+  TransformFunctionType(String name, SqlKind sqlKind, SqlReturnTypeInference returnTypeInference,
+      SqlOperandTypeChecker operandTypeChecker, SqlFunctionCategory sqlFunctionCategory, String... alternativeNames) {
     _name = name;
-    List<String> all = new ArrayList<>(aliases.length + 2);
+    List<String> all = new ArrayList<>(alternativeNames.length + 2);
     all.add(name);
     all.add(name());
-    all.addAll(Arrays.asList(aliases));
-    _aliases = Collections.unmodifiableList(all);
+    all.addAll(Arrays.asList(alternativeNames));
+    _alternativeNames = Collections.unmodifiableList(all);
     _sqlKind = sqlKind;
-    _sqlReturnTypeInference = sqlReturnTypeInference;
-    _sqlOperandTypeInference = sqlOperandTypeInference;
-    _sqlOperandTypeChecker = sqlOperandTypeChecker;
+    _returnTypeInference = returnTypeInference;
+    _operandTypeChecker = operandTypeChecker;
     _sqlFunctionCategory = sqlFunctionCategory;
   }
 
@@ -222,24 +217,20 @@ public enum TransformFunctionType {
     return _name;
   }
 
-  public List<String> getAliases() {
-    return _aliases;
+  public List<String> getAlternativeNames() {
+    return _alternativeNames;
   }
 
   public SqlKind getSqlKind() {
     return _sqlKind;
   }
 
-  public SqlReturnTypeInference getSqlReturnTypeInference() {
-    return _sqlReturnTypeInference;
+  public SqlReturnTypeInference getReturnTypeInference() {
+    return _returnTypeInference;
   }
 
-  public SqlOperandTypeInference getSqlOperandTypeInference() {
-    return _sqlOperandTypeInference;
-  }
-
-  public SqlOperandTypeChecker getSqlOperandTypeChecker() {
-    return _sqlOperandTypeChecker;
+  public SqlOperandTypeChecker getOperandTypeChecker() {
+    return _operandTypeChecker;
   }
 
   public SqlFunctionCategory getSqlFunctionCategory() {
@@ -272,18 +263,6 @@ public enum TransformFunctionType {
           throw new IllegalArgumentException("Invalid type: " + operandType);
         }
         return typeFactory.createSqlType(sqlTypeName);
-    }
-  }
-
-  public static String getNormalizedTransformFunctionName(String functionName) {
-    return StringUtils.remove(functionName, '_').toUpperCase();
-  }
-
-  public static boolean isTransformFunctionType(String functionName) {
-    try {
-      return valueOf(functionName.toUpperCase()) != null;
-    } catch (IllegalArgumentException e) {
-      return false;
     }
   }
 }
