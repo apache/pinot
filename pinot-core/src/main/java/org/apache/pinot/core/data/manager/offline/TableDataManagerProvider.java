@@ -20,8 +20,10 @@ package org.apache.pinot.core.data.manager.offline;
 
 import com.google.common.cache.LoadingCache;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
@@ -60,13 +62,14 @@ public class TableDataManagerProvider {
   public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
       LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache) {
-    return getTableDataManager(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager,
+    return getTableDataManager(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager, null,
         errorCache, () -> true);
   }
 
   public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache, Supplier<Boolean> isServerReadyToServeQueries) {
+      @Nullable ExecutorService segmentPreloadExecutor, LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      Supplier<Boolean> isServerReadyToServeQueries) {
     TableDataManager tableDataManager;
     switch (tableDataManagerConfig.getTableType()) {
       case OFFLINE:
@@ -90,8 +93,8 @@ public class TableDataManagerProvider {
       default:
         throw new IllegalStateException();
     }
-    tableDataManager.init(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager, errorCache,
-        _tableDataManagerParams);
+    tableDataManager.init(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager,
+        segmentPreloadExecutor, errorCache, _tableDataManagerParams);
     return tableDataManager;
   }
 }

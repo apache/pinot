@@ -60,6 +60,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
 
+  @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
+  private boolean _enablePreload;
+
   @JsonPropertyDescription("Custom class for upsert metadata manager")
   private String _metadataManagerClass;
 
@@ -106,6 +109,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public boolean isEnableSnapshot() {
     return _enableSnapshot;
+  }
+
+  public boolean isEnablePreload() {
+    return _enablePreload;
   }
 
   @Nullable
@@ -170,6 +177,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setEnableSnapshot(boolean enableSnapshot) {
     _enableSnapshot = enableSnapshot;
+  }
+
+  public void setEnablePreload(boolean enablePreload) {
+    _enablePreload = enablePreload;
   }
 
   public void setMetadataManagerClass(String metadataManagerClass) {
