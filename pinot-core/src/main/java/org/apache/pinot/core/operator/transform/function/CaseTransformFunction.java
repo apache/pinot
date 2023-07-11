@@ -54,7 +54,7 @@ import org.roaringbitmap.RoaringBitmap;
  * ELSE_EXPRESSION can be omitted. When none of when statements is evaluated to be true, and there is no else
  * expression, we output null. Note that when statement is considered as false if it is evaluated to be null.
  */
-public class CaseTransformFunction extends BaseTransformFunction {
+public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEnabledTransformFunction {
   public static final String FUNCTION_NAME = "case";
 
   private List<TransformFunction> _whenStatements = new ArrayList<>();
@@ -71,7 +71,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      boolean nullHandlingEnabled) {
+    super.init(arguments, columnContextMap, nullHandlingEnabled);
     // Check that there are more than 2 arguments
     // Else statement can be omitted.
     if (arguments.size() < 2) {
@@ -298,9 +300,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
     if (!nullHandlingEnabled) {
       return whenStatement.transformToIntValuesSV(valueBlock);
     }
-    Pair<int[], RoaringBitmap> result = whenStatement.transformToIntValuesSVWithNull(valueBlock);
-    RoaringBitmap bitmap = result.getRight();
-    int[] intResult = result.getLeft();
+    int[] intResult = whenStatement.transformToIntValuesSV(valueBlock);
+    RoaringBitmap bitmap = whenStatement.getNullBitmap(valueBlock);
     if (bitmap != null) {
       for (int i : bitmap) {
         intResult[i] = 0;
@@ -310,10 +311,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
-      return super.transformToIntValuesSV(valueBlock);
-    }
+  protected int[] transformToIntValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initIntValuesSV(numDocs);
@@ -348,10 +346,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<int[], RoaringBitmap> transformToIntValuesSVWithNull(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
-      return super.transformToIntValuesSVWithNull(valueBlock);
-    }
+  protected int[] transformToIntValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -362,7 +357,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
     Map<Integer, Pair<int[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToIntValuesSVWithNull(valueBlock));
+        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToIntValuesSV(valueBlock),
+            _thenStatements.get(i).getNullBitmap(valueBlock)));
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
@@ -386,9 +382,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           bitmap.add(docId);
         }
       } else {
-        Pair<int[], RoaringBitmap> intValuesNullPair = _elseStatement.transformToIntValuesSVWithNull(valueBlock);
-        int[] intValues = intValuesNullPair.getLeft();
-        RoaringBitmap nullBitmap = intValuesNullPair.getRight();
+        int[] intValues = _elseStatement.transformToIntValuesSV(valueBlock);
+        RoaringBitmap nullBitmap = _elseStatement.getNullBitmap(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
           _intValuesSV[docId] = intValues[docId];
           if (nullBitmap != null && nullBitmap.contains(docId)) {
@@ -397,14 +392,11 @@ public class CaseTransformFunction extends BaseTransformFunction {
         }
       }
     }
-    return ImmutablePair.of(_intValuesSV, bitmap);
+    return _intValuesSV;
   }
 
   @Override
-  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
-      return super.transformToLongValuesSV(valueBlock);
-    }
+  protected long[] transformToLongValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initLongValuesSV(numDocs);
@@ -439,10 +431,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<long[], RoaringBitmap> transformToLongValuesSVWithNull(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
-      return super.transformToLongValuesSVWithNull(valueBlock);
-    }
+  protected long[] transformToLongValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -453,7 +442,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
     Map<Integer, Pair<long[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToLongValuesSVWithNull(valueBlock));
+        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToLongValuesSV(valueBlock),
+            _thenStatements.get(i).getNullBitmap(valueBlock)));
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
@@ -477,9 +467,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           bitmap.add(docId);
         }
       } else {
-        Pair<long[], RoaringBitmap> longValuesNullPair = _elseStatement.transformToLongValuesSVWithNull(valueBlock);
-        long[] longValues = longValuesNullPair.getLeft();
-        RoaringBitmap nullBitmap = longValuesNullPair.getRight();
+        long[] longValues = _elseStatement.transformToLongValuesSV(valueBlock);
+        RoaringBitmap nullBitmap = _elseStatement.getNullBitmap(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
           _longValuesSV[docId] = longValues[docId];
           if (nullBitmap != null && nullBitmap.contains(docId)) {
@@ -488,14 +477,11 @@ public class CaseTransformFunction extends BaseTransformFunction {
         }
       }
     }
-    return ImmutablePair.of(_longValuesSV, bitmap);
+    return _longValuesSV;
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
-      return super.transformToFloatValuesSV(valueBlock);
-    }
+  protected float[] transformToFloatValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initFloatValuesSV(numDocs);
@@ -530,10 +516,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<float[], RoaringBitmap> transformToFloatValuesSVWithNull(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.FLOAT) {
-      return super.transformToFloatValuesSVWithNull(valueBlock);
-    }
+  protected float[] transformToFloatValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -544,7 +527,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
     Map<Integer, Pair<float[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToFloatValuesSVWithNull(valueBlock));
+        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToFloatValuesSV(valueBlock),
+            _thenStatements.get(i).getNullBitmap(valueBlock)));
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
@@ -568,9 +552,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           bitmap.add(docId);
         }
       } else {
-        Pair<float[], RoaringBitmap> floatValuesNullPair = _elseStatement.transformToFloatValuesSVWithNull(valueBlock);
-        float[] floatValues = floatValuesNullPair.getLeft();
-        RoaringBitmap nullBitmap = floatValuesNullPair.getRight();
+        float[] floatValues = _elseStatement.transformToFloatValuesSV(valueBlock);
+        RoaringBitmap nullBitmap = _elseStatement.getNullBitmap(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
           _floatValuesSV[docId] = floatValues[docId];
           if (nullBitmap != null && nullBitmap.contains(docId)) {
@@ -579,14 +562,11 @@ public class CaseTransformFunction extends BaseTransformFunction {
         }
       }
     }
-    return ImmutablePair.of(_floatValuesSV, bitmap);
+    return _floatValuesSV;
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
-      return super.transformToDoubleValuesSV(valueBlock);
-    }
+  protected double[] transformToDoubleValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initDoubleValuesSV(numDocs);
@@ -621,10 +601,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<double[], RoaringBitmap> transformToDoubleValuesSVWithNull(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.DOUBLE) {
-      return super.transformToDoubleValuesSVWithNull(valueBlock);
-    }
+  protected double[] transformToDoubleValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -635,7 +612,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
     Map<Integer, Pair<double[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToDoubleValuesSVWithNull(valueBlock));
+        thenStatementsIndexToValues.put(i,
+            ImmutablePair.of(_thenStatements.get(i).transformToDoubleValuesSV(valueBlock),
+                _thenStatements.get(i).getNullBitmap(valueBlock)));
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
@@ -659,10 +638,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           bitmap.add(docId);
         }
       } else {
-        Pair<double[], RoaringBitmap> doubleValuesNullPair =
-            _elseStatement.transformToDoubleValuesSVWithNull(valueBlock);
-        double[] doubleValues = doubleValuesNullPair.getLeft();
-        RoaringBitmap nullBitmap = doubleValuesNullPair.getRight();
+        double[] doubleValues = _elseStatement.transformToDoubleValuesSV(valueBlock);
+        RoaringBitmap nullBitmap = _elseStatement.getNullBitmap(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
           _doubleValuesSV[docId] = doubleValues[docId];
           if (nullBitmap != null && nullBitmap.contains(docId)) {
@@ -671,14 +648,11 @@ public class CaseTransformFunction extends BaseTransformFunction {
         }
       }
     }
-    return ImmutablePair.of(_doubleValuesSV, bitmap);
+    return _doubleValuesSV;
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.BIG_DECIMAL) {
-      return super.transformToBigDecimalValuesSV(valueBlock);
-    }
+  protected BigDecimal[] transformToBigDecimalValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initBigDecimalValuesSV(numDocs);
@@ -713,10 +687,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<BigDecimal[], RoaringBitmap> transformToBigDecimalValuesSVWithNull(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.BIG_DECIMAL) {
-      return super.transformToBigDecimalValuesSVWithNull(valueBlock);
-    }
+  protected BigDecimal[] transformToBigDecimalValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -727,7 +698,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
     Map<Integer, Pair<BigDecimal[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToBigDecimalValuesSVWithNull(valueBlock));
+        thenStatementsIndexToValues.put(i,
+            ImmutablePair.of(_thenStatements.get(i).transformToBigDecimalValuesSV(valueBlock),
+                _thenStatements.get(i).getNullBitmap(valueBlock)));
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
@@ -751,10 +724,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           bitmap.add(docId);
         }
       } else {
-        Pair<BigDecimal[], RoaringBitmap> bigDecimalValuesNullPair =
-            _elseStatement.transformToBigDecimalValuesSVWithNull(valueBlock);
-        BigDecimal[] bigDecimalValues = bigDecimalValuesNullPair.getLeft();
-        RoaringBitmap nullBitmap = bigDecimalValuesNullPair.getRight();
+        BigDecimal[] bigDecimalValues = _elseStatement.transformToBigDecimalValuesSV(valueBlock);
+        RoaringBitmap nullBitmap = _elseStatement.getNullBitmap(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
           _bigDecimalValuesSV[docId] = bigDecimalValues[docId];
           if (nullBitmap != null && nullBitmap.contains(docId)) {
@@ -763,14 +734,11 @@ public class CaseTransformFunction extends BaseTransformFunction {
         }
       }
     }
-    return ImmutablePair.of(_bigDecimalValuesSV, bitmap);
+    return _bigDecimalValuesSV;
   }
 
   @Override
-  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
-      return super.transformToStringValuesSV(valueBlock);
-    }
+  protected String[] transformToStringValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initStringValuesSV(numDocs);
@@ -805,10 +773,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<String[], RoaringBitmap> transformToStringValuesSVWithNull(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.STRING) {
-      return super.transformToStringValuesSVWithNull(valueBlock);
-    }
+  protected String[] transformToStringValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -819,7 +784,9 @@ public class CaseTransformFunction extends BaseTransformFunction {
     Map<Integer, Pair<String[], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToStringValuesSVWithNull(valueBlock));
+        thenStatementsIndexToValues.put(i,
+            ImmutablePair.of(_thenStatements.get(i).transformToStringValuesSV(valueBlock),
+                _thenStatements.get(i).getNullBitmap(valueBlock)));
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
@@ -843,10 +810,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           bitmap.add(docId);
         }
       } else {
-        Pair<String[], RoaringBitmap> stringValuesNullPair =
-            _elseStatement.transformToStringValuesSVWithNull(valueBlock);
-        String[] stringValues = stringValuesNullPair.getLeft();
-        RoaringBitmap nullBitmap = stringValuesNullPair.getRight();
+        String[] stringValues = _elseStatement.transformToStringValuesSV(valueBlock);
+        RoaringBitmap nullBitmap = _elseStatement.getNullBitmap(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
           _stringValuesSV[docId] = stringValues[docId];
           if (nullBitmap != null && nullBitmap.contains(docId)) {
@@ -855,14 +820,11 @@ public class CaseTransformFunction extends BaseTransformFunction {
         }
       }
     }
-    return ImmutablePair.of(_stringValuesSV, bitmap);
+    return _stringValuesSV;
   }
 
   @Override
-  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
-      return super.transformToBytesValuesSV(valueBlock);
-    }
+  protected byte[][] transformToBytesValuesSVUsingValue(ValueBlock valueBlock) {
     int[] selected = getSelectedArray(valueBlock, false);
     int numDocs = valueBlock.getNumDocs();
     initBytesValuesSV(numDocs);
@@ -897,10 +859,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public Pair<byte[][], RoaringBitmap> transformToBytesValuesSVWithNull(ValueBlock valueBlock) {
-    if (_resultMetadata.getDataType().getStoredType() != DataType.BYTES) {
-      return super.transformToBytesValuesSVWithNull(valueBlock);
-    }
+  protected byte[][] transformToBytesValuesSVUsingValueAndNull(ValueBlock valueBlock) {
     final RoaringBitmap bitmap = new RoaringBitmap();
     int[] selected = getSelectedArray(valueBlock, true);
     int numDocs = valueBlock.getNumDocs();
@@ -911,7 +870,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
     Map<Integer, Pair<byte[][], RoaringBitmap>> thenStatementsIndexToValues = new HashMap<>();
     for (int i = 0; i < numThenStatements; i++) {
       if (_computeThenStatements[i]) {
-        thenStatementsIndexToValues.put(i, _thenStatements.get(i).transformToBytesValuesSVWithNull(valueBlock));
+        thenStatementsIndexToValues.put(i, ImmutablePair.of(_thenStatements.get(i).transformToBytesValuesSV(valueBlock),
+            _thenStatements.get(i).getNullBitmap(valueBlock)));
       }
     }
     for (int docId = 0; docId < numDocs; docId++) {
@@ -935,9 +895,8 @@ public class CaseTransformFunction extends BaseTransformFunction {
           bitmap.add(docId);
         }
       } else {
-        Pair<byte[][], RoaringBitmap> bytesValuesNullPair = _elseStatement.transformToBytesValuesSVWithNull(valueBlock);
-        byte[][] byteValues = bytesValuesNullPair.getLeft();
-        RoaringBitmap nullBitmap = bytesValuesNullPair.getRight();
+        byte[][] byteValues = _elseStatement.transformToBytesValuesSV(valueBlock);
+        RoaringBitmap nullBitmap = _elseStatement.getNullBitmap(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
           _bytesValuesSV[docId] = byteValues[docId];
           if (nullBitmap != null && nullBitmap.contains(docId)) {
@@ -946,7 +905,7 @@ public class CaseTransformFunction extends BaseTransformFunction {
         }
       }
     }
-    return ImmutablePair.of(_bytesValuesSV, bitmap);
+    return _bytesValuesSV;
   }
 
   @Override

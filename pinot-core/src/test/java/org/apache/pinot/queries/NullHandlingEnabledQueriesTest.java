@@ -446,4 +446,22 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertArrayEquals(rows.get(1), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 3});
     assertArrayEquals(rows.get(2), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 2});
   }
+
+  @Test
+  public void testNestedCaseTransformFunction()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT (CASE WHEN %s = -2147483648 THEN 1 ELSE 2 END) + 0 FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertArrayEquals(rows.get(0), new Object[]{(double) 2});
+  }
 }

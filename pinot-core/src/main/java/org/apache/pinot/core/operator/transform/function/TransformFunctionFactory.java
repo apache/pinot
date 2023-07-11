@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -72,8 +71,10 @@ import org.apache.pinot.core.operator.transform.function.TrigonometricTransformF
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanhTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -254,11 +255,11 @@ public class TransformFunctionFactory {
    *
    * @param expression       Transform expression
    * @param columnContextMap Map from column name to context
-   * @param queryContext     Query context if available
+   * @param queryContext     Query context
    * @return Transform function
    */
   public static TransformFunction get(ExpressionContext expression, Map<String, ColumnContext> columnContextMap,
-      @Nullable QueryContext queryContext) {
+      QueryContext queryContext) {
     switch (expression.getType()) {
       case FUNCTION:
         FunctionContext function = expression.getFunction();
@@ -294,7 +295,7 @@ public class TransformFunctionFactory {
           transformFunctionArguments.add(TransformFunctionFactory.get(argument, columnContextMap, queryContext));
         }
         try {
-          transformFunction.init(transformFunctionArguments, columnContextMap);
+          transformFunction.init(transformFunctionArguments, columnContextMap, queryContext.isNullHandlingEnabled());
         } catch (Exception e) {
           throw new BadQueryRequestException("Caught exception while initializing transform function: " + functionName,
               e);
@@ -304,8 +305,7 @@ public class TransformFunctionFactory {
         String columnName = expression.getIdentifier();
         return new IdentifierTransformFunction(columnName, columnContextMap.get(columnName));
       case LITERAL:
-        return queryContext == null ? new LiteralTransformFunction(expression.getLiteral())
-            : queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
+        return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
                 LiteralTransformFunction::new);
       default:
         throw new IllegalStateException();
@@ -316,7 +316,19 @@ public class TransformFunctionFactory {
   public static TransformFunction get(ExpressionContext expression, Map<String, DataSource> dataSourceMap) {
     Map<String, ColumnContext> columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
     dataSourceMap.forEach((k, v) -> columnContextMap.put(k, ColumnContext.fromDataSource(v)));
-    return get(expression, columnContextMap, null);
+    QueryContext dummy = QueryContextConverterUtils.getQueryContext(
+        CalciteSqlParser.compileToPinotQuery("SELECT * from testTable;"));
+    return get(expression, columnContextMap, dummy);
+  }
+
+  @VisibleForTesting
+  public static TransformFunction getNullHandlingEnabled(ExpressionContext expression,
+      Map<String, DataSource> dataSourceMap) {
+    Map<String, ColumnContext> columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
+    dataSourceMap.forEach((k, v) -> columnContextMap.put(k, ColumnContext.fromDataSource(v)));
+    QueryContext dummy = QueryContextConverterUtils.getQueryContext(
+        CalciteSqlParser.compileToPinotQuery("SET enableNullHandling = true; SELECT * from testTable;"));
+    return get(expression, columnContextMap, dummy);
   }
 
   /**
