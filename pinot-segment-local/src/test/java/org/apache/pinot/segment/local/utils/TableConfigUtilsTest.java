@@ -1798,7 +1798,8 @@ public class TableConfigUtilsTest {
     Map<String, String> upsertCompactionTaskConfig =
         ImmutableMap.of(
             "bufferTimePeriod", "5d",
-            "invalidRecordsThresholdPercent", "0"
+            "invalidRecordsThresholdPercent", "1",
+            "minRecordCount", "1"
         );
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)
@@ -1808,6 +1809,60 @@ public class TableConfigUtilsTest {
         .build();
 
     TableConfigUtils.validateTaskConfigs(tableConfig, schema);
+
+    // test with invalid invalidRecordsThresholdPercents
+    upsertCompactionTaskConfig =
+        ImmutableMap.of(
+            "invalidRecordsThresholdPercent", "0"
+        );
+    TableConfig zeroPercentTableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setTaskConfig(new TableTaskConfig(
+            ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateTaskConfigs(zeroPercentTableConfig, schema));
+    upsertCompactionTaskConfig =
+        ImmutableMap.of(
+            "invalidRecordsThresholdPercent", "110"
+        );
+    TableConfig hundredTenPercentTableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setTaskConfig(new TableTaskConfig(
+            ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateTaskConfigs(hundredTenPercentTableConfig, schema));
+
+    // test with invalid minRecordCount
+    upsertCompactionTaskConfig =
+        ImmutableMap.of(
+            "minRecordCount", "0"
+        );
+    TableConfig invalidCountTableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setTaskConfig(new TableTaskConfig(
+            ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateTaskConfigs(invalidCountTableConfig, schema));
+
+    // test without invalidRecordsThresholdPercent or minRecordCount
+    upsertCompactionTaskConfig =
+        ImmutableMap.of(
+            "bufferTimePeriod", "5d"
+        );
+    TableConfig invalidTableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setTaskConfig(new TableTaskConfig(
+            ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateTaskConfigs(invalidTableConfig, schema));
   }
 
   @Test

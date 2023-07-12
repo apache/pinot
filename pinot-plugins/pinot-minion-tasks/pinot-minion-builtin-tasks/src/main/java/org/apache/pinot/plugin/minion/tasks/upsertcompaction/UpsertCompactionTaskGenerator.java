@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -55,8 +56,23 @@ import org.slf4j.LoggerFactory;
 public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
-  private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 30.0;
-  private static final long DEFAULT_MIN_RECORD_COUNT = 100_000;
+  private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 0.0;
+  private static final long DEFAULT_MIN_RECORD_COUNT = 0;
+  public static class SegmentSelectionResult {
+    private List<SegmentZKMetadata> _segmentsForCompaction;
+    private List<String> _segmentsForDeletion;
+    SegmentSelectionResult(List<SegmentZKMetadata> segmentsForCompaction, List<String> segmentsForDeletion) {
+      _segmentsForCompaction = segmentsForCompaction;
+      _segmentsForDeletion = segmentsForDeletion;
+    }
+    public List<SegmentZKMetadata> getSegmentsForCompaction() {
+      return _segmentsForCompaction;
+    }
+    public List<String> getSegmentsForDeletion() {
+      return _segmentsForDeletion;
+    }
+  }
+
   @Override
   public String getTaskType() {
     return MinionConstants.UpsertCompactionTask.TASK_TYPE;
@@ -111,42 +127,17 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       CompletionServiceHelper.CompletionServiceResponse serviceResponse =
             completionServiceHelper.doMultiGetRequest(validDocIdUrls, tableNameWithType, false, 3000);
 
-      // only compact segments that exceed the threshold
-      double invalidRecordsThresholdPercent =
-          Double.parseDouble(compactionConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
-              String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
-      List<SegmentZKMetadata> segmentsForCompaction = new ArrayList<>();
-      List<String> segmentsForDeletion = new ArrayList<>();
-      for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
-        JsonNode allValidDocIdMetadata;
-        try {
-          allValidDocIdMetadata = JsonUtils.stringToJsonNode(streamResponse.getValue());
-        } catch (IOException e) {
-          LOGGER.error("Unable to parse validDocIdMetadata response for: {}", streamResponse.getKey());
-          continue;
-        }
-        Iterator<JsonNode> iterator = allValidDocIdMetadata.elements();
-        while (iterator.hasNext()) {
-          JsonNode validDocIdMetadata = iterator.next();
-          long invalidRecordCount = validDocIdMetadata.get("totalInvalidDocs").asLong();
-          String segmentName = validDocIdMetadata.get("segmentName").asText();
-          SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
-          double invalidRecordPercent = ((double) invalidRecordCount / segment.getTotalDocs()) * 100;
-          if (invalidRecordCount == segment.getTotalDocs()) {
-            segmentsForDeletion.add(segment.getSegmentName());
-          } else if (invalidRecordPercent > invalidRecordsThresholdPercent) {
-            segmentsForCompaction.add(segment);
-          }
-        }
-      }
+      SegmentSelectionResult segmentSelectionResult =
+          processValidDocIdMetadata(compactionConfigs, completedSegmentsMap, serviceResponse._httpResponses.entrySet());
 
-      if (!segmentsForDeletion.isEmpty()) {
-          pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsForDeletion, "0d");
+      if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
+          pinotHelixResourceManager.deleteSegments(
+              tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(), "0d");
       }
 
       int numTasks = 0;
       int maxTasks = getMaxTasks(taskType, tableNameWithType, taskConfigs);
-      for (SegmentZKMetadata segment : segmentsForCompaction) {
+      for (SegmentZKMetadata segment : segmentSelectionResult.getSegmentsForCompaction()) {
         if (numTasks == maxTasks) {
           break;
         }
@@ -163,6 +154,42 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           numTasks, tableNameWithType, taskType);
     }
     return pinotTaskConfigs;
+  }
+
+  @VisibleForTesting
+  public static SegmentSelectionResult processValidDocIdMetadata(Map<String, String> compactionConfigs,
+      Map<String, SegmentZKMetadata> completedSegmentsMap, Set<Map.Entry<String, String>> responseSet) {
+    double invalidRecordsThresholdPercent =
+        Double.parseDouble(compactionConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
+            String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
+    long minRecordCount =
+        Long.parseLong(compactionConfigs.getOrDefault(UpsertCompactionTask.MIN_RECORD_COUNT,
+            String.valueOf(DEFAULT_MIN_RECORD_COUNT)));
+    List<SegmentZKMetadata> segmentsForCompaction = new ArrayList<>();
+    List<String> segmentsForDeletion = new ArrayList<>();
+    for (Map.Entry<String, String> streamResponse : responseSet) {
+      JsonNode allValidDocIdMetadata;
+      try {
+        allValidDocIdMetadata = JsonUtils.stringToJsonNode(streamResponse.getValue());
+      } catch (IOException e) {
+        LOGGER.error("Unable to parse validDocIdMetadata response for: {}", streamResponse.getKey());
+        continue;
+      }
+      Iterator<JsonNode> iterator = allValidDocIdMetadata.elements();
+      while (iterator.hasNext()) {
+        JsonNode validDocIdMetadata = iterator.next();
+        long invalidRecordCount = validDocIdMetadata.get("totalInvalidDocs").asLong();
+        String segmentName = validDocIdMetadata.get("segmentName").asText();
+        SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
+        double invalidRecordPercent = ((double) invalidRecordCount / segment.getTotalDocs()) * 100;
+        if (invalidRecordCount == segment.getTotalDocs()) {
+          segmentsForDeletion.add(segment.getSegmentName());
+        } else if (invalidRecordPercent > invalidRecordsThresholdPercent && invalidRecordCount > minRecordCount) {
+          segmentsForCompaction.add(segment);
+        }
+      }
+    }
+    return new SegmentSelectionResult(segmentsForCompaction, segmentsForDeletion);
   }
 
   @VisibleForTesting

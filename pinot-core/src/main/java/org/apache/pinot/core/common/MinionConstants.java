@@ -150,7 +150,7 @@ public class MinionConstants {
      */
     public static final String INVALID_RECORDS_THRESHOLD_PERCENT = "invalidRecordsThresholdPercent";
     /**
-     * The minimum count of records for a completed segment
+     * The minimum count of old records for a completed segment
      * e.g. if the count surpasses 100k, then the segment may be compacted
      */
     public static final String MIN_RECORD_COUNT = "minRecordCount";
