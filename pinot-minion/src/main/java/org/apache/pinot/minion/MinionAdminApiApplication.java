@@ -107,7 +107,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration().addHttpHandler(httpHandler, "/api/", "/help/");
 
     URL swaggerDistLocation =
-        MinionAdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/3.23.11/");
+        MinionAdminApiApplication.class.getClassLoader().getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
