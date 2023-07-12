@@ -125,10 +125,10 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
     boolean[] expectedValues = new boolean[NUM_ROWS];
     RoaringBitmap nullBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = true;
-      } else {
+      if (isNullRow(i)) {
         nullBitmap.add(i);
+      } else {
+        expectedValues[i] = true;
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, nullBitmap);
