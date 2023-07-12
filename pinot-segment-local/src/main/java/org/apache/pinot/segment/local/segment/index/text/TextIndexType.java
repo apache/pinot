@@ -183,10 +183,10 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     if (config.isDisabled()) {
       return null;
     }
-    if (!context.getFieldSpec().isSingleValueField()) {
-      return null;
-    }
     if (config.getFstType() == FSTType.NATIVE) {
+      if (!context.getFieldSpec().isSingleValueField()) {
+        return null;
+      }
       return new NativeMutableTextIndex(context.getFieldSpec().getName());
     }
     if (context.getConsumerDir() == null) {
