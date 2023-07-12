@@ -234,10 +234,10 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.DOUBLE);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        assertEquals(doubleValues[i], Math.min(_intSVValues[i], _doubleSVValues[i]));
-      } else {
+      if (isNullRow(i)) {
         assertEquals(doubleValues[i], _doubleSVValues[i]);
+      } else {
+        assertEquals(doubleValues[i], Math.min(_intSVValues[i], _doubleSVValues[i]));
       }
     }
     testNullBitmap(transformFunction, null);
@@ -261,10 +261,10 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     RoaringBitmap expectedNull = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        assertEquals(intValues[i], _intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         expectedNull.add(i);
+      } else {
+        assertEquals(intValues[i], _intSVValues[i]);
       }
     }
     testNullBitmap(transformFunction, expectedNull);
@@ -378,10 +378,10 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.DOUBLE);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        assertEquals(doubleValues[i], Math.max(_intSVValues[i], _doubleSVValues[i]));
-      } else {
+      if (isNullRow(i)) {
         assertEquals(doubleValues[i], _doubleSVValues[i]);
+      } else {
+        assertEquals(doubleValues[i], Math.max(_intSVValues[i], _doubleSVValues[i]));
       }
     }
     testNullBitmap(transformFunction, null);
@@ -406,10 +406,10 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     RoaringBitmap expectedNull = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        assertEquals(intValues[i], _intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         expectedNull.add(i);
+      } else {
+        assertEquals(intValues[i], _intSVValues[i]);
       }
     }
     testNullBitmap(transformFunction, expectedNull);

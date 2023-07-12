@@ -176,23 +176,23 @@ public abstract class BaseTransformFunctionTest {
       map.put(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
       map.put(BIG_DECIMAL_SV_COLUMN, _bigDecimalSVValues[i]);
       map.put(STRING_SV_COLUMN, _stringSVValues[i]);
-      if (i % 2 == 0) {
-        map.put(STRING_SV_NULL_COLUMN, _stringSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         map.put(STRING_SV_NULL_COLUMN, null);
+      } else {
+        map.put(STRING_SV_NULL_COLUMN, _stringSVValues[i]);
       }
       map.put(STRING_ALPHANUM_SV_COLUMN, _stringAlphaNumericSVValues[i]);
-      if (i % 2 == 0) {
-        map.put(STRING_ALPHANUM_NULL_SV_COLUMN, _stringAlphaNumericSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         map.put(STRING_ALPHANUM_NULL_SV_COLUMN, null);
+      } else {
+        map.put(STRING_ALPHANUM_NULL_SV_COLUMN, _stringAlphaNumericSVValues[i]);
       }
       map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
-      if (i % 2 == 0) {
-        map.put(INT_MV_NULL_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
-      } else {
+      if (isNullRow(i)) {
         map.put(INT_MV_NULL_COLUMN, null);
+      } else {
+        map.put(INT_MV_NULL_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
       }
       map.put(LONG_MV_COLUMN, ArrayUtils.toObject(_longMVValues[i]));
       map.put(FLOAT_MV_COLUMN, ArrayUtils.toObject(_floatMVValues[i]));
@@ -201,10 +201,10 @@ public abstract class BaseTransformFunctionTest {
       map.put(STRING_ALPHANUM_MV_COLUMN, _stringAlphaNumericMVValues[i]);
       map.put(STRING_LONG_MV_COLUMN, _stringLongFormatMVValues[i]);
       map.put(TIMESTAMP_COLUMN, _timeValues[i]);
-      if (i % 2 == 0) {
-        map.put(TIMESTAMP_COLUMN_NULL, _timeValues[i]);
-      } else {
+      if (isNullRow(i)) {
         map.put(TIMESTAMP_COLUMN_NULL, null);
+      } else {
+        map.put(TIMESTAMP_COLUMN_NULL, _timeValues[i]);
       }
       map.put(TIME_COLUMN, _timeValues[i]);
       _jsonValues[i] = JsonUtils.objectToJsonNode(map).toString();

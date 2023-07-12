@@ -100,7 +100,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
       case INT:
         int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
-          if (i % 2 == 0) {
+          if (!isNullRow(i)) {
             Assert.assertEquals(intValues[i], getExpectResult(_intMVValues[i]));
           }
         }
@@ -108,7 +108,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
       case LONG:
         long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
-          if (i % 2 == 0) {
+          if (!isNullRow(i)) {
             Assert.assertEquals(longValues[i], getExpectResult(_intMVValues[i]));
           }
         }
@@ -116,7 +116,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
       case FLOAT:
         float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
-          if (i % 2 == 0) {
+          if (!isNullRow(i)) {
             Assert.assertEquals(floatValues[i], getExpectResult(_intMVValues[i]));
           }
         }
@@ -124,7 +124,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
       case DOUBLE:
         double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
-          if (i % 2 == 0) {
+          if (!isNullRow(i)) {
             Assert.assertEquals(doubleValues[i], getExpectResult(_intMVValues[i]));
           }
         }
@@ -132,7 +132,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
       case STRING:
         String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
-          if (i % 2 == 0) {
+          if (!isNullRow(i)) {
             Assert.assertEquals(stringValues[i], getExpectResult(_intMVValues[i]));
           }
         }

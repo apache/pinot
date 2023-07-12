@@ -78,10 +78,10 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
     int[] values = transformFunction.transformToIntValuesSV(_projectionBlock);
     RoaringBitmap nullBitmap = transformFunction.getNullBitmap(_projectionBlock);
     for (int i = 0; i < _projectionBlock.getNumDocs(); i++) {
-      if (i % 2 == 0) {
-        assertEquals(values[i], expected.applyAsInt(_timeValues[i]));
-      } else {
+      if (isNullRow(i)) {
         assertTrue(nullBitmap.contains(i));
+      } else {
+        assertEquals(values[i], expected.applyAsInt(_timeValues[i]));
       }
     }
   }
