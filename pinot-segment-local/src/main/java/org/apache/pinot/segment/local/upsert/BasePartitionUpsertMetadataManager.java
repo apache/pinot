@@ -268,12 +268,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     segmentLock.lock();
     try {
       // Skip adding segments that has segment EndTime in the comparison cols earlier than (largestSeenTimestamp - TTL).
-      // Note: We only update largestSeenComparisonValueMs when addRecord, and access the value when addSegments.
+      // Note: We only update largestSeenComparisonValue when addRecord, and access the value when addOrReplaceSegments.
       // We only support single comparison column for TTL-enabled upsert tables.
       if (_largestSeenComparisonValue > 0) {
         Number endTime =
             (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
         if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+          _logger.info("Skip adding segment: {} because it's out of TTL", segment.getSegmentName());
           return;
         }
       }
@@ -398,12 +399,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     segmentLock.lock();
     try {
       // Skip adding segments that has segment EndTime in the comparison cols earlier than (largestSeenTimestamp - TTL).
-      // Note: We only update largestSeenComparisonValueMs when addRecord, and access the value when addSegments.
+      // Note: We only update largestSeenComparisonValue when addRecord, and access the value when addOrReplaceSegments.
       // We only support single comparison column for TTL-enabled upsert tables.
       if (_largestSeenComparisonValue > 0) {
         Number endTime =
             (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
         if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+          _logger.info("Skip replacing segment: {} because it's out of TTL", segment.getSegmentName());
           return;
         }
       }
@@ -616,8 +618,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           return;
         }
       }
-      try (OutputStream outputStream = new FileOutputStream(watermarkFile, false)) {
-        DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+      try (OutputStream outputStream = new FileOutputStream(watermarkFile, false);
+          DataOutputStream dataOutputStream = new DataOutputStream(outputStream)) {
         dataOutputStream.writeDouble(watermark);
       }
       _logger.info("Persisted watermark {} to file for table: {} partition_id: {}", watermark,
@@ -663,21 +665,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    */
   @Override
   public void removeExpiredPrimaryKeys() {
+    // If upsertTTL is enabled, we will remove expired primary keys from upsertMetadata after taking snapshot.
+    if (_metadataTTL == 0) {
+      return;
+    }
+
     if (_stopped) {
       _logger.debug("Skip removing expired primary keys because metadata manager is already stopped");
       return;
     }
+
     startOperation();
     try {
-      if (_metadataTTL > 0) {
-        doRemoveExpiredPrimaryKeys(_largestSeenComparisonValue);
-      }
+      doRemoveExpiredPrimaryKeys();
     } finally {
       finishOperation();
     }
   }
 
-  protected abstract void doRemoveExpiredPrimaryKeys(double timestamp);
+  protected abstract void doRemoveExpiredPrimaryKeys();
 
   @Override
   public void stop() {

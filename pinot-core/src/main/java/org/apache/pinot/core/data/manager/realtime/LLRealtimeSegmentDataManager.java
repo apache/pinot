@@ -676,9 +676,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         if (_partitionUpsertMetadataManager != null) {
           _partitionUpsertMetadataManager.takeSnapshot();
           // If upsertTTL is enabled, we will remove expired primary keys from upsertMetadata after taking snapshot.
-          if (_tableConfig.getUpsertConfig().getMetadataTTL() > 0) {
-            _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
-          }
+          _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
         }
 
         while (!_state.isFinal()) {

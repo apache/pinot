@@ -231,20 +231,19 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
    * When TTL is enabled for upsert, this function is used to remove expired keys from the primary key indexes.
    * This function will be called before new consuming segment start to consume.
    *
-   * @param largestSeenComparisonValueMs largest seen timestamp in comparison column timeunit.
    * @return void
    */
   @Override
-  public void doRemoveExpiredPrimaryKeys(double largestSeenComparisonValueMs) {
+  public void doRemoveExpiredPrimaryKeys() {
     // The expiredTimestamp is the timestamp in comparison column timeunit, used to keep the largest seen timestamp.
-    double expiredTimestamp = largestSeenComparisonValueMs - _metadataTTL;
+    double expiredTimestamp = _largestSeenComparisonValue - _metadataTTL;
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
       assert recordLocation.getComparisonValue() != null;
       if (((Number) recordLocation.getComparisonValue()).doubleValue() < expiredTimestamp) {
         _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
       }
     });
-    persistWatermark(largestSeenComparisonValueMs);
+    persistWatermark(_largestSeenComparisonValue);
   }
 
   @Override
@@ -255,13 +254,11 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     Comparable newComparisonValue = recordInfo.getComparisonValue();
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
-          // Update the largestSeenComparisonValueMs when add new record. If records during addSegments has a newer
-          // comparison column values than addRecords, it's a bug and should not happen.
+          // Update the largestSeenComparisonValue when add new record. If records during addOrReplaceSegments has a
+          // newer comparison column values than addRecords, it's a bug and should not happen.
           if (_metadataTTL > 0) {
             Number recordComparisonValue = (Number) recordInfo.getComparisonValue();
-            if (recordComparisonValue.doubleValue() > _largestSeenComparisonValue) {
-              _largestSeenComparisonValue = recordComparisonValue.doubleValue();
-            }
+            _largestSeenComparisonValue = Math.max(_largestSeenComparisonValue, recordComparisonValue.doubleValue());
           }
           if (currentRecordLocation != null) {
             // Existing primary key
