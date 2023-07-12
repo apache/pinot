@@ -603,16 +603,24 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @VisibleForTesting
   static String getValidPropertyValue(String value) {
     int length = value.length();
-    // strip the value if first or last character of the value is whitespace.
-    if (length > 0 && (Character.isWhitespace(value.charAt(0)) || Character.isWhitespace(value.charAt(length - 1)))) {
-      value = value.strip();
-      length = value.length(); // updating the length value after striping
+    if (length > 0) {
+      // check and replace first character if it's a white space
+      if (Character.isWhitespace(value.charAt(0))) {
+        String unicodeValue = "\\u" + String.format("%04x", (int) value.charAt(0));
+        value = unicodeValue + value.substring(1);
+      }
+
+      // check and replace last character if it's a white space
+      if (Character.isWhitespace(value.charAt(value.length() - 1))) {
+        String unicodeValue = "\\u" + String.format("%04x", (int) value.charAt(value.length() - 1));
+        value = value.substring(0, value.length() - 1) + unicodeValue;
+      }
     }
 
     // removing the ',' from the value if it's present.
     if (length > 0 && value.contains(",")) {
-      value = value.replace(",", "");
-      length = value.length(); // updating the length value after removing ','
+      value = value.replace(",", "\\,");
+      length = value.length(); // updating the length value after escaping ','
     }
 
     // taking first m characters of the value if length is greater than METADATA_PROPERTY_LENGTH_LIMIT

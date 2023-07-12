@@ -42,7 +42,8 @@ import org.testng.annotations.Test;
  */
 public class SegmentGenerationWithMinMaxTest {
   private static final String STRING_COLUMN = "col1";
-  private static final String[] STRING_VALUES_WITH_UNALLOWED_CHARACTER = {"A,", "B,", "C,", "D,", "E "};
+  private static final String[] STRING_VALUES_WITH_COMMA_CHARACTER = {"A,,", ",B,", "C,Z,", "D,", "E,"};
+  private static final String[] STRING_VALUES_WITH_WHITESPACE_CHARACTERS = {"A ", " B ", "  Z ", "  \r D", "E"};
   private static final String[] STRING_VALUES_VALID = {"A", "B", "C", "D", "E"};
   private static final String LONG_COLUMN = "col2";
   private static final long[] LONG_VALUES =
@@ -74,11 +75,19 @@ public class SegmentGenerationWithMinMaxTest {
     Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMaxValue(), "E");
 
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
-    segmentDir = buildSegment(_tableConfig, _schema, STRING_VALUES_WITH_UNALLOWED_CHARACTER);
+    segmentDir = buildSegment(_tableConfig, _schema, STRING_VALUES_WITH_COMMA_CHARACTER);
     metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getTotalDocs(), 5);
     Assert.assertFalse(metadata.getColumnMetadataFor("col1").isMinMaxValueInvalid());
-    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMinValue(), "A");
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMinValue(), ",B,");
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMaxValue(), "E,");
+
+    FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
+    segmentDir = buildSegment(_tableConfig, _schema, STRING_VALUES_WITH_WHITESPACE_CHARACTERS);
+    metadata = new SegmentMetadataImpl(segmentDir);
+    Assert.assertEquals(metadata.getTotalDocs(), 5);
+    Assert.assertFalse(metadata.getColumnMetadataFor("col1").isMinMaxValueInvalid());
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMinValue(), "  \r D");
     Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMaxValue(), "E");
   }
 

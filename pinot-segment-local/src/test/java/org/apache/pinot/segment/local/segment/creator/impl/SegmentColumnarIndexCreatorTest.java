@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -66,17 +67,24 @@ public class SegmentColumnarIndexCreatorTest {
   public void testGetValidPropertyValue()
       throws Exception {
     // Leading/trailing whitespace
-    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue(" a"), "a");
-    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("a\t"), "a");
-    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("\na"), "a");
+    Assert.assertEquals(
+        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue(" a")), " a");
+    Assert.assertEquals(
+        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue("a\t")), "a\t");
+    Assert.assertEquals(
+        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue("\na")), "\na");
 
     // Whitespace in the middle
-    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("a\t b"), "a\t b");
-    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("a \nb"), "a \nb");
+    Assert.assertEquals(
+        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue("a\t b")), "a\t b");
+    Assert.assertEquals(
+        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue("a \nb")), "a \nb");
 
     // List separator
-    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("a,b,c"), "abc");
-    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue(",a b"), "a b");
+    Assert.assertEquals(
+        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue("a,b,c")), "a,b,c");
+    Assert.assertEquals(
+        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue(",a b")), ",a b");
 
     // Empty string
     Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue(""), "");
@@ -212,7 +220,7 @@ public class SegmentColumnarIndexCreatorTest {
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", ",bar", "foo");
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
-    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), "bar");
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), ",bar");
 
     props = new PropertiesConfiguration();
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "  ");
@@ -221,19 +229,21 @@ public class SegmentColumnarIndexCreatorTest {
 
     // test for values with leading or ending whitespace.
     props = new PropertiesConfiguration();
-    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "a\t", "\na");
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "a\t", "\nb");
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
-    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), "a");
-    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))), "a");
+    Assert.assertEquals(
+        StringEscapeUtils.unescapeJava(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE)))), "a\t");
+    Assert.assertEquals(
+        StringEscapeUtils.unescapeJava(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE)))), "\nb");
 
     // test for values with 'v'.
     props = new PropertiesConfiguration();
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "aa,bb", "aa,bb,");
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
-    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), "aabb");
-    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))), "aabb");
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), "aa,bb");
+    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))), "aa,bb,");
 
     // test for value length grater than METADATA_PROPERTY_LENGTH_LIMIT
     props = new PropertiesConfiguration();
