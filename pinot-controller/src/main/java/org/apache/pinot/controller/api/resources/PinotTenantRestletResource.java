@@ -21,7 +21,6 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.Sets;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -31,14 +30,10 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -63,17 +58,18 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.rebalance.DefaultTenantRebalancer;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TenantRebalanceContext;
+import org.apache.pinot.controller.helix.core.rebalance.TenantRebalancer;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TenantRebalanceContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,9 +114,6 @@ public class PinotTenantRestletResource {
 
   @Inject
   ExecutorService _executorService;
-
-  @Inject
-  PinotTableRestletResource tableResource;
 
   @POST
   @Path("/tenants")
@@ -590,59 +583,8 @@ public class PinotTenantRestletResource {
   public Map<String, RebalanceResult> rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
       @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceContext context) {
-    Set<String> tables = getTablesServedFromTenant(tenantName);
-    Set<String> parallelTables;
-    Set<String> sequentialTables;
-    final ConcurrentLinkedQueue<String> parallelQueue;
-    Map<String, RebalanceResult> rebalanceResult = new HashMap<>();
-    if (context.getDegreeOfParallelism() > 1) {
-      if (!context.getParallelWhitelist().isEmpty()) {
-        parallelTables = new HashSet<>(context.getParallelWhitelist());
-      } else {
-        parallelTables = new HashSet<>(tables);
-      }
-      if (!context.getParallelBlacklist().isEmpty()) {
-        parallelTables = Sets.difference(parallelTables, context.getParallelBlacklist());
-      }
-      parallelQueue = new ConcurrentLinkedQueue<>(parallelTables);
-      for (int i=0; i < context.getDegreeOfParallelism(); i++) {
-        _executorService.submit(() -> {
-          try {
-            while (true) {
-              String table = parallelQueue.remove();
-              rebalanceResult.put(table, rebalanceTableWithContext(table, context));
-            }
-          } catch (NoSuchElementException ignore) {
-          }
-        });
-      }
-      sequentialTables = Sets.difference(tables, parallelTables);
-    } else {
-      sequentialTables = new HashSet<>(tables);
-      parallelQueue = new ConcurrentLinkedQueue<>();
-    }
-    _executorService.submit(() -> {
-      while (!parallelQueue.isEmpty()) {
-        try {
-          Thread.sleep(5000);
-        } catch (InterruptedException e) {
-          throw new RuntimeException(e);
-        }
-      }
-      for (String table : sequentialTables) {
-        rebalanceResult.put(table, rebalanceTableWithContext(table, context));
-      }
-    });
-    return rebalanceResult;
-  }
-
-  private RebalanceResult rebalanceTableWithContext(String tableName, TenantRebalanceContext context) {
-    return tableResource.rebalance(TableNameBuilder.extractRawTableName(tableName),
-        // if raw tableName is provided then its considered OFFLINE by default
-        Objects.requireNonNullElse(TableNameBuilder.getTableTypeFromTableName(tableName), TableType.OFFLINE).name(),
-        context.isDryRun(), context.isReassignInstances(), context.isIncludeConsuming(), context.isBootstrap(),
-        context.isDowntime(), context.getMinAvailableReplicas(), context.isBestEfforts(),
-        context.getExternalViewCheckIntervalInMs(), context.getExternalViewStabilizationTimeoutInMs(),
-        context.isUpdateTargetTier());
+    context.setTenantName(tenantName);
+    TenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_pinotHelixResourceManager, _executorService);
+    return tenantRebalancer.rebalance(context);
   }
 }

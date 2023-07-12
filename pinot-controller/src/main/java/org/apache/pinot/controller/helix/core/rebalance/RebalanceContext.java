@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -42,7 +60,7 @@ public class RebalanceContext {
   }
 
   public void setDryRun(Boolean dryRun) {
-    this._dryRun = dryRun;
+    _dryRun = dryRun;
   }
 
   public Boolean isReassignInstances() {
@@ -50,7 +68,7 @@ public class RebalanceContext {
   }
 
   public void setReassignInstances(Boolean reassignInstances) {
-    this._reassignInstances = reassignInstances;
+    _reassignInstances = reassignInstances;
   }
 
   public Boolean isIncludeConsuming() {
@@ -58,7 +76,7 @@ public class RebalanceContext {
   }
 
   public void setIncludeConsuming(Boolean includeConsuming) {
-    this._includeConsuming = includeConsuming;
+    _includeConsuming = includeConsuming;
   }
 
   public Boolean isBootstrap() {
@@ -66,7 +84,7 @@ public class RebalanceContext {
   }
 
   public void setBootstrap(Boolean bootstrap) {
-    this._bootstrap = bootstrap;
+    _bootstrap = bootstrap;
   }
 
   public Boolean isDowntime() {
@@ -74,7 +92,7 @@ public class RebalanceContext {
   }
 
   public void setDowntime(Boolean downtime) {
-    this._downtime = downtime;
+    _downtime = downtime;
   }
 
   public Integer getMinAvailableReplicas() {
@@ -82,7 +100,7 @@ public class RebalanceContext {
   }
 
   public void setMinAvailableReplicas(Integer minAvailableReplicas) {
-    this._minAvailableReplicas = minAvailableReplicas;
+    _minAvailableReplicas = minAvailableReplicas;
   }
 
   public Boolean isBestEfforts() {
@@ -90,7 +108,7 @@ public class RebalanceContext {
   }
 
   public void setBestEfforts(Boolean bestEfforts) {
-    this._bestEfforts = bestEfforts;
+    _bestEfforts = bestEfforts;
   }
 
   public Long getExternalViewCheckIntervalInMs() {
@@ -98,7 +116,7 @@ public class RebalanceContext {
   }
 
   public void setExternalViewCheckIntervalInMs(Long externalViewCheckIntervalInMs) {
-    this._externalViewCheckIntervalInMs = externalViewCheckIntervalInMs;
+    _externalViewCheckIntervalInMs = externalViewCheckIntervalInMs;
   }
 
   public Long getExternalViewStabilizationTimeoutInMs() {
@@ -106,7 +124,7 @@ public class RebalanceContext {
   }
 
   public void setExternalViewStabilizationTimeoutInMs(Long externalViewStabilizationTimeoutInMs) {
-    this._externalViewStabilizationTimeoutInMs = externalViewStabilizationTimeoutInMs;
+    _externalViewStabilizationTimeoutInMs = externalViewStabilizationTimeoutInMs;
   }
 
   public Boolean isUpdateTargetTier() {
@@ -114,6 +132,6 @@ public class RebalanceContext {
   }
 
   public void setUpdateTargetTier(Boolean updateTargetTier) {
-    this._updateTargetTier = updateTargetTier;
+    _updateTargetTier = updateTargetTier;
   }
 }
