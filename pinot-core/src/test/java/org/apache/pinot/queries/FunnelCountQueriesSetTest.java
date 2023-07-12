@@ -18,14 +18,15 @@
  */
 package org.apache.pinot.queries;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.roaringbitmap.RoaringBitmap;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -35,11 +36,11 @@ import static org.testng.Assert.assertTrue;
  * Queries test for FUNNEL_COUNT queries.
  */
 @SuppressWarnings("rawtypes")
-public class FunnelCountQueriesPartitionedTest extends BaseFunnelCountQueriesTest {
+public class FunnelCountQueriesSetTest extends BaseFunnelCountQueriesTest {
 
   @Override
   protected String getSettings() {
-    return "SETTINGS('partitioned')";
+    return "SETTINGS('set')";
   }
   @Override
   protected int getExpectedNumEntriesScannedInFilter() {
@@ -48,7 +49,7 @@ public class FunnelCountQueriesPartitionedTest extends BaseFunnelCountQueriesTes
 
   @Override
   protected int getExpectedInterSegmentMultiplier() {
-    return 4;
+    return 1;
   }
 
   @Override
@@ -70,7 +71,13 @@ public class FunnelCountQueriesPartitionedTest extends BaseFunnelCountQueriesTes
 
   @Override
   protected void assertIntermediateResult(Object intermediateResult, long[] expectedCounts) {
-    assertTrue(intermediateResult instanceof LongArrayList);
-    assertEquals(((LongArrayList)intermediateResult).elements(), expectedCounts);
+    assertTrue(intermediateResult instanceof List);
+    List<Set> sets = (List<Set>) intermediateResult;
+    // First step should match
+    assertEquals(Math.round(sets.get(0).size()), expectedCounts[0]);
+    for (int i=1;i<sets.size();i++) {
+      // Sets are yet to be intersected, we check that they are at least the size of the expected counts at this stage.
+      assertTrue(Math.round(sets.get(i).size()) >= expectedCounts[i]);
+    }
   }
 }

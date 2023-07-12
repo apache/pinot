@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.queries;
 
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.io.File;
 import java.util.Comparator;
 import java.util.List;
@@ -30,6 +31,9 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
 
 /**
  * Queries test for FUNNEL_COUNT queries using sorted strategy.
@@ -38,8 +42,18 @@ import org.apache.pinot.spi.utils.ReadMode;
 public class FunnelCountQueriesPartitionedSortedTest extends BaseFunnelCountQueriesTest {
 
   @Override
+  protected String getSettings() {
+    return "SETTINGS('partitioned', 'sorted')";
+  }
+
+  @Override
   protected int getExpectedNumEntriesScannedInFilter() {
     return 0;
+  }
+
+  @Override
+  protected int getExpectedInterSegmentMultiplier() {
+    return 4;
   }
 
   @Override
@@ -64,7 +78,8 @@ public class FunnelCountQueriesPartitionedSortedTest extends BaseFunnelCountQuer
   }
 
   @Override
-  protected String getSettings() {
-    return " SETTINGS('partitioned', 'sorted')";
+  protected void assertIntermediateResult(Object intermediateResult, long[] expectedCounts) {
+    assertTrue(intermediateResult instanceof LongArrayList);
+    assertEquals(((LongArrayList)intermediateResult).elements(), expectedCounts);
   }
 }
