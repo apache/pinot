@@ -483,6 +483,9 @@ public class TableRebalancer {
     }
   }
 
+  /**
+   * Gets the instance partitions for instance partition types and also returns a boolean for whether they are unchanged
+   */
   private Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
       TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     boolean instancePartitionsUnchanged = true;
@@ -522,6 +525,9 @@ public class TableRebalancer {
     return Pair.of(instancePartitionsMap, instancePartitionsUnchanged);
   }
 
+  /**
+   * Fetches/computes the instance partitions and also returns a boolean for whether they are unchanged
+   */
   private Pair<InstancePartitions, Boolean> getInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
@@ -596,7 +602,10 @@ public class TableRebalancer {
     }
   }
 
-  @Nullable
+  /**
+   * Fetches/computes the instance partitions for sorted tiers and also returns a boolean for whether the
+   * instance partitions are unchanged.
+   */
   private Pair<Map<String, InstancePartitions>, Boolean> getTierToInstancePartitionsMap(TableConfig tableConfig,
       @Nullable List<Tier> sortedTiers, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     if (sortedTiers == null) {
@@ -617,7 +626,8 @@ public class TableRebalancer {
 
   /**
    * Computes the instance partitions for the given tier. If table's instanceAssignmentConfigMap has an entry for the
-   * tier, it's used to calculate the instance partitions. Else default instance partitions are returned
+   * tier, it's used to calculate the instance partitions. Else default instance partitions are returned. Also returns
+   * a boolean for whether the instance partition is unchanged.
    */
   private Pair<InstancePartitions, Boolean> getInstancePartitionsForTier(TableConfig tableConfig, Tier tier,
       boolean reassignInstances, boolean bootstrap, boolean dryRun) {
