@@ -159,6 +159,8 @@ do
   sleep 2
 done
 
+PASS=0
+
 # Validate V2 query count(*) result
 for i in $(seq 1 150)
 do
@@ -173,13 +175,15 @@ do
   sleep 2
 done
 
+PASS=0
+
 # Validate V2 join query results
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"SET useMultistageEngine=true;SELECT a.playerName, a.teamID, b.teamName FROM baseballStats_OFFLINE AS a JOIN dimBaseballTeams_OFFLINE AS b ON a.teamID = b.teamID LIMIT 10","trace":false}' http://localhost:8099/query/sql`
   if [ $? -eq 0 ]; then
     RES_0=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
-    if [[ "${RES_0}" = "David Allan" ]]; then
+    if [[ "${RES_0}" = "\"David Allan\"" ]]; then
       PASS=1
       break
     fi
@@ -218,6 +222,8 @@ do
   sleep 2
 done
 
+PASS=0
+
 # Validate V2 query count(*) result
 for i in $(seq 1 150)
 do
@@ -232,13 +238,15 @@ do
   sleep 2
 done
 
+PASS=0
+
 # Validate V2 join query results
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"SET useMultistageEngine=true;SELECT a.playerName, a.teamID, b.teamName FROM baseballStats_OFFLINE AS a JOIN dimBaseballTeams_OFFLINE AS b ON a.teamID = b.teamID LIMIT 10","trace":false}' http://localhost:8000/query/sql`
   if [ $? -eq 0 ]; then
     RES_0=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
-    if [[ "${RES_0}" = "David Allan" ]]; then
+    if [[ ${RES_0} = "\"David Allan\"" ]]; then
       PASS=1
       break
     fi
