@@ -48,7 +48,7 @@ public class PulsarPartitionLevelConnectionHandler {
   public PulsarPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig) {
     _config = new PulsarConfig(streamConfig, clientId);
     _clientId = clientId;
-    _pulsarMetadataExtractor = PulsarMetadataExtractor.build(_config.isPopulateMetadata());
+    _pulsarMetadataExtractor = PulsarMetadataExtractor.build(_config.isPopulateMetadata(), _config.getMetadataFields());
     try {
       ClientBuilder pulsarClientBuilder = PulsarClient.builder().serviceUrl(_config.getBootstrapServers());
       if (_config.getTlsTrustCertsFilePath() != null) {
