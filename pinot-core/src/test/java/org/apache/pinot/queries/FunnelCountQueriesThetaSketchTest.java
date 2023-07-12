@@ -55,9 +55,9 @@ public class FunnelCountQueriesThetaSketchTest extends BaseFunnelCountQueriesTes
   @Override
   protected IndexSegment buildSegment(List<GenericRow> records)
       throws Exception {
-    MutableSegment mutableSegment = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false);
+    MutableSegment mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(),
+            Collections.emptySet(), false);
     for (GenericRow record : records) {
       mutableSegment.index(record, null);
     }
@@ -70,7 +70,7 @@ public class FunnelCountQueriesThetaSketchTest extends BaseFunnelCountQueriesTes
     List<Sketch> sketches = (List<Sketch>) intermediateResult;
     // First step should match
     assertEquals(Math.round(sketches.get(0).getEstimate()), expectedCounts[0]);
-    for (int i=1;i<sketches.size();i++) {
+    for (int i = 1; i < sketches.size(); i++) {
       // Sets are yet to be intersected, we check that they are at least the size of the expected counts at this stage.
       assertTrue(Math.round(sketches.get(i).getEstimate()) >= expectedCounts[i]);
     }

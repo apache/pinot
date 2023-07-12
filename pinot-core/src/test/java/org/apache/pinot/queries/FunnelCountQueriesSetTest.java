@@ -26,7 +26,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.roaringbitmap.RoaringBitmap;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -42,6 +41,7 @@ public class FunnelCountQueriesSetTest extends BaseFunnelCountQueriesTest {
   protected String getSettings() {
     return "SETTINGS('set')";
   }
+
   @Override
   protected int getExpectedNumEntriesScannedInFilter() {
     return NUM_RECORDS;
@@ -60,9 +60,9 @@ public class FunnelCountQueriesSetTest extends BaseFunnelCountQueriesTest {
   @Override
   protected IndexSegment buildSegment(List<GenericRow> records)
       throws Exception {
-    MutableSegment mutableSegment = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false);
+    MutableSegment mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(),
+            Collections.emptySet(), false);
     for (GenericRow record : records) {
       mutableSegment.index(record, null);
     }
@@ -75,7 +75,7 @@ public class FunnelCountQueriesSetTest extends BaseFunnelCountQueriesTest {
     List<Set> sets = (List<Set>) intermediateResult;
     // First step should match
     assertEquals(Math.round(sets.get(0).size()), expectedCounts[0]);
-    for (int i=1;i<sets.size();i++) {
+    for (int i = 1; i < sets.size(); i++) {
       // Sets are yet to be intersected, we check that they are at least the size of the expected counts at this stage.
       assertTrue(Math.round(sets.get(i).size()) >= expectedCounts[i]);
     }

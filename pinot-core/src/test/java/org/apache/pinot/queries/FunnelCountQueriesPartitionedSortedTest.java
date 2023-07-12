@@ -80,6 +80,6 @@ public class FunnelCountQueriesPartitionedSortedTest extends BaseFunnelCountQuer
   @Override
   protected void assertIntermediateResult(Object intermediateResult, long[] expectedCounts) {
     assertTrue(intermediateResult instanceof LongArrayList);
-    assertEquals(((LongArrayList)intermediateResult).elements(), expectedCounts);
+    assertEquals(((LongArrayList) intermediateResult).elements(), expectedCounts);
   }
 }

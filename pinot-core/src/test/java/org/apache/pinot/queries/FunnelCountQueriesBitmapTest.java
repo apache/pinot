@@ -20,7 +20,6 @@ package org.apache.pinot.queries;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImplTestUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -42,6 +41,7 @@ public class FunnelCountQueriesBitmapTest extends BaseFunnelCountQueriesTest {
   protected String getSettings() {
     return "SETTINGS('bitmap')";
   }
+
   @Override
   protected int getExpectedNumEntriesScannedInFilter() {
     return NUM_RECORDS;
@@ -60,9 +60,9 @@ public class FunnelCountQueriesBitmapTest extends BaseFunnelCountQueriesTest {
   @Override
   protected IndexSegment buildSegment(List<GenericRow> records)
       throws Exception {
-    MutableSegment mutableSegment = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false);
+    MutableSegment mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(),
+            Collections.emptySet(), false);
     for (GenericRow record : records) {
       mutableSegment.index(record, null);
     }
@@ -75,7 +75,7 @@ public class FunnelCountQueriesBitmapTest extends BaseFunnelCountQueriesTest {
     List<RoaringBitmap> bitmaps = (List<RoaringBitmap>) intermediateResult;
     // First step should match
     assertEquals(Math.round(bitmaps.get(0).getCardinality()), expectedCounts[0]);
-    for (int i=1;i<bitmaps.size();i++) {
+    for (int i = 1; i < bitmaps.size(); i++) {
       // Sets are yet to be intersected, we check that they are at least the size of the expected counts at this stage.
       assertTrue(Math.round(bitmaps.get(i).getCardinality()) >= expectedCounts[i]);
     }

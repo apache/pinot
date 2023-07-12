@@ -41,6 +41,7 @@ public class FunnelCountQueriesPartitionedTest extends BaseFunnelCountQueriesTes
   protected String getSettings() {
     return "SETTINGS('partitioned')";
   }
+
   @Override
   protected int getExpectedNumEntriesScannedInFilter() {
     return NUM_RECORDS;
@@ -59,9 +60,9 @@ public class FunnelCountQueriesPartitionedTest extends BaseFunnelCountQueriesTes
   @Override
   protected IndexSegment buildSegment(List<GenericRow> records)
       throws Exception {
-    MutableSegment mutableSegment = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false);
+    MutableSegment mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(),
+            Collections.emptySet(), false);
     for (GenericRow record : records) {
       mutableSegment.index(record, null);
     }
@@ -71,6 +72,6 @@ public class FunnelCountQueriesPartitionedTest extends BaseFunnelCountQueriesTes
   @Override
   protected void assertIntermediateResult(Object intermediateResult, long[] expectedCounts) {
     assertTrue(intermediateResult instanceof LongArrayList);
-    assertEquals(((LongArrayList)intermediateResult).elements(), expectedCounts);
+    assertEquals(((LongArrayList) intermediateResult).elements(), expectedCounts);
   }
 }
