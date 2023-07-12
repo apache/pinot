@@ -81,22 +81,31 @@ public class PulsarConfig {
     _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(offsetCriteria);
     _initialMessageId = PulsarUtils.offsetCriteriaToMessageId(offsetCriteria);
     _populateMetadata = Boolean.parseBoolean(streamConfig.getStreamConfigsMap().getOrDefault(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE), "false"));
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE),
+        "false"));
     String metadataFieldsToExtractCSV = streamConfig.getStreamConfigsMap().getOrDefault(
         StreamConfigProperties.constructStreamProperty(STREAM_TYPE, METADATA_FIELDS), "");
     if (StringUtils.isBlank(metadataFieldsToExtractCSV) || !_populateMetadata) {
       _metadataFields = Collections.emptySet();
     } else {
-      String[] metadataFieldsArr = metadataFieldsToExtractCSV.split(",");
-      _metadataFields = Stream.of(metadataFieldsArr)
+      _metadataFields = parseConfigStringToEnumSet(metadataFieldsToExtractCSV);
+    }
+  }
+
+  private Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> parseConfigStringToEnumSet(
+      String listOfMetadataFields) {
+    try {
+      String[] metadataFieldsArr = listOfMetadataFields.split(",");
+      return Stream.of(metadataFieldsArr)
           .map(String::trim)
           .filter(StringUtils::isNotBlank)
           .map(PulsarStreamMessageMetadata.PulsarMessageMetadataValue::findByKey)
           .filter(Objects::nonNull)
           .collect(Collectors.toSet());
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Invalid metadata fields list: " + listOfMetadataFields, e);
     }
   }
-
   public String getPulsarTopicName() {
     return _pulsarTopicName;
   }

@@ -28,9 +28,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pulsar.client.api.Message;
 
-import static org.apache.pinot.plugin.stream.pulsar.PulsarStreamMessageMetadata.PulsarMessageMetadataValue.*;
-
-
 public interface PulsarMetadataExtractor {
   static PulsarMetadataExtractor build(boolean populateMetadata,
       Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataValuesToExtract) {
@@ -63,10 +60,11 @@ public interface PulsarMetadataExtractor {
       Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataValuesToExtract) {
 
     Map<String, String> metadataMap = new HashMap<>();
-    populateMetadataField(EVENT_TIME, message, metadataMap);
-    populateMetadataField(PUBLISH_TIME, message, metadataMap);
-    populateMetadataField(BROKER_PUBLISH_TIME, message, metadataMap);
-    populateMetadataField(MESSAGE_KEY, message, metadataMap);
+    populateMetadataField(PulsarStreamMessageMetadata.PulsarMessageMetadataValue.EVENT_TIME, message, metadataMap);
+    populateMetadataField(PulsarStreamMessageMetadata.PulsarMessageMetadataValue.PUBLISH_TIME, message, metadataMap);
+    populateMetadataField(PulsarStreamMessageMetadata.PulsarMessageMetadataValue.BROKER_PUBLISH_TIME, message,
+        metadataMap);
+    populateMetadataField(PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_KEY, message, metadataMap);
 
     // Populate some timestamps for lag calculation even if populateMetadata is false
 
@@ -74,7 +72,7 @@ public interface PulsarMetadataExtractor {
       return metadataMap;
     }
 
-    for (PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue : metadataValuesToExtract){
+    for (PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue : metadataValuesToExtract) {
       populateMetadataField(metadataValue, message, metadataMap);
     }
 
@@ -87,54 +85,70 @@ public interface PulsarMetadataExtractor {
       case PUBLISH_TIME:
         long publishTime = message.getPublishTime();
         if (publishTime > 0) {
-          setMetadataMapField(metadataMap, PUBLISH_TIME, publishTime);
+          setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.PUBLISH_TIME,
+              publishTime);
         }
         break;
       case EVENT_TIME:
         long eventTime = message.getEventTime();
         if (eventTime > 0) {
-          setMetadataMapField(metadataMap, EVENT_TIME, eventTime);
+          setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.EVENT_TIME,
+              eventTime);
         }
         break;
       case BROKER_PUBLISH_TIME:
         message.getBrokerPublishTime()
-            .ifPresent(brokerPublishTime -> setMetadataMapField(metadataMap, BROKER_PUBLISH_TIME, brokerPublishTime));
+            .ifPresent(brokerPublishTime -> setMetadataMapField(metadataMap,
+                PulsarStreamMessageMetadata.PulsarMessageMetadataValue.BROKER_PUBLISH_TIME, brokerPublishTime));
         break;
       case MESSAGE_KEY:
-        setMetadataMapField(metadataMap, MESSAGE_KEY, message.getKey());
+        setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_KEY,
+            message.getKey());
         break;
       case MESSAGE_ID:
-        setMetadataMapField(metadataMap, MESSAGE_ID, message.getMessageId().toString());
+        setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID,
+            message.getMessageId().toString());
         break;
       case MESSAGE_ID_BYTES_B64:
-        setMetadataMapField(metadataMap, MESSAGE_ID_BYTES_B64, message.getMessageId().toByteArray());
+        setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID_BYTES_B64,
+            message.getMessageId().toByteArray());
         break;
       case PRODUCER_NAME:
-        setMetadataMapField(metadataMap, PRODUCER_NAME, message.getProducerName());
+        setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.PRODUCER_NAME,
+            message.getProducerName());
         break;
       case SCHEMA_VERSION:
-        setMetadataMapField(metadataMap, SCHEMA_VERSION, message.getSchemaVersion());
+        setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.SCHEMA_VERSION,
+            message.getSchemaVersion());
         break;
       case SEQUENCE_ID:
-        setMetadataMapField(metadataMap, SEQUENCE_ID, message.getSequenceId());
+        setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.SEQUENCE_ID,
+            message.getSequenceId());
         break;
       case ORDERING_KEY:
         if (message.hasOrderingKey()) {
-          setMetadataMapField(metadataMap, ORDERING_KEY, message.getOrderingKey());
+          setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.ORDERING_KEY,
+              message.getOrderingKey());
         }
         break;
       case SIZE:
-        setMetadataMapField(metadataMap, SIZE, message.size());
+        setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.SIZE,
+            message.size());
         break;
       case TOPIC_NAME:
-        setMetadataMapField(metadataMap, TOPIC_NAME, message.getTopicName());
+        setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.TOPIC_NAME,
+            message.getTopicName());
         break;
       case INDEX:
-        message.getIndex().ifPresent(index -> setMetadataMapField(metadataMap, INDEX, index));
+        message.getIndex().ifPresent(index -> setMetadataMapField(metadataMap,
+            PulsarStreamMessageMetadata.PulsarMessageMetadataValue.INDEX, index));
         break;
       case REDELIVERY_COUNT:
-        setMetadataMapField(metadataMap, REDELIVERY_COUNT, message.getRedeliveryCount());
+        setMetadataMapField(metadataMap, PulsarStreamMessageMetadata.PulsarMessageMetadataValue.REDELIVERY_COUNT,
+            message.getRedeliveryCount());
         break;
+      default:
+        throw new IllegalArgumentException("Unsupported metadata value: " + value);
     }
   }
 

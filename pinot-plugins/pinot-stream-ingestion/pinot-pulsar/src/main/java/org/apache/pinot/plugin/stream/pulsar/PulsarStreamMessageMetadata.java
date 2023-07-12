@@ -48,17 +48,17 @@ public class PulsarStreamMessageMetadata extends StreamMessageMetadata {
         INDEX("index"),
         REDELIVERY_COUNT("redeliveryCount");
 
-        private final String key;
+        private final String _key;
 
         PulsarMessageMetadataValue(String key) {
-            this.key = key;
+            _key = key;
         }
 
         public String getKey() {
-            return key;
+            return _key;
         }
 
-        public static PulsarMessageMetadataValue findByKey(final String key){
+        public static PulsarMessageMetadataValue findByKey(final String key) {
             EnumSet<PulsarMessageMetadataValue> values = EnumSet.allOf(PulsarMessageMetadataValue.class);
             return values.stream().filter(value -> value.getKey().equals(key)).findFirst().orElse(null);
         }

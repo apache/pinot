@@ -34,7 +34,7 @@ public class PulsarConfigTest {
   public static final String STREAM_TYPE = "pulsar";
   public static final String STREAM_PULSAR_BROKER_LIST = "pulsar://localhost:6650";
   public static final String STREAM_PULSAR_CONSUMER_TYPE = "simple";
-  Map<String, String> getCommonStreamConfigMap(){
+  Map<String, String> getCommonStreamConfigMap() {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", STREAM_TYPE);
     streamConfigMap.put("stream.pulsar.consumer.type", STREAM_PULSAR_CONSUMER_TYPE);
@@ -60,9 +60,11 @@ public class PulsarConfigTest {
         "messageId,messageIdBytes, publishTime, eventTime, key, topicName, ");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
     PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
-    Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract = pulsarConfig.getMetadataFields();
+    Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
+        pulsarConfig.getMetadataFields();
     Assert.assertEquals(metadataFieldsToExtract.size(), 6);
-    Assert.assertTrue(metadataFieldsToExtract.containsAll(List.of(PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID,
+    Assert.assertTrue(metadataFieldsToExtract.containsAll(List.of(
+        PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID,
         PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID_BYTES_B64,
         PulsarStreamMessageMetadata.PulsarMessageMetadataValue.PUBLISH_TIME,
         PulsarStreamMessageMetadata.PulsarMessageMetadataValue.EVENT_TIME,
@@ -78,7 +80,8 @@ public class PulsarConfigTest {
         "true");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
     PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
-    Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract = pulsarConfig.getMetadataFields();
+    Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
+        pulsarConfig.getMetadataFields();
     Assert.assertEquals(metadataFieldsToExtract.size(), 0);
   }
 
@@ -91,7 +94,8 @@ public class PulsarConfigTest {
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
     PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
     Assert.assertFalse(pulsarConfig.isPopulateMetadata());
-    Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract = pulsarConfig.getMetadataFields();
+    Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
+        pulsarConfig.getMetadataFields();
     Assert.assertEquals(metadataFieldsToExtract.size(), 0);
   }
 
@@ -106,9 +110,9 @@ public class PulsarConfigTest {
         "messageId,messageIdBytes, publishTime, eventTime, key, topicName, ");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
     PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
-    Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract = pulsarConfig.getMetadataFields();
+    Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
+        pulsarConfig.getMetadataFields();
     Assert.assertFalse(pulsarConfig.isPopulateMetadata());
     Assert.assertEquals(metadataFieldsToExtract.size(), 0);
   }
-
 }
