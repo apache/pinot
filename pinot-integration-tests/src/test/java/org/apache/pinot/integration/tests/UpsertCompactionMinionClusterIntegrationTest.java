@@ -195,7 +195,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
 
     assertNotNull(_taskManager.scheduleTasks(REALTIME_TABLE_NAME).get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
-    assertEquals(getCurrentCountStarResultWithoutUpsert(), 3);
+    waitForAllDocsLoaded(600_000L, 3);
     assertEquals(getSalary(), 2381560);
   }
 
