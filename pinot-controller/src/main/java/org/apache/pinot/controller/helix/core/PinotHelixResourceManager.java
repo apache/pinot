@@ -3025,6 +3025,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all table configs.
+   *
+   * @return List of table configs. Empty list in case of tables configs does not exist.
+   */
+  public List<TableConfig> getAllTableConfigs() {
+    return ZKMetadataProvider.getAllTableConfigs(_propertyStore);
+  }
+
+  /**
    * Get the offline table config for the given table name.
    *
    * @param tableName Table name with or without type suffix
@@ -4138,12 +4147,7 @@ public class PinotHelixResourceManager {
   public Map<String, Integer> minimumServersRequiredForTenants() {
     Map<String, Integer> tenantMinServerMap = new HashMap<>();
     getAllServerTenantNames().forEach(tenant -> tenantMinServerMap.put(tenant, 0));
-    for (String table : getAllTables()) {
-      TableConfig tableConfig = getTableConfig(table);
-      if (tableConfig == null) {
-        LOGGER.error("Unable to retrieve table config for table: {}", table);
-        continue;
-      }
+    for (TableConfig tableConfig : getAllTableConfigs()) {
       String tenant = tableConfig.getTenantConfig().getServer();
       int maxReplication = Math.max(Objects.requireNonNullElse(tenantMinServerMap.get(tenant), 0),
           tableConfig.getReplication());
