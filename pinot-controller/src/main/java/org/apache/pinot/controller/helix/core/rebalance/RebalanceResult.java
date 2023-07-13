@@ -29,6 +29,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class RebalanceResult {
   private final String _jobId;
   private final Status _status;
