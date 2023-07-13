@@ -49,7 +49,7 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
-  private final List<Object[]> _rows;
+  private final ArrayList<Object[]> _rows;
   private final RoaringBitmap[] _nullBitmaps;
 
   private int _numDocsScanned = 0;
@@ -75,6 +75,8 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     _numRowsToKeep = queryContext.getLimit();
+    // TODO(gortiz): I think this is incorrect. The SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY limit
+    //  is not enforced later in getNextBlock
     _rows = new ArrayList<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
   }
@@ -102,6 +104,7 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(_blockValSets);
 
       int numDocsToAdd = Math.min(_numRowsToKeep - _rows.size(), valueBlock.getNumDocs());
+      _rows.ensureCapacity(_rows.size() + numDocsToAdd);
       _numDocsScanned += numDocsToAdd;
       if (_nullHandlingEnabled) {
         for (int i = 0; i < numExpressions; i++) {
