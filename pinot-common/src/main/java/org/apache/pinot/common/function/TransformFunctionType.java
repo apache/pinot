@@ -35,6 +35,8 @@ import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
 
 
 public enum TransformFunctionType {
@@ -98,9 +100,25 @@ public enum TransformFunctionType {
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), "json_extract_key"),
 
   // date time functions
-  TIMECONVERT("timeConvert", "time_convert"),
-  DATETIMECONVERT("dateTimeConvert", "date_time_convert"),
-  DATETRUNC("dateTrunc", "datetrunc"),
+  TIMECONVERT("timeConvert",
+      ReturnTypes.BIGINT_FORCE_NULLABLE,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
+      "time_convert"),
+
+  DATETIMECONVERT("dateTimeConvert",
+      ReturnTypes.cascade(
+          opBinding -> dateTimeConverterReturnTypeInference(opBinding),
+          SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER)), "date_time_convert"),
+
+  DATETRUNC("dateTrunc",
+      ReturnTypes.BIGINT_FORCE_NULLABLE,
+      OperandTypes.family(
+          ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+              SqlTypeFamily.CHARACTER),
+          ordinal -> ordinal > 1)),
+
   YEAR("year"),
   YEAR_OF_WEEK("yearOfWeek", "yow"),
   QUARTER("quarter"),
@@ -134,7 +152,14 @@ public enum TransformFunctionType {
   CLPDECODE("clpDecode"),
 
   // Regexp functions
-  REGEXP_EXTRACT("regexpExtract"),
+  REGEXP_EXTRACT("regexpExtract", "regexp_extract"),
+  REGEXPREPLACE("regexpReplace",
+      ReturnTypes.VARCHAR_2000_NULLABLE,
+      OperandTypes.family(
+          ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+              SqlTypeFamily.INTEGER, SqlTypeFamily.INTEGER, SqlTypeFamily.CHARACTER),
+          ordinal -> ordinal > 2),
+      "regexp_replace"),
 
   // Special type for annotation based scalar functions
   SCALAR("scalar"),
@@ -250,6 +275,20 @@ public enum TransformFunctionType {
       return inferTypeFromStringLiteral(operandType, opBinding.getTypeFactory());
     }
     return opBinding.getTypeFactory().createSqlType(defaultSqlType);
+  }
+
+  private static RelDataType dateTimeConverterReturnTypeInference(SqlOperatorBinding opBinding) {
+    int outputFormatPos = 2;
+    if (opBinding.getOperandCount() > outputFormatPos
+        && opBinding.isOperandLiteral(outputFormatPos, false)) {
+      String outputFormatStr = opBinding.getOperandLiteralValue(outputFormatPos, String.class).toUpperCase();
+      DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(outputFormatStr);
+      if ((dateTimeFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.EPOCH) || (
+          dateTimeFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.TIMESTAMP)) {
+        return opBinding.getTypeFactory().createSqlType(SqlTypeName.BIGINT);
+      }
+    }
+    return opBinding.getTypeFactory().createSqlType(SqlTypeName.VARCHAR);
   }
 
   private static RelDataType inferTypeFromStringLiteral(String operandTypeStr, RelDataTypeFactory typeFactory) {
