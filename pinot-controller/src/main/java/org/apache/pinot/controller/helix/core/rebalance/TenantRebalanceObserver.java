@@ -16,8 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metadata.controllerjob;
+package org.apache.pinot.controller.helix.core.rebalance;
 
-public enum ControllerJobType {
-  RELOAD_SEGMENT, FORCE_COMMIT, TABLE_REBALANCE, TENANT_REBALANCE
+public interface TenantRebalanceObserver {
+  enum Trigger {
+    // Start of tenant rebalance Trigger
+    START_TRIGGER,
+    // rebalance of a table is started
+    REBALANCE_STARTED_TRIGGER,
+    // rebalance of a table is completed
+    REBALANCE_COMPLETED_TRIGGER,
+    // rebalance of a table is failed
+    REBALANCE_ERRORED_TRIGGER
+  }
+
+  void onTrigger(TenantRebalanceObserver.Trigger trigger, String tableName, String description);
+
+  void onSuccess(String msg);
+
+  void onError(String errorMsg);
 }

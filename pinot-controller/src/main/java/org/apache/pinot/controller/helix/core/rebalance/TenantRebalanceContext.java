@@ -34,7 +34,9 @@ public class TenantRebalanceContext extends RebalanceContext {
   @JsonProperty("parallelWhitelist")
   private Set<String> _parallelWhitelist = new HashSet<>();
   @JsonProperty("parallelBlacklist")
-  private Set<String> _parallelBlacklist = new HashSet<>();;
+  private Set<String> _parallelBlacklist = new HashSet<>();
+
+  private boolean _verboseResult = false;
 
   public String getTenantName() {
     return _tenantName;
@@ -66,5 +68,13 @@ public class TenantRebalanceContext extends RebalanceContext {
 
   public void setParallelBlacklist(Set<String> parallelBlacklist) {
     _parallelBlacklist = parallelBlacklist;
+  }
+
+  public boolean isVerboseResult() {
+    return _verboseResult;
+  }
+
+  public void setVerboseResult(boolean verboseResult) {
+    _verboseResult = verboseResult;
   }
 }
