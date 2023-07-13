@@ -271,7 +271,16 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     JsonNode queryResponse = postQuery(query);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
     // Full table scan without dictionary
-    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+    // The offline segments are created deterministically and all the offline segments contain "ActualElapsedTime =
+    // -9999" records.
+    // The realtime segments are created non-deterministically and there is a small chance some segments may not
+    // contain any "ActualElapsedTime = -9999" records, so these segments are pruned and not scanned.
+    long numEntriesScannedInFilter = queryResponse.get("numEntriesScannedInFilter").asLong();
+    if (queryResponse.get("numSegmentsQueried") == queryResponse.get("numSegmentsProcessed")) {
+      assertEquals(numEntriesScannedInFilter, numTotalDocs);
+    } else {
+      assertTrue(numEntriesScannedInFilter >= numTotalDocs / 2);
+    }
     long queryResult = queryResponse.get("resultTable").get("rows").get(0).get(0).asLong();
 
     // Enable dictionary and inverted index.
@@ -320,7 +329,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     }, 60_000L, "Failed to remove dictionary and inverted index");
     // Should get back to full table scan
     queryResponse = postQuery(query);
-    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+    assertEquals(queryResponse.get("numEntriesScannedInFilter").asLong(), numEntriesScannedInFilter);
   }
 
   @Test
