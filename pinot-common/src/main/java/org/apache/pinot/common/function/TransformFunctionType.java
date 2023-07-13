@@ -125,7 +125,10 @@ public enum TransformFunctionType {
   ARRAYMAX("arrayMax"),
   ARRAYSUM("arraySum"),
   VALUEIN("valueIn"),
-  MAPVALUE("mapValue"),
+  MAPVALUE("mapValue", ReturnTypes.cascade(opBinding ->
+      opBinding.getOperandType(2).getComponentType(), SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY)),
+      "map_value"),
 
   // special functions
   INIDSET("inIdSet"),
