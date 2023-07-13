@@ -24,8 +24,10 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -115,7 +117,25 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
   }
 
   private Configuration extractRebalanceConfig(TenantRebalanceContext context) {
-    return null;
+    Configuration rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, context.isDryRun());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, context.isReassignInstances());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, context.isIncludeConsuming());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.BOOTSTRAP, context.isBootstrap());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, context.isDowntime());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, context.getMinAvailableReplicas());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, context.isBestEfforts());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
+        context.getExternalViewCheckIntervalInMs());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
+        context.getExternalViewStabilizationTimeoutInMs());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.UPDATE_TARGET_TIER, context.isUpdateTargetTier());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.JOB_ID, createUniqueRebalanceJobIdentifier());
+    return rebalanceConfig;
+  }
+
+  private String createUniqueRebalanceJobIdentifier() {
+    return UUID.randomUUID().toString();
   }
 
   private Set<String> getTenantTables(String tenantName) {
