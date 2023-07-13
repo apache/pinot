@@ -16,11 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.rebalance;
+package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class TenantRebalanceResult {

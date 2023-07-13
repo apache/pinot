@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.rebalance;
+package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModelProperty;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceContext;
 
 
 public class TenantRebalanceContext extends RebalanceContext {

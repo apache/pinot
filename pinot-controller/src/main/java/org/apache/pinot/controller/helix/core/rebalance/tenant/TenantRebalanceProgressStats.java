@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.rebalance;
+package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import java.util.HashMap;
 import java.util.Map;

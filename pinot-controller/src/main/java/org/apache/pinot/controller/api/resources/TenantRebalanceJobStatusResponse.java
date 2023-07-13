@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.controller.helix.core.rebalance.TenantRebalanceProgressStats;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 
 
 public class TenantRebalanceJobStatusResponse {
