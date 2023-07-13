@@ -101,6 +101,8 @@ public class QueryDispatcher {
     } catch (Exception e) {
       cancel(requestId, dispatchableSubPlan);
       throw new RuntimeException("Error executing query: " + ExplainPlanPlanVisitor.explain(dispatchableSubPlan), e);
+    } catch (Throwable t) {
+      throw new RuntimeException("Error executing query: " + t.getMessage());
     }
   }
 
