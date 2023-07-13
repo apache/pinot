@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
-import java.util.Map;
-
 
 public interface TenantRebalancer {
-  Map<String, RebalanceResult> rebalance(TenantRebalanceContext context);
+  TenantRebalanceResult rebalance(TenantRebalanceContext context);
 }

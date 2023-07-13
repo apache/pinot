@@ -47,7 +47,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
   }
 
   @Override
-  public Map<String, RebalanceResult> rebalance(TenantRebalanceContext context) {
+  public TenantRebalanceResult rebalance(TenantRebalanceContext context) {
     Map<String, RebalanceResult> rebalanceResult = new HashMap<>();
     Set<String> tables = getTenantTables(context.getTenantName());
     tables.forEach(table -> {
@@ -60,12 +60,14 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
             null, null, null));
       }
     });
-    if (!context.isDryRun() && !context.isDowntime()) {
+    if (context.isDryRun() || context.isDowntime()) {
+      return new TenantRebalanceResult(null, rebalanceResult, context.isVerboseResult());
+    } else {
       for (String table : rebalanceResult.keySet()) {
         RebalanceResult result = rebalanceResult.get(table);
         if (result.getStatus() == RebalanceResult.Status.DONE) {
           rebalanceResult.put(table, new RebalanceResult(result.getJobId(), RebalanceResult.Status.IN_PROGRESS,
-              "In progress, check controller logs for updates", result.getInstanceAssignment(),
+              "In progress, check controller task status for the", result.getInstanceAssignment(),
               result.getTierInstanceAssignment(), result.getSegmentAssignment()));
         }
       }
@@ -128,7 +130,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
       observer.onError(String.format("Failed to rebalance the tenant %s. Cause: %s", context.getTenantName(),
           exception.getMessage()));
     }
-    return rebalanceResult;
+    return new TenantRebalanceResult(tenantRebalanceJobId, rebalanceResult, context.isVerboseResult());
   }
 
   private Configuration extractRebalanceConfig(TenantRebalanceContext context) {
@@ -138,7 +140,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     rebalanceConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, context.isIncludeConsuming());
     rebalanceConfig.addProperty(RebalanceConfigConstants.BOOTSTRAP, context.isBootstrap());
     rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, context.isDowntime());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, context.getMinAvailableReplicas());
+    rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME,
+        context.getMinAvailableReplicas());
     rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, context.isBestEfforts());
     rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
         context.getExternalViewCheckIntervalInMs());
@@ -178,7 +181,8 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
       if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
         observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
       } else {
-        observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName, result.getDescription());
+        observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName,
+            result.getDescription());
       }
     } catch (Throwable t) {
       observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName,

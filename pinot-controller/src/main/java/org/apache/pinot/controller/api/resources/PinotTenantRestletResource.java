@@ -51,6 +51,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -59,8 +60,9 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.rebalance.DefaultTenantRebalancer;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TenantRebalanceContext;
+import org.apache.pinot.controller.helix.core.rebalance.TenantRebalanceProgressStats;
+import org.apache.pinot.controller.helix.core.rebalance.TenantRebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TenantRebalancer;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -70,6 +72,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -580,11 +583,42 @@ public class PinotTenantRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Path("/tenants/{tenantName}/rebalance")
   @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
-  public Map<String, RebalanceResult> rebalance(
+  public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
       @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceContext context) {
     context.setTenantName(tenantName);
     TenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_pinotHelixResourceManager, _executorService);
     return tenantRebalancer.rebalance(context);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.UPDATE)
+  @Path("/tenants/rebalanceStatus/{jobId}")
+  @ApiOperation(value = "Gets detailed stats of a tenant rebalance operation",
+      notes = "Gets detailed stats of a tenant rebalance operation")
+  public TenantRebalanceJobStatusResponse rebalanceStatus(
+      @ApiParam(value = "Tenant rebalance job id", required = true) @PathParam("jobId") String jobId)
+      throws JsonProcessingException {
+    Map<String, String> controllerJobZKMetadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TENANT_REBALANCE);
+
+    if (controllerJobZKMetadata == null) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
+          Response.Status.NOT_FOUND);
+    }
+    TenantRebalanceProgressStats tenantRebalanceProgressStats =
+        JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceConfigConstants.REBALANCE_PROGRESS_STATS),
+            TenantRebalanceProgressStats.class);
+    long timeSinceStartInSecs = tenantRebalanceProgressStats.getTimeToFinishInSeconds();
+    if (tenantRebalanceProgressStats.getCompletionStatusMsg() == null) {
+      timeSinceStartInSecs =
+          (System.currentTimeMillis() - tenantRebalanceProgressStats.getStartTimeMs()) / 1000;
+    }
+
+    TenantRebalanceJobStatusResponse tenantRebalanceJobStatusResponse = new TenantRebalanceJobStatusResponse();
+    tenantRebalanceJobStatusResponse.setTenantRebalanceProgressStats(tenantRebalanceProgressStats);
+    tenantRebalanceJobStatusResponse.setTimeElapsedSinceStartInSeconds(timeSinceStartInSecs);
+    return tenantRebalanceJobStatusResponse;
   }
 }
