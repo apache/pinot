@@ -386,7 +386,7 @@ public class ClusterIntegrationTestUtils {
   public static void pushCsvIntoKafka(List<String> csvRecords, String kafkaTopic,
       @Nullable Integer partitionColumnIndex, boolean injectTombstones, StreamDataProducer producer)
       throws Exception {
-    int counter = 0;
+    long counter = 0;
     if (injectTombstones) {
       // publish lots of tombstones to livelock the consumer if it can't handle this properly
       for (int i = 0; i < 1000; i++) {
@@ -435,7 +435,7 @@ public class ClusterIntegrationTestUtils {
     StreamDataProducer producer =
         StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
-    int counter = 0;
+    long counter = 0;
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       if (injectTombstones) {
         // publish lots of tombstones to livelock the consumer if it can't handle this properly
@@ -492,7 +492,7 @@ public class ClusterIntegrationTestUtils {
     // initiate transaction.
     producer.initTransactions();
     producer.beginTransaction();
-    int counter = 0;
+    long counter = 0;
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       for (File avroFile : avroFiles) {
         try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
@@ -545,7 +545,7 @@ public class ClusterIntegrationTestUtils {
     properties.put("request.required.acks", "1");
     properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
 
-    int counter = 0;
+    long counter = 0;
     StreamDataProducer producer =
         StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
