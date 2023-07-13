@@ -4139,21 +4139,30 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Construct a map of all the tenants and their respective minimum server requirements.
-   * The minimum server requirement is computed by iterating over all the tables of the tenant and
-   * find the table with maximum replication.
-   * @return map of tenants and their minimum server requirements
+   * Construct a map of all the tags and their respective minimum instance requirements.
+   * The minimum instance requirement is computed by
+   * - for BROKER tenant tag set it to 1.
+   * - for SERVER tenant tag iterate over all the tables of that tenant and find the maximum table replication.
+   * - for rest of the tags just set it to 0
+   * @return map of tags and their minimum instance requirements
    */
-  public Map<String, Integer> minimumServersRequiredForTenants() {
-    Map<String, Integer> tenantMinServerMap = new HashMap<>();
-    getAllServerTenantNames().forEach(tenant -> tenantMinServerMap.put(tenant, 0));
-    for (TableConfig tableConfig : getAllTableConfigs()) {
-      String tenant = tableConfig.getTenantConfig().getServer();
-      int maxReplication = Math.max(Objects.requireNonNullElse(tenantMinServerMap.get(tenant), 0),
-          tableConfig.getReplication());
-      tenantMinServerMap.put(tenant, maxReplication);
+  public Map<String, Integer> minimumInstancesRequiredForTags() {
+    Map<String, Integer> tagMinServerMap = new HashMap<>();
+    for (InstanceConfig instanceConfig : getAllHelixInstanceConfigs()) {
+      for (String tag : instanceConfig.getTags()) {
+        tagMinServerMap.put(tag, TagNameUtils.isBrokerTag(tag) ? 1 : 0);
+      }
     }
-    return tenantMinServerMap;
+    for (TableConfig tableConfig : getAllTableConfigs()) {
+      String serverTag = TagNameUtils.getServerTagForTenant(tableConfig.getTenantConfig().getServer(),
+          tableConfig.getTableType());
+      int maxReplication = Math.max(Objects.requireNonNullElse(tagMinServerMap.get(serverTag), 0),
+          tableConfig.getReplication());
+      tagMinServerMap.put(serverTag, maxReplication);
+      String brokerTag = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
+      tagMinServerMap.put(brokerTag, 1);
+    }
+    return tagMinServerMap;
   }
 
   /*

@@ -35,10 +35,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.ClientErrorException;
@@ -64,7 +61,6 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.spi.config.instance.Instance;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -438,49 +434,49 @@ public class PinotInstanceRestletResource {
   public List<OperationValidationResponse> instanceTagUpdateSafetyCheck(List<InstanceTagUpdateRequest> instances) {
     LOGGER.info("Performing safety check on tag update request received for instances: {}",
         instances.stream().map(InstanceTagUpdateRequest::getInstanceName).collect(Collectors.toList()));
-    Map<String, List<String>> removedInstances = new HashMap<>();
-    Map<String, List<String>> addedInstances = new HashMap<>();
-    // compute the # assigned instances delta for each tenant based on updated tags
-    // also track the list of instances removed from each tenant for issue logging purpose
-    for (InstanceTagUpdateRequest instance : instances) {
-      String name = instance.getInstanceName();
-      Set<String> oldTags = new HashSet<>(_pinotHelixResourceManager.getTagsForInstance(name));
-      Set<String> newTags = new HashSet<>(instance.getNewTags());
-      // tags removed from instance
-      for (String tenant : Sets.difference(oldTags, newTags)) {
-        List<String> instanceList = Objects.requireNonNullElse(removedInstances.get(tenant), new ArrayList<>());
-        instanceList.add(name);
-        removedInstances.put(tenant, instanceList);
-      }
-      // newly added tags to instance
-      for (String tenant : Sets.difference(newTags, oldTags)) {
-        List<String> instanceList = Objects.requireNonNullElse(addedInstances.get(tenant), new ArrayList<>());
-        instanceList.add(name);
-        addedInstances.put(tenant, instanceList);
-      }
-    }
-    Map<String, Integer> tenantMinServerMap = _pinotHelixResourceManager.minimumServersRequiredForTenants();
+    Map<String, Integer> tagMinServerMap = _pinotHelixResourceManager.minimumInstancesRequiredForTags();
+    Map<String, Integer> tagDeficiency = computeTagDeficiency(instances, tagMinServerMap);
+
     Map<String, List<OperationValidationResponse.ErrorWrapper>> responseMap = new HashMap<>(instances.size());
     List<OperationValidationResponse.ErrorWrapper> tenantIssues = new ArrayList<>();
     instances.forEach(instance -> responseMap.put(instance.getInstanceName(), new ArrayList<>()));
-    removedInstances.forEach((tag, removed) -> instanceIssueHandling(tag, tenantMinServerMap,
-        () -> Objects.requireNonNullElse(addedInstances.remove(tag), new ArrayList<>()).size() - removed.size(),
-        // assumes existing tags are valid tenant tags
-        () -> { },
-        (type, deficiency) -> {
-      for (int i = 0; i < deficiency && i < removed.size(); i++) {
-        String instance = removed.get(i);
-        String tenant = TagNameUtils.getTenantFromTag(tag);
-        responseMap.get(instance).add(new OperationValidationResponse.ErrorWrapper(
-            OperationValidationResponse.ErrorCode.MINIMUM_INSTANCE_UNSATISFIED, tenant, type, tag, type, instance));
+    for (InstanceTagUpdateRequest instance : instances) {
+      String name = instance.getInstanceName();
+      Set<String> oldTags;
+      try {
+        oldTags = new HashSet<>(_pinotHelixResourceManager.getTagsForInstance(name));
+      } catch (NullPointerException exception) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Instance %s is not a valid instance name.", name), Response.Status.PRECONDITION_FAILED);
       }
-    }));
-    // record issue if even after adding new instance to a tenant, it still has instance deficiency
-    addedInstances.forEach((tag, added) -> instanceIssueHandling(tag, tenantMinServerMap, added::size,
-        () -> added.forEach(instance -> responseMap.get(instance).add(new OperationValidationResponse.ErrorWrapper(
-                OperationValidationResponse.ErrorCode.UNRECOGNISED_TAG_TYPE, tag))),
-        (type, deficiency) -> tenantIssues.add(new OperationValidationResponse.ErrorWrapper(
-            OperationValidationResponse.ErrorCode.ALREADY_DEFICIENT_TENANT, tag, type, deficiency.toString()))));
+      Set<String> newTags = new HashSet<>(instance.getNewTags());
+      // tags removed from instance
+      for (String tag : Sets.difference(oldTags, newTags)) {
+        Integer deficiency = tagDeficiency.get(tag);
+        if (deficiency != null && deficiency > 0) {
+          String tenant = TagNameUtils.getTenantFromTag(tag);
+          String tagType = getInstanceTypeFromTag(tag);
+          responseMap.get(name).add(new OperationValidationResponse.ErrorWrapper(
+              OperationValidationResponse.ErrorCode.MINIMUM_INSTANCE_UNSATISFIED, tenant, tagType, tag, tagType, name));
+          tagDeficiency.put(tag, deficiency - 1);
+        }
+      }
+      // newly added tags to instance
+      for (String tag : newTags) {
+        String tagType = getInstanceTypeFromTag(tag);
+        if (tagType == null) {
+          responseMap.get(name).add(new OperationValidationResponse.ErrorWrapper(
+              OperationValidationResponse.ErrorCode.UNRECOGNISED_TAG_TYPE, tag));
+          continue;
+        }
+        Integer deficiency = tagDeficiency.get(tag);
+        if (deficiency != null && deficiency > 0) {
+          tenantIssues.add(new OperationValidationResponse.ErrorWrapper(
+              OperationValidationResponse.ErrorCode.ALREADY_DEFICIENT_TENANT, TagNameUtils.getTenantFromTag(tag),
+              tagType, deficiency.toString(), name));
+        }
+      }
+    }
 
     // consolidate all the issues based on instances
     List<OperationValidationResponse> response = new ArrayList<>(instances.size());
@@ -494,39 +490,47 @@ public class PinotInstanceRestletResource {
     return response;
   }
 
-  private void instanceIssueHandling(String tag, Map<String, Integer> tenantMinServerMap,
-      Supplier<Integer> deltaCalculationHandler, Runnable unrecognisedTagHandler,
-      BiConsumer<String, Integer> recordIssueHandler) {
-    int delta = deltaCalculationHandler.get();
-    int updatedInstanceCount;
-    int minInstanceRequirement;
-    String instanceType;
+  private String getInstanceTypeFromTag(String tag) {
     if (TagNameUtils.isServerTag(tag)) {
-      String tenant = TagNameUtils.getTenantFromTag(tag);
-      List<InstanceConfig> instanceConfigList = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
-      minInstanceRequirement = Objects.requireNonNullElse(tenantMinServerMap.get(tenant), 0);
-      instanceType = "server";
-      if (TagNameUtils.isRealtimeServerTag(tag)) {
-        updatedInstanceCount = _pinotHelixResourceManager.getAllInstancesForServerTenantWithType(instanceConfigList,
-            tenant, TableType.REALTIME).size() + delta;
-      } else {
-        updatedInstanceCount = _pinotHelixResourceManager.getAllInstancesForServerTenantWithType(instanceConfigList,
-            tenant, TableType.OFFLINE).size() + delta;
-      }
+      return "server";
     } else if (TagNameUtils.isBrokerTag(tag)) {
-      String tenant = TagNameUtils.getTenantFromTag(tag);
-      updatedInstanceCount = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenant).size() + delta;
-      minInstanceRequirement = 1;
-      instanceType = "broker";
+      return "broker";
     } else {
-      unrecognisedTagHandler.run();
-      return;
+      return null;
     }
-    // record an issue if updated instance count for a tenant is less than
-    // the minimum requirement (max table replication for that tenant in case of server and 1 in case of broker)
-    if (updatedInstanceCount < minInstanceRequirement) {
-      int totalDeficiency = minInstanceRequirement - updatedInstanceCount;
-      recordIssueHandler.accept(instanceType, totalDeficiency);
-    }
+  }
+
+  private Map<String, Integer> computeTagDeficiency(List<InstanceTagUpdateRequest> instances,
+      Map<String, Integer> tagMinServerMap) {
+    Map<String, Integer> updatedTagInstanceMap = getUpdatedTagInstanceMap(instances);
+    Map<String, Integer> tagDeficiency = new HashMap<>();
+    tagMinServerMap.forEach((tag, minInstances) -> {
+      Integer updatedInstances = updatedTagInstanceMap.remove(tag);
+      tagDeficiency.put(tag, minInstances - (updatedInstances != null ? updatedInstances : 0));
+    });
+    updatedTagInstanceMap.forEach((tag, updatedInstances) -> tagDeficiency.put(tag, 0));
+    return tagDeficiency;
+  }
+
+  private Map<String, Integer> getUpdatedTagInstanceMap(List<InstanceTagUpdateRequest> instances) {
+    Map<String, Integer> updatedTagInstanceMap = new HashMap<>();
+    Set<String> visitedInstances = new HashSet<>();
+    instances.forEach(instance -> {
+      instance.getNewTags().forEach(tag -> {
+        Integer count = updatedTagInstanceMap.get(tag);
+        updatedTagInstanceMap.put(tag, count != null ? count + 1 : 1);
+      });
+      visitedInstances.add(instance.getInstanceName());
+    });
+    _pinotHelixResourceManager.getAllInstances().forEach(instance -> {
+      if (!visitedInstances.contains(instance)) {
+        _pinotHelixResourceManager.getTagsForInstance(instance).forEach(tag -> {
+          Integer count = updatedTagInstanceMap.get(tag);
+          updatedTagInstanceMap.put(tag, count != null ? count + 1 : 1);
+        });
+        visitedInstances.add(instance);
+      }
+    });
+    return updatedTagInstanceMap;
   }
 }

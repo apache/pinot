@@ -90,7 +90,7 @@ public class OperationValidationResponse {
     CONTAINS_RESOURCE("Instance %s exists in ideal state for %s"),
     MINIMUM_INSTANCE_UNSATISFIED(
         "Tenant '%s' will not satisfy minimum '%s' requirement if tag '%s' is removed from %s instance '%s'."),
-    ALREADY_DEFICIENT_TENANT("Tenant '%s' is low on '%s' instances by %s even with given allocation"),
+    ALREADY_DEFICIENT_TENANT("Tenant '%s' is low on '%s' instances by %s even after allocating instance %s"),
     UNRECOGNISED_TAG_TYPE("The tag '%s' does not follow the suffix convention of either broker or server");
 
     public final String _description;
