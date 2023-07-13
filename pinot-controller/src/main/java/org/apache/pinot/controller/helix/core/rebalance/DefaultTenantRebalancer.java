@@ -90,7 +90,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
           try {
             while (true) {
               String table = parallelQueue.remove();
-              rebalanceTableWithContext(table, config);
+              rebalanceTable(table, config);
             }
           } catch (NoSuchElementException ignore) {
           }
@@ -110,7 +110,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         }
       }
       for (String table : sequentialTables) {
-        rebalanceTableWithContext(table, config);
+        rebalanceTable(table, config);
       }
     });
     return rebalanceResult;
@@ -155,7 +155,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     return tables;
   }
 
-  private RebalanceResult rebalanceTableWithContext(String tableName, Configuration config) {
+  private RebalanceResult rebalanceTable(String tableName, Configuration config) {
     try {
       return _pinotHelixResourceManager.rebalanceTable(tableName, config, true);
     } catch (Throwable t) {
