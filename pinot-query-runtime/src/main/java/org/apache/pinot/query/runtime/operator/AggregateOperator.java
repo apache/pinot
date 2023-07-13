@@ -28,6 +28,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -38,7 +41,7 @@ import org.apache.pinot.core.common.IntermediateStageBlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -79,6 +82,7 @@ public class AggregateOperator extends MultiStageOperator {
   // Map that maintains the mapping between columnName and the column ordinal index. It is used to fetch the required
   // column value from row-based container and fetch the input datatype for the column.
   private final Map<String, Integer> _colNameToIndexMap;
+  private final Map<Integer, Map<Integer, Literal>> _aggCallLiteralArgsMap;
 
   private TransferableBlock _upstreamErrorBlock;
   private boolean _readyToConstruct;
@@ -92,16 +96,23 @@ public class AggregateOperator extends MultiStageOperator {
   // aggCalls has to be a list of FunctionCall and cannot be null
   // groupSet has to be a list of InputRef and cannot be null
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
+      DataSchema resultSchema, DataSchema inputSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet,
+      AggType aggType) {
+    this(context, inputOperator, resultSchema, inputSchema, aggCalls, groupSet, aggType,
+        new AbstractPlanNode.NodeHint());
+  }
 
   @VisibleForTesting
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       DataSchema resultSchema, DataSchema inputSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet,
-      AggType aggType) {
+      AggType aggType, AbstractPlanNode.NodeHint nodeHint) {
     super(context);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
     _inputSchema = inputSchema;
     _aggType = aggType;
+    _aggCallLiteralArgsMap = parseLiterals(nodeHint);
 
     _upstreamErrorBlock = null;
     _readyToConstruct = false;
@@ -126,6 +137,47 @@ public class AggregateOperator extends MultiStageOperator {
       _isGroupByAggregation = false;
       _aggregationExecutor = new MultistageAggregationExecutor(aggFunctions, aggType, _colNameToIndexMap,
           _resultSchema);
+    }
+  }
+
+  private static Map<Integer, Map<Integer, Literal>> parseLiterals(AbstractPlanNode.NodeHint nodeHint) {
+    Map<Integer, Map<Integer, Literal>> aggCallToLiteralArgsMap = new HashMap<>();
+    String rexLiteralStrings = nodeHint._hintOptions.get(PinotHintOptions.INTERNAL_AGG_OPTIONS)
+        .get(PinotHintOptions.InternalAggregateOptions.AGG_CALL_SIGNATURE);
+    if (StringUtils.isNotEmpty(rexLiteralStrings) && !"{}".equals(rexLiteralStrings)) {
+      String[] rexLiteralStringArr = rexLiteralStrings.substring(1, rexLiteralStrings.length() - 1).split(",");
+      for (String rexLiteralString : rexLiteralStringArr) {
+        String[] rexLiteralPart = rexLiteralString.split("_");
+        int aggIdx = Integer.parseInt(rexLiteralPart[0]);
+        int argListIdx = Integer.parseInt(rexLiteralPart[1]);
+        String sqlTypeNameStr = rexLiteralPart[2];
+        String valueStr = rexLiteralPart[3];
+        Map<Integer, Literal> literalArgs = aggCallToLiteralArgsMap.computeIfAbsent(aggIdx, i -> new HashMap<>());
+        literalArgs.put(argListIdx, toLiteral(sqlTypeNameStr, valueStr));
+      }
+    }
+    return aggCallToLiteralArgsMap;
+  }
+
+  private static Literal toLiteral(String sqlTypeNameStr, String valueStr) {
+    SqlTypeName sqlTypeName = SqlTypeName.get(sqlTypeNameStr);
+    if (sqlTypeName == null) {
+      return null;
+    }
+    switch (sqlTypeName) {
+      case DECIMAL:
+      case REAL:
+      case DOUBLE:
+        return Literal.doubleValue(Double.parseDouble(valueStr));
+      case INTEGER:
+        return Literal.intValue(Integer.parseInt(valueStr));
+      case BIGINT:
+        return Literal.longValue(Long.parseLong(valueStr));
+      case CHAR:
+      case VARCHAR:
+        return Literal.stringValue(valueStr);
+      default:
+        throw new UnsupportedOperationException("");
     }
   }
 
@@ -208,27 +260,30 @@ public class AggregateOperator extends MultiStageOperator {
     List<RexExpression.FunctionCall> aggFunctionCalls =
         aggCalls.stream().map(RexExpression.FunctionCall.class::cast).collect(Collectors.toList());
     List<FunctionContext> functionContexts = new ArrayList<>();
-    for (RexExpression.FunctionCall functionCall : aggFunctionCalls) {
-      FunctionContext funcContext = convertRexExpressionsToFunctionContext(functionCall);
+    for (int aggIdx = 0; aggIdx < aggFunctionCalls.size(); aggIdx ++) {
+      RexExpression.FunctionCall functionCall = aggFunctionCalls.get(aggIdx);
+      FunctionContext funcContext = convertRexExpressionsToFunctionContext(aggIdx, functionCall);
       functionContexts.add(funcContext);
     }
     return functionContexts;
   }
 
-  private FunctionContext convertRexExpressionsToFunctionContext(RexExpression.FunctionCall aggFunctionCall) {
+  private FunctionContext convertRexExpressionsToFunctionContext(int aggIdx,
+      RexExpression.FunctionCall aggFunctionCall) {
     // Extract details from RexExpression aggFunctionCall.
     String functionName = aggFunctionCall.getFunctionName();
     List<RexExpression> functionOperands = aggFunctionCall.getFunctionOperands();
 
     List<ExpressionContext> aggArguments = new ArrayList<>();
-    for (RexExpression operand : functionOperands) {
-      ExpressionContext exprContext = convertRexExpressionToExpressionContext(operand);
+    for (int argIdx = 0; argIdx < functionOperands.size(); argIdx++) {
+      RexExpression operand = functionOperands.get(argIdx);
+      ExpressionContext exprContext = convertRexExpressionToExpressionContext(aggIdx, argIdx, operand);
       aggArguments.add(exprContext);
     }
 
     // add additional arguments for aggFunctionCall
     if (_aggType.isInputIntermediateFormat()) {
-      functionNameRewrite(aggArguments, aggFunctionCall);
+      rewriteAggArgumentWithLiterals(aggArguments, aggIdx, aggFunctionCall);
     }
 
     if (aggArguments.isEmpty()) {
@@ -243,26 +298,34 @@ public class AggregateOperator extends MultiStageOperator {
     return functionContext;
   }
 
-  private void functionNameRewrite(List<ExpressionContext> aggArguments, RexExpression.FunctionCall aggFunctionCall) {
+  private void rewriteAggArgumentWithLiterals(List<ExpressionContext> aggArguments, int aggIdx,
+      RexExpression.FunctionCall aggFunctionCall) {
     String functionName = aggFunctionCall.getFunctionName();
+    // This should be provided by AggregationFunctionType indicating which argIdx requires literal.
     if (functionName.equals("FIRSTWITHTIME") || functionName.equals("LASTWITHTIME")) {
-      aggArguments.add(ExpressionContext.forIdentifier("ts"));
-      aggArguments.add(ExpressionContext.forLiteralContext(Literal.stringValue("DOUBLE")));
+      aggArguments.add(ExpressionContext.forIdentifier("__PLACEHOLDER__"));
+      aggArguments.add(ExpressionContext.forLiteralContext(_aggCallLiteralArgsMap.get(aggIdx).get(2)));
+    }
+    if (functionName.equals("PERCENTILE")) {
+      aggArguments.add(ExpressionContext.forLiteralContext(_aggCallLiteralArgsMap.get(aggIdx).get(1)));
     }
   }
 
   private List<ExpressionContext> getGroupSet(List<RexExpression> groupBySetRexExpr) {
     List<ExpressionContext> groupByExprContext = new ArrayList<>();
     for (RexExpression groupByRexExpr : groupBySetRexExpr) {
-      ExpressionContext exprContext = convertRexExpressionToExpressionContext(groupByRexExpr);
+      ExpressionContext exprContext = convertRexExpressionToExpressionContext(-1, -1, groupByRexExpr);
       groupByExprContext.add(exprContext);
     }
 
     return groupByExprContext;
   }
 
-  private ExpressionContext convertRexExpressionToExpressionContext(RexExpression rexExpr) {
+  private ExpressionContext convertRexExpressionToExpressionContext(int aggIdx, int argIdx, RexExpression rexExpr) {
     ExpressionContext exprContext;
+    if (_aggCallLiteralArgsMap.get(aggIdx) != null && _aggCallLiteralArgsMap.get(aggIdx).get(argIdx) != null) {
+      return ExpressionContext.forLiteralContext(_aggCallLiteralArgsMap.get(aggIdx).get(argIdx));
+    }
 
     // This is used only for aggregation arguments and groupby columns. The rexExpression can never be a function type.
     switch (rexExpr.getKind()) {
@@ -291,6 +354,9 @@ public class AggregateOperator extends MultiStageOperator {
     return exprContext;
   }
 
+  // TODO: If the previous block is not mailbox received, this method is not efficient.  Then getDataBlock() will
+  //  convert the unserialized format to serialized format of BaseDataBlock. Then it will convert it back to column
+  //  value primitive type.
   static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggFunction,
       TransferableBlock block, DataSchema inputDataSchema, Map<String, Integer> colNameToIndexMap) {
     List<ExpressionContext> expressions = aggFunction.getInputExpressions();
@@ -299,18 +365,17 @@ public class AggregateOperator extends MultiStageOperator {
       return Collections.emptyMap();
     }
 
-    Preconditions.checkState(numExpressions == 1, "Cannot handle more than one identifier in aggregation function.");
-    ExpressionContext expression = expressions.get(0);
-    Preconditions.checkState(expression.getType().equals(ExpressionContext.Type.IDENTIFIER));
-    int index = colNameToIndexMap.get(expression.getIdentifier());
-
-    DataSchema.ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
-    Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
-    // TODO: If the previous block is not mailbox received, this method is not efficient.  Then getDataBlock() will
-    //  convert the unserialized format to serialized format of BaseDataBlock. Then it will convert it back to column
-    //  value primitive type.
-    return Collections.singletonMap(expression,
-        new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index));
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    for (ExpressionContext expression : expressions) {
+      if (expression.getType().equals(ExpressionContext.Type.IDENTIFIER)
+          && !"__PLACEHOLDER__".equals(expression.getIdentifier())) {
+        int index = colNameToIndexMap.get(expression.getIdentifier());
+        DataSchema.ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
+        Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
+        blockValSetMap.put(expression, new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index));
+      }
+    }
+    return blockValSetMap;
   }
 
   static Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row,

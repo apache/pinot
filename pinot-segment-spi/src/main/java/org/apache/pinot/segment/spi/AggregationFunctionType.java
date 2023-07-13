@@ -93,7 +93,9 @@ public enum AggregationFunctionType {
   DISTINCTSUM("distinctSum"),
   DISTINCTAVG("distinctAvg"),
 
-  PERCENTILE("percentile"),
+  PERCENTILE("percentile", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.ARG0,
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
   PERCENTILEEST("percentileEst"),
   PERCENTILERAWEST("percentileRawEst"),
   PERCENTILETDIGEST("percentileTDigest"),

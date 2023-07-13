@@ -40,6 +40,7 @@ public class PinotHintOptions {
 
   public static class InternalAggregateOptions {
     public static final String AGG_TYPE = "agg_type";
+    public static final String AGG_CALL_SIGNATURE = "agg_call_signature";
   }
 
   public static class AggregateOptions {

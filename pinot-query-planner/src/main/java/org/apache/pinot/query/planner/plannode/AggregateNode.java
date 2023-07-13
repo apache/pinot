@@ -31,7 +31,8 @@ import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
 public class AggregateNode extends AbstractPlanNode {
-  private List<RelHint> _relHints;
+  @ProtoProperties
+  private NodeHint _nodeHint;
   @ProtoProperties
   private List<RexExpression> _aggCalls;
   @ProtoProperties
@@ -49,9 +50,8 @@ public class AggregateNode extends AbstractPlanNode {
     Preconditions.checkState(areHintsValid(relHints), "invalid sql hint for agg node: {}", relHints);
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     _groupSet = groupSet;
-    _relHints = relHints;
-    _aggType = AggType.valueOf(PinotHintStrategyTable.getHintOption(
-        relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE));
+    _nodeHint = new NodeHint(relHints);
+    _aggType = AggType.valueOf(PinotHintStrategyTable.getHintOption(relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE));
   }
 
   private boolean areHintsValid(List<RelHint> relHints) {
@@ -66,8 +66,8 @@ public class AggregateNode extends AbstractPlanNode {
     return _groupSet;
   }
 
-  public List<RelHint> getRelHints() {
-    return _relHints;
+  public NodeHint getNodeHint() {
+    return _nodeHint;
   }
 
   public AggType getAggType() {
