@@ -1273,6 +1273,16 @@
         <artifactId>clp-ffi</artifactId>
         <version>${clp-ffi.version}</version>
       </dependency>
+
+      <!-- This configures all aws sdk dependencies. -->
+      <!-- See https://reflectoring.io/maven-bom/ to understand how this work -->
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${aws.sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>
