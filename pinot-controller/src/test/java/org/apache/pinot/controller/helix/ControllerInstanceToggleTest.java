@@ -116,7 +116,8 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     // It may take time for an instance to toggle the state.
     TestUtils.waitForCondition(aVoid -> {
       try {
-        sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forInstanceState(instanceName), state);
+        sendPutRequest(
+            DEFAULT_INSTANCE.getControllerRequestURLBuilder().forInstanceState(instanceName) + "?state=" + state);
       } catch (IOException ioe) {
         // receive non-200 status code
         return false;
