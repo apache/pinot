@@ -146,39 +146,39 @@ public class ColumnMinMaxValueGenerator {
         case INT:
           try (IntDictionary intDictionary = new IntDictionary(dictionaryBuffer, length)) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                intDictionary.getStringValue(0), intDictionary.getStringValue(length - 1));
+                intDictionary.getStringValue(0), intDictionary.getStringValue(length - 1), dataType);
           }
           break;
         case LONG:
           try (LongDictionary longDictionary = new LongDictionary(dictionaryBuffer, length)) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                longDictionary.getStringValue(0), longDictionary.getStringValue(length - 1));
+                longDictionary.getStringValue(0), longDictionary.getStringValue(length - 1), dataType);
           }
           break;
         case FLOAT:
           try (FloatDictionary floatDictionary = new FloatDictionary(dictionaryBuffer, length)) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                floatDictionary.getStringValue(0), floatDictionary.getStringValue(length - 1));
+                floatDictionary.getStringValue(0), floatDictionary.getStringValue(length - 1), dataType);
           }
           break;
         case DOUBLE:
           try (DoubleDictionary doubleDictionary = new DoubleDictionary(dictionaryBuffer, length)) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                doubleDictionary.getStringValue(0), doubleDictionary.getStringValue(length - 1));
+                doubleDictionary.getStringValue(0), doubleDictionary.getStringValue(length - 1), dataType);
           }
           break;
         case STRING:
           try (StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, length,
               columnMetadata.getColumnMaxLength())) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                stringDictionary.getStringValue(0), stringDictionary.getStringValue(length - 1));
+                stringDictionary.getStringValue(0), stringDictionary.getStringValue(length - 1), dataType);
           }
           break;
         case BYTES:
           try (BytesDictionary bytesDictionary = new BytesDictionary(dictionaryBuffer, length,
               columnMetadata.getColumnMaxLength())) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                bytesDictionary.getStringValue(0), bytesDictionary.getStringValue(length - 1));
+                bytesDictionary.getStringValue(0), bytesDictionary.getStringValue(length - 1), dataType);
           }
           break;
         default:
@@ -215,7 +215,7 @@ public class ColumnMinMaxValueGenerator {
             }
           }
           SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              String.valueOf(min), String.valueOf(max));
+              String.valueOf(min), String.valueOf(max), dataType);
          }
          break;
         case LONG: {
@@ -243,7 +243,7 @@ public class ColumnMinMaxValueGenerator {
             }
           }
           SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                String.valueOf(min), String.valueOf(max));
+                String.valueOf(min), String.valueOf(max), dataType);
          }
          break;
         case FLOAT: {
@@ -271,7 +271,7 @@ public class ColumnMinMaxValueGenerator {
             }
           }
           SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                String.valueOf(min), String.valueOf(max));
+                String.valueOf(min), String.valueOf(max), dataType);
          }
          break;
         case DOUBLE: {
@@ -299,7 +299,7 @@ public class ColumnMinMaxValueGenerator {
             }
           }
           SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                String.valueOf(min), String.valueOf(max));
+                String.valueOf(min), String.valueOf(max), dataType);
           }
           break;
         case STRING: {
@@ -334,7 +334,7 @@ public class ColumnMinMaxValueGenerator {
                 }
             }
           }
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, min, max);
+          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, min, max, dataType);
           }
           break;
         case BYTES: {
@@ -370,7 +370,7 @@ public class ColumnMinMaxValueGenerator {
             }
           }
           SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              String.valueOf(new ByteArray(min)), String.valueOf(new ByteArray(max)));
+              String.valueOf(new ByteArray(min)), String.valueOf(new ByteArray(max)), dataType);
           }
           break;
         default:

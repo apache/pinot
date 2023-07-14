@@ -67,30 +67,23 @@ public class SegmentColumnarIndexCreatorTest {
   public void testGetValidPropertyValue()
       throws Exception {
     // Leading/trailing whitespace
-    Assert.assertEquals(
-        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue(" a")), " a");
-    Assert.assertEquals(
-        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue("a\t")), "a\t");
-    Assert.assertEquals(
-        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue("\na")), "\na");
+    Assert.assertEquals(getEscapedValidPropertyValue(" a"), " a");
+    Assert.assertEquals(getEscapedValidPropertyValue("a\t"), "a\t");
+    Assert.assertEquals(getEscapedValidPropertyValue("\na"), "\na");
 
     // Whitespace in the middle
-    Assert.assertEquals(
-        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue("a\t b")), "a\t b");
-    Assert.assertEquals(
-        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue("a \nb")), "a \nb");
+    Assert.assertEquals(getEscapedValidPropertyValue("a\t b"), "a\t b");
+    Assert.assertEquals(getEscapedValidPropertyValue("a \nb"), "a \nb");
 
     // List separator
-    Assert.assertEquals(
-        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue("a,b,c")), "a,b,c");
-    Assert.assertEquals(
-        StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue(",a b")), ",a b");
+    Assert.assertEquals(getEscapedValidPropertyValue("a,b,c"), "a,b,c");
+    Assert.assertEquals(getEscapedValidPropertyValue(",a b"), ",a b");
 
     // Empty string
-    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue(""), "");
+    Assert.assertEquals(getEscapedValidPropertyValue(""), "");
 
     // Escape character for variable substitution
-    Assert.assertEquals(SegmentColumnarIndexCreator.getValidPropertyValue("$${"), "$${");
+    Assert.assertEquals(getEscapedValidPropertyValue("$${"), "$${");
   }
 
   @Test
@@ -212,24 +205,24 @@ public class SegmentColumnarIndexCreatorTest {
   @Test
   public void testAddMinMaxValue() {
     PropertiesConfiguration props = new PropertiesConfiguration();
-    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "foo");
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "foo", FieldSpec.DataType.STRING);
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
 
     props = new PropertiesConfiguration();
-    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", ",bar", "foo");
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", ",bar", "foo", FieldSpec.DataType.STRING);
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
     Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), ",bar");
 
     props = new PropertiesConfiguration();
-    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "  ");
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "  ", FieldSpec.DataType.STRING);
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
 
     // test for values with leading or ending whitespace.
     props = new PropertiesConfiguration();
-    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "a\t", "\nb");
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "a\t", "\nb", FieldSpec.DataType.STRING);
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
     Assert.assertEquals(
@@ -239,7 +232,7 @@ public class SegmentColumnarIndexCreatorTest {
 
     // test for values with 'v'.
     props = new PropertiesConfiguration();
-    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "aa,bb", "aa,bb,");
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "aa,bb", "aa,bb,", FieldSpec.DataType.STRING);
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
     Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), "aa,bb");
@@ -251,13 +244,19 @@ public class SegmentColumnarIndexCreatorTest {
         randomAlphabetic(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
     String longMaxValue = RandomStringUtils.
         randomAlphabetic(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
-    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", longMinValue, longMaxValue);
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", longMinValue,
+        longMaxValue, FieldSpec.DataType.STRING);
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
     Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))),
-        longMinValue.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
+        SegmentColumnarIndexCreator.getValueWithinLengthLimit(longMinValue, false, FieldSpec.DataType.STRING));
     Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))),
-        longMaxValue.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
+        SegmentColumnarIndexCreator.getValueWithinLengthLimit(longMaxValue, true, FieldSpec.DataType.STRING));
+  }
+
+  private String getEscapedValidPropertyValue(String input) {
+    return StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue(input, false,
+        FieldSpec.DataType.STRING));
   }
 
   @AfterClass

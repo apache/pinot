@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -557,7 +559,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Object min = columnIndexCreationInfo.getMin();
       Object max = columnIndexCreationInfo.getMax();
       if (min != null && max != null) {
-        addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString());
+        addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString(), fieldSpec.getDataType());
       }
     }
 
@@ -568,9 +570,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
-      String maxValue) {
-    properties.setProperty(getKeyFor(column, MIN_VALUE), getValidPropertyValue(minValue));
-    properties.setProperty(getKeyFor(column, MAX_VALUE), getValidPropertyValue(maxValue));
+      String maxValue, DataType dataType) {
+    properties.setProperty(getKeyFor(column, MIN_VALUE), getValidPropertyValue(minValue, false, dataType));
+    properties.setProperty(getKeyFor(column, MAX_VALUE), getValidPropertyValue(maxValue, true, dataType));
   }
 
   /**
@@ -601,8 +603,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * Helper method to get the valid value for setting min/max.
    */
   @VisibleForTesting
-  static String getValidPropertyValue(String value) {
+  static String getValidPropertyValue(String value, boolean isMax, DataType dataType) {
+    value = getValueWithinLengthLimit(value, isMax, dataType);
     int length = value.length();
+
     if (length > 0) {
       // check and replace first character if it's a white space
       if (Character.isWhitespace(value.charAt(0))) {
@@ -620,12 +624,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     // removing the ',' from the value if it's present.
     if (length > 0 && value.contains(",")) {
       value = value.replace(",", "\\,");
-      length = value.length(); // updating the length value after escaping ','
-    }
-
-    // taking first m characters of the value if length is greater than METADATA_PROPERTY_LENGTH_LIMIT
-    if (length > METADATA_PROPERTY_LENGTH_LIMIT) {
-      value = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
     }
 
     return value;
@@ -644,5 +642,43 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     creators.addAll(_nullValueVectorCreatorMap.values());
     creators.addAll(_dictionaryCreatorMap.values());
     FileUtils.close(creators);
+  }
+
+  /**
+   * Returns the original string if its length is within the allowed limit.
+   * If the string's length exceeds the limit,
+   * it returns a truncated version of the string with maintaining min or max value.
+   *
+   */
+  @VisibleForTesting
+  static String getValueWithinLengthLimit(String value, boolean isMax, DataType dataType) {
+    int length = value.length();
+
+    // if length is less, no need of trimming the value.
+    if (length < METADATA_PROPERTY_LENGTH_LIMIT) {
+      return value;
+    }
+
+    // requires the trimming of the value, since it's length is more than permissible value.
+    if (dataType == DataType.BYTES) {
+        byte[] byteValue = BytesUtils.toBytes(value);
+        // As per the `encodeHexString` function doc,
+        // The returned String will be double the length of the passed array,
+        // as it takes two characters to represent any given byte
+        byte[] shortByteValue = Arrays.copyOf(byteValue, METADATA_PROPERTY_LENGTH_LIMIT / 2);
+        return BytesUtils.toHexString(shortByteValue);
+    } else {
+      // if property type is max value take first METADATA_PROPERTY_LENGTH_LIMIT - 1 characters
+      // and increment the last character value by 1.
+      if (isMax) {
+        return value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1)
+            + (char) (value.charAt(METADATA_PROPERTY_LENGTH_LIMIT - 1) + 1);
+      } else {
+        // property type is min value take first METADATA_PROPERTY_LENGTH_LIMIT - 1 characters
+        // and decrement the last character value by 1.
+        return value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1)
+            + (char) (value.charAt(METADATA_PROPERTY_LENGTH_LIMIT - 1) - 1);
+      }
+    }
   }
 }
