@@ -43,14 +43,13 @@
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
     <jersey-container-grizzly2-http.version>2.39</jersey-container-grizzly2-http.version>
     <simpleclient_common.version>0.8.1</simpleclient_common.version>
-    <grpc-proto.version>1.12.0</grpc-proto.version>
-    <grpc-context.version>1.14.0</grpc-context.version>
+    <grpc-proto.version>2.21.0</grpc-proto.version>
+    <grpc-context.version>1.53.0</grpc-context.version>
     <bouncycastle.version>1.74</bouncycastle.version>
     <caffeine.version>2.6.2</caffeine.version>
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
     <commons-collections.version>4.1</commons-collections.version>
-    <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
     <okio.version>1.6.0</okio.version>
   </properties>
 
@@ -155,7 +154,6 @@
     <dependency>
       <groupId>com.google.errorprone</groupId>
       <artifactId>error_prone_annotations</artifactId>
-      <version>2.3.4</version>
     </dependency>
     <dependency>
       <groupId>io.prometheus</groupId>
@@ -180,7 +178,7 @@
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-protobuf-lite</artifactId>
-      <version>${grpc-protobuf-lite.version}</version>
+      <version>${grpc.version}</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.errorprone</groupId>
@@ -189,6 +187,10 @@
         <exclusion>
           <groupId>io.grpc</groupId>
           <artifactId>grpc-context</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.grpc</groupId>
+          <artifactId>grpc-core</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

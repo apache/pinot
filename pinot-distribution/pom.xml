@@ -105,6 +105,10 @@
           <artifactId>pinot-batch-ingestion-standalone</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-pulsar</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-common</artifactId>
         </exclusion>
@@ -117,6 +121,10 @@
     <dependency>
       <groupId>javax.activation</groupId>
       <artifactId>activation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.android</groupId>
+      <artifactId>annotations</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -190,6 +198,10 @@
                 <relocation>
                   <pattern>io.netty</pattern>
                   <shadedPattern>${shade.prefix}.io.netty</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>io.netty</pattern>
+                  <shadedPattern>${shade.prefix}.io.grpc</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>org.apache.parquet</pattern>

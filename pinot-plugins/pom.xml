@@ -135,6 +135,10 @@
                       <shadedPattern>${shade.prefix}.io.netty</shadedPattern>
                     </relocation>
                     <relocation>
+                      <pattern>io.grpc</pattern>
+                      <shadedPattern>${shade.prefix}.io.grpc</shadedPattern>
+                    </relocation>
+                    <relocation>
                       <pattern>org.apache.parquet</pattern>
                       <shadedPattern>${shade.prefix}.org.apache.parquet</shadedPattern>
                     </relocation>
