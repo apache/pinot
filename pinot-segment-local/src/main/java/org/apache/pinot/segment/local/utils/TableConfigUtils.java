@@ -628,6 +628,11 @@ public final class TableConfigUtils {
     // snapshotEnabled has to be enabled for TTL feature
     Preconditions.checkState(tableConfig.getUpsertConfig().isEnableSnapshot(),
         String.format("Snapshot has to be enabled for TTL feature."));
+
+    // delete feature cannot co-exist with upsert TTL feature.
+    // TODO: Fix the deletion handling for TTL. Currently TTL cannot co-exist with delete.
+    Preconditions.checkState(tableConfig.getUpsertConfig().getDeleteRecordColumn() == null,
+        String.format("TTL feature cannot co-exist with delete in upsert."));
   }
 
   /**

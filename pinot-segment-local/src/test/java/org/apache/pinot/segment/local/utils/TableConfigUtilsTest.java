@@ -1845,14 +1845,36 @@ public class TableConfigUtilsTest {
     upsertConfig.setMetadataTTL(3600);
     upsertConfig.setEnableSnapshot(false);
 
-    TableConfig tableConfigWithBothSnapshotEnabledAndTTLConfig = new TableConfigBuilder(TableType.REALTIME)
+    TableConfig tableConfigWithInvalidTTLConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
 
     try {
-      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithBothSnapshotEnabledAndTTLConfig, schema);
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidTTLConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("Snapshot has to be enabled for TTL feature."));
+    }
+
+    // Invalid config with both delete and TTL enabled
+    String delCol = "myDelCol";
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .addSingleValueDimension(delCol, FieldSpec.DataType.STRING)
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setMetadataTTL(3600);
+    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setDeleteRecordColumn(delCol);
+
+    TableConfig tableConfigWithBothDeleteAndTTL = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
+
+    try {
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithBothDeleteAndTTL, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("TTL feature cannot co-exist with delete in upsert."));
     }
   }
 
