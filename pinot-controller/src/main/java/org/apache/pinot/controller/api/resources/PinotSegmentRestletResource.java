@@ -80,7 +80,8 @@ import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -189,7 +190,7 @@ public class PinotSegmentRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ListSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ListSegments")
   @ApiOperation(value = "List all segments. An optional 'excludeReplacedSegments' parameter is used to get the"
       + " list of segments which has not yet been replaced (determined by segment lineage entries) and can be queried"
       + " from the table. The value is false by default.",
@@ -217,7 +218,7 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("segments/{tableName}/servers")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetServerMaps")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetServerMaps")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get a map from server to segments hosted by the server",
       notes = "Get a map from server to segments hosted by the server")
@@ -239,7 +240,7 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("segments/{tableName}/lineage")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetSegmentLineage")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetSegmentLineage")
   @Authenticate(AccessType.READ)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List segment lineage", notes = "List segment lineage in chronologically sorted order")
@@ -271,7 +272,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @GET
   @Path("tables/{tableName}/segments")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetServerMap")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetServerMap")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get a map from server to segments hosted by the server (deprecated, use 'GET "
       + "/segments/{tableName}/servers' instead)",
@@ -304,7 +305,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @GET
   @Path("tables/{tableName}/segments/metadata")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetServerMap")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetServerMap")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get a map from server to segments hosted by the server (deprecated, use 'GET "
       + "/segments/{tableName}/servers' instead)",
@@ -320,7 +321,7 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("segments/{tableName}/crc")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetSegmentMap")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetSegmentMap")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get a map from segment to CRC of the segment (only apply to OFFLINE table)",
       notes = "Get a map from segment to CRC of the segment (only apply to OFFLINE table)")
@@ -335,7 +336,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @GET
   @Path("tables/{tableName}/segments/crc")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetSegmentMap")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetSegmentMap")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(
       value = "Get a map from segment to CRC of the segment (deprecated, use 'GET /segments/{tableName}/crc' instead)",
@@ -347,7 +348,7 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("segments/{tableName}/{segmentName}/metadata")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the metadata for a segment", notes = "Get the metadata for a segment")
   public Map<String, Object> getSegmentMetadata(
@@ -409,7 +410,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @GET
   @Path("tables/{tableName}/segments/{segmentName}/metadata")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(
       value = "Get the metadata for a segment (deprecated, use 'GET /segments/{tableName}/{segmentName}/metadata' "
@@ -448,7 +449,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @GET
   @Path("tables/{tableName}/segments/{segmentName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(
       value = "Get the metadata for a segment (deprecated, use 'GET /segments/{tableName}/{segmentName}/metadata' "
@@ -469,7 +470,7 @@ public class PinotSegmentRestletResource {
 
   @POST
   @Path("segments/{tableName}/{segmentName}/reload")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ReloadSegment")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ReloadSegment")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload a segment", notes = "Reload a segment")
@@ -526,7 +527,7 @@ public class PinotSegmentRestletResource {
    */
   @POST
   @Path("segments/{tableNameWithType}/{segmentName}/reset")
-  @RBACAuthorization(targetType = "cluster", permission = "ResetSegments")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ResetSegments")
   // SK: Get the <tableName>_<type> and then do a table level RBAC?
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
@@ -565,7 +566,7 @@ public class PinotSegmentRestletResource {
    */
   @POST
   @Path("segments/{tableNameWithType}/reset")
-  @RBACAuthorization(targetType = "cluster", permission = "ResetSegments")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ResetSegments")
   // SK: Extract tablename to do table level RBAC?
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
@@ -599,7 +600,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @POST
   @Path("tables/{tableName}/segments/{segmentName}/reload")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ReloadSegment")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ReloadSegment")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)",
@@ -622,7 +623,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @GET
   @Path("tables/{tableName}/segments/{segmentName}/reload")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ReloadSegment")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ReloadSegment")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload a segment (deprecated, use 'POST /segments/{tableName}/{segmentName}/reload' instead)",
@@ -636,7 +637,7 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("segments/segmentReloadStatus/{jobId}")
-  @RBACAuthorization(targetType = "cluster", permission = "GetSegmentReloadStatus")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetSegmentReloadStatus")
   // SK: extract table name and do table level RBAC below?
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get status for a submitted reload operation",
@@ -739,7 +740,7 @@ public class PinotSegmentRestletResource {
 
   @POST
   @Path("segments/{tableName}/reload")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ReloadSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ReloadSegments")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload all segments", notes = "Reload all segments")
@@ -789,7 +790,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @POST
   @Path("tables/{tableName}/segments/reload")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ReloadSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ReloadSegments")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)",
@@ -810,7 +811,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @GET
   @Path("tables/{tableName}/segments/reload")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ReloadSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ReloadSegments")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reload all segments (deprecated, use 'POST /segments/{tableName}/reload' instead)",
@@ -824,7 +825,7 @@ public class PinotSegmentRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}/{segmentName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "DeleteSegment")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "DeleteSegment")
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete a segment", notes = "Delete a segment")
   public SuccessResponse deleteSegment(
@@ -843,7 +844,7 @@ public class PinotSegmentRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "DeleteSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "DeleteSegments")
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete all segments", notes = "Delete all segments")
   public SuccessResponse deleteAllSegments(
@@ -868,7 +869,7 @@ public class PinotSegmentRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments/{tableName}/delete")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "DeleteSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "DeleteSegments")
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete the segments in the JSON array payload",
       notes = "Delete the segments in the JSON array payload")
@@ -949,7 +950,7 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("segments/{tableName}/metadata")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the server metadata for all table segments",
       notes = "Get the server metadata for all table segments")
@@ -978,7 +979,7 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("segments/{tableName}/zkmetadata")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the zookeeper metadata for all table segments", notes = "Get the zookeeper metadata for "
       + "all table segments")
@@ -1003,7 +1004,7 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("segments/{tableName}/tiers")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetStorageTiers")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetStorageTiers")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get storage tier for all segments in the given table", notes = "Get storage tier for all "
       + "segments in the given table")
@@ -1020,7 +1021,7 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("segments/{tableName}/{segmentName}/tiers")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetStorageTier")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetStorageTier")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get storage tiers for the given segment", notes = "Get storage tiers for the given segment")
   @ApiResponses(value = {
@@ -1063,7 +1064,7 @@ public class PinotSegmentRestletResource {
   @Deprecated
   @GET
   @Path("segments/{tableName}/select")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetSegments")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the selected segments given the (inclusive) start and (exclusive) end timestamps"
       + " in milliseconds. These timestamps will be compared against the minmax values of the time column in each"
@@ -1127,7 +1128,7 @@ public class PinotSegmentRestletResource {
 
   @POST
   @Path("/segments/{tableNameWithType}/updateZKTimeInterval")
-  @RBACAuthorization(targetType = "cluster", permission = "UpdateTimeInterval")
+  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateTimeInterval")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the start and end time of the segments based on latest schema",

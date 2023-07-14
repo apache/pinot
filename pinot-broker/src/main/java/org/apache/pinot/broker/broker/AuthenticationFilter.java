@@ -37,9 +37,9 @@ import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.RBACAuthUtils;
-import org.apache.pinot.core.auth.RBACAuthorization;
 import org.glassfish.grizzly.http.server.Request;
 
 /**
@@ -90,38 +90,35 @@ public class AuthenticationFilter implements ContainerRequestFilter {
           Response.Status.FORBIDDEN);
     }
 
-    handleRBACAuthorization(endpointMethod, uriInfo, accessControl, httpRequestIdentity);
+    handleFinerGrainAuth(endpointMethod, uriInfo, accessControl, httpRequestIdentity);
   }
 
-  private void handleRBACAuthorization(Method endpointMethod, UriInfo uriInfo, AccessControl accessControl,
+  private void handleFinerGrainAuth(Method endpointMethod, UriInfo uriInfo, AccessControl accessControl,
       HttpRequesterIdentity httpRequestIdentity) {
-    if (endpointMethod.isAnnotationPresent(RBACAuthorization.class)) {
-      RBACAuthorization rbacAuthorization = endpointMethod.getAnnotation(RBACAuthorization.class);
+    if (endpointMethod.isAnnotationPresent(Authorize.class)) {
+      final Authorize auth = endpointMethod.getAnnotation(Authorize.class);
 
-      // If targetId is not specified (null or empty), pass null to the accessControl.hasRBACAccess() method.
-      if (StringUtils.isEmpty(rbacAuthorization.targetId())) {
-        if (!accessControl.hasRBACAccess(httpRequestIdentity, rbacAuthorization.targetType(), null,
-            rbacAuthorization.permission())) {
-          throw new WebApplicationException("Permission denied to " + rbacAuthorization.permission(),
-              Response.Status.FORBIDDEN);
+      // If targetId is not specified (null or empty), pass null to the accessControl
+      if (StringUtils.isEmpty(auth.paramName())) {
+        if (!accessControl.hasAccess(httpRequestIdentity, auth.targetType(), null, auth.action())) {
+          throw new WebApplicationException("Permission denied to " + auth.action(), Response.Status.FORBIDDEN);
         }
       } else {
-        String targetId = RBACAuthUtils.getTargetId(rbacAuthorization.targetId(), uriInfo.getPathParameters(),
-            uriInfo.getQueryParameters());
+        String targetId =
+            RBACAuthUtils.getTargetId(auth.paramName(), uriInfo.getPathParameters(), uriInfo.getQueryParameters());
         if (targetId != null) {
-          if (!accessControl.hasRBACAccess(httpRequestIdentity, rbacAuthorization.targetType(), targetId,
-              rbacAuthorization.permission())) {
+          if (!accessControl.hasAccess(httpRequestIdentity, auth.targetType(), targetId, auth.action())) {
             throw new WebApplicationException(
-                "Permission denied to " + rbacAuthorization.permission() + " for targetId: " + targetId + " of type: "
-                    + rbacAuthorization.targetType(), Response.Status.FORBIDDEN);
+                "Permission denied to " + auth.action() + " for targetId: " + targetId + " of type: "
+                    + auth.targetType(), Response.Status.FORBIDDEN);
           }
         } else {
           throw new WebApplicationException(
-              "Permission denied: not able to find targetId: " + rbacAuthorization.targetId()
-                  + " in the path or query parameters", Response.Status.FORBIDDEN);
+              "Permission denied: not able to find targetId: " + auth.paramName() + " in the path or query parameters",
+              Response.Status.FORBIDDEN);
         }
       }
-    } else if (!accessControl.defaultRBACAuthorization(httpRequestIdentity)) {
+    } else if (!accessControl.defaultAccess(httpRequestIdentity)) {
       throw new WebApplicationException("Permission denied - default authorization failed", Response.Status.FORBIDDEN);
     }
   }

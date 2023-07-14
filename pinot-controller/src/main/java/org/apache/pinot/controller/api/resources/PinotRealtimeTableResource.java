@@ -53,7 +53,8 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -88,7 +89,7 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/pauseConsumption")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "PauseConsumption")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "PauseConsumption")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Pause consumption of a realtime table", notes = "Pause the consumption of a realtime table")
   public Response pauseConsumption(
@@ -104,7 +105,7 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/resumeConsumption")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ResumeConsumption")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ResumeConsumption")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Resume consumption of a realtime table", notes =
       "Resume the consumption for a realtime table. ConsumeFrom parameter indicates from which offsets "
@@ -129,7 +130,7 @@ public class PinotRealtimeTableResource {
 
   @POST
   @Path("/tables/{tableName}/forceCommit")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ForceCommit")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ForceCommit")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Force commit the current consuming segments",
       notes = "Force commit the current segments in consuming state and restart consumption. "
@@ -163,7 +164,7 @@ public class PinotRealtimeTableResource {
 
   @GET
   @Path("/tables/forceCommitStatus/{jobId}")
-  @RBACAuthorization(targetType = "cluster", permission = "ForceCommitStatus")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ForceCommitStatus")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get status for a submitted force commit operation",
       notes = "Get status for a submitted force commit operation")
@@ -198,7 +199,7 @@ public class PinotRealtimeTableResource {
 
   @GET
   @Path("/tables/{tableName}/pauseStatus")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetPauseStatus")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetPauseStatus")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Return pause status of a realtime table",
       notes = "Return pause status of a realtime table along with list of consuming segments.")
@@ -215,7 +216,7 @@ public class PinotRealtimeTableResource {
 
   @GET
   @Path("/tables/{tableName}/consumingSegmentsInfo")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetConsumingSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetConsumingSegments")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Returns state of consuming segments", notes = "Gets the status of consumers from all servers."
       + "Note that the partitionToOffsetMap has been deprecated and will be removed in the next release. The info is "

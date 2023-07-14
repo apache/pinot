@@ -38,8 +38,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,11 +95,11 @@ public class PinotControllerPeriodicTaskRestletResource {
       }
 
       tableName = matchingTableNamesWithType.get(0);
-      if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, "RunTask")) {
+      if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.RUN_TASK)) {
         return Response.status(Response.Status.FORBIDDEN).build();
       }
     } else {
-      if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "cluster", null, "RunTask")) {
+      if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.CLUSTER, null, Actions.Cluster.RUN_TASK)) {
         return Response.status(Response.Status.FORBIDDEN).build();
       }
     }
@@ -110,7 +112,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/names")
-  @RBACAuthorization(targetType = "cluster", permission = "GetTaskNames")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetTaskNames")
   @ApiOperation(value = "Get comma-delimited list of all available periodic task names.")
   public List<String> getPeriodicTaskNames() {
     return _periodicTaskScheduler.getTaskNames();

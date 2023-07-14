@@ -59,8 +59,9 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -163,7 +164,7 @@ public class PinotClientRequest {
 
   @DELETE
   @Path("query/{queryId}")
-  @RBACAuthorization(targetType = "cluster", permission = "DeleteQuery")
+  @Authorize(targetType = TargetType.CLUSTER, action = "DeleteQuery")
   // SK: If there is a way to get the table name for this query id, then it can be a table level permission.
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Cancel a query as identified by the queryId", notes = "No effect if no query exists for the "
@@ -200,7 +201,7 @@ public class PinotClientRequest {
 
   @GET
   @Path("queries")
-  @RBACAuthorization(targetType = "cluster", permission = "GetRunningQueries")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetRunningQueries")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get running queries submitted via the requested broker", notes = "The id is assigned by the "
       + "requested broker and only unique at the scope of this broker")

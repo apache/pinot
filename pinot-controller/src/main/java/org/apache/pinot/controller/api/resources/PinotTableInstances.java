@@ -44,7 +44,8 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -66,7 +67,7 @@ public class PinotTableInstances {
 
   @GET
   @Path("/tables/{tableName}/instances")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ListInstances")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ListInstances")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table instances", notes = "List instances of the given table")
   @ApiResponses(value = {
@@ -136,7 +137,7 @@ public class PinotTableInstances {
 
   @GET
   @Path("/tables/{tableName}/livebrokers")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ListBrokers")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the brokers serving a table", notes = "List live brokers of the given table based on EV")
   @ApiResponses(value = {
@@ -156,7 +157,7 @@ public class PinotTableInstances {
 
   @GET
   @Path("/tables/livebrokers")
-  @RBACAuthorization(targetType = "cluster", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListBrokers")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List tables to live brokers mappings", notes = "List tables to live brokers mappings based "
       + "on EV")

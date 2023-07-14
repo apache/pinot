@@ -48,7 +48,8 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -78,7 +79,7 @@ public class LLCSegmentCompletionHandlers {
   // We don't want to document these in swagger since they are internal APIs
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_EXTEND_BUILD_TIME)
-  @RBACAuthorization(targetType = "cluster", permission = "GetAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetAdminInfo")
   @Produces(MediaType.APPLICATION_JSON)
   public String extendBuildTime(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -124,7 +125,7 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_CONSUMED)
-  @RBACAuthorization(targetType = "cluster", permission = "GetAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetAdminInfo")
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentConsumed(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -153,7 +154,7 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)
-  @RBACAuthorization(targetType = "cluster", permission = "GetAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetAdminInfo")
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentStoppedConsuming(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -179,7 +180,7 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_START)
-  @RBACAuthorization(targetType = "cluster", permission = "GetAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetAdminInfo")
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitStart(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -215,7 +216,7 @@ public class LLCSegmentCompletionHandlers {
   // TODO: remove this API. Should not allow committing without metadata
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END)
-  @RBACAuthorization(targetType = "cluster", permission = "GetAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetAdminInfo")
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitEnd(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -265,7 +266,7 @@ public class LLCSegmentCompletionHandlers {
 
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT)
-  @RBACAuthorization(targetType = "cluster", permission = "PostAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = "PostAdminInfo")
   @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Produces(MediaType.APPLICATION_JSON)
@@ -353,7 +354,7 @@ public class LLCSegmentCompletionHandlers {
   // TODO: remove this API. Should not upload segment via controller
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD)
-  @RBACAuthorization(targetType = "cluster", permission = "PostAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = "PostAdminInfo")
   @Authenticate(AccessType.CREATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -396,7 +397,7 @@ public class LLCSegmentCompletionHandlers {
 
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END_METADATA)
-  @RBACAuthorization(targetType = "cluster", permission = "PostAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = "PostAdminInfo")
   @Authenticate(AccessType.CREATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)

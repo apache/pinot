@@ -43,7 +43,8 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.resources.Constants;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.api.resources.SuccessResponse;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -67,7 +68,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers")
-  @RBACAuthorization(targetType = "cluster", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListBrokers")
   @ApiOperation(value = "List tenants and tables to brokers mappings",
       notes = "List tenants and tables to brokers mappings")
   Map<String, Map<String, List<String>>> listBrokersMapping(
@@ -81,7 +82,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers/tenants")
-  @RBACAuthorization(targetType = "cluster", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListBrokers")
   @ApiOperation(value = "List tenants to brokers mappings", notes = "List tenants to brokers mappings")
   Map<String, List<String>> getTenantsToBrokersMapping(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state);
@@ -95,7 +96,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers/tenants/{tenantName}")
-  @RBACAuthorization(targetType = "cluster", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListBrokers")
   @ApiOperation(value = "List brokers for a given tenant", notes = "List brokers for a given tenant")
   List<String> getBrokersForTenant(
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName,
@@ -109,7 +110,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers/tables")
-  @RBACAuthorization(targetType = "cluster", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListBrokers")
   @ApiOperation(value = "List tables to brokers mappings", notes = "List tables to brokers mappings")
   Map<String, List<String>> getTablesToBrokersMapping(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state);
@@ -124,7 +125,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers/tables/{tableName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ListBrokers")
   @ApiOperation(value = "List brokers for a given table", notes = "List brokers for a given table")
   List<String> getBrokersForTable(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
@@ -139,7 +140,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers")
-  @RBACAuthorization(targetType = "cluster", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListBrokers")
   @ApiOperation(value = "List tenants and tables to brokers mappings",
       notes = "List tenants and tables to brokers mappings")
   Map<String, Map<String, List<InstanceInfo>>> listBrokersMappingV2(
@@ -153,7 +154,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tenants")
-  @RBACAuthorization(targetType = "cluster", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListBrokers")
   @ApiOperation(value = "List tenants to brokers mappings", notes = "List tenants to brokers mappings")
   Map<String, List<InstanceInfo>> getTenantsToBrokersMappingV2(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state);
@@ -167,7 +168,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tenants/{tenantName}")
-  @RBACAuthorization(targetType = "cluster", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListBrokers")
   @ApiOperation(value = "List brokers for a given tenant", notes = "List brokers for a given tenant")
   List<InstanceInfo> getBrokersForTenantV2(
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName,
@@ -181,7 +182,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tables")
-  @RBACAuthorization(targetType = "cluster", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListBrokers")
   @ApiOperation(value = "List tables to brokers mappings", notes = "List tables to brokers mappings")
   Map<String, List<InstanceInfo>> getTablesToBrokersMappingV2(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state);
@@ -196,7 +197,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tables/{tableName}")
-  @RBACAuthorization(targetType = "cluster", targetId = "tableName", permission = "ListBrokers")
+  @Authorize(targetType = TargetType.CLUSTER, paramName = "tableName", action = "ListBrokers")
   @ApiOperation(value = "List brokers for a given table", notes = "List brokers for a given table")
   List<InstanceInfo> getBrokersForTableV2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
@@ -211,7 +212,7 @@ public interface PinotBrokerService {
    */
   @POST
   @Path("/brokers/instances/{instanceName}/qps")
-  @RBACAuthorization(targetType = "cluster", permission = "UpdateQPS")
+  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateQPS")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)

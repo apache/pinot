@@ -39,7 +39,8 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -63,7 +64,7 @@ public class PinotTableSegmentConfigs {
   @Deprecated
   @PUT
   @Path("/tables/{tableName}/segmentConfigs")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "UpdateConfigs")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "UpdateConfigs")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update segments configuration",

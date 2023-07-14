@@ -26,7 +26,8 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 
 
 @Api(tags = "testExtra")
@@ -34,7 +35,7 @@ import org.apache.pinot.core.auth.RBACAuthorization;
 public class PinotDummyExtraRestletResource {
 
   @GET
-  @RBACAuthorization(targetType = "cluster", permission = "Dummy")
+  @Authorize(targetType = TargetType.CLUSTER, action = "Dummy")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "dummy get API")
   @ApiResponses(value = {

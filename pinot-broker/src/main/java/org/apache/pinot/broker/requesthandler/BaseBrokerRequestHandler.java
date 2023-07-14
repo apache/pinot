@@ -71,6 +71,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
@@ -384,13 +385,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
       AccessControl accessControl = _accessControlFactory.create();
       boolean hasTableAccess =
-          accessControl.hasAccess(requesterIdentity, serverBrokerRequest) && accessControl.hasRBACAccess(
-              requesterIdentity, "table", tableName, "query");
+          accessControl.hasAccess(requesterIdentity, serverBrokerRequest) && accessControl.hasAccess(
+              requesterIdentity, TargetType.TABLE, tableName, "query");
       if (!hasTableAccess) {
         _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);
         requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-        return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+        return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR); // SK:
       }
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
           System.nanoTime() - compilationEndTimeNs);

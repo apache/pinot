@@ -65,8 +65,10 @@ import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.events.SchemaEventType;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -104,7 +106,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
-  @RBACAuthorization(targetType = "cluster", permission = "GetSchemas")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetSchemas")
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
   public String listSchemaNames() {
     List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();
@@ -121,7 +123,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @RBACAuthorization(targetType = "table", targetId = "schemaName", permission = "GetSchema")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = "GetSchema")
   @ApiOperation(value = "Get a schema", notes = "Gets a schema by name")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -141,7 +143,7 @@ public class PinotSchemaRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @RBACAuthorization(targetType = "table", targetId = "schemaName", permission = "DeleteSchema")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = "DeleteSchema")
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete a schema", notes = "Deletes a schema by name")
   @ApiResponses(value = {
@@ -159,7 +161,7 @@ public class PinotSchemaRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @RBACAuthorization(targetType = "table", targetId = "schemaName", permission = "UpdateSchema")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = "UpdateSchema")
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
   @ApiResponses(value = {
@@ -183,7 +185,7 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @RBACAuthorization(targetType = "table", targetId = "schemaName", permission = "UpdateSchema")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = "UpdateSchema")
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
   @ApiResponses(value = {
@@ -234,7 +236,8 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema.getSchemaName());
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "CreateSchema")) {
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.CREATE_SCHEMA)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
     SuccessResponse successResponse = addSchema(schema, override, force);
@@ -274,7 +277,8 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema.getSchemaName());
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "CreateSchema")) {
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.CREATE_SCHEMA)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
     SuccessResponse successResponse = addSchema(schema, override, force);
@@ -301,7 +305,8 @@ public class PinotSchemaRestletResource {
     validateSchemaInternal(schema);
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "ValidateSchema")) {
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.VALIDATE_SCHEMA)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
     ObjectNode response = schema.toJsonObject();
@@ -338,7 +343,8 @@ public class PinotSchemaRestletResource {
     validateSchemaInternal(schema);
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schema.getSchemaName(), "ValidateSchema")) {
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.VALIDATE_SCHEMA)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
     ObjectNode response = schema.toJsonObject();
@@ -357,7 +363,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/fieldSpec")
-  @RBACAuthorization(targetType = "cluster", permission = "GetFieldSpec")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetFieldSpec")
   @ApiOperation(value = "Get fieldSpec metadata", notes = "Get fieldSpec metadata")
   public String getFieldSpecMetadata() {
     try {

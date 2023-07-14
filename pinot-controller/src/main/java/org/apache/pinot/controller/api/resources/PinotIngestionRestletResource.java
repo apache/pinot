@@ -50,7 +50,8 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.FileIngestionHelper;
 import org.apache.pinot.controller.util.FileIngestionHelper.DataPayload;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -124,7 +125,7 @@ public class PinotIngestionRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/ingestFromFile")
-  @RBACAuthorization(targetType = "cluster", permission = "IngestFile")
+  @Authorize(targetType = TargetType.CLUSTER, action = "IngestFile")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Ingest a file", notes = "Creates a segment using given file and pushes it to Pinot. "
       + "\n All steps happen on the controller. This API is NOT meant for production environments/large input files. "
@@ -170,7 +171,7 @@ public class PinotIngestionRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/ingestFromURI")
-  @RBACAuthorization(targetType = "cluster", permission = "IngestFile")
+  @Authorize(targetType = TargetType.CLUSTER, action = "IngestFile")
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Ingest from the given URI", notes =
       "Creates a segment using file at the given URI and pushes it to Pinot. "

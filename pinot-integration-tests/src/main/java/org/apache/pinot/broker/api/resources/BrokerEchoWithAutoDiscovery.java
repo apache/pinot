@@ -27,7 +27,8 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.core.api.AutoLoadedServiceForTest;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 
 
 /**
@@ -42,7 +43,7 @@ public class BrokerEchoWithAutoDiscovery {
     public AutoLoadedServiceForTest _injectedService;
     @GET
     @Path("/echo/{table}")
-    @RBACAuthorization(targetType = "table", targetId = "table", permission = "Echo")
+    @Authorize(targetType = TargetType.TABLE, paramName = "table", action = "Echo")
     @Produces(MediaType.TEXT_PLAIN)
     public String echo(@PathParam("table") String table) {
         return _injectedService.echo(table);

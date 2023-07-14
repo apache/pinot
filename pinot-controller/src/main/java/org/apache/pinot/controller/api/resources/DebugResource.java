@@ -70,7 +70,8 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -115,7 +116,7 @@ public class DebugResource {
 
   @GET
   @Path("tables/{tableName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetDebugInfo")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetDebugInfo")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for table.", notes = "Debug information for table.")
   @ApiResponses(value = {
@@ -147,7 +148,7 @@ public class DebugResource {
 
   @GET
   @Path("segments/{tableName}/{segmentName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetDebugInfo")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetDebugInfo")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for segment.", notes = "Debug information for segment.")
   @ApiResponses(value = {

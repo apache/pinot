@@ -56,7 +56,8 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
@@ -106,7 +107,7 @@ public class PinotTenantRestletResource {
 
   @POST
   @Path("/tenants")
-  @RBACAuthorization(targetType = "cluster", permission = "CreateTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = "CreateTenant")
   @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -140,7 +141,7 @@ public class PinotTenantRestletResource {
   // TODO: should be /tenant/{tenantName}
   @PUT
   @Path("/tenants")
-  @RBACAuthorization(targetType = "cluster", permission = "UpdateTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateTenant")
   @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -183,7 +184,7 @@ public class PinotTenantRestletResource {
 
   @GET
   @Path("/tenants")
-  @RBACAuthorization(targetType = "cluster", permission = "ListTenants")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListTenants")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all tenants")
   @ApiResponses(value = {
@@ -206,7 +207,7 @@ public class PinotTenantRestletResource {
 
   @GET
   @Path("/tenants/{tenantName}")
-  @RBACAuthorization(targetType = "cluster", permission = "ListTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListTenant")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List instance for a tenant")
   @ApiResponses(value = {
@@ -222,7 +223,7 @@ public class PinotTenantRestletResource {
 
   @POST
   @Path("/tenants/{tenantName}")
-  @RBACAuthorization(targetType = "cluster", permission = "UpdateTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateTenant")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "enable/disable a tenant")
   @ApiResponses(value = {
@@ -251,7 +252,7 @@ public class PinotTenantRestletResource {
    */
   @GET
   @Path("/tenants/{tenantName}/tables")
-  @RBACAuthorization(targetType = "cluster", permission = "ListTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListTenant")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List tables on a a server tenant")
   @ApiResponses(value = {
@@ -372,7 +373,7 @@ public class PinotTenantRestletResource {
 
   @GET
   @Path("/tenants/{tenantName}/metadata")
-  @RBACAuthorization(targetType = "cluster", permission = "GetTenantMetadata")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetTenantMetadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get tenant information")
   @ApiResponses(value = {
@@ -418,7 +419,7 @@ public class PinotTenantRestletResource {
   @Deprecated
   @POST
   @Path("/tenants/{tenantName}/metadata")
-  @RBACAuthorization(targetType = "cluster", permission = "UpdateTenantMetadata")
+  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateTenantMetadata")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Change tenant state")
@@ -482,7 +483,7 @@ public class PinotTenantRestletResource {
 
   @DELETE
   @Path("/tenants/{tenantName}")
-  @RBACAuthorization(targetType = "cluster", permission = "DeleteTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = "DeleteTenant")
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete a tenant")

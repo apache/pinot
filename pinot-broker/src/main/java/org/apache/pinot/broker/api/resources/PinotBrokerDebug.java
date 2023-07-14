@@ -42,7 +42,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -73,7 +74,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/timeBoundary/{tableName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetTimeBoundary")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetTimeBoundary")
   @ApiOperation(value = "Get the time boundary information for a table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Time boundary information for a table"),
@@ -95,7 +96,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/routingTable/{tableName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetRoutingTable")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetRoutingTable")
   @ApiOperation(value = "Get the routing table for a table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Routing table"),
@@ -132,7 +133,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/routingTable/sql")
-  @RBACAuthorization(targetType = "cluster", permission = "GetRouting")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetRouting")
   // SK: Shall it be a manual auth, and get the table name from query
   @ApiOperation(value = "Get the routing table for a query")
   @ApiResponses(value = {
@@ -158,7 +159,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/serverRoutingStats")
-  @RBACAuthorization(targetType = "cluster", permission = "GetServerRoutingStats")
+  @Authorize(targetType = TargetType.CLUSTER, action = "GetServerRoutingStats")
   @ApiOperation(value = "Get the routing stats for all the servers")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Server routing Stats"),

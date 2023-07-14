@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.access;
 
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
@@ -56,21 +57,6 @@ public interface AccessControl {
    */
   default boolean hasAccess(@Nullable String tableName, AccessType accessType, HttpHeaders httpHeaders,
       @Nullable String endpointUrl) {
-    return true;
-  }
-
-  default boolean hasRBACAccess(HttpHeaders httpHeaders, String targetType,
-      String targetId, String permission) {
-    return true;
-  }
-
-  /**
-   * If an API is neither annotated with RBACAuthorization nor ManualAuthorization,
-   * this method will be called to check the authorization.
-   * If the return is false, then API will be terminated by the filter.
-   * @return true to allow
-   */
-  default boolean defaultRBACAuthorization(HttpHeaders httpHeaders) {
     return true;
   }
 
@@ -124,5 +110,28 @@ public interface AccessControl {
     public void setWorkflow(String workflow) {
       _workflow = workflow;
     }
+  }
+
+  /**
+   * Checks whether the user has access to perform action on the particular resource
+   *
+   * @param httpHeaders HTTP headers
+   * @param targetType type of resource being accessed
+   * @param targetId id of the resource
+   * @param action type to validate
+   * @return true if user is allowed to perform the action
+   */
+  default boolean hasAccess(HttpHeaders httpHeaders, TargetType targetType, String targetId, String action) {
+    return true;
+  }
+
+  /**
+   * If an API is neither annotated with Authorize nor ManualAuthorization,
+   * this method will be called to check the default authorization.
+   * If the return is false, then API will be terminated by the filter.
+   * @return true to allow
+   */
+  default boolean defaultAccess(HttpHeaders httpHeaders) {
+    return true;
   }
 }

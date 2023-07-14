@@ -102,8 +102,10 @@ import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.controller.util.TableMetadataReader;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
-import org.apache.pinot.core.auth.RBACAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
@@ -203,7 +205,8 @@ public class PinotTableRestletResource {
           _accessControlFactory.create());
       // Using schema name, since table name contains type (OFFLINE) suffix
       if (!_accessControlFactory.create()
-          .hasRBACAccess(httpHeaders, "table", tableConfig.getValidationConfig().getSchemaName(), "AddTable")) {
+          .hasAccess(httpHeaders, TargetType.TABLE, tableConfig.getValidationConfig().getSchemaName(),
+              Actions.Table.ADD_TABLE)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -252,7 +255,7 @@ public class PinotTableRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/recommender")
-  @RBACAuthorization(targetType = "cluster", permission = "RecommendConfig")
+  @Authorize(targetType = TargetType.CLUSTER, action = "RecommendConfig")
   @ApiOperation(value = "Recommend config", notes = "Recommend a config with input json")
   public String recommendConfig(String inputStr) {
     try {
@@ -265,7 +268,7 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
-  @RBACAuthorization(targetType = "cluster", permission = "ListTables")
+  @Authorize(targetType = TargetType.CLUSTER, action = "ListTables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
   public String listTables(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
@@ -395,7 +398,7 @@ public class PinotTableRestletResource {
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
-      if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", tableName, stateStr)) {
+      if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, tableName, stateStr)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -437,7 +440,7 @@ public class PinotTableRestletResource {
 
   @DELETE
   @Path("/tables/{tableName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "Delete")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "Delete")
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
@@ -496,7 +499,7 @@ public class PinotTableRestletResource {
 
   @PUT
   @Path("/tables/{tableName}")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "Update")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "Update")
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
@@ -578,7 +581,8 @@ public class PinotTableRestletResource {
         _accessControlFactory.create());
     // Using schema name, since table name contains type (OFFLINE) suffix
     if (!_accessControlFactory.create()
-        .hasRBACAccess(httpHeaders, "table", tableConfig.getLeft().getValidationConfig().getSchemaName(), "Validate")) {
+        .hasAccess(httpHeaders, TargetType.TABLE, tableConfig.getLeft().getValidationConfig().getSchemaName(),
+            Actions.Table.VALIDATE)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -616,7 +620,7 @@ public class PinotTableRestletResource {
     String endpointUrl = request.getRequestURL().toString();
     AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if (!_accessControlFactory.create().hasRBACAccess(httpHeaders, "table", schemaName, "Validate")) {
+    if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.VALIDATE)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -646,7 +650,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebalance")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "Rebalance")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "Rebalance")
   @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
       notes = "Rebalances a table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(
@@ -728,7 +732,7 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/state")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetState")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetState")
   @ApiOperation(value = "Get current table state", notes = "Get current table state")
   public String getTableState(
       @ApiParam(value = "Name of the table to get its state", required = true) @PathParam("tableName") String tableName,
@@ -787,7 +791,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/rebalanceStatus/{jobId}")
-  @RBACAuthorization(targetType = "cluster", permission = "RebalanceStatus")
+  @Authorize(targetType = TargetType.CLUSTER, action = "RebalanceStatus")
   @ApiOperation(value = "Gets detailed stats of a rebalance operation",
       notes = "Gets detailed stats of a rebalance operation")
   public ServerRebalanceJobStatusResponse rebalanceStatus(
@@ -817,7 +821,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("/tables/{tableName}/stats")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "table stats", notes = "Provides metadata info/stats about the table.")
   public String getTableStats(
@@ -866,7 +870,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("/tables/{tableName}/status")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "table status", notes = "Provides status of the table including ingestion status")
   public String getTableStatus(
@@ -905,7 +909,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("tables/{tableName}/metadata")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the aggregate metadata of all segments for a table",
       notes = "Get the aggregate metadata of all segments for a table")
@@ -955,7 +959,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("table/{tableName}/jobs")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "GetControllerJobs")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetControllerJobs")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get list of controller jobs for this table",
       notes = "Get list of controller jobs for this table")
@@ -989,7 +993,7 @@ public class PinotTableRestletResource {
 
   @POST
   @Path("tables/{tableName}/timeBoundary")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "UpdateTimeBoundary")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "UpdateTimeBoundary")
   @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata", notes = "Set "
       + "hybrid table query time boundary based on offline segments' metadata")
   @Produces(MediaType.APPLICATION_JSON)
@@ -1030,7 +1034,7 @@ public class PinotTableRestletResource {
 
   @DELETE
   @Path("tables/{tableName}/timeBoundary")
-  @RBACAuthorization(targetType = "table", targetId = "tableName", permission = "DeleteTimeBoundary")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "DeleteTimeBoundary")
   @ApiOperation(value = "Delete hybrid table query time boundary", notes = "Delete hybrid table query time boundary")
   @Produces(MediaType.APPLICATION_JSON)
   public SuccessResponse deleteTimeBoundary(

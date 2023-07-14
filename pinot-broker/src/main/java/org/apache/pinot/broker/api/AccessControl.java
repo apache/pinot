@@ -20,6 +20,7 @@ package org.apache.pinot.broker.api;
 
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
@@ -59,18 +60,27 @@ public interface AccessControl {
    */
   boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables);
 
-  default boolean hasRBACAccess(RequesterIdentity requesterIdentity, String targetType,
-      String targetId, String permission) {
+  /**
+   * Checks whether the user has access to perform action on the particular resource
+   *
+   * @param requesterIdentity requester identity
+   * @param targetType type of resource being accessed
+   * @param targetId id of the resource
+   * @param action type to validate
+   * @return true if requester is allowed to perform the action
+   */
+  default boolean hasAccess(RequesterIdentity requesterIdentity, TargetType targetType, String targetId,
+      String action) {
     return true;
   }
 
   /**
-   * If an API is neither annotated with RBACAuthorization nor ManualAuthorization,
-   * this method will be called to check the authorization.
+   * If an API is neither annotated with Authorize nor ManualAuthorization,
+   * this method will be called to check the default authorization.
    * If the return is false, then API will be terminated by the filter.
    * @return true to allow
    */
-  default boolean defaultRBACAuthorization(RequesterIdentity requesterIdentity) {
+  default boolean defaultAccess(RequesterIdentity requesterIdentity) {
     return true;
   }
 }
