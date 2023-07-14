@@ -218,9 +218,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       queryResults = _queryDispatcher.submitAndReduce(requestId, dispatchableSubPlan, _mailboxService,
           _reducerScheduler,
           queryTimeoutMs, sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
-    } catch (Exception e) {
-      LOGGER.info("query execution failed", e);
-      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+    } catch (Throwable t) {
+      LOGGER.error("query execution failed: " + t);
+      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, t));
     }
 
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
