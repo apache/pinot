@@ -283,11 +283,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void offloadSegment(String tableNameWithType, String segmentName) {
     LOGGER.info("Removing segment: {} from table: {}", segmentName, tableNameWithType);
-    _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
-      v.removeSegment(segmentName);
-      LOGGER.info("Removed segment: {} from table: {}", segmentName, k);
-      return v;
-    });
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      tableDataManager.removeSegment(segmentName);
+      LOGGER.info("Removed segment: {} from table: {}", segmentName, tableNameWithType);
+    } else {
+      LOGGER.warn("Failed to find data manager for table: {}, skipping removing segment: {}", tableNameWithType,
+          segmentName);
+    }
   }
 
   @Override
