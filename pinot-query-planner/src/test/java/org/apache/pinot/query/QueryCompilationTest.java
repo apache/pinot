@@ -53,7 +53,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     try {
       long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
       String explainedPlan = _queryEnvironment.explainQuery(query, requestId);
-      Assert.assertEquals(stripPhysicalPlan(explainedPlan), digest);
+      Assert.assertEquals(explainedPlan, digest);
     } catch (RuntimeException e) {
       Assert.fail("failed to explain query: " + query, e);
     }
@@ -434,14 +434,16 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "      ]\n"
             + "    }\n"
             + "  ]\n"
-            + "}"},
+            + "}\n"
+            + _physicalPlanForExplainQueries[0]},
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
               "Execution Plan\n"
             + "digraph {\n"
             + "\"PinotLogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
             + "\"LogicalAggregate\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
             + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-            + "}\n"},
+            + "}\n\n"
+            + _physicalPlanForExplainQueries[1]},
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
               "Execution Plan\n"
             + "LogicalProject(col1=[$0], col3=[$2])\n"
@@ -451,9 +453,52 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "        LogicalTableScan(table=[[a]])\n"
             + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0], col3=[$2])\n"
-            + "        LogicalTableScan(table=[[b]])\n"
+            + "        LogicalTableScan(table=[[b]])\n\n"
+            + _physicalPlanForExplainQueries[2]
         },
     };
     //@formatter:on
   }
+
+  private final Object[] _physicalPlanForExplainQueries = new Object[] {
+  //@formatter:off
+  "Physical Plan\n"
+  + " [0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+  + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+  + "│   └── [1]@localhost:2 PROJECT\n"
+  + "│      └── [1]@localhost:2 TABLE SCAN (a) null\n"
+  + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+  + "   └── [1]@localhost:1 PROJECT\n"
+  + "      └── [1]@localhost:1 TABLE SCAN (a) null\n",
+  "Physical Plan\n"
+  + " [0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+  + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
+  + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+  + "   └── [1]@localhost:1 AGGREGATE_FINAL\n"
+  + "      └── [1]@localhost:1 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
+  + "         ├── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
+  + "         │   └── [2]@localhost:2 AGGREGATE_LEAF\n"
+  + "         │      └── [2]@localhost:2 TABLE SCAN (a) null\n"
+  + "         └── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
+  + "            └── [2]@localhost:1 AGGREGATE_LEAF\n"
+  + "               └── [2]@localhost:1 TABLE SCAN (a) null\n",
+  "Physical Plan\n"
+  + " [0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+  + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
+  + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+  + "   └── [1]@localhost:1 PROJECT\n"
+  + "      └── [1]@localhost:1 JOIN\n"
+  + "         ├── [1]@localhost:1 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
+  + "         │   ├── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
+  + "         │   │   └── [2]@localhost:2 PROJECT\n"
+  + "         │   │      └── [2]@localhost:2 TABLE SCAN (a) null\n"
+  + "         │   └── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
+  + "         │      └── [2]@localhost:1 PROJECT\n"
+  + "         │         └── [2]@localhost:1 TABLE SCAN (a) null\n"
+  + "         └── [1]@localhost:1 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
+  + "            └── [3]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
+  + "               └── [3]@localhost:1 PROJECT\n"
+  + "                  └── [3]@localhost:1 TABLE SCAN (b) null\n"
+};
+  //@formatter:on
 }
