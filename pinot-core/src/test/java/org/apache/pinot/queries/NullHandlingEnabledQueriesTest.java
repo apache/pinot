@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -463,5 +464,49 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertArrayEquals(rows.get(0), new Object[]{(double) 2});
+  }
+
+  @Test
+  public void testFilteringOnInvertedIndexColumn()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(false);
+    insertRow(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(Collections.singletonList(COLUMN1)).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT * FROM testTable WHERE %s = false", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{false});
+  }
+
+  @Test
+  public void testFilteringOnSortedColumn()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(false);
+    insertRow(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setSortedColumn(COLUMN1).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT * FROM testTable WHERE %s = false", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{false});
   }
 }
