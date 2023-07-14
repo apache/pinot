@@ -267,6 +267,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
     segmentLock.lock();
     try {
+      if (validDocIds == null) {
+        validDocIds = new ThreadSafeMutableRoaringBitmap();
+      }
+      if (queryableDocIds == null && _deleteRecordColumn != null) {
+        queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+      }
       // Skip adding segments that has segment EndTime in the comparison cols earlier than (largestSeenTimestamp - TTL).
       // Note: We only update largestSeenComparisonValue when addRecord, and access the value when addOrReplaceSegments.
       // We only support single comparison column for TTL-enabled upsert tables.
@@ -274,15 +280,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         Number endTime =
             (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
         if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+          // TODO: Fix the deletion handling for TTL. Currently TTL cannot co-exist with delete.
+          assert _deleteRecordColumn == null;
           _logger.info("Skip adding segment: {} because it's out of TTL", segment.getSegmentName());
+          // If delete is not enabled, set valid doc ids snapshot into the segment.
+          segment.enableUpsert(this, validDocIds, queryableDocIds);
           return;
         }
-      }
-      if (validDocIds == null) {
-        validDocIds = new ThreadSafeMutableRoaringBitmap();
-      }
-      if (queryableDocIds == null && _deleteRecordColumn != null) {
-        queryableDocIds = new ThreadSafeMutableRoaringBitmap();
       }
       if (isPreloading) {
         addSegmentWithoutUpsert(segment, validDocIds, queryableDocIds, recordInfoIterator);
@@ -396,19 +400,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       IndexSegment oldSegment) {
     String segmentName = segment.getSegmentName();
     Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+
+    // Currently when TTL is enabled, we don't support skip loading out-of-TTL segment with snapshots, since we don't
+    // know which docs are valid in the new segment.
+    // TODO: when ttl is enabled, we can allow
+    //       (1) skip loading segments without any invalid docs.
+    //       (2) assign the invalid docs from the replaced segment to the new segment.
     segmentLock.lock();
     try {
-      // Skip adding segments that has segment EndTime in the comparison cols earlier than (largestSeenTimestamp - TTL).
-      // Note: We only update largestSeenComparisonValue when addRecord, and access the value when addOrReplaceSegments.
-      // We only support single comparison column for TTL-enabled upsert tables.
-      if (_largestSeenComparisonValue > 0) {
-        Number endTime =
-            (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-        if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
-          _logger.info("Skip replacing segment: {} because it's out of TTL", segment.getSegmentName());
-          return;
-        }
-      }
       MutableRoaringBitmap validDocIdsForOldSegment =
           oldSegment.getValidDocIds() != null ? oldSegment.getValidDocIds().getMutableRoaringBitmap() : null;
       if (recordInfoIterator != null) {
@@ -666,7 +665,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   @Override
   public void removeExpiredPrimaryKeys() {
     // If upsertTTL is enabled, we will remove expired primary keys from upsertMetadata after taking snapshot.
-    if (_metadataTTL == 0) {
+    if (_metadataTTL <= 0) {
       return;
     }
 

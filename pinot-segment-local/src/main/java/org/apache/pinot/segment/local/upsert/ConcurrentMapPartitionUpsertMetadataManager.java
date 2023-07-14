@@ -206,6 +206,18 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @Override
   protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
     assert !validDocIds.isEmpty();
+
+    // Skip removing segments that has segment EndTime in the comparison cols earlier than (largestSeenTimestamp - TTL).
+    // Note: We only support single comparison column for TTL-enabled upsert tables.
+    if (_largestSeenComparisonValue > 0) {
+      Number endTime =
+          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
+      if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+        _logger.info("Skip removing segment: {} because it's out of TTL", segment.getSegmentName());
+        return;
+      }
+    }
+
     PrimaryKey primaryKey = new PrimaryKey(new Object[_primaryKeyColumns.size()]);
     PeekableIntIterator iterator = validDocIds.getIntIterator();
     try (
