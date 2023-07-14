@@ -28,6 +28,7 @@ package org.apache.calcite.rel.hint;
 public class PinotHintOptions {
   public static final String AGGREGATE_HINT_OPTIONS = "aggOptions";
   public static final String JOIN_HINT_OPTIONS = "joinOptions";
+  public static final String TABLE_HINT_OPTIONS = "tableOptions";
 
   /**
    * Hint to denote that the aggregation node is the final aggregation stage which extracts the final result.
@@ -50,5 +51,10 @@ public class PinotHintOptions {
   public static class JoinHintOptions {
     public static final String JOIN_STRATEGY = "join_strategy";
     public static final String IS_COLOCATED_BY_JOIN_KEYS = "is_colocated_by_join_keys";
+  }
+
+  public static class TableHintOptions {
+    public static final String PARTITION_KEY = "partition_key";
+    public static final String PARTITION_SIZE = "partition_size";
   }
 }

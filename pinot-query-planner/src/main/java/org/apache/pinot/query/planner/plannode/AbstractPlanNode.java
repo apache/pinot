@@ -19,9 +19,13 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.serde.ProtoProperties;
 import org.apache.pinot.query.planner.serde.ProtoSerializable;
 import org.apache.pinot.query.planner.serde.ProtoSerializationUtils;
 
@@ -80,5 +84,20 @@ public abstract class AbstractPlanNode implements PlanNode, ProtoSerializable {
   @Override
   public Plan.ObjectField toObjectField() {
     return ProtoSerializationUtils.convertObjectToObjectField(this);
+  }
+
+  public static class NodeHint {
+    @ProtoProperties
+    public Map<String, Map<String, String>> _hintOptions;
+    public NodeHint() {
+    }
+
+    public NodeHint(List<RelHint> relHints) {
+      _hintOptions = new HashMap<>();
+      for (RelHint relHint : relHints) {
+        Map<String, String> kvOptions = new HashMap<>(relHint.kvOptions);
+        _hintOptions.put(relHint.hintName, kvOptions);
+      }
+    }
   }
 }
