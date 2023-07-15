@@ -423,7 +423,7 @@ public class ControllerRequestURLBuilder {
       long endTimeInMilliSeconds) {
     StringBuilder url = new StringBuilder();
     url.append(StringUtil.join("/", _baseUrl, "segments", tableName,
-        String.format("select?startTimestamp=%d&endTimestamp=%d", startTimeInMilliSeconds, endTimeInMilliSeconds)));
+        String.format("choose?startTimestamp=%d&endTimestamp=%d", startTimeInMilliSeconds, endTimeInMilliSeconds)));
     return url.toString();
   }
 
