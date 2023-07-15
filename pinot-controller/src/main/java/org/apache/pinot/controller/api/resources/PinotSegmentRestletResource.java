@@ -868,7 +868,7 @@ public class PinotSegmentRestletResource {
   @DELETE
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/segments/{tableName}/select")
+  @Path("/segments/{tableName}/choose")
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete selected segments. An optional 'excludeReplacedSegments' parameter is used to get the"
       + " list of segments which has not yet been replaced (determined by segment lineage entries) and can be queried"
