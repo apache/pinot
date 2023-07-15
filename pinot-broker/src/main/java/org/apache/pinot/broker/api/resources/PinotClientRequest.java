@@ -59,6 +59,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
@@ -164,7 +165,7 @@ public class PinotClientRequest {
 
   @DELETE
   @Path("query/{queryId}")
-  @Authorize(targetType = TargetType.CLUSTER, action = "DeleteQuery")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
   // SK: If there is a way to get the table name for this query id, then it can be a table level permission.
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Cancel a query as identified by the queryId", notes = "No effect if no query exists for the "
@@ -201,7 +202,7 @@ public class PinotClientRequest {
 
   @GET
   @Path("queries")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetRunningQueries")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERIES)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get running queries submitted via the requested broker", notes = "The id is assigned by the "
       + "requested broker and only unique at the scope of this broker")

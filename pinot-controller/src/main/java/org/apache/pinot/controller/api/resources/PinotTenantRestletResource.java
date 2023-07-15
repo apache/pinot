@@ -56,6 +56,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -107,7 +108,7 @@ public class PinotTenantRestletResource {
 
   @POST
   @Path("/tenants")
-  @Authorize(targetType = TargetType.CLUSTER, action = "CreateTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_TENANT)
   @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -141,7 +142,7 @@ public class PinotTenantRestletResource {
   // TODO: should be /tenant/{tenantName}
   @PUT
   @Path("/tenants")
-  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TENANT)
   @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -184,7 +185,7 @@ public class PinotTenantRestletResource {
 
   @GET
   @Path("/tenants")
-  @Authorize(targetType = TargetType.CLUSTER, action = "ListTenants")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_TENANTS)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all tenants")
   @ApiResponses(value = {
@@ -207,7 +208,7 @@ public class PinotTenantRestletResource {
 
   @GET
   @Path("/tenants/{tenantName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = "ListTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_TENANT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List instance for a tenant")
   @ApiResponses(value = {
@@ -223,7 +224,7 @@ public class PinotTenantRestletResource {
 
   @POST
   @Path("/tenants/{tenantName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TENANT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "enable/disable a tenant")
   @ApiResponses(value = {
@@ -252,7 +253,7 @@ public class PinotTenantRestletResource {
    */
   @GET
   @Path("/tenants/{tenantName}/tables")
-  @Authorize(targetType = TargetType.CLUSTER, action = "ListTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_TENANT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List tables on a a server tenant")
   @ApiResponses(value = {
@@ -373,7 +374,7 @@ public class PinotTenantRestletResource {
 
   @GET
   @Path("/tenants/{tenantName}/metadata")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetTenantMetadata")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TENANT_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get tenant information")
   @ApiResponses(value = {
@@ -419,7 +420,7 @@ public class PinotTenantRestletResource {
   @Deprecated
   @POST
   @Path("/tenants/{tenantName}/metadata")
-  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateTenantMetadata")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TENANT_METADATA)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Change tenant state")
@@ -483,7 +484,7 @@ public class PinotTenantRestletResource {
 
   @DELETE
   @Path("/tenants/{tenantName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = "DeleteTenant")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_TENANT)
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete a tenant")

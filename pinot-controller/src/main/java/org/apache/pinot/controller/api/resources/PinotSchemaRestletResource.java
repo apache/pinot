@@ -106,7 +106,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetSchemas")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMAS)
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
   public String listSchemaNames() {
     List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();
@@ -123,7 +123,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = "GetSchema")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.GET_SCHEMA)
   @ApiOperation(value = "Get a schema", notes = "Gets a schema by name")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -143,7 +143,7 @@ public class PinotSchemaRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = "DeleteSchema")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.DELETE_SCHEMA)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete a schema", notes = "Deletes a schema by name")
   @ApiResponses(value = {
@@ -161,7 +161,7 @@ public class PinotSchemaRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = "UpdateSchema")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.UPDATE_SCHEMA)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
   @ApiResponses(value = {
@@ -185,7 +185,7 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = "UpdateSchema")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.UPDATE_SCHEMA)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
   @ApiResponses(value = {
@@ -363,7 +363,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/fieldSpec")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetFieldSpec")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_FIELD_SPEC)
   @ApiOperation(value = "Get fieldSpec metadata", notes = "Get fieldSpec metadata")
   public String getFieldSpecMetadata() {
     try {

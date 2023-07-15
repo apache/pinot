@@ -32,6 +32,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -54,7 +55,7 @@ public class PinotControllerAppConfigs {
 
   @GET
   @Path("/appconfigs")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetAppConfigs")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_APP_CONFIGS)
   @Produces(MediaType.APPLICATION_JSON)
   public String getAppConfigs() {
     PinotConfiguration pinotConfiguration =

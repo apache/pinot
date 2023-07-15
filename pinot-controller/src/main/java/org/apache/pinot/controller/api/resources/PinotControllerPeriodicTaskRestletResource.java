@@ -112,7 +112,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/names")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetTaskNames")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK_NAMES)
   @ApiOperation(value = "Get comma-delimited list of all available periodic task names.")
   public List<String> getPeriodicTaskNames() {
     return _periodicTaskScheduler.getTaskNames();

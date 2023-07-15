@@ -39,6 +39,7 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
@@ -64,7 +65,7 @@ public class PinotTableIndexingConfigs {
   @Deprecated
   @PUT
   @Path("/tables/{tableName}/indexingConfigs")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "UpdateConfigs")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_CONFIGS)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update table indexing configuration")
   @Produces(MediaType.APPLICATION_JSON)

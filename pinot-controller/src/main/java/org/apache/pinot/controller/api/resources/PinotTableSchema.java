@@ -37,6 +37,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.data.Schema;
@@ -59,7 +60,7 @@ public class PinotTableSchema {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/schema")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetSchema")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SCHEMA)
   @ApiOperation(value = "Get table schema", notes = "Read table schema")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),

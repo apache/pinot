@@ -48,6 +48,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.user.ComponentType;
@@ -94,7 +95,7 @@ public class PinotAccessControlUserRestletResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users")
-    @Authorize(targetType = TargetType.CLUSTER, action = "ListUsers")
+    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_USERS)
     @ApiOperation(value = "List all uses in cluster", notes = "List all users in cluster")
     public String listUers() {
         try {
@@ -109,7 +110,7 @@ public class PinotAccessControlUserRestletResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users/{username}")
-    @Authorize(targetType = TargetType.CLUSTER, action = "ListUser")
+    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_USER)
     @ApiOperation(value = "Get an user in cluster", notes = "Get an user in cluster")
     public String getUser(@PathParam("username") String username, @QueryParam("component") String componentTypeStr) {
         try {
@@ -127,7 +128,7 @@ public class PinotAccessControlUserRestletResource {
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users")
-    @Authorize(targetType = TargetType.CLUSTER, action = "AddUser")
+    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.ADD_USER)
     @ApiOperation(value = "Add a user", notes = "Add a user")
     public SuccessResponse addUser(String userConfigStr) {
         // TODO introduce a table config ctor with json string.
@@ -158,7 +159,7 @@ public class PinotAccessControlUserRestletResource {
 
     @DELETE
     @Path("/users/{username}")
-    @Authorize(targetType = TargetType.CLUSTER, action = "DeleteUser")
+    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_USER)
     @Authenticate(AccessType.DELETE)
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "Delete a user", notes = "Delete a user")
@@ -191,7 +192,7 @@ public class PinotAccessControlUserRestletResource {
 
     @PUT
     @Path("/users/{username}")
-    @Authorize(targetType = TargetType.CLUSTER, action = "UpdateUser")
+    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_USER)
     @Authenticate(AccessType.UPDATE)
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "Update user config for a user", notes = "Update user config for user")

@@ -42,6 +42,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableType;
@@ -75,7 +76,7 @@ public class TableViews {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/idealstate")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetIdealState")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_IDEAL_STATE)
   @ApiOperation(value = "Get table ideal state", notes = "Get table ideal state")
   public TableView getIdealState(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
@@ -87,7 +88,7 @@ public class TableViews {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/externalview")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetExternalView")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_EXTERNAL_VIEW)
   @ApiOperation(value = "Get table external view", notes = "Get table external view")
   public TableView getExternalView(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,

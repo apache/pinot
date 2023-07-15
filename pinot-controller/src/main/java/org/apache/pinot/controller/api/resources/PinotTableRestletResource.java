@@ -255,7 +255,7 @@ public class PinotTableRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/recommender")
-  @Authorize(targetType = TargetType.CLUSTER, action = "RecommendConfig")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RECOMMEND_CONFIG)
   @ApiOperation(value = "Recommend config", notes = "Recommend a config with input json")
   public String recommendConfig(String inputStr) {
     try {
@@ -268,7 +268,7 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
-  @Authorize(targetType = TargetType.CLUSTER, action = "ListTables")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_TABLES)
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
   public String listTables(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
@@ -440,7 +440,7 @@ public class PinotTableRestletResource {
 
   @DELETE
   @Path("/tables/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "Delete")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_TABLE)
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
@@ -499,7 +499,7 @@ public class PinotTableRestletResource {
 
   @PUT
   @Path("/tables/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "Update")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
@@ -650,7 +650,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebalance")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "Rebalance")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REBALANCE_TABLE)
   @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
       notes = "Rebalances a table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(
@@ -732,7 +732,7 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/state")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetState")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_STATE)
   @ApiOperation(value = "Get current table state", notes = "Get current table state")
   public String getTableState(
       @ApiParam(value = "Name of the table to get its state", required = true) @PathParam("tableName") String tableName,
@@ -791,7 +791,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/rebalanceStatus/{jobId}")
-  @Authorize(targetType = TargetType.CLUSTER, action = "RebalanceStatus")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_REBALANCE_STATUS)
   @ApiOperation(value = "Gets detailed stats of a rebalance operation",
       notes = "Gets detailed stats of a rebalance operation")
   public ServerRebalanceJobStatusResponse rebalanceStatus(
@@ -821,7 +821,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("/tables/{tableName}/stats")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "table stats", notes = "Provides metadata info/stats about the table.")
   public String getTableStats(
@@ -870,7 +870,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("/tables/{tableName}/status")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "table status", notes = "Provides status of the table including ingestion status")
   public String getTableStatus(
@@ -909,7 +909,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("tables/{tableName}/metadata")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the aggregate metadata of all segments for a table",
       notes = "Get the aggregate metadata of all segments for a table")
@@ -959,7 +959,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("table/{tableName}/jobs")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetControllerJobs")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_CONTROLLER_JOBS)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get list of controller jobs for this table",
       notes = "Get list of controller jobs for this table")
@@ -993,7 +993,7 @@ public class PinotTableRestletResource {
 
   @POST
   @Path("tables/{tableName}/timeBoundary")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "UpdateTimeBoundary")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TIME_BOUNDARY)
   @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata", notes = "Set "
       + "hybrid table query time boundary based on offline segments' metadata")
   @Produces(MediaType.APPLICATION_JSON)
@@ -1034,7 +1034,7 @@ public class PinotTableRestletResource {
 
   @DELETE
   @Path("tables/{tableName}/timeBoundary")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "DeleteTimeBoundary")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_TIME_BOUNDARY)
   @ApiOperation(value = "Delete hybrid table query time boundary", notes = "Delete hybrid table query time boundary")
   @Produces(MediaType.APPLICATION_JSON)
   public SuccessResponse deleteTimeBoundary(

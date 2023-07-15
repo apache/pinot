@@ -71,6 +71,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.RoutingTable;
@@ -386,7 +387,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       AccessControl accessControl = _accessControlFactory.create();
       boolean hasTableAccess =
           accessControl.hasAccess(requesterIdentity, serverBrokerRequest) && accessControl.hasAccess(
-              requesterIdentity, TargetType.TABLE, tableName, "query");
+              requesterIdentity, TargetType.TABLE, tableName, Actions.Table.QUERY);
       if (!hasTableAccess) {
         _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);

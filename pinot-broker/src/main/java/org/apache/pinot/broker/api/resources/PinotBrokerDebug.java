@@ -42,6 +42,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.routing.RoutingTable;
@@ -74,7 +75,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/timeBoundary/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetTimeBoundary")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TIME_BOUNDARY)
   @ApiOperation(value = "Get the time boundary information for a table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Time boundary information for a table"),
@@ -96,7 +97,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/routingTable/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetRoutingTable")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_ROUTING_TABLE)
   @ApiOperation(value = "Get the routing table for a table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Routing table"),
@@ -133,7 +134,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/routingTable/sql")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetRouting")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ROUTING)
   // SK: Shall it be a manual auth, and get the table name from query
   @ApiOperation(value = "Get the routing table for a query")
   @ApiResponses(value = {
@@ -159,7 +160,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/serverRoutingStats")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetServerRoutingStats")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SERVER_ROUTING_STATS)
   @ApiOperation(value = "Get the routing stats for all the servers")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Server routing Stats"),

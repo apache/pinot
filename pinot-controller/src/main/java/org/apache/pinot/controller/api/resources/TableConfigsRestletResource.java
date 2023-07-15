@@ -112,7 +112,7 @@ public class TableConfigsRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tableConfigs")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetTableConfigs")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_CONFIGS)
   @Authenticate(AccessType.READ)
   @ApiOperation(value = "Lists all TableConfigs in cluster", notes = "Lists all TableConfigs in cluster")
   public String listConfigs() {
@@ -138,7 +138,7 @@ public class TableConfigsRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tableConfigs/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetConfig")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_CONFIG)
   @Authenticate(AccessType.READ)
   @ApiOperation(value = "Get the TableConfigs for a given raw tableName",
       notes = "Get the TableConfigs for a given raw tableName")
@@ -262,7 +262,7 @@ public class TableConfigsRestletResource {
    */
   @DELETE
   @Path("/tableConfigs/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "DeleteTable")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_TABLE)
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete the TableConfigs", notes = "Delete the TableConfigs")
@@ -304,7 +304,7 @@ public class TableConfigsRestletResource {
    */
   @PUT
   @Path("/tableConfigs/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "UpdateConfigs")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_CONFIGS)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json",

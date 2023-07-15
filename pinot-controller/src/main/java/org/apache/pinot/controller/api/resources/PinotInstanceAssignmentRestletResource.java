@@ -57,6 +57,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -84,7 +85,7 @@ public class PinotInstanceAssignmentRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/instancePartitions")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetPartitions")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_PARTITIONS)
   @ApiOperation(value = "Get the instance partitions")
   public Map<String, InstancePartitions> getInstancePartitions(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
@@ -152,7 +153,7 @@ public class PinotInstanceAssignmentRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/assignInstances")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "AssignInstances")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.ASSIGN_INSTANCES)
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Assign server instances to a table")
   public Map<String, InstancePartitions> assignInstances(
@@ -292,7 +293,7 @@ public class PinotInstanceAssignmentRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/instancePartitions")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "AssignInstances")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.ASSIGN_INSTANCES)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Create/update the instance partitions")
   public Map<String, InstancePartitions> setInstancePartitions(
@@ -347,7 +348,7 @@ public class PinotInstanceAssignmentRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/instancePartitions")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "DeletePartitions")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_PARTITIONS)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Remove the instance partitions")
   public SuccessResponse removeInstancePartitions(
@@ -401,7 +402,7 @@ public class PinotInstanceAssignmentRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/replaceInstance")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "ReplaceInstance")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REPLACE_INSTANCE)
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Replace an instance in the instance partitions")
   public Map<String, InstancePartitions> replaceInstance(

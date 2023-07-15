@@ -43,6 +43,7 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 
@@ -63,7 +64,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetLoggers")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOGGERS)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all the loggers", notes = "Return all the logger names")
   public List<String> getLoggers() {
@@ -72,7 +73,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers/{loggerName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetLogger")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOGGER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get logger configs", notes = "Return logger info")
   public Map<String, String> getLogger(
@@ -86,7 +87,7 @@ public class PinotBrokerLogger {
 
   @PUT
   @Path("/loggers/{loggerName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = "PutLogger")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.SET_LOGGER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Set logger level", notes = "Set logger level for a given logger")
   public Map<String, String> setLoggerLevel(@ApiParam(value = "Logger name") @PathParam("loggerName") String loggerName,
@@ -96,7 +97,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers/files")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetLogFiles")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILES)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all local log files")
   public Set<String> getLocalLogFiles() {
@@ -112,7 +113,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers/download")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetLogFile")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @ApiOperation(value = "Download a log file")
   public Response downloadLogFile(

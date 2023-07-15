@@ -39,6 +39,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 
@@ -68,7 +69,7 @@ public class PinotControllerAuthResource {
    */
   @GET
   @Path("auth/verify")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetAuth")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CHECK_AUTH)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check whether authentication is enabled")
   @ApiResponses(value = {
@@ -90,7 +91,7 @@ public class PinotControllerAuthResource {
    */
   @GET
   @Path("auth/info")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetAuth")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_AUTH)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Retrieve auth workflow info")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Auth workflow info provided")})

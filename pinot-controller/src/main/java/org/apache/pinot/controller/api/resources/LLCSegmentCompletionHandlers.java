@@ -48,6 +48,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -79,7 +80,7 @@ public class LLCSegmentCompletionHandlers {
   // We don't want to document these in swagger since they are internal APIs
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_EXTEND_BUILD_TIME)
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String extendBuildTime(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -125,7 +126,7 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_CONSUMED)
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentConsumed(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -154,7 +155,7 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentStoppedConsuming(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -180,7 +181,7 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_START)
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitStart(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -216,7 +217,7 @@ public class LLCSegmentCompletionHandlers {
   // TODO: remove this API. Should not allow committing without metadata
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END)
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitEnd(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -266,7 +267,7 @@ public class LLCSegmentCompletionHandlers {
 
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT)
-  @Authorize(targetType = TargetType.CLUSTER, action = "PostAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.POST_ADMIN_INFO)
   @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Produces(MediaType.APPLICATION_JSON)
@@ -354,7 +355,7 @@ public class LLCSegmentCompletionHandlers {
   // TODO: remove this API. Should not upload segment via controller
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD)
-  @Authorize(targetType = TargetType.CLUSTER, action = "PostAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.POST_ADMIN_INFO)
   @Authenticate(AccessType.CREATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -397,7 +398,7 @@ public class LLCSegmentCompletionHandlers {
 
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END_METADATA)
-  @Authorize(targetType = TargetType.CLUSTER, action = "PostAdminInfo")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.POST_ADMIN_INFO)
   @Authenticate(AccessType.CREATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)

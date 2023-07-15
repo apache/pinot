@@ -48,6 +48,7 @@ import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -71,7 +72,7 @@ public class PinotLeadControllerRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetTableLeaders")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_LEADERS)
   @ApiOperation(value = "Gets leaders for all tables", notes = "Gets leaders for all tables")
   public LeadControllerResponse getLeadersForAllTables() {
     Map<String, LeadControllerEntry> leadControllerEntryMap = new LinkedHashMap<>();
@@ -114,7 +115,7 @@ public class PinotLeadControllerRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = "GetTableLeader")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_LEADER)
   @ApiOperation(value = "Gets leader for a given table", notes = "Gets leader for a given table")
   public LeadControllerResponse getLeaderForTable(
       @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName) {

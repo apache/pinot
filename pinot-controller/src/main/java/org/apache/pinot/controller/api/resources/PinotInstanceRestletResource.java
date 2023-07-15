@@ -54,6 +54,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -89,7 +90,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetInstances")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCES)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all instances")
   @ApiResponses(value = {
@@ -102,7 +103,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances/{instanceName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetInstance")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get instance information", produces = MediaType.APPLICATION_JSON)
   @ApiResponses(value = {
@@ -193,7 +194,7 @@ public class PinotInstanceRestletResource {
 
   @POST
   @Path("/instances")
-  @Authorize(targetType = TargetType.CLUSTER, action = "CreateInstance")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_INSTANCE)
   @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -265,7 +266,7 @@ public class PinotInstanceRestletResource {
   @Deprecated
   @POST
   @Path("/instances/{instanceName}/state")
-  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateInstance")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_INSTANCE)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
@@ -314,7 +315,7 @@ public class PinotInstanceRestletResource {
 
   @DELETE
   @Path("/instances/{instanceName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = "DeleteInstance")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_INSTANCE)
   @Authenticate(AccessType.DELETE)
   @Consumes(MediaType.TEXT_PLAIN)
   @Produces(MediaType.APPLICATION_JSON)
@@ -347,7 +348,7 @@ public class PinotInstanceRestletResource {
 
   @PUT
   @Path("/instances/{instanceName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateInstance")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_INSTANCE)
   @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -378,7 +379,7 @@ public class PinotInstanceRestletResource {
 
   @PUT
   @Path("/instances/{instanceName}/updateTags")
-  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateTags")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TAGS)
   @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -416,7 +417,7 @@ public class PinotInstanceRestletResource {
 
   @POST
   @Path("/instances/{instanceName}/updateBrokerResource")
-  @Authorize(targetType = TargetType.CLUSTER, action = "UpdateResource")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_RESOURCE)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the tables served by the specified broker instance in the broker resource", notes =
@@ -446,7 +447,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances/dropInstance/validate")
-  @Authorize(targetType = TargetType.CLUSTER, action = "GetInstances")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCES)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check if it's safe to drop the given instances. If not list all the reasons why its not safe.")
   @ApiResponses(value = {
