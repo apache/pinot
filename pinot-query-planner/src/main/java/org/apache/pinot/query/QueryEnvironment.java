@@ -169,7 +169,7 @@ public class QueryEnvironment {
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
+      RelRoot relRoot = planQueryLogical(sqlNodeAndOptions.getSqlNode(), plannerContext);
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
       // SubPlan for further processing.
@@ -199,7 +199,7 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
+      RelRoot relRoot = planQueryLogical(explain.getExplicandum(), plannerContext);
       SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
       SqlExplainLevel level =
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
@@ -235,7 +235,7 @@ public class QueryEnvironment {
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
           sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       }
-      RelRoot relRoot = compileQuery(sqlNode, plannerContext);
+      RelRoot relRoot = planQueryLogical(sqlNode, plannerContext);
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
     } catch (Throwable t) {
@@ -277,7 +277,7 @@ public class QueryEnvironment {
   // --------------------------------------------------------------------------
 
   @VisibleForTesting
-  protected RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext)
+  protected RelRoot planQueryLogical(SqlNode sqlNode, PlannerContext plannerContext)
       throws Exception {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
