@@ -284,7 +284,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           assert _deleteRecordColumn == null;
           _logger.info("Skip adding segment: {} because it's out of TTL", segment.getSegmentName());
           // If delete is not enabled, set valid doc ids snapshot into the segment.
-          segment.enableUpsert(this, validDocIds, queryableDocIds);
+          enableSegmentWithSnapshot(segment, validDocIds, queryableDocIds);
           return;
         }
       }
@@ -307,6 +307,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void addSegmentWithoutUpsert(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
     addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
+  }
+
+  protected void enableSegmentWithSnapshot(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds) {
+    MutableRoaringBitmap validDocIdsSnapshot = segment.loadValidDocIdsFromSnapshot();
+    validDocIdsSnapshot.forEach((int docId) -> validDocIds.add(docId));
+    segment.enableUpsert(this, validDocIds, queryableDocIds);
   }
 
   @Override

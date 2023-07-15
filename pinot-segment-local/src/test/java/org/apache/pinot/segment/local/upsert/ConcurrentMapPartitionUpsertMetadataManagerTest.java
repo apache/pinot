@@ -99,6 +99,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     verifyAddSegmentForTTL(new Float(80));
     verifyAddSegmentForTTL(new Double(80));
     verifyAddSegmentForTTL(new Long(80));
+    verifyAddOutOfTTLSegment();
   }
 
   private void verifyAddReplaceRemoveSegment(HashFunction hashFunction, boolean enableSnapshot)
@@ -489,7 +490,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   private static ImmutableSegmentImpl mockImmutableSegmentWithEndTime(int sequenceNumber,
       ThreadSafeMutableRoaringBitmap validDocIds, @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds,
-      List<PrimaryKey> primaryKeys, List<String> comparisonColumns, Comparable endTime) {
+      List<PrimaryKey> primaryKeys, List<String> comparisonColumns, Comparable endTime, MutableRoaringBitmap snapshot) {
     ImmutableSegmentImpl segment = mockImmutableSegment(sequenceNumber, validDocIds, queryableDocIds, primaryKeys);
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
@@ -498,6 +499,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       this.put(comparisonColumns.get(0), columnMetadata);
     }});
     when(columnMetadata.getMaxValue()).thenReturn(endTime);
+    if (snapshot != null) {
+      when(segment.loadValidDocIdsFromSnapshot()).thenReturn(snapshot);
+    } else {
+      when(segment.loadValidDocIdsFromSnapshot()).thenReturn(validDocIds.getMutableRoaringBitmap());
+    }
     return segment;
   }
 
@@ -814,7 +820,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
     ImmutableSegmentImpl segment1 =
         mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, Collections.singletonList("timeCol"),
-            earlierComparisonValue);
+            earlierComparisonValue, null);
 
     int[] docIds1 = new int[]{0, 1, 2, 3};
     MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
@@ -851,6 +857,76 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2, 3});
   }
 
+  private void verifyAddOutOfTTLSegment() {
+    File tableDir = new File(INDEX_DIR, REALTIME_TABLE_NAME);
+
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 30, tableDir,
+            mock(ServerMetrics.class));
+    Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
+        upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    // Add record to update largestSeenTimestamp, largest seen timestamp: 80
+    ThreadSafeMutableRoaringBitmap validDocIds0 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment segment0 = mockMutableSegment(1, validDocIds0, null);
+    upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(10), 1, new Double(80), false));
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+
+    // Add a segment with segmentEndTime = 80, so it will not be skipped
+    int numRecords = 4;
+    int[] primaryKeys = new int[]{0, 1, 2, 3};
+    Number[] timestamps = new Number[]{100, 100, 120, 80};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, Collections.singletonList("timeCol"),
+            new Double(80), null);
+
+    int[] docIds1 = new int[]{0, 1, 2, 3};
+    MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
+    validDocIdsSnapshot1.add(docIds1);
+
+    // load segment1 with segmentEndTime: 80, largest seen timestamp: 80. the segment will be loaded.
+    upsertMetadataManager.addSegment(segment1, validDocIds1, null,
+        getRecordInfoListForTTL(numRecords, primaryKeys, timestamps).iterator());
+    assertEquals(recordLocationMap.size(), 5);
+    checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 100, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2, 3});
+
+    // Add record to update largestSeenTimestamp, largest seen timestamp: 120
+    upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(0), 0, new Double(120), false));
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{1, 2, 3});
+    assertEquals(recordLocationMap.size(), 5);
+    checkRecordLocationForTTL(recordLocationMap, 0, segment0, 0, 120, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+
+    // Add an out-of-ttl segment, verify all the invalid docs should not show up again.
+    // Add a segment with segmentEndTime: 80, largest seen timestamp: 120. the segment will be skipped.
+    Number[] timestamps2 = new Number[]{80, 80, 80, 80};
+    List<PrimaryKey> primaryKeys2 = getPrimaryKeyList(numRecords, new int[]{100, 101, 102, 103});
+    int[] docIds2 = new int[]{0, 1};
+    MutableRoaringBitmap validDocIdsSnapshot2 = new MutableRoaringBitmap();
+    validDocIdsSnapshot2.add(docIds2);
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment2 =
+        mockImmutableSegmentWithEndTime(1, validDocIds2, null, primaryKeys2, Collections.singletonList("timeCol"),
+            new Double(80), validDocIdsSnapshot2);
+    upsertMetadataManager.addSegment(segment2, validDocIds2, null,
+        getRecordInfoListForTTL(numRecords, primaryKeys, timestamps2).iterator());
+    // out of ttl segment should not be added to recordLocationMap
+    assertEquals(recordLocationMap.size(), 5);
+    // out of ttl segment should still maintain validDocIds.
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+  }
+
   private void verifyAddSegmentForTTL(Comparable comparisonValue) {
     File tableDir = new File(INDEX_DIR, REALTIME_TABLE_NAME);
 
@@ -874,7 +950,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
     ImmutableSegmentImpl segment1 =
-        mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, Collections.singletonList("timeCol"), -1);
+        mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, Collections.singletonList("timeCol"), -1,
+            null);
 
     int[] docIds1 = new int[]{0, 1, 2, 3};
     MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
