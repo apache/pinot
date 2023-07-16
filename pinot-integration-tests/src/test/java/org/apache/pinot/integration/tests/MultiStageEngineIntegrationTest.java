@@ -31,6 +31,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -483,6 +484,25 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(results.get(8).asText(), "key1=value 1&key2=value@!$2&key3=value%3");
     assertEquals(results.get(9).asText(), "aGVsbG8h");
     assertEquals(results.get(10).asText(), "hello!");
+  }
+
+  @Test
+  public void testMultiValueColumnGroupBy()
+      throws Exception {
+    String pinotQuery = "SELECT count(*), multiValueToSet(RandomAirports) FROM mytable "
+        + "GROUP BY multiValueToSet(RandomAirports)";
+    JsonNode jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
+  }
+
+  @Test
+  public void testMultiValueColumnGroupByOrderBy()
+      throws Exception {
+    String pinotQuery = "SELECT count(*), multiValueToSet(RandomAirports) FROM mytable "
+        + "GROUP BY multiValueToSet(RandomAirports) "
+        + "ORDER BY multiValueToSet(RandomAirports) DESC";
+    JsonNode jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
   }
 
   @AfterClass

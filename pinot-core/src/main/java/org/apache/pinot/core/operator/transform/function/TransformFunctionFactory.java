@@ -147,6 +147,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.ARRAYMAX, ArrayMaxTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAYMIN, ArrayMinTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAYSUM, ArraySumTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAYTOMULTIVALUE, ArrayToMultiValueTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);

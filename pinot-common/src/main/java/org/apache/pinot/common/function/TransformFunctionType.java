@@ -90,6 +90,11 @@ public enum TransformFunctionType {
   // date type conversion functions
   CAST("cast"),
 
+  // object type
+  ARRAYTOMULTIVALUE("arrayToMultiValue", ReturnTypes.cascade(opBinding ->
+      opBinding.getOperandType(0).getComponentType(), SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(SqlTypeFamily.ARRAY), "array_to_multi_value"),
+
   // string functions
   JSONEXTRACTSCALAR("jsonExtractScalar",
       ReturnTypes.cascade(opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2,
