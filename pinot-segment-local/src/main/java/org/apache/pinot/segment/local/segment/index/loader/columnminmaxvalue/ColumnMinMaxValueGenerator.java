@@ -44,6 +44,7 @@ import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -370,7 +371,7 @@ public class ColumnMinMaxValueGenerator {
             }
           }
           SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              String.valueOf(new ByteArray(min)), String.valueOf(new ByteArray(max)), dataType);
+              BytesUtils.toHexString(min), BytesUtils.toHexString(max), dataType);
           }
           break;
         default:

@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Random;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -37,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -240,23 +242,79 @@ public class SegmentColumnarIndexCreatorTest {
 
     // test for value length grater than METADATA_PROPERTY_LENGTH_LIMIT
     props = new PropertiesConfiguration();
-    String longMinValue = RandomStringUtils.
+    String stringMinValue = RandomStringUtils.
         randomAlphabetic(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
-    String longMaxValue = RandomStringUtils.
+    String stringMaxValue = RandomStringUtils.
         randomAlphabetic(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", stringMinValue,
+        stringMaxValue, FieldSpec.DataType.STRING);
+    compareLongValuesWithColumnMinMax(stringMinValue, stringMaxValue, props, FieldSpec.DataType.STRING);
+
+    // long value test
+    props = new PropertiesConfiguration();
+    String longMinValue = String.valueOf(Long.MIN_VALUE);
+    String longMaxValue = String.valueOf(Long.MAX_VALUE);
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", longMinValue,
-        longMaxValue, FieldSpec.DataType.STRING);
+        longMaxValue, FieldSpec.DataType.LONG);
+    compareLongValuesWithColumnMinMax(longMinValue, longMaxValue, props, FieldSpec.DataType.LONG);
+
+    // int value test
+    props = new PropertiesConfiguration();
+    String intMinValue = String.valueOf(Integer.MIN_VALUE);
+    String intMaxValue = String.valueOf(Integer.MAX_VALUE);
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", intMinValue,
+        intMaxValue, FieldSpec.DataType.INT);
+    compareLongValuesWithColumnMinMax(intMinValue, intMaxValue, props, FieldSpec.DataType.INT);
+
+    // float value test
+    props = new PropertiesConfiguration();
+    String floatMinValue = String.valueOf(Float.MIN_VALUE);
+    String floatMaxValue = String.valueOf(Float.MAX_VALUE);
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", floatMinValue,
+        floatMaxValue, FieldSpec.DataType.FLOAT);
+    compareLongValuesWithColumnMinMax(floatMinValue, floatMaxValue, props, FieldSpec.DataType.FLOAT);
+
+    // Double value test
+    props = new PropertiesConfiguration();
+    String doubleMinValue = String.valueOf(Double.MIN_VALUE);
+    String doubleMaxValue = String.valueOf(Double.MAX_VALUE);
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", doubleMinValue,
+        doubleMaxValue, FieldSpec.DataType.DOUBLE);
+    compareLongValuesWithColumnMinMax(doubleMinValue, doubleMaxValue, props, FieldSpec.DataType.DOUBLE);
+
+    // Byte value test
+    props = new PropertiesConfiguration();
+    Random random = new Random();
+    byte[] byteMinValue = new byte[SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3];
+    byte[] byteMaxValue = new byte[SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3];
+    random.nextBytes(byteMinValue);
+    random.nextBytes(byteMaxValue);
+    String byteMinValueString = BytesUtils.toHexString(byteMinValue);
+    String byteMaxValueString = BytesUtils.toHexString(byteMaxValue);
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", byteMinValueString,
+        byteMaxValueString, FieldSpec.DataType.BYTES);
+    compareLongValuesWithColumnMinMax(byteMinValueString, byteMaxValueString, props, FieldSpec.DataType.BYTES);
+  }
+
+  private void compareLongValuesWithColumnMinMax(String longMinValue, String longMaxValue,
+      PropertiesConfiguration props, FieldSpec.DataType dataType) {
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
-    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))),
-        SegmentColumnarIndexCreator.getValueWithinLengthLimit(longMinValue, false, FieldSpec.DataType.STRING));
-    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))),
-        SegmentColumnarIndexCreator.getValueWithinLengthLimit(longMaxValue, true, FieldSpec.DataType.STRING));
+
+    String columnMinValue = getEscapedValidPropertyValue((String) props.getProperty(getKeyFor("colA", MIN_VALUE)));
+    String columnMaxValue = getEscapedValidPropertyValue((String) props.getProperty(getKeyFor("colA", MAX_VALUE)));
+    Assert.assertEquals(columnMinValue,
+          SegmentColumnarIndexCreator.getValidPropertyValue(longMinValue, false, dataType));
+    Assert.assertEquals(columnMaxValue,
+          SegmentColumnarIndexCreator.getValidPropertyValue(longMaxValue, true, dataType));
+
+
+    Assert.assertTrue(columnMinValue.compareTo(longMinValue) <= 0);
+    Assert.assertTrue(columnMaxValue.compareTo(longMaxValue) >= 0);
   }
 
   private String getEscapedValidPropertyValue(String input) {
-    return StringEscapeUtils.unescapeJava(SegmentColumnarIndexCreator.getValidPropertyValue(input, false,
-        FieldSpec.DataType.STRING));
+    return StringEscapeUtils.unescapeJava(input);
   }
 
   @AfterClass

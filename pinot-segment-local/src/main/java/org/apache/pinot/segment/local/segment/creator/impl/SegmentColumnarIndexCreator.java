@@ -604,29 +604,31 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    */
   @VisibleForTesting
   static String getValidPropertyValue(String value, boolean isMax, DataType dataType) {
-    value = getValueWithinLengthLimit(value, isMax, dataType);
-    int length = value.length();
+    String valueWithinLengthLimit = getValueWithinLengthLimit(value, isMax, dataType);
+    int length = valueWithinLengthLimit.length();
 
     if (length > 0) {
       // check and replace first character if it's a white space
-      if (Character.isWhitespace(value.charAt(0))) {
-        String unicodeValue = "\\u" + String.format("%04x", (int) value.charAt(0));
-        value = unicodeValue + value.substring(1);
+      if (Character.isWhitespace(valueWithinLengthLimit.charAt(0))) {
+        String unicodeValue = "\\u" + String.format("%04x", (int) valueWithinLengthLimit.charAt(0));
+        valueWithinLengthLimit = unicodeValue + valueWithinLengthLimit.substring(1);
       }
 
       // check and replace last character if it's a white space
-      if (Character.isWhitespace(value.charAt(value.length() - 1))) {
-        String unicodeValue = "\\u" + String.format("%04x", (int) value.charAt(value.length() - 1));
-        value = value.substring(0, value.length() - 1) + unicodeValue;
+      if (Character.isWhitespace(valueWithinLengthLimit.charAt(valueWithinLengthLimit.length() - 1))) {
+        String unicodeValue = "\\u"
+            + String.format("%04x", (int) valueWithinLengthLimit.charAt(valueWithinLengthLimit.length() - 1));
+        valueWithinLengthLimit =
+            valueWithinLengthLimit.substring(0, valueWithinLengthLimit.length() - 1) + unicodeValue;
       }
     }
 
     // removing the ',' from the value if it's present.
-    if (length > 0 && value.contains(",")) {
-      value = value.replace(",", "\\,");
+    if (length > 0 && valueWithinLengthLimit.contains(",")) {
+      valueWithinLengthLimit = valueWithinLengthLimit.replace(",", "\\,");
     }
 
-    return value;
+    return valueWithinLengthLimit;
   }
 
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
@@ -659,26 +661,35 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       return value;
     }
 
-    // requires the trimming of the value, since it's length is more than permissible value.
-    if (dataType == DataType.BYTES) {
-        byte[] byteValue = BytesUtils.toBytes(value);
-        // As per the `encodeHexString` function doc,
-        // The returned String will be double the length of the passed array,
-        // as it takes two characters to represent any given byte
-        byte[] shortByteValue = Arrays.copyOf(byteValue, METADATA_PROPERTY_LENGTH_LIMIT / 2);
-        return BytesUtils.toHexString(shortByteValue);
-    } else {
-      // if property type is max value take first METADATA_PROPERTY_LENGTH_LIMIT - 1 characters
-      // and increment the last character value by 1.
-      if (isMax) {
-        return value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1)
-            + (char) (value.charAt(METADATA_PROPERTY_LENGTH_LIMIT - 1) + 1);
-      } else {
-        // property type is min value take first METADATA_PROPERTY_LENGTH_LIMIT - 1 characters
-        // and decrement the last character value by 1.
-        return value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1)
-            + (char) (value.charAt(METADATA_PROPERTY_LENGTH_LIMIT - 1) - 1);
-      }
+    String alteredValue;
+    // For Numeric Data Type(INT, LONG, DOUBLE, FLOAT) value longer than METADATA_PROPERTY_LENGTH_LIMIT is not possible.
+    switch (dataType) {
+      case STRING:
+        if (isMax) {
+          alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1)
+              + (char) (value.charAt(METADATA_PROPERTY_LENGTH_LIMIT - 1) + 1);
+        } else {
+          // property type is min value take first METADATA_PROPERTY_LENGTH_LIMIT - 1 characters
+          // and decrement the last character value by 1.
+          alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1)
+              + (char) (value.charAt(METADATA_PROPERTY_LENGTH_LIMIT - 1) - 1);
+        }
+        break;
+      case BYTES:
+        byte[] shortByteValue = Arrays.copyOf(BytesUtils.toBytes(value),
+            (METADATA_PROPERTY_LENGTH_LIMIT / 2) + 1);
+        char ch;
+        if (isMax) {
+          ch = (char) ((char) shortByteValue[METADATA_PROPERTY_LENGTH_LIMIT / 2] + 1);
+        } else {
+          ch = (char) ((char) shortByteValue[METADATA_PROPERTY_LENGTH_LIMIT / 2] - 1);
+        }
+        shortByteValue[METADATA_PROPERTY_LENGTH_LIMIT / 2] = (byte) ch;
+        alteredValue = BytesUtils.toHexString(shortByteValue);
+        break;
+      default:
+        throw new IllegalStateException("Unsupported data type for property value length reduction: " + dataType);
     }
+    return alteredValue;
   }
 }
