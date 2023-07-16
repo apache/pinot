@@ -665,6 +665,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     // For Numeric Data Type(INT, LONG, DOUBLE, FLOAT) value longer than METADATA_PROPERTY_LENGTH_LIMIT is not possible.
     switch (dataType) {
       case STRING:
+      case JSON:
         if (isMax) {
           alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1)
               + (char) (value.charAt(METADATA_PROPERTY_LENGTH_LIMIT - 1) + 1);
