@@ -386,7 +386,8 @@ public class PinotTableRestletResource {
       @Context Request request) {
     try {
       if (StringUtils.isBlank(stateStr)) {
-        if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.LIST_TABLE_CONFIGS)) {
+        if (!_accessControlFactory.create()
+            .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.LIST_TABLE_CONFIGS)) {
           throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
         }
         return listTableConfigs(tableName, tableTypeStr);
