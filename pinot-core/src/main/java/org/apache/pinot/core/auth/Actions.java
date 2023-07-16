@@ -177,7 +177,11 @@ public class Actions {
     public static final String GET_SIZE = "GetSize";
     public static final String GET_IDEAL_STATE = "GetIdealState";
     public static final String GET_EXTERNAL_VIEW = "GetExternalView";
+    public static final String LIST_TABLE_CONFIGS = "ListTableConfigs";
     public static final String ECHO = "Echo";
-    public static final String QUERY = "query";
+    public static final String QUERY = "Query";
+    public static final String ENABLE = "Enable";
+    public static final String DISABLE = "Disable";
+    public static final String DROP = "Drop";
   }
 }

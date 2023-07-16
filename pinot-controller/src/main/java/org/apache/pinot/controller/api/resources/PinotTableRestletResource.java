@@ -385,7 +385,10 @@ public class PinotTableRestletResource {
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     try {
-      if (stateStr == null) {
+      if (StringUtils.isBlank(stateStr)) {
+        if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.LIST_TABLE_CONFIGS)) {
+          throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+        }
         return listTableConfigs(tableName, tableTypeStr);
       }
 
@@ -398,7 +401,9 @@ public class PinotTableRestletResource {
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
-      if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, tableName, stateStr)) {
+      // Convert the action to Enable, Disable and Drop corresponding to StateType enum.
+      if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, tableName,
+          StringUtils.capitalize(stateType.name().toLowerCase()))) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
