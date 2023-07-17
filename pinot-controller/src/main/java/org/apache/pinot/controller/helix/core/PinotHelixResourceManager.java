@@ -42,7 +42,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -4154,11 +4153,9 @@ public class PinotHelixResourceManager {
       }
     }
     for (TableConfig tableConfig : getAllTableConfigs()) {
-      String serverTag = TagNameUtils.getServerTagForTenant(tableConfig.getTenantConfig().getServer(),
+      String tag = TagNameUtils.getServerTagForTenant(tableConfig.getTenantConfig().getServer(),
           tableConfig.getTableType());
-      int maxReplication = Math.max(Objects.requireNonNullElse(tagMinServerMap.get(serverTag), 0),
-          tableConfig.getReplication());
-      tagMinServerMap.put(serverTag, maxReplication);
+      tagMinServerMap.put(tag, Math.max(tagMinServerMap.getOrDefault(tag, 0), tableConfig.getReplication()));
       String brokerTag = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
       tagMinServerMap.put(brokerTag, 1);
     }

@@ -464,7 +464,8 @@ public class PinotInstanceRestletResource {
       // newly added tags to instance
       for (String tag : newTags) {
         String tagType = getInstanceTypeFromTag(tag);
-        if (tagType == null) {
+        if (tagType == null && (name.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
+            || name.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE))) {
           responseMap.get(name).add(new OperationValidationResponse.ErrorWrapper(
               OperationValidationResponse.ErrorCode.UNRECOGNISED_TAG_TYPE, tag));
           continue;
@@ -516,18 +517,14 @@ public class PinotInstanceRestletResource {
     Map<String, Integer> updatedTagInstanceMap = new HashMap<>();
     Set<String> visitedInstances = new HashSet<>();
     instances.forEach(instance -> {
-      instance.getNewTags().forEach(tag -> {
-        Integer count = updatedTagInstanceMap.get(tag);
-        updatedTagInstanceMap.put(tag, count != null ? count + 1 : 1);
-      });
+      instance.getNewTags().forEach(tag ->
+          updatedTagInstanceMap.put(tag, updatedTagInstanceMap.getOrDefault(tag, 0) + 1));
       visitedInstances.add(instance.getInstanceName());
     });
     _pinotHelixResourceManager.getAllInstances().forEach(instance -> {
       if (!visitedInstances.contains(instance)) {
-        _pinotHelixResourceManager.getTagsForInstance(instance).forEach(tag -> {
-          Integer count = updatedTagInstanceMap.get(tag);
-          updatedTagInstanceMap.put(tag, count != null ? count + 1 : 1);
-        });
+        _pinotHelixResourceManager.getTagsForInstance(instance).forEach(tag ->
+            updatedTagInstanceMap.put(tag, updatedTagInstanceMap.getOrDefault(tag, 0) + 1));
         visitedInstances.add(instance);
       }
     });
