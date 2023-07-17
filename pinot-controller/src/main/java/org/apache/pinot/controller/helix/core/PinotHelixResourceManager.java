@@ -4140,26 +4140,26 @@ public class PinotHelixResourceManager {
   /**
    * Construct a map of all the tags and their respective minimum instance requirements.
    * The minimum instance requirement is computed by
-   * - for BROKER tenant tag set it to 1.
+   * - for BROKER tenant tag set it to 1 if it hosts any table else set it to 0
    * - for SERVER tenant tag iterate over all the tables of that tenant and find the maximum table replication.
    * - for rest of the tags just set it to 0
    * @return map of tags and their minimum instance requirements
    */
   public Map<String, Integer> minimumInstancesRequiredForTags() {
-    Map<String, Integer> tagMinServerMap = new HashMap<>();
+    Map<String, Integer> tagMinInstanceMap = new HashMap<>();
     for (InstanceConfig instanceConfig : getAllHelixInstanceConfigs()) {
       for (String tag : instanceConfig.getTags()) {
-        tagMinServerMap.put(tag, TagNameUtils.isBrokerTag(tag) ? 1 : 0);
+        tagMinInstanceMap.put(tag, 0);
       }
     }
     for (TableConfig tableConfig : getAllTableConfigs()) {
       String tag = TagNameUtils.getServerTagForTenant(tableConfig.getTenantConfig().getServer(),
           tableConfig.getTableType());
-      tagMinServerMap.put(tag, Math.max(tagMinServerMap.getOrDefault(tag, 0), tableConfig.getReplication()));
+      tagMinInstanceMap.put(tag, Math.max(tagMinInstanceMap.getOrDefault(tag, 0), tableConfig.getReplication()));
       String brokerTag = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
-      tagMinServerMap.put(brokerTag, 1);
+      tagMinInstanceMap.put(brokerTag, 1);
     }
-    return tagMinServerMap;
+    return tagMinInstanceMap;
   }
 
   /*
