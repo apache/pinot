@@ -75,8 +75,6 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     _numRowsToKeep = queryContext.getLimit();
-    // TODO(gortiz): I think this is incorrect. The SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY limit
-    //  is not enforced later in getNextBlock
     _rows = new ArrayList<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
   }
