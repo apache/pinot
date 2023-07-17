@@ -231,7 +231,7 @@ public class HashJoinOperator extends MultiStageOperator {
           rows = buildJoinedDataBlockAnti(leftBlock);
           break;
         }
-        default: {
+        default: { // INNER, LEFT, RIGHT, FULL
           rows = buildJoinedDataBlockDefault(leftBlock);
           break;
         }
@@ -240,7 +240,6 @@ public class HashJoinOperator extends MultiStageOperator {
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
   }
 
-  // INNER, LEFT, RIGHT, FULL
   private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock) {
     List<Object[]> container = leftBlock.getContainer();
     List<Object[]> rows = new ArrayList<>(container.size());
