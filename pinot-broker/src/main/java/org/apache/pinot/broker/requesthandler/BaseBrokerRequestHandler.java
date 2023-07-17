@@ -90,6 +90,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventInfo;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -238,7 +239,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders,
+                                      BrokerQueryEventInfo brokerQueryEventInfo)
       throws Exception {
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
@@ -248,6 +250,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (!hasAccess) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      brokerQueryEventInfo.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -255,12 +258,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setRequestId(requestId);
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null) {
+      brokerQueryEventInfo.setErrorCode(QueryException.BROKER_REQUEST_SEND_ERROR_CODE);
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
     String query = sql.asText();
     requestContext.setQuery(query);
-    BrokerResponse brokerResponse =
-        handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders);
+    BrokerResponse brokerResponse = handleRequest(requestId, query, sqlNodeAndOptions, request,
+            requesterIdentity, requestContext, httpHeaders, brokerQueryEventInfo);
 
     if (request.has(Broker.Request.QUERY_OPTIONS)) {
       String queryOptions = request.get(Broker.Request.QUERY_OPTIONS).asText();
@@ -298,6 +302,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
         requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+        brokerQueryEventInfo.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
       }
 
@@ -721,6 +726,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       brokerResponse.setTimeUsedMs(totalTimeMs);
       requestContext.setQueryProcessingTime(totalTimeMs);
       augmentStatistics(requestContext, brokerResponse);
+      augmentStatistics(brokerQueryEventInfo, brokerResponse);
       _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
           TimeUnit.MILLISECONDS);
 
@@ -845,7 +851,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * IN_ID_SET transform function.
    */
   private void handleSubquery(Expression expression, long requestId, JsonNode jsonRequest,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders,
+                              BrokerQueryEventInfo brokerQueryEventInfo)
       throws Exception {
     Function function = expression.getFunctionCall();
     if (function == null) {
@@ -858,7 +865,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
       String subquery = subqueryLiteral.getStringValue();
       BrokerResponse response =
-          handleRequest(requestId, subquery, null, jsonRequest, requesterIdentity, requestContext, httpHeaders);
+          handleRequest(requestId, subquery, null, jsonRequest, requesterIdentity, requestContext,
+                  httpHeaders, brokerQueryEventInfo);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }
@@ -1648,6 +1656,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
+  protected abstract BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+                                                  JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
+                                                  HttpHeaders httpHeaders, BrokerQueryEventInfo brokerQueryEventInfo);
+
   /**
    * Processes the optimized broker requests for both OFFLINE and REALTIME table.
    * TODO: Directly take PinotQuery
@@ -1681,6 +1693,30 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setOfflineTotalCpuTimeNs(response.getOfflineTotalCpuTimeNs());
     statistics.setRealtimeTotalCpuTimeNs(response.getRealtimeTotalCpuTimeNs());
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());
+  }
+
+  protected static void augmentStatistics(BrokerQueryEventInfo brokerQueryEventInfo, BrokerResponse response) {
+    brokerQueryEventInfo.setTotalDocs(response.getTotalDocs());
+    brokerQueryEventInfo.setNumDocsScanned(response.getNumDocsScanned());
+    brokerQueryEventInfo.setNumEntriesScannedInFilter(response.getNumEntriesScannedInFilter());
+    brokerQueryEventInfo.setNumEntriesScannedPostFilter(response.getNumEntriesScannedPostFilter());
+    brokerQueryEventInfo.setNumSegmentsQueried(response.getNumSegmentsQueried());
+    brokerQueryEventInfo.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
+    brokerQueryEventInfo.setNumSegmentsMatched(response.getNumSegmentsMatched());
+    brokerQueryEventInfo.setNumServersQueried(response.getNumServersQueried());
+    brokerQueryEventInfo.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
+    brokerQueryEventInfo.setNumServersResponded(response.getNumServersResponded());
+    brokerQueryEventInfo.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    brokerQueryEventInfo.setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
+    brokerQueryEventInfo.setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
+    brokerQueryEventInfo.setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
+    brokerQueryEventInfo.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
+    brokerQueryEventInfo.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());
+    brokerQueryEventInfo.setRealtimeResponseSerializationCpuTimeNs(
+            response.getRealtimeResponseSerializationCpuTimeNs());
+    brokerQueryEventInfo.setOfflineTotalCpuTimeNs(response.getOfflineTotalCpuTimeNs());
+    brokerQueryEventInfo.setRealtimeTotalCpuTimeNs(response.getRealtimeTotalCpuTimeNs());
+    brokerQueryEventInfo.setNumRowsResultSet(response.getNumRowsResultSet());
   }
 
   private String getGlobalQueryId(long requestId) {

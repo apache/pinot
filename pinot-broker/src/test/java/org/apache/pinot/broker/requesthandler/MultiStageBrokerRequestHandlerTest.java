@@ -81,7 +81,7 @@ public class MultiStageBrokerRequestHandlerTest {
     List<Long> requestIds = new ArrayList<>();
     // Request id should be unique each time, and there should be a difference of 1 between consecutive requestIds.
     for (int iteration = 0; iteration < 10; iteration++) {
-      _requestHandler.handleRequest(jsonRequest, null, null, requestContext, null);
+      _requestHandler.handleRequest(jsonRequest, null, null, requestContext, null, null);
       Assert.assertTrue(requestContext.getRequestId() >= 0, "Request ID should be non-negative");
       requestIds.add(requestContext.getRequestId());
       if (iteration != 0) {

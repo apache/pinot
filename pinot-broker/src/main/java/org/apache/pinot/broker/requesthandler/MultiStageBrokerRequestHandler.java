@@ -62,6 +62,7 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventInfo;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -97,7 +98,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   @Override
   protected BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
-      HttpHeaders httpHeaders) {
+      HttpHeaders httpHeaders, BrokerQueryEventInfo brokerQueryEventInfo) {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     long compilationStartTimeNs;
