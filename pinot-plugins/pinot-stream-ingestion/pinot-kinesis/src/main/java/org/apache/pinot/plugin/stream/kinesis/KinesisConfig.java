@@ -80,7 +80,7 @@ public class KinesisConfig {
   private final String _accessKey;
   private final String _secretKey;
   private final String _endpoint;
-  private boolean _populateMetadata = false;
+  private boolean _populateMetadata;
 
   // IAM Role values
   private boolean _iamRoleBasedAccess;

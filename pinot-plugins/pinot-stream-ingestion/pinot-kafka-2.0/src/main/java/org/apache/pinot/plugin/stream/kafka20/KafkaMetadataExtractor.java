@@ -31,11 +31,12 @@ import org.apache.pinot.spi.stream.RowMetadata;
 public interface KafkaMetadataExtractor {
   static KafkaMetadataExtractor build(boolean populateMetadata) {
     return record -> {
+      long recordTimestamp = record.timestamp();
+      Map<String, String> metadataMap = new HashMap<>();
+      metadataMap.put(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(record.offset()));
+      metadataMap.put(KafkaStreamMessageMetadata.RECORD_TIMESTAMP_KEY, String.valueOf(recordTimestamp));
+
       if (!populateMetadata) {
-        long recordTimestamp = record.timestamp();
-        Map<String, String> metadataMap = new HashMap<>();
-        metadataMap.put(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(record.offset()));
-        metadataMap.put(KafkaStreamMessageMetadata.RECORD_TIMESTAMP_KEY, String.valueOf(recordTimestamp));
         return new KafkaStreamMessageMetadata(recordTimestamp, RowMetadata.EMPTY_ROW, metadataMap);
       }
       GenericRow headerGenericRow = new GenericRow();
@@ -46,10 +47,7 @@ public interface KafkaMetadataExtractor {
           headerGenericRow.putValue(header.key(), header.value());
         }
       }
-      Map<String, String> metadata = new HashMap<>();
-      metadata.put(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(record.offset()));
-      metadata.put(KafkaStreamMessageMetadata.RECORD_TIMESTAMP_KEY, String.valueOf(record.timestamp()));
-      return new KafkaStreamMessageMetadata(record.timestamp(), headerGenericRow, metadata);
+      return new KafkaStreamMessageMetadata(record.timestamp(), headerGenericRow, metadataMap);
     };
   }
 

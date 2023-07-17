@@ -138,11 +138,12 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordsRequest);
 
         if (!getRecordsResponse.records().isEmpty()) {
-          getRecordsResponse.records().forEach(r -> {
+          getRecordsResponse.records().forEach(record -> {
             recordList.add(
-            new KinesisStreamMessage(r.partitionKey().getBytes(StandardCharsets.UTF_8), r.data().asByteArray(),
-                r.sequenceNumber(), (KinesisStreamMessageMetadata) _kinesisMetadataExtractor.extract(r),
-                r.data().asByteArray().length));
+            new KinesisStreamMessage(record.partitionKey().getBytes(StandardCharsets.UTF_8),
+                record.data().asByteArray(), record.sequenceNumber(),
+                (KinesisStreamMessageMetadata) _kinesisMetadataExtractor.extract(record),
+                record.data().asByteArray().length));
           });
           nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
 

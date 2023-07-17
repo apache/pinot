@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.stream.RowMetadata;
@@ -29,13 +30,13 @@ public interface KinesisMetadataExtractor {
   static KinesisMetadataExtractor build(boolean populateMetadata) {
     return record -> {
       long recordTimestamp = record.approximateArrivalTimestamp().toEpochMilli();
+
+      if (!populateMetadata) {
+        return new KinesisStreamMessageMetadata(recordTimestamp, null, Collections.emptyMap());
+      }
+      String seqNumber = record.sequenceNumber();
       Map<String, String> metadataMap = new HashMap<>();
       metadataMap.put(KinesisStreamMessageMetadata.APPRX_ARRIVAL_TIMESTAMP_KEY, String.valueOf(recordTimestamp));
-      if (!populateMetadata) {
-        return new KinesisStreamMessageMetadata(recordTimestamp, null, metadataMap);
-      }
-
-      String seqNumber = record.sequenceNumber();
       metadataMap.put(KinesisStreamMessageMetadata.SEQUENCE_NUMBER_KEY, seqNumber);
       return new KinesisStreamMessageMetadata(recordTimestamp, null, metadataMap);
     };
