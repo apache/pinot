@@ -226,7 +226,7 @@ public class TableRebalancer {
 
     // Calculate instance partitions map
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
-    Boolean instancePartitionsUnchanged;
+    boolean instancePartitionsUnchanged;
     try {
       Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> instancePartitionsMapAndUnchanged =
           getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
@@ -246,7 +246,7 @@ public class TableRebalancer {
         getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
 
     Map<String, InstancePartitions> tierToInstancePartitionsMap = tierToInstancePartitionsMapAndUnchanged.getLeft();
-    Boolean tierInstancePartitionsUnchanged = tierToInstancePartitionsMapAndUnchanged.getRight();
+    boolean tierInstancePartitionsUnchanged = tierToInstancePartitionsMapAndUnchanged.getRight();
 
     LOGGER.info("For rebalanceId: {}, calculating the target assignment for table: {}", rebalanceJobId,
         tableNameWithType);
@@ -266,13 +266,25 @@ public class TableRebalancer {
 
     boolean segmentAssignmentUnchanged = currentAssignment.equals(targetAssignment);
     LOGGER.info("For rebalanceId: {},  segmentAssignmentUnchanged: {}, "
-            + "tierInstancePartitionsUnchanged: {}, instancePartitionsUnchanged: {}",
-        rebalanceJobId, segmentAssignmentUnchanged, tierInstancePartitionsUnchanged, instancePartitionsUnchanged);
+            + "tierInstancePartitionsUnchanged: {}, instancePartitionsUnchanged: {} for table: {}",
+        rebalanceJobId, segmentAssignmentUnchanged, tierInstancePartitionsUnchanged,
+        instancePartitionsUnchanged, tableNameWithType);
 
-    if (segmentAssignmentUnchanged && tierInstancePartitionsUnchanged && instancePartitionsUnchanged) {
+    if (segmentAssignmentUnchanged) {
       LOGGER.info("Table: {} is already balanced", tableNameWithType);
-    return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
+      if (instancePartitionsUnchanged && tierInstancePartitionsUnchanged) {
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
+      } else {
+        if (dryRun)  {
+          return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
+              "Instance reassigned in dry-run mode, table is already balanced", instancePartitionsMap,
+              tierToInstancePartitionsMap, targetAssignment);
+        }
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
+            "Instance reassigned, table is already balanced", instancePartitionsMap, tierToInstancePartitionsMap,
+            targetAssignment);
+      }
     }
 
     if (dryRun) {
@@ -538,6 +550,8 @@ public class TableRebalancer {
             TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
         if (hasPreConfiguredInstancePartitions) {
           String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
+          InstancePartitions existingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
+              _helixManager.getHelixPropertyStore(), referenceInstancePartitionsName);
           InstancePartitions instancePartitions =
               InstancePartitionsUtils.fetchInstancePartitionsWithRename(_helixManager.getHelixPropertyStore(),
                   referenceInstancePartitionsName, instancePartitionsType.getInstancePartitionsName(rawTableName));
@@ -547,7 +561,7 @@ public class TableRebalancer {
             InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
                 instancePartitions);
           }
-          return Pair.of(instancePartitions, true);
+          return Pair.of(instancePartitions, instancePartitions.equals(existingInstancePartitions));
         }
         // Set existing instance partition to null if bootstrap mode is enabled, so that the instance partition
         // map can be fully recalculated.
@@ -560,11 +574,12 @@ public class TableRebalancer {
         InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType,
             _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true),
             existingInstancePartitions);
-        if (!dryRun) {
+        boolean instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+        if (!dryRun && instancePartitionsUnchanged) {
           LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
           InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
         }
-        return Pair.of(instancePartitions, instancePartitions.equals(existingInstancePartitions));
+        return Pair.of(instancePartitions, instancePartitionsUnchanged);
       } else {
         LOGGER.info("Fetching/computing {} instance partitions for table: {}", instancePartitionsType,
             tableNameWithType);
@@ -580,12 +595,17 @@ public class TableRebalancer {
       }
       InstancePartitions instancePartitions =
           InstancePartitionsUtils.computeDefaultInstancePartitions(_helixManager, tableConfig, instancePartitionsType);
-      if (!dryRun) {
+
+      Boolean noExistingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+          InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
+              instancePartitionsType.toString())) == null;
+
+      if (!dryRun && !noExistingInstancePartitions) {
         String instancePartitionsName = instancePartitions.getInstancePartitionsName();
         LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
         InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
       }
-      return Pair.of(instancePartitions, true);
+      return Pair.of(instancePartitions, noExistingInstancePartitions);
     }
   }
 
