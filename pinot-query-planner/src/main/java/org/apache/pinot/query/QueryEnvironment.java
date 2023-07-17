@@ -173,8 +173,7 @@ public class QueryEnvironment {
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
       // SubPlan for further processing.
-      DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
-      return new QueryPlannerResult(dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
+      return planQueryDispatchable(relRoot, plannerContext, null, false, requestId);
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
@@ -205,15 +204,7 @@ public class QueryEnvironment {
           explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
       boolean showPhysicalPlan = explain.withImplementation();
       String logicalPlan = PlannerUtils.explainPlan(relRoot.rel, format, level);
-      if (showPhysicalPlan) {
-        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
-        String physicalPlan = ExplainPlanPlanVisitor.explain(dispatchableSubPlan);
-        String completePlan = String.format("%s\nPhysical Plan\n %s", logicalPlan, physicalPlan);
-        return new QueryPlannerResult(dispatchableSubPlan, completePlan, dispatchableSubPlan.getTableNames());
-      } else {
-        Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
-        return new QueryPlannerResult(null, logicalPlan, tableNames);
-      }
+      return planQueryDispatchable(relRoot, plannerContext, logicalPlan, showPhysicalPlan, requestId);
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
@@ -343,16 +334,28 @@ public class QueryEnvironment {
     // 5. construct a logical query plan.
     PinotLogicalQueryPlanner pinotLogicalQueryPlanner = new PinotLogicalQueryPlanner();
     QueryPlan queryPlan = pinotLogicalQueryPlanner.planQuery(relRoot);
-    SubPlan subPlan = pinotLogicalQueryPlanner.makePlan(queryPlan);
-    return subPlan;
+    return pinotLogicalQueryPlanner.makePlan(queryPlan);
   }
-  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
+  private QueryPlannerResult planQueryDispatchable(RelRoot relRoot, PlannerContext plannerContext,
+      String explainPlan, boolean showPhysicalPlan, long requestId) {
     SubPlan subPlanRoot = toSubPlan(relRoot);
 
     // 6. construct a dispatchable query plan.
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
-    return pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
+    pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
+    DispatchableSubPlan dispatchableSubPlan = pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
+
+    if (showPhysicalPlan) {
+      String physicalPlan = getQueryPhysicalPlan(dispatchableSubPlan);
+      explainPlan = String.format("%s\nPhysical Plan\n %s", explainPlan, physicalPlan);
+    }
+
+    return new QueryPlannerResult(dispatchableSubPlan, explainPlan, dispatchableSubPlan.getTableNames());
+  }
+
+  private String getQueryPhysicalPlan(DispatchableSubPlan dispatchableSubPlan) {
+    return ExplainPlanPlanVisitor.explain(dispatchableSubPlan);
   }
 
   // --------------------------------------------------------------------------
