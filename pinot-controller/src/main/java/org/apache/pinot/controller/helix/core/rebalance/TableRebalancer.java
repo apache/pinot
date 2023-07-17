@@ -276,7 +276,7 @@ public class TableRebalancer {
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
       } else {
-        if (dryRun)  {
+        if (dryRun) {
           return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
               "Instance reassigned in dry-run mode, table is already balanced", instancePartitionsMap,
               tierToInstancePartitionsMap, targetAssignment);
@@ -596,7 +596,8 @@ public class TableRebalancer {
       InstancePartitions instancePartitions =
           InstancePartitionsUtils.computeDefaultInstancePartitions(_helixManager, tableConfig, instancePartitionsType);
 
-      Boolean noExistingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+      Boolean noExistingInstancePartitions =
+          InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
           InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
               instancePartitionsType.toString())) == null;
 
