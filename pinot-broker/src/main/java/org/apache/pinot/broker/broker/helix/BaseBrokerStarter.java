@@ -257,8 +257,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _serverRoutingStatsManager.init();
     _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
     _routingManager.init(_spectatorHelixManager);
+    final PinotConfiguration factoryConf = _brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX);
+    // Adding cluster name to the config so that it can be used by the AccessControlFactory
+    factoryConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, _brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME));
     _accessControlFactory =
-        AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX), _propertyStore);
+        AccessControlFactory.loadFactory(factoryConf, _propertyStore);
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
         new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
     queryQuotaManager.init(_spectatorHelixManager);
