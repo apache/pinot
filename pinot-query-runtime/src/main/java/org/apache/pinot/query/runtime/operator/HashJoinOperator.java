@@ -59,6 +59,7 @@ import org.slf4j.LoggerFactory;
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 public class HashJoinOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
+  private static final int INITIAL_HEURISTIC_SIZE = 16;
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
 
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES = ImmutableSet.of(
@@ -169,10 +170,9 @@ public class HashJoinOperator extends MultiStageOperator {
       }
       List<Object[]> container = rightBlock.getContainer();
       // put all the rows into corresponding hash collections keyed by the key selector function.
-      int initialHeuristicSize = 16;
       for (Object[] row : container) {
-        ArrayList<Object[]> hashCollection =
-            _broadcastRightTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>(16));
+        ArrayList<Object[]> hashCollection = _broadcastRightTable.computeIfAbsent(
+            new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>(INITIAL_HEURISTIC_SIZE));
         int size = hashCollection.size();
         if ((size & size - 1) == 0 && size < Integer.MAX_VALUE / 2) { // is power of 2
           hashCollection.ensureCapacity(size << 1);
