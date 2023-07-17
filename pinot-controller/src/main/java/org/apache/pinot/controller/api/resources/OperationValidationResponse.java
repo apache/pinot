@@ -68,8 +68,13 @@ public class OperationValidationResponse {
   }
 
   public static class ErrorWrapper {
+    @JsonProperty("code")
     ErrorCode _code;
+    @JsonProperty("message")
     String _message;
+
+    public ErrorWrapper() {
+    }
 
     public ErrorWrapper(ErrorCode code, String... args) {
       _code = code;

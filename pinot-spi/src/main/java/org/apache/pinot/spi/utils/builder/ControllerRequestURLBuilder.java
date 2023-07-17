@@ -534,6 +534,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "pauseStatus");
   }
 
+  public String forUpdateTagsValidation() {
+    return String.format("%s/instances/updateTags/validate", _baseUrl);
+  }
+
   private static String encode(String s) {
     try {
       return URLEncoder.encode(s, "UTF-8");
