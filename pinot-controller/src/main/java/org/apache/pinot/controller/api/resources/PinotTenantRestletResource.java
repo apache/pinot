@@ -246,17 +246,27 @@ public class PinotTenantRestletResource {
   @GET
   @Path("/tenants/{tenantName}/tables")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "List tables on a a server tenant")
+  @ApiOperation(value = "List tables on a server or broker tenant")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Error reading list")
   })
   public String getTablesOnTenant(
-      @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName) {
-    return getTablesServedFromTenant(tenantName);
+      @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "Tenant type (server|broker)",
+          required = false, allowableValues = "BROKER, SERVER", defaultValue = "SERVER")
+      @QueryParam("type") String tenantType) {
+    if (tenantType == null || tenantType.isEmpty() || tenantType.equalsIgnoreCase("server")) {
+      return getTablesServedFromServerTenant(tenantName);
+    } else if (tenantType.equalsIgnoreCase("broker")) {
+      return getTablesServedFromBrokerTenant(tenantName);
+    } else {
+      throw new ControllerApplicationException(LOGGER, "Invalid tenant type: " + tenantType,
+          Response.Status.BAD_REQUEST);
+    }
   }
 
-  private String getTablesServedFromTenant(String tenantName) {
+  private String getTablesServedFromServerTenant(String tenantName) {
     Set<String> tables = new HashSet<>();
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
@@ -267,6 +277,26 @@ public class PinotTenantRestletResource {
         continue;
       }
       String tableConfigTenant = tableConfig.getTenantConfig().getServer();
+      if (tenantName.equals(tableConfigTenant)) {
+        tables.add(table);
+      }
+    }
+
+    resourceGetRet.set(TABLES, JsonUtils.objectToJsonNode(tables));
+    return resourceGetRet.toString();
+  }
+
+  private String getTablesServedFromBrokerTenant(String tenantName) {
+    Set<String> tables = new HashSet<>();
+    ObjectNode resourceGetRet = JsonUtils.newObjectNode();
+
+    for (String table : _pinotHelixResourceManager.getAllTables()) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(table);
+      if (tableConfig == null) {
+        LOGGER.error("Unable to retrieve table config for table: {}", table);
+        continue;
+      }
+      String tableConfigTenant = tableConfig.getTenantConfig().getBroker();
       if (tenantName.equals(tableConfigTenant)) {
         tables.add(table);
       }
