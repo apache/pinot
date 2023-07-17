@@ -126,12 +126,11 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     double[] expectedValues = new double[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = (double) _intSVValues[i] * 2;
-      } else {
-        //
+      if (isNullRow(i)) {
         expectedValues[i] = (double) Integer.MIN_VALUE + (double) _intSVValues[i];
         roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = (double) _intSVValues[i] * 2;
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);

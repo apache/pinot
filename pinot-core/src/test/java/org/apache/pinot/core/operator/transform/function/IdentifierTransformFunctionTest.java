@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -103,8 +102,6 @@ public class IdentifierTransformFunctionTest {
         new IdentifierTransformFunction(TEST_COLUMN_NAME, _columnContext);
     RoaringBitmap bitmap = identifierTransformFunction.getNullBitmap(_projectionBlock);
     Assert.assertEquals(bitmap, NULL_BITMAP);
-    Pair<int[], RoaringBitmap> intResult = identifierTransformFunction.transformToIntValuesSVWithNull(_projectionBlock);
-    Assert.assertEquals(intResult.getLeft(), INT_VALUES);
-    Assert.assertEquals(intResult.getRight(), NULL_BITMAP);
+    Assert.assertEquals(identifierTransformFunction.transformToIntValuesSV(_projectionBlock), INT_VALUES);
   }
 }

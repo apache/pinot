@@ -22,7 +22,6 @@ import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -331,10 +330,8 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
 
-    Pair<int[], RoaringBitmap> intValuesWithNull = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
-
-    assertEquals(intValuesWithNull.getLeft()[0], 1);
-    assertFalse(intValuesWithNull.getRight().contains(0));
+    assertEquals(transformFunction.transformToIntValuesSV(_projectionBlock)[0], 1);
+    assertFalse(transformFunction.getNullBitmap(_projectionBlock).contains(0));
   }
 
   @Test
@@ -344,7 +341,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
 
-    assertTrue(transformFunction.transformToIntValuesSVWithNull(_projectionBlock).getRight().contains(0));
+    assertTrue(transformFunction.getNullBitmap(_projectionBlock).contains(0));
   }
 
   @Test
@@ -367,7 +364,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
     RoaringBitmap expectedNullBitmap = new RoaringBitmap();
     expectedNullBitmap.add((long) 0, (long) NUM_ROWS);
 
-    assertEquals(transformFunction.transformToIntValuesSVWithNull(_projectionBlock).getRight(), expectedNullBitmap);
+    testNullBitmap(transformFunction, expectedNullBitmap);
   }
 
   @Test
@@ -378,7 +375,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
     RoaringBitmap expectedNullBitmap = new RoaringBitmap();
     expectedNullBitmap.add((long) 0, (long) NUM_ROWS);
 
-    assertEquals(transformFunction.transformToIntValuesSVWithNull(_projectionBlock).getRight(), expectedNullBitmap);
+    testNullBitmap(transformFunction, expectedNullBitmap);
   }
 
   @Test
@@ -389,6 +386,6 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
     RoaringBitmap expectedNullBitmap = new RoaringBitmap();
     expectedNullBitmap.add((long) 0, (long) NUM_ROWS);
 
-    assertEquals(transformFunction.transformToIntValuesSVWithNull(_projectionBlock).getRight(), expectedNullBitmap);
+    testNullBitmap(transformFunction, expectedNullBitmap);
   }
 }

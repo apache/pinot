@@ -65,10 +65,10 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
     long[] expectedValues = new long[NUM_ROWS];
     RoaringBitmap expectedNull = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = TimeUnit.MILLISECONDS.toDays(_timeValues[i]);
-      } else {
+      if (isNullRow(i)) {
         expectedNull.add(i);
+      } else {
+        expectedValues[i] = TimeUnit.MILLISECONDS.toDays(_timeValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, expectedNull);

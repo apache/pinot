@@ -119,12 +119,10 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   @Override
   public String toString() {
-    String retString =
-        ("AddTable -tableConfigFile " + _tableConfigFile + " -offlineTableConfigFile " + _offlineTableConfigFile
-            + " -realtimeTableConfigFile" + _realtimeTableConfigFile + " -schemaFile " + _schemaFile
-            + " -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-            + " -controllerPort " + _controllerPort + " -user " + _user + " -password " + "[hidden]");
-    return ((_exec) ? (retString + " -exec") : retString);
+    return "AddTable -tableConfigFile " + _tableConfigFile + " -offlineTableConfigFile " + _offlineTableConfigFile
+        + " -realtimeTableConfigFile " + _realtimeTableConfigFile + " -schemaFile " + _schemaFile
+        + " -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost + " -controllerPort "
+        + _controllerPort + " -user " + _user + " -password [hidden]" + (_exec ? " -exec" : "");
   }
 
   @Override

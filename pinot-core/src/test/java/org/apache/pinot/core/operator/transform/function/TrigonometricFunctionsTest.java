@@ -168,10 +168,10 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
     expectedValues = new double[NUM_ROWS];
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = op.applyAsDouble(_intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = op.applyAsDouble(_intSVValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);

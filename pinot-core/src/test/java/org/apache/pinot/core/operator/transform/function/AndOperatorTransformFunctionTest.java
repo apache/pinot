@@ -60,10 +60,10 @@ public class AndOperatorTransformFunctionTest extends LogicalOperatorTransformFu
     int[] expectedValues = new int[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = (_intSVValues[i] == 0) ? 0 : 1;
-      } else {
+      if (isNullRow(i)) {
         roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = (_intSVValues[i] == 0) ? 0 : 1;
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);

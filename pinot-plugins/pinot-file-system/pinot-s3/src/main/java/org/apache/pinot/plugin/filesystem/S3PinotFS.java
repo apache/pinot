@@ -178,6 +178,7 @@ public class S3PinotFS extends BasePinotFS {
     S3Config s3Config = new S3Config(serverSideEncryptionConfig);
     setServerSideEncryption(serverSideEncryption, s3Config);
     setMultiPartUploadConfigs(s3Config);
+    setDisableAcl(s3Config);
   }
 
   private void setServerSideEncryption(@Nullable String serverSideEncryption, S3Config s3Config) {
@@ -631,6 +632,10 @@ public class S3PinotFS extends BasePinotFS {
 
   private void setMultiPartUploadConfigs(S3Config s3Config) {
     setMultiPartUploadConfigs(s3Config.getMinObjectSizeForMultiPartUpload(), s3Config.getMultiPartUploadPartSize());
+  }
+
+  private void setDisableAcl(S3Config s3Config) {
+    _disableAcl = s3Config.getDisableAcl();
   }
 
   @VisibleForTesting

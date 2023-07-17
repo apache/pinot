@@ -187,7 +187,7 @@ public class FunctionRegistry {
     }
 
     @ScalarFunction(names = {"jsonExtractKey", "json_extract_key"}, isPlaceholder = true)
-    public static String jsonExtractKey(String jsonFieldName, String jsonPath) {
+    public static Object jsonExtractKey(String jsonFieldName, String jsonPath) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 

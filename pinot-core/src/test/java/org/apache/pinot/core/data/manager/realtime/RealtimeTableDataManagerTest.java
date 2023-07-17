@@ -100,7 +100,7 @@ public class RealtimeTableDataManagerTest {
     TableConfig tableConfig = setupTableConfig(propertyStore);
     Schema schema = setupSchema(propertyStore);
     tmgr.init(tableDataManagerConfig, "server01", propertyStore,
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
         new TableDataManagerParams(0, false, -1));
 
     // Create a dummy local segment.
@@ -135,7 +135,7 @@ public class RealtimeTableDataManagerTest {
     TableConfig tableConfig = setupTableConfig(propertyStore);
     Schema schema = setupSchema(propertyStore);
     tmgr.init(tableDataManagerConfig, "server01", propertyStore,
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
         new TableDataManagerParams(0, false, -1));
 
     // Create a raw segment and put it in deep store backed by local fs.

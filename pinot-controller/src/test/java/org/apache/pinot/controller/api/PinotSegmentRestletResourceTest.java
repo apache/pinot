@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -163,6 +164,39 @@ public class PinotSegmentRestletResourceTest {
 
     // Check crc api
     checkCrcRequest(rawTableName, segmentMetadataTable, 9);
+  }
+
+  @Test
+  public void testDeleteSegmentsWithTimeWindow()
+      throws Exception {
+    // Adding table and segment
+    String rawTableName = "deleteWithTimeWindowTestTable";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1)
+            .setDeletedSegmentsRetentionPeriod("0d").build();
+    PinotHelixResourceManager resourceManager = TEST_INSTANCE.getHelixResourceManager();
+    resourceManager.addTable(tableConfig);
+    SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName,
+        10L, 20L, TimeUnit.MILLISECONDS);
+    resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
+
+    // Send query and verify
+    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
+    // case 1: no overlapping
+    String reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
+        rawTableName, 0L, 10L));
+    assertTrue(reply.contains("Deleted 0 segments"));
+
+    // case 2: partial overlapping
+    reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
+        rawTableName, 10L, 20L));
+    assertTrue(reply.contains("Deleted 0 segments"));
+
+    // case 3: fully within the time window
+    reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
+        rawTableName, 10L, 21L));
+    assertTrue(reply.contains("Deleted 1 segments"));
   }
 
   private void checkCrcRequest(String tableName, Map<String, SegmentMetadata> metadataTable, int expectedSize)

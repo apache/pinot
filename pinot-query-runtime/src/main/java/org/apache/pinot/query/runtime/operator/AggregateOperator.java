@@ -19,17 +19,21 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.IntermediateStageBlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -71,7 +75,7 @@ public class AggregateOperator extends MultiStageOperator {
 
   // Map that maintains the mapping between columnName and the column ordinal index. It is used to fetch the required
   // column value from row-based container and fetch the input datatype for the column.
-  private final HashMap<String, Integer> _colNameToIndexMap;
+  private final Map<String, Integer> _colNameToIndexMap;
 
   private TransferableBlock _upstreamErrorBlock;
   private boolean _readyToConstruct;
@@ -112,10 +116,12 @@ public class AggregateOperator extends MultiStageOperator {
     // Initialize the appropriate executor.
     if (!groupSet.isEmpty()) {
       _isGroupByAggregation = true;
-      _groupByExecutor = new MultistageGroupByExecutor(groupByExpr, aggFunctions, aggType, _colNameToIndexMap);
+      _groupByExecutor = new MultistageGroupByExecutor(groupByExpr, aggFunctions, aggType, _colNameToIndexMap,
+          _resultSchema);
     } else {
       _isGroupByAggregation = false;
-      _aggregationExecutor = new MultistageAggregationExecutor(aggFunctions, aggType, _colNameToIndexMap);
+      _aggregationExecutor = new MultistageAggregationExecutor(aggFunctions, aggType, _colNameToIndexMap,
+          _resultSchema);
     }
   }
 
@@ -266,5 +272,40 @@ public class AggregateOperator extends MultiStageOperator {
     }
 
     return exprContext;
+  }
+
+  static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggFunction,
+      TransferableBlock block, DataSchema inputDataSchema, Map<String, Integer> colNameToIndexMap) {
+    List<ExpressionContext> expressions = aggFunction.getInputExpressions();
+    int numExpressions = expressions.size();
+    if (numExpressions == 0) {
+      return Collections.emptyMap();
+    }
+
+    Preconditions.checkState(numExpressions == 1, "Cannot handle more than one identifier in aggregation function.");
+    ExpressionContext expression = expressions.get(0);
+    Preconditions.checkState(expression.getType().equals(ExpressionContext.Type.IDENTIFIER));
+    int index = colNameToIndexMap.get(expression.getIdentifier());
+
+    DataSchema.ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
+    Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
+    // TODO: If the previous block is not mailbox received, this method is not efficient.  Then getDataBlock() will
+    //  convert the unserialized format to serialized format of BaseDataBlock. Then it will convert it back to column
+    //  value primitive type.
+    return Collections.singletonMap(expression,
+        new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index));
+  }
+
+  static Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row,
+      Map<String, Integer> colNameToIndexMap) {
+    List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
+    Preconditions.checkState(expressions.size() == 1, "Only support single expression, got: %s", expressions.size());
+    ExpressionContext expr = expressions.get(0);
+    ExpressionContext.Type exprType = expr.getType();
+    if (exprType == ExpressionContext.Type.IDENTIFIER) {
+      return row[colNameToIndexMap.get(expr.getIdentifier())];
+    }
+    Preconditions.checkState(exprType == ExpressionContext.Type.LITERAL, "Unsupported expression type: %s", exprType);
+    return expr.getLiteral().getValue();
   }
 }
