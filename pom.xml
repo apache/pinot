@@ -125,7 +125,7 @@
     <parquet.version>1.11.2</parquet.version>
     <helix.version>1.0.4</helix.version>
     <zkclient.version>0.7</zkclient.version>
-    <jackson.version>2.13.5</jackson.version>
+    <jackson.version>2.12.7</jackson.version>
     <zookeeper.version>3.6.3</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
     <jersey.version>2.39</jersey.version>
