@@ -21,22 +21,28 @@ package org.apache.pinot.core.auth;
 
 import javax.ws.rs.core.MultivaluedMap;
 
+
+/**
+ * Utility methods to share in Broker and Controller request filters.
+ */
 public class RBACAuthUtils {
 
-    private RBACAuthUtils() {
-    }
+  private RBACAuthUtils() {
+  }
 
-    public static String getTargetId(String targetIdTemplate,
-                                     MultivaluedMap<String, String> pathParams,
-                                     MultivaluedMap<String, String> queryParams) {
-        // TODO: Starting simple, where targetIdTemplate is only one entry only.
-        //       if needed, we can add support for hierarchical id tableName/segmentName
-        //       if needed, we can add support for templates {tableName}_foo/{segmentName}
-        //                  similar to templates in @Path annotations
-        String name = pathParams.getFirst(targetIdTemplate);
-        if (name == null) {
-            name = queryParams.getFirst(targetIdTemplate);
-        }
-        return name;
+  /**
+   * Returns the parameter from the path or query params.
+   * @param paramName to look for
+   * @param pathParams path params
+   * @param queryParams query params
+   * @return the value of the parameter
+   */
+  public static String findParam(String paramName, MultivaluedMap<String, String> pathParams,
+      MultivaluedMap<String, String> queryParams) {
+    String name = pathParams.getFirst(paramName);
+    if (name == null) {
+      name = queryParams.getFirst(paramName);
     }
+    return name;
+  }
 }

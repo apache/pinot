@@ -36,8 +36,9 @@ public @interface Authorize {
   TargetType targetType();
 
   // The query or path parameter to use to get the id of the resource
+  // If the target type is the Pinot cluster, then this field is not required
   String paramName() default "";
 
-  // Permission to be checked
+  // action to validate on the specified resource
   String action();
 }
