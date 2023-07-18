@@ -210,8 +210,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // this status with a boolean, instead of relying on if _tableUpsertMetadataManager is null or not.
       _isUpsertEnabled = true;
       _tableUpsertMetadataManager =
-          TableUpsertMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics, _helixManager,
-              _segmentPreloadExecutor);
+          TableUpsertMetadataManagerFactory.create(tableConfig);
+      _tableUpsertMetadataManager.init(tableConfig, schema, this, _serverMetrics, _helixManager,
+          _segmentPreloadExecutor);
     }
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
