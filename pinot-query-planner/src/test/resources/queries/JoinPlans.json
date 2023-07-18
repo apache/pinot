@@ -137,7 +137,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', a.ts + b.ts) FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[dateTrunc('DAY', +($2, $5))])",
+          "\nLogicalProject(EXPR$0=[DATETRUNC('DAY', +($2, $5))])",
           "\n  LogicalJoin(condition=[AND(=($0, $3), =($1, $4))], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], ts=[$6])",

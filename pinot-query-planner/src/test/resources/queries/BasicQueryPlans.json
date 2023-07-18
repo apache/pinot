@@ -37,7 +37,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', ts) FROM a LIMIT 10",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[dateTrunc('DAY', $6)])",
+          "\nLogicalProject(EXPR$0=[DATETRUNC('DAY', $6)])",
           "\n  LogicalSort(offset=[0], fetch=[10])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n      LogicalSort(fetch=[10])",
@@ -50,7 +50,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', ts) AS day FROM a LIMIT 10",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(day=[dateTrunc('DAY', $6)])",
+          "\nLogicalProject(day=[DATETRUNC('DAY', $6)])",
           "\n  LogicalSort(offset=[0], fetch=[10])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n      LogicalSort(fetch=[10])",
