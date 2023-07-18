@@ -45,6 +45,7 @@ public class TenantRebalanceProgressStats {
     _tableStatusMap = tables.stream()
         .collect(Collectors.toMap(Function.identity(), k -> TableStatus.UNPROCESSED.name()));
     _totalTables = tables.size();
+    _remainingTables = _totalTables;
   }
 
   public Map<String, String> getTableStatusMap() {
