@@ -28,7 +28,6 @@ import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.calcite.tools.RelBuilderFactory;
 

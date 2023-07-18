@@ -127,7 +127,7 @@ public class QueryEnvironment {
 
     // ----
     // Run Pinot specific pre-rules
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PINOT_PRE_RULES) ;
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PINOT_PRE_RULES);
 
     // ----
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
@@ -135,6 +135,7 @@ public class QueryEnvironment {
     for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
       hepProgramBuilder.addRuleInstance(relOptRule);
     }
+
     // ----
     // Pushdown filters using a single HepInstruction.
     hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);

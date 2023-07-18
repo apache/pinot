@@ -19,16 +19,11 @@
 package org.apache.calcite.rel.rules;
 
 import com.google.common.collect.ImmutableList;
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.hep.HepRelVertex;
-import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Project;
@@ -39,22 +34,11 @@ import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.runtime.Geometries;
-import org.apache.calcite.sql.type.SqlTypeFamily;
-import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.calcite.util.DateString;
-import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
-import org.apache.calcite.util.Sarg;
-import org.apache.calcite.util.TimeString;
-import org.apache.calcite.util.TimestampString;
-import org.apache.calcite.util.Util;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.query.planner.logical.LiteralHintUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.checkerframework.checker.nullness.qual.Nullable;
 
 
 /**
@@ -85,55 +69,36 @@ public class PinotAggregateLiteralAttachmentRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Aggregate aggregate = call.rel(0);
-    Map<Pair<Integer, Integer>, RexLiteral> rexLiterals = extractRexLiterals(call);
+    Map<Pair<Integer, Integer>, RexExpression.Literal> rexLiterals = extractLiterals(call);
     List<RelHint> newHints = PinotHintStrategyTable.replaceHintOptions(aggregate.getHints(),
         PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_CALL_SIGNATURE,
-        createRexLiteralHintsString(rexLiterals));
+        LiteralHintUtils.literalMapToHintString(rexLiterals));
+    // TODO: validate the RexLiteralHint position map with the aggregationFunctionType required literal arg indices
     call.transformTo(new LogicalAggregate(aggregate.getCluster(), aggregate.getTraitSet(), newHints,
         aggregate.getInput(), aggregate.getGroupSet(), aggregate.getGroupSets(), aggregate.getAggCallList()));
   }
 
-  private static Map<Pair<Integer, Integer>, RexLiteral> extractRexLiterals(RelOptRuleCall call) {
+  private static Map<Pair<Integer, Integer>, RexExpression.Literal> extractLiterals(RelOptRuleCall call) {
     Aggregate aggregate = call.rel(0);
     Project project = call.rel(1);
     List<RexNode> rexNodes = project.getProjects();
     List<AggregateCall> aggCallList = aggregate.getAggCallList();
-    final Map<Pair<Integer, Integer>, RexLiteral> rexLiteralMap = new HashMap<>();
+    final Map<Pair<Integer, Integer>, RexExpression.Literal> rexLiteralMap = new HashMap<>();
     for (int aggIdx = 0; aggIdx < aggCallList.size(); aggIdx++) {
       AggregateCall aggCall = aggCallList.get(aggIdx);
-      for (int argIdx = 0; argIdx < aggCall.getArgList().size(); argIdx++) {
-        RexNode field = rexNodes.get(aggCall.getArgList().get(argIdx));
-        if (field instanceof RexLiteral) {
-          rexLiteralMap.put(new Pair<>(aggIdx, argIdx), (RexLiteral) field);
+      int argSize = aggCall.getArgList().size();
+      if (argSize > 1) {
+        // use -1 argIdx to indicate size of the agg operands.
+        rexLiteralMap.put(new Pair<>(aggIdx, -1), new RexExpression.Literal(FieldSpec.DataType.INT, argSize));
+        // put the literals in to the map.
+        for (int argIdx = 0; argIdx < argSize; argIdx++) {
+          RexNode field = rexNodes.get(aggCall.getArgList().get(argIdx));
+          if (field instanceof RexLiteral) {
+            rexLiteralMap.put(new Pair<>(aggIdx, argIdx), LiteralHintUtils.rexLiteralToLiteral((RexLiteral) field));
+          }
         }
       }
     }
     return rexLiteralMap;
-  }
-
-  private static String createRexLiteralHintsString(Map<Pair<Integer, Integer>, RexLiteral> rexLiterals) {
-    List<String> rexLiteralStrings = new ArrayList<>(rexLiterals.size());
-    for (Map.Entry<Pair<Integer, Integer>, RexLiteral> e : rexLiterals.entrySet()) {
-      SqlTypeName typeName = e.getValue().getTypeName();
-      String valueStr = RexLiteralToString(typeName, e.getValue().getValue());
-      rexLiteralStrings.add(String.format("%d_%d_%s_%s", e.getKey().left, e.getKey().right, typeName.name(), valueStr));
-    }
-    return "{" + StringUtils.join(rexLiteralStrings, ",") + "}";
-  }
-
-  private static String RexLiteralToString(SqlTypeName sqlTypeName, Object value) {
-    switch (sqlTypeName) {
-      case DECIMAL:
-      case DOUBLE:
-      case REAL:
-      case INTEGER:
-      case BIGINT:
-        return value.toString();
-      case CHAR:
-      case VARCHAR:
-        return value instanceof NlsString ? ((NlsString) value).getValue() : value.toString();
-      default:
-        throw new UnsupportedOperationException("");
-    }
   }
 }

@@ -18,6 +18,9 @@
  */
 package org.apache.calcite.rel.hint;
 
+import org.apache.pinot.query.planner.logical.LiteralHintUtils;
+
+
 /**
  * {@code PinotHintOptions} specified the supported hint options by Pinot based a particular type of relation node.
  *
@@ -40,6 +43,17 @@ public class PinotHintOptions {
 
   public static class InternalAggregateOptions {
     public static final String AGG_TYPE = "agg_type";
+    /**
+     * agg call signature is used to store LITERAL inputs to the Aggregate Call. which is not supported in Calcite
+     * here
+     * 1. we store the Map of Pair[aggCallIdx, argListIdx] to RexLiteral to indicate the RexLiteral being passed into
+     *     the aggregateCalls[aggCallIdx].operandList[argListIdx] is supposed to be a RexLiteral.
+     * 2. not all RexLiteral types are supported to be part of the input constant call signature.
+     * 3. RexLiteral are encoded as String and decoded as Pinot Literal objects.
+     *
+     * see: {@link LiteralHintUtils}.
+     * see: https://issues.apache.org/jira/projects/CALCITE/issues/CALCITE-5833
+     */
     public static final String AGG_CALL_SIGNATURE = "agg_call_signature";
   }
 

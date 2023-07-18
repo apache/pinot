@@ -51,7 +51,8 @@ public class AggregateNode extends AbstractPlanNode {
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     _groupSet = groupSet;
     _nodeHint = new NodeHint(relHints);
-    _aggType = AggType.valueOf(PinotHintStrategyTable.getHintOption(relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE));
+    _aggType = AggType.valueOf(PinotHintStrategyTable.getHintOption(relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS,
+        PinotHintOptions.InternalAggregateOptions.AGG_TYPE));
   }
 
   private boolean areHintsValid(List<RelHint> relHints) {
