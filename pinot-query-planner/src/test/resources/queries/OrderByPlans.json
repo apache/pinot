@@ -3,7 +3,7 @@
     "queries": [
       {
         "description": "Simple Order by",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1 FROM a ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1 FROM a ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
@@ -16,7 +16,7 @@
       },
       {
         "description": "Simple Order by with alias on select column",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1 FROM a ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1 AS value1 FROM a ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
@@ -29,7 +29,7 @@
       },
       {
         "description": "Select * order by",
-        "sql": "EXPLAIN PLAN FOR SELECT * FROM a ORDER BY col1 LIMIT 10",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM a ORDER BY col1 LIMIT 10",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0], fetch=[10])",
@@ -41,7 +41,7 @@
       },
       {
         "description": "Select * order by on 2 columns with descending",
-        "sql": "EXPLAIN PLAN FOR SELECT * FROM b ORDER BY col1, col2 DESC LIMIT 10",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM b ORDER BY col1, col2 DESC LIMIT 10",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[DESC], offset=[0], fetch=[10])",
@@ -53,7 +53,7 @@
       },
       {
         "description": "Order by and group by",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a GROUP BY a.col1 ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, SUM(a.col3) FROM a GROUP BY a.col1 ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
@@ -68,7 +68,7 @@
       },
       {
         "description": "Order by and group by with hint",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a GROUP BY a.col1 ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a GROUP BY a.col1 ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
@@ -83,7 +83,7 @@
       },
       {
         "description": "Order by and group by with alias",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, SUM(a.col3) AS sum FROM a GROUP BY a.col1 ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1 AS value1, SUM(a.col3) AS sum FROM a GROUP BY a.col1 ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
@@ -98,7 +98,7 @@
       },
       {
         "description": "Order by and group by with alias with SqlHint",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1 AS value1, SUM(a.col3) AS sum FROM a GROUP BY a.col1 ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1 AS value1, SUM(a.col3) AS sum FROM a GROUP BY a.col1 ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",

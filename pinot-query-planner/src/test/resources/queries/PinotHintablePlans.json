@@ -3,7 +3,7 @@
     "queries": [
       {
         "description": "SELECT * inner join with filter on one table",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
         "output": [
           "Execution Plan",
           "\nLogicalJoin(condition=[=($0, $8)], joinType=[inner])",
@@ -17,7 +17,7 @@
       },
       {
         "description": "Inner join with group by",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), aggOptions(is_partitioned_by_group_by_keys='true') */a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), aggOptions(is_partitioned_by_group_by_keys='true') */a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($1):DOUBLE NOT NULL, $2)])",
@@ -36,7 +36,7 @@
       },
       {
         "description": "semi-join with dynamic_broadcast join strategy",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy='dynamic_broadcast',is_colocated_by_join_keys='false') */ a.col1, a.col2 FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0)",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ joinOptions(join_strategy='dynamic_broadcast',is_colocated_by_join_keys='false') */ a.col1, a.col2 FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0)",
         "output": [
           "Execution Plan",
           "\nPinotLogicalExchange(distribution=[hash[0]])",
@@ -52,7 +52,7 @@
       },
       {
         "description": "semi-join with colocated join key",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys) */ * FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0)",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ joinOptions(is_colocated_by_join_keys) */ * FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0)",
         "output": [
           "Execution Plan",
           "\nLogicalJoin(condition=[=($0, $7)], joinType=[semi])",
@@ -67,7 +67,7 @@
       },
       {
         "description": "semi-join with colocated join key and dynamic_broadcast join strategy",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy='dynamic_broadcast', is_colocated_by_join_keys='true') */ a.col1, a.col2 FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0)",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ joinOptions(join_strategy='dynamic_broadcast', is_colocated_by_join_keys='true') */ a.col1, a.col2 FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0)",
         "output": [
           "Execution Plan",
           "\nPinotLogicalExchange(distribution=[single])",
@@ -83,7 +83,7 @@
       },
       {
         "description": "semi-join with dynamic_broadcast join strategy then group-by on same key",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy='dynamic_broadcast'), aggOptionsInternal(agg_type='DIRECT') */ a.col1, SUM(a.col3) FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0) GROUP BY 1",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ joinOptions(join_strategy='dynamic_broadcast'), aggOptionsInternal(agg_type='DIRECT') */ a.col1, SUM(a.col3) FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0) GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
@@ -100,7 +100,7 @@
       },
       {
         "description": "semi-join with dynamic_broadcast join strategy then group-by on different key",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ a.col2, SUM(a.col3) FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0) GROUP BY 1",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ a.col2, SUM(a.col3) FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0) GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -119,7 +119,7 @@
       },
       {
         "description": "aggregate with skip leaf stage hint, group by aggregate",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col1 = 'a' GROUP BY a.col1, a.col2",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col1 = 'a' GROUP BY a.col1, a.col2",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col2=[$1], col1=[$0], EXPR$2=[$2])",
@@ -133,7 +133,7 @@
       },
       {
         "description": "aggregate with skip leaf stage hint, group by aggregate with having clause",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col2=[$0], EXPR$1=[$1], EXPR$2=[$2], EXPR$3=[$3])",
@@ -148,7 +148,7 @@
       },
       {
         "description": "aggregate with skip intermediate stage hint (via hinting the leaf stage group by as final stage_",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10",
         "output": [
           "Execution Plan",
           "\nLogicalFilter(condition=[>($1, 10)])",
@@ -161,7 +161,7 @@
       },
       {
         "description": "aggregate with skip leaf stage hint (via hint option is_partitioned_by_group_by_keys",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2",
+        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, COUNT(*), SUM(a.col3), SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], EXPR$1=[COUNT()], EXPR$2=[$SUM0($1)], EXPR$3=[$SUM0($2)])",

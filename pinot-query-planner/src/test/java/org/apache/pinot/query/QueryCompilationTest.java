@@ -47,9 +47,19 @@ import org.testng.annotations.Test;
 
 public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
-  @Test(dataProvider = "testQueryPlanDataProvider")
-  public void testQueryPlanExplain(String query, String digest)
+  @Test(dataProvider = "testQueryLogicalPlanDataProvider")
+  public void testQueryPlanExplainLogical(String query, String digest)
       throws Exception {
+    testQueryPlanExplain(query, digest);
+  }
+
+  @Test(dataProvider = "testQueryPhysicalPlanDataProvider")
+  public void testQueryPlanExplainPhysical(String query, String digest)
+      throws Exception {
+    testQueryPlanExplain(query, digest);
+  }
+
+  private void testQueryPlanExplain(String query, String digest) {
     try {
       long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
       String explainedPlan = _queryEnvironment.explainQuery(query, requestId);
@@ -400,11 +410,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     };
   }
 
-  @DataProvider(name = "testQueryPlanDataProvider")
-  private Object[][] provideQueriesWithExplainedPlan() {
+  @DataProvider(name = "testQueryLogicalPlanDataProvider")
+  private Object[][] provideQueriesWithExplainedLogicalPlan() {
     //@formatter:off
     return new Object[][] {
-        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
+        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES WITHOUT IMPLEMENTATION AS JSON FOR "
+            + "SELECT col1, col3 FROM a",
               "{\n"
             + "  \"rels\": [\n"
             + "    {\n"
@@ -434,17 +445,16 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "      ]\n"
             + "    }\n"
             + "  ]\n"
-            + "}\n"
-            + _physicalPlanForExplainQueries[0]},
-        new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
+            + "}"},
+        new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES WITHOUT IMPLEMENTATION AS DOT FOR "
+            + "SELECT col1, COUNT(*) FROM a GROUP BY col1",
               "Execution Plan\n"
             + "digraph {\n"
             + "\"PinotLogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
             + "\"LogicalAggregate\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
             + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-            + "}\n\n"
-            + _physicalPlanForExplainQueries[1]},
-        new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
+            + "}\n"},
+        new Object[]{"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
               "Execution Plan\n"
             + "LogicalProject(col1=[$0], col3=[$2])\n"
             + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
@@ -453,25 +463,29 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "        LogicalTableScan(table=[[a]])\n"
             + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0], col3=[$2])\n"
-            + "        LogicalTableScan(table=[[b]])\n\n"
-            + _physicalPlanForExplainQueries[2]
+            + "        LogicalTableScan(table=[[b]])\n"
         },
     };
     //@formatter:on
   }
 
-  private final Object[] _physicalPlanForExplainQueries = new Object[] {
-  //@formatter:off
-  "Physical Plan\n"
-  + " [0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+  @DataProvider(name = "testQueryPhysicalPlanDataProvider")
+  private Object[][] provideQueriesWithExplainedPhysicalPlan() {
+    //@formatter:off
+    return new Object[][] {
+new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES WITH IMPLEMENTATION AS JSON FOR SELECT col1, col3 FROM a",
+"Physical Plan\n"
+  + "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
   + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
   + "│   └── [1]@localhost:2 PROJECT\n"
   + "│      └── [1]@localhost:2 TABLE SCAN (a) null\n"
   + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
   + "   └── [1]@localhost:1 PROJECT\n"
-  + "      └── [1]@localhost:1 TABLE SCAN (a) null\n",
-  "Physical Plan\n"
-  + " [0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+  + "      └── [1]@localhost:1 TABLE SCAN (a) null\n"},
+new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES WITH IMPLEMENTATION AS DOT FOR "
+    + "SELECT col1, COUNT(*) FROM a GROUP BY col1",
+"Physical Plan\n"
+  + "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
   + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
   + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
   + "   └── [1]@localhost:1 AGGREGATE_FINAL\n"
@@ -481,9 +495,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   + "         │      └── [2]@localhost:2 TABLE SCAN (a) null\n"
   + "         └── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
   + "            └── [2]@localhost:1 AGGREGATE_LEAF\n"
-  + "               └── [2]@localhost:1 TABLE SCAN (a) null\n",
-  "Physical Plan\n"
-  + " [0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+  + "               └── [2]@localhost:1 TABLE SCAN (a) null\n"},
+new Object[]{"EXPLAIN PLAN WITH IMPLEMENTATION FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
+"Physical Plan\n"
+  + "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
   + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
   + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
   + "   └── [1]@localhost:1 PROJECT\n"
@@ -498,7 +513,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   + "         └── [1]@localhost:1 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
   + "            └── [3]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
   + "               └── [3]@localhost:1 PROJECT\n"
-  + "                  └── [3]@localhost:1 TABLE SCAN (b) null\n"
-};
-  //@formatter:on
+  + "                  └── [3]@localhost:1 TABLE SCAN (b) null\n"}
+    };
+    //@formatter:on
+  }
 }
