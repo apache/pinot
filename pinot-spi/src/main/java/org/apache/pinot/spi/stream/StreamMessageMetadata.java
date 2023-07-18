@@ -34,6 +34,10 @@ public class StreamMessageMetadata implements RowMetadata {
   private final GenericRow _headers;
   private final Map<String, String> _metadata;
 
+  public StreamMessageMetadata(long recordIngestionTimeMs) {
+    this(recordIngestionTimeMs, Long.MIN_VALUE, null, Collections.emptyMap());
+  }
+
   public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers) {
     this(recordIngestionTimeMs, Long.MIN_VALUE, headers, Collections.emptyMap());
   }

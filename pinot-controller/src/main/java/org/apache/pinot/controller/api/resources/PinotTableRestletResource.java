@@ -28,6 +28,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
@@ -90,6 +92,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
@@ -363,9 +366,7 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
-  @ApiOperation(value = "Get/Enable/Disable/Drop a table",
-      notes = "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
-          + ", the tableconfig will be printed")
+  @ApiOperation(value = "Lists the table configs")
   public String alterTableStateOrListTableConfig(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "enable|disable|drop") @QueryParam("state") String stateStr,
@@ -375,6 +376,8 @@ public class PinotTableRestletResource {
       if (stateStr == null) {
         return listTableConfigs(tableName, tableTypeStr);
       }
+
+      // TODO: DO NOT allow toggling state with GET request
 
       StateType stateType = Constants.validateState(stateStr);
       TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -714,6 +717,45 @@ public class PinotTableRestletResource {
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, "Failed to find table: " + tableNameWithType,
           Response.Status.NOT_FOUND);
+    }
+  }
+
+  @PUT
+  @Path("/tables/{tableName}/state")
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
+  @ApiOperation(value = "Enable/disable a table", notes = "Enable/disable a table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  public SuccessResponse toggleTableState(
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "enable|disable", required = true) @QueryParam("state") String state) {
+    String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
+    StateType stateType;
+    if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
+      stateType = StateType.ENABLE;
+    } else if (StateType.DISABLE.name().equalsIgnoreCase(state)) {
+      stateType = StateType.DISABLE;
+    } else {
+      throw new ControllerApplicationException(LOGGER, "Unknown state '" + state + "'", Response.Status.BAD_REQUEST);
+    }
+    if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist",
+          Response.Status.NOT_FOUND);
+    }
+    PinotResourceManagerResponse response = _pinotHelixResourceManager.toggleTableState(tableNameWithType, stateType);
+    if (response.isSuccessful()) {
+      return new SuccessResponse("Request to " + state + " table '" + tableNameWithType + "' is successful");
+    } else {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to " + state + " table '" + tableNameWithType + "': " + response.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 

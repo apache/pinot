@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.util.function.LongToIntFunction;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -76,12 +75,13 @@ public class ExtractTransformFunctionTest extends BaseTransformFunctionTest {
 
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof ExtractTransformFunction);
-    Pair<int[], RoaringBitmap> valuesSVWithNull = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
+    int[] values = transformFunction.transformToIntValuesSV(_projectionBlock);
+    RoaringBitmap nullBitmap = transformFunction.getNullBitmap(_projectionBlock);
     for (int i = 0; i < _projectionBlock.getNumDocs(); i++) {
-      if (i % 2 == 0) {
-        assertEquals(valuesSVWithNull.getLeft()[i], expected.applyAsInt(_timeValues[i]));
+      if (isNullRow(i)) {
+        assertTrue(nullBitmap.contains(i));
       } else {
-        assertTrue(valuesSVWithNull.getRight().contains(i));
+        assertEquals(values[i], expected.applyAsInt(_timeValues[i]));
       }
     }
   }

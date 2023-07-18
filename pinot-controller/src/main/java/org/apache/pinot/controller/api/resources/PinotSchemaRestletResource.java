@@ -359,7 +359,8 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema.getSchemaName());
     try {
       List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schema.getSchemaName());
-      SchemaUtils.validate(schema, tableConfigs);
+      boolean isIgnoreCase = _pinotHelixResourceManager.getTableCache().isIgnoreCase();
+      SchemaUtils.validate(schema, tableConfigs, isIgnoreCase);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);

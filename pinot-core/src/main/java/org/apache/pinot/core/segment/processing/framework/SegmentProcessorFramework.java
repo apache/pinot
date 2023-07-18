@@ -65,6 +65,7 @@ public class SegmentProcessorFramework {
   private final File _reducerOutputDir;
   private final File _segmentsOutputDir;
   private Map<String, GenericRowFileManager> _partitionToFileManagerMap;
+  private final SegmentNumRowProvider _segmentNumRowProvider;
 
   /**
    * Initializes the SegmentProcessorFramework with record readers, config and working directory. We will now rely on
@@ -75,11 +76,11 @@ public class SegmentProcessorFramework {
   public SegmentProcessorFramework(List<RecordReader> recordReaders, SegmentProcessorConfig segmentProcessorConfig,
       File workingDir)
       throws IOException {
-    this(segmentProcessorConfig, workingDir, convertRecordReadersToRecordReaderFileConfig(recordReaders));
+    this(segmentProcessorConfig, workingDir, convertRecordReadersToRecordReaderFileConfig(recordReaders), null);
   }
 
   public SegmentProcessorFramework(SegmentProcessorConfig segmentProcessorConfig, File workingDir,
-      List<RecordReaderFileConfig> recordReaderFileConfigs)
+      List<RecordReaderFileConfig> recordReaderFileConfigs, SegmentNumRowProvider segmentNumRowProvider)
       throws IOException {
 
     Preconditions.checkState(!recordReaderFileConfigs.isEmpty(), "No recordReaderFileConfigs provided");
@@ -95,6 +96,9 @@ public class SegmentProcessorFramework {
     FileUtils.forceMkdir(_reducerOutputDir);
     _segmentsOutputDir = new File(workingDir, "segments_output");
     FileUtils.forceMkdir(_segmentsOutputDir);
+
+    _segmentNumRowProvider = (segmentNumRowProvider == null) ? new DefaultSegmentNumRowProvider(
+        segmentProcessorConfig.getSegmentConfig().getMaxNumRecordsPerSegment()) : segmentNumRowProvider;
   }
 
   private static List<RecordReaderFileConfig> convertRecordReadersToRecordReaderFileConfig(
@@ -180,7 +184,6 @@ public class SegmentProcessorFramework {
       generatorConfig.setSegmentNamePostfix(segmentNamePostfix);
     }
 
-    int maxNumRecordsPerSegment = _segmentProcessorConfig.getSegmentConfig().getMaxNumRecordsPerSegment();
     int sequenceId = 0;
     for (Map.Entry<String, GenericRowFileManager> entry : _partitionToFileManagerMap.entrySet()) {
       String partitionId = entry.getKey();
@@ -192,7 +195,9 @@ public class SegmentProcessorFramework {
         LOGGER.info("Start creating segments on partition: {}, numRows: {}, numSortFields: {}", partitionId, numRows,
             numSortFields);
         GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+        int maxNumRecordsPerSegment;
         for (int startRowId = 0; startRowId < numRows; startRowId += maxNumRecordsPerSegment, sequenceId++) {
+          maxNumRecordsPerSegment = _segmentNumRowProvider.getNumRows();
           int endRowId = Math.min(startRowId + maxNumRecordsPerSegment, numRows);
           LOGGER.info("Start creating segment of sequenceId: {} with row range: {} to {}", sequenceId, startRowId,
               endRowId);
@@ -206,6 +211,8 @@ public class SegmentProcessorFramework {
               TransformPipeline.getPassThroughPipeline());
           driver.build();
           outputSegmentDirs.add(driver.getOutputDirectory());
+          _segmentNumRowProvider.updateSegmentInfo(driver.getSegmentStats().getTotalDocCount(),
+              FileUtils.sizeOfDirectory(driver.getOutputDirectory()));
         }
       } finally {
         fileManager.cleanUp();

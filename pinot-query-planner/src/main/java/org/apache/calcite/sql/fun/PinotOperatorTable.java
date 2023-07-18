@@ -21,15 +21,15 @@ package org.apache.calcite.sql.fun;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.calcite.sql.SqlAggFunction;
+import java.util.Locale;
+import org.apache.calcite.sql.PinotSqlAggFunction;
+import org.apache.calcite.sql.PinotSqlTransformFunction;
 import org.apache.calcite.sql.SqlFunction;
-import org.apache.calcite.sql.SqlFunctionCategory;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
-import org.apache.calcite.sql.type.OperandTypes;
-import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
 import org.apache.calcite.util.Util;
+import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 
@@ -50,18 +50,6 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
   private static @MonotonicNonNull PinotOperatorTable _instance;
 
   public static final SqlFunction COALESCE = new PinotSqlCoalesceFunction();
-  public static final SqlFunction SKEWNESS_REDUCE = new SqlFunction("SKEWNESS_REDUCE", SqlKind.OTHER_FUNCTION,
-      ReturnTypes.DOUBLE, null, OperandTypes.BINARY, SqlFunctionCategory.USER_DEFINED_FUNCTION);
-  public static final SqlFunction KURTOSIS_REDUCE = new SqlFunction("KURTOSIS_REDUCE", SqlKind.OTHER_FUNCTION,
-      ReturnTypes.DOUBLE, null, OperandTypes.BINARY, SqlFunctionCategory.USER_DEFINED_FUNCTION);
-  public static final SqlFunction COUNT_DISTINCT_REDUCE = new SqlFunction("COUNT_DISTINCT_REDUCE",
-      SqlKind.OTHER_FUNCTION, ReturnTypes.INTEGER, null, OperandTypes.BINARY,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION);
-
-  public static final SqlAggFunction BOOL_AND = PinotBoolAndAggregateFunction.INSTANCE;
-  public static final SqlAggFunction BOOL_OR = PinotBoolOrAggregateFunction.INSTANCE;
-  public static final SqlAggFunction SKEWNESS = PinotSkewnessAggregateFunction.INSTANCE;
-  public static final SqlAggFunction KURTOSIS = PinotKurtosisAggregateFunction.INSTANCE;
 
   // TODO: clean up lazy init by using Suppliers.memorized(this::computeInstance) and make getter wrapped around
   // supplier instance. this should replace all lazy init static objects in the codebase
@@ -82,6 +70,9 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
    *
    * <p>This is a direct copy of the {@link org.apache.calcite.sql.util.ReflectiveSqlOperatorTable} and can be hard to
    * debug, suggest changing to a non-dynamic registration. Dynamic function support should happen via catalog.
+   *
+   * This also registers aggregation functions defined in {@link org.apache.pinot.segment.spi.AggregationFunctionType}
+   * which are multistage enabled.
    */
   public final void initNoDuplicate() {
     // Use reflection to register the expressions stored in public fields.
@@ -101,6 +92,61 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
         }
       } catch (IllegalArgumentException | IllegalAccessException e) {
         throw Util.throwAsRuntime(Util.causeOrSelf(e));
+      }
+    }
+
+    // Walk through all the Pinot aggregation types and
+    //   1. register those that are supported in multistage in addition to calcite standard opt table.
+    //   2. register special handling that differs from calcite standard.
+    for (AggregationFunctionType aggregationFunctionType : AggregationFunctionType.values()) {
+      if (aggregationFunctionType.getSqlKind() != null) {
+        // 1. Register the aggregation function with Calcite
+        registerAggregateFunction(aggregationFunctionType.getName(), aggregationFunctionType);
+        // 2. Register the aggregation function with Calcite on all alternative names
+        List<String> alternativeFunctionNames = aggregationFunctionType.getAlternativeNames();
+        for (String alternativeFunctionName : alternativeFunctionNames) {
+          registerAggregateFunction(alternativeFunctionName, aggregationFunctionType);
+        }
+      }
+    }
+
+    // Walk through all the Pinot transform types and
+    //   1. register those that are supported in multistage in addition to calcite standard opt table.
+    //   2. register special handling that differs from calcite standard.
+    for (TransformFunctionType transformFunctionType : TransformFunctionType.values()) {
+      if (transformFunctionType.getSqlKind() != null) {
+        // 1. Register the aggregation function with Calcite
+        registerTransformFunction(transformFunctionType.getName(), transformFunctionType);
+        // 2. Register the aggregation function with Calcite on all alternative names
+        List<String> alternativeFunctionNames = transformFunctionType.getAlternativeNames();
+        for (String alternativeFunctionName : alternativeFunctionNames) {
+          registerTransformFunction(alternativeFunctionName, transformFunctionType);
+        }
+      }
+    }
+  }
+
+  private void registerAggregateFunction(String functionName, AggregationFunctionType functionType) {
+    // register function behavior that's different from Calcite
+    if (functionType.getOperandTypeChecker() != null && functionType.getReturnTypeInference() != null) {
+      PinotSqlAggFunction sqlAggFunction = new PinotSqlAggFunction(functionName.toUpperCase(Locale.ROOT), null,
+          functionType.getSqlKind(), functionType.getReturnTypeInference(), null,
+          functionType.getOperandTypeChecker(), functionType.getSqlFunctionCategory());
+      if (notRegistered(sqlAggFunction)) {
+        register(sqlAggFunction);
+      }
+    }
+  }
+
+  private void registerTransformFunction(String functionName, TransformFunctionType functionType) {
+    // register function behavior that's different from Calcite
+    if (functionType.getOperandTypeChecker() != null && functionType.getReturnTypeInference() != null) {
+      PinotSqlTransformFunction sqlTransformFunction =
+          new PinotSqlTransformFunction(functionName.toUpperCase(Locale.ROOT),
+              functionType.getSqlKind(), functionType.getReturnTypeInference(), null,
+              functionType.getOperandTypeChecker(), functionType.getSqlFunctionCategory());
+      if (notRegistered(sqlTransformFunction)) {
+        register(sqlTransformFunction);
       }
     }
   }

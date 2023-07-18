@@ -1037,10 +1037,10 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     String[] expectedValues = new String[NUM_ROWS];
     RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = _stringAlphaNumericSVValues[i].toLowerCase();
-      } else {
+      if (isNullRow(i)) {
         bitmap.add(i);
+      } else {
+        expectedValues[i] = _stringAlphaNumericSVValues[i].toLowerCase();
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);

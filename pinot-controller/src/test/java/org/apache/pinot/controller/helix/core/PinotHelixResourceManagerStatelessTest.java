@@ -679,7 +679,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
         if (stateMap.size() != 1) {
           return false;
         }
-        String instanceId = LeadControllerUtils.generateParticipantInstanceId(LOCAL_HOST, _controllerPort);
+        String instanceId = LeadControllerUtils.generateParticipantInstanceId(LOCAL_HOST, getControllerPort());
         return MasterSlaveSMD.States.MASTER.name().equals(stateMap.get(instanceId));
       }
       return true;

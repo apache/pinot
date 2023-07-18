@@ -232,7 +232,7 @@ public class ADLSGen2PinotFSTest {
     when(_mockFileSystemClient.getDirectoryClient(any())).thenReturn(_mockDirectoryClient);
     when(_mockDirectoryClient.getProperties()).thenReturn(_mockPathProperties);
     Instant now = Instant.now();
-    OffsetDateTime mtime = Instant.now().atOffset(ZoneOffset.UTC);
+    OffsetDateTime mtime = now.atOffset(ZoneOffset.UTC);
     when(_mockPathProperties.getLastModified()).thenReturn(mtime);
 
     long actual = _adlsGen2PinotFsUnderTest.lastModified(_mockURI);

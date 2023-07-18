@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -99,6 +100,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _resourceTmpDir;
   protected Logger _logger;
   protected HelixManager _helixManager;
+  protected ExecutorService _segmentPreloadExecutor;
   protected AuthProvider _authProvider;
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
@@ -114,6 +116,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
       ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
+      @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
       TableDataManagerParams tableDataManagerParams) {
     LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
@@ -123,6 +126,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = propertyStore;
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
+    _segmentPreloadExecutor = segmentPreloadExecutor;
 
     _authProvider =
         AuthProviderUtils.extractAuthProvider(toPinotConfiguration(_tableDataManagerConfig.getAuthConfig()), null);
@@ -681,8 +685,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return new File(_indexDir, segmentName);
   }
 
-  @VisibleForTesting
-  File getSegmentDataDir(String segmentName, @Nullable String segmentTier, TableConfig tableConfig) {
+  @Override
+  public File getSegmentDataDir(String segmentName, @Nullable String segmentTier, TableConfig tableConfig) {
     if (segmentTier == null) {
       return getSegmentDataDir(segmentName);
     }
@@ -763,7 +767,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * object may be created when trying to load the segment, but it's closed if the method
    * returns false; otherwise it's opened and to be referred by ImmutableSegment object.
    */
-  protected boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
+  @Override
+  public boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
       SegmentZKMetadata zkMetadata) {
     // Try to recover the segment from potential segment reloading failure.
     String segmentTier = zkMetadata.getTier();

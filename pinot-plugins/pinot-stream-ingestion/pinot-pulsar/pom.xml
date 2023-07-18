@@ -41,12 +41,11 @@
     <jetty-server.version>9.4.51.v20230217</jetty-server.version>
     <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
-    <jersey-container-grizzly2-http.version>2.35</jersey-container-grizzly2-http.version>
+    <jersey-container-grizzly2-http.version>2.39</jersey-container-grizzly2-http.version>
     <simpleclient_common.version>0.8.1</simpleclient_common.version>
     <grpc-proto.version>1.12.0</grpc-proto.version>
     <grpc-context.version>1.14.0</grpc-context.version>
-    <bouncycastle.version>1.68</bouncycastle.version>
-    <commons-codec.version>1.11</commons-codec.version>
+    <bouncycastle.version>1.74</bouncycastle.version>
     <caffeine.version>2.6.2</caffeine.version>
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
@@ -78,14 +77,6 @@
       <artifactId>pulsar-client-original</artifactId>
       <version>${pulsar.version}</version>
       <exclusions>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty-transport-native-unix-common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty-resolver</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>javax.ws.rs</groupId>
           <artifactId>javax.ws.rs-api</artifactId>
@@ -160,7 +151,6 @@
     <dependency>
       <groupId>commons-codec</groupId>
       <artifactId>commons-codec</artifactId>
-      <version>${commons-codec.version}</version>
     </dependency>
     <dependency>
       <groupId>com.google.errorprone</groupId>

@@ -249,6 +249,19 @@ public class SchemaUtilsTest {
   }
 
   @Test
+  public void testValidateCaseInsensitive() {
+    Schema pinotSchema;
+    pinotSchema =
+      new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+          new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
+        .addSingleValueDimension("dim1", DataType.INT)
+        .addSingleValueDimension("Dim1", DataType.INT)
+        .build();
+
+    checkValidationFails(pinotSchema, true);
+  }
+
+  @Test
   public void testValidatePrimaryKeyColumns() {
     Schema pinotSchema;
     // non-existing column used as primary key
@@ -416,12 +429,16 @@ public class SchemaUtilsTest {
     checkValidationFails(pinotSchema);
   }
 
-  private void checkValidationFails(Schema pinotSchema) {
+  private void checkValidationFails(Schema pinotSchema, boolean isIgnoreCase) {
     try {
-      SchemaUtils.validate(pinotSchema);
+      SchemaUtils.validate(pinotSchema, isIgnoreCase);
       Assert.fail("Schema validation should have failed.");
     } catch (IllegalArgumentException | IllegalStateException e) {
       // expected
     }
+  }
+
+  private void checkValidationFails(Schema pinotSchema) {
+    checkValidationFails(pinotSchema, false);
   }
 }

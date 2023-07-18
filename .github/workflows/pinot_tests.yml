@@ -273,4 +273,4 @@ jobs:
         env:
           MAVEN_OPTS: -Xmx2G -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
         run: |
-          mvn clean install -Dmaven.test.skip=true -Ppresto-driver -am -B -pl ':presto-pinot-driver' -Djdk.version=8 -T 16 || exit 1
+          mvn clean install -Dmaven.test.skip=true -Ppresto-driver -am -B -pl ':pinot-spi-jdk8',':pinot-common-jdk8',':pinot-segment-spi-jdk8' -Djdk.version=8 -T 16 || exit 1

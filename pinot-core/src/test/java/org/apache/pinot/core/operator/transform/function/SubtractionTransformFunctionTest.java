@@ -141,10 +141,10 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
     double[] expectedValues = new double[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = _intSVValues[i];
-      } else {
+      if (isNullRow(i)) {
         roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = _intSVValues[i];
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);

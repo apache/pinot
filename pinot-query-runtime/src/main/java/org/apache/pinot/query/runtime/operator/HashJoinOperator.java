@@ -38,7 +38,7 @@ import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -245,7 +245,7 @@ public class HashJoinOperator extends MultiStageOperator {
             // TODO: Optimize this to avoid unnecessary object copy.
             Object[] resultRow = joinRow(leftRow, rightRow);
             if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
-                evaluator -> (Boolean) FunctionInvokeUtils.convert(evaluator.apply(resultRow),
+                evaluator -> (Boolean) TypeUtils.convert(evaluator.apply(resultRow),
                     DataSchema.ColumnDataType.BOOLEAN))) {
               rows.add(resultRow);
               hasMatchForLeftRow = true;

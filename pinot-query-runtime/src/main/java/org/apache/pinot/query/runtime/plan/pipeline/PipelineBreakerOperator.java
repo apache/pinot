@@ -50,6 +50,9 @@ class PipelineBreakerOperator extends MultiStageOperator {
     _expectedKeySet = ImmutableSet.copyOf(pipelineWorkerMap.keySet());
     _workerEntries = new ArrayDeque<>();
     _workerEntries.addAll(pipelineWorkerMap.entrySet());
+    for (int workerKey : _expectedKeySet) {
+      _resultMap.put(workerKey, new ArrayList<>());
+    }
   }
 
   public Map<Integer, List<TransferableBlock>> getResultMap() {
@@ -92,9 +95,8 @@ class PipelineBreakerOperator extends MultiStageOperator {
           constructErrorResponse(block);
           return _errorBlock;
         }
-        List<TransferableBlock> blockList = _resultMap.computeIfAbsent(worker.getKey(), (k) -> new ArrayList<>());
         if (!block.isEndOfStreamBlock()) {
-          blockList.add(block);
+          _resultMap.get(worker.getKey()).add(block);
         }
         return block;
       }

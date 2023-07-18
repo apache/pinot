@@ -12,7 +12,7 @@
           "\n      LogicalSort(sort0=[$0], dir0=[ASC])",
           "\n        LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            LogicalProject(col1=[$0], ts=[$4])",
+          "\n            LogicalProject(col1=[$0], ts=[$6])",
           "\n              LogicalTableScan(table=[[a]])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col2=[$1], col3=[$2])",
@@ -31,7 +31,7 @@
           "\n      LogicalSort(sort0=[$0], dir0=[ASC])",
           "\n        LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            LogicalProject(col1=[$0], ts=[$4])",
+          "\n            LogicalProject(col1=[$0], ts=[$6])",
           "\n              LogicalTableScan(table=[[a]])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col2=[$1], col3=[$2])",
@@ -44,7 +44,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[=($0, $6)], joinType=[inner])",
+          "\nLogicalJoin(condition=[=($0, $8)], joinType=[inner])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalTableScan(table=[[a]])",
           "\n  PinotLogicalExchange(distribution=[hash[1]])",
@@ -57,7 +57,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[=($0, $6)], joinType=[inner])",
+          "\nLogicalJoin(condition=[=($0, $8)], joinType=[inner])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalFilter(condition=[>=($2, 0)])",
           "\n      LogicalTableScan(table=[[a]])",
@@ -71,7 +71,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[AND(=($0, $6), >($2, $7))], joinType=[inner])",
+          "\nLogicalJoin(condition=[AND(=($0, $8), >($2, $9))], joinType=[inner])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalFilter(condition=[>=($2, 0)])",
           "\n      LogicalTableScan(table=[[a]])",
@@ -85,7 +85,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2",
         "output": [
           "Execution Plan",
-          "\nLogicalJoin(condition=[AND(=($0, $5), =($1, $6))], joinType=[inner])",
+          "\nLogicalJoin(condition=[AND(=($0, $7), =($1, $8))], joinType=[inner])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalTableScan(table=[[a]])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
@@ -101,7 +101,7 @@
           "\nLogicalProject(col1=[$0], ts=[$1], col3=[$3])",
           "\n  LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col1=[$0], ts=[$4])",
+          "\n      LogicalProject(col1=[$0], ts=[$6])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n          LogicalTableScan(table=[[a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
@@ -117,7 +117,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n  LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[$SUM0($2)])",
+          "\n  LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
           "\n        LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
@@ -140,10 +140,10 @@
           "\nLogicalProject(EXPR$0=[dateTrunc('DAY', +($2, $5))])",
           "\n  LogicalJoin(condition=[AND(=($0, $3), =($1, $4))], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], ts=[$4])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], ts=[$6])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], ts=[$4])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], ts=[$6])",
           "\n        LogicalTableScan(table=[[b]])",
           "\n"
         ]
@@ -317,7 +317,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0])",
-          "\n  LogicalJoin(condition=[AND(=($0, $5), =($1, $6), >($3, $10))], joinType=[inner])",
+          "\n  LogicalJoin(condition=[AND(=($0, $7), =($1, $8), >($3, $12))], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalTableScan(table=[[a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
@@ -340,9 +340,9 @@
           "\n      LogicalProject(col1=[$0], col2=[$1])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalAggregate(group=[{0}], sum_col3=[$SUM0($1)])",
+          "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          LogicalAggregate(group=[{1}], sum_col3=[$SUM0($2)])",
+          "\n          LogicalAggregate(group=[{1}], agg#0=[$SUM0($2)])",
           "\n            LogicalTableScan(table=[[b]])",
           "\n"
         ]

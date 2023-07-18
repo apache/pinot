@@ -37,6 +37,7 @@ import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamMessage;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -281,7 +282,9 @@ public class KafkaPartitionLevelConsumerTest {
           consumer.fetchMessages(new LongMsgOffset(0), new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), 10000);
       Assert.assertEquals(batch1.getMessageCount(), 500);
       for (int i = 0; i < batch1.getMessageCount(); i++) {
-        final byte[] msg = (byte[]) batch1.getStreamMessage(i).getValue();
+        StreamMessage streamMessage = batch1.getStreamMessage(i);
+        Assert.assertNotNull(streamMessage.getMetadata());
+        final byte[] msg = (byte[]) streamMessage.getValue();
         Assert.assertEquals(new String(msg), "sample_msg_" + i);
         Assert.assertNotNull(batch1.getMetadataAtIndex(i));
       }
@@ -290,7 +293,9 @@ public class KafkaPartitionLevelConsumerTest {
           consumer.fetchMessages(new LongMsgOffset(500), new LongMsgOffset(NUM_MSG_PRODUCED_PER_PARTITION), 10000);
       Assert.assertEquals(batch2.getMessageCount(), 500);
       for (int i = 0; i < batch2.getMessageCount(); i++) {
-        final byte[] msg = (byte[]) batch2.getStreamMessage(i).getValue();
+        StreamMessage streamMessage = batch2.getStreamMessage(i);
+        Assert.assertNotNull(streamMessage.getMetadata());
+        final byte[] msg = (byte[]) streamMessage.getValue();
         Assert.assertEquals(new String(msg), "sample_msg_" + (500 + i));
         Assert.assertNotNull(batch1.getMetadataAtIndex(i));
       }
@@ -298,7 +303,9 @@ public class KafkaPartitionLevelConsumerTest {
       final MessageBatch batch3 = consumer.fetchMessages(new LongMsgOffset(10), new LongMsgOffset(35), 10000);
       Assert.assertEquals(batch3.getMessageCount(), 25);
       for (int i = 0; i < batch3.getMessageCount(); i++) {
-        final byte[] msg = (byte[]) batch3.getStreamMessage(i).getValue();
+        StreamMessage streamMessage = batch3.getStreamMessage(i);
+        Assert.assertNotNull(streamMessage.getMetadata());
+        final byte[] msg = (byte[]) streamMessage.getValue();
         Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
         Assert.assertNotNull(batch1.getMetadataAtIndex(i));
       }

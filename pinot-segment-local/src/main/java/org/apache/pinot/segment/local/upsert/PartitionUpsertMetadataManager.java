@@ -65,6 +65,13 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   void addSegment(ImmutableSegment segment);
 
   /**
+   * Different from adding a segment, when preloading a segment, the upsert metadata may be updated more efficiently.
+   * Basically the upsert metadata can be directly updated for each primary key, without doing the more costly
+   * read-compare-update.
+   */
+  void preloadSegment(ImmutableSegment segment);
+
+  /**
    * Updates the upsert metadata for a new consumed record in the given consuming segment.
    */
   void addRecord(MutableSegment segment, RecordInfo recordInfo);

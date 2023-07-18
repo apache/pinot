@@ -18,10 +18,23 @@
  */
 package org.apache.pinot.common.function;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlFunctionCategory;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperatorBinding;
+import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
+import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeFamily;
+import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeTransforms;
 
 
 public enum TransformFunctionType {
@@ -76,13 +89,18 @@ public enum TransformFunctionType {
   CAST("cast"),
 
   // string functions
-  JSONEXTRACTSCALAR("jsonExtractScalar"),
-  JSONEXTRACTKEY("jsonExtractKey"),
+  JSONEXTRACTSCALAR("jsonExtractScalar",
+      ReturnTypes.cascade(opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2,
+          SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER), ordinal -> ordinal > 2), "json_extract_scalar"),
+  JSONEXTRACTKEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), "json_extract_key"),
 
   // date time functions
-  TIMECONVERT("timeConvert"),
-  DATETIMECONVERT("dateTimeConvert"),
-  DATETRUNC("dateTrunc"),
+  TIMECONVERT("timeConvert", "time_convert"),
+  DATETIMECONVERT("dateTimeConvert", "date_time_convert"),
+  DATETRUNC("dateTrunc", "datetrunc"),
   YEAR("year"),
   YEAR_OF_WEEK("yearOfWeek", "yow"),
   QUARTER("quarter"),
@@ -162,22 +180,94 @@ public enum TransformFunctionType {
   RADIANS("radians");
 
   private final String _name;
-  private final List<String> _aliases;
+  private final List<String> _alternativeNames;
+  private final SqlKind _sqlKind;
+  private final SqlReturnTypeInference _returnTypeInference;
+  private final SqlOperandTypeChecker _operandTypeChecker;
+  private final SqlFunctionCategory _sqlFunctionCategory;
 
-  TransformFunctionType(String name, String... aliases) {
+  TransformFunctionType(String name, String... alternativeNames) {
+    this(name, null, null, null, null, alternativeNames);
+  }
+
+  TransformFunctionType(String name, SqlReturnTypeInference returnTypeInference,
+      SqlOperandTypeChecker operandTypeChecker, String... alternativeNames) {
+    this(name, SqlKind.OTHER_FUNCTION, returnTypeInference, operandTypeChecker,
+        SqlFunctionCategory.USER_DEFINED_FUNCTION, alternativeNames);
+  }
+
+  /**
+   * Constructor to use for transform functions which are supported in both v1 and multistage engines
+   */
+  TransformFunctionType(String name, SqlKind sqlKind, SqlReturnTypeInference returnTypeInference,
+      SqlOperandTypeChecker operandTypeChecker, SqlFunctionCategory sqlFunctionCategory, String... alternativeNames) {
     _name = name;
-    List<String> all = new ArrayList<>(aliases.length + 2);
+    List<String> all = new ArrayList<>(alternativeNames.length + 2);
     all.add(name);
     all.add(name());
-    all.addAll(Arrays.asList(aliases));
-    _aliases = Collections.unmodifiableList(all);
+    all.addAll(Arrays.asList(alternativeNames));
+    _alternativeNames = Collections.unmodifiableList(all);
+    _sqlKind = sqlKind;
+    _returnTypeInference = returnTypeInference;
+    _operandTypeChecker = operandTypeChecker;
+    _sqlFunctionCategory = sqlFunctionCategory;
   }
 
   public String getName() {
     return _name;
   }
 
-  public List<String> getAliases() {
-    return _aliases;
+  public List<String> getAlternativeNames() {
+    return _alternativeNames;
+  }
+
+  public SqlKind getSqlKind() {
+    return _sqlKind;
+  }
+
+  public SqlReturnTypeInference getReturnTypeInference() {
+    return _returnTypeInference;
+  }
+
+  public SqlOperandTypeChecker getOperandTypeChecker() {
+    return _operandTypeChecker;
+  }
+
+  public SqlFunctionCategory getSqlFunctionCategory() {
+    return _sqlFunctionCategory;
+  }
+
+  /** Returns the optional explicit returning type specification. */
+  private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos) {
+    return positionalReturnTypeInferenceFromStringLiteral(opBinding, pos, SqlTypeName.ANY);
+  }
+
+  private static RelDataType positionalReturnTypeInferenceFromStringLiteral(SqlOperatorBinding opBinding, int pos,
+      SqlTypeName defaultSqlType) {
+    if (opBinding.getOperandCount() > pos
+        && opBinding.isOperandLiteral(pos, false)) {
+      String operandType = opBinding.getOperandLiteralValue(pos, String.class).toUpperCase();
+      return inferTypeFromStringLiteral(operandType, opBinding.getTypeFactory());
+    }
+    return opBinding.getTypeFactory().createSqlType(defaultSqlType);
+  }
+
+  private static RelDataType inferTypeFromStringLiteral(String operandTypeStr, RelDataTypeFactory typeFactory) {
+    switch (operandTypeStr) {
+      case "INT":
+        return typeFactory.createSqlType(SqlTypeName.INTEGER);
+      case "LONG":
+        return typeFactory.createSqlType(SqlTypeName.BIGINT);
+      case "STRING":
+        return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      case "BYTES":
+        return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      default:
+        SqlTypeName sqlTypeName = SqlTypeName.get(operandTypeStr);
+        if (sqlTypeName == null) {
+          throw new IllegalArgumentException("Invalid type: " + operandTypeStr);
+        }
+        return typeFactory.createSqlType(sqlTypeName);
+    }
   }
 }

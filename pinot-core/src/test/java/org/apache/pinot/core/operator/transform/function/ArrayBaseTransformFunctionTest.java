@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -89,84 +88,54 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
     Assert.assertTrue(transformFunction.getResultMetadata().isSingleValue());
     Assert.assertFalse(transformFunction.getResultMetadata().hasDictionary());
 
+    RoaringBitmap expectedNulls = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        expectedNulls.add(i);
+      }
+    }
+    testNullBitmap(transformFunction, expectedNulls);
+
     switch (getResultDataType(FieldSpec.DataType.INT)) {
       case INT:
-        Pair<int[], RoaringBitmap> intResults = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
-        int[] intValues = intResults.getLeft();
-        RoaringBitmap nullBitmap = intResults.getRight();
-        RoaringBitmap expectedNulls = new RoaringBitmap();
+        int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
-          if (i % 2 == 0) {
+          if (!isNullRow(i)) {
             Assert.assertEquals(intValues[i], getExpectResult(_intMVValues[i]));
-          } else {
-            expectedNulls.add(i);
           }
         }
-        Assert.assertEquals(nullBitmap, expectedNulls);
-        Assert.assertEquals(transformFunction.getNullBitmap(_projectionBlock), expectedNulls);
         break;
       case LONG:
-        Pair<long[], RoaringBitmap> longResults = transformFunction.transformToLongValuesSVWithNull(_projectionBlock);
-        long[] longValues = longResults.getLeft();
-        nullBitmap = longResults.getRight();
-        expectedNulls = new RoaringBitmap();
+        long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
-          if (i % 2 == 0) {
+          if (!isNullRow(i)) {
             Assert.assertEquals(longValues[i], getExpectResult(_intMVValues[i]));
-          } else {
-            expectedNulls.add(i);
           }
         }
-        Assert.assertEquals(nullBitmap, expectedNulls);
-        Assert.assertEquals(transformFunction.getNullBitmap(_projectionBlock), expectedNulls);
         break;
       case FLOAT:
-        Pair<float[], RoaringBitmap> floatResults =
-            transformFunction.transformToFloatValuesSVWithNull(_projectionBlock);
-        float[] floatValues = floatResults.getLeft();
-        nullBitmap = floatResults.getRight();
-        expectedNulls = new RoaringBitmap();
+        float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
-          if (i % 2 == 0) {
+          if (!isNullRow(i)) {
             Assert.assertEquals(floatValues[i], getExpectResult(_intMVValues[i]));
-          } else {
-            expectedNulls.add(i);
           }
         }
-        Assert.assertEquals(nullBitmap, expectedNulls);
-        Assert.assertEquals(transformFunction.getNullBitmap(_projectionBlock), expectedNulls);
         break;
       case DOUBLE:
-        Pair<double[], RoaringBitmap> doubleResults =
-            transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
-        double[] doubleValues = doubleResults.getLeft();
-        nullBitmap = doubleResults.getRight();
-        expectedNulls = new RoaringBitmap();
+        double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
-          if (i % 2 == 0) {
+          if (!isNullRow(i)) {
             Assert.assertEquals(doubleValues[i], getExpectResult(_intMVValues[i]));
-          } else {
-            expectedNulls.add(i);
           }
         }
-        Assert.assertEquals(nullBitmap, expectedNulls);
-        Assert.assertEquals(transformFunction.getNullBitmap(_projectionBlock), expectedNulls);
         break;
       case STRING:
-        Pair<String[], RoaringBitmap> stringResults =
-            transformFunction.transformToStringValuesSVWithNull(_projectionBlock);
-        String[] stringValues = stringResults.getLeft();
-        nullBitmap = stringResults.getRight();
-        expectedNulls = new RoaringBitmap();
+        String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
-          if (i % 2 == 0) {
+          if (!isNullRow(i)) {
             Assert.assertEquals(stringValues[i], getExpectResult(_intMVValues[i]));
-          } else {
-            expectedNulls.add(i);
           }
         }
-        Assert.assertEquals(nullBitmap, expectedNulls);
-        Assert.assertEquals(transformFunction.getNullBitmap(_projectionBlock), expectedNulls);
         break;
       default:
         break;

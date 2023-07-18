@@ -197,16 +197,18 @@ public class BaseBrokerRequestHandlerTest {
     BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
     when(routingManager.routingExists(anyString())).thenReturn(true);
     RoutingTable rt = mock(RoutingTable.class);
-    when(rt.getServerInstanceToSegmentsMap()).thenReturn(Collections
-        .singletonMap(new ServerInstance(new InstanceConfig("server01_9000")), Collections.singletonList("segment01")));
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Collections.singletonMap(new ServerInstance(new InstanceConfig("server01_9000")),
+            Collections.singletonList("segment01")));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);
     CountDownLatch latch = new CountDownLatch(1);
+    final long[] testRequestId = {-1};
     PinotConfiguration config =
         new PinotConfiguration(Collections.singletonMap("pinot.broker.enable.query.cancellation", "true"));
     BaseBrokerRequestHandler requestHandler =
-        new BaseBrokerRequestHandler(config, null, routingManager, new AllowAllAccessControlFactory(),
+        new BaseBrokerRequestHandler(config, "testBrokerId", routingManager, new AllowAllAccessControlFactory(),
             queryQuotaManager, tableCache,
             new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet())) {
           @Override
@@ -225,6 +227,7 @@ public class BaseBrokerRequestHandlerTest {
               @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
               RequestContext requestContext)
               throws Exception {
+            testRequestId[0] = requestId;
             latch.await();
             return null;
           }
@@ -239,12 +242,12 @@ public class BaseBrokerRequestHandlerTest {
         throw new RuntimeException(e);
       }
     });
-    TestUtils.waitForCondition((aVoid) -> requestHandler.getRunningServers(1).size() == 1, 500, 5000,
+    TestUtils.waitForCondition((aVoid) -> requestHandler.getRunningServers(testRequestId[0]).size() == 1, 500, 5000,
         "Failed to submit query");
     Map.Entry<Long, String> entry = requestHandler.getRunningQueries().entrySet().iterator().next();
-    Assert.assertEquals(entry.getKey().longValue(), 1);
+    Assert.assertEquals(entry.getKey().longValue(), testRequestId[0]);
     Assert.assertTrue(entry.getValue().contains("select * from myTable_OFFLINE limit 10"));
-    Set<ServerInstance> servers = requestHandler.getRunningServers(1);
+    Set<ServerInstance> servers = requestHandler.getRunningServers(testRequestId[0]);
     Assert.assertEquals(servers.size(), 1);
     Assert.assertEquals(servers.iterator().next().getHostname(), "server01");
     Assert.assertEquals(servers.iterator().next().getPort(), 9000);

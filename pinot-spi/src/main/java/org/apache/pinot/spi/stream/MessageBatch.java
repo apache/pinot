@@ -57,12 +57,12 @@ public interface MessageBatch<T> {
   }
 
   default StreamMessage<T> getStreamMessage(int index) {
-    return new LegacyStreamMessage(getMessageBytesAtIndex(index));
+    return new LegacyStreamMessage(getMessageBytesAtIndex(index), (StreamMessageMetadata) getMetadataAtIndex(index));
   }
 
   class LegacyStreamMessage extends StreamMessage {
-    public LegacyStreamMessage(byte[] value) {
-      super(value, value.length);
+    public LegacyStreamMessage(byte[] value, StreamMessageMetadata metadata) {
+      super(value, value.length, metadata);
     }
   }
   /**
