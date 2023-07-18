@@ -392,7 +392,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);
         requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-        return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR); // SK:
+        return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
       }
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
           System.nanoTime() - compilationEndTimeNs);

@@ -166,7 +166,6 @@ public class PinotClientRequest {
   @DELETE
   @Path("query/{queryId}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
-  // SK: If there is a way to get the table name for this query id, then it can be a table level permission.
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Cancel a query as identified by the queryId", notes = "No effect if no query exists for the "
       + "given queryId on the requested broker. Query may continue to run for a short while after calling cancel as "

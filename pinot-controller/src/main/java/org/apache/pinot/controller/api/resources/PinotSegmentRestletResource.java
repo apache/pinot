@@ -529,7 +529,6 @@ public class PinotSegmentRestletResource {
   @POST
   @Path("segments/{tableNameWithType}/{segmentName}/reset")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RESET_SEGMENTS)
-  // SK: Get the <tableName>_<type> and then do a table level RBAC?
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(
@@ -568,7 +567,6 @@ public class PinotSegmentRestletResource {
   @POST
   @Path("segments/{tableNameWithType}/reset")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RESET_SEGMENTS)
-  // SK: Extract tablename to do table level RBAC?
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(
@@ -639,7 +637,6 @@ public class PinotSegmentRestletResource {
   @GET
   @Path("segments/segmentReloadStatus/{jobId}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SEGMENT_RELOAD_STATUS)
-  // SK: extract table name and do table level RBAC below?
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get status for a submitted reload operation",
       notes = "Get status for a submitted reload operation")

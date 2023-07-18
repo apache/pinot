@@ -135,7 +135,6 @@ public class PinotBrokerDebug {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/routingTable/sql")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ROUTING)
-  // SK: Shall it be a manual auth, and get the table name from query
   @ApiOperation(value = "Get the routing table for a query")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Routing table"),
