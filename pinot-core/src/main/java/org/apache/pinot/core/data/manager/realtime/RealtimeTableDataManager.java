@@ -125,7 +125,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
-  private boolean _isUpsertEnabled;
   private BooleanSupplier _isTableReadyToConsumeData;
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
@@ -206,12 +205,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           _tableUpsertMetadataManager);
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-      // While creating _tableUpsertMetadataManager object, some methods want to check if upsert is enabled, so track
-      // this status with a boolean, instead of relying on if _tableUpsertMetadataManager is null or not.
-      _isUpsertEnabled = true;
-      _tableUpsertMetadataManager =
-          TableUpsertMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics, _helixManager,
-              _segmentPreloadExecutor);
+      // NOTE: Set _tableUpsertMetadataManager before initializing it because when preloading is enabled, we need to
+      //       load segments into it
+      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig);
+      _tableUpsertMetadataManager.init(tableConfig, schema, this, _serverMetrics, _helixManager,
+          _segmentPreloadExecutor);
     }
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
@@ -358,7 +356,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public boolean isUpsertEnabled() {
-    return _isUpsertEnabled;
+    return _tableUpsertMetadataManager != null;
   }
 
   public boolean isPartialUpsertEnabled() {
