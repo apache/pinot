@@ -216,5 +216,10 @@ public class FunctionRegistry {
         String defaultValue) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
+
+    @ScalarFunction(names = {"multiValueToSet", "multi_value_to_set"}, isPlaceholder = true)
+    public static String multiValueToSet(Object multiValue) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
   }
 }

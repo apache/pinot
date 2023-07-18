@@ -91,9 +91,9 @@ public enum TransformFunctionType {
   CAST("cast"),
 
   // object type
-  ARRAYTOMULTIVALUE("arrayToMultiValue", ReturnTypes.cascade(opBinding ->
-      opBinding.getOperandType(0).getComponentType(), SqlTypeTransforms.FORCE_NULLABLE),
-      OperandTypes.family(SqlTypeFamily.ARRAY), "array_to_multi_value"),
+  MULTI_VALUE_TO_SET("multiValueToSet",
+      ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0), SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(SqlTypeFamily.MULTISET), "multi_value_to_set"),
 
   // string functions
   JSONEXTRACTSCALAR("jsonExtractScalar",
@@ -283,6 +283,13 @@ public enum TransformFunctionType {
       return inferTypeFromStringLiteral(operandType, opBinding.getTypeFactory());
     }
     return opBinding.getTypeFactory().createSqlType(defaultSqlType);
+  }
+
+  private static RelDataType positionalComponentReturnType(SqlOperatorBinding opBinding, int pos) {
+    if (opBinding.getOperandCount() > pos) {
+      return opBinding.getOperandType(pos).getComponentType();
+    }
+    throw new IllegalArgumentException("Invalid number of arguments for function " + opBinding.getOperator().getName());
   }
 
   private static RelDataType dateTimeConverterReturnTypeInference(SqlOperatorBinding opBinding) {

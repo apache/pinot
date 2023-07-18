@@ -31,22 +31,22 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * <code>ArrayToMultiValueTransformFunction</code> is the bridge for leaf stage Group By Multi-Value column.
+ * <code>MultiValueToSetTransformFunction</code> is the bridge for leaf stage Group By Multi-Value column.
  */
-public class ArrayToMultiValueTransformFunction implements TransformFunction {
+public class MultiValueToSetTransformFunction implements TransformFunction {
   private TransformFunction _transformFunction;
   private TransformResultMetadata _resultMetadata;
 
   @Override
   public String getName() {
-    return "arrayToMultiValue";
+    return "multiValueToSet";
   }
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     if (arguments.size() != 1) {
       throw new IllegalArgumentException(
-          "Expect exact 1 argument for ArrayToMultiValue operator [" + getName() + "], args [" + Arrays.toString(
+          "Expect exact 1 argument for MultiValueToSet operator [" + getName() + "], args [" + Arrays.toString(
               arguments.toArray()) + "].");
     }
 
@@ -54,7 +54,7 @@ public class ArrayToMultiValueTransformFunction implements TransformFunction {
     _resultMetadata = _transformFunction.getResultMetadata();
     if (_resultMetadata.isSingleValue()) {
       throw new IllegalArgumentException(
-          "Expect a multi-value column for ArrayToMultiValue operator [" + getName() + "], args [" + Arrays.toString(
+          "Expect a multi-value column for MultiValueToSet operator [" + getName() + "], args [" + Arrays.toString(
               arguments.toArray()) + "].");
     }
   }
@@ -72,7 +72,7 @@ public class ArrayToMultiValueTransformFunction implements TransformFunction {
 
   @Override
   public int[] transformToDictIdsSV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("Expected multi-value column for ArrayToMultiValue transform function");
+    throw new UnsupportedOperationException("Expected multi-value column for MultiValueToSet transform function");
   }
 
   @Override
@@ -82,37 +82,37 @@ public class ArrayToMultiValueTransformFunction implements TransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("Expected multi-value column for ArrayToMultiValue transform function");
+    throw new UnsupportedOperationException("Expected multi-value column for MultiValueToSet transform function");
   }
 
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("Expected multi-value column for ArrayToMultiValue transform function");
+    throw new UnsupportedOperationException("Expected multi-value column for MultiValueToSet transform function");
   }
 
   @Override
   public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("Expected multi-value column for ArrayToMultiValue transform function");
+    throw new UnsupportedOperationException("Expected multi-value column for MultiValueToSet transform function");
   }
 
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("Expected multi-value column for ArrayToMultiValue transform function");
+    throw new UnsupportedOperationException("Expected multi-value column for MultiValueToSet transform function");
   }
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("Expected multi-value column for ArrayToMultiValue transform function");
+    throw new UnsupportedOperationException("Expected multi-value column for MultiValueToSet transform function");
   }
 
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("Expected multi-value column for ArrayToMultiValue transform function");
+    throw new UnsupportedOperationException("Expected multi-value column for MultiValueToSet transform function");
   }
 
   @Override
   public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("Expected multi-value column for ArrayToMultiValue transform function");
+    throw new UnsupportedOperationException("Expected multi-value column for MultiValueToSet transform function");
   }
 
   @Override

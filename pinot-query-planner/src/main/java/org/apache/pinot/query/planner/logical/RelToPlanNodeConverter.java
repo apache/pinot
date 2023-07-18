@@ -207,7 +207,7 @@ public final class RelToPlanNodeConverter {
 
   public static DataSchema.ColumnDataType convertToColumnDataType(RelDataType relDataType) {
     SqlTypeName sqlTypeName = relDataType.getSqlTypeName();
-    boolean isArray = sqlTypeName == SqlTypeName.ARRAY;
+    boolean isArray = (sqlTypeName == SqlTypeName.ARRAY) || (sqlTypeName == SqlTypeName.MULTISET);
     if (isArray) {
       sqlTypeName = relDataType.getComponentType().getSqlTypeName();
     }
