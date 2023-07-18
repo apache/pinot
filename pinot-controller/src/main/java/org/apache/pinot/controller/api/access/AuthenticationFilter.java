@@ -117,10 +117,11 @@ public class AuthenticationFilter implements ContainerRequestFilter {
    * There are 2 possible cases:
    * 1. {@link Authorize} annotation is present on the method. In this case, do the finer grain authorization using the
    *    fields of the annotation. There are 2 possibilities depending on the targetType ({@link TargetType}):
-   *    a. The targetType is {@link TargetType#CLUSTER}. In this case, the paramName field ({@link Authorize#paramName()})
-   *    is not used, since the target is the Pinot cluster.
-   *    b. The targetType is {@link TargetType#TABLE}. In this case, the paramName field ({@link Authorize#paramName()})
-   *    is mandatory, and it must be found in either the path parameters or the query parameters.
+   *    a. The targetType is {@link TargetType#CLUSTER}. In this case, the paramName field
+   *       ({@link Authorize#paramName()}) is not used, since the target is the Pinot cluster.
+   *    b. The targetType is {@link TargetType#TABLE}. In this case, the paramName field
+   *       ({@link Authorize#paramName()}) is mandatory, and it must be found in either the path parameters or the
+   *       query parameters.
    * 2. {@link Authorize} annotation is not present on the method. In this use the default authorization.
    *
    * @param endpointMethod of the API

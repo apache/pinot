@@ -39,6 +39,6 @@ public @interface Authorize {
   // If the target type is the Pinot cluster, then this field is not required
   String paramName() default "";
 
-  // action to validate on the specified resource
+  // action to validate on the specific resource
   String action();
 }
