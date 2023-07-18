@@ -106,7 +106,6 @@ public final class TableConfigUtils {
   private static final String KINESIS_STREAM_TYPE = "kinesis";
   private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
       EnumSet.of(SUM, MIN, MAX, COUNT);
-          AggregationFunctionType.COUNT);
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
           RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
