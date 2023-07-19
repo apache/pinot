@@ -108,8 +108,8 @@ public class TransformOperator extends MultiStageOperator {
       return block;
     }
 
-    List<Object[]> resultRows = new ArrayList<>();
     List<Object[]> container = block.getContainer();
+    List<Object[]> resultRows = new ArrayList<>(container.size());
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
       for (int i = 0; i < _resultColumnSize; i++) {
