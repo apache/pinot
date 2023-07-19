@@ -42,7 +42,108 @@
       {"sql": "SELECT COUNT(DISTINCT val) FROM {tbl1}"},
       {"sql": "SELECT groupingCol, COUNT(DISTINCT val) FROM {tbl1} GROUP BY groupingCol"},
       {"sql": "SELECT l.groupingCol, COUNT(DISTINCT l.val), COUNT(DISTINCT r.val) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol"},
-      {"sql": "SELECT l.groupingCol, COUNT(DISTINCT CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol"}
+      {"sql": "SELECT l.groupingCol, COUNT(DISTINCT CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol"},
+      {"sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, COUNT(DISTINCT val) FROM {tbl1} GROUP BY groupingCol"},
+      {"sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, COUNT(DISTINCT l.val), COUNT(DISTINCT r.val) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol"},
+      {"sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, COUNT(DISTINCT CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol"}
+    ]
+  },
+  "countDistinct_non_h2": {
+    "tables": {
+      "tbl1": {
+        "schema": [
+          {"name": "groupingCol", "type": "STRING"},
+          {"name": "val", "type": "STRING"}
+        ],
+        "inputs": [
+          ["a", "foo"],
+          ["a", "foo"],
+          ["a", "bar"],
+          ["a", "bar"],
+          ["b", "foo"],
+          ["b", "foo"],
+          ["b", "foo"],
+          ["b", "baz"],
+          ["b", "baz"],
+          ["b", "baz"]
+        ]
+      },
+      "tbl2": {
+        "schema": [
+          {"name": "groupingCol", "type": "STRING"},
+          {"name": "val", "type": "STRING"}
+        ],
+        "inputs": [
+          ["a", "foo"],
+          ["a", "foo"],
+          ["a", "bar"],
+          ["a", "bingo"],
+          ["b", "foo"],
+          ["b", "foo"],
+          ["b", "foo"],
+          ["b", "baz"],
+          ["b", "baz"],
+          ["b", "ringo"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT DISTINCTCOUNT(val) FROM {tbl1}",
+        "outputs": [[3]]
+      },
+      {
+        "sql": "SELECT groupingCol, DISTINCTCOUNT(val) FROM {tbl1} GROUP BY groupingCol",
+        "outputs": [["b", 2], ["a", 2]]
+      },
+      {
+        "sql": "SELECT l.groupingCol, DISTINCTCOUNT(l.val), DISTINCTCOUNT(r.val) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "outputs": [["b", 2, 3], ["a", 2, 3]]
+      },
+      {
+        "sql": "SELECT l.groupingCol, DISTINCTCOUNT(CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "outputs": [["b", 6], ["a", 6]]
+      },
+      {
+        "sql": "SELECT DISTINCTCOUNTHLL(val) FROM {tbl1}",
+        "outputs": [[3]]
+      },
+      {
+        "sql": "SELECT groupingCol, DISTINCTCOUNTHLL(val) FROM {tbl1} GROUP BY groupingCol",
+        "outputs": [["b", 2], ["a", 2]]
+      },
+      {
+        "sql": "SELECT l.groupingCol, DISTINCTCOUNTHLL(l.val), DISTINCTCOUNTHLL(r.val) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "outputs": [["b", 2, 3], ["a", 2, 3]]
+      },
+      {
+        "sql": "SELECT l.groupingCol, DISTINCTCOUNTHLL(CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "outputs": [["b", 6], ["a", 6]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, DISTINCTCOUNT(val) FROM {tbl1} GROUP BY groupingCol",
+        "outputs": [["b", 2], ["a", 2]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, DISTINCTCOUNT(l.val), DISTINCTCOUNT(r.val) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "outputs": [["b", 2, 3], ["a", 2, 3]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, DISTINCTCOUNT(CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "outputs": [["b", 6], ["a", 6]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, DISTINCTCOUNTHLL(val) FROM {tbl1} GROUP BY groupingCol",
+        "outputs": [["b", 2], ["a", 2]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, DISTINCTCOUNTHLL(l.val), DISTINCTCOUNTHLL(r.val) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "outputs": [["b", 2, 3], ["a", 2, 3]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, DISTINCTCOUNTHLL(CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "outputs": [["b", 6], ["a", 6]]
+      }
     ]
   }
 }

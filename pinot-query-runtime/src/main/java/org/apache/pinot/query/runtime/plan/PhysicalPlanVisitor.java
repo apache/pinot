@@ -101,7 +101,7 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
     DataSchema resultSchema = node.getDataSchema();
 
     return new AggregateOperator(context.getOpChainExecutionContext(), nextOperator, resultSchema, inputSchema,
-        node.getAggCalls(), node.getGroupSet(), node.getAggType());
+        node.getAggCalls(), node.getGroupSet(), node.getAggType(), node.getNodeHint());
   }
 
   @Override

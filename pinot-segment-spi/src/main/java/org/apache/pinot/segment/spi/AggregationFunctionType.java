@@ -18,18 +18,21 @@
  */
 package org.apache.pinot.segment.spi;
 
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -62,8 +65,12 @@ public enum AggregationFunctionType {
   AVG("avg"),
   MODE("mode"),
 
-  FIRSTWITHTIME("firstWithTime"),
-  LASTWITHTIME("lastWithTime"),
+  FIRSTWITHTIME("firstWithTime", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER)),
+      ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  LASTWITHTIME("lastWithTime", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER)),
+      ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
   MINMAXRANGE("minMaxRange"),
   /**
    * for all distinct count family functions:
@@ -75,7 +82,7 @@ public enum AggregationFunctionType {
       ReturnTypes.explicit(SqlTypeName.OTHER)),
   DISTINCTCOUNTBITMAP("distinctCountBitmap"),
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount"),
-  DISTINCTCOUNTHLL("distinctCountHLL", Collections.emptyList(), SqlKind.OTHER_FUNCTION,
+  DISTINCTCOUNTHLL("distinctCountHLL", ImmutableList.of("DISTINCT_COUNT_HLL"), SqlKind.OTHER_FUNCTION,
       SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.ANY, ReturnTypes.BIGINT,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
   DISTINCTCOUNTRAWHLL("distinctCountRawHLL"),
@@ -86,7 +93,9 @@ public enum AggregationFunctionType {
   DISTINCTSUM("distinctSum"),
   DISTINCTAVG("distinctAvg"),
 
-  PERCENTILE("percentile"),
+  PERCENTILE("percentile", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.ARG0,
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
   PERCENTILEEST("percentileEst"),
   PERCENTILERAWEST("percentileRawEst"),
   PERCENTILETDIGEST("percentileTDigest"),
@@ -99,12 +108,22 @@ public enum AggregationFunctionType {
 
   HISTOGRAM("histogram"),
 
-  COVARPOP("covarPop"),
-  COVARSAMP("covarSamp"),
-  VARPOP("varPop"),
-  VARSAMP("varSamp"),
-  STDDEVPOP("stdDevPop"),
-  STDDEVSAMP("stdDevSamp"),
+  // TODO: support underscore separated version of the stats functions
+  // currently Pinot is missing generated agg functions impl from Calcite's AggregateReduceFunctionsRule
+  COVARPOP("covarPop", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.DOUBLE,
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
+  COVARSAMP("covarSamp", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.DOUBLE,
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
+  VARPOP("varPop", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  VARSAMP("varSamp", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  STDDEVPOP("stdDevPop", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  STDDEVSAMP("stdDevSamp", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
   SKEWNESS("skewness", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
   KURTOSIS("kurtosis", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
@@ -189,7 +208,12 @@ public enum AggregationFunctionType {
   }
 
   /**
-   * Constructor to use for aggregation functions which are supported in both v1 and multistage engines
+   * Constructor to use for aggregation functions which are supported in both v1 and multistage engines.
+   * <ul>
+   *   <li>single input operand.</li>
+   *   <li>built-in input/output behavior expected by {@link org.apache.calcite.sql.fun.SqlStdOperatorTable}.</li>
+   *   <li>intermediate output type the same as final output type.</li>
+   * </ul>
    */
   AggregationFunctionType(String name, List<String> alternativeNames, SqlKind sqlKind,
       SqlFunctionCategory sqlFunctionCategory) {
@@ -197,20 +221,22 @@ public enum AggregationFunctionType {
   }
 
   /**
-   * Constructor to use for aggregation functions which are supported in both v1 and multistage engines
-   * and requires override on calcite behaviors.
+   * Constructor to use for aggregation functions which are supported in both v1 and multistage engines with
+   * different behavior comparing to Calcite and requires literal operand inputs.
+   *
+   * @param name name of the agg function
+   * @param alternativeNames alternative name of the agg function.
+   * @param sqlKind sql kind indicator, used by Calcite
+   * @param sqlFunctionCategory function catalog, used by Calcite
+   * @param operandTypeChecker input operand type signature, used by Calcite
+   * @param finalReturnType final output type signature, used by Calcite
+   * @param intermediateReturnType intermediate output type signature, used by Pinot and Calcite
    */
-  AggregationFunctionType(String name, List<String> alternativeNames,
-      SqlKind sqlKind, SqlFunctionCategory sqlFunctionCategory, SqlOperandTypeChecker operandTypeChecker,
-      SqlReturnTypeInference returnTypeInference) {
-    this(name, alternativeNames, sqlKind, sqlFunctionCategory, operandTypeChecker, returnTypeInference, null);
-  }
-
-  AggregationFunctionType(String name, List<String> alternativeNames,
-      SqlKind sqlKind, SqlFunctionCategory sqlFunctionCategory, SqlOperandTypeChecker operandTypeChecker,
-      SqlReturnTypeInference returnTypeInference, SqlReturnTypeInference intermediateReturnTypeInference) {
+  AggregationFunctionType(String name, @Nullable List<String> alternativeNames, @Nullable SqlKind sqlKind,
+      @Nullable SqlFunctionCategory sqlFunctionCategory, @Nullable SqlOperandTypeChecker operandTypeChecker,
+      @Nullable SqlReturnTypeInference finalReturnType, @Nullable SqlReturnTypeInference intermediateReturnType) {
     _name = name;
-    if (alternativeNames == null || alternativeNames.size() == 0) {
+    if (alternativeNames == null) {
       _alternativeNames = Collections.singletonList(getUnderscoreSplitAggregationFunctionName(_name));
     } else {
       _alternativeNames = alternativeNames;
@@ -218,10 +244,10 @@ public enum AggregationFunctionType {
     _sqlKind = sqlKind;
     _sqlFunctionCategory = sqlFunctionCategory;
 
-    _returnTypeInference = returnTypeInference;
+    _returnTypeInference = finalReturnType;
     _operandTypeChecker = operandTypeChecker;
-    _intermediateReturnTypeInference = intermediateReturnTypeInference == null ? _returnTypeInference
-        : intermediateReturnTypeInference;
+    _intermediateReturnTypeInference = intermediateReturnType == null ? _returnTypeInference
+        : intermediateReturnType;
   }
 
   public String getName() {
