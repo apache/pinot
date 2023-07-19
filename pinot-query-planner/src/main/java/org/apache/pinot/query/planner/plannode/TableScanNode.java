@@ -19,11 +19,14 @@
 package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
 public class TableScanNode extends AbstractPlanNode {
+  @ProtoProperties
+  private NodeHint _nodeHint;
   @ProtoProperties
   private String _tableName;
   @ProtoProperties
@@ -33,9 +36,11 @@ public class TableScanNode extends AbstractPlanNode {
     super(planFragmentId);
   }
 
-  public TableScanNode(int planFragmentId, DataSchema dataSchema, String tableName, List<String> tableScanColumns) {
+  public TableScanNode(int planFragmentId, DataSchema dataSchema, List<RelHint> relHints, String tableName,
+      List<String> tableScanColumns) {
     super(planFragmentId, dataSchema);
     _tableName = tableName;
+    _nodeHint = new NodeHint(relHints);
     _tableScanColumns = tableScanColumns;
   }
 
@@ -45,6 +50,10 @@ public class TableScanNode extends AbstractPlanNode {
 
   public List<String> getTableScanColumns() {
     return _tableScanColumns;
+  }
+
+  public NodeHint getNodeHint() {
+    return _nodeHint;
   }
 
   @Override
