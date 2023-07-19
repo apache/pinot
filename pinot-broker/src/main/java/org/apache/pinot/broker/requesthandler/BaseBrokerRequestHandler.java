@@ -37,6 +37,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
@@ -385,8 +387,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (!hasTableAccess) {
         _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);
-        requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-        return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+        throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
       }
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
           System.nanoTime() - compilationEndTimeNs);
