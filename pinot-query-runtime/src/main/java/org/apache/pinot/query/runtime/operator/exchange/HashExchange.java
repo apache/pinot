@@ -48,10 +48,11 @@ class HashExchange extends BlockExchange {
   protected void route(List<SendingMailbox> destinations, TransferableBlock block)
       throws Exception {
     List<Object[]>[] destIdxToRows = new List[destinations.size()];
-    for (Object[] row : block.getContainer()) {
+    List<Object[]> container = block.getContainer();
+    for (Object[] row : container) {
       int partition = _keySelector.computeHash(row) % destinations.size();
       if (destIdxToRows[partition] == null) {
-        destIdxToRows[partition] = new ArrayList<>();
+        destIdxToRows[partition] = new ArrayList<>(container.size());
       }
       destIdxToRows[partition].add(row);
     }
