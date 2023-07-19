@@ -533,8 +533,6 @@
       {
         "psql": "9.21.0",
         "description": "distinct count on all columns",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT distinctcount(int_col), distinctcount(double_col), distinctcount(bool_col), distinctcount(string_col) FROM {tbl}",
         "outputs": [
           [12, 16, 2, 3]
@@ -543,8 +541,6 @@
       {
         "psql": "9.21.0",
         "description": "distinct count with filter",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT distinctcount(int_col), distinctcount(double_col), distinctcount(bool_col), distinctcount(string_col) FROM {tbl} where string_col='c'",
         "outputs": [
           [5, 5, 2, 1]
@@ -553,8 +549,6 @@
       {
         "psql": "9.21.0",
         "description": "distintcount with group by",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT string_col, distinctcount(int_col), distinctcount(double_col), distinctcount(bool_col) FROM {tbl} group by string_col",
         "outputs": [
           ["a", 5, 6, 1],
@@ -565,8 +559,6 @@
       {
         "psql": "9.21.0",
         "description": "distinctcount with multiple group by columns",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT string_col, bool_col, distinctcount(int_col), distinctcount(double_col) FROM {tbl} group by string_col, bool_col",
         "outputs": [
           ["a", true, 5, 6],
@@ -578,8 +570,6 @@
       {
         "psql": "9.21.0",
         "description": "JOIN with distinct count on columns",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT distinctcount(double_col), distinctcount(int_col), distinctcount(double_col2), distinctcount(int_col2), distinctcount(bool_col), distinctcount(string_col), distinctcount(string_col2) from {tbl} JOIN {tbl2} ON string_col = string_col2",
         "outputs": [
           [11, 7, 2, 2, 2, 2, 2]
@@ -588,8 +578,6 @@
       {
         "psql": "9.21.0",
         "description": "JOIN with distinct count and group by on columns",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT string_col, distinctcount(double_col), distinctcount(int_col), distinctcount(double_col2), distinctcount(int_col2), distinctcount(bool_col) from {tbl} JOIN {tbl2} ON string_col = string_col2 GROUP BY string_col",
         "outputs": [
           ["a", 6, 5, 1, 1, 1],
@@ -690,8 +678,6 @@
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
-        "comments": "class java.lang.Double cannot be cast to class java.lang.Boolean",
         "description": "aggregate boolean column",
         "sql": "SELECT min(bool_col) FROM {tbl}"
       },
@@ -725,8 +711,8 @@
       {
         "psql": "4.2.7",
         "comments": "parse error:Encountered HAVING",
-        "description": "aggregate query with having clause",
         "ignored": true,
+        "description": "aggregate query with having clause",
         "sql": "select string_col, count(int_col) from {tbl} a group by string_col order by string_col having (select count(*) from {tbl} b where count(int_col) = b.int_col) > 0;"
       }
     ]

@@ -66,7 +66,7 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     JoinInfo joinInfo = join.analyzeCondition();
 
     boolean isColocatedJoin =
-        PinotHintStrategyTable.containsHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
+        PinotHintStrategyTable.isHintOptionTrue(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
             PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
     if (isColocatedJoin) {
       // join exchange are colocated, we should directly pass through via join key

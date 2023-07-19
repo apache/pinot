@@ -108,7 +108,13 @@ public class PinotQueryRuleSets {
       PruneEmptyRules.UNION_INSTANCE
   );
 
-  // Pinot specific rules that should be run after all other rules
+  // Pinot specific rules that should be run BEFORE all other rules
+  public static final Collection<RelOptRule> PINOT_PRE_RULES = ImmutableList.of(
+      PinotAggregateLiteralAttachmentRule.INSTANCE
+  );
+
+
+  // Pinot specific rules that should be run AFTER all other rules
   public static final Collection<RelOptRule> PINOT_POST_RULES = ImmutableList.of(
       // Evaluate the Literal filter nodes
       CoreRules.FILTER_REDUCE_EXPRESSIONS,
