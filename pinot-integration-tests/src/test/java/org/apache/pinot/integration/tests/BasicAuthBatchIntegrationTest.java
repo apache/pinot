@@ -100,10 +100,12 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   @Test
   public void testBrokerNoAuth()
       throws Exception {
-    JsonNode response = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT now()\"}"));
-    Assert.assertFalse(response.has("resultTable"), "must not return result table");
-    Assert.assertTrue(response.get("exceptions").get(0).get("errorCode").asInt() != 0, "must return error code");
+    try {
+        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT now()\"}");
+    } catch (IOException e) {
+      HttpErrorStatusException httpErrorStatusException = (HttpErrorStatusException) e.getCause();
+      Assert.assertEquals(httpErrorStatusException.getStatusCode(), 403, "must return 403");
+    }
   }
 
   @Test
@@ -183,7 +185,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
           "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER_USER);
     } catch (IOException e) {
       HttpErrorStatusException httpErrorStatusException = (HttpErrorStatusException) e.getCause();
-      Assert.assertTrue(httpErrorStatusException.getStatusCode() == 403, "must return 403");
+      Assert.assertEquals(httpErrorStatusException.getStatusCode(), 403, "must return 403");
     }
   }
 }
