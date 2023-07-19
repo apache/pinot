@@ -59,15 +59,20 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 0.0;
   private static final long DEFAULT_MIN_RECORD_COUNT = 0;
   public static class SegmentSelectionResult {
+
     private List<SegmentZKMetadata> _segmentsForCompaction;
+
     private List<String> _segmentsForDeletion;
+
     SegmentSelectionResult(List<SegmentZKMetadata> segmentsForCompaction, List<String> segmentsForDeletion) {
       _segmentsForCompaction = segmentsForCompaction;
       _segmentsForDeletion = segmentsForDeletion;
     }
+
     public List<SegmentZKMetadata> getSegmentsForCompaction() {
       return _segmentsForCompaction;
     }
+
     public List<String> getSegmentsForDeletion() {
       return _segmentsForDeletion;
     }
@@ -261,12 +266,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private Map<String, String> getCompactionConfigs(Map<String, String> taskConfig) {
     Map<String, String> compactionConfigs = new HashMap<>();
 
-    for (Map.Entry<String, String> entry : taskConfig.entrySet()) {
-      String key = entry.getKey();
-      for (String configKey : VALID_CONFIG_KEYS) {
-        if (key.endsWith(configKey)) {
-          compactionConfigs.put(configKey, entry.getValue());
-        }
+    for (String configKey : VALID_CONFIG_KEYS) {
+      if (taskConfig.containsKey(configKey)) {
+        compactionConfigs.put(configKey, taskConfig.get(configKey));
       }
     }
 
@@ -278,13 +280,13 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     String taskType = MinionConstants.UpsertCompactionTask.TASK_TYPE;
     String tableNameWithType = tableConfig.getTableName();
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      String message = "Skip generation task: {} for table: {}, offline table is not supported";
-      LOGGER.warn(message, taskType, tableNameWithType);
+      LOGGER.warn("Skip generation task: {} for table: {}, offline table is not supported",
+          taskType, tableNameWithType);
       return false;
     }
     if (!tableConfig.isUpsertEnabled()) {
-      String message = "Skip generation task: {} for table: {}, table without upsert enabled is not supported";
-      LOGGER.warn(message, taskType, tableNameWithType);
+      LOGGER.warn("Skip generation task: {} for table: {}, table without upsert enabled is not supported",
+          taskType, tableNameWithType);
       return false;
     }
     return true;
