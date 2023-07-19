@@ -53,6 +53,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String INT_KEY_MAP_FIELD_NAME = "intKeyMap";
   private static final String STRING_KEY_MAP_STR_FIELD_NAME = "stringKeyMapStr";
   private static final String INT_KEY_MAP_STR_FIELD_NAME = "intKeyMapStr";
+  private int _setSelectionDefaultDocCount = 10;
 
   @Override
   protected long getCountStarResult() {
@@ -131,12 +132,13 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   protected int getSelectionDefaultDocCount() {
-    return 10;
+    return _setSelectionDefaultDocCount;
   }
 
-  @Test
-  public void testJsonPathQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonPathQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Selection only
     String query = "SELECT stringKeyMapStr FROM " + getTableName();
     JsonNode pinotResponse = postQuery(query);
@@ -252,9 +254,10 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(pinotResponse.get("exceptions").size(), 0);
   }
 
-  @Test
-  public void testQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Selection only
     String query = "SELECT mapValue(stringKeyMap__KEYS, 'k1', stringKeyMap__VALUES) FROM " + getTableName();
     JsonNode pinotResponse = postQuery(query);
@@ -368,9 +371,10 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     assertNotEquals(pinotResponse.get("exceptions").size(), 0);
   }
 
-  @Test
-  public void testMultiValueQueries()
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testMultiValueQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query;
     JsonNode pinotResponse;
     JsonNode rows;
@@ -430,5 +434,11 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     stopZk();
 
     FileUtils.deleteDirectory(_tempDir);
+  }
+
+  @Override
+  protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
+    super.setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    _setSelectionDefaultDocCount = useMultiStageQueryEngine ? 1000 : 10;
   }
 }
