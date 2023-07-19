@@ -396,6 +396,13 @@ public class TablesResource {
 
       File segmentTarFile = new File(tmpSegmentTarDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
           + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+
+      if (!segmentTarFile.getCanonicalPath().startsWith(tmpSegmentTarDir.getCanonicalPath())) {
+        throw new WebApplicationException(
+            String.format("Invalid table / segment name: %s , %s", tableNameWithType, segmentName),
+            Response.Status.BAD_REQUEST);
+      }
+
       TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
@@ -531,6 +538,13 @@ public class TablesResource {
 
       segmentTarFile = new File(segmentTarUploadDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
           + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+
+      if (!segmentTarFile.getCanonicalPath().startsWith(segmentTarUploadDir.getPath())) {
+        throw new WebApplicationException(
+            String.format("Invalid table / segment name: %s, %s", tableNameWithType, segmentName),
+            Response.Status.BAD_REQUEST);
+      }
+
       TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
 
       // Use segment uploader to upload the segment tar file to segment store and return the segment download url.

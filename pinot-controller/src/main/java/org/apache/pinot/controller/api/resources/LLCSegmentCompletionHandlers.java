@@ -448,8 +448,13 @@ public class LLCSegmentCompletionHandlers {
           "Invalid multi-part for segment: %s", segmentName);
       FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
 
-      File localTempFile = new File(ControllerFilePathProvider.getInstance().getFileUploadTempDir(),
-          getTempSegmentFileName(segmentName));
+      File fileUploadTempDir = ControllerFilePathProvider.getInstance().getFileUploadTempDir();
+      File localTempFile = new File(fileUploadTempDir, getTempSegmentFileName(segmentName));
+
+      if (!localTempFile.getCanonicalPath().startsWith(fileUploadTempDir.getPath())) {
+        throw new IllegalArgumentException("Invalid segment name: " + segmentName);
+      }
+
       try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
         Files.copy(inputStream, localTempFile.toPath());
       } catch (Exception e) {
@@ -468,8 +473,12 @@ public class LLCSegmentCompletionHandlers {
    */
   private static SegmentMetadataImpl extractMetadataFromLocalSegmentFile(File segmentFile)
       throws Exception {
-    File tempIndexDir =
-        new File(ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), segmentFile.getName());
+    File untarredFileTempDir = ControllerFilePathProvider.getInstance().getUntarredFileTempDir();
+    File tempIndexDir = new File(untarredFileTempDir, segmentFile.getName());
+    if (tempIndexDir.getCanonicalPath().startsWith(untarredFileTempDir.getPath())) {
+      throw new IllegalArgumentException("Invalid segment file: " + segmentFile);
+    }
+
     try {
       FileUtils.forceMkdir(tempIndexDir);
 
@@ -496,6 +505,12 @@ public class LLCSegmentCompletionHandlers {
       throws IOException {
     File tempIndexDir = new File(ControllerFilePathProvider.getInstance().getUntarredFileTempDir(),
         getTempSegmentFileName(segmentName));
+
+    if (!tempIndexDir.getCanonicalPath()
+        .startsWith(ControllerFilePathProvider.getInstance().getUntarredFileTempDir().getPath())) {
+      throw new IllegalArgumentException("Invalid segment name: " + segmentName);
+    }
+
     try {
       FileUtils.forceMkdir(tempIndexDir);
 
@@ -532,8 +547,12 @@ public class LLCSegmentCompletionHandlers {
    */
   private static SegmentMetadataImpl extractMetadataFromSegmentFileURI(URI segmentFileURI, String segmentName)
       throws Exception {
-    File localTempFile =
-        new File(ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName));
+    File fileUploadTempDir = ControllerFilePathProvider.getInstance().getFileUploadTempDir();
+    File localTempFile = new File(fileUploadTempDir, getTempSegmentFileName(segmentName));
+    if (!localTempFile.getCanonicalPath().startsWith(fileUploadTempDir.getPath())) {
+      throw new IllegalArgumentException("Invalid segment name: " + segmentName);
+    }
+
     try {
       SegmentFetcherFactory.fetchSegmentToLocal(segmentFileURI, localTempFile);
       return extractMetadataFromLocalSegmentFile(localTempFile);

@@ -98,6 +98,10 @@ public class FileIngestionHelper {
     LOGGER.info("Starting ingestion of {} payload to table: {} using working dir: {}", payload._payloadType,
         tableNameWithType, workingDir.getAbsolutePath());
 
+    if (!workingDir.getCanonicalPath().startsWith(_ingestionDir.getPath())) {
+      throw new IllegalArgumentException("Invalid working dir path %s" + workingDir.getAbsolutePath());
+    }
+
     // Setup working dir
     File inputDir = new File(workingDir, INPUT_DATA_DIR);
     File outputDir = new File(workingDir, OUTPUT_SEGMENT_DIR);
