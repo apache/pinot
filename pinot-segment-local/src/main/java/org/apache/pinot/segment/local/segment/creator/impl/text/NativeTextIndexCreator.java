@@ -175,8 +175,9 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
         FileChannel invertedIndexFileChannel = new RandomAccessFile(_invertedIndexFile, "r").getChannel();
         FileChannel fstFileChannel = new RandomAccessFile(_fstIndexFile, "rw").getChannel()) {
       indexFileChannel.write(headerBuffer);
-      fstFileChannel.transferTo(0, _fstDataSize, indexFileChannel);
-      invertedIndexFileChannel.transferTo(0, invertedIndexFileLength, indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(fstFileChannel, 0, _fstDataSize, indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(invertedIndexFileChannel, 0, invertedIndexFileLength,
+          indexFileChannel);
     }
   }
 }

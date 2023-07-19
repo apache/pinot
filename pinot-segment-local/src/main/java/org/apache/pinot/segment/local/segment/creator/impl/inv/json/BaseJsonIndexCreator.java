@@ -148,8 +148,10 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
         FileChannel dictionaryFileChannel = new RandomAccessFile(_dictionaryFile, "r").getChannel();
         FileChannel invertedIndexFileChannel = new RandomAccessFile(_invertedIndexFile, "r").getChannel()) {
       indexFileChannel.write(headerBuffer);
-      dictionaryFileChannel.transferTo(0, dictionaryFileLength, indexFileChannel);
-      invertedIndexFileChannel.transferTo(0, invertedIndexFileLength, indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(dictionaryFileChannel, 0, dictionaryFileLength,
+          indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(invertedIndexFileChannel, 0, invertedIndexFileLength,
+          indexFileChannel);
 
       // Write the doc id mapping to the index file
       ByteBuffer docIdMappingBuffer =
