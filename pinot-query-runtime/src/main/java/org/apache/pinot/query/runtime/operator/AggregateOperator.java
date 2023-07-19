@@ -110,9 +110,14 @@ public class AggregateOperator extends MultiStageOperator {
     _resultSchema = resultSchema;
     _inputSchema = inputSchema;
     _aggType = aggType;
-    _aggCallSignatureMap = LiteralHintUtils.hintStringToLiteralMap(nodeHint._hintOptions
-        .get(PinotHintOptions.INTERNAL_AGG_OPTIONS)
-        .get(PinotHintOptions.InternalAggregateOptions.AGG_CALL_SIGNATURE));
+    if (nodeHint != null && nodeHint._hintOptions != null
+        && nodeHint._hintOptions.get(PinotHintOptions.INTERNAL_AGG_OPTIONS) != null) {
+      _aggCallSignatureMap = LiteralHintUtils.hintStringToLiteralMap(nodeHint._hintOptions
+          .get(PinotHintOptions.INTERNAL_AGG_OPTIONS)
+          .get(PinotHintOptions.InternalAggregateOptions.AGG_CALL_SIGNATURE));
+    } else {
+      _aggCallSignatureMap = Collections.emptyMap();
+    }
 
     _upstreamErrorBlock = null;
     _readyToConstruct = false;

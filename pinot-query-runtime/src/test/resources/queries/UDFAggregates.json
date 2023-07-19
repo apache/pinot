@@ -1,0 +1,65 @@
+{
+  "pinot_aggregate_udf_tests": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "long_col", "type": "LONG"},
+          {"name": "float_col", "type": "FLOAT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"},
+          {"name": "decimal_col", "type": "BIG_DECIMAL"},
+          {"name": "timestamp_col", "type": "TIMESTAMP"}
+        ],
+        "inputs": [
+          [2, 2, 300, 300, "a", true, "1E-307", "2020-01-01 03:10:12"],
+          [2, 2, 400, 400, "a", true, "1E+307", "2020-01-01 03:39:12"],
+          [3, 3, 100, 100, "b", false, "1E-308", "2020-01-01 08:32:12"],
+          [100, 100, 1, 1, "b", false, "1E+308", "2020-02-06 03:32:12"],
+          [101, 101, 1.01, 1.01, "c", false, "1E-317", "2020-05-01 03:32:12"],
+          [150, 150, 1.5, 1.5, "c", false, "1E+317", "2020-02-03 03:32:12"],
+          [175, 175, 1.75, 1.75, "c", true, "1E+328", "2020-01-02 03:32:12"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT FIRSTWITHTIME(int_col, timestamp_col, 'INT'), FIRSTWITHTIME(string_col, timestamp_col, 'STRING'), first_with_time(bool_col, CAST(long_col AS TIMESTAMP), 'BOOLEAN') FROM {tbl}",
+        "outputs": [[2, "a", true]]
+      },
+      {
+        "sql": "SELECT bool_col, FIRSTWITHTIME(float_col, timestamp_col, 'FLOAT'), FIRSTWITHTIME(double_col, timestamp_col, 'DOUBLE'), first_with_time(long_col, CAST(long_col AS TIMESTAMP), 'LONG') FROM {tbl} GROUP BY bool_col",
+        "outputs": [[false, 100, 100, 3], [true, 300, 300, 2]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, FIRSTWITHTIME(float_col, timestamp_col, 'FLOAT'), FIRSTWITHTIME(double_col, timestamp_col, 'DOUBLE'), first_with_time(long_col, CAST(long_col AS TIMESTAMP), 'LONG') FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 300, 300, 2], ["b", 100, 100, 3], ["c", 1.75, 1.75, 101]]
+      },
+      {
+        "sql": "SELECT LASTWITHTIME(int_col, timestamp_col, 'INT'), LASTWITHTIME(string_col, timestamp_col, 'STRING'), last_with_time(bool_col, CAST(long_col AS TIMESTAMP), 'BOOLEAN') FROM {tbl}",
+        "outputs": [[101, "c", true]]
+      },
+      {
+        "sql": "SELECT bool_col, LASTWITHTIME(float_col, timestamp_col, 'FLOAT'), LASTWITHTIME(double_col, timestamp_col, 'DOUBLE'), last_with_time(long_col, CAST(long_col AS TIMESTAMP), 'LONG') FROM {tbl} GROUP BY bool_col",
+        "outputs": [[false, 1.01, 1.01, 150], [true, 1.75, 1.75, 175]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, LASTWITHTIME(float_col, timestamp_col, 'FLOAT'), LASTWITHTIME(double_col, timestamp_col, 'DOUBLE'), last_with_time(long_col, CAST(long_col AS TIMESTAMP), 'LONG') FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 400, 400, 2], ["b", 1, 1, 100], ["c", 1.01, 1.01, 175]]
+      },
+      {
+        "sql": "SELECT PERCENTILE(float_col, 50), PERCENTILE(double_col, 5), PERCENTILE(int_col, 75), PERCENTILE(long_col, 75) FROM {tbl}",
+        "outputs": [[1.75, 1, 150, 150]]
+      },
+      {
+        "sql": "SELECT bool_col, PERCENTILE(float_col, 50), PERCENTILE(double_col, 5), PERCENTILE(int_col, 75), PERCENTILE(long_col, 75) FROM {tbl} GROUP BY bool_col",
+        "outputs": [[false, 1.5, 1, 150, 150], [true, 300, 1.75, 175, 175]]
+      },
+      {
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, PERCENTILE(float_col, 50), PERCENTILE(double_col, 5), PERCENTILE(int_col, 75), PERCENTILE(long_col, 75) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 400, 300, 2, 2], ["b", 100, 1, 100, 100], ["c", 1.5, 1.01, 175, 175]]
+      }
+    ]
+  }
+}
