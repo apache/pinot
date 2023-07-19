@@ -120,6 +120,7 @@ public class PinotQueryResource {
       LOGGER.error("Caught exception while processing post request {}", pe.getMessage());
       return pe.getMessage();
     } catch (WebApplicationException wae) {
+      LOGGER.error("Caught exception while processing post request", wae);
       throw wae;
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
@@ -138,6 +139,7 @@ public class PinotQueryResource {
       LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
       return pe.getMessage();
     } catch (WebApplicationException wae) {
+      LOGGER.error("Caught exception while processing get request", wae);
       throw wae;
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
@@ -193,7 +195,7 @@ public class PinotQueryResource {
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
     AccessControl accessControl = _accessControlFactory.create();
     if (!accessControl.hasAccess(null, AccessType.READ, httpHeaders, endpointUrl)) {
-      return QueryException.ACCESS_DENIED_ERROR.toString();
+      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
     QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),

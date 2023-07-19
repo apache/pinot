@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -176,11 +177,13 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
         "must return row count 97889");
     Assert.assertTrue(response.get("exceptions").isEmpty(), "must not return exception");
 
-    // user with valid auth but no table access
-    JsonNode responseUser = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql",
-            "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER_USER));
-    Assert.assertFalse(responseUser.has("resultTable"), "must not return result table");
-    Assert.assertTrue(responseUser.get("exceptions").get(0).get("errorCode").asInt() != 0, "must return error code");
+    // user with valid auth but no table access - must return 403
+    try {
+      sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql",
+          "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER_USER);
+    } catch (IOException e) {
+      HttpErrorStatusException httpErrorStatusException = (HttpErrorStatusException) e.getCause();
+      Assert.assertTrue(httpErrorStatusException.getStatusCode() == 403, "must return 403");
+    }
   }
 }

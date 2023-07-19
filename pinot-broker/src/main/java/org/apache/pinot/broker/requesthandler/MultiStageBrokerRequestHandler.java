@@ -27,6 +27,8 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -134,7 +136,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.info("Access denied for requestId {}", requestId);
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
     JsonNode sql = request.get(CommonConstants.Broker.Request.SQL);
@@ -167,7 +169,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {
-            return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+            throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
           }
 
           return constructMultistageExplainPlan(query, plan);
@@ -193,7 +195,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Validate table access.
     if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {
-      return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
 
