@@ -41,18 +41,20 @@ public class LiteralHintUtils {
   public static String literalMapToHintString(Map<Pair<Integer, Integer>, RexExpression.Literal> literals) {
     List<String> literalStrings = new ArrayList<>(literals.size());
     for (Map.Entry<Pair<Integer, Integer>, RexExpression.Literal> e : literals.entrySet()) {
-      literalStrings.add(String.format("%d_%d_%s_%s", e.getKey().left, e.getKey().right,
+      // individual literal parts are joined with `|`
+      literalStrings.add(String.format("%d|%d|%s|%s", e.getKey().left, e.getKey().right,
           e.getValue().getDataType().name(), e.getValue().getValue()));
     }
-    return "{" + StringUtils.join(literalStrings, ",") + "}";
+    // semi-colon is used to separate between encoded literals
+    return "{" + StringUtils.join(literalStrings, ";") + "}";
   }
 
   public static Map<Integer, Map<Integer, Literal>> hintStringToLiteralMap(String literalString) {
     Map<Integer, Map<Integer, Literal>> aggCallToLiteralArgsMap = new HashMap<>();
     if (StringUtils.isNotEmpty(literalString) && !"{}".equals(literalString)) {
-      String[] literalStringArr = literalString.substring(1, literalString.length() - 1).split(",");
+      String[] literalStringArr = literalString.substring(1, literalString.length() - 1).split(";");
       for (String literalStr : literalStringArr) {
-        String[] literalStrParts = literalStr.split("_");
+        String[] literalStrParts = literalStr.split("\\|", 4);
         int aggIdx = Integer.parseInt(literalStrParts[0]);
         int argListIdx = Integer.parseInt(literalStrParts[1]);
         String dataTypeNameStr = literalStrParts[2];

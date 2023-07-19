@@ -116,6 +116,11 @@ public class PinotHintStrategyTable {
    * Replace the option value by option key in the {@link RelHint#kvOptions}. the option key is looked up from the
    * specified hint name for a hint-able {@link org.apache.calcite.rel.RelNode}.
    *
+   * <p>Note that Calcite's {@link RelHint} is not designed to be mutable, so replacing a hint option will
+   * result in copy of the entire hint list. This util is built as a work-around of the limitation of Calcite
+   * and Pinot in handling literals around aggregates. Consider the hint cloning overhead when utilizing this method.
+   * </p>
+   *
    * @param oldHintList hint list from the {@link org.apache.calcite.rel.RelNode}.
    * @param hintName the name of the {@link RelHint}.
    * @param optionKey the option key to look for in the {@link RelHint#kvOptions}.

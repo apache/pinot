@@ -73,7 +73,7 @@ public class PinotAggregateLiteralAttachmentRule extends RelOptRule {
     List<RelHint> newHints = PinotHintStrategyTable.replaceHintOptions(aggregate.getHints(),
         PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_CALL_SIGNATURE,
         LiteralHintUtils.literalMapToHintString(rexLiterals));
-    // TODO: validate the RexLiteralHint position map with the aggregationFunctionType required literal arg indices
+    // TODO: validate against AggregationFunctionType to see if expected literal positions are properly attached
     call.transformTo(new LogicalAggregate(aggregate.getCluster(), aggregate.getTraitSet(), newHints,
         aggregate.getInput(), aggregate.getGroupSet(), aggregate.getGroupSets(), aggregate.getAggCallList()));
   }
