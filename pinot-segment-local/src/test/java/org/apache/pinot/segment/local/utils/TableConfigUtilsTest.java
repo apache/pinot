@@ -1755,6 +1755,27 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
     }
+
+    // aggregation function that exists but has no ValueAggregator available
+    HashMap<String, String> invalidAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
+    invalidAgg2Config.put("myCol.aggregationType", "Histogram");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidAgg2Config, "SegmentGenerationAndPushTask",
+            segmentGenerationAndPushTaskConfig))).build();
+    try {
+      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
+    }
+
+    // valid agg
+    HashMap<String, String> validAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
+    validAggConfig.put("myCol.aggregationType", "distinctCountHLL");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAggConfig, "SegmentGenerationAndPushTask",
+            segmentGenerationAndPushTaskConfig))).build();
+    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
   }
 
   @Test
