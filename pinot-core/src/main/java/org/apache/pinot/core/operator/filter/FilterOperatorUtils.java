@@ -96,7 +96,7 @@ public class FilterOperatorUtils {
           return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null) {
-          return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new InvertedIndexFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
       } else {
@@ -104,7 +104,7 @@ public class FilterOperatorUtils {
           return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         if (dataSource.getInvertedIndex() != null) {
-          return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new InvertedIndexFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
           return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
