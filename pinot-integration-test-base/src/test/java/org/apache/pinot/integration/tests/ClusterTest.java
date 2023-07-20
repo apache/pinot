@@ -76,6 +76,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.DataProvider;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -96,12 +97,26 @@ public abstract class ClusterTest extends ControllerTest {
 
   private String _brokerBaseApiUrl;
 
+  private boolean _useMultiStageQueryEngine = false;
+
   protected String getBrokerBaseApiUrl() {
     return _brokerBaseApiUrl;
   }
 
   protected boolean useMultiStageQueryEngine() {
-    return false;
+    return _useMultiStageQueryEngine;
+  }
+
+  protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
+    _useMultiStageQueryEngine = useMultiStageQueryEngine;
+  }
+
+  protected void disableMultiStageQueryEngine() {
+    setUseMultiStageQueryEngine(false);
+  }
+
+  protected void enableMultiStageQueryEngine() {
+    setUseMultiStageQueryEngine(true);
   }
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
@@ -489,5 +504,27 @@ public abstract class ClusterTest extends ControllerTest {
     }
     return JsonUtils.stringToJsonNode(
         sendPostRequest(controllerBaseApiUrl + "/sql", JsonUtils.objectToString(payload), headers));
+  }
+
+  @DataProvider(name = "useBothQueryEngines")
+  public Object[][] useBothQueryEngines() {
+    return new Object[][]{
+        {false},
+        {true}
+    };
+  }
+
+  @DataProvider(name = "useV1QueryEngine")
+  public Object[][] useV1QueryEngine() {
+    return new Object[][]{
+        {false}
+    };
+  }
+
+  @DataProvider(name = "useV2QueryEngine")
+  public Object[][] useV2QueryEngine() {
+    return new Object[][]{
+        {true}
+    };
   }
 }
