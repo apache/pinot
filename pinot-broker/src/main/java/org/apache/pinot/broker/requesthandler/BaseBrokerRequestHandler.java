@@ -265,6 +265,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     brokerResponse.setRequestId(String.valueOf(requestId));
+    brokerResponse.setBrokerId(_brokerId);
+    brokerResponse.setBrokerReduceTimeMs(requestContext.getReduceTimeMillis());
     return brokerResponse;
   }
 

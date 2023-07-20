@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.JsonNode;
  */
 public class BrokerResponse {
   private String _requestId;
+  private String _brokerId;
   private JsonNode _aggregationResults;
   private JsonNode _selectionResults;
   private JsonNode _resultTable;
@@ -37,6 +38,7 @@ public class BrokerResponse {
 
   private BrokerResponse(JsonNode brokerResponse) {
     _requestId = brokerResponse.get("requestId") != null ? brokerResponse.get("requestId").asText() : "unknown";
+    _brokerId = brokerResponse.get("brokerId") != null ? brokerResponse.get("brokerId").asText() : "unknown";
     _aggregationResults = brokerResponse.get("aggregationResults");
     _exceptions = brokerResponse.get("exceptions");
     _selectionResults = brokerResponse.get("selectionResults");
@@ -86,5 +88,9 @@ public class BrokerResponse {
 
   public String getRequestId() {
     return _requestId;
+  }
+
+  public String getBrokerId() {
+    return _brokerId;
   }
 }
