@@ -95,6 +95,11 @@ public class FileIngestionHelper {
     File workingDir = new File(_ingestionDir,
         String.format("%s_%s_%d_%s", WORKING_DIR_PREFIX, tableNameWithType, System.currentTimeMillis(),
             RandomStringUtils.random(10, true, false)));
+
+    if (!workingDir.getCanonicalPath().startsWith(_ingestionDir.getPath())) {
+      throw new IllegalArgumentException("Invalid working dir path %s" + workingDir.getAbsolutePath());
+    }
+
     LOGGER.info("Starting ingestion of {} payload to table: {} using working dir: {}", payload._payloadType,
         tableNameWithType, workingDir.getAbsolutePath());
 
