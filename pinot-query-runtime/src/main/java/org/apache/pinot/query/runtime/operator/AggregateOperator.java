@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -103,9 +102,8 @@ public class AggregateOperator extends MultiStageOperator {
     _aggType = aggType;
     // filter arg index array
     int[] filterArgIndexArray;
-    if (filterArgIndices == null) {
-      filterArgIndexArray = new int[aggCalls.size()];
-      Arrays.fill(filterArgIndexArray, -1);
+    if (filterArgIndices == null || filterArgIndices.size() == 0) {
+      filterArgIndexArray = null;
     } else {
       filterArgIndexArray = filterArgIndices.stream().mapToInt(Integer::intValue).toArray();
     }

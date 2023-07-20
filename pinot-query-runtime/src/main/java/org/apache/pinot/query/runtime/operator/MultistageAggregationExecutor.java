@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -48,7 +49,7 @@ public class MultistageAggregationExecutor {
   private final AggregationResultHolder[] _aggregateResultHolder;
   private final Object[] _mergeResultHolder;
 
-  public MultistageAggregationExecutor(AggregationFunction[] aggFunctions, int[] filterArgIndices,
+  public MultistageAggregationExecutor(AggregationFunction[] aggFunctions, @Nullable int[] filterArgIndices,
       AggType aggType, Map<String, Integer> colNameToIndexMap, DataSchema resultSchema) {
     _filterArgIndices = filterArgIndices;
     _aggFunctions = aggFunctions;
@@ -118,13 +119,23 @@ public class MultistageAggregationExecutor {
   }
 
   private void processAggregate(TransferableBlock block, DataSchema inputDataSchema) {
-    for (int i = 0; i < _aggFunctions.length; i++) {
-      AggregationFunction aggregationFunction = _aggFunctions[i];
-      int filterArgIdx = _filterArgIndices[i];
-      Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(
-          aggregationFunction, block, inputDataSchema, _colNameToIndexMap, filterArgIdx);
-      int numRows = AggregateOperator.computeBlockNumRows(block, filterArgIdx);
-      aggregationFunction.aggregate(numRows, _aggregateResultHolder[i], blockValSetMap);
+    if (_filterArgIndices == null) {
+      for (int i = 0; i < _aggFunctions.length; i++) {
+        AggregationFunction aggregationFunction = _aggFunctions[i];
+        Map<ExpressionContext, BlockValSet> blockValSetMap =
+            AggregateOperator.getBlockValSetMap(aggregationFunction, block, inputDataSchema, _colNameToIndexMap, -1);
+        aggregationFunction.aggregate(block.getNumRows(), _aggregateResultHolder[i], blockValSetMap);
+      }
+    } else {
+      for (int i = 0; i < _aggFunctions.length; i++) {
+        AggregationFunction aggregationFunction = _aggFunctions[i];
+        int filterArgIdx = _filterArgIndices[i];
+        Map<ExpressionContext, BlockValSet> blockValSetMap =
+            AggregateOperator.getBlockValSetMap(aggregationFunction, block, inputDataSchema, _colNameToIndexMap,
+                filterArgIdx);
+        int numRows = AggregateOperator.computeBlockNumRows(block, filterArgIdx);
+        aggregationFunction.aggregate(numRows, _aggregateResultHolder[i], blockValSetMap);
+      }
     }
   }
 

@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -59,7 +60,8 @@ public class MultistageGroupByExecutor {
   private final Map<Key, Integer> _groupKeyToIdMap;
 
   public MultistageGroupByExecutor(List<ExpressionContext> groupByExpr, AggregationFunction[] aggFunctions,
-      int[] filterArgIndices, AggType aggType, Map<String, Integer> colNameToIndexMap, DataSchema resultSchema) {
+      @Nullable int[] filterArgIndices, AggType aggType, Map<String, Integer> colNameToIndexMap,
+      DataSchema resultSchema) {
     _aggType = aggType;
     _colNameToIndexMap = colNameToIndexMap;
     _groupSet = groupByExpr;
@@ -73,9 +75,9 @@ public class MultistageGroupByExecutor {
     _groupKeyToIdMap = new HashMap<>();
 
     for (int i = 0; i < _aggFunctions.length; i++) {
-      _aggregateResultHolders[i] =
-          _aggFunctions[i].createGroupByResultHolder(InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-              InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+      _aggregateResultHolders[i] = _aggFunctions[i].createGroupByResultHolder(
+          InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
     }
   }
 
@@ -132,16 +134,29 @@ public class MultistageGroupByExecutor {
   }
 
   private void processAggregate(TransferableBlock block, DataSchema inputDataSchema) {
-    for (int i = 0; i < _aggFunctions.length; i++) {
-      AggregationFunction aggregationFunction = _aggFunctions[i];
-      int filterArgIdx = _filterArgIndices[i];
-      Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(
-          aggregationFunction, block, inputDataSchema, _colNameToIndexMap, filterArgIdx);
-      int numRows = AggregateOperator.computeBlockNumRows(block, filterArgIdx);
-      int[] intKeys = generateGroupByKeys(block.getContainer(), filterArgIdx);
-      GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
-      groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
-      aggregationFunction.aggregateGroupBySV(numRows, intKeys, groupByResultHolder, blockValSetMap);
+    if (_filterArgIndices == null) {
+      int[] intKeys = generateGroupByKeys(block.getContainer());
+      for (int i = 0; i < _aggFunctions.length; i++) {
+        AggregationFunction aggregationFunction = _aggFunctions[i];
+        Map<ExpressionContext, BlockValSet> blockValSetMap =
+            AggregateOperator.getBlockValSetMap(aggregationFunction, block, inputDataSchema, _colNameToIndexMap, -1);
+        GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
+        groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
+        aggregationFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
+      }
+    } else {
+      for (int i = 0; i < _aggFunctions.length; i++) {
+        AggregationFunction aggregationFunction = _aggFunctions[i];
+        int filterArgIdx = _filterArgIndices[i];
+        int[] intKeys = generateGroupByKeys(block.getContainer(), filterArgIdx);
+        Map<ExpressionContext, BlockValSet> blockValSetMap =
+            AggregateOperator.getBlockValSetMap(aggregationFunction, block, inputDataSchema, _colNameToIndexMap,
+                filterArgIdx);
+        int numRows = AggregateOperator.computeBlockNumRows(block, filterArgIdx);
+        GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
+        groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
+        aggregationFunction.aggregateGroupBySV(numRows, intKeys, groupByResultHolder, blockValSetMap);
+      }
     }
   }
 
