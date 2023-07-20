@@ -414,8 +414,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   private Object[][] provideQueriesWithExplainedLogicalPlan() {
     //@formatter:off
     return new Object[][] {
-        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR "
-            + "SELECT col1, col3 FROM a",
+        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
               "{\n"
             + "  \"rels\": [\n"
             + "    {\n"
@@ -446,8 +445,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "    }\n"
             + "  ]\n"
             + "}"},
-        new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR "
-            + "SELECT col1, COUNT(*) FROM a GROUP BY col1",
+        new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
               "Execution Plan\n"
             + "digraph {\n"
             + "\"PinotLogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"

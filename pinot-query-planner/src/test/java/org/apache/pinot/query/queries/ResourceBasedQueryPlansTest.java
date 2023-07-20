@@ -51,7 +51,7 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
       String explainedPlan = _queryEnvironment.explainQuery(query, requestId);
       Assert.assertEquals(explainedPlan, output,
           String.format("Test case %s for query %s doesn't match expected output: %s", testCaseName, query, output));
-      String queryWithoutExplainPlan = query.replace("EXPLAIN PLAN FOR", "");
+      String queryWithoutExplainPlan = query.replace("EXPLAIN PLAN FOR ", "");
       DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(queryWithoutExplainPlan);
       Assert.assertNotNull(dispatchableSubPlan,
           String.format("Test case %s for query %s should not have a null QueryPlan",
