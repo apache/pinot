@@ -62,10 +62,32 @@ public class DateTimeGranularitySpecTest {
     assertEquals(dateTimeGranularitySpec.getTimeUnit(), TimeUnit.MILLISECONDS);
     assertEquals(dateTimeGranularitySpec.granularityToMillis(), 1);
 
+    // New format without explicitly setting size
+    dateTimeGranularitySpec = new DateTimeGranularitySpec("HOURS");
+    assertEquals(dateTimeGranularitySpec.getSize(), 1);
+    assertEquals(dateTimeGranularitySpec.getTimeUnit(), TimeUnit.HOURS);
+    assertEquals(dateTimeGranularitySpec.granularityToMillis(), 3600000);
+
+    dateTimeGranularitySpec = new DateTimeGranularitySpec("MINUTES");
+    assertEquals(dateTimeGranularitySpec.getSize(), 1);
+    assertEquals(dateTimeGranularitySpec.getTimeUnit(), TimeUnit.MINUTES);
+    assertEquals(dateTimeGranularitySpec.granularityToMillis(), 60000);
+
+    dateTimeGranularitySpec = new DateTimeGranularitySpec("MILLISECONDS");
+    assertEquals(dateTimeGranularitySpec.getSize(), 1);
+    assertEquals(dateTimeGranularitySpec.getTimeUnit(), TimeUnit.MILLISECONDS);
+    assertEquals(dateTimeGranularitySpec.granularityToMillis(), 1);
+
+    // IllegalArguments
+    assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec(""));
+    assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("1"));
+    assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("1:1"));
+    assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("1|1"));
+    assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("DAY:DAY"));
+    assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("DAY|DAY"));
     assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("DAY:1"));
     assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("1|DAY"));
-    assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("DAY:DAY"));
-    assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("1:1"));
+    assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("EPOCH|DAY|1"));
     assertThrows(IllegalArgumentException.class, () -> new DateTimeGranularitySpec("1:DAY:EPOCH"));
   }
 }

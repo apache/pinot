@@ -66,7 +66,7 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
         }, new Object[]{"dateTimeConvert(5,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')"}, new Object[]{
         String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')", INT_MV_COLUMN)
     }, new Object[]{
-        String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','MINUTES')", TIME_COLUMN)
+        String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','MINUTES:1')", TIME_COLUMN)
     }, new Object[]{
         String.format("dateTimeConvert(%s,%s,'1:MINUTES:EPOCH','1:MINUTES')", TIME_COLUMN, INT_SV_COLUMN)
     }
@@ -87,10 +87,10 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
     long[] expectedValues = new long[NUM_ROWS];
     RoaringBitmap expectedNulls = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = TimeUnit.MILLISECONDS.toMinutes(_timeValues[i]);
-      } else {
+      if (isNullRow(i)) {
         expectedNulls.add(i);
+      } else {
+        expectedValues[i] = TimeUnit.MILLISECONDS.toMinutes(_timeValues[i]);
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, expectedNulls);

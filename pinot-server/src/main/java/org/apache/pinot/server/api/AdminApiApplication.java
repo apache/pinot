@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
@@ -70,6 +71,7 @@ public class AdminApiApplication extends ResourceConfig {
       protected void configure() {
         bind(_shutDownInProgress).to(AtomicBoolean.class);
         bind(_serverInstance).to(ServerInstance.class);
+        bind(_serverInstance.getHelixManager()).to(HelixManager.class);
         bind(_serverInstance.getServerMetrics()).to(ServerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
         bind(serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID)).named(SERVER_INSTANCE_ID);
@@ -145,7 +147,7 @@ public class AdminApiApplication extends ResourceConfig {
     _httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help/");
 
     URL swaggerDistLocation =
-        AdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/3.23.11/");
+        AdminApiApplication.class.getClassLoader().getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }

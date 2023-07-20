@@ -75,7 +75,7 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
   @Test
   public void testBrokerExtraEndpointsAutoLoaded()
       throws Exception {
-    String response = sendGetRequest(_brokerBaseApiUrl + "/test/echo/doge");
+    String response = sendGetRequest(getBrokerBaseApiUrl() + "/test/echo/doge");
     Assert.assertEquals(response, "doge");
   }
 }

@@ -113,10 +113,10 @@ public class NotOperatorTransformFunctionTest extends BaseTransformFunctionTest 
     int[] expectedValues = new int[NUM_ROWS];
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = _intSVValues[i] == 0 ? 1 : 0;
-      } else {
+      if (isNullRow(i)) {
         roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = _intSVValues[i] == 0 ? 1 : 0;
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);

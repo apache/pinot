@@ -27,20 +27,25 @@ import org.apache.pinot.spi.plugin.PluginManager;
  * Provider class for {@link MergeRollupTaskSegmentGroupManager}
  */
 public abstract class MergeRollupTaskSegmentGroupManagerProvider {
+
+  private static String _defaultMergeRollupTaskSegmentGroupManagerClassName =
+      DefaultMergeRollupTaskSegmentGroupManager.class.getName();
+
+  public static void setDefaultMergeRollupTaskSegmentGroupManagerClassName(String className) {
+    _defaultMergeRollupTaskSegmentGroupManagerClassName = className;
+  }
+
   /**
    * Constructs the {@link MergeRollupTaskSegmentGroupManager} using MergeRollup task configs
    */
   public static MergeRollupTaskSegmentGroupManager create(Map<String, String> taskConfigs) {
     String segmentGroupManagerClassName =
-        taskConfigs.get(MinionConstants.MergeRollupTask.SEGMENT_GROUP_MANAGER_CLASS_NAME_KEY);
-    if (segmentGroupManagerClassName != null) {
-      try {
-        return PluginManager.get().createInstance(segmentGroupManagerClassName);
-      } catch (Exception e) {
-        throw new RuntimeException("Fail to create segment group manager", e);
-      }
-    } else {
-      return new DefaultMergeRollupTaskSegmentGroupManager();
+        taskConfigs.getOrDefault(MinionConstants.MergeRollupTask.SEGMENT_GROUP_MANAGER_CLASS_NAME_KEY,
+            _defaultMergeRollupTaskSegmentGroupManagerClassName);
+    try {
+      return PluginManager.get().createInstance(segmentGroupManagerClassName);
+    } catch (Exception e) {
+      throw new RuntimeException("Fail to create segment group manager", e);
     }
   }
 }

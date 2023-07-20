@@ -121,6 +121,9 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   //
   private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
+  // To preload segments of table using upsert in parallel for fast upsert metadata recovery.
+  private static final String MAX_SEGMENT_PRELOAD_THREADS = "max.segment.preload.threads";
+
   // Size of cache that holds errors.
   private static final String ERROR_CACHE_SIZE = "error.cache.size";
 
@@ -238,6 +241,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   public int getMaxParallelRefreshThreads() {
     return _instanceDataManagerConfiguration.getProperty(MAX_PARALLEL_REFRESH_THREADS, 1);
+  }
+
+  public int getMaxSegmentPreloadThreads() {
+    return _instanceDataManagerConfiguration.getProperty(MAX_SEGMENT_PRELOAD_THREADS, 0);
   }
 
   public int getMaxParallelSegmentBuilds() {
