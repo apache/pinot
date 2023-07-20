@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -121,7 +122,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       List<String> validDocIdUrls;
       try {
         validDocIdUrls = getValidDocIdMetadataUrls(
-            serverToSegments, serverToEndpoints, tableNameWithType, completedSegmentsMap);
+            serverToSegments, serverToEndpoints, tableNameWithType, completedSegmentsMap.keySet());
       } catch (URISyntaxException e) {
         throw new RuntimeException(e);
       }
@@ -200,18 +201,23 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   @VisibleForTesting
   public static List<String> getValidDocIdMetadataUrls(Map<String, List<String>> serverToSegments,
       BiMap<String, String> serverToEndpoints, String tableNameWithType,
-      Map<String, SegmentZKMetadata> completedSegments) throws URISyntaxException {
+      Set<String> completedSegments) throws URISyntaxException {
+    Set<String> remainingSegments = new HashSet<>(completedSegments);
     List<String> urls = new ArrayList<>();
     for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
+      if (remainingSegments.isEmpty()) {
+        break;
+      }
       String server = entry.getKey();
       List<String> segmentNames = entry.getValue();
       URIBuilder uriBuilder = new URIBuilder(serverToEndpoints.get(server)).setPath(
           String.format("/tables/%s/validDocIdMetadata", tableNameWithType));
       int completedSegmentCountPerServer = 0;
       for (String segmentName : segmentNames) {
-        if (completedSegments.containsKey(segmentName)) {
+        if (remainingSegments.contains(segmentName)) {
           completedSegmentCountPerServer++;
           uriBuilder.addParameter("segmentNames", segmentName);
+          remainingSegments.remove(segmentName);
         }
       }
       if (completedSegmentCountPerServer > 0) {

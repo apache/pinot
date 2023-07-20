@@ -25,6 +25,7 @@ import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -176,9 +177,9 @@ public class UpsertCompactionTaskGeneratorTest {
     BiMap<String, String> serverToEndpoints = HashBiMap.create(1);
     serverToEndpoints.put("server1", "http://endpoint1");
     serverToEndpoints.put("server2", "http://endpoint2");
-    Map<String, SegmentZKMetadata> completedSegments = new HashMap<>();
-    completedSegments.put(_completedSegment.getSegmentName(), _completedSegment);
-    completedSegments.put(_completedSegment2.getSegmentName(), _completedSegment2);
+    Set<String> completedSegments = new HashSet<>();
+    completedSegments.add(_completedSegment.getSegmentName());
+    completedSegments.add(_completedSegment2.getSegmentName());
 
     List<String> validDocIdUrls =
         UpsertCompactionTaskGenerator.getValidDocIdMetadataUrls(
@@ -188,6 +189,31 @@ public class UpsertCompactionTaskGeneratorTest {
         "http://endpoint1", REALTIME_TABLE_NAME, _completedSegment.getSegmentName(),
         _completedSegment2.getSegmentName());
     assertEquals(validDocIdUrls.get(0), expectedUrl);
+    assertEquals(validDocIdUrls.size(), 1);
+  }
+
+  @Test
+  public void testGetValidDocIdMetadataUrlsWithReplicatedSegments()
+      throws URISyntaxException {
+    Map<String, List<String>> serverToSegments = new LinkedHashMap<>();
+    serverToSegments.put("server1",
+        Lists.newArrayList(_completedSegment.getSegmentName(), _completedSegment2.getSegmentName()));
+    serverToSegments.put("server2",
+        Lists.newArrayList(_completedSegment.getSegmentName(), _completedSegment2.getSegmentName()));
+    BiMap<String, String> serverToEndpoints = HashBiMap.create(1);
+    serverToEndpoints.put("server1", "http://endpoint1");
+    serverToEndpoints.put("server2", "http://endpoint2");
+    Set<String> completedSegments = new HashSet<>();
+    completedSegments.add(_completedSegment.getSegmentName());
+    completedSegments.add(_completedSegment2.getSegmentName());
+
+    List<String> validDocIdUrls = UpsertCompactionTaskGenerator.getValidDocIdMetadataUrls(
+        serverToSegments, serverToEndpoints, REALTIME_TABLE_NAME, completedSegments);
+
+    String expectedUrl = String.format("%s/tables/%s/validDocIdMetadata?segmentNames=%s&segmentNames=%s",
+        "http://endpoint1", REALTIME_TABLE_NAME, _completedSegment.getSegmentName(),
+        _completedSegment2.getSegmentName());
+        assertEquals(validDocIdUrls.get(0), expectedUrl);
     assertEquals(validDocIdUrls.size(), 1);
   }
 
