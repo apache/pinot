@@ -30,10 +30,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -129,7 +127,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       // request the urls from the servers
       CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(
-            Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager(), serverToEndpoints.inverse());
+          _clusterInfoAccessor.getExecutor(), _clusterInfoAccessor.getConnectionManager(), serverToEndpoints.inverse());
+
       CompletionServiceHelper.CompletionServiceResponse serviceResponse =
             completionServiceHelper.doMultiGetRequest(validDocIdUrls, tableNameWithType, false, 3000);
 

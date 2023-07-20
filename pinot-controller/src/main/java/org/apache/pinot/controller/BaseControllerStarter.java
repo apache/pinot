@@ -673,7 +673,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _taskManagerStatusCache = getTaskManagerStatusCache();
     _taskManager =
         new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _leadControllerManager, _config,
-            _controllerMetrics, _taskManagerStatusCache);
+            _controllerMetrics, _taskManagerStatusCache, _executorService, _connectionManager);
     periodicTasks.add(_taskManager);
     _retentionManager =
         new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);

@@ -32,8 +32,10 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
@@ -114,7 +116,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   public PinotTaskManager(PinotHelixTaskResourceManager helixTaskResourceManager,
       PinotHelixResourceManager helixResourceManager, LeadControllerManager leadControllerManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics,
-      TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> taskManagerStatusCache) {
+      TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> taskManagerStatusCache, Executor executor,
+      MultiThreadedHttpConnectionManager connectionManager) {
     super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
         controllerConf.getPinotTaskManagerInitialDelaySeconds(), helixResourceManager, leadControllerManager,
         controllerMetrics);
@@ -122,7 +125,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     _taskManagerStatusCache = taskManagerStatusCache;
     _clusterInfoAccessor =
         new ClusterInfoAccessor(helixResourceManager, helixTaskResourceManager, controllerConf, controllerMetrics,
-            leadControllerManager);
+            leadControllerManager, executor, connectionManager);
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoAccessor);
     _skipLateCronSchedule = controllerConf.isSkipLateCronSchedule();
     _maxCronScheduleDelayInSeconds = controllerConf.getMaxCronScheduleDelayInSeconds();

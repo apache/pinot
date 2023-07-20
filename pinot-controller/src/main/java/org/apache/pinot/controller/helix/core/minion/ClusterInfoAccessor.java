@@ -21,7 +21,9 @@ package org.apache.pinot.controller.helix.core.minion;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.task.TaskState;
@@ -51,15 +53,20 @@ public class ClusterInfoAccessor {
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
   private final LeadControllerManager _leadControllerManager;
+  private final Executor _executor;
+  private final MultiThreadedHttpConnectionManager _connectionManager;
 
   public ClusterInfoAccessor(PinotHelixResourceManager pinotHelixResourceManager,
       PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager) {
+      ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager, Executor executor,
+      MultiThreadedHttpConnectionManager connectionManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
     _leadControllerManager = leadControllerManager;
+    _executor = executor;
+    _connectionManager = connectionManager;
   }
 
   /**
@@ -102,6 +109,20 @@ public class ClusterInfoAccessor {
    */
   public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
     return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+  }
+
+  /**
+   * Get shared executor
+   */
+  public Executor getExecutor() {
+    return _executor;
+  }
+
+  /**
+   * Get shared connection manager
+   */
+  public MultiThreadedHttpConnectionManager getConnectionManager() {
+    return _connectionManager;
   }
 
   /**
