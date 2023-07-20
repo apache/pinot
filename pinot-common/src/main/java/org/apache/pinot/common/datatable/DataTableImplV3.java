@@ -67,6 +67,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * | METADATA SECTION                              |
  * +-----------------------------------------------+
  */
+@Deprecated
 public class DataTableImplV3 extends BaseDataTable {
   private static final int HEADER_SIZE = Integer.BYTES * 13;
   // _errCodeToExceptionMap stores exceptions as a map of errorCode->errorMessage

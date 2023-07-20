@@ -39,6 +39,7 @@ import org.roaringbitmap.RoaringBitmap;
  * - Use one dictionary for all columns (save space)
  * - Support setting nullRowIds
  */
+@Deprecated
 public class DataTableBuilderV2V3 extends BaseDataTableBuilder {
   private final Map<String, Map<String, Integer>> _dictionaryMap = new HashMap<>();
   private final Map<String, Map<Integer, String>> _reverseDictionaryMap = new HashMap<>();

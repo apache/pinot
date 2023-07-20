@@ -32,50 +32,20 @@ public class DataTableBuilderFactory {
   private DataTableBuilderFactory() {
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(DataTableBuilderFactory.class);
-
   public static final int DEFAULT_VERSION = DataTableFactory.VERSION_4;
 
-  private static int _version = DEFAULT_VERSION;
-
   public static int getDataTableVersion() {
-    return _version;
-  }
-
-  public static void setDataTableVersion(int version) {
-    LOGGER.info("Setting DataTable version to: " + version);
-    if (version != DataTableFactory.VERSION_2 && version != DataTableFactory.VERSION_3
-        && version != DataTableFactory.VERSION_4) {
-      throw new IllegalArgumentException("Unsupported version: " + version);
-    }
-    _version = version;
+    return DataTableFactory.VERSION_4;
   }
 
   public static DataTableBuilder getDataTableBuilder(DataSchema dataSchema) {
-    switch (_version) {
-      case DataTableFactory.VERSION_2:
-      case DataTableFactory.VERSION_3:
-        return new DataTableBuilderV2V3(dataSchema, _version);
-      case DataTableFactory.VERSION_4:
-        return new DataTableBuilderV4(dataSchema);
-      default:
-        throw new IllegalStateException("Unsupported data table version: " + _version);
-    }
+    return new DataTableBuilderV4(dataSchema);
   }
 
   /**
    * Returns an empty data table without data.
    */
   public static DataTable getEmptyDataTable() {
-    switch (_version) {
-      case DataTableFactory.VERSION_2:
-        return new DataTableImplV2();
-      case DataTableFactory.VERSION_3:
-        return new DataTableImplV3();
-      case DataTableFactory.VERSION_4:
-        return new DataTableImplV4();
-      default:
-        throw new IllegalStateException("Unsupported data table version: " + _version);
-    }
+    return new DataTableImplV4();
   }
 }

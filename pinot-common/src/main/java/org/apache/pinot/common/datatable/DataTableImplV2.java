@@ -31,6 +31,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
+@Deprecated
 public class DataTableImplV2 extends BaseDataTable {
   // VERSION
   // NUM_ROWS

@@ -198,16 +198,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
         Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
 
-    // Set data table version send to broker.
-    int dataTableVersion =
-        _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, DataTableBuilderFactory.DEFAULT_VERSION);
-    if (dataTableVersion > DataTableBuilderFactory.DEFAULT_VERSION) {
-      LOGGER.warn("Setting experimental DataTable version newer than default via config could result in"
-          + " backward-compatibility issues. Current default DataTable version: "
-          + DataTableBuilderFactory.DEFAULT_VERSION);
-    }
-    DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
-
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
     _helixManager =
