@@ -3,7 +3,7 @@
     "queries": [
       {
         "description": "Inner join with order by",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
@@ -22,7 +22,7 @@
       },
       {
         "description": "Inner join with order by and select column with alias",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1 AS value1, a.ts AS ts1, b.col3 FROM a JOIN b ON a.col1 = b.col2 ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, a.ts AS ts1, b.col3 FROM a JOIN b ON a.col1 = b.col2 ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
@@ -41,7 +41,7 @@
       },
       {
         "description": "SELECT * inner join",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM a JOIN b ON a.col1 = b.col2",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2",
         "output": [
           "Execution Plan",
           "\nLogicalJoin(condition=[=($0, $8)], joinType=[inner])",
@@ -54,7 +54,7 @@
       },
       {
         "description": "SELECT * inner join with filter on one table",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0",
         "output": [
           "Execution Plan",
           "\nLogicalJoin(condition=[=($0, $8)], joinType=[inner])",
@@ -68,7 +68,7 @@
       },
       {
         "description": "SELECT * inner join with filter",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3",
         "output": [
           "Execution Plan",
           "\nLogicalJoin(condition=[AND(=($0, $8), >($2, $9))], joinType=[inner])",
@@ -82,7 +82,7 @@
       },
       {
         "description": "SELECT * inner join on 2 columns equality",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2",
         "output": [
           "Execution Plan",
           "\nLogicalJoin(condition=[AND(=($0, $7), =($1, $8))], joinType=[inner])",
@@ -95,7 +95,7 @@
       },
       {
         "description": "Inner join with filter on both tables",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], ts=[$1], col3=[$3])",
@@ -113,7 +113,7 @@
       },
       {
         "description": "Inner join with group by",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($1):DOUBLE NOT NULL, $2)])",
@@ -134,7 +134,7 @@
       },
       {
         "description": "Inner join with datetrunc transform",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT dateTrunc('DAY', a.ts + b.ts) FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2",
+        "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', a.ts + b.ts) FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2",
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[DATETRUNC('DAY', +($2, $5))])",
@@ -150,7 +150,7 @@
       },
       {
         "description": "Inner join with group by on 2 columns",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 >= 0 GROUP BY a.col2, a.col3",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 >= 0 GROUP BY a.col2, a.col3",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0, 1}])",
@@ -169,7 +169,7 @@
       },
       {
         "description": "Inner join with group by on 2 columns with select alias",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col2, a.col3 as value3 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 >= 0 GROUP BY a.col2, a.col3",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, a.col3 as value3 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col3 >= 0 GROUP BY a.col2, a.col3",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0, 1}])",
@@ -188,7 +188,7 @@
       },
       {
         "description": "Inner join with filters using IN clause",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 IN ('foo', 'bar') AND b.col2 NOT IN ('alice', 'charlie')",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 IN ('foo', 'bar') AND b.col2 NOT IN ('alice', 'charlie')",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], col2=[$2])",
@@ -206,7 +206,7 @@
       },
       {
         "description": "Inner join with filters using IN clause with select alias",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, b.col2 as bvalue2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 IN ('foo', 'bar') AND b.col2 NOT IN ('alice', 'charlie')",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col2 as bvalue2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 IN ('foo', 'bar') AND b.col2 NOT IN ('alice', 'charlie')",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], bvalue2=[$2])",
@@ -224,7 +224,7 @@
       },
       {
         "description": "Semi join with IN clause",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], col2=[$1])",
@@ -239,7 +239,7 @@
       },
       {
         "description": "Semi join with multiple IN clause",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT col1, col2 FROM a WHERE col2 = 'test' AND col3 IN (SELECT col3 FROM b WHERE col1='foo') AND col3 IN (SELECT col3 FROM b WHERE col1='bar') AND col3 IN (SELECT col3 FROM b WHERE col1='foobar')",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col2 = 'test' AND col3 IN (SELECT col3 FROM b WHERE col1='foo') AND col3 IN (SELECT col3 FROM b WHERE col1='bar') AND col3 IN (SELECT col3 FROM b WHERE col1='foobar')",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], col2=[$1])",
@@ -269,7 +269,7 @@
       },
       {
         "description": "Semi join with multiple NOT IN clause",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT col1, col2 FROM a WHERE col2 = 'test' AND col3 NOT IN (SELECT col3 FROM b WHERE col1='foo') AND col3 NOT IN (SELECT col3 FROM b WHERE col1='bar') AND col3 NOT IN (SELECT col3 FROM b WHERE col1='foobar')",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col2 = 'test' AND col3 NOT IN (SELECT col3 FROM b WHERE col1='foo') AND col3 NOT IN (SELECT col3 FROM b WHERE col1='bar') AND col3 NOT IN (SELECT col3 FROM b WHERE col1='foobar')",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], col2=[$1])",
@@ -313,7 +313,7 @@
       },
       {
         "description": "Correlated join",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1 FROM a WHERE a.col4 > (SELECT 0.5 * SUM(b.col3) FROM b WHERE b.col2 = a.col2 AND b.col1 = a.col1)",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 FROM a WHERE a.col4 > (SELECT 0.5 * SUM(b.col3) FROM b WHERE b.col2 = a.col2 AND b.col1 = a.col1)",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0])",
@@ -331,7 +331,7 @@
       },
       {
         "description": "Lateral join",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, newb.sum_col3 FROM a JOIN LATERAL (SELECT SUM(col3) as sum_col3 FROM b WHERE col2 = a.col2) AS newb ON TRUE;\n",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, newb.sum_col3 FROM a JOIN LATERAL (SELECT SUM(col3) as sum_col3 FROM b WHERE col2 = a.col2) AS newb ON TRUE;\n",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], sum_col3=[$3])",
@@ -353,7 +353,7 @@
     "queries": [
       {
         "description": "Incorrect table",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3",
+        "sql": "EXPLAIN PLAN FOR SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3",
         "expectedException": "Error explain query plan for.*"
       }
     ]

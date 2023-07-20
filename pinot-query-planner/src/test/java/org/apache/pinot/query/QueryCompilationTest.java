@@ -414,7 +414,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   private Object[][] provideQueriesWithExplainedLogicalPlan() {
     //@formatter:off
     return new Object[][] {
-        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES WITHOUT IMPLEMENTATION AS JSON FOR "
+        new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR "
             + "SELECT col1, col3 FROM a",
               "{\n"
             + "  \"rels\": [\n"
@@ -446,7 +446,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "    }\n"
             + "  ]\n"
             + "}"},
-        new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES WITHOUT IMPLEMENTATION AS DOT FOR "
+        new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR "
             + "SELECT col1, COUNT(*) FROM a GROUP BY col1",
               "Execution Plan\n"
             + "digraph {\n"
@@ -454,7 +454,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "\"LogicalAggregate\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
             + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
             + "}\n"},
-        new Object[]{"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
+        new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
               "Execution Plan\n"
             + "LogicalProject(col1=[$0], col3=[$2])\n"
             + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
@@ -473,19 +473,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   private Object[][] provideQueriesWithExplainedPhysicalPlan() {
     //@formatter:off
     return new Object[][] {
-new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES WITH IMPLEMENTATION AS JSON FOR SELECT col1, col3 FROM a",
-"Physical Plan\n"
-  + "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+new Object[]{"EXPLAIN IMPLEMENTATION PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
+  "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
   + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
   + "│   └── [1]@localhost:2 PROJECT\n"
   + "│      └── [1]@localhost:2 TABLE SCAN (a) null\n"
   + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
   + "   └── [1]@localhost:1 PROJECT\n"
   + "      └── [1]@localhost:1 TABLE SCAN (a) null\n"},
-new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES WITH IMPLEMENTATION AS DOT FOR "
+new Object[]{"EXPLAIN IMPLEMENTATION PLAN EXCLUDING ATTRIBUTES AS DOT FOR "
     + "SELECT col1, COUNT(*) FROM a GROUP BY col1",
-"Physical Plan\n"
-  + "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+  "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
   + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
   + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
   + "   └── [1]@localhost:1 AGGREGATE_FINAL\n"
@@ -496,9 +494,8 @@ new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES WITH IMPLEMENTATION AS DOT FOR "
   + "         └── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
   + "            └── [2]@localhost:1 AGGREGATE_LEAF\n"
   + "               └── [2]@localhost:1 TABLE SCAN (a) null\n"},
-new Object[]{"EXPLAIN PLAN WITH IMPLEMENTATION FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
-"Physical Plan\n"
-  + "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+new Object[]{"EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
+  "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
   + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
   + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
   + "   └── [1]@localhost:1 PROJECT\n"

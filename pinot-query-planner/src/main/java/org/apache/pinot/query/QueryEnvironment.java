@@ -72,6 +72,7 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
 
 
 /**
@@ -173,7 +174,8 @@ public class QueryEnvironment {
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
       // SubPlan for further processing.
-      return getQueryPlannerResult(getQueryDispatchableSubPlan(relRoot, plannerContext, requestId), null);
+      DispatchableSubPlan dispatchableSubPlan = planQueryDispatchable(relRoot, plannerContext, requestId);
+      return new QueryPlannerResult(dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
           + "': " + e.getMessage() + "'", e);
@@ -196,27 +198,22 @@ public class QueryEnvironment {
    */
   public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
-      plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
-      SqlExplain.Depth planType = explain.getDepth();
-
+      plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = planQueryLogical(explain.getExplicandum(), plannerContext);
-
-      // get the logical plan for query.
-      if (planType == SqlExplain.Depth.LOGICAL) {
-        String logicalPlan = getExplainQueryLogicalPlan(relRoot, explain);
-        return getQueryPlannerResult(getQueryDispatchableSubPlan(relRoot, plannerContext, requestId), logicalPlan);
+      if (explain instanceof SqlPhysicalExplain) {
+        // get the physical plan for query.
+        DispatchableSubPlan dispatchableSubPlan = planQueryDispatchable(relRoot, plannerContext, requestId);
+        return new QueryPlannerResult(null, ExplainPlanPlanVisitor.explain(dispatchableSubPlan),
+            dispatchableSubPlan.getTableNames());
+      } else {
+        // get the logical plan for query.
+        SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
+        SqlExplainLevel level =
+            explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
+        Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
+        return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
       }
-
-      // get the physical plan for query.
-      if (planType == SqlExplain.Depth.PHYSICAL) {
-        DispatchableSubPlan dispatchableSubPlan = getQueryDispatchableSubPlan(relRoot, plannerContext, requestId);
-        return getQueryPlannerResult(dispatchableSubPlan, getExplainQueryPhysicalPlan(dispatchableSubPlan));
-      }
-
-      // throwing exception for SqlExplain.Depth.TYPE
-      throw new UnsupportedOperationException(String.format("'%s' Depth is not supported.", planType));
     } catch (Exception e) {
       throw new RuntimeException("Error explain query plan for: " + sqlQuery, e);
     }
@@ -236,7 +233,7 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
-          sqlNode = ((SqlExplain) sqlNode).getExplicandum();
+        sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       }
       RelRoot relRoot = planQueryLogical(sqlNode, plannerContext);
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
@@ -348,31 +345,14 @@ public class QueryEnvironment {
     QueryPlan queryPlan = pinotLogicalQueryPlanner.planQuery(relRoot);
     return pinotLogicalQueryPlanner.makePlan(queryPlan);
   }
-  private DispatchableSubPlan getQueryDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext,
+  private DispatchableSubPlan planQueryDispatchable(RelRoot relRoot, PlannerContext plannerContext,
       long requestId) {
     SubPlan subPlanRoot = toSubPlan(relRoot);
 
-    // 6. construct a dispatchable query plan.
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
     pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
     return pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
-  }
-
-  private QueryPlannerResult getQueryPlannerResult(DispatchableSubPlan dispatchableSubPlan, String plan) {
-    return new QueryPlannerResult(dispatchableSubPlan, plan, dispatchableSubPlan.getTableNames());
-  }
-
-  private String getExplainQueryPhysicalPlan(DispatchableSubPlan dispatchableSubPlan) {
-    String physicalPlan = ExplainPlanPlanVisitor.explain(dispatchableSubPlan);
-    return String.format("Physical Plan\n%s", physicalPlan);
-  }
-
-  private String getExplainQueryLogicalPlan(RelRoot relRoot, SqlExplain explain) {
-    SqlExplainFormat format = explain.getFormat() == null ? SqlExplainFormat.DOT : explain.getFormat();
-    SqlExplainLevel level =
-        explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
-    return PlannerUtils.explainPlan(relRoot.rel, format, level);
   }
 
   // --------------------------------------------------------------------------

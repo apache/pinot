@@ -3,7 +3,7 @@
     "queries": [
       {
         "description": "UNION ALL from two tables",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT col1, col2 FROM a UNION ALL SELECT col1, col2 FROM b",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a UNION ALL SELECT col1, col2 FROM b",
         "output": [
           "Execution Plan",
           "\nLogicalUnion(all=[true])",
@@ -18,7 +18,7 @@
       },
       {
         "description": "UNION ALL from three tables",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT col1, col2 FROM a UNION ALL SELECT col1, col2 FROM b UNION ALL SELECT col1, col2 FROM c",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a UNION ALL SELECT col1, col2 FROM b UNION ALL SELECT col1, col2 FROM c",
         "output": [
           "Execution Plan",
           "\nLogicalUnion(all=[true])",
@@ -38,7 +38,7 @@
       },
       {
         "description": "UNION from three tables",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT col1, col2 FROM a UNION SELECT col1, col2 FROM b UNION SELECT col1, col2 FROM c",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a UNION SELECT col1, col2 FROM b UNION SELECT col1, col2 FROM c",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0, 1}])",
@@ -61,7 +61,7 @@
       },
       {
         "description": "INTERSECT from three tables",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT col1, col2 FROM a INTERSECT SELECT col1, col2 FROM b INTERSECT SELECT col1, col2 FROM c",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a INTERSECT SELECT col1, col2 FROM b INTERSECT SELECT col1, col2 FROM c",
         "output": [
           "Execution Plan",
           "\nLogicalIntersect(all=[false])",
@@ -81,7 +81,7 @@
       },
       {
         "description": "EXCEPT from three tables",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT col1, col2 FROM a EXCEPT SELECT col1, col2 FROM b EXCEPT SELECT col1, col2 FROM c",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a EXCEPT SELECT col1, col2 FROM b EXCEPT SELECT col1, col2 FROM c",
         "output": [
           "Execution Plan",
           "\nLogicalMinus(all=[false])",
@@ -105,7 +105,7 @@
     "queries": [
       {
         "description": "Incorrect selection list ",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT col1, col3 FROM a UNION ALL SELECT col1 FROM b",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col3 FROM a UNION ALL SELECT col1 FROM b",
         "expectedException": "Error explain query plan for.*"
       }
     ]

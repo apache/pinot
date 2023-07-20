@@ -3,7 +3,7 @@
     "queries": [
       {
         "description": "Select *",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM d",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d",
         "output": [
           "Execution Plan",
           "\nLogicalTableScan(table=[[d]])",
@@ -12,7 +12,7 @@
       },
       {
         "description": "Select with filters",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, a.col3 + a.ts FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col3 + a.ts FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[+($2, $6)])",
@@ -23,7 +23,7 @@
       },
       {
         "description": "Select with filters and select alias",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT a.col1, a.col3 + a.ts AS colsum FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col3 + a.ts AS colsum FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], colsum=[+($2, $6)])",
@@ -34,7 +34,7 @@
       },
       {
         "description": "Select with transform",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT dateTrunc('DAY', ts) FROM a LIMIT 10",
+        "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', ts) FROM a LIMIT 10",
         "output": [
           "Execution Plan",
           "\nLogicalSort(offset=[0], fetch=[10])",
@@ -47,7 +47,7 @@
       },
       {
         "description": "Select with transform and select alias",
-        "sql": "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT dateTrunc('DAY', ts) AS day FROM a LIMIT 10",
+        "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', ts) AS day FROM a LIMIT 10",
         "output": [
           "Execution Plan",
           "\nLogicalSort(offset=[0], fetch=[10])",
