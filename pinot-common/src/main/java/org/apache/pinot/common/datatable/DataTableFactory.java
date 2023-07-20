@@ -34,10 +34,6 @@ public class DataTableFactory {
       throws IOException {
     int version = byteBuffer.getInt();
     switch (version) {
-      case VERSION_2:
-        return new DataTableImplV2(byteBuffer);
-      case VERSION_3:
-        return new DataTableImplV3(byteBuffer);
       case VERSION_4:
         return new DataTableImplV4(byteBuffer);
       default:

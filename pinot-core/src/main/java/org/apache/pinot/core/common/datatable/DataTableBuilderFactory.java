@@ -20,13 +20,8 @@ package org.apache.pinot.core.common.datatable;
 
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.common.datatable.DataTableImplV2;
-import org.apache.pinot.common.datatable.DataTableImplV3;
 import org.apache.pinot.common.datatable.DataTableImplV4;
 import org.apache.pinot.common.utils.DataSchema;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 public class DataTableBuilderFactory {
   private DataTableBuilderFactory() {
