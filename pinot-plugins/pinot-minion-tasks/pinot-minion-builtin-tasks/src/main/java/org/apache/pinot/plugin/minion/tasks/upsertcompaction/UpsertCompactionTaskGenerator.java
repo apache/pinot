@@ -139,6 +139,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
             "0d");
+        LOGGER.info("Deleted segments containing only invalid records for table: {} for task: {}", tableNameWithType,
+            taskType);
       }
 
       int numTasks = 0;
@@ -156,7 +158,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
         numTasks++;
       }
-      LOGGER.info("Finished generating {} tasks configs for table: {} " + "for task: {}", numTasks, tableNameWithType,
+      LOGGER.info("Finished generating {} tasks configs for table: {} for task: {}", numTasks, tableNameWithType,
           taskType);
     }
     return pinotTaskConfigs;
