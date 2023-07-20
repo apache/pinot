@@ -57,6 +57,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
   private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 0.0;
   private static final long DEFAULT_MIN_RECORD_COUNT = 0;
+
   public static class SegmentSelectionResult {
 
     private List<SegmentZKMetadata> _segmentsForCompaction;
@@ -86,14 +87,13 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
     String taskType = MinionConstants.UpsertCompactionTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
-    for (TableConfig tableConfig: tableConfigs) {
+    for (TableConfig tableConfig : tableConfigs) {
       if (!validate(tableConfig)) {
         continue;
       }
 
       String tableNameWithType = tableConfig.getTableName();
-      LOGGER.info("Start generating task configs for table: {} for task: {}",
-          tableNameWithType, taskType);
+      LOGGER.info("Start generating task configs for table: {} for task: {}", tableNameWithType, taskType);
 
       Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
       Map<String, String> compactionConfigs = getCompactionConfigs(taskConfigs);
@@ -114,30 +114,31 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         throw new RuntimeException(e);
       }
 
-      Map<String, SegmentZKMetadata> completedSegmentsMap = completedSegments.stream()
-          .collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
+      Map<String, SegmentZKMetadata> completedSegmentsMap =
+          completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
 
       List<String> validDocIdUrls;
       try {
-        validDocIdUrls = getValidDocIdMetadataUrls(
-            serverToSegments, serverToEndpoints, tableNameWithType, completedSegmentsMap.keySet());
+        validDocIdUrls = getValidDocIdMetadataUrls(serverToSegments, serverToEndpoints, tableNameWithType,
+            completedSegmentsMap.keySet());
       } catch (URISyntaxException e) {
         throw new RuntimeException(e);
       }
 
       // request the urls from the servers
-      CompletionServiceHelper completionServiceHelper = new CompletionServiceHelper(
-          _clusterInfoAccessor.getExecutor(), _clusterInfoAccessor.getConnectionManager(), serverToEndpoints.inverse());
+      CompletionServiceHelper completionServiceHelper =
+          new CompletionServiceHelper(_clusterInfoAccessor.getExecutor(), _clusterInfoAccessor.getConnectionManager(),
+              serverToEndpoints.inverse());
 
       CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-            completionServiceHelper.doMultiGetRequest(validDocIdUrls, tableNameWithType, false, 3000);
+          completionServiceHelper.doMultiGetRequest(validDocIdUrls, tableNameWithType, false, 3000);
 
       SegmentSelectionResult segmentSelectionResult =
           processValidDocIdMetadata(compactionConfigs, completedSegmentsMap, serviceResponse._httpResponses.entrySet());
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
-          pinotHelixResourceManager.deleteSegments(
-              tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(), "0d");
+        pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
+            "0d");
       }
 
       int numTasks = 0;
@@ -155,8 +156,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
         numTasks++;
       }
-      LOGGER.info("Finished generating {} tasks configs for table: {} " + "for task: {}",
-          numTasks, tableNameWithType, taskType);
+      LOGGER.info("Finished generating {} tasks configs for table: {} " + "for task: {}", numTasks, tableNameWithType,
+          taskType);
     }
     return pinotTaskConfigs;
   }
@@ -164,12 +165,11 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   @VisibleForTesting
   public static SegmentSelectionResult processValidDocIdMetadata(Map<String, String> compactionConfigs,
       Map<String, SegmentZKMetadata> completedSegmentsMap, Set<Map.Entry<String, String>> responseSet) {
-    double invalidRecordsThresholdPercent =
-        Double.parseDouble(compactionConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
+    double invalidRecordsThresholdPercent = Double.parseDouble(
+        compactionConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
-    long minRecordCount =
-        Long.parseLong(compactionConfigs.getOrDefault(UpsertCompactionTask.MIN_RECORD_COUNT,
-            String.valueOf(DEFAULT_MIN_RECORD_COUNT)));
+    long minRecordCount = Long.parseLong(compactionConfigs.getOrDefault(UpsertCompactionTask.MIN_RECORD_COUNT,
+        String.valueOf(DEFAULT_MIN_RECORD_COUNT)));
     List<SegmentZKMetadata> segmentsForCompaction = new ArrayList<>();
     List<String> segmentsForDeletion = new ArrayList<>();
     for (Map.Entry<String, String> streamResponse : responseSet) {
@@ -199,8 +199,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
   @VisibleForTesting
   public static List<String> getValidDocIdMetadataUrls(Map<String, List<String>> serverToSegments,
-      BiMap<String, String> serverToEndpoints, String tableNameWithType,
-      Set<String> completedSegments) throws URISyntaxException {
+      BiMap<String, String> serverToEndpoints, String tableNameWithType, Set<String> completedSegments)
+      throws URISyntaxException {
     Set<String> remainingSegments = new HashSet<>(completedSegments);
     List<String> urls = new ArrayList<>();
     for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
@@ -230,8 +230,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private List<SegmentZKMetadata> getCompletedSegments(String tableNameWithType,
       Map<String, String> compactionConfigs) {
     List<SegmentZKMetadata> completedSegments = new ArrayList<>();
-    String bufferPeriod = compactionConfigs.getOrDefault(
-        UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
+    String bufferPeriod =
+        compactionConfigs.getOrDefault(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
     long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
     List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
     for (SegmentZKMetadata segment : allSegments) {
@@ -263,8 +263,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   }
 
   private static final String[] VALID_CONFIG_KEYS = {
-      UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY,
-      UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
+      UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
       UpsertCompactionTask.MIN_RECORD_COUNT
   };
 
@@ -285,13 +284,13 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     String taskType = MinionConstants.UpsertCompactionTask.TASK_TYPE;
     String tableNameWithType = tableConfig.getTableName();
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      LOGGER.warn("Skip generation task: {} for table: {}, offline table is not supported",
-          taskType, tableNameWithType);
+      LOGGER.warn("Skip generation task: {} for table: {}, offline table is not supported", taskType,
+          tableNameWithType);
       return false;
     }
     if (!tableConfig.isUpsertEnabled()) {
-      LOGGER.warn("Skip generation task: {} for table: {}, table without upsert enabled is not supported",
-          taskType, tableNameWithType);
+      LOGGER.warn("Skip generation task: {} for table: {}, table without upsert enabled is not supported", taskType,
+          tableNameWithType);
       return false;
     }
     return true;

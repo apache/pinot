@@ -187,8 +187,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           TableNameBuilder.extractRawTableName(tableNameWithType));
       NameValuePair tableTypeParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE,
           TableNameBuilder.getTableTypeFromTableName(tableNameWithType).toString());
-      List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter,
-          tableTypeParameter);
+      List<NameValuePair> parameters =
+          Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter, tableTypeParameter);
 
       // Upload the tarred segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Uploading segment: " + segmentName);

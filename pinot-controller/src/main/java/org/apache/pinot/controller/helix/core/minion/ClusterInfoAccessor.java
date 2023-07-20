@@ -145,8 +145,8 @@ public class ClusterInfoAccessor {
    */
   @Nullable
   public SegmentLineage getSegmentLineage(String tableNameWithType) {
-    return SegmentLineageAccessHelper
-        .getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+    return SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
+        tableNameWithType);
   }
 
   /**
@@ -158,8 +158,8 @@ public class ClusterInfoAccessor {
    * @param expectedVersion The expected version of data to be overwritten. Set to -1 to override version check.
    */
   public void setMinionTaskMetadata(BaseTaskMetadata taskMetadata, String taskType, int expectedVersion) {
-    MinionTaskMetadataUtils
-        .persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType, taskMetadata, expectedVersion);
+    MinionTaskMetadataUtils.persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType, taskMetadata,
+        expectedVersion);
   }
 
   /**
@@ -206,8 +206,9 @@ public class ClusterInfoAccessor {
    * @return cluster config
    */
   public String getClusterConfig(String configName) {
-    HelixConfigScope helixConfigScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
-        .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
+    HelixConfigScope helixConfigScope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
+            _pinotHelixResourceManager.getHelixClusterName()).build();
     Map<String, String> configMap =
         _pinotHelixResourceManager.getHelixAdmin().getConfig(helixConfigScope, Collections.singletonList(configName));
     return configMap != null ? configMap.get(configName) : null;

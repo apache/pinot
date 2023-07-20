@@ -52,6 +52,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
+
 public class UpsertCompactionTaskGeneratorTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
@@ -69,12 +70,10 @@ public class UpsertCompactionTaskGeneratorTest {
     Map<String, Map<String, String>> tableTaskConfigs = new HashMap<>();
     Map<String, String> compactionConfigs = new HashMap<>();
     tableTaskConfigs.put(UpsertCompactionTask.TASK_TYPE, compactionConfigs);
-    _tableConfig = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(tableTaskConfigs))
-        .build();
+    _tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+            .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+            .setTaskConfig(new TableTaskConfig(tableTaskConfigs)).build();
     _mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
 
     _completedSegment = new SegmentZKMetadata("testTable__0");
@@ -98,44 +97,39 @@ public class UpsertCompactionTaskGeneratorTest {
 
   @Test
   public void testValidate() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN_NAME)
-        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+            .build();
     assertFalse(UpsertCompactionTaskGenerator.validate(tableConfig));
 
-    TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN_NAME);
+    TableConfigBuilder tableConfigBuilder =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME);
     assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
 
-    tableConfigBuilder = tableConfigBuilder
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL));
+    tableConfigBuilder = tableConfigBuilder.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL));
     assertTrue(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
   }
 
   @Test
   public void testGenerateTasksValidatesTableConfigs() {
     UpsertCompactionTaskGenerator taskGenerator = new UpsertCompactionTaskGenerator();
-    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN_NAME)
-        .build();
+    TableConfig offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+            .build();
     List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(Lists.newArrayList(offlineTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
 
-    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN_NAME)
-        .build();
+    TableConfig realtimeTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+            .build();
     pinotTaskConfigs = taskGenerator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
   }
 
   @Test
   public void testGenerateTasksWithNoSegments() {
-    when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(Collections.emptyList()));
+    when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
+        Lists.newArrayList(Collections.emptyList()));
     _taskGenerator.init(_mockClusterInfoAccessor);
 
     List<PinotTaskConfig> pinotTaskConfigs = _taskGenerator.generateTasks(Lists.newArrayList(_tableConfig));
@@ -147,8 +141,8 @@ public class UpsertCompactionTaskGeneratorTest {
   public void testGenerateTasksWithConsumingSegment() {
     SegmentZKMetadata consumingSegment = new SegmentZKMetadata("testTable__0");
     consumingSegment.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
-    when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(consumingSegment));
+    when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
+        Lists.newArrayList(consumingSegment));
     _taskGenerator.init(_mockClusterInfoAccessor);
 
     List<PinotTaskConfig> pinotTaskConfigs = _taskGenerator.generateTasks(Lists.newArrayList(_tableConfig));
@@ -158,8 +152,8 @@ public class UpsertCompactionTaskGeneratorTest {
 
   @Test
   public void testGenerateTasksWithNewlyCompletedSegment() {
-    when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Lists.newArrayList(_completedSegment));
+    when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
+        Lists.newArrayList(_completedSegment));
     _taskGenerator.init(_mockClusterInfoAccessor);
 
     List<PinotTaskConfig> pinotTaskConfigs = _taskGenerator.generateTasks(Lists.newArrayList(_tableConfig));
@@ -169,7 +163,7 @@ public class UpsertCompactionTaskGeneratorTest {
 
   @Test
   public void testGetValidDocIdMetadataUrls()
-    throws URISyntaxException {
+      throws URISyntaxException {
     Map<String, List<String>> serverToSegments = new HashMap<>();
     serverToSegments.put("server1",
         Lists.newArrayList(_completedSegment.getSegmentName(), _completedSegment2.getSegmentName()));
@@ -182,12 +176,12 @@ public class UpsertCompactionTaskGeneratorTest {
     completedSegments.add(_completedSegment2.getSegmentName());
 
     List<String> validDocIdUrls =
-        UpsertCompactionTaskGenerator.getValidDocIdMetadataUrls(
-            serverToSegments, serverToEndpoints, REALTIME_TABLE_NAME, completedSegments);
+        UpsertCompactionTaskGenerator.getValidDocIdMetadataUrls(serverToSegments, serverToEndpoints,
+            REALTIME_TABLE_NAME, completedSegments);
 
-    String expectedUrl = String.format("%s/tables/%s/validDocIdMetadata?segmentNames=%s&segmentNames=%s",
-        "http://endpoint1", REALTIME_TABLE_NAME, _completedSegment.getSegmentName(),
-        _completedSegment2.getSegmentName());
+    String expectedUrl =
+        String.format("%s/tables/%s/validDocIdMetadata?segmentNames=%s&segmentNames=%s", "http://endpoint1",
+            REALTIME_TABLE_NAME, _completedSegment.getSegmentName(), _completedSegment2.getSegmentName());
     assertEquals(validDocIdUrls.get(0), expectedUrl);
     assertEquals(validDocIdUrls.size(), 1);
   }
@@ -207,13 +201,14 @@ public class UpsertCompactionTaskGeneratorTest {
     completedSegments.add(_completedSegment.getSegmentName());
     completedSegments.add(_completedSegment2.getSegmentName());
 
-    List<String> validDocIdUrls = UpsertCompactionTaskGenerator.getValidDocIdMetadataUrls(
-        serverToSegments, serverToEndpoints, REALTIME_TABLE_NAME, completedSegments);
+    List<String> validDocIdUrls =
+        UpsertCompactionTaskGenerator.getValidDocIdMetadataUrls(serverToSegments, serverToEndpoints,
+            REALTIME_TABLE_NAME, completedSegments);
 
-    String expectedUrl = String.format("%s/tables/%s/validDocIdMetadata?segmentNames=%s&segmentNames=%s",
-        "http://endpoint1", REALTIME_TABLE_NAME, _completedSegment.getSegmentName(),
-        _completedSegment2.getSegmentName());
-        assertEquals(validDocIdUrls.get(0), expectedUrl);
+    String expectedUrl =
+        String.format("%s/tables/%s/validDocIdMetadata?segmentNames=%s&segmentNames=%s", "http://endpoint1",
+            REALTIME_TABLE_NAME, _completedSegment.getSegmentName(), _completedSegment2.getSegmentName());
+    assertEquals(validDocIdUrls.get(0), expectedUrl);
     assertEquals(validDocIdUrls.size(), 1);
   }
 
@@ -232,19 +227,10 @@ public class UpsertCompactionTaskGeneratorTest {
   public void testProcessValidDocIdMetadata() {
     Map<String, String> compactionConfigs = getCompactionConfigs("1", "10");
     Set<Map.Entry<String, String>> responseSet = new HashSet<>();
-    String json =
-         "[{"
-          + "\"totalValidDocs\" : 50,"
-          + "\"totalInvalidDocs\" : 50,"
-          + "\"segmentName\" : \"" + _completedSegment.getSegmentName() + "\","
-          + "\"totalDocs\" : 100"
-        + "},"
-        + "{"
-          + "\"totalValidDocs\" : 0,"
-          + "\"totalInvalidDocs\" : 10,"
-          + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\","
-          + "\"totalDocs\" : 10"
-        + "}]";
+    String json = "[{" + "\"totalValidDocs\" : 50," + "\"totalInvalidDocs\" : 50," + "\"segmentName\" : \""
+        + _completedSegment.getSegmentName() + "\"," + "\"totalDocs\" : 100" + "}," + "{" + "\"totalValidDocs\" : 0,"
+        + "\"totalInvalidDocs\" : 10," + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\","
+        + "\"totalDocs\" : 10" + "}]";
     responseSet.add(new AbstractMap.SimpleEntry<>("", json));
     UpsertCompactionTaskGenerator.SegmentSelectionResult segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap, responseSet);

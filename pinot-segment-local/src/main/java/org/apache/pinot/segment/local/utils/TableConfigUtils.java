@@ -533,8 +533,7 @@ public final class TableConfigUtils {
           Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
               "UpsertCompactionTask only supports realtime tables!");
           // check upsert enabled
-          Preconditions.checkState(tableConfig.isUpsertEnabled(),
-              "Upsert must be enabled for UpsertCompactionTask");
+          Preconditions.checkState(tableConfig.isUpsertEnabled(), "Upsert must be enabled for UpsertCompactionTask");
 
           // check no malformed period
           if (taskTypeConfig.containsKey("bufferTimePeriod")) {
@@ -542,21 +541,19 @@ public final class TableConfigUtils {
           }
           // check maxNumRecordsPerSegment
           if (taskTypeConfig.containsKey("invalidRecordsThresholdPercent")) {
-            Preconditions.checkState(
-                Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) > 0
+            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) > 0
                     && Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) <= 100,
                 "invalidRecordsThresholdPercent must be > 0 and <= 100");
           }
           // check minRecordCount
           if (taskTypeConfig.containsKey("minRecordCount")) {
-            Preconditions.checkState(
-                Long.parseLong(taskTypeConfig.get("minRecordCount")) >= 1,
+            Preconditions.checkState(Long.parseLong(taskTypeConfig.get("minRecordCount")) >= 1,
                 "minRecordCount must be >= 1");
           }
           // check that either invalidRecordsThresholdPercent or minRecordCount was provided
-          Preconditions.checkState(taskTypeConfig.containsKey("invalidRecordsThresholdPercent")
-            || taskTypeConfig.containsKey("minRecordCount"),
-              "invalidRecordsThresholdPercent or minRecordCount or both must be provided");
+          Preconditions.checkState(
+              taskTypeConfig.containsKey("invalidRecordsThresholdPercent") || taskTypeConfig.containsKey(
+                  "minRecordCount"), "invalidRecordsThresholdPercent or minRecordCount or both must be provided");
         }
       }
     }
@@ -595,8 +592,8 @@ public final class TableConfigUtils {
     Preconditions.checkState(streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType(),
         "Upsert/Dedup table must use low-level streaming consumer type");
     // replica group is configured for routing
-    Preconditions.checkState(tableConfig.getRoutingConfig() != null
-            && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
+    Preconditions.checkState(
+        tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
 
     // specifically for upsert
@@ -634,8 +631,8 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validateInstancePartitionsTypeMapConfig(TableConfig tableConfig) {
-    if (MapUtils.isEmpty(tableConfig.getInstancePartitionsMap())
-        || MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+    if (MapUtils.isEmpty(tableConfig.getInstancePartitionsMap()) || MapUtils.isEmpty(
+        tableConfig.getInstanceAssignmentConfigMap())) {
       return;
     }
     for (InstancePartitionsType instancePartitionsType : tableConfig.getInstancePartitionsMap().keySet()) {
@@ -653,11 +650,11 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validatePartitionedReplicaGroupInstance(TableConfig tableConfig) {
-    if (tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() == null
-        || MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+    if (tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() == null || MapUtils.isEmpty(
+        tableConfig.getInstanceAssignmentConfigMap())) {
       return;
     }
-    for (Map.Entry<String, InstanceAssignmentConfig> entry: tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
+    for (Map.Entry<String, InstanceAssignmentConfig> entry : tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
       boolean isNullReplicaGroupPartitionConfig = entry.getValue().getReplicaGroupPartitionConfig() == null;
       Preconditions.checkState(isNullReplicaGroupPartitionConfig,
           "Both replicaGroupStrategyConfig and replicaGroupPartitionConfig is provided");
@@ -1010,8 +1007,8 @@ public final class TableConfigUtils {
       return;
     }
 
-    boolean forwardIndexDisabled =
-        Boolean.parseBoolean(fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
+    boolean forwardIndexDisabled = Boolean.parseBoolean(
+        fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
             FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
     if (!forwardIndexDisabled) {
       return;
@@ -1030,20 +1027,23 @@ public final class TableConfigUtils {
     }
 
     Preconditions.checkState(
-        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(),
-        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
-            + " not supported with forward index for column: %s, disabled", columnName));
+        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(), String.format(
+            "Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
+                + " not supported with forward index for column: %s, disabled", columnName));
 
-    boolean hasDictionary = fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
-        || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName);
-    boolean hasInvertedIndex = indexingConfigs.getInvertedIndexColumns() != null
-        && indexingConfigs.getInvertedIndexColumns().contains(columnName);
+    boolean hasDictionary =
+        fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY || noDictionaryColumns == null
+            || !noDictionaryColumns.contains(columnName);
+    boolean hasInvertedIndex =
+        indexingConfigs.getInvertedIndexColumns() != null && indexingConfigs.getInvertedIndexColumns()
+            .contains(columnName);
 
     if (!hasDictionary || !hasInvertedIndex) {
       LOGGER.warn("Forward index has been disabled for column {}. Either dictionary ({}) and / or inverted index ({}) "
               + "has been disabled. If the forward index needs to be regenerated or another index added please refresh "
               + "or back-fill the forward index as it cannot be rebuilt without dictionary and inverted index.",
-          columnName, hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
+          columnName,
+          hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
     }
   }
 
@@ -1256,9 +1256,7 @@ public final class TableConfigUtils {
     if (clone.getFieldConfigList() != null) {
       List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
       for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
-        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
-            .withIndexTypes(null)
-            .build());
+        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig).withIndexTypes(null).build());
       }
       clone.setFieldConfigList(cleanFieldConfigList);
     }

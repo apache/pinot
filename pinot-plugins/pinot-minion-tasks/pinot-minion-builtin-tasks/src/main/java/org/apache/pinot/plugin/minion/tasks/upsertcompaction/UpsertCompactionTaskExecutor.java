@@ -126,14 +126,14 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
     @Override
     public void close()
-      throws IOException {
+        throws IOException {
       _pinotSegmentRecordReader.close();
     }
   }
 
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
-    throws Exception {
+      throws Exception {
     _eventObserver.notifyProgress(pinotTaskConfig, "Compacting segment: " + indexDir);
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
@@ -154,9 +154,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       if (!FileUtils.deleteQuietly(workingDir)) {
         LOGGER.warn("Failed to delete working directory: {}", workingDir.getAbsolutePath());
       }
-      return new SegmentConversionResult.Builder()
-          .setTableNameWithType(tableNameWithType)
-          .setSegmentName(segmentName)
+      return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
           .build();
     }
 
@@ -169,11 +167,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     }
 
     File compactedSegmentFile = new File(workingDir, segmentName);
-    SegmentConversionResult result = new SegmentConversionResult.Builder()
-        .setFile(compactedSegmentFile)
-        .setTableNameWithType(tableNameWithType)
-        .setSegmentName(segmentName)
-        .build();
+    SegmentConversionResult result =
+        new SegmentConversionResult.Builder().setFile(compactedSegmentFile).setTableNameWithType(tableNameWithType)
+            .setSegmentName(segmentName).build();
 
     long endMillis = System.currentTimeMillis();
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
@@ -209,12 +205,11 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     String server = getServer(segmentName, tableNameWithType);
 
     // get the url for the validDocIds for the server
-    InstanceConfig instanceConfig =
-        _clusterManagementTool.getInstanceConfig(_clusterName, server);
+    InstanceConfig instanceConfig = _clusterManagementTool.getInstanceConfig(_clusterName, server);
     String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
-    String url = new URIBuilder(endpoint)
-        .setPath(String.format("/segments/%s/%s/validDocIds", tableNameWithType, segmentName))
-        .toString();
+    String url =
+        new URIBuilder(endpoint).setPath(String.format("/segments/%s/%s/validDocIds", tableNameWithType, segmentName))
+            .toString();
 
     // get the validDocIds from that server
     Response response = ClientBuilder.newClient().target(url).request().get(Response.class);
