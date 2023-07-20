@@ -107,9 +107,10 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     return 10;
   }
 
-  @Test
-  public void testThetaSketchQuery()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testThetaSketchQuery(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     /*
     Original data:
 
@@ -206,7 +207,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       runAndAssert(query, expected);
     }
 
-     // gender = female DIFF course = history
+    // gender = female DIFF course = history
     {
       String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
           + "'dimName = ''gender'' and dimValue = ''Female''', 'dimName = ''course'' and dimValue = ''History''', "
