@@ -124,6 +124,7 @@ public class StreamConfigProperties {
   }
 
   public static String getPropertySuffix(String incoming, String propertyPrefix) {
-    return incoming.split(propertyPrefix + ".")[1];
+    String prefix = propertyPrefix + DOT_SEPARATOR;
+    return incoming.substring(prefix.length());
   }
 }
