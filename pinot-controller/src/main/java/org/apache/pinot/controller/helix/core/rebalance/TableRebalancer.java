@@ -555,13 +555,14 @@ public class TableRebalancer {
           InstancePartitions instancePartitions =
               InstancePartitionsUtils.fetchInstancePartitionsWithRename(_helixManager.getHelixPropertyStore(),
                   referenceInstancePartitionsName, instancePartitionsType.getInstancePartitionsName(rawTableName));
-          if (!dryRun) {
+          boolean instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+          if (!dryRun && instancePartitionsUnchanged) {
             LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
                 referenceInstancePartitionsName);
             InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
                 instancePartitions);
           }
-          return Pair.of(instancePartitions, instancePartitions.equals(existingInstancePartitions));
+          return Pair.of(instancePartitions, instancePartitionsUnchanged);
         }
         // Set existing instance partition to null if bootstrap mode is enabled, so that the instance partition
         // map can be fully recalculated.
