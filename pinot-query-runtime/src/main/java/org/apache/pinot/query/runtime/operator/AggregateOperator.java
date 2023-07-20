@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +46,7 @@ import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -90,26 +92,24 @@ public class AggregateOperator extends MultiStageOperator {
   private MultistageAggregationExecutor _aggregationExecutor;
   private MultistageGroupByExecutor _groupByExecutor;
 
-  // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
-  // aggCalls has to be a list of FunctionCall and cannot be null
-  // groupSet has to be a list of InputRef and cannot be null
-  // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
-  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
-      DataSchema resultSchema, DataSchema inputSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet,
-      AggType aggType) {
-    this(context, inputOperator, resultSchema, inputSchema, aggCalls, groupSet, aggType,
-        new AbstractPlanNode.NodeHint());
-  }
-
   @VisibleForTesting
-  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
-      DataSchema resultSchema, DataSchema inputSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet,
-      AggType aggType, AbstractPlanNode.NodeHint nodeHint) {
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator, DataSchema resultSchema,
+      DataSchema inputSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType,
+      @Nullable List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint) {
     super(context);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
     _inputSchema = inputSchema;
     _aggType = aggType;
+    // filter arg index array
+    int[] filterArgIndexArray;
+    if (filterArgIndices == null) {
+      filterArgIndexArray = new int[aggCalls.size()];
+      Arrays.fill(filterArgIndexArray, -1);
+    } else {
+      filterArgIndexArray = filterArgIndices.stream().mapToInt(Integer::intValue).toArray();
+    }
+    // filter operand and literal hints
     if (nodeHint != null && nodeHint._hintOptions != null
         && nodeHint._hintOptions.get(PinotHintOptions.INTERNAL_AGG_OPTIONS) != null) {
       _aggCallSignatureMap = LiteralHintUtils.hintStringToLiteralMap(nodeHint._hintOptions
@@ -126,6 +126,7 @@ public class AggregateOperator extends MultiStageOperator {
 
     // Convert groupSet to ExpressionContext that our aggregation functions understand.
     List<ExpressionContext> groupByExpr = getGroupSet(groupSet);
+
     List<FunctionContext> functionContexts = getFunctionContexts(aggCalls);
     AggregationFunction[] aggFunctions = new AggregationFunction[functionContexts.size()];
 
@@ -136,12 +137,12 @@ public class AggregateOperator extends MultiStageOperator {
     // Initialize the appropriate executor.
     if (!groupSet.isEmpty()) {
       _isGroupByAggregation = true;
-      _groupByExecutor = new MultistageGroupByExecutor(groupByExpr, aggFunctions, aggType, _colNameToIndexMap,
-          _resultSchema);
+      _groupByExecutor = new MultistageGroupByExecutor(groupByExpr, aggFunctions, filterArgIndexArray, aggType,
+          _colNameToIndexMap, _resultSchema);
     } else {
       _isGroupByAggregation = false;
-      _aggregationExecutor = new MultistageAggregationExecutor(aggFunctions, aggType, _colNameToIndexMap,
-          _resultSchema);
+      _aggregationExecutor = new MultistageAggregationExecutor(aggFunctions, filterArgIndexArray, aggType,
+          _colNameToIndexMap, _resultSchema);
     }
   }
 
@@ -253,7 +254,7 @@ public class AggregateOperator extends MultiStageOperator {
     // The literal value here does not matter. We create a dummy literal here just so that the count aggregation
     // has some column to process.
     if (aggArguments.isEmpty()) {
-      aggArguments.add(ExpressionContext.forIdentifier("__PLACEHOLDER__"));
+      aggArguments.add(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "__PLACEHOLDER__"));
     }
 
     return new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, aggArguments);
@@ -321,7 +322,7 @@ public class AggregateOperator extends MultiStageOperator {
   //  convert the unserialized format to serialized format of BaseDataBlock. Then it will convert it back to column
   //  value primitive type.
   static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggFunction,
-      TransferableBlock block, DataSchema inputDataSchema, Map<String, Integer> colNameToIndexMap) {
+      TransferableBlock block, DataSchema inputDataSchema, Map<String, Integer> colNameToIndexMap, int filterArgIdx) {
     List<ExpressionContext> expressions = aggFunction.getInputExpressions();
     int numExpressions = expressions.size();
     if (numExpressions == 0) {
@@ -335,10 +336,23 @@ public class AggregateOperator extends MultiStageOperator {
         int index = colNameToIndexMap.get(expression.getIdentifier());
         DataSchema.ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
         Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
-        blockValSetMap.put(expression, new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index));
+        blockValSetMap.put(expression, new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index,
+            filterArgIdx));
       }
     }
     return blockValSetMap;
+  }
+
+  static int computeBlockNumRows(TransferableBlock block, int filterArgIdx) {
+    if (filterArgIdx == -1) {
+      return block.getNumRows();
+    } else {
+      int rowCount = 0;
+      for (int rowId = 0; rowId < block.getNumRows(); rowId++) {
+        rowCount += block.getDataBlock().getInt(rowId, filterArgIdx) == 1 ? 1 : 0;
+      }
+      return rowCount;
+    }
   }
 
   static Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row,

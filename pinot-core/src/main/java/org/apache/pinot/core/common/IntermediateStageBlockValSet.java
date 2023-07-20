@@ -37,13 +37,16 @@ import org.roaringbitmap.RoaringBitmap;
 public class IntermediateStageBlockValSet implements BlockValSet {
   private final FieldSpec.DataType _dataType;
   private final DataBlock _dataBlock;
-  private final int _index;
+  private final int _colIndex;
+  private final int _filterArgIdx;
   private final RoaringBitmap _nullBitMap;
 
-  public IntermediateStageBlockValSet(DataSchema.ColumnDataType columnDataType, DataBlock dataBlock, int colIndex) {
+  public IntermediateStageBlockValSet(DataSchema.ColumnDataType columnDataType, DataBlock dataBlock, int colIndex,
+      int filterArgIdx) {
     _dataType = columnDataType.toDataType();
     _dataBlock = dataBlock;
-    _index = colIndex;
+    _colIndex = colIndex;
+    _filterArgIdx = filterArgIdx;
     _nullBitMap = dataBlock.getNullRowIds(colIndex);
   }
 
@@ -80,37 +83,37 @@ public class IntermediateStageBlockValSet implements BlockValSet {
 
   @Override
   public int[] getIntValuesSV() {
-    return DataBlockUtils.extractIntValuesForColumn(_dataBlock, _index);
+    return DataBlockUtils.extractIntValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
   }
 
   @Override
   public long[] getLongValuesSV() {
-    return DataBlockUtils.extractLongValuesForColumn(_dataBlock, _index);
+    return DataBlockUtils.extractLongValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
   }
 
   @Override
   public float[] getFloatValuesSV() {
-    return DataBlockUtils.extractFloatValuesForColumn(_dataBlock, _index);
+    return DataBlockUtils.extractFloatValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
   }
 
   @Override
   public double[] getDoubleValuesSV() {
-    return DataBlockUtils.extractDoubleValuesForColumn(_dataBlock, _index);
+    return DataBlockUtils.extractDoubleValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
   }
 
   @Override
   public BigDecimal[] getBigDecimalValuesSV() {
-    return DataBlockUtils.extractBigDecimalValuesForColumn(_dataBlock, _index);
+    return DataBlockUtils.extractBigDecimalValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
   }
 
   @Override
   public String[] getStringValuesSV() {
-    return DataBlockUtils.extractStringValuesForColumn(_dataBlock, _index);
+    return DataBlockUtils.extractStringValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
   }
 
   @Override
   public byte[][] getBytesValuesSV() {
-    return DataBlockUtils.extractBytesValuesForColumn(_dataBlock, _index);
+    return DataBlockUtils.extractBytesValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
   }
 
   @Override

@@ -42,13 +42,15 @@ public class MultistageAggregationExecutor {
   private final DataSchema _resultSchema;
 
   private final AggregationFunction[] _aggFunctions;
+  private final int[] _filterArgIndices;
 
   // Result holders for each mode.
   private final AggregationResultHolder[] _aggregateResultHolder;
   private final Object[] _mergeResultHolder;
 
-  public MultistageAggregationExecutor(AggregationFunction[] aggFunctions,
+  public MultistageAggregationExecutor(AggregationFunction[] aggFunctions, int[] filterArgIndices,
       AggType aggType, Map<String, Integer> colNameToIndexMap, DataSchema resultSchema) {
+    _filterArgIndices = filterArgIndices;
     _aggFunctions = aggFunctions;
     _aggType = aggType;
     _colNameToIndexMap = colNameToIndexMap;
@@ -118,9 +120,11 @@ public class MultistageAggregationExecutor {
   private void processAggregate(TransferableBlock block, DataSchema inputDataSchema) {
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggregationFunction = _aggFunctions[i];
-      Map<ExpressionContext, BlockValSet> blockValSetMap =
-          AggregateOperator.getBlockValSetMap(aggregationFunction, block, inputDataSchema, _colNameToIndexMap);
-      aggregationFunction.aggregate(block.getNumRows(), _aggregateResultHolder[i], blockValSetMap);
+      int filterArgIdx = _filterArgIndices[i];
+      Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(
+          aggregationFunction, block, inputDataSchema, _colNameToIndexMap, filterArgIdx);
+      int numRows = AggregateOperator.computeBlockNumRows(block, filterArgIdx);
+      aggregationFunction.aggregate(numRows, _aggregateResultHolder[i], blockValSetMap);
     }
   }
 

@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,7 @@ public class MultistageGroupByExecutor {
 
   private final List<ExpressionContext> _groupSet;
   private final AggregationFunction[] _aggFunctions;
+  private final int[] _filterArgIndices;
 
   // Group By Result holders for each mode
   private final GroupByResultHolder[] _aggregateResultHolders;
@@ -57,11 +59,12 @@ public class MultistageGroupByExecutor {
   private final Map<Key, Integer> _groupKeyToIdMap;
 
   public MultistageGroupByExecutor(List<ExpressionContext> groupByExpr, AggregationFunction[] aggFunctions,
-      AggType aggType, Map<String, Integer> colNameToIndexMap, DataSchema resultSchema) {
+      int[] filterArgIndices, AggType aggType, Map<String, Integer> colNameToIndexMap, DataSchema resultSchema) {
     _aggType = aggType;
     _colNameToIndexMap = colNameToIndexMap;
     _groupSet = groupByExpr;
     _aggFunctions = aggFunctions;
+    _filterArgIndices = filterArgIndices;
     _resultSchema = resultSchema;
 
     _aggregateResultHolders = new GroupByResultHolder[_aggFunctions.length];
@@ -129,15 +132,16 @@ public class MultistageGroupByExecutor {
   }
 
   private void processAggregate(TransferableBlock block, DataSchema inputDataSchema) {
-    int[] intKeys = generateGroupByKeys(block.getContainer());
-
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggregationFunction = _aggFunctions[i];
-      Map<ExpressionContext, BlockValSet> blockValSetMap =
-          AggregateOperator.getBlockValSetMap(aggregationFunction, block, inputDataSchema, _colNameToIndexMap);
+      int filterArgIdx = _filterArgIndices[i];
+      Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(
+          aggregationFunction, block, inputDataSchema, _colNameToIndexMap, filterArgIdx);
+      int numRows = AggregateOperator.computeBlockNumRows(block, filterArgIdx);
+      int[] intKeys = generateGroupByKeys(block.getContainer(), filterArgIdx);
       GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
       groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
-      aggregationFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
+      aggregationFunction.aggregateGroupBySV(numRows, intKeys, groupByResultHolder, blockValSetMap);
     }
   }
 
@@ -190,5 +194,43 @@ public class MultistageGroupByExecutor {
       rowIntKeys[i] = _groupKeyToIdMap.computeIfAbsent(rowKey, k -> _groupKeyToIdMap.size());
     }
     return rowIntKeys;
+  }
+
+  /**
+   * Creates the group by key for each row. Converts the key into a 0-index based int value that can be used by
+   * GroupByAggregationResultHolders used in v1 aggregations.
+   * <p>
+   * Returns the int key for each row.
+   */
+  private int[] generateGroupByKeys(List<Object[]> rows, int filterArgIndex) {
+    int numRows = rows.size();
+    int[] rowIntKeys = new int[numRows];
+    int numKeys = _groupSet.size();
+    if (filterArgIndex == -1) {
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        Object[] row = rows.get(rowId);
+        Object[] keyValues = new Object[numKeys];
+        for (int j = 0; j < numKeys; j++) {
+          keyValues[j] = row[_colNameToIndexMap.get(_groupSet.get(j).getIdentifier())];
+        }
+        Key rowKey = new Key(keyValues);
+        rowIntKeys[rowId] = _groupKeyToIdMap.computeIfAbsent(rowKey, k -> _groupKeyToIdMap.size());
+      }
+      return rowIntKeys;
+    } else {
+      int outRowId = 0;
+      for (int inRowId = 0; inRowId < numRows; inRowId++) {
+        Object[] row = rows.get(inRowId);
+        if ((Boolean) row[filterArgIndex]) {
+          Object[] keyValues = new Object[numKeys];
+          for (int j = 0; j < numKeys; j++) {
+            keyValues[j] = row[_colNameToIndexMap.get(_groupSet.get(j).getIdentifier())];
+          }
+          Key rowKey = new Key(keyValues);
+          rowIntKeys[outRowId++] = _groupKeyToIdMap.computeIfAbsent(rowKey, k -> _groupKeyToIdMap.size());
+        }
+      }
+      return Arrays.copyOfRange(rowIntKeys, 0, outRowId);
+    }
   }
 }
