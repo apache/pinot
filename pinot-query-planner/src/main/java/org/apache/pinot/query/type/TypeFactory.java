@@ -55,31 +55,31 @@ public class TypeFactory extends JavaTypeFactoryImpl {
     switch (fieldSpec.getDataType()) {
       case INT:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.INTEGER)
-            : createMultisetType(createSqlType(SqlTypeName.INTEGER), -1);
+            : createArrayType(createSqlType(SqlTypeName.INTEGER), -1);
       case LONG:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BIGINT)
-            : createMultisetType(createSqlType(SqlTypeName.BIGINT), -1);
+            : createArrayType(createSqlType(SqlTypeName.BIGINT), -1);
       case FLOAT:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.REAL)
-            : createMultisetType(createSqlType(SqlTypeName.REAL), -1);
+            : createArrayType(createSqlType(SqlTypeName.REAL), -1);
       case DOUBLE:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
-            : createMultisetType(createSqlType(SqlTypeName.DOUBLE), -1);
+            : createArrayType(createSqlType(SqlTypeName.DOUBLE), -1);
       case BOOLEAN:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BOOLEAN)
-            : createMultisetType(createSqlType(SqlTypeName.BOOLEAN), -1);
+            : createArrayType(createSqlType(SqlTypeName.BOOLEAN), -1);
       case TIMESTAMP:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.TIMESTAMP)
-            : createMultisetType(createSqlType(SqlTypeName.TIMESTAMP), -1);
+            : createArrayType(createSqlType(SqlTypeName.TIMESTAMP), -1);
       case STRING:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARCHAR)
-            : createMultisetType(createSqlType(SqlTypeName.VARCHAR), -1);
+            : createArrayType(createSqlType(SqlTypeName.VARCHAR), -1);
       case BYTES:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARBINARY)
-            : createMultisetType(createSqlType(SqlTypeName.VARBINARY), -1);
+            : createArrayType(createSqlType(SqlTypeName.VARBINARY), -1);
       case BIG_DECIMAL:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DECIMAL)
-            : createMultisetType(createSqlType(SqlTypeName.DECIMAL), -1);
+            : createArrayType(createSqlType(SqlTypeName.DECIMAL), -1);
       case JSON:
         return createSqlType(SqlTypeName.VARCHAR);
       case LIST:

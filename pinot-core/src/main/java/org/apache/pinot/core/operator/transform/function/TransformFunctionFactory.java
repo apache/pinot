@@ -147,7 +147,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.ARRAYMAX, ArrayMaxTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAYMIN, ArrayMinTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAYSUM, ArraySumTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.MULTI_VALUE_TO_SET, MultiValueToSetTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_TO_MV, ArrayToMVTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
@@ -307,7 +307,7 @@ public class TransformFunctionFactory {
         return new IdentifierTransformFunction(columnName, columnContextMap.get(columnName));
       case LITERAL:
         return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
-                LiteralTransformFunction::new);
+            LiteralTransformFunction::new);
       default:
         throw new IllegalStateException();
     }

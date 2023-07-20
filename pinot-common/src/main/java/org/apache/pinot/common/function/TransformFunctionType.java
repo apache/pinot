@@ -91,9 +91,9 @@ public enum TransformFunctionType {
   CAST("cast"),
 
   // object type
-  MULTI_VALUE_TO_SET("multiValueToSet",
+  ARRAY_TO_MV("arrayToMV",
       ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0), SqlTypeTransforms.FORCE_NULLABLE),
-      OperandTypes.family(SqlTypeFamily.MULTISET), "multi_value_to_set"),
+      OperandTypes.family(SqlTypeFamily.ARRAY), "array_to_mv", "arrayToMultiValue", "array_to_multi_value"),
 
   // string functions
   JSONEXTRACTSCALAR("jsonExtractScalar",

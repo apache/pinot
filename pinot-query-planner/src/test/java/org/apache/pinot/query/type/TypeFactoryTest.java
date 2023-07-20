@@ -21,8 +21,8 @@ package org.apache.pinot.query.type;
 import java.util.List;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.BasicSqlType;
-import org.apache.calcite.sql.type.MultisetSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -84,27 +84,27 @@ public class TypeFactoryTest {
           break;
         case "INT_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new MultisetSqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.INTEGER), false));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.INTEGER), false));
           break;
         case "LONG_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new MultisetSqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.BIGINT), false));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.BIGINT), false));
           break;
         case "FLOAT_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new MultisetSqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.REAL), false));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.REAL), false));
           break;
         case "DOUBLE_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new MultisetSqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE), false));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE), false));
           break;
         case "STRING_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new MultisetSqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR), false));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR), false));
           break;
         case "BYTES_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new MultisetSqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY), false));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY), false));
           break;
         default:
           Assert.fail("Unexpected column name: " + field.getName());

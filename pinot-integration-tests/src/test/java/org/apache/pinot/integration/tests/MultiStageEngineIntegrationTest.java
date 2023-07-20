@@ -489,8 +489,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testMultiValueColumnGroupBy()
       throws Exception {
-    String pinotQuery = "SELECT count(*), multiValueToSet(RandomAirports) FROM mytable "
-        + "GROUP BY multiValueToSet(RandomAirports)";
+    String pinotQuery = "SELECT count(*), arrayToMV(RandomAirports) FROM mytable "
+        + "GROUP BY arrayToMV(RandomAirports)";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
   }
@@ -498,9 +498,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testMultiValueColumnGroupByOrderBy()
       throws Exception {
-    String pinotQuery = "SELECT count(*), multiValueToSet(RandomAirports) FROM mytable "
-        + "GROUP BY multiValueToSet(RandomAirports) "
-        + "ORDER BY multiValueToSet(RandomAirports) DESC";
+    String pinotQuery = "SELECT count(*), arrayToMV(RandomAirports) FROM mytable "
+        + "GROUP BY arrayToMV(RandomAirports) "
+        + "ORDER BY arrayToMV(RandomAirports) DESC";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
   }
