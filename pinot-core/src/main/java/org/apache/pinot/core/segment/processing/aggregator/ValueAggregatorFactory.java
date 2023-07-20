@@ -32,6 +32,9 @@ public class ValueAggregatorFactory {
 
   /**
    * Constructs a ValueAggregator from the given aggregation type.
+   *
+   * When adding entries to this please add them to the Set in org.apache.pinot.segment.local.utils.TableConfigUtils
+   * named AVAILABLE_CORE_VALUE_AGGREGATORS so that they can be used in RealtimeToOfflineTask
    */
   public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType, DataType dataType) {
     switch (aggregationType) {
