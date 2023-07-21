@@ -203,7 +203,7 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
 
   private ImmutableRoaringBitmap queryRangeBitmap(long value, long columnMax) {
     RangeBitmap rangeBitmap = mapRangeBitmap();
-    if (Long.compareUnsigned(value, columnMax) < 0) {
+    if (Long.compareUnsigned(value, columnMax) <= 0) {
       return rangeBitmap.eq(value).toMutableRoaringBitmap();
     } else {
       return new MutableRoaringBitmap();
@@ -230,7 +230,7 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
 
   private int queryRangeBitmapCardinality(long value, long columnMax) {
     RangeBitmap rangeBitmap = mapRangeBitmap();
-    if (Long.compareUnsigned(value, columnMax) < 0) {
+    if (Long.compareUnsigned(value, columnMax) <= 0) {
       return (int) rangeBitmap.eqCardinality(value);
     } else {
       return 0;
