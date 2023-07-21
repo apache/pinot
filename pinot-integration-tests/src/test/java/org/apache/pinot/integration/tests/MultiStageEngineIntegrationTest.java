@@ -96,17 +96,17 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
   @Test
   @Override
-  public void testHardcodedQueriesMultiStage()
+  public void testHardcodedQueries()
       throws Exception {
-    super.testHardcodedQueriesMultiStage();
+    super.testHardcodedQueries();
   }
 
   @Test
   @Override
   public void testGeneratedQueries()
       throws Exception {
-    // test multistage engine, currently we don't support MV columns.
     super.testGeneratedQueries(false, true);
+    super.testGeneratedQueries(true, true);
   }
 
   @Test

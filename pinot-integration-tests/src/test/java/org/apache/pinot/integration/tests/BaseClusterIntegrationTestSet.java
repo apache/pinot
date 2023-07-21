@@ -102,25 +102,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   /**
-   * Test features supported in V2 Multi-stage Engine.
-   * - Some V1 features will not be supported.
-   * - Some V1 features will be added as V2 engine feature development progresses.
-   * @throws Exception
-   */
-  public void testHardcodedQueriesMultiStage()
-      throws Exception {
-    testHardcodedQueriesCommon();
-    testHardcodedQueriesV2();
-  }
-
-  /**
    * Test hard-coded queries.
    * @throws Exception
    */
   public void testHardcodedQueries()
       throws Exception {
     testHardcodedQueriesCommon();
-    testHardCodedQueriesV1();
+    if (useMultiStageQueryEngine()) {
+      testHardcodedQueriesV2();
+    } else {
+      testHardCodedQueriesV1();
+    }
   }
 
   /**
@@ -481,7 +473,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       QueryGenerator.Query query = queryGenerator.generateQuery();
       if (useMultistageEngine) {
         // multistage engine follows standard SQL thus should use H2 query string for testing.
-        testQuery(query.generateH2Query().replace("`", "\""), query.generateH2Query());
+        testQuery(query.generatePinotQuery().replace("`", "\""), query.generateH2Query());
       } else {
         testQuery(query.generatePinotQuery(), query.generateH2Query());
       }
