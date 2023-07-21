@@ -621,11 +621,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         valueWithinLengthLimit =
             valueWithinLengthLimit.substring(0, valueWithinLengthLimit.length() - 1) + unicodeValue;
       }
-    }
 
-    // removing the ',' from the value if it's present.
-    if (length > 0 && valueWithinLengthLimit.contains(",")) {
-      valueWithinLengthLimit = valueWithinLengthLimit.replace(",", "\\,");
+      // removing the ',' from the value if it's present.
+      if (valueWithinLengthLimit.contains(",")) {
+        valueWithinLengthLimit = valueWithinLengthLimit.replace(",", "\\,");
+      }
     }
 
     return valueWithinLengthLimit;
@@ -657,7 +657,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     int length = value.length();
 
     // if length is less, no need of trimming the value.
-    if (length < METADATA_PROPERTY_LENGTH_LIMIT) {
+    if (length <= METADATA_PROPERTY_LENGTH_LIMIT) {
       return value;
     }
 
@@ -670,22 +670,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1)
               + (char) (value.charAt(METADATA_PROPERTY_LENGTH_LIMIT - 1) + 1);
         } else {
-          // property type is min value take first METADATA_PROPERTY_LENGTH_LIMIT - 1 characters
-          // and decrement the last character value by 1.
-          alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1)
-              + (char) (value.charAt(METADATA_PROPERTY_LENGTH_LIMIT - 1) - 1);
+          alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
         }
         break;
       case BYTES:
-        byte[] shortByteValue = Arrays.copyOf(BytesUtils.toBytes(value),
-            (METADATA_PROPERTY_LENGTH_LIMIT / 2) + 1);
-        char ch;
+        byte[] shortByteValue = Arrays.copyOf(BytesUtils.toBytes(value), (METADATA_PROPERTY_LENGTH_LIMIT / 2));
         if (isMax) {
-          ch = (char) ((char) shortByteValue[METADATA_PROPERTY_LENGTH_LIMIT / 2] + 1);
-        } else {
-          ch = (char) ((char) shortByteValue[METADATA_PROPERTY_LENGTH_LIMIT / 2] - 1);
+          shortByteValue[METADATA_PROPERTY_LENGTH_LIMIT / 2 - 1] += 1;
         }
-        shortByteValue[METADATA_PROPERTY_LENGTH_LIMIT / 2] = (byte) ch;
         alteredValue = BytesUtils.toHexString(shortByteValue);
         break;
       default:
