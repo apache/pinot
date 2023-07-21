@@ -910,7 +910,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     // Add an out-of-ttl segment, verify all the invalid docs should not show up again.
     // Add a segment with segmentEndTime: 80, largest seen timestamp: 120. the segment will be skipped.
-    Number[] timestamps2 = new Number[]{80, 80, 80, 80};
     List<PrimaryKey> primaryKeys2 = getPrimaryKeyList(numRecords, new int[]{100, 101, 102, 103});
     int[] docIds2 = new int[]{0, 1};
     MutableRoaringBitmap validDocIdsSnapshot2 = new MutableRoaringBitmap();
@@ -919,12 +918,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ImmutableSegmentImpl segment2 =
         mockImmutableSegmentWithEndTime(1, validDocIds2, null, primaryKeys2, Collections.singletonList("timeCol"),
             new Double(80), validDocIdsSnapshot2);
-    upsertMetadataManager.addSegment(segment2, validDocIds2, null,
-        getRecordInfoListForTTL(numRecords, primaryKeys, timestamps2).iterator());
+    upsertMetadataManager.addSegment(segment2);
     // out of ttl segment should not be added to recordLocationMap
     assertEquals(recordLocationMap.size(), 5);
-    // out of ttl segment should still maintain validDocIds.
-    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
   }
 
   private void verifyAddSegmentForTTL(Comparable comparisonValue) {
@@ -946,7 +942,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // add a segment with segmentEndTime = -1 so it will be skipped since it out-of-TTL
     int numRecords = 4;
     int[] primaryKeys = new int[]{0, 1, 2, 3};
-    Number[] timestamps = new Number[]{100, 100, 120, 80};
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
     ImmutableSegmentImpl segment1 =
@@ -958,8 +953,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     validDocIdsSnapshot1.add(docIds1);
 
     // load segment1.
-    upsertMetadataManager.addSegment(segment1, validDocIds1, null,
-        getRecordInfoListForTTL(numRecords, primaryKeys, timestamps).iterator());
+    upsertMetadataManager.addSegment(segment1);
     assertEquals(recordLocationMap.size(), 1);
     checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
   }

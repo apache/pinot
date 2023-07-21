@@ -136,6 +136,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _tableNameWithType);
 
     if (_enableSnapshot) {
+      ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+      if (_deleteRecordColumn != null) {
+        ThreadSafeMutableRoaringBitmap queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+      }
+      // Skip adding segments that has segment EndTime in the comparison cols earlier than (largestSeenTimestamp - TTL).
+      // Note: We only update largestSeenComparisonValue when addRecord, and access the value when addOrReplaceSegments.
+      // We only support single comparison column for TTL-enabled upsert tables.
+      if (_largestSeenComparisonValue > 0) {
+        Number endTime =
+            (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
+        if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+          // TODO: Fix the deletion handling for TTL. Currently TTL cannot co-exist with delete.
+          assert _deleteRecordColumn == null;
+          _logger.info("Skip adding segment: {} because it's out of TTL", segment.getSegmentName());
+          // If delete is not enabled, set valid doc ids snapshot into the segment.
+          enableSegmentWithSnapshot((ImmutableSegmentImpl) segment, validDocIds, null);
+          return;
+        }
+      }
       _snapshotLock.readLock().lock();
     }
     startOperation();
@@ -273,21 +292,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (queryableDocIds == null && _deleteRecordColumn != null) {
         queryableDocIds = new ThreadSafeMutableRoaringBitmap();
       }
-      // Skip adding segments that has segment EndTime in the comparison cols earlier than (largestSeenTimestamp - TTL).
-      // Note: We only update largestSeenComparisonValue when addRecord, and access the value when addOrReplaceSegments.
-      // We only support single comparison column for TTL-enabled upsert tables.
-      if (_largestSeenComparisonValue > 0) {
-        Number endTime =
-            (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-        if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
-          // TODO: Fix the deletion handling for TTL. Currently TTL cannot co-exist with delete.
-          assert _deleteRecordColumn == null;
-          _logger.info("Skip adding segment: {} because it's out of TTL", segment.getSegmentName());
-          // If delete is not enabled, set valid doc ids snapshot into the segment.
-          enableSegmentWithSnapshot(segment, validDocIds, queryableDocIds);
-          return;
-        }
-      }
       if (isPreloading) {
         addSegmentWithoutUpsert(segment, validDocIds, queryableDocIds, recordInfoIterator);
       } else {
@@ -312,8 +316,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void enableSegmentWithSnapshot(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds) {
     MutableRoaringBitmap validDocIdsSnapshot = segment.loadValidDocIdsFromSnapshot();
-    validDocIdsSnapshot.forEach((int docId) -> validDocIds.add(docId));
-    segment.enableUpsert(this, validDocIds, queryableDocIds);
+    if (validDocIdsSnapshot != null) {
+      validDocIdsSnapshot.forEach((int docId) -> validDocIds.add(docId));
+      segment.enableUpsert(this, validDocIds, queryableDocIds);
+    } else {
+      segment.enableUpsert(this, null, queryableDocIds);
+    }
   }
 
   @Override
@@ -468,6 +476,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
 
     if (_enableSnapshot) {
+      // Skip removing segments that has segment comparison column endTime earlier than (largestSeenTimestamp - TTL).
+      // Note: We only support single comparison column for TTL-enabled upsert tables.
+      if (_largestSeenComparisonValue > 0) {
+        Number endTime =
+            (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
+        if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+          _logger.info("Skip removing segment: {} because it's out of TTL", segment.getSegmentName());
+          return;
+        }
+      }
       _snapshotLock.readLock().lock();
     }
     startOperation();

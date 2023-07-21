@@ -615,7 +615,7 @@ public final class TableConfigUtils {
 
       // currently we only support 1 comparison column since we need to fetch endTime in comparisonValue time unit from
       // columnMetadata. If we have multiple comparison columns, we can only use the first comparison column as filter.
-      Preconditions.checkState(comparisonColumns.size() <= 1,
+      Preconditions.checkState(comparisonColumns.size() == 1,
           String.format("Currently upsert TTL only support 1 comparison columns."));
 
       String column = comparisonColumns.size() == 1 ? comparisonColumns.get(0)
