@@ -21,7 +21,7 @@ where
       )
       and ps_availqty > (
         select
-          0.5 * sum(l_quantity)
+          CAST(0.5 * SUM(l_quantity) AS DOUBLE)
         from
           lineitem
         where

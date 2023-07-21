@@ -70,4 +70,24 @@ public class TypeSystem extends RelDataTypeSystemImpl {
       }
     }
   }
+
+  @Override
+  public RelDataType deriveSumType(RelDataTypeFactory typeFactory,
+      RelDataType argumentType) {
+    assert SqlTypeUtil.isNumeric(argumentType);
+    switch (argumentType.getSqlTypeName()) {
+      case TINYINT:
+      case SMALLINT:
+      case INTEGER:
+      case BIGINT:
+        return typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.BIGINT),
+            argumentType.isNullable());
+      case FLOAT:
+      case DOUBLE:
+        return typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.DOUBLE),
+            argumentType.isNullable());
+      default:
+        return super.deriveSumType(typeFactory, argumentType);
+    }
+  }
 }

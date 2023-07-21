@@ -36,7 +36,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[/(CAST(CASE(=($1, 0), null:INTEGER, $0)):DOUBLE, $1)], count=[$1])",
+          "\nLogicalProject(avg=[/(CAST(CASE(=($1, 0), null:BIGINT, $0)):DOUBLE, $1)], count=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
@@ -51,7 +51,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), COUNT(a.col1) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:INTEGER, $0)], EXPR$1=[$1])",
+          "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)], EXPR$1=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
@@ -64,7 +64,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:INTEGER, $0)], EXPR$1=[$1])",
+          "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)], EXPR$1=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
@@ -79,7 +79,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(sum=[CASE(=($1, 0), null:INTEGER, $0)], count=[$1])",
+          "\nLogicalProject(sum=[CASE(=($1, 0), null:BIGINT, $0)], count=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
@@ -94,7 +94,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[/(CAST(CASE(=($1, 0), null:INTEGER, $0)):DOUBLE, $1)], count=[$1])",
+          "\nLogicalProject(avg=[/(CAST(CASE(=($1, 0), null:BIGINT, $0)):DOUBLE, $1)], count=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
@@ -109,7 +109,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(sum=[CASE(=($1, 0), null:INTEGER, $0)], count=[$1])",
+          "\nLogicalProject(sum=[CASE(=($1, 0), null:BIGINT, $0)], count=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
