@@ -191,8 +191,9 @@ public class PinotSegmentUploadDownloadRestletResource {
       File downloadTempDir = ControllerFilePathProvider.getInstance().getFileDownloadTempDir();
       File tableDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(downloadTempDir, tableName,
           "Invalid table name: %s", tableName);
-      segmentFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName + "-" + UUID.randomUUID(),
-          "Invalid segment name: %s", segmentName);
+      segmentFile =
+          org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName + "-" + UUID.randomUUID(),
+              "Invalid segment name: %s", segmentName);
 
       pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
       // Streaming in the tmp file and delete it afterward.
