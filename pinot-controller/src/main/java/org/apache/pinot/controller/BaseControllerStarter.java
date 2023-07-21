@@ -500,7 +500,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       TableConfig tableConfig = _helixResourceManager.getTableConfig(rt);
       if (tableConfig != null) {
         Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
-        String consumerType = streamConfigMap.get(StreamConfigProperties.STREAM_CONSUMER_TYPES);
+        String streamType = streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka");
+        String consumerType = streamConfigMap.get(StreamConfigProperties.constructStreamProperty(streamType,
+            StreamConfigProperties.STREAM_CONSUMER_TYPES));
         if (StreamConfig.ConsumerType.LOWLEVEL.name().equalsIgnoreCase(consumerType)
             || "simple".equalsIgnoreCase(consumerType)) {
           return;
