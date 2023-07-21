@@ -114,4 +114,14 @@ public class FileUtils {
       throws IOException {
     close(Arrays.asList(closeables));
   }
+
+  public static File concatAndValidateFile(File folderDir, String filename, String msg, Object... args)
+      throws IllegalArgumentException, IOException {
+    File filePath = new File(folderDir, filename);
+    if (!filePath.getCanonicalPath().startsWith(folderDir.getCanonicalPath() + File.separator)) {
+      throw new IllegalArgumentException(String.format(msg, args));
+    }
+
+    return filePath;
+  }
 }

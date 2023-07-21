@@ -169,17 +169,10 @@ public class PinotSegmentUploadDownloadRestletResource {
     // If the segment file is local, just use it as the return entity; otherwise copy it from remote to local first.
     if (CommonConstants.Segment.LOCAL_SEGMENT_SCHEME.equals(dataDirURI.getScheme())) {
       File dataDir = new File(dataDirURI);
-      File tableDir = new File(dataDir, tableName);
-      if (!tableDir.getCanonicalPath().startsWith(dataDir.getCanonicalPath())) {
-        throw new ControllerApplicationException(LOGGER, "Invalid table name: " + tableName,
-            Response.Status.BAD_REQUEST);
-      }
-
-      segmentFile = new File(tableDir, segmentName);
-      if (!segmentFile.getCanonicalPath().startsWith(new File(dataDirURI).getPath())) {
-        throw new ControllerApplicationException(LOGGER, "Invalid segment name: " + segmentName,
-            Response.Status.BAD_REQUEST);
-      }
+      File tableDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(dataDir, tableName,
+          "Invalid table name: %s", tableName);
+      segmentFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName,
+          "Invalid segment name: %s", segmentName);
 
       if (!segmentFile.exists()) {
         throw new ControllerApplicationException(LOGGER,
@@ -196,16 +189,10 @@ public class PinotSegmentUploadDownloadRestletResource {
             Response.Status.NOT_FOUND);
       }
       File downloadTempDir = ControllerFilePathProvider.getInstance().getFileDownloadTempDir();
-      File tableDir = new File(downloadTempDir, tableName);
-      if (!tableDir.getCanonicalPath().startsWith(downloadTempDir.getCanonicalPath())) {
-        throw new ControllerApplicationException(LOGGER, "Invalid table name: " + tableName,
-            Response.Status.BAD_REQUEST);
-      }
-      segmentFile = new File(tableDir, segmentName + "-" + UUID.randomUUID());
-      if (!segmentFile.getCanonicalPath().startsWith(tableDir.getCanonicalPath())) {
-        throw new ControllerApplicationException(LOGGER, "Invalid segment name: " + segmentName,
-            Response.Status.BAD_REQUEST);
-      }
+      File tableDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(downloadTempDir, tableName,
+          "Invalid table name: %s", tableName);
+      segmentFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName + "-" + UUID.randomUUID(),
+          "Invalid segment name: %s", segmentName);
 
       pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
       // Streaming in the tmp file and delete it afterward.

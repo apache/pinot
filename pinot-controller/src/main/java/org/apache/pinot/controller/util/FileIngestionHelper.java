@@ -92,20 +92,11 @@ public class FileIngestionHelper {
     String tableNameWithType = _tableConfig.getTableName();
     // 1. append a timestamp for easy debugging
     // 2. append a random string to avoid using the same working directory when multiple tasks are running in parallel
-    File workingDir = new File(_ingestionDir,
+    File workingDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(_ingestionDir,
         String.format("%s_%s_%d_%s", WORKING_DIR_PREFIX, tableNameWithType, System.currentTimeMillis(),
-            RandomStringUtils.random(10, true, false)));
-
-    if (!workingDir.getCanonicalPath().startsWith(_ingestionDir.getPath())) {
-      throw new IllegalArgumentException("Invalid working dir path %s" + workingDir.getAbsolutePath());
-    }
-
+            RandomStringUtils.random(10, true, false)), "Invalid table name: %S", tableNameWithType);
     LOGGER.info("Starting ingestion of {} payload to table: {} using working dir: {}", payload._payloadType,
         tableNameWithType, workingDir.getAbsolutePath());
-
-    if (!workingDir.getCanonicalPath().startsWith(_ingestionDir.getPath())) {
-      throw new IllegalArgumentException("Invalid working dir path %s" + workingDir.getAbsolutePath());
-    }
 
     // Setup working dir
     File inputDir = new File(workingDir, INPUT_DATA_DIR);

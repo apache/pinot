@@ -396,12 +396,9 @@ public class TablesResource {
 
       File segmentTarFile = new File(tmpSegmentTarDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
           + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-
-      if (!segmentTarFile.getCanonicalPath().startsWith(tmpSegmentTarDir.getCanonicalPath())) {
-        throw new WebApplicationException(
-            String.format("Invalid table / segment name: %s , %s", tableNameWithType, segmentName),
-            Response.Status.BAD_REQUEST);
-      }
+      org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tmpSegmentTarDir,
+          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
+          "Invalid table / segment name: %s , %s", tableNameWithType, segmentName);
 
       TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
       Response.ResponseBuilder builder = Response.ok();
@@ -538,12 +535,9 @@ public class TablesResource {
 
       segmentTarFile = new File(segmentTarUploadDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
           + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-
-      if (!segmentTarFile.getCanonicalPath().startsWith(segmentTarUploadDir.getPath())) {
-        throw new WebApplicationException(
-            String.format("Invalid table / segment name: %s, %s", tableNameWithType, segmentName),
-            Response.Status.BAD_REQUEST);
-      }
+      segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
+          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
+          "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
 
       TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
 
