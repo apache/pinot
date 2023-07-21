@@ -423,6 +423,16 @@ public class PinotInstanceRestletResource {
     }
   }
 
+  /**
+   * Endpoint to validate the safety of instance tag update requests.
+   * This is to ensure that any instance tag update operation that user wants to perform is safe and does not create any
+   * side effect on the cluster and disturb the cluster consistency.
+   * This operation does not perform any changes to the cluster, but surfaces the possible issues which might occur upon
+   * applying the intended changes.
+   * @param requests list if instance tag update requests
+   * @return list of {@link OperationValidationResponse} which denotes the validity of each request along with listing
+   * the issues if any.
+   */
   @POST
   @Path("/instances/updateTags/validate")
   @Produces(MediaType.APPLICATION_JSON)
@@ -431,17 +441,18 @@ public class PinotInstanceRestletResource {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Internal error")
   })
-  public List<OperationValidationResponse> instanceTagUpdateSafetyCheck(List<InstanceTagUpdateRequest> instances) {
+  public List<OperationValidationResponse> instanceTagUpdateSafetyCheck(List<InstanceTagUpdateRequest> requests) {
     LOGGER.info("Performing safety check on tag update request received for instances: {}",
-        instances.stream().map(InstanceTagUpdateRequest::getInstanceName).collect(Collectors.toList()));
+        requests.stream().map(InstanceTagUpdateRequest::getInstanceName).collect(Collectors.toList()));
     Map<String, Integer> tagMinServerMap = _pinotHelixResourceManager.minimumInstancesRequiredForTags();
-    Map<String, Integer> tagDeficiency = computeTagDeficiency(instances, tagMinServerMap);
+    Map<String, Integer> tagToInstanceCountMap = getUpdatedTagToInstanceCountMap(requests);
+    Map<String, Integer> tagDeficiency = computeTagDeficiency(tagToInstanceCountMap, tagMinServerMap);
 
-    Map<String, List<OperationValidationResponse.ErrorWrapper>> responseMap = new HashMap<>(instances.size());
+    Map<String, List<OperationValidationResponse.ErrorWrapper>> responseMap = new HashMap<>(requests.size());
     List<OperationValidationResponse.ErrorWrapper> tenantIssues = new ArrayList<>();
-    instances.forEach(instance -> responseMap.put(instance.getInstanceName(), new ArrayList<>()));
-    for (InstanceTagUpdateRequest instance : instances) {
-      String name = instance.getInstanceName();
+    requests.forEach(request -> responseMap.put(request.getInstanceName(), new ArrayList<>()));
+    for (InstanceTagUpdateRequest request : requests) {
+      String name = request.getInstanceName();
       Set<String> oldTags;
       try {
         oldTags = new HashSet<>(_pinotHelixResourceManager.getTagsForInstance(name));
@@ -449,7 +460,7 @@ public class PinotInstanceRestletResource {
         throw new ControllerApplicationException(LOGGER,
             String.format("Instance %s is not a valid instance name.", name), Response.Status.PRECONDITION_FAILED);
       }
-      Set<String> newTags = new HashSet<>(instance.getNewTags());
+      Set<String> newTags = new HashSet<>(request.getNewTags());
       // tags removed from instance
       for (String tag : Sets.difference(oldTags, newTags)) {
         Integer deficiency = tagDeficiency.get(tag);
@@ -480,7 +491,7 @@ public class PinotInstanceRestletResource {
     }
 
     // consolidate all the issues based on instances
-    List<OperationValidationResponse> response = new ArrayList<>(instances.size());
+    List<OperationValidationResponse> response = new ArrayList<>(requests.size());
     responseMap.forEach((instance, issueList) -> response.add(issueList.isEmpty()
         ? new OperationValidationResponse().setInstanceName(instance).setSafe(true)
         : new OperationValidationResponse().putAllIssues(issueList).setInstanceName(instance).setSafe(false)));
@@ -501,26 +512,50 @@ public class PinotInstanceRestletResource {
     }
   }
 
-  private Map<String, Integer> computeTagDeficiency(List<InstanceTagUpdateRequest> instances,
-      Map<String, Integer> tagMinServerMap) {
-    Map<String, Integer> updatedTagInstanceMap = getUpdatedTagInstanceMap(instances);
+  /**
+   * Compute the number of deficient instances for each tag.
+   * The utility accepts two maps
+   * - map of tags and count of their intended tagged instances
+   * - map of tags and their minimum number of instance requirements
+   * And then compares these two maps to return a map of tags and the number of their deficient instances.
+   *
+   * @param tagToInstanceCountMap tags and count of their intended tagged instances
+   * @param tagToMinInstanceCountMap tags and their minimum number of instance requirements
+   * @return tags and the number of their deficient instances
+   */
+  private Map<String, Integer> computeTagDeficiency(Map<String, Integer> tagToInstanceCountMap,
+      Map<String, Integer> tagToMinInstanceCountMap) {
     Map<String, Integer> tagDeficiency = new HashMap<>();
-    tagMinServerMap.forEach((tag, minInstances) -> {
-      Integer updatedInstances = updatedTagInstanceMap.remove(tag);
+    Map<String, Integer> tagToInstanceCountMapCopy = new HashMap<>(tagToInstanceCountMap);
+    // compute deficiency for each of the minimum instance requirement entry
+    tagToMinInstanceCountMap.forEach((tag, minInstances) -> {
+      Integer updatedInstances = tagToInstanceCountMapCopy.remove(tag);
+      // if tag is not present in the provided map its considered as if tag is not assigned to any instance
+      // hence deficiency = minimum instance requirement.
       tagDeficiency.put(tag, minInstances - (updatedInstances != null ? updatedInstances : 0));
     });
-    updatedTagInstanceMap.forEach((tag, updatedInstances) -> tagDeficiency.put(tag, 0));
+    // tags for which minimum instance requirement is not specified are assumed to have no deficiency (deficiency = 0)
+    tagToInstanceCountMapCopy.forEach((tag, updatedInstances) -> tagDeficiency.put(tag, 0));
     return tagDeficiency;
   }
 
-  private Map<String, Integer> getUpdatedTagInstanceMap(List<InstanceTagUpdateRequest> instances) {
+  /**
+   * Utility to fetch the existing tags and count of their respective tagged instances and then apply the changes based
+   * on the provided list of {@link InstanceTagUpdateRequest} to get the updated map of tags and count of their
+   * respective tagged instances
+   * @param requests list of {@link InstanceTagUpdateRequest}
+   * @return map of tags and updated count of their respective tagged instances
+   */
+  private Map<String, Integer> getUpdatedTagToInstanceCountMap(List<InstanceTagUpdateRequest> requests) {
     Map<String, Integer> updatedTagInstanceMap = new HashMap<>();
     Set<String> visitedInstances = new HashSet<>();
-    instances.forEach(instance -> {
+    // build the map of tags and their respective instance counts from the given tag update request list
+    requests.forEach(instance -> {
       instance.getNewTags().forEach(tag ->
           updatedTagInstanceMap.put(tag, updatedTagInstanceMap.getOrDefault(tag, 0) + 1));
       visitedInstances.add(instance.getInstanceName());
     });
+    // add the instance counts to tags for the rest of the instances apart from the ones mentioned in requests
     _pinotHelixResourceManager.getAllInstances().forEach(instance -> {
       if (!visitedInstances.contains(instance)) {
         _pinotHelixResourceManager.getTagsForInstance(instance).forEach(tag ->
