@@ -27,13 +27,6 @@ public class BitmapDocIdSet implements BlockDocIdSet {
   private final BitmapDocIdIterator _iterator;
 
   public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs) {
-    this(docIds, numDocs, false);
-  }
-
-  public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs, boolean exclusive) {
-    if (exclusive) {
-      docIds = ImmutableRoaringBitmap.flip(docIds, 0L, numDocs);
-    }
     _iterator = new BitmapDocIdIterator(docIds, numDocs);
   }
 

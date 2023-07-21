@@ -45,7 +45,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class RangeIndexBasedFilterOperator extends NullHandlingSupportedFilterOperator {
+public class RangeIndexBasedFilterOperator extends NullHandlingSupportedSingleColumnLeafFilterOperator {
 
   private static final String EXPLAIN_NAME = "FILTER_RANGE_INDEX";
 

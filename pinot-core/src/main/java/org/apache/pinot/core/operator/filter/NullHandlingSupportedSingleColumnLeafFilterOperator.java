@@ -23,18 +23,19 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
-import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public abstract class NullHandlingSupportedFilterOperator extends BaseFilterOperator {
+public abstract class NullHandlingSupportedSingleColumnLeafFilterOperator extends BaseFilterOperator {
   protected final QueryContext _queryContext;
   protected final DataSource _dataSource;
   protected final int _numDocs;
 
-  protected NullHandlingSupportedFilterOperator(QueryContext queryContext, DataSource dataSource, int numDocs) {
+  protected NullHandlingSupportedSingleColumnLeafFilterOperator(QueryContext queryContext, DataSource dataSource,
+      int numDocs) {
     _queryContext = queryContext;
     _dataSource = dataSource;
     _numDocs = numDocs;
@@ -43,26 +44,28 @@ public abstract class NullHandlingSupportedFilterOperator extends BaseFilterOper
   @Override
   protected FilterBlock getNextBlock() {
     if (_queryContext.isNullHandlingEnabled()) {
-      return new FilterBlock(excludeNulls(getNextBlockWithoutNullHandling()));
-    } else {
-      return new FilterBlock(getNextBlockWithoutNullHandling());
+      ImmutableRoaringBitmap nullBitmap = getNullBitmap();
+      if (nullBitmap != null && !nullBitmap.isEmpty()) {
+        return new FilterBlock(excludeNulls(getNextBlockWithoutNullHandling(), nullBitmap));
+      }
     }
+    return new FilterBlock(getNextBlockWithoutNullHandling());
   }
 
   protected abstract BlockDocIdSet getNextBlockWithoutNullHandling();
 
-  private BlockDocIdSet excludeNulls(BlockDocIdSet blockDocIdSet) {
-    return new AndDocIdSet(
-        Arrays.asList(blockDocIdSet, fromNonNullBitmap()),
+  private BlockDocIdSet excludeNulls(BlockDocIdSet blockDocIdSet, ImmutableRoaringBitmap nullBitmap) {
+    return new AndDocIdSet(Arrays.asList(blockDocIdSet,
+        new BitmapDocIdSet(ImmutableRoaringBitmap.flip(nullBitmap, 0, (long) _numDocs), _numDocs)),
         _queryContext.getQueryOptions());
   }
 
-  private BlockDocIdSet fromNonNullBitmap() {
+  private ImmutableRoaringBitmap getNullBitmap() {
     NullValueVectorReader nullValueVector = _dataSource.getNullValueVector();
     if (nullValueVector != null) {
-      return new BitmapDocIdSet(nullValueVector.getNullBitmap(), _numDocs, true);
+      return nullValueVector.getNullBitmap();
     } else {
-      return new MatchAllDocIdSet(_numDocs);
+      return null;
     }
   }
 }

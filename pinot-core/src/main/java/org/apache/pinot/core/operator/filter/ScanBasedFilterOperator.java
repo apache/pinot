@@ -32,7 +32,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 
 
-public class ScanBasedFilterOperator extends NullHandlingSupportedFilterOperator {
+public class ScanBasedFilterOperator extends NullHandlingSupportedSingleColumnLeafFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_FULL_SCAN";
 
   private final PredicateEvaluator _predicateEvaluator;
