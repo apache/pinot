@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.query.parser;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.calcite.sql.SqlKind;
@@ -50,6 +52,8 @@ import org.slf4j.LoggerFactory;
 public class CalciteRexExpressionParser {
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteRexExpressionParser.class);
   private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
+  private static final Set<String> ARRAY_TO_MV_ALIAS =
+      ImmutableSet.of("ARRAYTOMV", "ARRAY_TO_MV", "ARRAYTOMULTIVALUE", "ARRAY_TO_MULTI_VALUE");
 
   static {
     CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();
@@ -199,6 +203,12 @@ public class CalciteRexExpressionParser {
         return compileOrExpression(rexCall, pinotQuery);
       case OTHER_FUNCTION:
         functionName = rexCall.getFunctionName();
+        // Special handle for leaf stage multi-value columns, as the default behavior for filter and group by is not
+        // sql standard, so need to use `array_to_mv` to convert the array to v1 multi-value column for behavior
+        // consistency meanwhile not violating the sql standard.
+        if (ARRAY_TO_MV_ALIAS.contains(functionName)) {
+          return toExpression(rexCall.getFunctionOperands().get(0), pinotQuery);
+        }
         break;
       default:
         functionName = functionKind.name();
