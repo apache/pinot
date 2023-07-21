@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import java.util.List;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -61,6 +63,11 @@ public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<Fo
     for (int i = 0; i < length; i++) {
       dictIdBuffer[i] = _reader.readInt(docIds[i]);
     }
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ForwardIndexReaderContext context) {
+    return _reader.getByteRanges(docId);
   }
 
   @Override

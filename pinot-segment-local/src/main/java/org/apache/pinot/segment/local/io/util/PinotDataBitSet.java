@@ -19,6 +19,9 @@
 package org.apache.pinot.segment.local.io.util;
 
 import java.io.Closeable;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
@@ -73,6 +76,30 @@ public final class PinotDataBitSet implements Closeable {
 
   public PinotDataBitSet(PinotDataBuffer dataBuffer) {
     _dataBuffer = dataBuffer;
+  }
+
+  public List<ForwardIndexByteRange> getByteRanges(int index, int numBitsPerValue) {
+    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+    long bitOffset = (long) index * numBitsPerValue;
+    int byteOffset = (int) (bitOffset / Byte.SIZE);
+    int bitOffsetInFirstByte = (int) (bitOffset % Byte.SIZE);
+
+    ranges.add(ForwardIndexByteRange.newByteRange(byteOffset, Byte.SIZE));
+    // Initiated with the value in first byte
+    int currentValue = _dataBuffer.getByte(byteOffset) & (BYTE_MASK >>> bitOffsetInFirstByte);
+
+    int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
+    if (numBitsLeft > 0) {
+      while (numBitsLeft > Byte.SIZE) {
+        byteOffset++;
+        currentValue = (currentValue << Byte.SIZE) | (_dataBuffer.getByte(byteOffset) & BYTE_MASK);
+        ranges.add(ForwardIndexByteRange.newByteRange(byteOffset, Byte.SIZE));
+        numBitsLeft -= Byte.SIZE;
+      }
+      ranges.add(ForwardIndexByteRange.newByteRange(byteOffset + 1, Byte.SIZE));
+    }
+
+    return ranges;
   }
 
   public int readInt(int index, int numBitsPerValue) {

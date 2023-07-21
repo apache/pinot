@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -54,6 +55,8 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   protected final int _headerEntryChunkOffsetSize;
   protected final PinotDataBuffer _rawData;
   protected final boolean _isSingleValue;
+  protected final int _dataHeaderStart;
+  protected final int _rawDataStart;
 
   public BaseChunkForwardIndexReader(PinotDataBuffer dataBuffer, DataType storedType, boolean isSingleValue) {
     _dataBuffer = dataBuffer;
@@ -97,9 +100,11 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     // Slice out the header from the data buffer.
     int dataHeaderLength = _numChunks * _headerEntryChunkOffsetSize;
     int rawDataStart = dataHeaderStart + dataHeaderLength;
+    _dataHeaderStart = dataHeaderStart;
     _dataHeader = _dataBuffer.view(dataHeaderStart, rawDataStart);
 
     // Useful for uncompressed data.
+    _rawDataStart = rawDataStart;
     _rawData = _dataBuffer.view(rawDataStart, _dataBuffer.size());
 
     _isSingleValue = isSingleValue;
@@ -158,6 +163,14 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
       return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
     } else {
       return _dataHeader.getLong(chunkId * _headerEntryChunkOffsetSize);
+    }
+  }
+
+  protected ForwardIndexByteRange getChunkPositionBufferRange(int chunkId) {
+    if (_headerEntryChunkOffsetSize == Integer.BYTES) {
+      return ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES);
+    } else {
+      return ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES);
     }
   }
 

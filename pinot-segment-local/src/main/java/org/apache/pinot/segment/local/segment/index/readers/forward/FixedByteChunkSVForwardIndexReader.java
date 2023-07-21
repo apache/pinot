@@ -19,8 +19,15 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
+import java.nio.DoubleBuffer;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.nio.LongBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -46,6 +53,51 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkForwardIn
     } else {
       return null;
     }
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ChunkReaderContext context) {
+    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+    if (_isCompressed) {
+      int chunkId = docId / _numDocsPerChunk;
+      ranges.add(getChunkPositionBufferRange(chunkId));
+      long chunkPosition = getChunkPosition(chunkId);
+
+      // Actual chunk offset
+      int chunkSize;
+      if (chunkId == (_numChunks - 1)) { // Last chunk.
+        chunkSize = (int) (_dataBuffer.size() - chunkPosition);
+      } else {
+        ranges.add(getChunkPositionBufferRange(chunkId + 1));
+        long nextChunkOffset = getChunkPosition(chunkId + 1);
+        chunkSize = (int) (nextChunkOffset - chunkPosition);
+      }
+
+      ranges.add(ForwardIndexByteRange.newByteRange(chunkPosition, chunkSize));
+    } else {
+      switch (_storedType) {
+        case INT: {
+          ranges.add(ForwardIndexByteRange.newByteRange(_rawDataStart + docId * Integer.BYTES, Integer.BYTES));
+        }
+        break;
+        case LONG: {
+          ranges.add(ForwardIndexByteRange.newByteRange(_rawDataStart + docId * Long.BYTES, Long.BYTES));
+        }
+        break;
+        case FLOAT: {
+          ranges.add(ForwardIndexByteRange.newByteRange(_rawDataStart + docId * Float.BYTES, Float.BYTES));
+        }
+        break;
+        case DOUBLE: {
+          ranges.add(ForwardIndexByteRange.newByteRange(_rawDataStart + docId * Double.BYTES, Double.BYTES));
+        }
+        break;
+        default:
+          throw new IllegalArgumentException();
+      }
+    }
+
+    return ranges;
   }
 
   @Override

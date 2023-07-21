@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.io.util;
 
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
+import java.util.List;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
@@ -36,6 +38,10 @@ public final class FixedBitIntReaderWriter implements Closeable {
 
   public int readInt(int index) {
     return _dataBitSet.readInt(index, _numBitsPerValue);
+  }
+
+  public List<ForwardIndexByteRange> getByteRanges(int index) {
+    return _dataBitSet.getByteRanges(index, _numBitsPerValue);
   }
 
   public void readInt(int startIndex, int length, int[] buffer) {

@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.math.BigDecimal;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
@@ -104,6 +105,14 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   default void readDictIds(int[] docIds, int length, int[] dictIdBuffer, T context) {
     throw new UnsupportedOperationException();
   }
+
+  /**
+   * Returns the buffer level absolute byte range for the given document id.
+   * @param docId
+   * @param context
+   * @return
+   */
+  List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, T context);
 
   /**
    * Reads the dictionary ids for a multi-value column at the given document id into the passed in buffer (the buffer
