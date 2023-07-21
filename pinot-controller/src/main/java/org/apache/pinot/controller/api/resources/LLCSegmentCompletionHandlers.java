@@ -448,9 +448,9 @@ public class LLCSegmentCompletionHandlers {
           "Invalid multi-part for segment: %s", segmentName);
       FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
 
-      File fileUploadTempDir = ControllerFilePathProvider.getInstance().getFileUploadTempDir();
-      File localTempFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(fileUploadTempDir, segmentName,
-          "Invalid segment name: %s", segmentName);
+      File localTempFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
+          ControllerFilePathProvider.getInstance().getFileUploadTempDir(), segmentName, "Invalid segment name: %s",
+          segmentName);
 
       try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
         Files.copy(inputStream, localTempFile.toPath());
@@ -470,11 +470,9 @@ public class LLCSegmentCompletionHandlers {
    */
   private static SegmentMetadataImpl extractMetadataFromLocalSegmentFile(File segmentFile)
       throws Exception {
-    File untarredFileTempDir = ControllerFilePathProvider.getInstance().getUntarredFileTempDir();
-
-    File tempIndexDir =
-        org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(untarredFileTempDir, segmentFile.getName(),
-            "Invalid segment file: %s", segmentFile);
+    File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
+        ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), segmentFile.getName(),
+        "Invalid segment file: %s", segmentFile);
 
     try {
       FileUtils.forceMkdir(tempIndexDir);
@@ -500,7 +498,6 @@ public class LLCSegmentCompletionHandlers {
    */
   private static SegmentMetadataImpl extractSegmentMetadataFromForm(FormDataMultiPart form, String segmentName)
       throws IOException {
-
     File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
         ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), getTempSegmentFileName(segmentName),
         "Invalid segment name: %s", segmentName);

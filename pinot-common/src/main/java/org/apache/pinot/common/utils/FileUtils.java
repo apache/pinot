@@ -115,6 +115,16 @@ public class FileUtils {
     close(Arrays.asList(closeables));
   }
 
+  /**
+   * Concatenates the folderDir and filename and validates that the resulting file path is still within the folderDir.
+   * @param folderDir the parent directory
+   * @param filename the filename to concatenate to the parent directory
+   * @param msg the error message if the resulting file path is not within the parent directory
+   * @param args the error message arguments
+   * @return File object representing the concatenated file path
+   * @throws IllegalArgumentException if the resulting file path is not within the parent directory
+   * @throws IOException if the resulting file path is invalid
+   */
   public static File concatAndValidateFile(File folderDir, String filename, String msg, Object... args)
       throws IllegalArgumentException, IOException {
     File filePath = new File(folderDir, filename);
