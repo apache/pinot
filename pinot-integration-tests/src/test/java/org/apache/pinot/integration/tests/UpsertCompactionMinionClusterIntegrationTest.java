@@ -68,7 +68,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
 
   @Override
   protected String getAvroTarFileName() {
-    return "upsert_upload_segment_test.tar.gz";
+    return "upsert_compaction_test.tar.gz";
   }
 
   @Override
@@ -190,13 +190,13 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
   @Test
   public void testCompaction()
       throws Exception {
-    waitForAllDocsLoaded(600_000L, 300);
-    assertEquals(getSalary(), 2381560);
+    waitForAllDocsLoaded(600_000L, 283);
+    assertEquals(getSalary(), 9747108);
 
     assertNotNull(_taskManager.scheduleTasks(REALTIME_TABLE_NAME).get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
     waitForAllDocsLoaded(600_000L, 3);
-    assertEquals(getSalary(), 2381560);
+    assertEquals(getSalary(), 9747108);
   }
 
   @Test
@@ -204,13 +204,13 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
       throws Exception {
     pushAvroIntoKafka(_avroFiles);
     // Wait for all documents loaded
-    waitForAllDocsLoaded(600_000L, 600);
-    assertEquals(getSalary(), 2381560);
+    waitForAllDocsLoaded(600_000L, 566);
+    assertEquals(getSalary(), 9747108);
 
     assertNull(_taskManager.scheduleTasks(REALTIME_TABLE_NAME).get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
-    waitForAllDocsLoaded(600_000L, 300);
-    assertEquals(getSalary(), 2381560);
+    waitForAllDocsLoaded(600_000L, 283);
+    assertEquals(getSalary(), 9747108);
   }
 
   protected void waitForTaskToComplete() {

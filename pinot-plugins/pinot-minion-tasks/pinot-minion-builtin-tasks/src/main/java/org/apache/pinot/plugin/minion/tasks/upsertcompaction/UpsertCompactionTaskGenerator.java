@@ -241,12 +241,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     for (SegmentZKMetadata segment : allSegments) {
       CommonConstants.Segment.Realtime.Status status = segment.getStatus();
       // initial segments selection based on status and age
-      if (status.isCompleted()) {
-        boolean endedWithinBufferPeriod = segment.getEndTimeMs() <= (System.currentTimeMillis() - bufferMs);
-        boolean endsInTheFuture = segment.getEndTimeMs() > System.currentTimeMillis();
-        if (endedWithinBufferPeriod || endsInTheFuture) {
-          completedSegments.add(segment);
-        }
+      if (status.isCompleted() && (segment.getEndTimeMs() <= (System.currentTimeMillis() - bufferMs))) {
+        completedSegments.add(segment);
       }
     }
     return completedSegments;
