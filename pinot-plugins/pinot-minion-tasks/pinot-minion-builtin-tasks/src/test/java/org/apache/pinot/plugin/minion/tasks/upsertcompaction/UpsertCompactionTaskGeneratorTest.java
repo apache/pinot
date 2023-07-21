@@ -251,7 +251,7 @@ public class UpsertCompactionTaskGeneratorTest {
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
         _completedSegment.getSegmentName());
 
-    // test without a minRecordCount
+    // test without a invalidRecordsThresholdCount
     compactionConfigs = getCompactionConfigs("30", "0");
     segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap, responseSet);
@@ -259,13 +259,14 @@ public class UpsertCompactionTaskGeneratorTest {
         _completedSegment.getSegmentName());
   }
 
-  private Map<String, String> getCompactionConfigs(String invalidRecordsThresholdPercent, String minRecordCount) {
+  private Map<String, String> getCompactionConfigs(String invalidRecordsThresholdPercent,
+      String invalidRecordsThresholdCount) {
     Map<String, String> compactionConfigs = new HashMap<>();
     if (!invalidRecordsThresholdPercent.equals("0")) {
       compactionConfigs.put(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT, invalidRecordsThresholdPercent);
     }
-    if (!minRecordCount.equals("0")) {
-      compactionConfigs.put(UpsertCompactionTask.MIN_RECORD_COUNT, minRecordCount);
+    if (!invalidRecordsThresholdCount.equals("0")) {
+      compactionConfigs.put(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT, invalidRecordsThresholdCount);
     }
     return compactionConfigs;
   }

@@ -56,7 +56,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
   private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 0.0;
-  private static final long DEFAULT_MIN_RECORD_COUNT = 0;
+  private static final long DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT = 0;
 
   public static class SegmentSelectionResult {
 
@@ -170,8 +170,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     double invalidRecordsThresholdPercent = Double.parseDouble(
         compactionConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
-    long minRecordCount = Long.parseLong(compactionConfigs.getOrDefault(UpsertCompactionTask.MIN_RECORD_COUNT,
-        String.valueOf(DEFAULT_MIN_RECORD_COUNT)));
+    long invalidRecordsThresholdCount = Long.parseLong(
+        compactionConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT,
+            String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT)));
     List<SegmentZKMetadata> segmentsForCompaction = new ArrayList<>();
     List<String> segmentsForDeletion = new ArrayList<>();
     for (Map.Entry<String, String> streamResponse : responseSet) {
@@ -191,7 +192,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         double invalidRecordPercent = ((double) invalidRecordCount / segment.getTotalDocs()) * 100;
         if (invalidRecordCount == segment.getTotalDocs()) {
           segmentsForDeletion.add(segment.getSegmentName());
-        } else if (invalidRecordPercent > invalidRecordsThresholdPercent && invalidRecordCount > minRecordCount) {
+        } else if (invalidRecordPercent > invalidRecordsThresholdPercent
+            && invalidRecordCount > invalidRecordsThresholdCount) {
           segmentsForCompaction.add(segment);
         }
       }
@@ -266,7 +268,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
   private static final String[] VALID_CONFIG_KEYS = {
       UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
-      UpsertCompactionTask.MIN_RECORD_COUNT
+      UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT
   };
 
   private Map<String, String> getCompactionConfigs(Map<String, String> taskConfig) {

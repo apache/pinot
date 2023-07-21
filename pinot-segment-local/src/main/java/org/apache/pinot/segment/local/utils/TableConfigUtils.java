@@ -545,15 +545,16 @@ public final class TableConfigUtils {
                     && Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) <= 100,
                 "invalidRecordsThresholdPercent must be > 0 and <= 100");
           }
-          // check minRecordCount
-          if (taskTypeConfig.containsKey("minRecordCount")) {
-            Preconditions.checkState(Long.parseLong(taskTypeConfig.get("minRecordCount")) >= 1,
-                "minRecordCount must be >= 1");
+          // check invalidRecordsThresholdCount
+          if (taskTypeConfig.containsKey("invalidRecordsThresholdCount")) {
+            Preconditions.checkState(Long.parseLong(taskTypeConfig.get("invalidRecordsThresholdCount")) >= 1,
+                "invalidRecordsThresholdCount must be >= 1");
           }
-          // check that either invalidRecordsThresholdPercent or minRecordCount was provided
+          // check that either invalidRecordsThresholdPercent or invalidRecordsThresholdCount was provided
           Preconditions.checkState(
               taskTypeConfig.containsKey("invalidRecordsThresholdPercent") || taskTypeConfig.containsKey(
-                  "minRecordCount"), "invalidRecordsThresholdPercent or minRecordCount or both must be provided");
+                  "invalidRecordsThresholdCount"),
+              "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
         }
       }
     }

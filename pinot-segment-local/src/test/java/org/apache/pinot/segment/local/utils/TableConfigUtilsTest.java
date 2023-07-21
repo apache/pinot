@@ -1797,7 +1797,8 @@ public class TableConfigUtilsTest {
             .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
     Map<String, String> upsertCompactionTaskConfig =
-        ImmutableMap.of("bufferTimePeriod", "5d", "invalidRecordsThresholdPercent", "1", "minRecordCount", "1");
+        ImmutableMap.of("bufferTimePeriod", "5d", "invalidRecordsThresholdPercent", "1", "invalidRecordsThresholdCount",
+            "1");
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
@@ -1821,8 +1822,8 @@ public class TableConfigUtilsTest {
     Assert.assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateTaskConfigs(hundredTenPercentTableConfig, schema));
 
-    // test with invalid minRecordCount
-    upsertCompactionTaskConfig = ImmutableMap.of("minRecordCount", "0");
+    // test with invalid invalidRecordsThresholdCount
+    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdCount", "0");
     TableConfig invalidCountTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
@@ -1830,7 +1831,7 @@ public class TableConfigUtilsTest {
     Assert.assertThrows(IllegalStateException.class,
         () -> TableConfigUtils.validateTaskConfigs(invalidCountTableConfig, schema));
 
-    // test without invalidRecordsThresholdPercent or minRecordCount
+    // test without invalidRecordsThresholdPercent or invalidRecordsThresholdCount
     upsertCompactionTaskConfig = ImmutableMap.of("bufferTimePeriod", "5d");
     TableConfig invalidTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
