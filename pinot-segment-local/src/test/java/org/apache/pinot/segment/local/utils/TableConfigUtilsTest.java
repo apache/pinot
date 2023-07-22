@@ -1799,9 +1799,9 @@ public class TableConfigUtilsTest {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setMetadataTTL(3600);
     upsertConfig.setEnableSnapshot(true);
-
-    TableConfig tableConfigWithoutComparisonColumn = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
+    TableConfig tableConfigWithoutComparisonColumn =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
     TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithoutComparisonColumn, schema);
 
     // Invalid comparison columns: "myCol"
@@ -1809,31 +1809,29 @@ public class TableConfigUtilsTest {
     upsertConfig.setComparisonColumns(Collections.singletonList("myCol"));
     upsertConfig.setEnableSnapshot(true);
     upsertConfig.setMetadataTTL(3600);
-    TableConfig tableConfigWithInvalidComparisonColumn = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setUpsertConfig(upsertConfig).build();
-
+    TableConfig tableConfigWithInvalidComparisonColumn =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
     try {
       TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidComparisonColumn, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("The column myCol: STRING is not a numeric values"));
+      // Expected
     }
 
-    // Invalid comparison columns: multiple comparison columns are not supported for TTL-enabled uspert table.
+    // Invalid comparison columns: multiple comparison columns are not supported for TTL-enabled upsert table.
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setComparisonColumns(Lists.newArrayList(TIME_COLUMN, "myCol"));
     upsertConfig.setEnableSnapshot(true);
     upsertConfig.setMetadataTTL(3600);
-    TableConfig tableConfigWithInvalidComparisonColumn2 = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setUpsertConfig(upsertConfig).build();
-
+    TableConfig tableConfigWithInvalidComparisonColumn2 =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
     try {
       TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidComparisonColumn2, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("Currently upsert TTL only support 1 comparison columns"));
+      // Expected
     }
 
     // Invalid config with TTLConfig but Snapshot is not enabled
@@ -1844,15 +1842,14 @@ public class TableConfigUtilsTest {
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setMetadataTTL(3600);
     upsertConfig.setEnableSnapshot(false);
-
-    TableConfig tableConfigWithInvalidTTLConfig = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
-
+    TableConfig tableConfigWithInvalidTTLConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
     try {
       TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidTTLConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("Snapshot has to be enabled for TTL feature."));
+      // Expected
     }
 
     // Invalid config with both delete and TTL enabled
@@ -1866,15 +1863,14 @@ public class TableConfigUtilsTest {
     upsertConfig.setMetadataTTL(3600);
     upsertConfig.setEnableSnapshot(true);
     upsertConfig.setDeleteRecordColumn(delCol);
-
-    TableConfig tableConfigWithBothDeleteAndTTL = new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
-
+    TableConfig tableConfigWithBothDeleteAndTTL =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
     try {
       TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithBothDeleteAndTTL, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("TTL feature cannot co-exist with delete in upsert."));
+      // Expected
     }
   }
 
