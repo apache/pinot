@@ -449,8 +449,8 @@ public class LLCSegmentCompletionHandlers {
       FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
 
       File localTempFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
-          ControllerFilePathProvider.getInstance().getFileUploadTempDir(), segmentName, "Invalid segment name: %s",
-          segmentName);
+          ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName),
+          "Invalid segment name: %s", segmentName);
 
       try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
         Files.copy(inputStream, localTempFile.toPath());
