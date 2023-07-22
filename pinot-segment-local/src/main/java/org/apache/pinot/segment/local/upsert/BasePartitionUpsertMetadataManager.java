@@ -93,8 +93,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
-      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler,
-      boolean enableSnapshot, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
+      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
@@ -134,32 +134,36 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
         "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
         _tableNameWithType);
+    ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+
+    // Skip adding segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
+    if (_largestSeenComparisonValue > 0) {
+      Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
+      Preconditions.checkState(_comparisonColumns.size() == 1,
+          "Upsert TTL does not work with multiple comparison columns");
+      // TODO: Support deletion for TTL. Need to construct queryableDocIds when adding segments out of TTL.
+      Preconditions.checkState(_deleteRecordColumn == null, "Upsert TTL doesn't work with record deletion");
+      Number maxComparisonValue =
+          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
+      if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+        _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
+        MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
+        if (validDocIdsSnapshot != null) {
+          immutableSegment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot), null);
+        } else {
+          _logger.warn("Failed to find snapshot from segment: {} which is out of TTL, treating all documents as valid",
+              segmentName);
+        }
+        return;
+      }
+    }
 
     if (_enableSnapshot) {
-      ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
-      if (_deleteRecordColumn != null) {
-        ThreadSafeMutableRoaringBitmap queryableDocIds = new ThreadSafeMutableRoaringBitmap();
-      }
-      // Skip adding segments that has segment EndTime in the comparison cols earlier than (largestSeenTimestamp - TTL).
-      // Note: We only update largestSeenComparisonValue when addRecord, and access the value when addOrReplaceSegments.
-      // We only support single comparison column for TTL-enabled upsert tables.
-      if (_largestSeenComparisonValue > 0) {
-        Number endTime =
-            (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-        if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
-          // TODO: Fix the deletion handling for TTL. Currently TTL cannot co-exist with delete.
-          assert _deleteRecordColumn == null;
-          _logger.info("Skip adding segment: {} because it's out of TTL", segment.getSegmentName());
-          // If delete is not enabled, set valid doc ids snapshot into the segment.
-          enableSegmentWithSnapshot((ImmutableSegmentImpl) segment, validDocIds, null);
-          return;
-        }
-      }
       _snapshotLock.readLock().lock();
     }
     startOperation();
     try {
-      doAddSegment((ImmutableSegmentImpl) segment);
+      doAddSegment(immutableSegment);
       _trackedSegments.add(segment);
     } finally {
       finishOperation();
@@ -313,17 +317,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
   }
 
-  protected void enableSegmentWithSnapshot(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
-      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds) {
-    MutableRoaringBitmap validDocIdsSnapshot = segment.loadValidDocIdsFromSnapshot();
-    if (validDocIdsSnapshot != null) {
-      validDocIdsSnapshot.forEach((int docId) -> validDocIds.add(docId));
-      segment.enableUpsert(this, validDocIds, queryableDocIds);
-    } else {
-      segment.enableUpsert(this, null, queryableDocIds);
-    }
-  }
-
   @Override
   public void addRecord(MutableSegment segment, RecordInfo recordInfo) {
     if (_stopped) {
@@ -475,17 +468,17 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
 
-    if (_enableSnapshot) {
-      // Skip removing segments that has segment comparison column endTime earlier than (largestSeenTimestamp - TTL).
-      // Note: We only support single comparison column for TTL-enabled upsert tables.
-      if (_largestSeenComparisonValue > 0) {
-        Number endTime =
-            (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-        if (endTime.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
-          _logger.info("Skip removing segment: {} because it's out of TTL", segment.getSegmentName());
-          return;
-        }
+    // Skip removing segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
+    if (_largestSeenComparisonValue > 0) {
+      Number maxComparisonValue =
+          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
+      if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+        _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
+        return;
       }
+    }
+
+    if (_enableSnapshot) {
       _snapshotLock.readLock().lock();
     }
     startOperation();
@@ -611,8 +604,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   /**
-   * Note: Load watermark when the server is started/restarted.
-   * */
+   * Loads watermark from the file if exists.
+   */
   protected double loadWatermark() {
     File watermarkFile = getWatermarkFile();
     if (watermarkFile.exists()) {
@@ -623,16 +616,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
             _partitionId);
         return watermark;
       } catch (Exception e) {
-        _logger.warn("Caught exception while loading watermark file: {}, skipping",
-            watermarkFile);
+        _logger.warn("Caught exception while loading watermark file: {}, skipping", watermarkFile);
       }
     }
     return Double.MIN_VALUE;
   }
 
   /**
-   * Note: Persist watermark when the expired primary keys are cleanup from upsertMetadata.
-   * */
+   * Persists watermark to the file.
+   */
   protected void persistWatermark(double watermark) {
     File watermarkFile = getWatermarkFile();
     try {
@@ -646,23 +638,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           DataOutputStream dataOutputStream = new DataOutputStream(outputStream)) {
         dataOutputStream.writeDouble(watermark);
       }
-      _logger.info("Persisted watermark {} to file for table: {} partition_id: {}", watermark,
-          _tableNameWithType, _partitionId);
+      _logger.info("Persisted watermark: {} to file: {}", watermark, watermarkFile);
     } catch (Exception e) {
-      _logger.warn("Caught exception while persisting watermark file: {}, skipping",
-          watermarkFile);
+      _logger.warn("Caught exception while persisting watermark file: {}, skipping", watermarkFile);
     }
   }
 
   /**
-   * Note: Watermark file need to be deleted when upsert TTL is disabled in the upsertConfig.
-   * */
+   * Deletes the watermark file.
+   */
   protected void deleteWatermark() {
     File watermarkFile = getWatermarkFile();
     if (watermarkFile.exists()) {
       if (!FileUtils.deleteQuietly(watermarkFile)) {
         _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
-        return;
       }
     }
   }
@@ -683,19 +672,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  /**
-   * When TTL is enabled for upsert, this function is used to remove expired keys from the primary key indexes.
-   * Primary keys that has comparison value earlier than largestSeenComparisonValue - TTL value will be removed.
-   */
   @Override
   public void removeExpiredPrimaryKeys() {
-    // If upsertTTL is enabled, we will remove expired primary keys from upsertMetadata after taking snapshot.
     if (_metadataTTL <= 0) {
       return;
     }
-
     if (_stopped) {
-      _logger.debug("Skip removing expired primary keys because metadata manager is already stopped");
+      _logger.info("Skip removing expired primary keys because metadata manager is already stopped");
       return;
     }
 
@@ -707,6 +690,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
+  /**
+   * Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL).
+   */
   protected abstract void doRemoveExpiredPrimaryKeys();
 
   @Override

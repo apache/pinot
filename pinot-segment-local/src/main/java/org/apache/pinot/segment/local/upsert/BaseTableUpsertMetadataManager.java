@@ -234,9 +234,4 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   public UpsertConfig.Mode getUpsertMode() {
     return _partialUpsertHandler == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
   }
-
-  @Override
-  public double getMetadataTTL() {
-    return _metadataTTL;
-  }
 }

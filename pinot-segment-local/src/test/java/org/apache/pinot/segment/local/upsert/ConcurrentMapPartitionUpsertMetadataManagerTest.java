@@ -862,7 +862,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 30, tableDir,
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 30, tableDir,
             mock(ServerMetrics.class));
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
@@ -928,7 +928,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 30, tableDir,
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 30, tableDir,
             mock(ServerMetrics.class));
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
@@ -962,8 +962,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private List<RecordInfo> getRecordInfoListForTTL(int numRecords, int[] primaryKeys, Number[] timestamps) {
     List<RecordInfo> recordInfoList = new ArrayList<>();
     for (int i = 0; i < numRecords; i++) {
-      recordInfoList.add(new RecordInfo(makePrimaryKey(primaryKeys[i]), i, new Double(timestamps[i].doubleValue()),
-          false));
+      recordInfoList.add(
+          new RecordInfo(makePrimaryKey(primaryKeys[i]), i, new Double(timestamps[i].doubleValue()), false));
     }
     return recordInfoList;
   }

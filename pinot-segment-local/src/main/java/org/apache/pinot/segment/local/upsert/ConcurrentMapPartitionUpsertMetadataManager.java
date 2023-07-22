@@ -59,8 +59,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
-      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler,
-      boolean enableSnapshot, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
+      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction,
         partialUpsertHandler, enableSnapshot, metadataTTL, tableIndexDir, serverMetrics);
   }
@@ -228,19 +228,11 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     }
   }
 
-  /**
-   * When TTL is enabled for upsert, this function is used to remove expired keys from the primary key indexes.
-   * This function will be called before new consuming segment start to consume.
-   *
-   * @return void
-   */
   @Override
   public void doRemoveExpiredPrimaryKeys() {
-    // The expiredTimestamp is the timestamp in comparison column timeunit, used to keep the largest seen timestamp.
-    double expiredTimestamp = _largestSeenComparisonValue - _metadataTTL;
+    double threshold = _largestSeenComparisonValue - _metadataTTL;
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
-      assert recordLocation.getComparisonValue() != null;
-      if (((Number) recordLocation.getComparisonValue()).doubleValue() < expiredTimestamp) {
+      if (((Number) recordLocation.getComparisonValue()).doubleValue() < threshold) {
         _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
       }
     });
@@ -255,11 +247,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     Comparable newComparisonValue = recordInfo.getComparisonValue();
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
-          // Update the largestSeenComparisonValue when add new record. If records during addOrReplaceSegments has a
-          // newer comparison column values than addRecords, it's a bug and should not happen.
+          // Update largestSeenComparisonValue when adding new record
           if (_metadataTTL > 0) {
-            Number recordComparisonValue = (Number) recordInfo.getComparisonValue();
-            _largestSeenComparisonValue = Math.max(_largestSeenComparisonValue, recordComparisonValue.doubleValue());
+            double comparisonValue = ((Number) recordInfo.getComparisonValue()).doubleValue();
+            _largestSeenComparisonValue = Math.max(_largestSeenComparisonValue, comparisonValue);
           }
           if (currentRecordLocation != null) {
             // Existing primary key

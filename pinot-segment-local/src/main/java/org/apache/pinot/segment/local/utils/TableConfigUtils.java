@@ -599,40 +599,31 @@ public final class TableConfigUtils {
   }
 
   /**
-   * Validates whether the comparison columns is compatible with Upsert TTL feature.
-   * Validation fails when one of the comparison columns is not a numeric value.
+   * Validates the upsert config related to TTL.
    */
   @VisibleForTesting
   static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
-    if (tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE
-        || tableConfig.getUpsertConfig().getMetadataTTL() == 0) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig == null || upsertConfig.getMetadataTTL() == 0) {
       return;
     }
 
-    // comparison columns should hold timestamp values in numeric values
-    List<String> comparisonColumns = tableConfig.getUpsertConfig().getComparisonColumns();
-    if (comparisonColumns != null && !comparisonColumns.isEmpty()) {
-
-      // currently we only support 1 comparison column since we need to fetch endTime in comparisonValue time unit from
-      // columnMetadata. If we have multiple comparison columns, we can only use the first comparison column as filter.
+    List<String> comparisonColumns = upsertConfig.getComparisonColumns();
+    if (CollectionUtils.isNotEmpty(comparisonColumns)) {
       Preconditions.checkState(comparisonColumns.size() == 1,
-          String.format("Currently upsert TTL only support 1 comparison columns."));
-
-      String column = comparisonColumns.size() == 1 ? comparisonColumns.get(0)
-          : tableConfig.getValidationConfig().getTimeColumnName();
-      Preconditions.checkState(schema.getFieldSpecFor(column).getDataType().isNumeric(), String.format(
-          "Upsert TTL must have numeric value for the comparison columns. The column %s: %s is not a "
-              + "numeric values", column, schema.getFieldSpecFor(column).getDataType()));
+          "Upsert TTL does not work with multiple comparison columns");
+      String comparisonColumn = comparisonColumns.get(0);
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "Upsert TTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
     }
 
-    // snapshotEnabled has to be enabled for TTL feature
-    Preconditions.checkState(tableConfig.getUpsertConfig().isEnableSnapshot(),
-        String.format("Snapshot has to be enabled for TTL feature."));
+    Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
 
-    // delete feature cannot co-exist with upsert TTL feature.
-    // TODO: Fix the deletion handling for TTL. Currently TTL cannot co-exist with delete.
-    Preconditions.checkState(tableConfig.getUpsertConfig().getDeleteRecordColumn() == null,
-        String.format("TTL feature cannot co-exist with delete in upsert."));
+    // TODO: Support deletion for TTL. Need to construct queryableDocIds when adding segments out of TTL.
+    Preconditions.checkState(upsertConfig.getDeleteRecordColumn() == null,
+        "Upsert TTL doesn't work with record deletion");
   }
 
   /**
