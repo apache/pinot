@@ -38,7 +38,7 @@ public abstract class FixedBitIntReader {
    */
   public abstract int read(int index);
 
-  public abstract int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges);
+  public abstract int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges);
 
   /**
    * Returns the value at the given index. This method does not check the boundary of the data buffer, and assume there
@@ -136,7 +136,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       int offset = index >>> 3;
       int bitOffsetInByte = index & 0x7;
       ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
@@ -204,7 +204,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       int offset = index >>> 2;
       int bitOffsetInByte = (index << 1) & 0x7;
       ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
@@ -266,7 +266,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 3;
       int offset = (int) (bitOffset >>> 3);
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -352,7 +352,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       int offset = index >>> 1;
       int bitOffsetInByte = (index << 2) & 0x7;
       ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
@@ -437,7 +437,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 5;
       int offset = (int) (bitOffset >>> 3);
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -525,7 +525,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 6;
       int offset = (int) (bitOffset >>> 3);
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -614,7 +614,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 7;
       int offset = (int) (bitOffset >>> 3);
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -695,7 +695,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + index, Byte.BYTES));
       return _dataBuffer.getByte(index) & 0xff;
     }
@@ -766,7 +766,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 9;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -845,7 +845,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 10;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -931,7 +931,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 11;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -1019,7 +1019,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 12;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -1107,7 +1107,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 13;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -1203,7 +1203,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 14;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -1300,7 +1300,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 0xf;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -1389,7 +1389,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + ((long) index << 1), Short.BYTES));
       return _dataBuffer.getShort((long) index << 1) & 0xffff;
     }
@@ -1470,7 +1470,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 17;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -1559,7 +1559,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 18;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -1656,7 +1656,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 19;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -1755,7 +1755,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 20;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -1854,7 +1854,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 21;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -1962,7 +1962,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 22;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -2071,7 +2071,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 23;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -2171,7 +2171,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long offset = (long) index * 3;
       ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES + Byte.BYTES));
       return ((_dataBuffer.getShort(offset) & 0xffff) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff);
@@ -2261,7 +2261,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 25;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -2356,7 +2356,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 26;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -2458,7 +2458,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 27;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -2562,7 +2562,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 28;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -2666,7 +2666,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 29;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -2778,7 +2778,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 30;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
@@ -2891,7 +2891,7 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
-    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    public int readAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
       long bitOffset = (long) index * 31;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;

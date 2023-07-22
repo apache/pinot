@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import com.sun.jna.platform.win32.Pdh;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
@@ -55,10 +57,12 @@ public class VarByteChunkSVForwardIndexReaderV4
   private final PinotDataBuffer _metadata;
   private final PinotDataBuffer _chunks;
 
+  private final long _chunksStartOffset;
+
   public VarByteChunkSVForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType) {
     if (dataBuffer.getInt(0) < VarByteChunkSVForwardIndexWriterV4.VERSION) {
-      throw new IllegalStateException("version " + dataBuffer.getInt(0) + " < "
-          + VarByteChunkSVForwardIndexWriterV4.VERSION);
+      throw new IllegalStateException(
+          "version " + dataBuffer.getInt(0) + " < " + VarByteChunkSVForwardIndexWriterV4.VERSION);
     }
     _storedType = storedType;
     _targetDecompressedChunkSize = dataBuffer.getInt(4);
@@ -67,6 +71,7 @@ public class VarByteChunkSVForwardIndexReaderV4
     int chunksOffset = dataBuffer.getInt(12);
     // the file has a BE header for compatability reasons (version selection) but the content is LE
     _metadata = dataBuffer.view(16, chunksOffset, ByteOrder.LITTLE_ENDIAN);
+    _chunksStartOffset = chunksOffset;
     _chunks = dataBuffer.view(chunksOffset, dataBuffer.size(), ByteOrder.LITTLE_ENDIAN);
   }
 
@@ -103,15 +108,17 @@ public class VarByteChunkSVForwardIndexReaderV4
   @Nullable
   @Override
   public ReaderContext createContext() {
-    return _chunkCompressionType == ChunkCompressionType.PASS_THROUGH
-        ? new UncompressedReaderContext(_chunks, _metadata)
-        : new CompressedReaderContext(_metadata, _chunks, _chunkDecompressor, _chunkCompressionType,
+    return _chunkCompressionType == ChunkCompressionType.PASS_THROUGH ? new UncompressedReaderContext(_metadata,
+        _chunks, _chunksStartOffset)
+        : new CompressedReaderContext(_metadata, _chunks, _chunksStartOffset, _chunkDecompressor, _chunkCompressionType,
             _targetDecompressedChunkSize);
   }
 
   @Override
   public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ReaderContext context) {
-    return null;
+    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+    context.getValueAndRecordRanges(docId, ranges);
+    return ranges;
   }
 
   @Override
@@ -127,10 +134,27 @@ public class VarByteChunkSVForwardIndexReaderV4
     protected int _nextDocIdOffset;
     protected boolean _regularChunk;
     protected int _numDocsInCurrentChunk;
+    protected long _chunkStartOffset;
+    private List<ForwardIndexByteRange> _ranges;
 
-    protected ReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks) {
+    protected ReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset) {
       _chunks = chunks;
       _metadata = metadata;
+      _chunkStartOffset = chunkStartOffset;
+    }
+
+    public byte[] getValueAndRecordRanges(int docId, List<ForwardIndexByteRange> ranges) {
+      if (docId >= _docIdOffset && docId < _nextDocIdOffset) {
+        ranges.addAll(_ranges);
+        return readSmallUncompressedValue(docId);
+      } else {
+        try {
+          return decompressAndReadAndRecordRanges(docId, ranges);
+        } catch (IOException e) {
+          LOGGER.error("Exception caught while decompressing data chunk", e);
+          throw new RuntimeException(e);
+        }
+      }
     }
 
     public byte[] getValue(int docId) {
@@ -167,6 +191,10 @@ public class VarByteChunkSVForwardIndexReaderV4
     protected abstract byte[] processChunkAndReadFirstValue(int docId, long offset, long limit)
         throws IOException;
 
+    protected abstract byte[] processChunkAndReadFirstValueAndRecordRanges(int docId, long offset, long limit,
+        List<ForwardIndexByteRange> ranges)
+        throws IOException;
+
     protected abstract byte[] readSmallUncompressedValue(int docId);
 
     private byte[] decompressAndRead(int docId)
@@ -186,18 +214,56 @@ public class VarByteChunkSVForwardIndexReaderV4
       }
       return processChunkAndReadFirstValue(docId, offset, limit);
     }
+
+    private byte[] decompressAndReadAndRecordRanges(int docId, List<ForwardIndexByteRange> ranges)
+        throws IOException {
+      // We'd practically end up reading entire metadata buffer
+      _ranges = new ArrayList<>();
+      _ranges.add(ForwardIndexByteRange.newByteRange(0, (int) _metadata.size()));
+      long metadataEntry = chunkIndexFor(docId);
+      int info = _metadata.getInt(metadataEntry);
+      _docIdOffset = info & 0x7FFFFFFF;
+      _regularChunk = _docIdOffset == info;
+      long offset = _metadata.getInt(metadataEntry + Integer.BYTES) & 0xFFFFFFFFL;
+      long limit;
+      if (_metadata.size() - METADATA_ENTRY_SIZE > metadataEntry) {
+        _nextDocIdOffset = _metadata.getInt(metadataEntry + METADATA_ENTRY_SIZE) & 0x7FFFFFFF;
+        limit = _metadata.getInt(metadataEntry + METADATA_ENTRY_SIZE + Integer.BYTES) & 0xFFFFFFFFL;
+      } else {
+        _nextDocIdOffset = Integer.MAX_VALUE;
+        limit = _chunks.size();
+      }
+      byte[] data = processChunkAndReadFirstValueAndRecordRanges(docId, offset, limit, _ranges);
+      ranges.addAll(_ranges);
+      return data;
+    }
   }
 
   private static final class UncompressedReaderContext extends ReaderContext {
 
     private ByteBuffer _chunk;
 
-    UncompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks) {
-      super(chunks, metadata);
+    private List<ForwardIndexByteRange> _ranges;
+
+    UncompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset) {
+      super(chunks, metadata, chunkStartOffset);
     }
 
     @Override
     protected byte[] processChunkAndReadFirstValue(int docId, long offset, long limit) {
+      _chunk = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
+      if (!_regularChunk) {
+        return readHugeValue();
+      }
+      _numDocsInCurrentChunk = _chunk.getInt(0);
+      return readSmallUncompressedValue(docId);
+    }
+
+    @Override
+    protected byte[] processChunkAndReadFirstValueAndRecordRanges(int docId, long offset, long limit,
+        List<ForwardIndexByteRange> ranges)
+        throws IOException {
+      ranges.add(ForwardIndexByteRange.newByteRange(_chunkStartOffset + offset, (int) (limit - offset)));
       _chunk = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
       if (!_regularChunk) {
         return readHugeValue();
@@ -216,9 +282,8 @@ public class VarByteChunkSVForwardIndexReaderV4
     protected byte[] readSmallUncompressedValue(int docId) {
       int index = docId - _docIdOffset;
       int offset = _chunk.getInt((index + 1) * Integer.BYTES);
-      int nextOffset = index == _numDocsInCurrentChunk - 1
-          ? _chunk.limit()
-          : _chunk.getInt((index + 2) * Integer.BYTES);
+      int nextOffset =
+          index == _numDocsInCurrentChunk - 1 ? _chunk.limit() : _chunk.getInt((index + 2) * Integer.BYTES);
       byte[] bytes = new byte[nextOffset - offset];
       _chunk.position(offset);
       _chunk.get(bytes);
@@ -238,9 +303,9 @@ public class VarByteChunkSVForwardIndexReaderV4
     private final ChunkDecompressor _chunkDecompressor;
     private final ChunkCompressionType _chunkCompressionType;
 
-    CompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, ChunkDecompressor chunkDecompressor,
-        ChunkCompressionType chunkCompressionType, int targetChunkSize) {
-      super(metadata, chunks);
+    CompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset,
+        ChunkDecompressor chunkDecompressor, ChunkCompressionType chunkCompressionType, int targetChunkSize) {
+      super(metadata, chunks, chunkStartOffset);
       _chunkDecompressor = chunkDecompressor;
       _chunkCompressionType = chunkCompressionType;
       _decompressedBuffer = ByteBuffer.allocateDirect(targetChunkSize).order(ByteOrder.LITTLE_ENDIAN);
@@ -261,11 +326,39 @@ public class VarByteChunkSVForwardIndexReaderV4
     }
 
     @Override
+    protected byte[] processChunkAndReadFirstValueAndRecordRanges(int docId, long offset, long limit,
+        List<ForwardIndexByteRange> ranges)
+        throws IOException {
+      _decompressedBuffer.clear();
+      ranges.add(ForwardIndexByteRange.newByteRange(_chunkStartOffset + offset, (int) (limit - offset)));
+      ByteBuffer compressed = _chunks.toDirectByteBuffer(offset, (int) (limit - offset));
+      if (_regularChunk) {
+        _chunkDecompressor.decompress(compressed, _decompressedBuffer);
+        _numDocsInCurrentChunk = _decompressedBuffer.getInt(0);
+        return readSmallUncompressedValue(docId);
+      }
+      // huge value, no benefit from buffering, return the whole thing
+      return readHugeCompressedValue(compressed, _chunkDecompressor.decompressedLength(compressed));
+    }
+
+    @Override
     protected byte[] readSmallUncompressedValue(int docId) {
       int index = docId - _docIdOffset;
       int offset = _decompressedBuffer.getInt((index + 1) * Integer.BYTES);
-      int nextOffset = index == _numDocsInCurrentChunk - 1
-          ? _decompressedBuffer.limit()
+      int nextOffset = index == _numDocsInCurrentChunk - 1 ? _decompressedBuffer.limit()
+          : _decompressedBuffer.getInt((index + 2) * Integer.BYTES);
+      byte[] bytes = new byte[nextOffset - offset];
+      _decompressedBuffer.position(offset);
+      _decompressedBuffer.get(bytes);
+      _decompressedBuffer.position(0);
+      return bytes;
+    }
+
+    @Override
+    protected byte[] readSmallUncompressedValueAndRecordRanges(int docId, List<ForwardIndexByteRange> ranges) {
+      int index = docId - _docIdOffset;
+      int offset = _decompressedBuffer.getInt((index + 1) * Integer.BYTES);
+      int nextOffset = index == _numDocsInCurrentChunk - 1 ? _decompressedBuffer.limit()
           : _decompressedBuffer.getInt((index + 2) * Integer.BYTES);
       byte[] bytes = new byte[nextOffset - offset];
       _decompressedBuffer.position(offset);

@@ -101,7 +101,7 @@ public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<
   @Override
   public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ForwardIndexReaderContext context) {
     List<ForwardIndexByteRange> ranges = new ArrayList<>();
-    _reader.readAndGetRanges(docId, 0, ranges);
+    _reader.readAndRecordRanges(docId, 0, ranges);
     return ranges;
   }
 

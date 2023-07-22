@@ -58,68 +58,10 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
   public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ChunkReaderContext context) {
     List<ForwardIndexByteRange> ranges = new ArrayList<>();
     if (_isCompressed) {
-      int chunkId = docId / _numDocsPerChunk;
-      ranges.add(getChunkPositionBufferRange(chunkId));
-      long chunkPosition = getChunkPosition(chunkId);
-
-      // Actual chunk offset
-      int chunkSize;
-      if (chunkId == (_numChunks - 1)) { // Last chunk.
-        chunkSize = (int) (_dataBuffer.size() - chunkPosition);
-      } else {
-        ranges.add(getChunkPositionBufferRange(chunkId + 1));
-        long nextChunkOffset = getChunkPosition(chunkId + 1);
-        chunkSize = (int) (nextChunkOffset - chunkPosition);
-      }
-
-      ranges.add(ForwardIndexByteRange.newByteRange(chunkPosition, chunkSize));
+      sliceBytesCompressedAndRecordRanges(docId, context, ranges);
     } else {
-      int chunkId = docId / _numDocsPerChunk;
-      int chunkRowId = docId % _numDocsPerChunk;
-
-      // These offsets are offset in the data buffer
-      ranges.add(getChunkPositionBufferRange(chunkId));
-      long chunkStartOffset = getChunkPosition(chunkId);
-
-      ranges.add(
-          ForwardIndexByteRange.newByteRange(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE, Integer.BYTES));
-      long valueStartOffset =
-          chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
-      long valueEndOffset;
-
-      if (chunkId == _numChunks - 1) {
-        // Last chunk
-        if (chunkRowId == _numDocsPerChunk - 1) {
-          // Last row in the last chunk
-          valueEndOffset = _dataBuffer.size();
-        } else {
-          ranges.add(ForwardIndexByteRange.newByteRange(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE,
-              Integer.BYTES));
-          int valueEndOffsetInChunk = _dataBuffer
-              .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
-          if (valueEndOffsetInChunk == 0) {
-            // Last row in the last chunk (chunk is incomplete, which stores 0 as the offset for the absent rows)
-            valueEndOffset = _dataBuffer.size();
-          } else {
-            valueEndOffset = chunkStartOffset + valueEndOffsetInChunk;
-          }
-        }
-      } else {
-        if (chunkRowId == _numDocsPerChunk - 1) {
-          // Last row in the chunk
-          ranges.add(getChunkPositionBufferRange(chunkId + 1));
-          valueEndOffset = getChunkPosition(chunkId + 1);
-        } else {
-          ranges.add(ForwardIndexByteRange.newByteRange(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE,
-              Integer.BYTES));
-          valueEndOffset = chunkStartOffset + _dataBuffer
-              .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
-        }
-      }
-
-      ranges.add(ForwardIndexByteRange.newByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
+      sliceBytesUncompressedAndRecordRanges(docId, ranges);
     }
-
     return ranges;
   }
 
@@ -224,6 +166,18 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
   /**
    * Helper method to read BYTES value from the compressed index.
    */
+  private ByteBuffer sliceBytesCompressedAndRecordRanges(int docId, ChunkReaderContext context,
+      List<ForwardIndexByteRange> ranges) {
+    int chunkRowId = docId % _numDocsPerChunk;
+    ByteBuffer chunkBuffer = getChunkBufferAndRecordRanges(docId, context, ranges);
+
+    // These offsets are offset in the chunk buffer
+    int valueStartOffset = chunkBuffer.getInt(chunkRowId * ROW_OFFSET_SIZE);
+    int valueEndOffset = getValueEndOffset(chunkRowId, chunkBuffer);
+    // cast only for JDK8 compilation profile
+    return (ByteBuffer) chunkBuffer.duplicate().position(valueStartOffset).limit(valueEndOffset);
+  }
+
   private ByteBuffer sliceBytesCompressed(int docId, ChunkReaderContext context) {
     int chunkRowId = docId % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkBuffer(docId, context);
@@ -233,6 +187,23 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     int valueEndOffset = getValueEndOffset(chunkRowId, chunkBuffer);
     // cast only for JDK8 compilation profile
     return (ByteBuffer) chunkBuffer.duplicate().position(valueStartOffset).limit(valueEndOffset);
+  }
+
+  private ByteBuffer sliceBytesUncompressedAndRecordRanges(int docId, List<ForwardIndexByteRange> ranges) {
+    int chunkId = docId / _numDocsPerChunk;
+    int chunkRowId = docId % _numDocsPerChunk;
+
+    // These offsets are offset in the data buffer
+    long chunkStartOffset = getChunkPositionAndRecordRanges(chunkId, ranges);
+
+    ranges.add(
+        ForwardIndexByteRange.newByteRange(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE, Integer.BYTES));
+    long valueStartOffset =
+        chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
+    long valueEndOffset = getValueEndOffsetAndRecordRanges(chunkId, chunkRowId, chunkStartOffset, ranges);
+
+    ranges.add(ForwardIndexByteRange.newByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
+    return _dataBuffer.toDirectByteBuffer(valueStartOffset, (int) (valueEndOffset - valueStartOffset));
   }
 
   /**
@@ -264,6 +235,38 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
         return chunkBuffer.limit();
       } else {
         return valueEndOffset;
+      }
+    }
+  }
+
+  private long getValueEndOffsetAndRecordRanges(int chunkId, int chunkRowId, long chunkStartOffset,
+      List<ForwardIndexByteRange> ranges) {
+    if (chunkId == _numChunks - 1) {
+      // Last chunk
+      if (chunkRowId == _numDocsPerChunk - 1) {
+        // Last row in the last chunk
+        return _dataBuffer.size();
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE,
+            Integer.BYTES));
+        int valueEndOffsetInChunk = _dataBuffer
+            .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
+        if (valueEndOffsetInChunk == 0) {
+          // Last row in the last chunk (chunk is incomplete, which stores 0 as the offset for the absent rows)
+          return _dataBuffer.size();
+        } else {
+          return chunkStartOffset + valueEndOffsetInChunk;
+        }
+      }
+    } else {
+      if (chunkRowId == _numDocsPerChunk - 1) {
+        // Last row in the chunk
+        return getChunkPositionAndRecordRanges(chunkId + 1, ranges);
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE,
+            Integer.BYTES));
+        return chunkStartOffset + _dataBuffer
+            .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
       }
     }
   }

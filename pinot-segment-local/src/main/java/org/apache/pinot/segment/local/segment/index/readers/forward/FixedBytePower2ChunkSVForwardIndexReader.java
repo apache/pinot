@@ -57,21 +57,7 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
   public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ChunkReaderContext context) {
     List<ForwardIndexByteRange> ranges = new ArrayList<>();
     if (_isCompressed) {
-      int chunkId = docId >>> _shift;
-      ranges.add(getChunkPositionBufferRange(chunkId));
-      long chunkPosition = getChunkPosition(chunkId);
-
-      // Actual chunk offset
-      int chunkSize;
-      if (chunkId == (_numChunks - 1)) { // Last chunk.
-        chunkSize = (int) (_dataBuffer.size() - chunkPosition);
-      } else {
-        ranges.add(getChunkPositionBufferRange(chunkId + 1));
-        long nextChunkOffset = getChunkPosition(chunkId + 1);
-        chunkSize = (int) (nextChunkOffset - chunkPosition);
-      }
-
-      ranges.add(ForwardIndexByteRange.newByteRange(chunkPosition, chunkSize));
+      getChunkBufferAndRecordRanges(docId, context, ranges);
     } else {
       switch (_storedType) {
         case INT: {
@@ -158,5 +144,15 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
       return context.getChunkBuffer();
     }
     return decompressChunk(chunkId, context);
+  }
+
+  protected ByteBuffer getChunkBufferAndRecordRanges(int docId, ChunkReaderContext context,
+      List<ForwardIndexByteRange> ranges) {
+    int chunkId = docId >>> _shift;
+    if (context.getChunkId() == chunkId) {
+      ranges.addAll(context.getRanges());
+      return context.getChunkBuffer();
+    }
+    return decompressChunkAndRecordRanges(chunkId, context, ranges);
   }
 }

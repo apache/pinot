@@ -59,21 +59,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkForwardIn
   public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ChunkReaderContext context) {
     List<ForwardIndexByteRange> ranges = new ArrayList<>();
     if (_isCompressed) {
-      int chunkId = docId / _numDocsPerChunk;
-      ranges.add(getChunkPositionBufferRange(chunkId));
-      long chunkPosition = getChunkPosition(chunkId);
-
-      // Actual chunk offset
-      int chunkSize;
-      if (chunkId == (_numChunks - 1)) { // Last chunk.
-        chunkSize = (int) (_dataBuffer.size() - chunkPosition);
-      } else {
-        ranges.add(getChunkPositionBufferRange(chunkId + 1));
-        long nextChunkOffset = getChunkPosition(chunkId + 1);
-        chunkSize = (int) (nextChunkOffset - chunkPosition);
-      }
-
-      ranges.add(ForwardIndexByteRange.newByteRange(chunkPosition, chunkSize));
+      getChunkBufferAndRecordRanges(docId, context, ranges);
     } else {
       switch (_storedType) {
         case INT: {

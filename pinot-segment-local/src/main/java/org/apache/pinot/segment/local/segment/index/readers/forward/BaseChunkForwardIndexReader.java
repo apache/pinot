@@ -220,15 +220,6 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     }
   }
 
-  protected ForwardIndexByteRange getChunkPositionBufferRange(int chunkId) {
-    if (_headerEntryChunkOffsetSize == Integer.BYTES) {
-      return ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize,
-          Integer.BYTES);
-    } else {
-      return ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES);
-    }
-  }
-
   @Override
   public boolean isDictionaryEncoded() {
     return false;

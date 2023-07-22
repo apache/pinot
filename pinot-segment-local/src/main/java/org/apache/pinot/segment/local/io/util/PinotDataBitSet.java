@@ -19,9 +19,7 @@
 package org.apache.pinot.segment.local.io.util;
 
 import java.io.Closeable;
-import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
@@ -79,7 +77,7 @@ public final class PinotDataBitSet implements Closeable {
     _dataBuffer = dataBuffer;
   }
 
-  public int readIntAndGetRanges(int index, int numBitsPerValue, long baseOffset,
+  public int readIntAndRecordRanges(int index, int numBitsPerValue, long baseOffset,
       List<ForwardIndexByteRange> ranges) {
     long bitOffset = (long) index * numBitsPerValue;
     int byteOffset = (int) (bitOffset / Byte.SIZE);
@@ -131,7 +129,7 @@ public final class PinotDataBitSet implements Closeable {
     }
   }
 
-  public void readIntAndGetRanges(int startIndex, int numBitsPerValue, int length, int[] buffer, long baseOffset,
+  public void readIntAndRecordRanges(int startIndex, int numBitsPerValue, int length, int[] buffer, long baseOffset,
       List<ForwardIndexByteRange> ranges) {
     long startBitOffset = (long) startIndex * numBitsPerValue;
     int byteOffset = (int) (startBitOffset / Byte.SIZE);
@@ -322,7 +320,7 @@ public final class PinotDataBitSet implements Closeable {
     }
   }
 
-  public int getNextNthSetBitOffsetOffsetRanges(int bitOffset, int n, long baseOffset,
+  public int getNextNthSetBitOffsetOffsetAndRecordRanges(int bitOffset, int n, long baseOffset,
       List<ForwardIndexByteRange> ranges) {
     int byteOffset = bitOffset / Byte.SIZE;
     int bitOffsetInFirstByte = bitOffset % Byte.SIZE;

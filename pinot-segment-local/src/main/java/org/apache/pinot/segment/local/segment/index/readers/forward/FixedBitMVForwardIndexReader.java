@@ -113,7 +113,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
       int chunkId = docId / _numDocsPerChunk;
       if (docId > contextDocId && chunkId == contextDocId / _numDocsPerChunk) {
         // Same chunk
-        startIndex = _bitmapReader.getNextNthSetBitOffsetOffsetRanges(contextEndOffset + 1, docId - contextDocId - 1,
+        startIndex = _bitmapReader.getNextNthSetBitOffsetOffsetAndRecordRanges(contextEndOffset + 1, docId - contextDocId - 1,
             _bitmapReaderStartOffset, ranges);
       } else {
         // Different chunk
@@ -124,7 +124,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
           startIndex = chunkOffset;
         } else {
           startIndex =
-              _bitmapReader.getNextNthSetBitOffsetOffsetRanges(chunkOffset + 1, indexInChunk, _bitmapReaderStartOffset,
+              _bitmapReader.getNextNthSetBitOffsetOffsetAndRecordRanges(chunkOffset + 1, indexInChunk, _bitmapReaderStartOffset,
                   ranges);
         }
       }
@@ -137,7 +137,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     }
     int numValues = endIndex - startIndex;
     int[] dictIdBuffer = new int[numValues];
-    _rawDataReader.readIntAndGetRanges(startIndex, numValues, dictIdBuffer, _rawDataReaderStartOffset, ranges);
+    _rawDataReader.readIntAndRecordRanges(startIndex, numValues, dictIdBuffer, _rawDataReaderStartOffset, ranges);
 
     // Update context
     context._docId = docId;

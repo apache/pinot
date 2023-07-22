@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.constant;
 
+import java.util.List;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -41,6 +43,11 @@ public final class ConstantMVForwardIndexReader implements ForwardIndexReader<Fo
   @Override
   public DataType getStoredType() {
     return DataType.INT;
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ForwardIndexReaderContext context) {
+    throw new UnsupportedOperationException();
   }
 
   /*
