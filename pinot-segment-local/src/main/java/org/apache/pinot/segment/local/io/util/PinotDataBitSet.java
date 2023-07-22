@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.io.util;
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
@@ -78,28 +79,32 @@ public final class PinotDataBitSet implements Closeable {
     _dataBuffer = dataBuffer;
   }
 
-  public List<ForwardIndexByteRange> getByteRanges(int index, int numBitsPerValue) {
-    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+  public int readIntAndGetRanges(int index, int numBitsPerValue, long baseOffset,
+      List<ForwardIndexByteRange> ranges) {
     long bitOffset = (long) index * numBitsPerValue;
     int byteOffset = (int) (bitOffset / Byte.SIZE);
     int bitOffsetInFirstByte = (int) (bitOffset % Byte.SIZE);
 
-    ranges.add(ForwardIndexByteRange.newByteRange(byteOffset, Byte.SIZE));
     // Initiated with the value in first byte
+    ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.SIZE));
     int currentValue = _dataBuffer.getByte(byteOffset) & (BYTE_MASK >>> bitOffsetInFirstByte);
 
     int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
-    if (numBitsLeft > 0) {
+    if (numBitsLeft <= 0) {
+      // The value is inside the first byte
+      return currentValue >>> -numBitsLeft;
+    } else {
+      // The value is in multiple bytes
       while (numBitsLeft > Byte.SIZE) {
         byteOffset++;
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.SIZE));
         currentValue = (currentValue << Byte.SIZE) | (_dataBuffer.getByte(byteOffset) & BYTE_MASK);
-        ranges.add(ForwardIndexByteRange.newByteRange(byteOffset, Byte.SIZE));
         numBitsLeft -= Byte.SIZE;
       }
-      ranges.add(ForwardIndexByteRange.newByteRange(byteOffset + 1, Byte.SIZE));
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.SIZE));
+      return (currentValue << numBitsLeft) | ((_dataBuffer.getByte(byteOffset + 1) & BYTE_MASK) >>> (Byte.SIZE
+          - numBitsLeft));
     }
-
-    return ranges;
   }
 
   public int readInt(int index, int numBitsPerValue) {
@@ -123,6 +128,46 @@ public final class PinotDataBitSet implements Closeable {
       }
       return (currentValue << numBitsLeft) | ((_dataBuffer.getByte(byteOffset + 1) & BYTE_MASK) >>> (Byte.SIZE
           - numBitsLeft));
+    }
+  }
+
+  public void readIntAndGetRanges(int startIndex, int numBitsPerValue, int length, int[] buffer, long baseOffset,
+      List<ForwardIndexByteRange> ranges) {
+    long startBitOffset = (long) startIndex * numBitsPerValue;
+    int byteOffset = (int) (startBitOffset / Byte.SIZE);
+    int bitOffsetInFirstByte = (int) (startBitOffset % Byte.SIZE);
+
+    // Initiated with the value in first byte
+    ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.SIZE));
+    int currentValue = _dataBuffer.getByte(byteOffset) & (BYTE_MASK >>> bitOffsetInFirstByte);
+
+    for (int i = 0; i < length; i++) {
+      if (bitOffsetInFirstByte == Byte.SIZE) {
+        bitOffsetInFirstByte = 0;
+        byteOffset++;
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.SIZE));
+        currentValue = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
+      }
+      int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
+      if (numBitsLeft <= 0) {
+        // The value is inside the first byte
+        buffer[i] = currentValue >>> -numBitsLeft;
+        bitOffsetInFirstByte = Byte.SIZE + numBitsLeft;
+        currentValue = currentValue & (BYTE_MASK >>> bitOffsetInFirstByte);
+      } else {
+        // The value is in multiple bytes
+        while (numBitsLeft > Byte.SIZE) {
+          byteOffset++;
+          ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.SIZE));
+          currentValue = (currentValue << Byte.SIZE) | (_dataBuffer.getByte(byteOffset) & BYTE_MASK);
+          numBitsLeft -= Byte.SIZE;
+        }
+        byteOffset++;
+        int nextByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
+        buffer[i] = (currentValue << numBitsLeft) | (nextByte >>> (Byte.SIZE - numBitsLeft));
+        bitOffsetInFirstByte = numBitsLeft;
+        currentValue = nextByte & (BYTE_MASK >>> bitOffsetInFirstByte);
+      }
     }
   }
 
@@ -243,6 +288,24 @@ public final class PinotDataBitSet implements Closeable {
     _dataBuffer.putByte(byteOffset, (byte) (_dataBuffer.getByte(byteOffset) & (0xFF7F >>> bitOffsetInByte)));
   }
 
+  public int getNextSetBitOffsetRanges(int bitOffset, long baseOffset, List<ForwardIndexByteRange> ranges) {
+    int byteOffset = bitOffset / Byte.SIZE;
+    int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
+    ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.BYTES));
+    int firstByte = (_dataBuffer.getByte(byteOffset) << bitOffsetInFirstByte) & BYTE_MASK;
+    if (firstByte != 0) {
+      return bitOffset + FIRST_BIT_SET[firstByte];
+    }
+    while (true) {
+      byteOffset++;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.BYTES));
+      int currentByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
+      if (currentByte != 0) {
+        return (byteOffset * Byte.SIZE) | FIRST_BIT_SET[currentByte];
+      }
+    }
+  }
+
   public int getNextSetBitOffset(int bitOffset) {
     int byteOffset = bitOffset / Byte.SIZE;
     int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
@@ -255,6 +318,28 @@ public final class PinotDataBitSet implements Closeable {
       int currentByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
       if (currentByte != 0) {
         return (byteOffset * Byte.SIZE) | FIRST_BIT_SET[currentByte];
+      }
+    }
+  }
+
+  public int getNextNthSetBitOffsetOffsetRanges(int bitOffset, int n, long baseOffset,
+      List<ForwardIndexByteRange> ranges) {
+    int byteOffset = bitOffset / Byte.SIZE;
+    int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
+    ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.BYTES));
+    int firstByte = (_dataBuffer.getByte(byteOffset) << bitOffsetInFirstByte) & BYTE_MASK;
+    int numBitsSet = NUM_BITS_SET[firstByte];
+    if (numBitsSet >= n) {
+      return bitOffset + NTH_BIT_SET[n - 1][firstByte];
+    }
+    while (true) {
+      n -= numBitsSet;
+      byteOffset++;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.BYTES));
+      int currentByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
+      numBitsSet = NUM_BITS_SET[currentByte];
+      if (numBitsSet >= n) {
+        return (byteOffset * Byte.SIZE) | NTH_BIT_SET[n - 1][currentByte];
       }
     }
   }

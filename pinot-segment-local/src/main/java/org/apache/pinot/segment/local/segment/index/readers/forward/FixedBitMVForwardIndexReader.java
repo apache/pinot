@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -58,16 +61,21 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   private final int _numValues;
   private final int _numDocsPerChunk;
 
+  private final long _bitmapReaderStartOffset;
+  private final long _rawDataReaderStartOffset;
+
   public FixedBitMVForwardIndexReader(PinotDataBuffer dataBuffer, int numDocs, int numValues, int numBitsPerValue) {
     _numDocs = numDocs;
     _numValues = numValues;
     _numDocsPerChunk = (int) (Math.ceil((float) PREFERRED_NUM_VALUES_PER_CHUNK / (numValues / numDocs)));
     int numChunks = (numDocs + _numDocsPerChunk - 1) / _numDocsPerChunk;
     long endOffset = numChunks * Integer.BYTES;
+    _bitmapReaderStartOffset = endOffset;
     _chunkOffsetReader = new FixedByteValueReaderWriter(dataBuffer.view(0L, endOffset));
     int bitmapSize = (numValues + Byte.SIZE - 1) / Byte.SIZE;
     _bitmapReader = new PinotDataBitSet(dataBuffer.view(endOffset, endOffset + bitmapSize));
     endOffset += bitmapSize;
+    _rawDataReaderStartOffset = endOffset;
     int rawDataSize = (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
     _rawDataReader =
         new FixedBitIntReaderWriter(dataBuffer.view(endOffset, endOffset + rawDataSize), numValues, numBitsPerValue);
@@ -91,6 +99,51 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   @Override
   public Context createContext() {
     return new Context();
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, Context context) {
+    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+    int contextDocId = context._docId;
+    int contextEndOffset = context._endOffset;
+    int startIndex;
+    if (docId == contextDocId + 1) {
+      startIndex = contextEndOffset;
+    } else {
+      int chunkId = docId / _numDocsPerChunk;
+      if (docId > contextDocId && chunkId == contextDocId / _numDocsPerChunk) {
+        // Same chunk
+        startIndex = _bitmapReader.getNextNthSetBitOffsetOffsetRanges(contextEndOffset + 1, docId - contextDocId - 1,
+            _bitmapReaderStartOffset, ranges);
+      } else {
+        // Different chunk
+        ranges.add(ForwardIndexByteRange.newByteRange(chunkId, Integer.BYTES));
+        int chunkOffset = _chunkOffsetReader.getInt(chunkId);
+        int indexInChunk = docId % _numDocsPerChunk;
+        if (indexInChunk == 0) {
+          startIndex = chunkOffset;
+        } else {
+          startIndex =
+              _bitmapReader.getNextNthSetBitOffsetOffsetRanges(chunkOffset + 1, indexInChunk, _bitmapReaderStartOffset,
+                  ranges);
+        }
+      }
+    }
+    int endIndex;
+    if (docId == _numDocs - 1) {
+      endIndex = _numValues;
+    } else {
+      endIndex = _bitmapReader.getNextSetBitOffsetRanges(startIndex + 1, _bitmapReaderStartOffset, ranges);
+    }
+    int numValues = endIndex - startIndex;
+    int[] dictIdBuffer = new int[numValues];
+    _rawDataReader.readIntAndGetRanges(startIndex, numValues, dictIdBuffer, _rawDataReaderStartOffset, ranges);
+
+    // Update context
+    context._docId = docId;
+    context._endOffset = endIndex;
+
+    return ranges;
   }
 
   @Override

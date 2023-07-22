@@ -23,11 +23,13 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
@@ -105,6 +107,11 @@ public class VarByteChunkSVForwardIndexReaderV4
         ? new UncompressedReaderContext(_chunks, _metadata)
         : new CompressedReaderContext(_metadata, _chunks, _chunkDecompressor, _chunkCompressionType,
             _targetDecompressedChunkSize);
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ReaderContext context) {
+    return null;
   }
 
   @Override

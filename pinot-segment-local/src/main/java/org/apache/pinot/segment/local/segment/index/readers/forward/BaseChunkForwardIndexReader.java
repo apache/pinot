@@ -25,6 +25,8 @@ import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -128,6 +130,46 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     return decompressChunk(chunkId, context);
   }
 
+  protected ByteBuffer getChunkBufferAndRecordRanges(int docId, ChunkReaderContext context,
+      List<ForwardIndexByteRange> ranges) {
+    int chunkId = docId / _numDocsPerChunk;
+    if (context.getChunkId() == chunkId) {
+      ranges.addAll(context.getRanges());
+      return context.getChunkBuffer();
+    }
+    return decompressChunkAndRecordRanges(chunkId, context, ranges);
+  }
+
+  protected ByteBuffer decompressChunkAndRecordRanges(int chunkId, ChunkReaderContext context,
+      List<ForwardIndexByteRange> ranges) {
+    List<ForwardIndexByteRange> chunkRanges = new ArrayList<>();
+    int chunkSize;
+    long chunkPosition = getChunkPositionAndRecordRanges(chunkId, chunkRanges);
+
+    // Size of chunk can be determined using next chunks offset, or end of data buffer for last chunk.
+    if (chunkId == (_numChunks - 1)) { // Last chunk.
+      chunkSize = (int) (_dataBuffer.size() - chunkPosition);
+    } else {
+      long nextChunkOffset = getChunkPositionAndRecordRanges(chunkId + 1, chunkRanges);
+      chunkSize = (int) (nextChunkOffset - chunkPosition);
+    }
+
+    ByteBuffer decompressedBuffer = context.getChunkBuffer();
+    decompressedBuffer.clear();
+
+    try {
+      chunkRanges.add(ForwardIndexByteRange.newByteRange(chunkPosition, chunkSize));
+      _chunkDecompressor.decompress(_dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize), decompressedBuffer);
+    } catch (IOException e) {
+      LOGGER.error("Exception caught while decompressing data chunk", e);
+      throw new RuntimeException(e);
+    }
+    context.setChunkId(chunkId);
+    context.setRanges(chunkRanges);
+    ranges.addAll(chunkRanges);
+    return decompressedBuffer;
+  }
+
   protected ByteBuffer decompressChunk(int chunkId, ChunkReaderContext context) {
     int chunkSize;
     long chunkPosition = getChunkPosition(chunkId);
@@ -166,9 +208,22 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     }
   }
 
+  protected long getChunkPositionAndRecordRanges(int chunkId, List<ForwardIndexByteRange> ranges) {
+    if (_headerEntryChunkOffsetSize == Integer.BYTES) {
+      ranges.add(
+          ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES));
+      return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
+    } else {
+      ranges.add(
+          ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES));
+      return _dataHeader.getLong(chunkId * _headerEntryChunkOffsetSize);
+    }
+  }
+
   protected ForwardIndexByteRange getChunkPositionBufferRange(int chunkId) {
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
-      return ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES);
+      return ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize,
+          Integer.BYTES);
     } else {
       return ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES);
     }

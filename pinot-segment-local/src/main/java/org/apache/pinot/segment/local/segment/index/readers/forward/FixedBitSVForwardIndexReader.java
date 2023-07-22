@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
@@ -67,7 +68,9 @@ public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<Fo
 
   @Override
   public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ForwardIndexReaderContext context) {
-    return _reader.getByteRanges(docId);
+    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+    _reader.readIntAndGetRanges(docId, 0, ranges);
+    return ranges;
   }
 
   @Override

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.io.reader.impl;
 
+import java.util.List;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 
@@ -35,6 +37,8 @@ public abstract class FixedBitIntReader {
    * Returns the value at the given index.
    */
   public abstract int read(int index);
+
+  public abstract int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges);
 
   /**
    * Returns the value at the given index. This method does not check the boundary of the data buffer, and assume there
@@ -132,6 +136,14 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      int offset = index >>> 3;
+      int bitOffsetInByte = index & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
+      return (_dataBuffer.getByte(offset) >>> (7 - bitOffsetInByte)) & 0x1;
+    }
+
+    @Override
     public int readUnchecked(int index) {
       int offset = index >>> 3;
       int bitOffsetInByte = index & 0x7;
@@ -192,6 +204,14 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      int offset = index >>> 2;
+      int bitOffsetInByte = (index << 1) & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
+      return (_dataBuffer.getByte(offset) >>> (7 - bitOffsetInByte)) & 0x1;
+    }
+
+    @Override
     public int readUnchecked(int index) {
       int offset = index >>> 2;
       int bitOffsetInByte = (index << 1) & 0x7;
@@ -243,6 +263,22 @@ public abstract class FixedBitIntReader {
 
     private Bit3Reader(PinotDataBuffer dataBuffer) {
       super(dataBuffer);
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 3;
+      int offset = (int) (bitOffset >>> 3);
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
+      int valueInFirstByte = _dataBuffer.getByte(offset) & (0xff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 5;
+      if (numBitsLeft <= 0) {
+        return valueInFirstByte >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 1, Byte.BYTES));
+        return (valueInFirstByte << numBitsLeft) | ((_dataBuffer.getByte(offset + 1) & 0xff) >>> (8 - numBitsLeft));
+      }
     }
 
     @Override
@@ -313,6 +349,14 @@ public abstract class FixedBitIntReader {
 
     private Bit4Reader(PinotDataBuffer dataBuffer) {
       super(dataBuffer);
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      int offset = index >>> 1;
+      int bitOffsetInByte = (index << 2) & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
+      return (_dataBuffer.getByte(offset) >>> (4 - bitOffsetInByte)) & 0xf;
     }
 
     @Override
@@ -393,6 +437,22 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 5;
+      int offset = (int) (bitOffset >>> 3);
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
+      int valueInFirstByte = _dataBuffer.getByte(offset) & (0xff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 3;
+      if (numBitsLeft <= 0) {
+        return valueInFirstByte >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 1, Byte.BYTES));
+        return (valueInFirstByte << numBitsLeft) | ((_dataBuffer.getByte(offset + 1) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 5;
       int offset = (int) (bitOffset >>> 3);
@@ -460,6 +520,22 @@ public abstract class FixedBitIntReader {
       if (numBitsLeft <= 0) {
         return valueInFirstByte >>> -numBitsLeft;
       } else {
+        return (valueInFirstByte << numBitsLeft) | ((_dataBuffer.getByte(offset + 1) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 6;
+      int offset = (int) (bitOffset >>> 3);
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
+      int valueInFirstByte = _dataBuffer.getByte(offset) & (0xff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 2;
+      if (numBitsLeft <= 0) {
+        return valueInFirstByte >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 1, Byte.BYTES));
         return (valueInFirstByte << numBitsLeft) | ((_dataBuffer.getByte(offset + 1) & 0xff) >>> (8 - numBitsLeft));
       }
     }
@@ -538,6 +614,22 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 7;
+      int offset = (int) (bitOffset >>> 3);
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
+      int valueInFirstByte = _dataBuffer.getByte(offset) & (0xff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 1;
+      if (numBitsLeft <= 0) {
+        return valueInFirstByte >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 1, Byte.BYTES));
+        return (valueInFirstByte << numBitsLeft) | ((_dataBuffer.getByte(offset + 1) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 7;
       int offset = (int) (bitOffset >>> 3);
@@ -603,6 +695,12 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + index, Byte.BYTES));
+      return _dataBuffer.getByte(index) & 0xff;
+    }
+
+    @Override
     public int readUnchecked(int index) {
       return _dataBuffer.getByte(index) & 0xff;
     }
@@ -664,6 +762,15 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 9;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      return (_dataBuffer.getShort(offset) >>> (7 - bitOffsetInFirstByte)) & 0x1ff;
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 9;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES));
       return (_dataBuffer.getShort(offset) >>> (7 - bitOffsetInFirstByte)) & 0x1ff;
     }
 
@@ -734,6 +841,15 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 10;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      return (_dataBuffer.getShort(offset) >>> (6 - bitOffsetInFirstByte)) & 0x3ff;
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 10;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES));
       return (_dataBuffer.getShort(offset) >>> (6 - bitOffsetInFirstByte)) & 0x3ff;
     }
 
@@ -815,6 +931,22 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 11;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES));
+      int valueInFirstShort = _dataBuffer.getShort(offset) & (0xffff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 5;
+      if (numBitsLeft <= 0) {
+        return valueInFirstShort >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 2, Short.BYTES));
+        return (valueInFirstShort << numBitsLeft) | ((_dataBuffer.getByte(offset + 2) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 11;
       long offset = bitOffset >>> 3;
@@ -883,6 +1015,15 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 12;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      return (_dataBuffer.getShort(offset) >>> (4 - bitOffsetInFirstByte)) & 0xfff;
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 12;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES));
       return (_dataBuffer.getShort(offset) >>> (4 - bitOffsetInFirstByte)) & 0xfff;
     }
 
@@ -966,6 +1107,22 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 13;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES));
+      int valueInFirstShort = _dataBuffer.getShort(offset) & (0xffff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 3;
+      if (numBitsLeft <= 0) {
+        return valueInFirstShort >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 2, Byte.BYTES));
+        return (valueInFirstShort << numBitsLeft) | ((_dataBuffer.getByte(offset + 2) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 13;
       long offset = bitOffset >>> 3;
@@ -1041,6 +1198,22 @@ public abstract class FixedBitIntReader {
       if (numBitsLeft <= 0) {
         return valueInFirstShort >>> -numBitsLeft;
       } else {
+        return (valueInFirstShort << numBitsLeft) | ((_dataBuffer.getByte(offset + 2) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 14;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES));
+      int valueInFirstShort = _dataBuffer.getShort(offset) & (0xffff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 2;
+      if (numBitsLeft <= 0) {
+        return valueInFirstShort >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 2, Byte.BYTES));
         return (valueInFirstShort << numBitsLeft) | ((_dataBuffer.getByte(offset + 2) & 0xff) >>> (8 - numBitsLeft));
       }
     }
@@ -1127,6 +1300,22 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 0xf;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES));
+      int valueInFirstShort = _dataBuffer.getShort(offset) & (0xffff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 1;
+      if (numBitsLeft <= 0) {
+        return valueInFirstShort >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Byte.BYTES));
+        return (valueInFirstShort << numBitsLeft) | ((_dataBuffer.getByte(offset + 2) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 15;
       long offset = bitOffset >>> 3;
@@ -1196,6 +1385,12 @@ public abstract class FixedBitIntReader {
 
     @Override
     public int read(int index) {
+      return _dataBuffer.getShort((long) index << 1) & 0xffff;
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + ((long) index << 1), Short.BYTES));
       return _dataBuffer.getShort((long) index << 1) & 0xffff;
     }
 
@@ -1275,6 +1470,16 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 17;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES + Byte.BYTES));
+      return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (7
+          - bitOffsetInFirstByte)) & 0x1ffff;
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 17;
       long offset = bitOffset >>> 3;
@@ -1349,6 +1554,16 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 18;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (6
+          - bitOffsetInFirstByte)) & 0x3ffff;
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 18;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES + Byte.BYTES));
       return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (6
           - bitOffsetInFirstByte)) & 0x3ffff;
     }
@@ -1441,6 +1656,24 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 19;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES + Byte.BYTES));
+      int valueInFirst3Bytes =
+          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
+              >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 5;
+      if (numBitsLeft <= 0) {
+        return valueInFirst3Bytes >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 3, Byte.BYTES));
+        return (valueInFirst3Bytes << numBitsLeft) | ((_dataBuffer.getByte(offset + 3) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 19;
       long offset = bitOffset >>> 3;
@@ -1517,6 +1750,16 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 20;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (4
+          - bitOffsetInFirstByte)) & 0xfffff;
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 20;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES + Byte.BYTES));
       return (((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) >>> (4
           - bitOffsetInFirstByte)) & 0xfffff;
     }
@@ -1611,6 +1854,24 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 21;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES + Byte.BYTES));
+      int valueInFirst3Bytes =
+          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
+              >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 3;
+      if (numBitsLeft <= 0) {
+        return valueInFirst3Bytes >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 3, Byte.BYTES));
+        return (valueInFirst3Bytes << numBitsLeft) | ((_dataBuffer.getByte(offset + 3) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 21;
       long offset = bitOffset >>> 3;
@@ -1696,6 +1957,24 @@ public abstract class FixedBitIntReader {
       if (numBitsLeft <= 0) {
         return valueInFirst3Bytes >>> -numBitsLeft;
       } else {
+        return (valueInFirst3Bytes << numBitsLeft) | ((_dataBuffer.getByte(offset + 3) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 22;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES + Byte.BYTES));
+      int valueInFirst3Bytes =
+          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
+              >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 2;
+      if (numBitsLeft <= 0) {
+        return valueInFirst3Bytes >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 3, Byte.BYTES));
         return (valueInFirst3Bytes << numBitsLeft) | ((_dataBuffer.getByte(offset + 3) & 0xff) >>> (8 - numBitsLeft));
       }
     }
@@ -1792,6 +2071,24 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 23;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES + Byte.BYTES));
+      int valueInFirst3Bytes =
+          ((_dataBuffer.getShort(offset) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff)) & (0xffffff
+              >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 1;
+      if (numBitsLeft <= 0) {
+        return valueInFirst3Bytes >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 3, Byte.BYTES));
+        return (valueInFirst3Bytes << numBitsLeft) | ((_dataBuffer.getByte(offset + 3) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 23;
       long offset = bitOffset >>> 3;
@@ -1870,6 +2167,13 @@ public abstract class FixedBitIntReader {
     @Override
     public int read(int index) {
       long offset = (long) index * 3;
+      return ((_dataBuffer.getShort(offset) & 0xffff) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff);
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long offset = (long) index * 3;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Short.BYTES + Byte.BYTES));
       return ((_dataBuffer.getShort(offset) & 0xffff) << 8) | (_dataBuffer.getByte(offset + 2) & 0xff);
     }
 
@@ -1957,6 +2261,15 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 25;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Integer.BYTES));
+      return (_dataBuffer.getInt(offset) >>> (7 - bitOffsetInFirstByte)) & 0x1ffffff;
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 25;
       long offset = bitOffset >>> 3;
@@ -2039,6 +2352,15 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 26;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      return (_dataBuffer.getInt(offset) >>> (6 - bitOffsetInFirstByte)) & 0x3ffffff;
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 26;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Integer.BYTES));
       return (_dataBuffer.getInt(offset) >>> (6 - bitOffsetInFirstByte)) & 0x3ffffff;
     }
 
@@ -2136,6 +2458,22 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 27;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Integer.BYTES));
+      int valueInFirstInt = _dataBuffer.getInt(offset) & (0xffffffff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 5;
+      if (numBitsLeft <= 0) {
+        return valueInFirstInt >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 4, Byte.BYTES));
+        return (valueInFirstInt << numBitsLeft) | ((_dataBuffer.getByte(offset + 4) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 27;
       long offset = bitOffset >>> 3;
@@ -2220,6 +2558,15 @@ public abstract class FixedBitIntReader {
       long bitOffset = (long) index * 28;
       long offset = bitOffset >>> 3;
       int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      return (_dataBuffer.getInt(offset) >>> (4 - bitOffsetInFirstByte)) & 0xfffffff;
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 28;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Integer.BYTES));
       return (_dataBuffer.getInt(offset) >>> (4 - bitOffsetInFirstByte)) & 0xfffffff;
     }
 
@@ -2314,6 +2661,22 @@ public abstract class FixedBitIntReader {
       if (numBitsLeft <= 0) {
         return valueInFirstInt >>> -numBitsLeft;
       } else {
+        return (valueInFirstInt << numBitsLeft) | ((_dataBuffer.getByte(offset + 4) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 29;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Integer.BYTES));
+      int valueInFirstInt = _dataBuffer.getInt(offset) & (0xffffffff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 3;
+      if (numBitsLeft <= 0) {
+        return valueInFirstInt >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 4, Byte.BYTES));
         return (valueInFirstInt << numBitsLeft) | ((_dataBuffer.getByte(offset + 4) & 0xff) >>> (8 - numBitsLeft));
       }
     }
@@ -2415,6 +2778,22 @@ public abstract class FixedBitIntReader {
     }
 
     @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 30;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Integer.BYTES));
+      int valueInFirstInt = _dataBuffer.getInt(offset) & (0xffffffff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 2;
+      if (numBitsLeft <= 0) {
+        return valueInFirstInt >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 4, Byte.BYTES));
+        return (valueInFirstInt << numBitsLeft) | ((_dataBuffer.getByte(offset + 4) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
     public int readUnchecked(int index) {
       long bitOffset = (long) index * 30;
       long offset = bitOffset >>> 3;
@@ -2507,6 +2886,22 @@ public abstract class FixedBitIntReader {
       if (numBitsLeft <= 0) {
         return valueInFirstInt >>> -numBitsLeft;
       } else {
+        return (valueInFirstInt << numBitsLeft) | ((_dataBuffer.getByte(offset + 4) & 0xff) >>> (8 - numBitsLeft));
+      }
+    }
+
+    @Override
+    public int readAndGetRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
+      long bitOffset = (long) index * 31;
+      long offset = bitOffset >>> 3;
+      int bitOffsetInFirstByte = (int) bitOffset & 0x7;
+      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset, Integer.BYTES));
+      int valueInFirstInt = _dataBuffer.getInt(offset) & (0xffffffff >>> bitOffsetInFirstByte);
+      int numBitsLeft = bitOffsetInFirstByte - 1;
+      if (numBitsLeft <= 0) {
+        return valueInFirstInt >>> -numBitsLeft;
+      } else {
+        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + offset + 4, Byte.BYTES));
         return (valueInFirstInt << numBitsLeft) | ((_dataBuffer.getByte(offset + 4) & 0xff) >>> (8 - numBitsLeft));
       }
     }
