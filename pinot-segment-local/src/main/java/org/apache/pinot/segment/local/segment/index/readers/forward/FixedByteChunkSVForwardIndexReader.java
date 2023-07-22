@@ -19,10 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
-import java.nio.DoubleBuffer;
-import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
-import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;

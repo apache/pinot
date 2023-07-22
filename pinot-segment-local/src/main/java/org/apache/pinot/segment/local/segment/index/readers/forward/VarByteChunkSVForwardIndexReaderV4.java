@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
-import com.sun.jna.platform.win32.Pdh;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -343,19 +342,6 @@ public class VarByteChunkSVForwardIndexReaderV4
 
     @Override
     protected byte[] readSmallUncompressedValue(int docId) {
-      int index = docId - _docIdOffset;
-      int offset = _decompressedBuffer.getInt((index + 1) * Integer.BYTES);
-      int nextOffset = index == _numDocsInCurrentChunk - 1 ? _decompressedBuffer.limit()
-          : _decompressedBuffer.getInt((index + 2) * Integer.BYTES);
-      byte[] bytes = new byte[nextOffset - offset];
-      _decompressedBuffer.position(offset);
-      _decompressedBuffer.get(bytes);
-      _decompressedBuffer.position(0);
-      return bytes;
-    }
-
-    @Override
-    protected byte[] readSmallUncompressedValueAndRecordRanges(int docId, List<ForwardIndexByteRange> ranges) {
       int index = docId - _docIdOffset;
       int offset = _decompressedBuffer.getInt((index + 1) * Integer.BYTES);
       int nextOffset = index == _numDocsInCurrentChunk - 1 ? _decompressedBuffer.limit()

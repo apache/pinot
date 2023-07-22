@@ -20,7 +20,9 @@ package org.apache.pinot.segment.local.segment.index.readers.sorted;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.List;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -108,6 +110,12 @@ public class SortedIndexReaderImpl implements SortedIndexReader<SortedIndexReade
         dictIdBuffer[i] = getDictId(docIds[i], context);
       }
     }
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, Context context) {
+    // TODO (probaly not a good fit for prefetching)
+    return null;
   }
 
   @Override

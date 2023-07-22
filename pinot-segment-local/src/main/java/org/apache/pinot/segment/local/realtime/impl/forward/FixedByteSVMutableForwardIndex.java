@@ -28,6 +28,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -299,6 +301,11 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     public void setBytes(int row, byte[] value) {
       _writer.setBytes(row - _startRowId, 0, value);
     }
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ForwardIndexReaderContext context) {
+    throw new UnsupportedOperationException("Operattion not supported by mutable forward index");
   }
 
   /**

@@ -20,8 +20,11 @@ package org.apache.pinot.segment.local.realtime.impl.forward;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.List;
 import org.apache.pinot.segment.local.io.writer.impl.MutableOffHeapByteArrayStore;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -60,6 +63,11 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   @Override
   public DataType getStoredType() {
     return _storedType;
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ForwardIndexReaderContext context) {
+    throw new UnsupportedOperationException("Operattion not supported by mutable forward index");
   }
 
   @Override

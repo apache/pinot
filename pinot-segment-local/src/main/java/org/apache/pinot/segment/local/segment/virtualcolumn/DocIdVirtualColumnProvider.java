@@ -19,10 +19,12 @@
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
 import java.io.IOException;
+import java.util.List;
 import org.apache.pinot.segment.local.segment.index.column.BaseVirtualColumnProvider;
 import org.apache.pinot.segment.local.segment.index.readers.DocIdDictionary;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
@@ -68,6 +70,11 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     @Override
     public void readDictIds(int[] docIds, int length, int[] dictIdBuffer, ForwardIndexReaderContext context) {
       System.arraycopy(docIds, 0, dictIdBuffer, 0, length);
+    }
+
+    @Override
+    public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ForwardIndexReaderContext context) {
+      throw new IllegalStateException("Not implemented");
     }
 
     @Override
