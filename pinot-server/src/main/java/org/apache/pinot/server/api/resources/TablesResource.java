@@ -394,8 +394,10 @@ public class TablesResource {
           new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), PEER_SEGMENT_DOWNLOAD_DIR);
       tmpSegmentTarDir.mkdir();
 
-      File segmentTarFile = new File(tmpSegmentTarDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
-          + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      File segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tmpSegmentTarDir,
+          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
+          "Invalid table / segment name: %s , %s", tableNameWithType, segmentName);
+
       TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
@@ -529,8 +531,10 @@ public class TablesResource {
           new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
       segmentTarUploadDir.mkdir();
 
-      segmentTarFile = new File(segmentTarUploadDir, tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
-          + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
+          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
+          "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
+
       TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
 
       // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
