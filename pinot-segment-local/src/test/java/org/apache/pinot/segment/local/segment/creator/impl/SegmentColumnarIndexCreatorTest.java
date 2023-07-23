@@ -243,9 +243,9 @@ public class SegmentColumnarIndexCreatorTest {
     // test for value length grater than METADATA_PROPERTY_LENGTH_LIMIT
     props = new PropertiesConfiguration();
     String stringMinValue = RandomStringUtils.
-        randomAlphabetic(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
+        randomAlphanumeric(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
     String stringMaxValue = RandomStringUtils.
-        randomAlphabetic(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
+        randomAlphanumeric(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", stringMinValue,
         stringMaxValue, FieldSpec.DataType.STRING);
     compareLongValuesWithColumnMinMax(stringMinValue, stringMaxValue, props, FieldSpec.DataType.STRING);
@@ -294,6 +294,18 @@ public class SegmentColumnarIndexCreatorTest {
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", byteMinValueString,
         byteMaxValueString, FieldSpec.DataType.BYTES);
     compareLongValuesWithColumnMinMax(byteMinValueString, byteMaxValueString, props, FieldSpec.DataType.BYTES);
+
+    // Byte value test with overflow condition at index 255
+    props = new PropertiesConfiguration();
+    byte[] byteMaxValueWithOverflowCondition = new byte[SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3];
+    random.nextBytes(byteMinValue);
+    random.nextBytes(byteMaxValue);
+    byteMaxValueWithOverflowCondition[SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT / 2 - 1] = (byte) 127;
+    String byteMaxValueWithOverflowConditionString = BytesUtils.toHexString(byteMaxValueWithOverflowCondition);
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", byteMinValueString,
+        byteMaxValueWithOverflowConditionString, FieldSpec.DataType.BYTES);
+    compareLongValuesWithColumnMinMax(byteMinValueString, byteMaxValueWithOverflowConditionString,
+        props, FieldSpec.DataType.BYTES);
   }
 
   private void compareLongValuesWithColumnMinMax(String longMinValue, String longMaxValue,

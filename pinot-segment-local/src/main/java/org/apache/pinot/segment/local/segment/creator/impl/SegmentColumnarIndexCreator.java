@@ -667,8 +667,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       case STRING:
       case JSON:
         if (isMax) {
-          alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1)
-              + (char) (value.charAt(METADATA_PROPERTY_LENGTH_LIMIT - 1) + 1);
+          alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT - 1) + Character.toString(126);
         } else {
           alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
         }
