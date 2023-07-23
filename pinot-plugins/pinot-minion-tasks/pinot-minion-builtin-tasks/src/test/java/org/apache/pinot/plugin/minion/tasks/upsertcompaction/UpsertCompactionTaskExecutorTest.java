@@ -24,6 +24,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -39,7 +40,7 @@ public class UpsertCompactionTaskExecutorTest {
     ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
     Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
     Map<String, String> map = new HashMap<>();
-    map.put("server1", "server1");
+    map.put("server1", SegmentStateModel.ONLINE);
     externalViewSegmentAssignment.put(SEGMENT_NAME, map);
     HelixAdmin clusterManagementTool = Mockito.mock(HelixAdmin.class);
     MinionContext minionContext = MinionContext.getInstance();
@@ -53,5 +54,10 @@ public class UpsertCompactionTaskExecutorTest {
     String server = UpsertCompactionTaskExecutor.getServer(SEGMENT_NAME, REALTIME_TABLE_NAME);
 
     Assert.assertEquals(server, "server1");
+
+    // verify exception thrown with OFFLINE server
+    map.put("server1", SegmentStateModel.OFFLINE);
+    Assert.assertThrows(IllegalStateException.class,
+        () -> UpsertCompactionTaskExecutor.getServer(SEGMENT_NAME, REALTIME_TABLE_NAME));
   }
 }

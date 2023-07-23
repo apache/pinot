@@ -26,7 +26,6 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.ws.rs.client.ClientBuilder;
@@ -51,6 +50,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -222,19 +222,20 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
   @VisibleForTesting
   public static String getServer(String segmentName, String tableNameWithType) {
-    String server = null;
     ExternalView externalView = _clusterManagementTool.getResourceExternalView(_clusterName, tableNameWithType);
     if (externalView == null) {
       throw new IllegalStateException("External view does not exist for table: " + tableNameWithType);
     }
-    for (Map.Entry<String, Map<String, String>> entry : externalView.getRecord().getMapFields().entrySet()) {
-      String segment = entry.getKey();
-      if (Objects.equals(segment, segmentName)) {
-        server = entry.getValue().keySet().toArray()[0].toString();
-        break;
+    Map<String, String> instanceStateMap = externalView.getStateMap(segmentName);
+    if (instanceStateMap == null) {
+      throw new IllegalStateException("Failed to find segment: " + segmentName);
+    }
+    for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
+      if (entry.getValue().equals(SegmentStateModel.ONLINE)) {
+        return entry.getKey();
       }
     }
-    return server;
+    throw new IllegalStateException("Failed to find ONLINE server for segment: " + segmentName);
   }
 
   @Override
