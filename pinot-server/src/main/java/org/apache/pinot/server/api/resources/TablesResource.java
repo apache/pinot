@@ -41,7 +41,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.DefaultValue;
@@ -586,18 +585,15 @@ public class TablesResource {
             recordsLagMap.put(k, v.getRecordsLag());
             availabilityLagMsMap.put(k, v.getAvailabilityLagMs());
           });
-          @Deprecated Map<String, String> partitiionToOffsetMap =
+          @Deprecated Map<String, String> partitionToOffsetMap =
               realtimeSegmentDataManager.getPartitionToCurrentOffset();
           segmentConsumerInfoList.add(
               new SegmentConsumerInfo(segmentDataManager.getSegmentName(),
                   realtimeSegmentDataManager.getConsumerState().toString(),
                   realtimeSegmentDataManager.getLastConsumedTimestamp(),
-                  partitiionToOffsetMap,
-                  new SegmentConsumerInfo.PartitionOffsetInfo(
-                      partitiionToOffsetMap,
-                      partitionStateMap.entrySet().stream().collect(
-                          Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())
-                      ), recordsLagMap, availabilityLagMsMap)));
+                  partitionToOffsetMap,
+                  SegmentConsumerInfo.PartitionOffsetInfo.createFrom(
+                      partitionToOffsetMap, partitionStateMap, recordsLagMap, availabilityLagMsMap)));
         }
       }
     } catch (Exception e) {

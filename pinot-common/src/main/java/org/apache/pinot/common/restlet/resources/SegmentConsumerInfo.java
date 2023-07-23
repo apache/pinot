@@ -21,6 +21,8 @@ package org.apache.pinot.common.restlet.resources;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
 
 
 /**
@@ -89,6 +91,23 @@ public class SegmentConsumerInfo {
       _latestUpstreamOffsets = latestUpstreamOffsets;
       _recordsLag = recordsLag;
       _availabilityLagMs = availabilityLagMs;
+    }
+
+    public static PartitionOffsetInfo createFrom(
+            Map<String, String> currentOffsets,
+            Map<String, ConsumerPartitionState> partitionStateMap,
+            Map<String, String> recordsLag,
+            Map<String, String> availabilityLagMs
+            ) {
+      return new PartitionOffsetInfo(
+              currentOffsets,
+              partitionStateMap.entrySet().stream().collect(
+                      Collectors.toMap(Map.Entry::getKey, e -> {
+                        ConsumerPartitionState partitionState = e.getValue();
+                        return partitionState.getUpstreamLatestOffset() == null
+                                ? "UNKNOWN" : partitionState.getUpstreamLatestOffset().toString();
+                      })
+              ), recordsLag, availabilityLagMs);
     }
 
     public Map<String, String> getCurrentOffsets() {
