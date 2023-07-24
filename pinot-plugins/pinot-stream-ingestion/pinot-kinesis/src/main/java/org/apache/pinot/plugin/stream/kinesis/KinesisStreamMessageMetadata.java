@@ -16,23 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
+package org.apache.pinot.plugin.stream.kinesis;
 
+import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.stream.StreamMessage;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
-public class KafkaStreamMessage extends StreamMessage<byte[]> {
-  public KafkaStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
-    super(key, value, metadata, value.length);
+public class KinesisStreamMessageMetadata extends StreamMessageMetadata {
+  public static final String APPRX_ARRIVAL_TIMESTAMP_KEY = "apprxArrivalTimestamp";
+  public static final String SEQUENCE_NUMBER_KEY = "sequenceNumber";
+
+  public KinesisStreamMessageMetadata(long recordIngestionTimeMs,
+      @Nullable GenericRow headers) {
+    super(recordIngestionTimeMs, headers);
   }
 
-  public long getNextOffset() {
-    if (_metadata != null) {
-      long offset = Long.parseLong(_metadata.getRecordMetadata().get(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY));
-      return offset < 0 ? -1 : offset + 1;
-    }
-    return -1;
+  public KinesisStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
+      Map<String, String> metadata) {
+    super(recordIngestionTimeMs, headers, metadata);
   }
 }

@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
@@ -79,6 +80,7 @@ public class KinesisConfig {
   private final String _accessKey;
   private final String _secretKey;
   private final String _endpoint;
+  private boolean _populateMetadata;
 
   // IAM Role values
   private boolean _iamRoleBasedAccess;
@@ -126,6 +128,8 @@ public class KinesisConfig {
           "Must provide 'roleArn' in stream config for table %s if iamRoleBasedAccess is enabled",
           streamConfig.getTableNameWithType());
     }
+    _populateMetadata = Boolean.parseBoolean(streamConfig.getStreamConfigsMap().getOrDefault(
+        StreamConfigProperties.METADATA_POPULATE, "false"));
   }
 
   public String getStreamTopicName() {
@@ -182,5 +186,9 @@ public class KinesisConfig {
 
   public boolean isAsyncSessionUpdateEnabled() {
     return _asyncSessionUpdateEnabled;
+  }
+
+  public boolean isPopulateMetadata() {
+    return _populateMetadata;
   }
 }
