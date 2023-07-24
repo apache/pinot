@@ -472,8 +472,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     for (int i = 0; i < numQueriesToGenerate; i++) {
       QueryGenerator.Query query = queryGenerator.generateQuery();
       if (useMultistageEngine) {
-        // multistage engine follows standard SQL thus should use H2 query string for testing.
-        testQuery(query.generatePinotQuery().replace("`", "\""), query.generateH2Query());
+        if (withMultiValues) {
+          // For multistage query with MV columns, we need to use Pinot query string for testing.
+          testQuery(query.generatePinotQuery().replace("`", "\""), query.generateH2Query());
+        } else {
+          // multistage engine follows standard SQL thus should use H2 query string for testing.
+          testQuery(query.generateH2Query().replace("`", "\""), query.generateH2Query());
+        }
       } else {
         testQuery(query.generatePinotQuery(), query.generateH2Query());
       }

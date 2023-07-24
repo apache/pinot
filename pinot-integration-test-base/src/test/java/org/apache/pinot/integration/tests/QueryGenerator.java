@@ -488,14 +488,42 @@ public class QueryGenerator {
 
     @Override
     public String generatePinotQuery() {
+      List<String> pinotAggregateColumnAndFunctions =
+          (_useMultistageEngine && !_skipMultiValuePredicates) ? generatePinotMultistageQuery()
+              : _aggregateColumnsAndFunctions;
       if (_groupColumns.isEmpty()) {
-        return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
-            _predicate.generatePinotQuery());
+        return joinWithSpaces("SELECT", StringUtils.join(pinotAggregateColumnAndFunctions, ", "), "FROM",
+            _pinotTableName, _predicate.generatePinotQuery());
       } else {
-        return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
-            _predicate.generatePinotQuery(), "GROUP BY", StringUtils.join(_groupColumns, ", "),
+        return joinWithSpaces("SELECT", StringUtils.join(pinotAggregateColumnAndFunctions, ", "), "FROM",
+            _pinotTableName, _predicate.generatePinotQuery(), "GROUP BY", StringUtils.join(_groupColumns, ", "),
             _havingPredicate.generatePinotQuery(), _limit.generatePinotQuery());
       }
+    }
+
+    public List<String> generatePinotMultistageQuery() {
+      List<String> pinotAggregateColumnAndFunctions = new ArrayList<>();
+      for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
+        String pinotAggregateFunction = aggregateColumnAndFunction;
+        String pinotAggregateColumnAndFunction = pinotAggregateFunction;
+        if (!pinotAggregateFunction.equals("COUNT(*)")) {
+          pinotAggregateFunction = pinotAggregateFunction.replace("(", "(`").replace(")", "`)");
+        }
+        if (!pinotAggregateFunction.contains("(")) {
+          pinotAggregateFunction = String.format("`%s`", pinotAggregateFunction);
+        }
+        if (AGGREGATION_FUNCTIONS.contains(pinotAggregateFunction.substring(0, 3))) {
+          // For multistage query, we need to explicit hoist the data type to avoid overflow.
+          String aggFunctionName = pinotAggregateFunction.substring(0, 3);
+          if ("SUM".equalsIgnoreCase(aggFunctionName)) {
+            pinotAggregateColumnAndFunction = pinotAggregateFunction
+                .replace(aggFunctionName + "(", aggFunctionName + "(CAST(")
+                .replace(")", " AS BIGINT))");
+          }
+        }
+        pinotAggregateColumnAndFunctions.add(pinotAggregateColumnAndFunction);
+      }
+      return pinotAggregateColumnAndFunctions;
     }
 
     @Override
