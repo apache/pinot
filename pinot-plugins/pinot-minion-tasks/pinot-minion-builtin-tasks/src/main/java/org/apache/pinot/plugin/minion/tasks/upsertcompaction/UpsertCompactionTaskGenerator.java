@@ -96,8 +96,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       LOGGER.info("Start generating task configs for table: {}", tableNameWithType);
 
       Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
-      Map<String, String> compactionConfigs = getCompactionConfigs(taskConfigs);
-      List<SegmentZKMetadata> completedSegments = getCompletedSegments(tableNameWithType, compactionConfigs);
+//      Map<String, String> compactionConfigs = getCompactionConfigs(taskConfigs);
+      List<SegmentZKMetadata> completedSegments = getCompletedSegments(tableNameWithType, taskConfigs);
 
       if (completedSegments.isEmpty()) {
         LOGGER.info("No completed segments were eligible for compaction for table: {}", tableNameWithType);
@@ -134,7 +134,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           completionServiceHelper.doMultiGetRequest(validDocIdUrls, tableNameWithType, false, 3000);
 
       SegmentSelectionResult segmentSelectionResult =
-          processValidDocIdMetadata(compactionConfigs, completedSegmentsMap, serviceResponse._httpResponses.entrySet());
+          processValidDocIdMetadata(taskConfigs, completedSegmentsMap, serviceResponse._httpResponses.entrySet());
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
@@ -163,13 +163,13 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  public static SegmentSelectionResult processValidDocIdMetadata(Map<String, String> compactionConfigs,
+  public static SegmentSelectionResult processValidDocIdMetadata(Map<String, String> taskConfigs,
       Map<String, SegmentZKMetadata> completedSegmentsMap, Set<Map.Entry<String, String>> responseSet) {
     double invalidRecordsThresholdPercent = Double.parseDouble(
-        compactionConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
+        taskConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
     long invalidRecordsThresholdCount = Long.parseLong(
-        compactionConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT,
+        taskConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT)));
     List<SegmentZKMetadata> segmentsForCompaction = new ArrayList<>();
     List<String> segmentsForDeletion = new ArrayList<>();
@@ -229,11 +229,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     return urls;
   }
 
-  private List<SegmentZKMetadata> getCompletedSegments(String tableNameWithType,
-      Map<String, String> compactionConfigs) {
+  private List<SegmentZKMetadata> getCompletedSegments(String tableNameWithType, Map<String, String> taskConfigs) {
     List<SegmentZKMetadata> completedSegments = new ArrayList<>();
-    String bufferPeriod =
-        compactionConfigs.getOrDefault(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
+    String bufferPeriod = taskConfigs.getOrDefault(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
     long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
     List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
     for (SegmentZKMetadata segment : allSegments) {
@@ -264,18 +262,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
       UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT
   };
-
-  private Map<String, String> getCompactionConfigs(Map<String, String> taskConfig) {
-    Map<String, String> compactionConfigs = new HashMap<>();
-
-    for (String configKey : VALID_CONFIG_KEYS) {
-      if (taskConfig.containsKey(configKey)) {
-        compactionConfigs.put(configKey, taskConfig.get(configKey));
-      }
-    }
-
-    return compactionConfigs;
-  }
 
   @VisibleForTesting
   static boolean validate(TableConfig tableConfig) {
