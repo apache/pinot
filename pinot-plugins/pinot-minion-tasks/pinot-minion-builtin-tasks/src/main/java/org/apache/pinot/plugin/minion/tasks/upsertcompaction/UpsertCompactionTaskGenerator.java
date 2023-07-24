@@ -216,10 +216,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           String.format("/tables/%s/validDocIdMetadata", tableNameWithType));
       int completedSegmentCountPerServer = 0;
       for (String segmentName : segmentNames) {
-        if (remainingSegments.contains(segmentName)) {
+        if (remainingSegments.remove(segmentName)) {
           completedSegmentCountPerServer++;
           uriBuilder.addParameter("segmentNames", segmentName);
-          remainingSegments.remove(segmentName);
         }
       }
       if (completedSegmentCountPerServer > 0) {
