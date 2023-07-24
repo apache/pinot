@@ -237,7 +237,7 @@ public class BaseBrokerRequestHandlerTest {
         JsonNode request = JsonUtils.stringToJsonNode(
             String.format("{\"sql\":\"select * from %s limit 10\",\"queryOptions\":\"timeoutMs=10000\"}", tableName));
         RequestContext requestStats = Tracing.getTracer().createRequestScope();
-        requestHandler.handleRequest(request, null, requestStats);
+        requestHandler.handleRequest(request, null, requestStats, null);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

@@ -20,14 +20,14 @@ package org.apache.pinot.broker.api;
 
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.auth.FineGrainedAccessControl;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public interface AccessControl {
+public interface AccessControl extends FineGrainedAccessControl {
   /**
    * First-step access control when processing broker requests. Decides whether request is allowed to acquire resources
    * for further processing. Request may still be rejected at table-level later on.
@@ -59,28 +59,4 @@ public interface AccessControl {
    * @return {@code true} if authorized, {@code false} otherwise
    */
   boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables);
-
-  /**
-   * Checks whether the user has access to perform action on the particular resource
-   *
-   * @param requesterIdentity requester identity
-   * @param targetType type of resource being accessed
-   * @param targetId id of the resource
-   * @param action type to validate
-   * @return true if requester is allowed to perform the action
-   */
-  default boolean hasAccess(RequesterIdentity requesterIdentity, TargetType targetType, String targetId,
-      String action) {
-    return true;
-  }
-
-  /**
-   * If an API is neither annotated with Authorize nor ManualAuthorization,
-   * this method will be called to check the default authorization.
-   * If the return is false, then API will be terminated by the filter.
-   * @return true to allow
-   */
-  default boolean defaultAccess(RequesterIdentity requesterIdentity) {
-    return true;
-  }
 }

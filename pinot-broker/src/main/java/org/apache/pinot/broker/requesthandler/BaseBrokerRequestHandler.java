@@ -37,6 +37,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
@@ -232,7 +233,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws Exception {
     long requestId = _brokerIdGenerator.get();
     requestContext.setRequestId(requestId);
@@ -255,7 +256,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     String query = sql.asText();
     requestContext.setQuery(query);
     BrokerResponse brokerResponse = handleRequest(requestId, query, sqlNodeAndOptions, request,
-            requesterIdentity, requestContext);
+            requesterIdentity, requestContext, httpHeaders);
 
     if (request.has(Broker.Request.QUERY_OPTIONS)) {
       String queryOptions = request.get(Broker.Request.QUERY_OPTIONS).asText();
@@ -271,7 +272,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private BrokerResponseNative handleRequest(long requestId, String query,
       @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext)
+      RequestContext requestContext, HttpHeaders httpHeaders)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
@@ -331,7 +332,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       try {
-        handleSubquery(serverPinotQuery, requestId, request, requesterIdentity, requestContext);
+        handleSubquery(serverPinotQuery, requestId, request, requesterIdentity, requestContext, httpHeaders);
       } catch (Exception e) {
         LOGGER.info("Caught exception while handling the subquery in request {}: {}, {}", requestId, query,
             e.getMessage());
@@ -387,7 +388,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       AccessControl accessControl = _accessControlFactory.create();
       boolean hasTableAccess =
           accessControl.hasAccess(requesterIdentity, serverBrokerRequest) && accessControl.hasAccess(
-              requesterIdentity, TargetType.TABLE, tableName, Actions.Table.QUERY);
+              httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
       if (!hasTableAccess) {
         _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);
@@ -823,11 +824,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * <p>Currently only supports subquery within the filter.
    */
   private void handleSubquery(PinotQuery pinotQuery, long requestId, JsonNode jsonRequest,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
+      HttpHeaders httpHeaders)
       throws Exception {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
-      handleSubquery(filterExpression, requestId, jsonRequest, requesterIdentity, requestContext);
+      handleSubquery(filterExpression, requestId, jsonRequest, requesterIdentity, requestContext, httpHeaders);
     }
   }
 
@@ -839,7 +841,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * IN_ID_SET transform function.
    */
   private void handleSubquery(Expression expression, long requestId, JsonNode jsonRequest,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
+      HttpHeaders httpHeaders)
       throws Exception {
     Function function = expression.getFunctionCall();
     if (function == null) {
@@ -852,7 +855,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
       String subquery = subqueryLiteral.getStringValue();
       BrokerResponseNative response =
-          handleRequest(requestId, subquery, null, jsonRequest, requesterIdentity, requestContext);
+          handleRequest(requestId, subquery, null, jsonRequest, requesterIdentity, requestContext, httpHeaders);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }
@@ -861,7 +864,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       operands.set(1, RequestUtils.getLiteralExpression(serializedIdSet));
     } else {
       for (Expression operand : operands) {
-        handleSubquery(operand, requestId, jsonRequest, requesterIdentity, requestContext);
+        handleSubquery(operand, requestId, jsonRequest, requesterIdentity, requestContext, httpHeaders);
       }
     }
   }

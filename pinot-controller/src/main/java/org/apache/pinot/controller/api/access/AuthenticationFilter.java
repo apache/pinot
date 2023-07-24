@@ -36,14 +36,9 @@ import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
-import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.controller.api.exception.ControllerApplicationException;
-import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
-import org.apache.pinot.core.auth.RBACAuthUtils;
-import org.apache.pinot.core.auth.TargetType;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,64 +104,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     AccessType accessType = extractAccessType(endpointMethod);
     AccessControlUtils.validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
 
-    handleFinerGrainAuth(endpointMethod, uriInfo, accessControl);
-  }
-
-  /**
-   * Check for finer grain authorization of APIs.
-   * There are 2 possible cases:
-   * 1. {@link Authorize} annotation is present on the method. In this case, do the finer grain authorization using the
-   *    fields of the annotation. There are 2 possibilities depending on the targetType ({@link TargetType}):
-   *    a. The targetType is {@link TargetType#CLUSTER}. In this case, the paramName field
-   *       ({@link Authorize#paramName()}) is not used, since the target is the Pinot cluster.
-   *    b. The targetType is {@link TargetType#TABLE}. In this case, the paramName field
-   *       ({@link Authorize#paramName()}) is mandatory, and it must be found in either the path parameters or the
-   *       query parameters.
-   * 2. {@link Authorize} annotation is not present on the method. In this use the default authorization.
-   *
-   * @param endpointMethod of the API
-   * @param uriInfo of the API
-   * @param accessControl to check the access
-   */
-  private void handleFinerGrainAuth(Method endpointMethod, UriInfo uriInfo, AccessControl accessControl) {
-    if (endpointMethod.isAnnotationPresent(Authorize.class)) {
-      final Authorize auth = endpointMethod.getAnnotation(Authorize.class);
-      String targetId = null;
-      // Message to use in the access denied exception
-      String accessDeniedMsg;
-      if (auth.targetType() == TargetType.TABLE) {
-        // paramName is mandatory for table level authorization
-        if (StringUtils.isEmpty(auth.paramName())) {
-          throw new ControllerApplicationException(LOGGER,
-              "paramName not found for table level authorization in API: " + uriInfo.getRequestUri(),
-              Response.Status.INTERNAL_SERVER_ERROR);
-        }
-
-        // find the paramName in the path or query params
-        targetId = RBACAuthUtils.findParam(auth.paramName(), uriInfo.getPathParameters(), uriInfo.getQueryParameters());
-
-        if (StringUtils.isEmpty(targetId)) {
-          throw new ControllerApplicationException(LOGGER,
-              "Could not find paramName " + auth.paramName() + " in path or query params of the API: "
-                  + uriInfo.getRequestUri(), Response.Status.INTERNAL_SERVER_ERROR);
-        }
-        accessDeniedMsg = "Access denied to " + auth.action() + " for table: " + targetId;
-      } else if (auth.targetType() == TargetType.CLUSTER) {
-        accessDeniedMsg = "Access denied to " + auth.action() + " in the cluster";
-      } else {
-        throw new ControllerApplicationException(LOGGER,
-            "Unsupported targetType: " + auth.targetType() + " in API: " + uriInfo.getRequestUri(),
-            Response.Status.INTERNAL_SERVER_ERROR);
-      }
-
-      // Check for access now
-      if (!accessControl.hasAccess(_httpHeaders, auth.targetType(), targetId, auth.action())) {
-        throw new ControllerApplicationException(LOGGER, accessDeniedMsg, Response.Status.FORBIDDEN);
-      }
-    } else if (!accessControl.defaultAccess(_httpHeaders)) {
-      throw new ControllerApplicationException(LOGGER, "Access denied - default authorization failed",
-          Response.Status.FORBIDDEN);
-    }
+    FineGrainedAuthUtils.validateFineGrainedAuth(endpointMethod, uriInfo, _httpHeaders, LOGGER, accessControl);
   }
 
   @VisibleForTesting
