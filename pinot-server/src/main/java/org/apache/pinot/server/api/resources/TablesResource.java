@@ -125,8 +125,8 @@ public class TablesResource {
   //swagger annotations
   @ApiOperation(value = "List tables", notes = "List all the tables on this server")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success", response = TablesList.class), @ApiResponse(code = 500, message =
-      "Server initialization error", response = ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success", response = TablesList.class),
+      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
   })
   public String listTables() {
     InstanceDataManager instanceDataManager = ServerResourceUtils.checkGetInstanceDataManager(_serverInstance);
@@ -139,8 +139,8 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table segments", notes = "List segments of table hosted on this server")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500,
-      message = "Server initialization error", response = ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success", response = TableSegments.class),
+      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
   })
   public String listTableSegments(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
@@ -167,7 +167,8 @@ public class TablesResource {
   @ApiOperation(value = "List metadata for all segments of a given table", notes = "List segments metadata of table "
       + "hosted on this server")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error"),
       @ApiResponse(code = 404, message = "Table not found")
   })
   public String getSegmentMetadata(
@@ -289,9 +290,9 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment metadata", notes = "Provide segments metadata for the segment on server")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getSegmentMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
@@ -335,9 +336,9 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment crc information", notes = "Provide crc information for the segments on server")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getCrcMetadataForTable(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
@@ -468,9 +469,9 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provides segment validDocId metadata", notes = "Provides segment validDocId metadata")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
@@ -537,9 +538,10 @@ public class TablesResource {
   @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url",
       notes = "Upload a low level consumer segment to segment store and return the segment download url")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class), @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class),
+      @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)
   })
   public String uploadLLCSegment(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
