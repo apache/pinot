@@ -61,7 +61,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
-import org.apache.pinot.query.planner.ExplainPlanPlanVisitor;
+import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.SubPlan;
@@ -170,11 +170,11 @@ public class QueryEnvironment {
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = planQueryLogical(sqlNodeAndOptions.getSqlNode(), plannerContext);
+      RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
       // Each SubPlan should be able to run independently from Broker then set the results into the dependent
       // SubPlan for further processing.
-      DispatchableSubPlan dispatchableSubPlan = planQueryDispatchable(relRoot, plannerContext, requestId);
+      DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
       return new QueryPlannerResult(dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
     } catch (CalciteContextException e) {
       throw new RuntimeException("Error composing query plan for '" + sqlQuery
@@ -200,11 +200,11 @@ public class QueryEnvironment {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
-      RelRoot relRoot = planQueryLogical(explain.getExplicandum(), plannerContext);
+      RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
       if (explain instanceof SqlPhysicalExplain) {
         // get the physical plan for query.
-        DispatchableSubPlan dispatchableSubPlan = planQueryDispatchable(relRoot, plannerContext, requestId);
-        return new QueryPlannerResult(null, ExplainPlanPlanVisitor.explain(dispatchableSubPlan),
+        DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
+        return new QueryPlannerResult(null, PhysicalExplainPlanVisitor.explain(dispatchableSubPlan),
             dispatchableSubPlan.getTableNames());
       } else {
         // get the logical plan for query.
@@ -235,7 +235,7 @@ public class QueryEnvironment {
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       }
-      RelRoot relRoot = planQueryLogical(sqlNode, plannerContext);
+      RelRoot relRoot = compileQuery(sqlNode, plannerContext);
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
     } catch (Throwable t) {
@@ -277,7 +277,7 @@ public class QueryEnvironment {
   // --------------------------------------------------------------------------
 
   @VisibleForTesting
-  protected RelRoot planQueryLogical(SqlNode sqlNode, PlannerContext plannerContext)
+  protected RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext)
       throws Exception {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
@@ -345,7 +345,7 @@ public class QueryEnvironment {
     QueryPlan queryPlan = pinotLogicalQueryPlanner.planQuery(relRoot);
     return pinotLogicalQueryPlanner.makePlan(queryPlan);
   }
-  private DispatchableSubPlan planQueryDispatchable(RelRoot relRoot, PlannerContext plannerContext,
+  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext,
       long requestId) {
     SubPlan subPlanRoot = toSubPlan(relRoot);
 

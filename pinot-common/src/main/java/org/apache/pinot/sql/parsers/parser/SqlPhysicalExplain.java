@@ -23,7 +23,11 @@ import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
-
+/**
+ * Calcite extension for creating a physical plan sql node from a EXPLAIN IMPLEMENTATION query.
+ *
+ * <p>Syntax: EXPLAIN IMPLEMENTATION PLAN [ [INCLUDING | EXCLUDING] [ALL] ATTRIBUTES ] FOR SELECT</p>
+ */
 public class SqlPhysicalExplain extends SqlExplain {
   public SqlPhysicalExplain(SqlParserPos pos, SqlNode explicandum, SqlLiteral detailLevel, SqlLiteral depth,
       SqlLiteral format, int dynamicParameterCount) {
