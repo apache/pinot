@@ -543,6 +543,12 @@ public class TableRebalancer {
   private Pair<InstancePartitions, Boolean> getInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
+
+    InstancePartitions existingInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
+                instancePartitionsType.toString()));
+
     if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
       if (reassignInstances) {
         String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -550,10 +556,6 @@ public class TableRebalancer {
             TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
         if (hasPreConfiguredInstancePartitions) {
           String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
-          InstancePartitions existingInstancePartitions =
-              InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
-                  InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
-                      instancePartitionsType.toString()));
           InstancePartitions instancePartitions =
               InstancePartitionsUtils.fetchInstancePartitionsWithRename(_helixManager.getHelixPropertyStore(),
                   referenceInstancePartitionsName, instancePartitionsType.getInstancePartitionsName(rawTableName));
@@ -566,10 +568,6 @@ public class TableRebalancer {
           }
           return Pair.of(instancePartitions, instancePartitionsUnchanged);
         }
-        InstancePartitions existingInstancePartitions =
-            InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
-                InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
-                    instancePartitionsType.toString()));
         LOGGER.info("Reassigning {} instances for table: {}", instancePartitionsType, tableNameWithType);
         // Assign instances with existing instance partition to null if bootstrap mode is enabled,
         // so that the instance partition map can be fully recalculated.
@@ -599,10 +597,7 @@ public class TableRebalancer {
       InstancePartitions instancePartitions =
           InstancePartitionsUtils.computeDefaultInstancePartitions(_helixManager, tableConfig, instancePartitionsType);
 
-      Boolean noExistingInstancePartitions =
-          InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
-          InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
-              instancePartitionsType.toString())) == null;
+      Boolean noExistingInstancePartitions = existingInstancePartitions == null;
 
       if (!dryRun && !noExistingInstancePartitions) {
         String instancePartitionsName = instancePartitions.getInstancePartitionsName();
@@ -659,16 +654,16 @@ public class TableRebalancer {
     InstancePartitions defaultInstancePartitions =
         InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableConfig.getTableName(),
             tier.getName(), storage.getServerTag());
+    String instancePartitionsName =
+        InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(), tier.getName());
+    InstancePartitions existingInstancePartitions = InstancePartitionsUtils.
+        fetchInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
 
     if (tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
         .containsKey(tier.getName())) {
       LOGGER.info("Skipping fetching/computing instance partitions for tier {} for table: {}", tier.getName(),
           tableConfig.getTableName());
-      String instancePartitionsName =
-          InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(), tier.getName());
-      Boolean noExistingInstancePartitions =
-          InstancePartitionsUtils.
-              fetchInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName) == null;
+      Boolean noExistingInstancePartitions = existingInstancePartitions == null;
 
       if (!dryRun && !noExistingInstancePartitions) {
         LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
@@ -678,12 +673,7 @@ public class TableRebalancer {
     }
 
     String tableNameWithType = tableConfig.getTableName();
-    String instancePartitionsName =
-        InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(), tier.getName());
     if (reassignInstances) {
-      InstancePartitions existingInstancePartitions =
-          InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
-              instancePartitionsName);
       // Assign instances with existing instance partition to null if bootstrap mode is enabled,
       // so that the instance partition map can be fully recalculated.
       InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
@@ -699,11 +689,8 @@ public class TableRebalancer {
       return Pair.of(instancePartitions, instancePartitionsUnchanged);
     }
 
-    InstancePartitions instancePartitions =
-        InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
-            InstancePartitionsUtils.getInstancePartitionsNameForTier(tableNameWithType, tier.getName()));
-    if (instancePartitions != null) {
-      return Pair.of(instancePartitions, true);
+    if (existingInstancePartitions != null) {
+      return Pair.of(existingInstancePartitions, true);
     }
 
     return Pair.of(defaultInstancePartitions, true);
