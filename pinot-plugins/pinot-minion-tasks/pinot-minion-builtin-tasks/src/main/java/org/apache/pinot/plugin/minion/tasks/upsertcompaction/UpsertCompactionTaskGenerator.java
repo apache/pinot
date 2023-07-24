@@ -184,14 +184,15 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       Iterator<JsonNode> iterator = allValidDocIdMetadata.elements();
       while (iterator.hasNext()) {
         JsonNode validDocIdMetadata = iterator.next();
-        long invalidRecordCount = validDocIdMetadata.get("totalInvalidDocs").asLong();
+        long totalInvalidDocs = validDocIdMetadata.get("totalInvalidDocs").asLong();
         String segmentName = validDocIdMetadata.get("segmentName").asText();
         SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
-        double invalidRecordPercent = ((double) invalidRecordCount / segment.getTotalDocs()) * 100;
-        if (invalidRecordCount == segment.getTotalDocs()) {
+        long totalDocs = validDocIdMetadata.get("totalDocs").asLong();
+        double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
+        if (totalInvalidDocs == totalDocs) {
           segmentsForDeletion.add(segment.getSegmentName());
         } else if (invalidRecordPercent > invalidRecordsThresholdPercent
-            && invalidRecordCount > invalidRecordsThresholdCount) {
+            && totalInvalidDocs > invalidRecordsThresholdCount) {
           segmentsForCompaction.add(segment);
         }
       }
