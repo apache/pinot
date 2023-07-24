@@ -22,6 +22,8 @@ cmdName=`basename $0`
 cmdDir=`dirname $0`
 source ${cmdDir}/utils.inc
 MVN_CACHE_DIR="mvn-compat-cache"
+df -h
+du -hd2 /home/runner
 
 # get usage of the script
 function usage() {
@@ -64,7 +66,7 @@ function checkOut() {
 # compatibility tester
 # It uses a different version for each build, since we build trees in parallel.
 # Building the same version on all trees in parallel causes unstable builds.
-# Using indpendent buildIds will cause maven cache to fill up, so we use a
+# Using independent buildIds will cause maven cache to fill up, so we use a
 # dedicated maven cache for these builds, and remove the cache after build is
 # completed.
 # If buildId is less than 0, then the mvn version is not changed in pom files.
@@ -72,11 +74,13 @@ function build() {
   local outFile=$1
   local buildTests=$2
   local buildId=$3
+  local buildCompatibilityVerifier=$4
   local repoOption=""
   local versionOption="-Djdk.version=11"
   local maxRetry=5
 
   mkdir -p ${MVN_CACHE_DIR}
+  mkdir -p ${mvnCache}
 
   if [ ${buildId} -gt 0 ]; then
     # Build it in a different env under different version so that maven cache does
@@ -86,29 +90,40 @@ function build() {
     mvn versions:commit -q -B 1>${outFile} 2>&1
     repoOption="-Dmaven.repo.local=${mvnCache}/${buildId}"
   fi
+  buildComponents=":pinot-tools"
+  if [ $buildCompatibilityVerifier -gt 0 ]; then
+    buildComponents=":pinot-tools,:pinot-compatibility-verifier"
+  fi
   for i in $(seq 1 $maxRetry); do
-    mvn clean install -DskipTests -Pbin-dist ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
+    mvn clean package -am -pl ${buildComponents} -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>${outFile} 2>&1
     if [ $? -eq 0 ]; then break; fi
     if [ $i -eq $maxRetry ]; then exit 1; fi
-    echo "Build failed, retrying after 30 seconds"
-    sleep 30
-  done
-  for i in $(seq 1 $maxRetry); do
-    mvn -pl pinot-tools package -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
-    if [ $? -eq 0 ]; then break; fi
-    if [ $i -eq $maxRetry ]; then exit 1; fi
-    echo "Build failed, retrying after 30 seconds"
+    echo ""
+    echo "Build failed, see last 1000 lines of output below."
+    tail -1000 ${outFile}
+    echo "Retrying after 30 seconds..."
     sleep 30
   done
   if [ $buildTests -eq 1 ]; then
     for i in $(seq 1 $maxRetry); do
-      mvn -pl pinot-integration-tests package -DskipTests ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+      mvn -pl :pinot-integration-tests package -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
       if [ $? -eq 0 ]; then break; fi
       if [ $i -eq $maxRetry ]; then exit 1; fi
-      echo "Build failed, retrying after 30 seconds"
+      echo ""
+      echo "Build failed, see last 500 lines of output below."
+      tail -500 ${outFile}
+      echo "Retrying after 30 seconds..."
       sleep 30
     done
   fi
+  # DELETE the mvn cache
+  du -hd1 ${mvnCache}
+  df -h
+  rm -rf ${mvnCache}
+  du -hd2 /home/runner
+  df -h
+  rm -rf /home/runner/.m2/repository
+  df -h
 }
 
 #
@@ -205,28 +220,45 @@ fi
 echo "Checking out old version at commit \"${olderCommit}\""
 checkOut "$olderCommit" "$oldTargetDir"
 
-# Start builds in parallel.
+exitStatus=0
+
+# Start builds in sequential.
 # First build the current tree. We need it so that we can
-# run the compatibiity tester.
+# run the compatibility tester.
 echo Starting build for compat checker at ${cmdDir}, buildId none.
-(cd ${cmdDir}/..; build ${curBuildOutFile} 1 -1) &
+(cd ${cmdDir}/..; build ${curBuildOutFile} 1 -1 1) &
 curBuildPid=$!
+
+echo Awaiting build complete for compat checker
+while true ; do
+  printf "."
+  ps -p ${curBuildPid} 1>/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    printf "\n"
+    wait ${curBuildPid}
+    curBuildStatus=$?
+    break
+  fi
+  sleep 5
+done
+
+if [ ${curBuildStatus} -eq 0 ]; then
+  echo Compat checker build completed successfully
+else
+  echo Compat checker build failed. See ${curBuildOutFile}
+  echo ======== Build output ========
+  cat ${curBuildOutFile}
+  echo ==== End Build output ========
+  exitStatus=1
+  /bin/rm -r ${mvnCache}
+  exit ${exitStatus}
+fi
 
 # The old commit has been cloned in oldTargetDir, build it.
 buildId=$(date +%s)
 echo Starting build for old version at ${oldTargetDir} buildId ${buildId}
-(cd ${oldTargetDir}; build ${oldBuildOutFile} 0 ${buildId}) &
+(cd ${oldTargetDir}; build ${oldBuildOutFile} 0 ${buildId} 0) &
 oldBuildPid=$!
-
-# In case the user specified the current tree as newer commit, then
-# We don't need to build newer commit tree (we have already built the
-# current tree above and linked newTargetDir). Otherwise, build the newTargetDir
-if [ ${buildNewTarget} -eq 1 ]; then
-  buildId=$((buildId+1))
-  echo Starting build for new version at ${newTargetDir} buildId ${buildId}
-  (cd ${newTargetDir}; build ${newBuildOutFile} 0 ${buildId}) &
-  newBuildPid=$!
-fi
 
 # We may have potentially started three builds above (at least two).
 # Wait for each of them to complete.
@@ -243,18 +275,27 @@ while true ; do
   sleep 5
 done
 
-echo Awaiting build complete for compat checker
-while true ; do
-  printf "."
-  ps -p ${curBuildPid} 1>/dev/null 2>&1
-  if [ $? -ne 0 ]; then
-    printf "\n"
-    wait ${curBuildPid}
-    curBuildStatus=$?
-    break
-  fi
-  sleep 5
-done
+if [ ${oldBuildStatus} -eq 0 ]; then
+  echo Old version build completed successfully
+else
+  echo Old version build failed. See ${oldBuildOutFile}
+  echo ======== Build output ========
+  cat ${oldBuildOutFile}
+  echo ==== End Build output ========
+  exitStatus=1
+  /bin/rm -r ${mvnCache}
+  exit ${exitStatus}
+fi
+
+# In case the user specified the current tree as newer commit, then
+# We don't need to build newer commit tree (we have already built the
+# current tree above and linked newTargetDir). Otherwise, build the newTargetDir
+if [ ${buildNewTarget} -eq 1 ]; then
+  buildId=$((buildId+1))
+  echo Starting build for new version at ${newTargetDir} buildId ${buildId}
+  (cd ${newTargetDir}; build ${newBuildOutFile} 0 ${buildId} 0) &
+  newBuildPid=$!
+fi
 
 if [ ${buildNewTarget} -eq 1 ]; then
   echo Awaiting build complete for new commit
@@ -271,28 +312,6 @@ if [ ${buildNewTarget} -eq 1 ]; then
   done
 fi
 
-exitStatus=0
-
-if [ ${oldBuildStatus} -eq 0 ]; then
-  echo Old version build completed successfully
-else
-  echo Old version build failed. See ${oldBuildOutFile}
-  echo ======== Build output ========
-  cat ${oldBuildOutFile}
-  echo ==== End Build output ========
-  exitStatus=1
-fi
-
-if [ ${curBuildStatus} -eq 0 ]; then
-  echo Compat checker build completed successfully
-else
-  echo Compat checker build failed. See ${curBuildOutFile}
-  echo ======== Build output ========
-  cat ${curBuildOutFile}
-  echo ==== End Build output ========
-  exitStatus=1
-fi
-
 if [ ${buildNewTarget} -eq 1 ]; then
   if [ ${newBuildStatus} -eq 0 ]; then
     echo New version build completed successfully
@@ -302,6 +321,7 @@ if [ ${buildNewTarget} -eq 1 ]; then
     cat ${newBuildOutFile}
     echo ==== End Build output ========
     exitStatus=1
+    exit ${exitStatus}
   fi
 fi
 

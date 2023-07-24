@@ -50,6 +50,7 @@ echo "        <httpConfiguration>">> ${SETTINGS_FILE}
 echo "          <all>">> ${SETTINGS_FILE}
 echo "            <connectionTimeout>120000</connectionTimeout>">> ${SETTINGS_FILE}
 echo "            <readTimeout>120000</readTimeout>">> ${SETTINGS_FILE}
+echo "            <retries>3</retries>">> ${SETTINGS_FILE}
 echo "          </all>">> ${SETTINGS_FILE}
 echo "        </httpConfiguration>">> ${SETTINGS_FILE}
 echo "      </configuration>">> ${SETTINGS_FILE}
@@ -60,6 +61,22 @@ echo "</settings>">> ${SETTINGS_FILE}
 
 # PINOT_MAVEN_OPTS is used to provide additional maven options to the checkoutAndBuild.sh command
 export PINOT_MAVEN_OPTS="-s $(pwd)/${SETTINGS_FILE}"
+
+# Compare commit hash for compatibility verification
+git fetch --all
+NEW_COMMIT_HASH=`git log -1 --pretty=format:'%h' HEAD`
+if [ ! -z "${NEW_COMMIT}" ]; then
+  NEW_COMMIT_HASH=`git log -1 --pretty=format:'%h' ${NEW_COMMIT}`
+fi
+OLD_COMMIT_HASH=`git log -1 --pretty=format:'%h' ${OLD_COMMIT}`
+if [ $? -ne 0 ]; then
+  echo "Failed to get commit hash for commit: \"${OLD_COMMIT}\""
+  OLD_COMMIT_HASH=`git log -1 --pretty=format:'%h' origin/${OLD_COMMIT}`
+fi
+if [ "${NEW_COMMIT_HASH}" == "${OLD_COMMIT_HASH}" ]; then
+  echo "No changes between old commit: \"${OLD_COMMIT}\" and new commit: \"${NEW_COMMIT}\""
+  exit 0
+fi
 
 if [ -z "${NEW_COMMIT}" ]; then
   echo "Running compatibility regression test against \"${OLD_COMMIT}\""
