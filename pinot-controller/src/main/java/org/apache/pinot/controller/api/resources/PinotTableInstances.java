@@ -68,7 +68,7 @@ public class PinotTableInstances {
 
   @GET
   @Path("/tables/{tableName}/instances")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.LIST_INSTANCES)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_INSTANCE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table instances", notes = "List instances of the given table")
   @ApiResponses(value = {
@@ -138,7 +138,7 @@ public class PinotTableInstances {
 
   @GET
   @Path("/tables/{tableName}/livebrokers")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.LIST_BROKERS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_BROKER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the brokers serving a table", notes = "List live brokers of the given table based on EV")
   @ApiResponses(value = {
@@ -158,7 +158,7 @@ public class PinotTableInstances {
 
   @GET
   @Path("/tables/livebrokers")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_BROKERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List tables to live brokers mappings", notes = "List tables to live brokers mappings based "
       + "on EV")

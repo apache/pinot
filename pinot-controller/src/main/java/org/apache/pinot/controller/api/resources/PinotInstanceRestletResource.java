@@ -90,7 +90,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCES)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all instances")
   @ApiResponses(value = {
@@ -379,7 +379,7 @@ public class PinotInstanceRestletResource {
 
   @PUT
   @Path("/instances/{instanceName}/updateTags")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TAGS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TAG)
   @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -447,7 +447,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances/dropInstance/validate")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCES)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check if it's safe to drop the given instances. If not list all the reasons why its not safe.")
   @ApiResponses(value = {

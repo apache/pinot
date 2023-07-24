@@ -72,7 +72,7 @@ public class PinotLeadControllerRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_LEADERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_LEADER)
   @ApiOperation(value = "Gets leaders for all tables", notes = "Gets leaders for all tables")
   public LeadControllerResponse getLeadersForAllTables() {
     Map<String, LeadControllerEntry> leadControllerEntryMap = new LinkedHashMap<>();

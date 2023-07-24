@@ -69,13 +69,12 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/run")
-  @ManualAuthorization
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.EXECUTE_TASK)
   @ApiOperation(value = "Run periodic task against table. If table name is missing, task will run against all tables.")
   public Response runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
       @ApiParam(value = "Name of the table") @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType,
-      @Context HttpHeaders httpHeaders) {
+      @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType) {
 
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
@@ -95,13 +94,6 @@ public class PinotControllerPeriodicTaskRestletResource {
       }
 
       tableName = matchingTableNamesWithType.get(0);
-      if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.RUN_TASK)) {
-        return Response.status(Response.Status.FORBIDDEN).build();
-      }
-    } else {
-      if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.CLUSTER, null, Actions.Cluster.RUN_TASK)) {
-        return Response.status(Response.Status.FORBIDDEN).build();
-      }
     }
 
     return Response.ok()
@@ -112,7 +104,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/names")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK_NAMES)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @ApiOperation(value = "Get comma-delimited list of all available periodic task names.")
   public List<String> getPeriodicTaskNames() {
     return _periodicTaskScheduler.getTaskNames();

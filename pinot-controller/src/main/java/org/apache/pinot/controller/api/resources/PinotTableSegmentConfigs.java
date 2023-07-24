@@ -65,7 +65,7 @@ public class PinotTableSegmentConfigs {
   @Deprecated
   @PUT
   @Path("/tables/{tableName}/segmentConfigs")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_CONFIGS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_CONFIG)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update segments configuration",

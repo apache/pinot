@@ -552,7 +552,7 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/v2/segments")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPLOAD_SEGMENTS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPLOAD_SEGMENT)
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   @ApiResponses(value = {
@@ -630,7 +630,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @POST
   @Path("segments/{tableName}/startReplaceSegments")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REPLACE_SEGMENTS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REPLACE_SEGMENT)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Start to replace segments", notes = "Start to replace segments")
@@ -660,7 +660,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @POST
   @Path("segments/{tableName}/endReplaceSegments")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REPLACE_SEGMENTS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REPLACE_SEGMENT)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "End to replace segments", notes = "End to replace segments")
@@ -692,7 +692,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
   @POST
   @Path("segments/{tableName}/revertReplaceSegments")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REPLACE_SEGMENTS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REPLACE_SEGMENT)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Revert segments replacement", notes = "Revert segments replacement")

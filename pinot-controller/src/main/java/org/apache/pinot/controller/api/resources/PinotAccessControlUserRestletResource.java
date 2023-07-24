@@ -95,7 +95,7 @@ public class PinotAccessControlUserRestletResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users")
-    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_USERS)
+    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_USER)
     @ApiOperation(value = "List all uses in cluster", notes = "List all users in cluster")
     public String listUers() {
         try {
@@ -110,7 +110,7 @@ public class PinotAccessControlUserRestletResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users/{username}")
-    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_USER)
+    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_USER)
     @ApiOperation(value = "Get an user in cluster", notes = "Get an user in cluster")
     public String getUser(@PathParam("username") String username, @QueryParam("component") String componentTypeStr) {
         try {
@@ -128,7 +128,7 @@ public class PinotAccessControlUserRestletResource {
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/users")
-    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.ADD_USER)
+    @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_USER)
     @ApiOperation(value = "Add a user", notes = "Add a user")
     public SuccessResponse addUser(String userConfigStr) {
         // TODO introduce a table config ctor with json string.

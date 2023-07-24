@@ -92,8 +92,7 @@ public class FineGrainedAuthUtils {
         }
 
         // find the paramName in the path or query params
-        targetId =
-            FineGrainedAuthUtils.findParam(auth.paramName(), uriInfo.getPathParameters(), uriInfo.getQueryParameters());
+        targetId = findParam(auth.paramName(), uriInfo.getPathParameters(), uriInfo.getQueryParameters());
 
         if (StringUtils.isEmpty(targetId)) {
           logAndThrow(logger, "Could not find paramName " + auth.paramName() + " in path or query params of the API: "

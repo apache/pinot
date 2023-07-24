@@ -69,7 +69,7 @@ public class PinotControllerAuthResource {
    */
   @GET
   @Path("auth/verify")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CHECK_AUTH)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_AUTH)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check whether authentication is enabled")
   @ApiResponses(value = {

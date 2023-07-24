@@ -106,7 +106,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMAS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA)
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
   public String listSchemaNames() {
     List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();

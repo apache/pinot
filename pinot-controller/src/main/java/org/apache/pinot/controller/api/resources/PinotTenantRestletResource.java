@@ -185,7 +185,7 @@ public class PinotTenantRestletResource {
 
   @GET
   @Path("/tenants")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_TENANTS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TENANT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all tenants")
   @ApiResponses(value = {
@@ -208,7 +208,7 @@ public class PinotTenantRestletResource {
 
   @GET
   @Path("/tenants/{tenantName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_TENANT)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TENANT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List instance for a tenant")
   @ApiResponses(value = {
@@ -253,7 +253,7 @@ public class PinotTenantRestletResource {
    */
   @GET
   @Path("/tenants/{tenantName}/tables")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_TENANT)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TENANT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List tables on a a server tenant")
   @ApiResponses(value = {
@@ -374,7 +374,7 @@ public class PinotTenantRestletResource {
 
   @GET
   @Path("/tenants/{tenantName}/metadata")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TENANT_METADATA)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TENANT)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get tenant information")
   @ApiResponses(value = {

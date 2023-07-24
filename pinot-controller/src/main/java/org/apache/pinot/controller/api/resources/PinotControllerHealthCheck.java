@@ -79,7 +79,7 @@ public class PinotControllerHealthCheck {
 
   @GET
   @Path("health")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CHECK_HEALTH)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)

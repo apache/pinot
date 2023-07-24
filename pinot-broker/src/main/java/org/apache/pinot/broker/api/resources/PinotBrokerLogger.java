@@ -64,7 +64,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOGGERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOGGER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all the loggers", notes = "Return all the logger names")
   public List<String> getLoggers() {
@@ -87,7 +87,7 @@ public class PinotBrokerLogger {
 
   @PUT
   @Path("/loggers/{loggerName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.SET_LOGGER)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_LOGGER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Set logger level", notes = "Set logger level for a given logger")
   public Map<String, String> setLoggerLevel(@ApiParam(value = "Logger name") @PathParam("loggerName") String loggerName,
@@ -97,7 +97,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers/files")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILES)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all local log files")
   public Set<String> getLocalLogFiles() {

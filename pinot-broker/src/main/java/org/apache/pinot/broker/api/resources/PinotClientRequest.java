@@ -207,7 +207,7 @@ public class PinotClientRequest {
 
   @GET
   @Path("queries")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERIES)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get running queries submitted via the requested broker", notes = "The id is assigned by the "
       + "requested broker and only unique at the scope of this broker")

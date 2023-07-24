@@ -85,7 +85,7 @@ public class PinotInstanceAssignmentRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/instancePartitions")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_PARTITIONS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_PARTITION)
   @ApiOperation(value = "Get the instance partitions")
   public Map<String, InstancePartitions> getInstancePartitions(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
@@ -153,7 +153,7 @@ public class PinotInstanceAssignmentRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/assignInstances")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.ASSIGN_INSTANCES)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.ASSIGN_INSTANCE)
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Assign server instances to a table")
   public Map<String, InstancePartitions> assignInstances(
@@ -293,7 +293,7 @@ public class PinotInstanceAssignmentRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/instancePartitions")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.ASSIGN_INSTANCES)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.ASSIGN_INSTANCE)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Create/update the instance partitions")
   public Map<String, InstancePartitions> setInstancePartitions(
@@ -348,7 +348,7 @@ public class PinotInstanceAssignmentRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/instancePartitions")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_PARTITIONS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_PARTITION)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Remove the instance partitions")
   public SuccessResponse removeInstancePartitions(

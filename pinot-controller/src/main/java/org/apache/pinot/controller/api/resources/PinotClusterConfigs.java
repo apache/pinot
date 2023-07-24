@@ -74,7 +74,7 @@ public class PinotClusterConfigs {
 
   @GET
   @Path("/cluster/info")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_CLUSTER_INFO)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_CLUSTER_CONFIG)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get cluster Info", notes = "Get cluster Info")
   @ApiResponses(value = {

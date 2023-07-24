@@ -206,7 +206,7 @@ public class PinotTableRestletResource {
       // Using schema name, since table name contains type (OFFLINE) suffix
       if (!_accessControlFactory.create()
           .hasAccess(httpHeaders, TargetType.TABLE, tableConfig.getValidationConfig().getSchemaName(),
-              Actions.Table.ADD_TABLE)) {
+              Actions.Table.CREATE_TABLE)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -268,7 +268,7 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_TABLES)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE)
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
   public String listTables(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
@@ -387,7 +387,7 @@ public class PinotTableRestletResource {
     try {
       if (StringUtils.isBlank(stateStr)) {
         if (!_accessControlFactory.create()
-            .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.LIST_TABLE_CONFIGS)) {
+            .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.GET_TABLE_CONFIG)) {
           throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
         }
         return listTableConfigs(tableName, tableTypeStr);
@@ -402,9 +402,9 @@ public class PinotTableRestletResource {
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
-      // Convert the action to Enable, Disable and Drop corresponding to StateType enum.
+      // Convert the action to EnableTable, DisableTable and DropTable corresponding to StateType enum.
       if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, tableName,
-          StringUtils.capitalize(stateType.name().toLowerCase()))) {
+          StringUtils.capitalize(stateType.name().toLowerCase()) + "Table")) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -588,7 +588,7 @@ public class PinotTableRestletResource {
     // Using schema name, since table name contains type (OFFLINE) suffix
     if (!_accessControlFactory.create()
         .hasAccess(httpHeaders, TargetType.TABLE, tableConfig.getLeft().getValidationConfig().getSchemaName(),
-            Actions.Table.VALIDATE)) {
+            Actions.Table.VALIDATE_TABLE)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -626,7 +626,7 @@ public class PinotTableRestletResource {
     String endpointUrl = request.getRequestURL().toString();
     AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.VALIDATE)) {
+    if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.VALIDATE_TABLE)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -999,7 +999,7 @@ public class PinotTableRestletResource {
 
   @POST
   @Path("tables/{tableName}/timeBoundary")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TIME_BOUNDARY)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE)
   @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata", notes = "Set "
       + "hybrid table query time boundary based on offline segments' metadata")
   @Produces(MediaType.APPLICATION_JSON)

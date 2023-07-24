@@ -55,7 +55,7 @@ public class PinotControllerAppConfigs {
 
   @GET
   @Path("/appconfigs")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_APP_CONFIGS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_APP_CONFIG)
   @Produces(MediaType.APPLICATION_JSON)
   public String getAppConfigs() {
     PinotConfiguration pinotConfiguration =

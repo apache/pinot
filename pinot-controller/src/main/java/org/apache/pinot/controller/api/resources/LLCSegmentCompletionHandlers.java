@@ -267,7 +267,7 @@ public class LLCSegmentCompletionHandlers {
 
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.POST_ADMIN_INFO)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Produces(MediaType.APPLICATION_JSON)
@@ -355,7 +355,7 @@ public class LLCSegmentCompletionHandlers {
   // TODO: remove this API. Should not upload segment via controller
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.POST_ADMIN_INFO)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT)
   @Authenticate(AccessType.CREATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -398,7 +398,7 @@ public class LLCSegmentCompletionHandlers {
 
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END_METADATA)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.POST_ADMIN_INFO)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Authenticate(AccessType.CREATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)

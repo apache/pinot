@@ -69,7 +69,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_BROKERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
   @ApiOperation(value = "List tenants and tables to brokers mappings",
       notes = "List tenants and tables to brokers mappings")
   Map<String, Map<String, List<String>>> listBrokersMapping(
@@ -83,7 +83,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers/tenants")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_BROKERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
   @ApiOperation(value = "List tenants to brokers mappings", notes = "List tenants to brokers mappings")
   Map<String, List<String>> getTenantsToBrokersMapping(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state);
@@ -97,7 +97,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers/tenants/{tenantName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_BROKERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
   @ApiOperation(value = "List brokers for a given tenant", notes = "List brokers for a given tenant")
   List<String> getBrokersForTenant(
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName,
@@ -111,7 +111,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers/tables")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_BROKERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
   @ApiOperation(value = "List tables to brokers mappings", notes = "List tables to brokers mappings")
   Map<String, List<String>> getTablesToBrokersMapping(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state);
@@ -126,7 +126,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/brokers/tables/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.LIST_BROKERS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_BROKER)
   @ApiOperation(value = "List brokers for a given table", notes = "List brokers for a given table")
   List<String> getBrokersForTable(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
@@ -141,7 +141,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_BROKERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
   @ApiOperation(value = "List tenants and tables to brokers mappings",
       notes = "List tenants and tables to brokers mappings")
   Map<String, Map<String, List<InstanceInfo>>> listBrokersMappingV2(
@@ -155,7 +155,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tenants")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_BROKERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
   @ApiOperation(value = "List tenants to brokers mappings", notes = "List tenants to brokers mappings")
   Map<String, List<InstanceInfo>> getTenantsToBrokersMappingV2(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state);
@@ -169,7 +169,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tenants/{tenantName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_BROKERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
   @ApiOperation(value = "List brokers for a given tenant", notes = "List brokers for a given tenant")
   List<InstanceInfo> getBrokersForTenantV2(
       @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName,
@@ -183,7 +183,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tables")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_BROKERS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
   @ApiOperation(value = "List tables to brokers mappings", notes = "List tables to brokers mappings")
   Map<String, List<InstanceInfo>> getTablesToBrokersMappingV2(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state);
@@ -198,7 +198,7 @@ public interface PinotBrokerService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/brokers/tables/{tableName}")
-  @Authorize(targetType = TargetType.CLUSTER, paramName = "tableName", action = Actions.Table.LIST_BROKERS)
+  @Authorize(targetType = TargetType.CLUSTER, paramName = "tableName", action = Actions.Table.GET_BROKER)
   @ApiOperation(value = "List brokers for a given table", notes = "List brokers for a given table")
   List<InstanceInfo> getBrokersForTableV2(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,

@@ -258,7 +258,7 @@ public class ZookeeperResource {
 
   @GET
   @Path("/zk/ls")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_ZNODE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ZNODE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the child znodes")
   @ApiResponses(value = {
@@ -281,7 +281,7 @@ public class ZookeeperResource {
 
   @GET
   @Path("/zk/getChildren")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ZNODES)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ZNODE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all child znodes")
   @ApiResponses(value = {
@@ -316,7 +316,7 @@ public class ZookeeperResource {
 
   @GET
   @Path("/zk/lsl")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_ZNODES)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ZNODE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List the child znodes along with Stats")
   @ApiResponses(value = {
@@ -340,7 +340,7 @@ public class ZookeeperResource {
 
   @GET
   @Path("/zk/stat")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.LIST_ZNODE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ZNODE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the stat",
       notes = " Use this api to fetch additional details of a znode such as creation time, modified time, numChildren"

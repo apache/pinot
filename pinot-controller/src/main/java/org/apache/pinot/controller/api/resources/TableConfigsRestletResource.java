@@ -112,7 +112,7 @@ public class TableConfigsRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tableConfigs")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_CONFIGS)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_CONFIG)
   @Authenticate(AccessType.READ)
   @ApiOperation(value = "Lists all TableConfigs in cluster", notes = "Lists all TableConfigs in cluster")
   public String listConfigs() {
@@ -216,7 +216,7 @@ public class TableConfigsRestletResource {
                 accessControl);
       }
 
-      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.ADD_CONFIGS)) {
+      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.CREATE_TABLE)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -304,7 +304,7 @@ public class TableConfigsRestletResource {
    */
   @PUT
   @Path("/tableConfigs/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_CONFIGS)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_CONFIG)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json",
@@ -432,7 +432,7 @@ public class TableConfigsRestletResource {
     }
 
     if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(),
-        Actions.Table.VALIDATE_CONFIGS)) {
+        Actions.Table.VALIDATE_CONFIG)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
