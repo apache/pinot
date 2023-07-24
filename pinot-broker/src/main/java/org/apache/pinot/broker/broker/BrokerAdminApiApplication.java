@@ -27,9 +27,9 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.helix.HelixManager;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -83,14 +83,14 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     }
     _executorService =
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
-    MultiThreadedHttpConnectionManager connMgr = new MultiThreadedHttpConnectionManager();
+    PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager();
     connMgr.getParams().setConnectionTimeout((int) brokerConf
         .getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
             CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
     register(new AbstractBinder() {
       @Override
       protected void configure() {
-        bind(connMgr).to(HttpConnectionManager.class);
+        bind(connMgr).to(HttpClientConnectionManager.class);
         bind(_executorService).to(Executor.class);
         bind(helixManager).to(HelixManager.class);
         bind(sqlQueryExecutor).to(SqlQueryExecutor.class);

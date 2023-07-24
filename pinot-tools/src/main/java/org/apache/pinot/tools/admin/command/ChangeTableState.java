@@ -19,8 +19,13 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.net.URI;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.methods.GetMethod;
+import java.nio.charset.Charset;
+import org.apache.commons.io.IOUtils;
+import org.apache.http.HttpException;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -84,17 +89,20 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
       throw new IllegalArgumentException(
           "Invalid value for state: " + _state + "\n Value must be one of enable|disable|drop");
     }
-    HttpClient httpClient = new HttpClient();
-    URI uri = new URI(_controllerProtocol, null, _controllerHost, Integer.parseInt(_controllerPort),
-        URI_TABLES_PATH + _tableName, "state=" + stateValue, null);
+    try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
+      URI uri = new URI(_controllerProtocol, null, _controllerHost, Integer.parseInt(_controllerPort),
+          URI_TABLES_PATH + _tableName, "state=" + stateValue, null);
 
-    GetMethod httpGet = new GetMethod(uri.toString());
-    makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
-        .forEach(header -> httpGet.addRequestHeader(header.getName(), header.getValue()));
+      HttpGet httpGet = new HttpGet(uri);
+      makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
+          .forEach(header -> httpGet.addHeader(header.getName(), header.getValue()));
 
-    int status = httpClient.executeMethod(httpGet);
-    if (status != 200) {
-      throw new RuntimeException("Failed to change table state, error: " + httpGet.getResponseBodyAsString());
+      HttpResponse response  = httpClient.execute(httpGet);
+      int status = response.getStatusLine().getStatusCode();
+      if (status != 200) {
+        String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+        throw new HttpException("Failed to change table state, error: " + responseString);
+      }
     }
     return true;
   }

@@ -50,7 +50,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.exception.QueryException;
@@ -97,7 +97,7 @@ public class PinotClientRequest {
   private Executor _executor;
 
   @Inject
-  private HttpConnectionManager _httpConnMgr;
+  private HttpClientConnectionManager _httpConnMgr;
 
   @GET
   @ManagedAsync

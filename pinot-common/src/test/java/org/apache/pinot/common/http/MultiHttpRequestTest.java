@@ -32,8 +32,8 @@ import java.util.List;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -107,7 +107,7 @@ public class MultiHttpRequestTest {
   @Test
   public void testMultiGet() {
     MultiHttpRequest mget =
-        new MultiHttpRequest(Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager());
+        new MultiHttpRequest(Executors.newCachedThreadPool(), new PoolingHttpClientConnectionManager());
     List<String> urls = Arrays.asList("http://localhost:" + String.valueOf(_portStart) + URI_PATH,
         "http://localhost:" + String.valueOf(_portStart + 1) + URI_PATH,
         "http://localhost:" + String.valueOf(_portStart + 2) + URI_PATH,
@@ -116,15 +116,15 @@ public class MultiHttpRequestTest {
     // timeout value needs to be less than 5000ms set above for
     // third server
     final int requestTimeoutMs = 1000;
-    CompletionService<GetMethod> completionService = mget.execute(urls, null, requestTimeoutMs);
+    CompletionService<HttpGet> completionService = mget.execute(urls, null, requestTimeoutMs);
     int success = 0;
     int errors = 0;
     int timeouts = 0;
     for (int i = 0; i < urls.size(); i++) {
-      GetMethod getMethod = null;
+      HttpGet getMethod = null;
       try {
         getMethod = completionService.take().get();
-        if (getMethod.getStatusCode() >= 300) {
+        if (getMethod.get >= 300) {
           errors++;
           Assert.assertEquals(getMethod.getResponseBodyAsString(), ERROR_MSG);
         } else {

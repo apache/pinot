@@ -26,7 +26,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.commons.httpclient.HttpMethodBase;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.params.HttpClientParams;
@@ -78,13 +78,13 @@ public class MultiHttpRequest {
   private final Executor _executor;
   // TODO: Verify that _connectionManager is an instaceOf MultithreadedHttpConnectionManager.
   //       SimpleHttpConnectionManager is not thread-safe.
-  private final HttpConnectionManager _connectionManager;
+  private final HttpClientConnectionManager _connectionManager;
 
   /**
    * @param executor executor service to use for making parallel requests
    * @param connectionManager http connection manager to use.
    */
-  public MultiHttpRequest(Executor executor, HttpConnectionManager connectionManager) {
+  public MultiHttpRequest(Executor executor, HttpClientConnectionManager connectionManager) {
     _executor = executor;
     _connectionManager = connectionManager;
   }

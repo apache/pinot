@@ -32,7 +32,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -53,10 +53,10 @@ public class ConsumingSegmentInfoReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumingSegmentInfoReader.class);
 
   private final Executor _executor;
-  private final HttpConnectionManager _connectionManager;
+  private final HttpClientConnectionManager _connectionManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
 
-  public ConsumingSegmentInfoReader(Executor executor, HttpConnectionManager connectionManager,
+  public ConsumingSegmentInfoReader(Executor executor, HttpClientConnectionManager connectionManager,
       PinotHelixResourceManager helixResourceManager) {
     _executor = executor;
     _connectionManager = connectionManager;

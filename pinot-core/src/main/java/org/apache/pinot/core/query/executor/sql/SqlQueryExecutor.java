@@ -103,7 +103,7 @@ public class SqlQueryExecutor {
           List<Object[]> rows = new ArrayList<>();
           tableToTaskIdMap.forEach((key, value) -> rows.add(new Object[]{key, value}));
           result.setResultTable(new ResultTable(statement.getResultSchema(), rows));
-        } catch (IOException e) {
+        } catch (Exception e) {
           result.setExceptions(ImmutableList.of(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e)));
         }
         break;

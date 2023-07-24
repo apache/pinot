@@ -22,8 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
-import javax.ws.rs.core.HttpHeaders;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -82,7 +81,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
       throws Exception {
     requestContext.setBrokerId(_brokerId);
     if (sqlNodeAndOptions == null) {

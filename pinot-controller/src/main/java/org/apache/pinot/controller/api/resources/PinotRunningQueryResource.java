@@ -47,7 +47,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -84,7 +84,7 @@ public class PinotRunningQueryResource {
   private Executor _executor;
 
   @Inject
-  private HttpConnectionManager _httpConnMgr;
+  private HttpClientConnectionManager _httpConnMgr;
 
   @DELETE
   @Path("query/{brokerId}/{queryId}")

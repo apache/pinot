@@ -32,7 +32,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.InstanceType;
@@ -66,7 +66,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentRelocator.class);
 
   private final ExecutorService _executorService;
-  private final HttpConnectionManager _connectionManager;
+  private final HttpClientConnectionManager _connectionManager;
   private final boolean _enableLocalTierMigration;
   private final int _serverAdminRequestTimeoutMs;
   private final long _externalViewCheckIntervalInMs;
@@ -76,7 +76,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
 
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
-      ExecutorService executorService, HttpConnectionManager connectionManager) {
+      ExecutorService executorService, HttpClientConnectionManager connectionManager) {
     super(SegmentRelocator.class.getSimpleName(), config.getSegmentRelocatorFrequencyInSeconds(),
         config.getSegmentRelocatorInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);

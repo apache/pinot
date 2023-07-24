@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.http.conn.HttpClientConnectionManager;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -60,7 +61,7 @@ public interface BrokerRequestHandler {
    * @param serverResponses to collect cancel responses from all servers if a map is provided
    * @return true if there is a running query for the given queryId.
    */
-  boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpConnectionManager connMgr,
+  boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception;
 }

@@ -20,6 +20,8 @@ package org.apache.pinot.controller.api.upload;
 
 import java.util.concurrent.Executor;
 import javax.ws.rs.core.Response;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -65,7 +67,7 @@ public class SegmentValidationUtils {
 
   public static void checkStorageQuota(String segmentName, long segmentSizeInBytes, TableConfig tableConfig,
       PinotHelixResourceManager resourceManager, ControllerConf controllerConf, ControllerMetrics controllerMetrics,
-      HttpConnectionManager connectionManager, Executor executor, boolean isLeaderForTable) {
+      HttpClientConnectionManager connectionManager, Executor executor, boolean isLeaderForTable) {
     if (!controllerConf.getEnableStorageQuotaCheck()) {
       return;
     }

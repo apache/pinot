@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.pinot.common.http.MultiHttpRequest;
@@ -45,10 +45,10 @@ public class CompletionServiceHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompletionServiceHelper.class);
 
   private final Executor _executor;
-  private final HttpConnectionManager _httpConnectionManager;
+  private final HttpClientConnectionManager _httpConnectionManager;
   private final BiMap<String, String> _endpointsToServers;
 
-  public CompletionServiceHelper(Executor executor, HttpConnectionManager httpConnectionManager,
+  public CompletionServiceHelper(Executor executor, HttpClientConnectionManager httpConnectionManager,
       BiMap<String, String> endpointsToServers) {
     _executor = executor;
     _httpConnectionManager = httpConnectionManager;
