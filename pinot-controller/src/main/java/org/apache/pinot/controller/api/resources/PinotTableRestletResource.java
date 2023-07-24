@@ -626,7 +626,8 @@ public class PinotTableRestletResource {
     String endpointUrl = request.getRequestURL().toString();
     AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.VALIDATE_TABLE)) {
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.VALIDATE_TABLE)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
