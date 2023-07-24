@@ -44,7 +44,6 @@ public class BrokerEchoWithAutoDiscovery {
     public AutoLoadedServiceForTest _injectedService;
     @GET
     @Path("/echo/{table}")
-    @Authorize(targetType = TargetType.TABLE, paramName = "table", action = Actions.Table.ECHO)
     @Produces(MediaType.TEXT_PLAIN)
     public String echo(@PathParam("table") String table) {
         return _injectedService.echo(table);

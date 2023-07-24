@@ -36,7 +36,6 @@ import org.apache.pinot.core.auth.TargetType;
 public class PinotDummyExtraRestletResource {
 
   @GET
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DUMMY)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "dummy get API")
   @ApiResponses(value = {
