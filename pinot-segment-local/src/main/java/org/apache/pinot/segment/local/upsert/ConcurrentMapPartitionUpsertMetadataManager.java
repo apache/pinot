@@ -245,13 +245,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     int newDocId = recordInfo.getDocId();
     Comparable newComparisonValue = recordInfo.getComparisonValue();
+
+    // When TTL is enabled, update largestSeenComparisonValue when adding new record
+    if (_metadataTTL > 0) {
+      double comparisonValue = ((Number) newComparisonValue).doubleValue();
+      _largestSeenComparisonValue = Math.max(_largestSeenComparisonValue, comparisonValue);
+    }
+
     _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (primaryKey, currentRecordLocation) -> {
-          // Update largestSeenComparisonValue when adding new record
-          if (_metadataTTL > 0) {
-            double comparisonValue = ((Number) recordInfo.getComparisonValue()).doubleValue();
-            _largestSeenComparisonValue = Math.max(_largestSeenComparisonValue, comparisonValue);
-          }
           if (currentRecordLocation != null) {
             // Existing primary key
 
