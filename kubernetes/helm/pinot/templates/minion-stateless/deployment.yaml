@@ -37,6 +37,7 @@ spec:
 {{ toYaml .Values.minionStateless.podAnnotations | indent 8 }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "pinot.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.minionStateless.podSecurityContext | nindent 8 }}
       {{- with .Values.imagePullSecrets }}

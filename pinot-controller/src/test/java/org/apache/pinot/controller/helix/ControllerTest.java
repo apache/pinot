@@ -43,6 +43,7 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ClusterConfig;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.ResourceConfig;
@@ -58,6 +59,7 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
@@ -86,6 +88,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_I
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.fail;
 
 
 public class ControllerTest {
@@ -105,6 +108,8 @@ public class ControllerTest {
   // NOTE: To add HLC realtime table, number of Server instances must be multiple of replicas
   public static final int DEFAULT_NUM_SERVER_INSTANCES = 4;
 
+  public static final long TIMEOUT_MS = 10_000L;
+
   /**
    * default static instance used to access all wrapped static instances.
    */
@@ -114,8 +119,8 @@ public class ControllerTest {
 
   protected static HttpClient _httpClient = null;
 
-  protected int _controllerPort;
-  protected String _controllerBaseApiUrl;
+  private int _controllerPort;
+  private String _controllerBaseApiUrl;
   protected ControllerConf _controllerConfig;
   protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
 
@@ -771,6 +776,10 @@ public class ControllerTest {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
+  public static String sendPostRequest(String urlString)
+    throws IOException {
+    return sendPostRequest(urlString, null);
+  }
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
     return sendPostRequest(urlString, payload, Collections.emptyMap());
@@ -963,6 +972,24 @@ public class ControllerTest {
     stopFakeInstances();
     stopController();
     stopZk();
+  }
+
+  /**
+   * Checks if the number of online instances for a given resource matches the expected num of instances or not.
+   */
+  public void checkNumOnlineInstancesFromExternalView(String resourceName, int expectedNumOnlineInstances)
+      throws InterruptedException {
+    long endTime = System.currentTimeMillis() + TIMEOUT_MS;
+    while (System.currentTimeMillis() < endTime) {
+      ExternalView resourceExternalView = DEFAULT_INSTANCE.getHelixAdmin()
+          .getResourceExternalView(DEFAULT_INSTANCE.getHelixClusterName(), resourceName);
+      Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
+      if (instanceSet.size() == expectedNumOnlineInstances) {
+        return;
+      }
+      Thread.sleep(100L);
+    }
+    fail("Failed to reach " + expectedNumOnlineInstances + " online instances for resource: " + resourceName);
   }
 
   /**

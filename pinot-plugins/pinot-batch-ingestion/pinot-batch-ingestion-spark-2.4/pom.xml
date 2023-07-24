@@ -37,7 +37,7 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
     <scala.major.version>2.11</scala.major.version>
-    <spark.version>2.4.0</spark.version>
+    <spark.version>2.4.6</spark.version>
     <scala.minor.version>2.11.11</scala.minor.version>
   </properties>
 
@@ -92,10 +92,6 @@
         <exclusion>
           <groupId>jakarta.ws.rs</groupId>
           <artifactId>jakarta.ws.rs-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

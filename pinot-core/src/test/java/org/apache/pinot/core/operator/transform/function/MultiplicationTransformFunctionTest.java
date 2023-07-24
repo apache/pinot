@@ -106,10 +106,10 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
     RoaringBitmap roaringBitmap = new RoaringBitmap();
     double[] expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        expectedValues[i] = (double) _intSVValues[i] * (double) _intSVValues[i];
-      } else {
+      if (isNullRow(i)) {
         roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = (double) _intSVValues[i] * (double) _intSVValues[i];
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);

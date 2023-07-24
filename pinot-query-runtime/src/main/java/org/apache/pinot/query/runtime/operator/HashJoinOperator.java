@@ -38,7 +38,7 @@ import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,12 +59,13 @@ import org.slf4j.LoggerFactory;
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 public class HashJoinOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
+  private static final int INITIAL_HEURISTIC_SIZE = 16;
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
 
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES = ImmutableSet.of(
       JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL, JoinRelType.SEMI, JoinRelType.ANTI);
 
-  private final HashMap<Key, List<Object[]>> _broadcastRightTable;
+  private final HashMap<Key, ArrayList<Object[]>> _broadcastRightTable;
 
   // Used to track matched right rows.
   // Only used for right join and full join to output non-matched right rows.
@@ -170,8 +171,12 @@ public class HashJoinOperator extends MultiStageOperator {
       List<Object[]> container = rightBlock.getContainer();
       // put all the rows into corresponding hash collections keyed by the key selector function.
       for (Object[] row : container) {
-        List<Object[]> hashCollection =
-            _broadcastRightTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>());
+        ArrayList<Object[]> hashCollection = _broadcastRightTable.computeIfAbsent(
+            new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>(INITIAL_HEURISTIC_SIZE));
+        int size = hashCollection.size();
+        if ((size & size - 1) == 0 && size < Integer.MAX_VALUE / 2) { // is power of 2
+          hashCollection.ensureCapacity(size << 1);
+        }
         hashCollection.add(row);
       }
       rightBlock = _rightTableOperator.nextBlock();
@@ -198,7 +203,7 @@ public class HashJoinOperator extends MultiStageOperator {
     if (leftBlock.isSuccessfulEndOfStreamBlock() && needUnmatchedRightRows()) {
       // Return remaining non-matched rows for non-inner join.
       List<Object[]> returnRows = new ArrayList<>();
-      for (Map.Entry<Key, List<Object[]>> entry : _broadcastRightTable.entrySet()) {
+      for (Map.Entry<Key, ArrayList<Object[]>> entry : _broadcastRightTable.entrySet()) {
         Set<Integer> matchedIdx = _matchedRightRows.getOrDefault(entry.getKey(), new HashSet<>());
         List<Object[]> rightRows = entry.getValue();
         if (rightRows.size() == matchedIdx.size()) {
@@ -213,55 +218,94 @@ public class HashJoinOperator extends MultiStageOperator {
       _isTerminated = true;
       return new TransferableBlock(returnRows, _resultSchema, DataBlock.Type.ROW);
     }
-    List<Object[]> rows = new ArrayList<>();
-    List<Object[]> container = leftBlock.isEndOfStreamBlock() ? new ArrayList<>() : leftBlock.getContainer();
-    for (Object[] leftRow : container) {
-      Key key = new Key(_leftKeySelector.getKey(leftRow));
+    List<Object[]> rows;
+    if (leftBlock.isEndOfStreamBlock()) {
+      rows = new ArrayList<>();
+    } else {
       switch (_joinType) {
-        case SEMI:
-          // SEMI-JOIN only checks existence of the key
-          if (_broadcastRightTable.containsKey(key)) {
-            rows.add(joinRow(leftRow, null));
-          }
+        case SEMI: {
+          rows = buildJoinedDataBlockSemi(leftBlock);
           break;
-        case ANTI:
-          // ANTI-JOIN only checks non-existence of the key
-          if (!_broadcastRightTable.containsKey(key)) {
-            rows.add(joinRow(leftRow, null));
-          }
+        }
+        case ANTI: {
+          rows = buildJoinedDataBlockAnti(leftBlock);
           break;
-        default: // INNER, LEFT, RIGHT, FULL
-          // NOTE: Empty key selector will always give same hash code.
-          List<Object[]> matchedRightRows = _broadcastRightTable.getOrDefault(key, null);
-          if (matchedRightRows == null) {
-            if (needUnmatchedLeftRows()) {
-              rows.add(joinRow(leftRow, null));
-            }
-            continue;
-          }
-          boolean hasMatchForLeftRow = false;
-          for (int i = 0; i < matchedRightRows.size(); i++) {
-            Object[] rightRow = matchedRightRows.get(i);
-            // TODO: Optimize this to avoid unnecessary object copy.
-            Object[] resultRow = joinRow(leftRow, rightRow);
-            if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
-                evaluator -> (Boolean) FunctionInvokeUtils.convert(evaluator.apply(resultRow),
-                    DataSchema.ColumnDataType.BOOLEAN))) {
-              rows.add(resultRow);
-              hasMatchForLeftRow = true;
-              if (_matchedRightRows != null) {
-                HashSet<Integer> matchedRows = _matchedRightRows.computeIfAbsent(key, k -> new HashSet<>());
-                matchedRows.add(i);
-              }
-            }
-          }
-          if (!hasMatchForLeftRow && needUnmatchedLeftRows()) {
-            rows.add(joinRow(leftRow, null));
-          }
+        }
+        default: { // INNER, LEFT, RIGHT, FULL
+          rows = buildJoinedDataBlockDefault(leftBlock);
           break;
+        }
       }
     }
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+  }
+
+  private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock) {
+    List<Object[]> container = leftBlock.getContainer();
+    List<Object[]> rows = new ArrayList<>(container.size());
+
+    for (Object[] leftRow : container) {
+      Key key = new Key(_leftKeySelector.getKey(leftRow));
+      // SEMI-JOIN only checks existence of the key
+      if (_broadcastRightTable.containsKey(key)) {
+        rows.add(joinRow(leftRow, null));
+      }
+    }
+
+    return rows;
+  }
+
+  private List<Object[]> buildJoinedDataBlockDefault(TransferableBlock leftBlock) {
+    List<Object[]> container = leftBlock.getContainer();
+    ArrayList<Object[]> rows = new ArrayList<>(container.size());
+
+    for (Object[] leftRow : container) {
+      Key key = new Key(_leftKeySelector.getKey(leftRow));
+      // NOTE: Empty key selector will always give same hash code.
+      List<Object[]> matchedRightRows = _broadcastRightTable.getOrDefault(key, null);
+      if (matchedRightRows == null) {
+        if (needUnmatchedLeftRows()) {
+          rows.add(joinRow(leftRow, null));
+        }
+        continue;
+      }
+      boolean hasMatchForLeftRow = false;
+      rows.ensureCapacity(rows.size() + matchedRightRows.size());
+      for (int i = 0; i < matchedRightRows.size(); i++) {
+        Object[] rightRow = matchedRightRows.get(i);
+        // TODO: Optimize this to avoid unnecessary object copy.
+        Object[] resultRow = joinRow(leftRow, rightRow);
+        if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
+            evaluator -> (Boolean) TypeUtils.convert(evaluator.apply(resultRow),
+                DataSchema.ColumnDataType.BOOLEAN))) {
+          rows.add(resultRow);
+          hasMatchForLeftRow = true;
+          if (_matchedRightRows != null) {
+            HashSet<Integer> matchedRows = _matchedRightRows.computeIfAbsent(key, k -> new HashSet<>());
+            matchedRows.add(i);
+          }
+        }
+      }
+      if (!hasMatchForLeftRow && needUnmatchedLeftRows()) {
+        rows.add(joinRow(leftRow, null));
+      }
+    }
+
+    return rows;
+  }
+
+  private List<Object[]> buildJoinedDataBlockAnti(TransferableBlock leftBlock) {
+    List<Object[]> container = leftBlock.getContainer();
+    List<Object[]> rows = new ArrayList<>(container.size());
+
+    for (Object[] leftRow : container) {
+      Key key = new Key(_leftKeySelector.getKey(leftRow));
+      // ANTI-JOIN only checks non-existence of the key
+      if (!_broadcastRightTable.containsKey(key)) {
+        rows.add(joinRow(leftRow, null));
+      }
+    }
+    return rows;
   }
 
   private Object[] joinRow(@Nullable Object[] leftRow, @Nullable Object[] rightRow) {

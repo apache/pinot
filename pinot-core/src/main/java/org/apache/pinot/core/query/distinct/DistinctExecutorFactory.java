@@ -24,7 +24,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColumnDistinctOrderByExecutor;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedSingleColumnDistinctOnlyExecutor;
@@ -44,6 +43,7 @@ import org.apache.pinot.core.query.distinct.raw.RawLongSingleColumnDistinctOrder
 import org.apache.pinot.core.query.distinct.raw.RawMultiColumnDistinctExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawStringSingleColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawStringSingleColumnDistinctOrderByExecutor;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -58,15 +58,16 @@ public class DistinctExecutorFactory {
   /**
    * Returns the {@link DistinctExecutor} for the given distinct query.
    */
-  public static DistinctExecutor getDistinctExecutor(DistinctAggregationFunction distinctAggregationFunction,
-      BaseProjectOperator<?> projectOperator, boolean nullHandlingEnabled) {
-    List<ExpressionContext> expressions = distinctAggregationFunction.getInputExpressions();
-    List<OrderByExpressionContext> orderByExpressions = distinctAggregationFunction.getOrderByExpressions();
-    int limit = distinctAggregationFunction.getLimit();
+  public static DistinctExecutor getDistinctExecutor(BaseProjectOperator<?> projectOperator,
+      QueryContext queryContext) {
+    List<ExpressionContext> expressions = queryContext.getSelectExpressions();
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    int limit = queryContext.getLimit();
     if (orderByExpressions == null) {
-      return getDistinctOnlyExecutor(expressions, limit, projectOperator, nullHandlingEnabled);
+      return getDistinctOnlyExecutor(expressions, limit, projectOperator, queryContext.isNullHandlingEnabled());
     } else {
-      return getDistinctOrderByExecutor(expressions, orderByExpressions, limit, projectOperator, nullHandlingEnabled);
+      return getDistinctOrderByExecutor(expressions, orderByExpressions, limit, projectOperator,
+          queryContext.isNullHandlingEnabled());
     }
   }
 

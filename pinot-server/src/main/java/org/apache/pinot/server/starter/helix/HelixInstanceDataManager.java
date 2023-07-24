@@ -99,6 +99,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   // Key is TableNameWithType-SegmentName pair.
   private LoadingCache<Pair<String, String>, SegmentErrorInfo> _errorCache;
   private ExecutorService _segmentRefreshExecutor;
+  private ExecutorService _segmentPreloadExecutor;
 
   @Override
   public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
@@ -133,8 +134,20 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     SegmentBuildTimeLeaseExtender.initExecutor();
     // Initialize a fixed thread pool to reload/refresh segments in parallel. The getMaxParallelRefreshThreads() is
     // used to initialize a segment refresh semaphore to limit the parallelism, so create a pool of same size.
-    _segmentRefreshExecutor = Executors.newFixedThreadPool(getMaxParallelRefreshThreads(),
+    int poolSize = getMaxParallelRefreshThreads();
+    Preconditions.checkArgument(poolSize > 0,
+        "SegmentRefreshExecutor requires a positive pool size but got: " + poolSize);
+    _segmentRefreshExecutor = Executors.newFixedThreadPool(poolSize,
         new ThreadFactoryBuilder().setNameFormat("segment-refresh-thread-%d").build());
+    LOGGER.info("Created SegmentRefreshExecutor with pool size: {}", poolSize);
+    poolSize = _instanceDataManagerConfig.getMaxSegmentPreloadThreads();
+    if (poolSize > 0) {
+      _segmentPreloadExecutor = Executors.newFixedThreadPool(poolSize,
+          new ThreadFactoryBuilder().setNameFormat("segment-preload-thread-%d").build());
+      LOGGER.info("Created SegmentPreloadExecutor with pool size: {}", poolSize);
+    } else {
+      LOGGER.info("SegmentPreloadExecutor was not created with pool size: {}", poolSize);
+    }
     // Initialize the table data manager provider
     TableDataManagerProvider.init(_instanceDataManagerConfig);
     LOGGER.info("Initialized Helix instance data manager");
@@ -190,6 +203,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public synchronized void shutDown() {
     _segmentRefreshExecutor.shutdownNow();
+    if (_segmentPreloadExecutor != null) {
+      _segmentPreloadExecutor.shutdownNow();
+    }
     for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
       tableDataManager.shutDown();
     }
@@ -231,7 +247,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(_instanceDataManagerConfig, tableConfig);
     TableDataManager tableDataManager =
         TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore,
-            _serverMetrics, _helixManager, _errorCache, _isServerReadyToServeQueries);
+            _serverMetrics, _helixManager, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
@@ -267,11 +283,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void offloadSegment(String tableNameWithType, String segmentName) {
     LOGGER.info("Removing segment: {} from table: {}", segmentName, tableNameWithType);
-    _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
-      v.removeSegment(segmentName);
-      LOGGER.info("Removed segment: {} from table: {}", segmentName, k);
-      return v;
-    });
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      tableDataManager.removeSegment(segmentName);
+      LOGGER.info("Removed segment: {} from table: {}", segmentName, tableNameWithType);
+    } else {
+      LOGGER.warn("Failed to find data manager for table: {}, skipping removing segment: {}", tableNameWithType,
+          segmentName);
+    }
   }
 
   @Override

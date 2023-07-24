@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.OptionalInt;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -95,7 +96,7 @@ public class FilterOperatorUtils {
           return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null) {
-          return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new InvertedIndexFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
       } else {
@@ -103,7 +104,7 @@ public class FilterOperatorUtils {
           return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         if (dataSource.getInvertedIndex() != null) {
-          return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new InvertedIndexFilterOperator(predicateEvaluator, dataSource, numDocs);
         }
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
           return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
@@ -175,7 +176,7 @@ public class FilterOperatorUtils {
 
 
     /**
-     * For AND filter operator, reorders its child filter operators based on the their cost and puts the ones with
+     * For AND filter operator, reorders its child filter operators based on their cost and puts the ones with
      * inverted index first in order to reduce the number of documents to be processed.
      * <p>Special filter operators such as {@link MatchAllFilterOperator} and {@link EmptyFilterOperator} should be
      * removed from the list before calling this method.
@@ -188,36 +189,42 @@ public class FilterOperatorUtils {
         }
 
         int getPriority(BaseFilterOperator filterOperator) {
+          if (filterOperator instanceof PrioritizedFilterOperator) {
+            OptionalInt priority = ((PrioritizedFilterOperator<?>) filterOperator).getPriority();
+            if (priority.isPresent()) {
+              return priority.getAsInt();
+            }
+          }
           if (filterOperator instanceof SortedIndexBasedFilterOperator) {
-            return 0;
+            return PrioritizedFilterOperator.HIGH_PRIORITY;
           }
           if (filterOperator instanceof BitmapBasedFilterOperator) {
-            return 1;
+            return PrioritizedFilterOperator.MEDIUM_PRIORITY;
           }
           if (filterOperator instanceof RangeIndexBasedFilterOperator
               || filterOperator instanceof TextContainsFilterOperator
               || filterOperator instanceof TextMatchFilterOperator || filterOperator instanceof JsonMatchFilterOperator
               || filterOperator instanceof H3IndexFilterOperator
               || filterOperator instanceof H3InclusionIndexFilterOperator) {
-            return 2;
+            return PrioritizedFilterOperator.LOW_PRIORITY;
           }
           if (filterOperator instanceof AndFilterOperator) {
-            return 3;
+            return PrioritizedFilterOperator.AND_PRIORITY;
           }
           if (filterOperator instanceof OrFilterOperator) {
-            return 4;
+            return PrioritizedFilterOperator.OR_PRIORITY;
           }
           if (filterOperator instanceof NotFilterOperator) {
             return getPriority(((NotFilterOperator) filterOperator).getChildFilterOperator());
           }
           if (filterOperator instanceof ScanBasedFilterOperator) {
-            return getScanBasedFilterPriority(queryContext, (ScanBasedFilterOperator) filterOperator, 5);
+            int basePriority = PrioritizedFilterOperator.SCAN_PRIORITY;
+            return getScanBasedFilterPriority(queryContext, (ScanBasedFilterOperator) filterOperator, basePriority);
           }
           if (filterOperator instanceof ExpressionFilterOperator) {
-            return 10;
+            return PrioritizedFilterOperator.EXPRESSION_PRIORITY;
           }
-          throw new IllegalStateException(filterOperator.getClass().getSimpleName()
-              + " should not be reordered, remove it from the list before calling this method");
+          return PrioritizedFilterOperator.UNKNOWN_FILTER_PRIORITY;
         }
       });
     }
@@ -232,7 +239,7 @@ public class FilterOperatorUtils {
         return basePriority;
       } else {
         // Lower priority for multi-value column
-        return basePriority + 1;
+        return basePriority + 50;
       }
     }
   }

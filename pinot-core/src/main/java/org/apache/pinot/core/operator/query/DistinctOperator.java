@@ -20,12 +20,12 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -39,31 +39,29 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT";
 
   private final IndexSegment _indexSegment;
-  private final DistinctAggregationFunction _distinctAggregationFunction;
   private final BaseProjectOperator<?> _projectOperator;
-  private final DistinctExecutor _distinctExecutor;
+  private final QueryContext _queryContext;
 
   private int _numDocsScanned = 0;
 
-  public DistinctOperator(IndexSegment indexSegment, DistinctAggregationFunction distinctAggregationFunction,
-      BaseProjectOperator<?> projectOperator, QueryContext queryContext) {
+  public DistinctOperator(IndexSegment indexSegment, BaseProjectOperator<?> projectOperator,
+      QueryContext queryContext) {
     _indexSegment = indexSegment;
-    _distinctAggregationFunction = distinctAggregationFunction;
     _projectOperator = projectOperator;
-    _distinctExecutor = DistinctExecutorFactory.getDistinctExecutor(distinctAggregationFunction, projectOperator,
-        queryContext.isNullHandlingEnabled());
+    _queryContext = queryContext;
   }
 
   @Override
   protected DistinctResultsBlock getNextBlock() {
+    DistinctExecutor executor = DistinctExecutorFactory.getDistinctExecutor(_projectOperator, _queryContext);
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
-      if (_distinctExecutor.process(valueBlock)) {
+      if (executor.process(valueBlock)) {
         break;
       }
     }
-    return new DistinctResultsBlock(_distinctAggregationFunction, _distinctExecutor.getResult());
+    return new DistinctResultsBlock(executor.getResult());
   }
 
   @Override
@@ -87,13 +85,12 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
 
   @Override
   public String toExplainString() {
-    String[] keys = _distinctAggregationFunction.getColumns();
+    List<ExpressionContext> expressions = _queryContext.getSelectExpressions();
+    int numExpressions = expressions.size();
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(keyColumns:");
-    if (keys.length > 0) {
-      stringBuilder.append(keys[0]);
-      for (int i = 1; i < keys.length; i++) {
-        stringBuilder.append(", ").append(keys[i]);
-      }
+    stringBuilder.append(expressions.get(0).toString());
+    for (int i = 1; i < numExpressions; i++) {
+      stringBuilder.append(", ").append(expressions.get(i).toString());
     }
     return stringBuilder.append(')').toString();
   }

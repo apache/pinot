@@ -79,7 +79,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     Map<String, String> batchConfigs = new HashMap<>();
     batchConfigs.put(BatchConfigProperties.OUTPUT_DIR_URI, _tarDir.getAbsolutePath());
     batchConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
-    batchConfigs.put(BatchConfigProperties.PUSH_CONTROLLER_URI, _controllerBaseApiUrl);
+    batchConfigs.put(BatchConfigProperties.PUSH_CONTROLLER_URI, getControllerBaseApiUrl());
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(
         new BatchIngestionConfig(Collections.singletonList(batchConfigs), "APPEND", "HOURLY"));

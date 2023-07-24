@@ -191,9 +191,8 @@ public class Connection {
   private static String[] resolveTableName(String query) {
     try {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-      String tableName =
-          RequestUtils.getTableName(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode()));
-      return new String[]{tableName};
+      return RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode()))
+          .toArray(new String[0]);
     } catch (Exception e) {
       LOGGER.error("Cannot parse table name from query: {}. Fallback to broker selector default.", query, e);
     }

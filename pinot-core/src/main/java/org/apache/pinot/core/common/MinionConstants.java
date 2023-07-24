@@ -118,6 +118,9 @@ public class MinionConstants {
     public static final String SEGMENT_ZK_METADATA_TIME_KEY = TASK_TYPE + TASK_TIME_SUFFIX;
 
     public static final String MERGED_SEGMENT_NAME_PREFIX = "merged_";
+
+    // Custom segment group manager class name
+    public static final String SEGMENT_GROUP_MANAGER_CLASS_NAME_KEY = "segment.group.manager.class.name";
   }
 
   /**

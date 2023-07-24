@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.calcite.avatica.util.Casing;
-import org.apache.calcite.sql.SqlAsOperator;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlExplain;
@@ -48,8 +47,6 @@ import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.SqlSetOption;
-import org.apache.calcite.sql.SqlWith;
-import org.apache.calcite.sql.SqlWithItem;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
@@ -145,69 +142,6 @@ public class CalciteSqlParser {
     } catch (Throwable e) {
       throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
     }
-  }
-
-  public static List<String> extractTableNamesFromNode(SqlNode sqlNode) {
-    List<String> tableNames = new ArrayList<>();
-    if (sqlNode instanceof SqlSelect) {
-      SqlNode fromNode = ((SqlSelect) sqlNode).getFrom();
-      if (fromNode instanceof SqlJoin) {
-        SqlNode left = ((SqlJoin) fromNode).getLeft();
-        SqlNode right = ((SqlJoin) fromNode).getRight();
-        if (left instanceof SqlIdentifier) {
-          tableNames.addAll(((SqlIdentifier) left).names);
-        } else {
-          tableNames.addAll(extractTableNamesFromNode(left));
-        }
-        if (right instanceof SqlIdentifier) {
-          tableNames.addAll(((SqlIdentifier) right).names);
-        } else {
-          tableNames.addAll(extractTableNamesFromNode(right));
-        }
-      } else if ((fromNode instanceof SqlBasicCall)
-          && (((SqlBasicCall) fromNode).getOperator() instanceof SqlAsOperator)) {
-        tableNames.addAll(extractTableNamesFromNode(((SqlBasicCall) fromNode).getOperandList().get(0)));
-      } else {
-        tableNames.addAll(((SqlIdentifier) fromNode).names);
-        tableNames.addAll(extractTableNamesFromNode(((SqlSelect) sqlNode).getWhere()));
-      }
-    } else if (sqlNode instanceof SqlOrderBy) {
-      for (SqlNode node : ((SqlOrderBy) sqlNode).getOperandList()) {
-        tableNames.addAll(extractTableNamesFromNode(node));
-      }
-    } else if (sqlNode instanceof SqlBasicCall) {
-      if (((SqlBasicCall) sqlNode).getOperator() instanceof SqlAsOperator) {
-        SqlNode firstOperand = ((SqlBasicCall) sqlNode).getOperandList().get(0);
-        if (firstOperand instanceof SqlSelect) {
-          tableNames.addAll(extractTableNamesFromNode(firstOperand));
-        } else if (firstOperand instanceof SqlBasicCall) {
-          tableNames.addAll(extractTableNamesFromNode(((SqlBasicCall) firstOperand).getOperandList().get(0)));
-        } else {
-          tableNames.addAll(((SqlIdentifier) firstOperand).names);
-        }
-      } else {
-        for (SqlNode node : ((SqlBasicCall) sqlNode).getOperandList()) {
-          tableNames.addAll(extractTableNamesFromNode(node));
-        }
-      }
-    } else if (sqlNode instanceof SqlWith) {
-      List<SqlNode> withList = ((SqlWith) sqlNode).withList;
-      Set<String> aliases = new HashSet<>();
-      for (SqlNode withItem : withList) {
-        aliases.addAll(((SqlWithItem) withItem).name.names);
-        tableNames.addAll(extractTableNamesFromNode(((SqlWithItem) withItem).query));
-      }
-      tableNames.addAll(extractTableNamesFromNode(((SqlWith) sqlNode).body));
-      tableNames.removeAll(aliases);
-    } else if (sqlNode instanceof SqlSetOption) {
-      for (SqlNode node : ((SqlSetOption) sqlNode).getOperandList()) {
-        tableNames.addAll(extractTableNamesFromNode(node));
-      }
-    } else if (sqlNode instanceof SqlExplain) {
-      SqlExplain explain = (SqlExplain) sqlNode;
-      tableNames.addAll(extractTableNamesFromNode(explain.getExplicandum()));
-    }
-    return tableNames;
   }
 
   @VisibleForTesting

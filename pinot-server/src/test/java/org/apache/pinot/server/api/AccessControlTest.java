@@ -30,6 +30,7 @@ import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.auth.BasicAuthUtils;
@@ -73,6 +74,7 @@ public class AccessControlTest {
     // Mock the server instance
     ServerInstance serverInstance = mock(ServerInstance.class);
     when(serverInstance.getServerMetrics()).thenReturn(mock(ServerMetrics.class));
+    when(serverInstance.getHelixManager()).thenReturn(mock(HelixManager.class));
 
     PinotConfiguration serverConf = new PinotConfiguration();
     String hostname = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,

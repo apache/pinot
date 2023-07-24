@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -72,12 +71,11 @@ public class LiteralTransformFunctionTest {
     RoaringBitmap expectedBitmap = new RoaringBitmap();
     expectedBitmap.add(0L, NUM_DOCS);
     Assert.assertEquals(bitmap, expectedBitmap);
-    Pair<int[], RoaringBitmap> intResult = nullLiteral.transformToIntValuesSVWithNull(_projectionBlock);
-    int[] intValues = intResult.getLeft();
+    int[] intValues = nullLiteral.transformToIntValuesSV(_projectionBlock);
     Assert.assertEquals(intValues.length, NUM_DOCS);
     for (int i = 0; i < NUM_DOCS; i++) {
       Assert.assertEquals(intValues[i], 0);
     }
-    Assert.assertEquals(intResult.getRight(), expectedBitmap);
+    Assert.assertEquals(nullLiteral.getNullBitmap(_projectionBlock), expectedBitmap);
   }
 }

@@ -81,9 +81,9 @@ public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
         // Log every minute or 100k events
         if (now - _lastLogTime > 60000 || _currentCount - _lastCount >= 100000) {
           if (_lastCount == 0) {
-            _logger.info("Consumed {} events from kafka stream {}", _currentCount, _streamConfig.getTopicName());
+            _logger.info("Consumed {} events from pulsar stream {}", _currentCount, _streamConfig.getTopicName());
           } else {
-            _logger.info("Consumed {} events from kafka stream {} (rate:{}/s)", _currentCount - _lastCount,
+            _logger.info("Consumed {} events from pulsar stream {} (rate:{}/s)", _currentCount - _lastCount,
                 _streamConfig.getTopicName(), (float) (_currentCount - _lastCount) * 1000 / (now - _lastLogTime));
           }
           _lastCount = _currentCount;

@@ -31,7 +31,17 @@ public interface MutableTextIndex extends TextIndexReader, MutableIndex {
 
   @Override
   default void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
-    throw new UnsupportedOperationException("Mutable text indexes are not supported for multi-valued columns");
+    if (values instanceof String[]) {
+      add((String[]) values);
+      return;
+    }
+
+    int length = values.length;
+    String[] strings = new String[length];
+    for (int i = 0; i < length; i++) {
+      strings[i] = (String) values[i];
+    }
+    add(strings);
   }
 
   /**
@@ -39,4 +49,10 @@ public interface MutableTextIndex extends TextIndexReader, MutableIndex {
    * @param document the document as a string
    */
   void add(String document);
+
+  /**
+   * Index the multi-value document
+   * @param documents the documents as an array of strings
+   */
+  void add(String[] documents);
 }

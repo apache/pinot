@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.datablock;
 
-import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -27,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTableImplV3;
 import org.apache.pinot.common.datatable.DataTableUtils;
@@ -387,7 +387,10 @@ public abstract class BaseDataBlock implements DataBlock {
    */
   protected byte[] serializeStringDictionary()
       throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    if (_stringDictionary.length == 0) {
+      return new byte[4];
+    }
+    UnsynchronizedByteArrayOutputStream byteArrayOutputStream = new UnsynchronizedByteArrayOutputStream(1024);
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
     dataOutputStream.writeInt(_stringDictionary.length);
@@ -433,7 +436,7 @@ public abstract class BaseDataBlock implements DataBlock {
       throws IOException {
     ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
 
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    UnsynchronizedByteArrayOutputStream byteArrayOutputStream = new UnsynchronizedByteArrayOutputStream(8192);
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     writeLeadingSections(dataOutputStream);
 
@@ -533,7 +536,10 @@ public abstract class BaseDataBlock implements DataBlock {
 
   private byte[] serializeExceptions()
       throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    if (_errCodeToExceptionMap.isEmpty()) {
+      return new byte[4];
+    }
+    UnsynchronizedByteArrayOutputStream byteArrayOutputStream = new UnsynchronizedByteArrayOutputStream(1024);
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
     dataOutputStream.writeInt(_errCodeToExceptionMap.size());
