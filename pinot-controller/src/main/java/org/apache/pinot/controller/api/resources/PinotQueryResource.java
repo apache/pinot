@@ -401,8 +401,10 @@ public class PinotQueryResource {
       if (responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
         throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
       } else if (responseCode != HttpURLConnection.HTTP_OK) {
-        throw new IOException("Failed : HTTP error code : " + responseCode + ". Root Cause: "
-            + IOUtils.toString(conn.getErrorStream(), StandardCharsets.UTF_8));
+        InputStream errorStream = conn.getErrorStream();
+        throw new IOException(
+            "Failed : HTTP error code : " + responseCode + ". Root Cause: " + (errorStream != null ? IOUtils.toString(
+                errorStream, StandardCharsets.UTF_8) : "Unknown"));
       }
       final byte[] bytes = drain(new BufferedInputStream(conn.getInputStream()));
 
