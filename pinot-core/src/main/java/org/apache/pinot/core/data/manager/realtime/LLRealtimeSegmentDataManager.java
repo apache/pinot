@@ -234,7 +234,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final ServerMetrics _serverMetrics;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final BooleanSupplier _isReadyToConsumeData;
-  private final MutableSegmentImpl _realtimeSegment;
+  private MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
@@ -293,8 +293,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _rateLimiter;
 
-  private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
+  private StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
+
+  private RealtimeSegmentConfig.Builder _realtimeSegmentConfigBuilder;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -650,6 +652,24 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   public class PartitionConsumer implements Runnable {
+
+    @VisibleForTesting
+    void init() {
+      // create stream consumer and partition metadata provider
+      makeStreamConsumer("Starting");
+      createPartitionMetadataProvider("Starting");
+
+      // set latest stream offset at startup time
+      _latestStreamOffsetAtStartupTime = fetchLatestStreamOffset(5000);
+
+      // adjust partition count in partitioning config based on the actual number of stream partitions
+      SegmentPartitionConfig partitionConfig = _tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+      setPartitionParameters(_realtimeSegmentConfigBuilder, partitionConfig);
+
+      // create mutable segment
+      _realtimeSegment = new MutableSegmentImpl(_realtimeSegmentConfigBuilder.build(), _serverMetrics);
+    }
+
     public void run() {
       long initialConsumptionEnd = 0L;
       long lastCatchUpStart = 0L;
@@ -679,6 +699,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
         }
 
+        init();
         while (!_state.isFinal()) {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
@@ -789,6 +810,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _realtimeTableDataManager
             .addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
+
+        // At this point, we are done consuming from the stream using this consuming segment.
+        // We need to close the stream consumer and release the consumer semaphore.
+        closeStreamConsumers();
         return;
       }
 
@@ -1412,18 +1437,24 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
-    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder(indexLoadingConfig).setTableNameWithType(_tableNameWithType)
+    _realtimeSegmentConfigBuilder =
+        new RealtimeSegmentConfig.Builder(indexLoadingConfig)
+            .setTableNameWithType(_tableNameWithType)
             .setSegmentName(_segmentNameStr)
-            .setStreamName(streamTopic).setSchema(_schema).setTimeColumnName(timeColumnName)
-            .setCapacity(_segmentMaxRowCount).setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
+            .setStreamName(streamTopic)
+            .setSchema(_schema)
+            .setTimeColumnName(timeColumnName)
+            .setCapacity(_segmentMaxRowCount)
+            .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setSegmentZKMetadata(segmentZKMetadata)
-            .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
+            .setOffHeap(_isOffHeap)
+            .setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics())
             .setIngestionAggregationConfigs(IngestionConfigUtils.getAggregationConfigs(tableConfig))
             .setNullHandlingEnabled(_nullHandlingEnabled)
-            .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
+            .setConsumerDir(consumerDir)
+            .setUpsertMode(tableConfig.getUpsertMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setUpsertComparisonColumns(tableConfig.getUpsertComparisonColumns())
@@ -1455,16 +1486,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     try {
       _startOffset = _partitionGroupConsumptionStatus.getStartOffset();
       _currentOffset = _streamPartitionMsgOffsetFactory.create(_startOffset);
-      makeStreamConsumer("Starting");
-      createPartitionMetadataProvider("Starting");
-      setPartitionParameters(realtimeSegmentConfigBuilder, indexingConfig.getSegmentPartitionConfig());
-      _realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), serverMetrics);
       _resourceTmpDir = new File(resourceDataDir, RESOURCE_TEMP_DIR_NAME);
       if (!_resourceTmpDir.exists()) {
         _resourceTmpDir.mkdirs();
       }
       _state = State.INITIAL_CONSUMING;
-      _latestStreamOffsetAtStartupTime = fetchLatestStreamOffset(5000);
       _consumeStartTime = now();
       setConsumeEndTime(segmentZKMetadata, _consumeStartTime);
       _segmentCommitterFactory =

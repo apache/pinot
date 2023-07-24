@@ -169,6 +169,7 @@ public class LLRealtimeSegmentDataManagerTest {
       throws Exception {
     final String offset = "34";
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    segmentDataManager.createPartitionConsumer().init();
     {
       //  Controller sends catchup response with both offset and streamPartitionMsgOffset
       String responseStr =
@@ -267,6 +268,7 @@ public class LLRealtimeSegmentDataManagerTest {
   public void testSegmentBuildException()
       throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    segmentDataManager.createPartitionConsumer().init();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     // We should consume initially...
@@ -526,6 +528,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.COMMITTED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -536,6 +539,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.RETAINED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -546,6 +550,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.DISCARDED);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -556,6 +561,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.ERROR);
       segmentDataManager.goOnlineFromConsuming(metadata);
@@ -567,6 +573,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // If holding, but we have overshot the expected final offset, the download and replace
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.HOLDING);
       segmentDataManager.setCurrentOffset(finalOffsetValue + 1);
@@ -579,6 +586,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // If catching up, but we have overshot the expected final offset, the download and replace
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager.setCurrentOffset(finalOffsetValue + 1);
@@ -591,6 +599,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // If catching up, but we did not get to the final offset, then download and replace
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(new LongMsgOffset(finalOffsetValue - 1));
@@ -603,6 +612,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // But then if we get to the exact offset, we get to build and replace, not download
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._stopWaitTimeMs = 0;
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(finalOffset);
@@ -619,6 +629,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // test reaching max row limit
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       segmentDataManager.setNumRowsIndexed(Fixtures.MAX_ROWS_IN_SEGMENT - 1);
@@ -631,6 +642,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // test reaching max time limit
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       // We should still get false because there is no messages fetched
@@ -646,6 +658,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // In catching up state, test reaching final offset
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
       final long finalOffset = START_OFFSET_VALUE + 100;
       segmentDataManager.setFinalOffset(finalOffset);
@@ -658,6 +671,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // In catching up state, test reaching final offset ignoring time
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._timeSupplier.add(Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS);
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
       final long finalOffset = START_OFFSET_VALUE + 100;
@@ -672,6 +686,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // Case 1. We have reached final offset.
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._timeSupplier.add(1);
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CONSUMING_TO_ONLINE);
       segmentDataManager.setConsumeEndTime(segmentDataManager._timeSupplier.get() + 10);
@@ -686,6 +701,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // Case 2. We have reached time limit.
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager.createPartitionConsumer().init();
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CONSUMING_TO_ONLINE);
       final long endTime = segmentDataManager._timeSupplier.get() + 10;
       segmentDataManager.setConsumeEndTime(endTime);
@@ -712,6 +728,7 @@ public class LLRealtimeSegmentDataManagerTest {
   public void testReuseOfBuiltSegment()
       throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    segmentDataManager.createPartitionConsumer().init();
 
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
     params.withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -749,6 +766,7 @@ public class LLRealtimeSegmentDataManagerTest {
   public void testFileRemovedDuringOnlineTransition()
       throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    segmentDataManager.createPartitionConsumer().init();
 
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
     params.withStatus(SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
@@ -782,17 +800,20 @@ public class LLRealtimeSegmentDataManagerTest {
       throws Exception {
     long timeout = 10_000L;
     FakeLLRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
+    firstSegmentDataManager.createPartitionConsumer().init();
     Assert.assertTrue(firstSegmentDataManager.getAcquiredConsumerSemaphore().get());
     Semaphore firstSemaphore = firstSegmentDataManager.getPartitionGroupConsumerSemaphore();
     Assert.assertEquals(firstSemaphore.availablePermits(), 0);
     Assert.assertFalse(firstSemaphore.hasQueuedThreads());
 
-    AtomicReference<FakeLLRealtimeSegmentDataManager> secondSegmentDataManager = new AtomicReference<>(null);
+    AtomicReference<FakeLLRealtimeSegmentDataManager> secondSegmentDataManagerRef = new AtomicReference<>(null);
 
     // Construct the second segment manager, which will be blocked on the semaphore.
     Thread constructSecondSegmentManager = new Thread(() -> {
       try {
-        secondSegmentDataManager.set(createFakeSegmentManager());
+        FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+        segmentDataManager.createPartitionConsumer().init();
+        secondSegmentDataManagerRef.set(segmentDataManager);
       } catch (Exception e) {
         throw new RuntimeException("Exception when sleeping for " + timeout + "ms", e);
       }
@@ -811,11 +832,11 @@ public class LLRealtimeSegmentDataManagerTest {
     }, timeout, "Failed to wait for the second segment blocked on semaphore");
 
     // Wait for the second segment manager finished the construction.
-    TestUtils.waitForCondition(aVoid -> secondSegmentDataManager.get() != null, timeout,
+    TestUtils.waitForCondition(aVoid -> secondSegmentDataManagerRef.get() != null, timeout,
         "Failed to acquire the semaphore for the second segment manager in " + timeout + "ms");
 
-    Assert.assertTrue(secondSegmentDataManager.get().getAcquiredConsumerSemaphore().get());
-    Semaphore secondSemaphore = secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore();
+    Assert.assertTrue(secondSegmentDataManagerRef.get().getAcquiredConsumerSemaphore().get());
+    Semaphore secondSemaphore = secondSegmentDataManagerRef.get().getPartitionGroupConsumerSemaphore();
     Assert.assertEquals(firstSemaphore, secondSemaphore);
     Assert.assertEquals(secondSemaphore.availablePermits(), 0);
     Assert.assertFalse(secondSemaphore.hasQueuedThreads());
@@ -825,8 +846,8 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertEquals(firstSegmentDataManager.getPartitionGroupConsumerSemaphore().availablePermits(), 0);
 
     // The permit finally gets released in the Semaphore.
-    secondSegmentDataManager.get().destroy();
-    Assert.assertEquals(secondSegmentDataManager.get().getPartitionGroupConsumerSemaphore().availablePermits(), 1);
+    secondSegmentDataManagerRef.get().destroy();
+    Assert.assertEquals(secondSegmentDataManagerRef.get().getPartitionGroupConsumerSemaphore().availablePermits(), 1);
   }
 
   @Test
