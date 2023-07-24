@@ -34,6 +34,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -120,6 +121,9 @@ public class BrokerReduceService extends BaseReduceService {
     } else {
       queryContext = QueryContextConverterUtils.getQueryContext(brokerRequest.getPinotQuery());
       GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
+      if (gapfillType == null) {
+        throw new BadQueryRequestException("Nested query is not supported without gapfill");
+      }
       BaseGapfillProcessor gapfillProcessor =
           GapfillProcessorFactory.getGapfillProcessor(queryContext, gapfillType);
       gapfillProcessor.process(brokerResponseNative);
