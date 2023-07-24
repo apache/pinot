@@ -82,12 +82,8 @@ public class TypeSystem extends RelDataTypeSystemImpl {
       case BIGINT:
         return typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.BIGINT),
             argumentType.isNullable());
-      case FLOAT:
-      case DOUBLE:
-        return typeFactory.createTypeWithNullability(typeFactory.createSqlType(SqlTypeName.DOUBLE),
-            argumentType.isNullable());
       default:
-        return super.deriveSumType(typeFactory, argumentType);
+        return argumentType;
     }
   }
 }

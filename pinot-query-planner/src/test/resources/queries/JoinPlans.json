@@ -339,7 +339,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalTableScan(table=[[a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[$2], col10=[CAST($0):VARCHAR], col20=[CAST($1):VARCHAR], EXPR$05=[CAST($2):DECIMAL(1000, 1)])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[$2], col10=[CAST($0):VARCHAR], col20=[CAST($1):VARCHAR], EXPR$05=[CAST($2):DECIMAL(12, 1)])",
           "\n        LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n            LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
@@ -358,7 +358,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalTableScan(table=[[a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CAST(/(CAST($2):DECIMAL(12, 1) NOT NULL, $3)):DECIMAL(12, 1) NOT NULL], col10=[CAST($0):VARCHAR], col20=[CAST($1):VARCHAR], EXPR$05=[CAST(CAST(/(CAST($2):DECIMAL(12, 1) NOT NULL, $3)):DECIMAL(12, 1) NOT NULL):DECIMAL(12, 1)])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CAST(/($2, $3)):DECIMAL(12, 1) NOT NULL], col10=[CAST($0):VARCHAR], col20=[CAST($1):VARCHAR], EXPR$05=[CAST(CAST(/($2, $3)):DECIMAL(12, 1) NOT NULL):DECIMAL(12, 1)])",
           "\n        LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT($3)])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n            LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
@@ -410,6 +410,15 @@
       {
         "description": "Incorrect table",
         "sql": "EXPLAIN PLAN FOR SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3",
+        "expectedException": "Error explain query plan for.*"
+      }
+    ]
+  },
+  "failed_to_decorrelate_due_to_type_mismatch": {
+    "queries": [
+      {
+        "description": "Decorrelation failed due to DECIMAL type mismatch",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 FROM a WHERE a.col4 > (SELECT 0.5 * SUM(b.col3) FROM b WHERE b.col1 = a.col1)",
         "expectedException": "Error explain query plan for.*"
       }
     ]

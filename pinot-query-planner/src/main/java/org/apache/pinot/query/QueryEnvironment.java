@@ -287,7 +287,12 @@ public class QueryEnvironment {
 
   private RelRoot decorrelateIfNeeded(RelRoot relRoot) {
     if (hasCorrelateNode(relRoot.rel)) {
-      relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, RelBuilder.create(_config)));
+      try {
+        relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, RelBuilder.create(_config)));
+      } catch (Throwable e) {
+        throw new UnsupportedOperationException(
+            "Failed to de-correlate the given query to a valid execution plan: " + RelOptUtil.toString(relRoot.rel), e);
+      }
     }
     return relRoot;
   }
