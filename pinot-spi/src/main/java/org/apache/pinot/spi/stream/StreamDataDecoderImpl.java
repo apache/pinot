@@ -53,7 +53,7 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
         if (metadata != null) {
           if (metadata.getHeaders() != null) {
             metadata.getHeaders().getFieldToValueMap()
-                    .forEach((key, value) -> row.putValue(HEADER_KEY_PREFIX + key, value));
+                .forEach((key, value) -> row.putValue(HEADER_KEY_PREFIX + key, value));
           }
           metadata.getRecordMetadata()
                   .forEach((key, value) -> row.putValue(METADATA_KEY_PREFIX + key, value));
