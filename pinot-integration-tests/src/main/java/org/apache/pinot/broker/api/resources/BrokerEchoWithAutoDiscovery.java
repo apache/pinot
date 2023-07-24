@@ -27,9 +27,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.core.api.AutoLoadedServiceForTest;
-import org.apache.pinot.core.auth.Actions;
-import org.apache.pinot.core.auth.Authorize;
-import org.apache.pinot.core.auth.TargetType;
 
 
 /**
