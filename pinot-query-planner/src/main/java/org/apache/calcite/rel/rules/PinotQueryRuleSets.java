@@ -60,8 +60,6 @@ public class PinotQueryRuleSets {
           CoreRules.PROJECT_MERGE,
           // remove identity project
           CoreRules.PROJECT_REMOVE,
-          // reorder sort and projection
-          CoreRules.SORT_PROJECT_TRANSPOSE,
 
           // convert OVER aggregate to logical WINDOW
           CoreRules.PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW,
