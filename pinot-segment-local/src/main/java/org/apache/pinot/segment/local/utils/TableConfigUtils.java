@@ -611,6 +611,35 @@ public final class TableConfigUtils {
       }
     }
     validateAggregateMetricsForUpsertConfig(tableConfig);
+    validateTTLForUpsertConfig(tableConfig, schema);
+  }
+
+  /**
+   * Validates the upsert config related to TTL.
+   */
+  @VisibleForTesting
+  static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig == null || upsertConfig.getMetadataTTL() == 0) {
+      return;
+    }
+
+    List<String> comparisonColumns = upsertConfig.getComparisonColumns();
+    if (CollectionUtils.isNotEmpty(comparisonColumns)) {
+      Preconditions.checkState(comparisonColumns.size() == 1,
+          "Upsert TTL does not work with multiple comparison columns");
+      String comparisonColumn = comparisonColumns.get(0);
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "Upsert TTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
+    }
+
+    Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
+
+    // TODO: Support deletion for TTL. Need to construct queryableDocIds when adding segments out of TTL.
+    Preconditions.checkState(upsertConfig.getDeleteRecordColumn() == null,
+        "Upsert TTL doesn't work with record deletion");
   }
 
   /**
