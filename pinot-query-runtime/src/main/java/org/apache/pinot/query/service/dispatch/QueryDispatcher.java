@@ -47,7 +47,7 @@ import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
-import org.apache.pinot.query.planner.ExplainPlanPlanVisitor;
+import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -100,7 +100,8 @@ public class QueryDispatcher {
           traceEnabled);
     } catch (Exception e) {
       cancel(requestId, dispatchableSubPlan);
-      throw new RuntimeException("Error executing query: " + ExplainPlanPlanVisitor.explain(dispatchableSubPlan), e);
+      throw new RuntimeException("Error executing query: "
+          + PhysicalExplainPlanVisitor.explain(dispatchableSubPlan), e);
     }
   }
 

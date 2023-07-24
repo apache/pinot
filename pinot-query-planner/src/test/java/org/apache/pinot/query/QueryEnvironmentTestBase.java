@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -40,6 +41,8 @@ import org.testng.annotations.DataProvider;
 
 
 public class QueryEnvironmentTestBase {
+
+  protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
       ImmutableMap.of("a_REALTIME", ImmutableList.of("a1", "a2"), "b_REALTIME", ImmutableList.of("b1"), "c_OFFLINE",
           ImmutableList.of("c1"), "d_OFFLINE", ImmutableList.of("d1"));
