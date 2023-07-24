@@ -101,6 +101,11 @@ public class DictionaryIndexType
   }
 
   @Override
+  public boolean hasSpecialLifecycle() {
+    return true;
+  }
+
+  @Override
   public Map<String, DictionaryIndexConfig> fromIndexLoadingConfig(
       IndexLoadingConfig indexLoadingConfig) {
     Map<String, DictionaryIndexConfig> result = new HashMap<>();

@@ -192,7 +192,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
           Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
       for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
-        if (hasSpecialLifecycle(index)) {
+        if (index.hasSpecialLifecycle()) {
           continue;
         }
         tryCreateIndexCreator(creatorsByIndex, index, context, config);
@@ -238,14 +238,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       builder.undeclare(StandardIndexes.inverted());
     }
     return builder.build();
-  }
-
-  /**
-   * Returns true if the given index type has their own construction lifecycle and therefore should not be instantiated
-   * in the general index loop and shouldn't be notified of each new column.
-   */
-  private boolean hasSpecialLifecycle(IndexType<?, ?, ?> indexType) {
-    return indexType == StandardIndexes.nullValueVector() || indexType == StandardIndexes.dictionary();
   }
 
   /**

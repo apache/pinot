@@ -79,6 +79,15 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
   IC createIndexCreator(IndexCreationContext context, C indexConfig)
       throws Exception;
 
+
+  /**
+   * Returns true if the given index type has their own construction lifecycle and therefore should not be instantiated
+   * in the general index loop and shouldn't be notified of each new column.
+   */
+  default boolean hasSpecialLifecycle() {
+    return false;
+  }
+
   /**
    * Returns the {@link IndexReaderFactory} that should be used to return readers for this type.
    */

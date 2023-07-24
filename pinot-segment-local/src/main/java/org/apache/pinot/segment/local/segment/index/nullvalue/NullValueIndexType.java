@@ -71,6 +71,11 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   }
 
   @Override
+  public boolean hasSpecialLifecycle() {
+    return true;
+  }
+
+  @Override
   public String getPrettyName() {
     return INDEX_DISPLAY_NAME;
   }
