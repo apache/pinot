@@ -145,6 +145,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws Exception {
     String query;
     String h2Query;
+
     query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
     query = "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND "
@@ -251,6 +252,33 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT DistanceGroup FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
         + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
     h2Query = "SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
+    testQuery(query, h2Query);
+
+    // DateTimeConverter
+    query = "SELECT dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS'), COUNT(*) FROM mytable "
+        + "GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS') "
+        + "ORDER BY COUNT(*), dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS') DESC";
+    h2Query = "SELECT DaysSinceEpoch * 24, COUNT(*) FROM mytable "
+        + "GROUP BY DaysSinceEpoch * 24 "
+        + "ORDER BY COUNT(*), DaysSinceEpoch DESC";
+    testQuery(query, h2Query);
+
+    // TimeConvert
+    query = "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS'), COUNT(*) FROM mytable "
+        + "GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS') "
+        + "ORDER BY COUNT(*), timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC";
+    h2Query = "SELECT DaysSinceEpoch * 86400, COUNT(*) FROM mytable "
+        + "GROUP BY DaysSinceEpoch * 86400"
+        + "ORDER BY COUNT(*), DaysSinceEpoch * 86400 DESC";
+    testQuery(query, h2Query);
+
+    // test arithmetic operations on date time columns
+    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable "
+        + "GROUP BY sub(DaysSinceEpoch,25) "
+        + "ORDER BY COUNT(*),sub(DaysSinceEpoch,25) DESC";
+    h2Query = "SELECT DaysSinceEpoch - 25, COUNT(*) FROM mytable "
+        + "GROUP BY DaysSinceEpoch "
+        + "ORDER BY COUNT(*), DaysSinceEpoch DESC";
     testQuery(query, h2Query);
   }
 

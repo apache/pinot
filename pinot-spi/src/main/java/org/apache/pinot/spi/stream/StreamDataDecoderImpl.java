@@ -50,10 +50,11 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
           row.putValue(KEY, new String(message.getKey(), StandardCharsets.UTF_8));
         }
         RowMetadata metadata = message.getMetadata();
-        if (metadata != null && metadata.getHeaders() != null) {
-          metadata.getHeaders().getFieldToValueMap()
-              .forEach((key, value) -> row.putValue(HEADER_KEY_PREFIX + key, value));
-
+        if (metadata != null) {
+          if (metadata.getHeaders() != null) {
+            metadata.getHeaders().getFieldToValueMap()
+                    .forEach((key, value) -> row.putValue(HEADER_KEY_PREFIX + key, value));
+          }
           metadata.getRecordMetadata()
                   .forEach((key, value) -> row.putValue(METADATA_KEY_PREFIX + key, value));
         }

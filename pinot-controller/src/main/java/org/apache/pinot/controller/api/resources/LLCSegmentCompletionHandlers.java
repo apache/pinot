@@ -459,8 +459,10 @@ public class LLCSegmentCompletionHandlers {
           "Invalid multi-part for segment: %s", segmentName);
       FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
 
-      File localTempFile = new File(ControllerFilePathProvider.getInstance().getFileUploadTempDir(),
-          getTempSegmentFileName(segmentName));
+      File localTempFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
+          ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName),
+          "Invalid segment name: %s", segmentName);
+
       try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
         Files.copy(inputStream, localTempFile.toPath());
       } catch (Exception e) {
@@ -479,8 +481,10 @@ public class LLCSegmentCompletionHandlers {
    */
   private static SegmentMetadataImpl extractMetadataFromLocalSegmentFile(File segmentFile)
       throws Exception {
-    File tempIndexDir =
-        new File(ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), segmentFile.getName());
+    File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
+        ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), segmentFile.getName(),
+        "Invalid segment file: %s", segmentFile);
+
     try {
       FileUtils.forceMkdir(tempIndexDir);
 
@@ -505,8 +509,10 @@ public class LLCSegmentCompletionHandlers {
    */
   private static SegmentMetadataImpl extractSegmentMetadataFromForm(FormDataMultiPart form, String segmentName)
       throws IOException {
-    File tempIndexDir = new File(ControllerFilePathProvider.getInstance().getUntarredFileTempDir(),
-        getTempSegmentFileName(segmentName));
+    File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
+        ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), getTempSegmentFileName(segmentName),
+        "Invalid segment name: %s", segmentName);
+
     try {
       FileUtils.forceMkdir(tempIndexDir);
 
@@ -543,8 +549,10 @@ public class LLCSegmentCompletionHandlers {
    */
   private static SegmentMetadataImpl extractMetadataFromSegmentFileURI(URI segmentFileURI, String segmentName)
       throws Exception {
-    File localTempFile =
-        new File(ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName));
+    File localTempFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
+        ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName),
+        "Invalid segment name: %s", segmentName);
+
     try {
       SegmentFetcherFactory.fetchSegmentToLocal(segmentFileURI, localTempFile);
       return extractMetadataFromLocalSegmentFile(localTempFile);

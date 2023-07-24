@@ -172,7 +172,7 @@ public final class RelToPlanNodeConverter {
     String tableName = node.getTable().getQualifiedName().get(0);
     List<String> columnNames =
         node.getRowType().getFieldList().stream().map(RelDataTypeField::getName).collect(Collectors.toList());
-    return new TableScanNode(currentStageId, toDataSchema(node.getRowType()), tableName, columnNames);
+    return new TableScanNode(currentStageId, toDataSchema(node.getRowType()), node.getHints(), tableName, columnNames);
   }
 
   private static PlanNode convertLogicalJoin(LogicalJoin node, int currentStageId) {
@@ -185,7 +185,7 @@ public final class RelToPlanNodeConverter {
     List<RexExpression> joinClause =
         joinInfo.nonEquiConditions.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     boolean isColocatedJoin =
-        PinotHintStrategyTable.containsHintOption(node.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
+        PinotHintStrategyTable.isHintOptionTrue(node.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
             PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
     return new JoinNode(currentStageId, toDataSchema(node.getRowType()), toDataSchema(node.getLeft().getRowType()),
         toDataSchema(node.getRight().getRowType()), joinType, joinKeys, joinClause, isColocatedJoin);

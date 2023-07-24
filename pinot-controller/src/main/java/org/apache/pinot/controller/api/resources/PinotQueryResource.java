@@ -44,8 +44,10 @@ import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.io.IOUtils;
@@ -117,6 +119,9 @@ public class PinotQueryResource {
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing post request {}", pe.getMessage());
       return pe.getMessage();
+    } catch (WebApplicationException wae) {
+      LOGGER.error("Caught exception while processing post request", wae);
+      throw wae;
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -134,6 +139,9 @@ public class PinotQueryResource {
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
       return pe.getMessage();
+    } catch (WebApplicationException wae) {
+      LOGGER.error("Caught exception while processing get request", wae);
+      throw wae;
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
@@ -188,7 +196,7 @@ public class PinotQueryResource {
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
     AccessControl accessControl = _accessControlFactory.create();
     if (!accessControl.hasAccess(null, AccessType.READ, httpHeaders, endpointUrl)) {
-      return QueryException.ACCESS_DENIED_ERROR.toString();
+      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
     QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
@@ -391,7 +399,9 @@ public class PinotQueryResource {
       /*if (LOG.isInfoEnabled()){
         LOGGER.info("The http response code is " + responseCode);
       }*/
-      if (responseCode != HttpURLConnection.HTTP_OK) {
+      if (responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+        throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+      } else if (responseCode != HttpURLConnection.HTTP_OK) {
         throw new IOException("Failed : HTTP error code : " + responseCode + ". Root Cause: "
             + IOUtils.toString(conn.getErrorStream(), StandardCharsets.UTF_8));
       }
