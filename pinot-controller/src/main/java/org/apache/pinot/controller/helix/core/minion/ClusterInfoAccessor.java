@@ -102,16 +102,6 @@ public class ClusterInfoAccessor {
   }
 
   /**
-   * Get all server to segment mappings for the given table.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @return Map where the key is the server and the value is a List of segments
-   */
-  public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
-    return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
-  }
-
-  /**
    * Get shared executor
    */
   public Executor getExecutor() {
