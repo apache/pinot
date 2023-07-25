@@ -61,7 +61,8 @@ public enum AggregationFunctionType {
       ReturnTypes.explicit(SqlTypeName.DOUBLE)),
   SUM0("$sum0", null, SqlKind.SUM0, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC,
       ReturnTypes.AGG_SUM_EMPTY_IS_ZERO, ReturnTypes.explicit(SqlTypeName.DOUBLE)),
-  SUMPRECISION("sumPrecision"),
+  SUMPRECISION("sumPrecision", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.ANY, ReturnTypes.explicit(SqlTypeName.DECIMAL), ReturnTypes.explicit(SqlTypeName.OTHER)),
   AVG("avg"),
   MODE("mode"),
 
