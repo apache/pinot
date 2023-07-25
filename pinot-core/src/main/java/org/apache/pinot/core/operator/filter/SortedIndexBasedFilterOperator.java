@@ -39,12 +39,12 @@ public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
 
   private final PredicateEvaluator _predicateEvaluator;
   private final SortedIndexReader<?> _sortedIndexReader;
-  private final int _numDocs;
 
-  SortedIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  SortedIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+      boolean nullHandlingEnabled) {
+    super(numDocs, nullHandlingEnabled);
     _predicateEvaluator = predicateEvaluator;
     _sortedIndexReader = (SortedIndexReader<?>) dataSource.getInvertedIndex();
-    _numDocs = numDocs;
   }
 
   @Override

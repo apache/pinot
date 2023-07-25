@@ -43,13 +43,12 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public class ExpressionFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_EXPRESSION";
 
-  private final int _numDocs;
   private final Map<String, DataSource> _dataSourceMap;
   private final TransformFunction _transformFunction;
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
-    _numDocs = numDocs;
+    super(numDocs, queryContext.isNullHandlingEnabled());
 
     Set<String> columns = new HashSet<>();
     ExpressionContext lhs = predicate.getLhs();

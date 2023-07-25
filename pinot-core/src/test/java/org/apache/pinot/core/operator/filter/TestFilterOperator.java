@@ -30,48 +30,24 @@ import org.apache.pinot.segment.spi.Constants;
 public class TestFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_TEST";
 
-  private final int[] _docIds;
+  private final int[] _trueDocIds;
+  private final int[] _nullDocIds;
 
-  public TestFilterOperator(int[] docIds) {
-    _docIds = docIds;
+  public TestFilterOperator(int[] trueDocIds, int[] nullDocIds, int numDocs) {
+    super(numDocs, true);
+    _trueDocIds = trueDocIds;
+    _nullDocIds = nullDocIds;
+  }
+
+  public TestFilterOperator(int[] docIds, int numDocs) {
+    super(numDocs, false);
+    _trueDocIds = docIds;
+    _nullDocIds = new int[0];
   }
 
   @Override
   protected FilterBlock getNextBlock() {
-    return new FilterBlock(new BlockDocIdSet() {
-      @Override
-      public BlockDocIdIterator iterator() {
-        return new BlockDocIdIterator() {
-          private final int _numDocIds = _docIds.length;
-          private int _nextIndex = 0;
-
-          @Override
-          public int next() {
-            if (_nextIndex < _numDocIds) {
-              return _docIds[_nextIndex++];
-            } else {
-              return Constants.EOF;
-            }
-          }
-
-          @Override
-          public int advance(int targetDocId) {
-            while (_nextIndex < _numDocIds) {
-              int docId = _docIds[_nextIndex++];
-              if (docId >= targetDocId) {
-                return docId;
-              }
-            }
-            return Constants.EOF;
-          }
-        };
-      }
-
-      @Override
-      public long getNumEntriesScannedInFilter() {
-        return 0L;
-      }
-    });
+    return new FilterBlock(new TestBlockDocIdSet(_trueDocIds));
   }
 
   @Override
@@ -82,5 +58,51 @@ public class TestFilterOperator extends BaseFilterOperator {
   @Override
   public List<Operator> getChildOperators() {
     return Collections.emptyList();
+  }
+
+  @Override
+  protected BlockDocIdSet getNulls() {
+    return new TestBlockDocIdSet(_nullDocIds);
+  }
+
+  private static class TestBlockDocIdSet implements BlockDocIdSet {
+    private final int[] _docIds;
+
+    public TestBlockDocIdSet(int[] docIds) {
+      _docIds = docIds;
+    }
+
+    @Override
+    public BlockDocIdIterator iterator() {
+      return new BlockDocIdIterator() {
+        private final int _numDocIds = _docIds.length;
+        private int _nextIndex = 0;
+
+        @Override
+        public int next() {
+          if (_nextIndex < _numDocIds) {
+            return _docIds[_nextIndex++];
+          } else {
+            return Constants.EOF;
+          }
+        }
+
+        @Override
+        public int advance(int targetDocId) {
+          while (_nextIndex < _numDocIds) {
+            int docId = _docIds[_nextIndex++];
+            if (docId >= targetDocId) {
+              return docId;
+            }
+          }
+          return Constants.EOF;
+        }
+      };
+    }
+
+    @Override
+    public long getNumEntriesScannedInFilter() {
+      return 0L;
+    }
   }
 }

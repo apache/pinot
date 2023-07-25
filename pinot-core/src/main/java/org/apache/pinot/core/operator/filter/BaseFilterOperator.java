@@ -18,14 +18,34 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Arrays;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
+import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
+import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 
 
 /**
  * The {@link BaseFilterOperator} class is the base class for all filter operators.
  */
 public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
+  protected final int _numDocs;
+  protected boolean _nullHandlingEnabled;
+
+  /**
+   * The constructor for filter operators that cannot apply AND/OR/NOT operations and {@link EmptyFilterOperator}.
+   */
+  public BaseFilterOperator() {
+    _numDocs = -1;
+  }
+
+  public BaseFilterOperator(int numDocs, boolean nullHandlingEnabled) {
+    _numDocs = numDocs;
+    _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
 
   /**
    * Returns {@code true} if the result is always empty, {@code false} otherwise.
@@ -67,5 +87,24 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
    */
   public BitmapCollection getBitmaps() {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * @return document IDs in which the predicate evaluates to NULL.
+   */
+  protected BlockDocIdSet getNulls() {
+    return EmptyDocIdSet.getInstance();
+  }
+
+  /**
+   * @return document IDs in which the predicate evaluates to false.
+   */
+  protected BlockDocIdSet getFalses() {
+    if (_nullHandlingEnabled) {
+      return new NotDocIdSet(new OrDocIdSet(Arrays.asList(getNextBlock().getBlockDocIdSet(), getNulls()), _numDocs),
+          _numDocs);
+    } else {
+      return new NotDocIdSet(getNextBlock().getBlockDocIdSet(), _numDocs);
+    }
   }
 }

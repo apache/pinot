@@ -223,7 +223,7 @@ public class RawIndexBenchmark {
    * @return Time take in millis for the lookups
    */
   private long profileLookups(IndexSegment segment, String column, int[] docIds) {
-    BaseFilterOperator filterOperator = new TestFilterOperator(docIds);
+    BaseFilterOperator filterOperator = new TestFilterOperator(docIds, -1);
     DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     ProjectionOperator projectionOperator = new ProjectionOperator(buildDataSourceMap(segment), docIdSetOperator);
 

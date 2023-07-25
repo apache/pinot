@@ -41,16 +41,16 @@ public class InvertedIndexFilterOperator extends BaseFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
   private final InvertedIndexReader<ImmutableRoaringBitmap> _invertedIndexReader;
   private final boolean _exclusive;
-  private final int _numDocs;
 
-  InvertedIndexFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  InvertedIndexFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+      boolean nullHandlingEnabled) {
+    super(numDocs, nullHandlingEnabled);
     _predicateEvaluator = predicateEvaluator;
     @SuppressWarnings("unchecked")
     InvertedIndexReader<ImmutableRoaringBitmap> invertedIndexReader =
         (InvertedIndexReader<ImmutableRoaringBitmap>) dataSource.getInvertedIndex();
     _invertedIndexReader = invertedIndexReader;
     _exclusive = predicateEvaluator.isExclusive();
-    _numDocs = numDocs;
   }
 
   @Override

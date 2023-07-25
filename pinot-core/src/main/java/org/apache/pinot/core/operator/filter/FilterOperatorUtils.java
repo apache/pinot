@@ -85,29 +85,29 @@ public class FilterOperatorUtils {
       Predicate.Type predicateType = predicateEvaluator.getPredicateType();
       if (predicateType == Predicate.Type.RANGE) {
         if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
-          return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
         }
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
-          return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
         }
         return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
       } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
         if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()) {
-          return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
         }
         if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null) {
-          return new InvertedIndexFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new InvertedIndexFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
         }
         return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
       } else {
         if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
-          return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
         }
         if (dataSource.getInvertedIndex() != null) {
-          return new InvertedIndexFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new InvertedIndexFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
         }
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
-          return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
         }
         return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
       }
@@ -134,7 +134,8 @@ public class FilterOperatorUtils {
       } else {
         // Return the AND filter operator with re-ordered child filter operators
         reorderAndFilterChildOperators(queryContext, childFilterOperators);
-        return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions());
+        return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
+            queryContext.isNullHandlingEnabled());
       }
     }
 
@@ -158,7 +159,8 @@ public class FilterOperatorUtils {
         return childFilterOperators.get(0);
       } else {
         // Return the OR filter operator with child filter operators
-        return new OrFilterOperator(childFilterOperators, numDocs);
+        return new OrFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
+            queryContext.isNullHandlingEnabled());
       }
     }
 
@@ -171,7 +173,7 @@ public class FilterOperatorUtils {
         return new MatchAllFilterOperator(numDocs);
       }
 
-      return new NotFilterOperator(filterOperator, numDocs);
+      return new NotFilterOperator(filterOperator, numDocs, queryContext.isNullHandlingEnabled());
     }
 
 

@@ -52,7 +52,6 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   private final IndexSegment _segment;
   private final QueryContext _queryContext;
   private final Predicate _predicate;
-  private final int _numDocs;
   private final H3IndexReader _h3IndexReader;
   private final long _h3Id;
   private final double _edgeLength;
@@ -60,10 +59,10 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   private final double _upperBound;
 
   public H3IndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
+    super(numDocs, false);
     _segment = segment;
     _queryContext = queryContext;
     _predicate = predicate;
-    _numDocs = numDocs;
 
     // TODO: handle nested geography/geometry conversion functions
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();

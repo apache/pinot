@@ -20,9 +20,13 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
@@ -33,11 +37,13 @@ public class OrFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_OR";
 
   private final List<BaseFilterOperator> _filterOperators;
-  private final int _numDocs;
+  private final Map<String, String> _queryOptions;
 
-  public OrFilterOperator(List<BaseFilterOperator> filterOperators, int numDocs) {
+  public OrFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
+      int numDocs, boolean nullHandlingEnabled) {
+    super(numDocs, nullHandlingEnabled);
     _filterOperators = filterOperators;
-    _numDocs = numDocs;
+    _queryOptions = queryOptions;
   }
 
   @Override
@@ -79,5 +85,23 @@ public class OrFilterOperator extends BaseFilterOperator {
       bitmaps[i] = _filterOperators.get(i).getBitmaps().reduce();
     }
     return BufferFastAggregation.orCardinality(bitmaps);
+  }
+
+  @Override
+  protected BlockDocIdSet getNulls() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  protected BlockDocIdSet getFalses() {
+    List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
+    for (BaseFilterOperator filterOperator : _filterOperators) {
+      if (filterOperator instanceof EmptyFilterOperator) {
+        blockDocIdSets.add(new MatchAllDocIdSet(_numDocs));
+      } else {
+        blockDocIdSets.add(filterOperator.getFalses());
+      }
+    }
+    return new AndDocIdSet(blockDocIdSets, _queryOptions);
   }
 }

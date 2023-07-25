@@ -38,14 +38,13 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_JSON_INDEX";
 
   private final JsonIndexReader _jsonIndex;
-  private final int _numDocs;
   private final JsonMatchPredicate _predicate;
 
   public JsonMatchFilterOperator(JsonIndexReader jsonIndex, JsonMatchPredicate predicate,
       int numDocs) {
+    super(numDocs, false);
     _jsonIndex = jsonIndex;
     _predicate = predicate;
-    _numDocs = numDocs;
   }
 
   @Override

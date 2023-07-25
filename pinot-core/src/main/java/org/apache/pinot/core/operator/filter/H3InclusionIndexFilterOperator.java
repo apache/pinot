@@ -53,17 +53,16 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   private final IndexSegment _segment;
   private final QueryContext _queryContext;
   private final Predicate _predicate;
-  private final int _numDocs;
   private final H3IndexReader _h3IndexReader;
   private final Geometry _geometry;
   private final boolean _isPositiveCheck;
 
   public H3InclusionIndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate,
       int numDocs) {
+    super(numDocs, false);
     _segment = segment;
     _queryContext = queryContext;
     _predicate = predicate;
-    _numDocs = numDocs;
 
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
     EqPredicate eqPredicate = (EqPredicate) predicate;

@@ -53,7 +53,6 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
   private final DataSource _dataSource;
   private final FieldSpec.DataType _parameterType;
-  private final int _numDocs;
 
   static boolean canEvaluate(PredicateEvaluator predicateEvaluator, DataSource dataSource) {
     Predicate.Type type = predicateEvaluator.getPredicateType();
@@ -63,11 +62,12 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   }
 
   @SuppressWarnings("unchecked")
-  public RangeIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  public RangeIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+      boolean nullHandlingEnabled) {
+    super(numDocs, nullHandlingEnabled);
     _predicateEvaluator = predicateEvaluator;
     _rangeIndexReader = (RangeIndexReader<ImmutableRoaringBitmap>) dataSource.getRangeIndex();
     _dataSource = dataSource;
-    _numDocs = numDocs;
     _parameterType = predicateEvaluator.isDictionaryBased() ? FieldSpec.DataType.INT : predicateEvaluator.getDataType();
   }
 

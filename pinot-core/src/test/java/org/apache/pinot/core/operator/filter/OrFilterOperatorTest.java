@@ -34,6 +34,7 @@ public class OrFilterOperatorTest {
 
   @Test
   public void testUnionForTwoLists() {
+    int numDocs = 40;
     int[] docIds1 = new int[]{2, 3, 10, 15, 16, 28};
     int[] docIds2 = new int[]{3, 6, 8, 20, 28};
     TreeSet<Integer> treeSet = new TreeSet<>();
@@ -42,9 +43,9 @@ public class OrFilterOperatorTest {
     Iterator<Integer> expectedIterator = treeSet.iterator();
 
     List<BaseFilterOperator> operators = new ArrayList<>();
-    operators.add(new TestFilterOperator(docIds1));
-    operators.add(new TestFilterOperator(docIds2));
-    OrFilterOperator orOperator = new OrFilterOperator(operators, 40);
+    operators.add(new TestFilterOperator(docIds1, numDocs));
+    operators.add(new TestFilterOperator(docIds2, numDocs));
+    OrFilterOperator orOperator = new OrFilterOperator(operators, null, numDocs, false);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
@@ -55,6 +56,7 @@ public class OrFilterOperatorTest {
 
   @Test
   public void testUnionForThreeLists() {
+    int numDocs = 40;
     int[] docIds1 = new int[]{2, 3, 6, 10, 15, 16, 28};
     int[] docIds2 = new int[]{3, 6, 8, 20, 28};
     int[] docIds3 = new int[]{1, 2, 3, 6, 30};
@@ -65,10 +67,10 @@ public class OrFilterOperatorTest {
     Iterator<Integer> expectedIterator = treeSet.iterator();
 
     List<BaseFilterOperator> operators = new ArrayList<>();
-    operators.add(new TestFilterOperator(docIds1));
-    operators.add(new TestFilterOperator(docIds2));
-    operators.add(new TestFilterOperator(docIds3));
-    OrFilterOperator orOperator = new OrFilterOperator(operators, 40);
+    operators.add(new TestFilterOperator(docIds1, numDocs));
+    operators.add(new TestFilterOperator(docIds2, numDocs));
+    operators.add(new TestFilterOperator(docIds3, numDocs));
+    OrFilterOperator orOperator = new OrFilterOperator(operators, null, numDocs, false);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
@@ -79,6 +81,7 @@ public class OrFilterOperatorTest {
 
   @Test
   public void testComplex() {
+    int numDocs = 40;
     int[] docIds1 = new int[]{2, 3, 6, 10, 15, 16, 28};
     int[] docIds2 = new int[]{3, 6, 8, 20, 28};
     int[] docIds3 = new int[]{1, 2, 3, 6, 30};
@@ -89,19 +92,50 @@ public class OrFilterOperatorTest {
     Iterator<Integer> expectedIterator = treeSet.iterator();
 
     List<BaseFilterOperator> childOperators = new ArrayList<>();
-    childOperators.add(new TestFilterOperator(docIds1));
-    childOperators.add(new TestFilterOperator(docIds2));
-    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators, 40);
+    childOperators.add(new TestFilterOperator(docIds1, numDocs));
+    childOperators.add(new TestFilterOperator(docIds2, numDocs));
+    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators, null, numDocs, false);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childOrOperator);
-    operators.add(new TestFilterOperator(docIds3));
-    OrFilterOperator orOperator = new OrFilterOperator(operators, 40);
+    operators.add(new TestFilterOperator(docIds3, numDocs));
+    OrFilterOperator orOperator = new OrFilterOperator(operators, null, numDocs, false);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
       Assert.assertEquals(docId, expectedIterator.next().intValue());
     }
+  }
+
+  @Test
+  public void testOrWithNull() {
+    int numDocs = 10;
+    int[] docIds1 = new int[]{1, 2, 3};
+    int[] docIds2 = new int[]{0, 1, 2};
+    int[] nullDocIds1 = new int[]{4, 5, 6};
+    int[] nullDocIds2 = new int[]{3, 4, 5, 6, 7};
+
+    OrFilterOperator orFilterOperator = new OrFilterOperator(
+        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
+            new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, true);
+
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getNextBlock().getBlockDocIdSet()), List.of(0, 1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of(8, 9));
+  }
+
+  @Test
+  public void testOrWithNullOneFilterIsEmpty() {
+    int numDocs = 10;
+    int[] docIds1 = new int[]{1, 2, 3};
+    int[] nullDocIds1 = new int[]{4, 5, 6};
+
+    OrFilterOperator orFilterOperator = new OrFilterOperator(
+        Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), EmptyFilterOperator.getInstance()), null,
+        numDocs, true);
+
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getNextBlock().getBlockDocIdSet()),
+        Arrays.asList(1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Arrays.asList(0, 7, 8, 9));
   }
 }

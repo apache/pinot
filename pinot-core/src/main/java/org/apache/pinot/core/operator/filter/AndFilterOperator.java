@@ -21,10 +21,13 @@ package org.apache.pinot.core.operator.filter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -36,13 +39,11 @@ public class AndFilterOperator extends BaseFilterOperator {
   private final List<BaseFilterOperator> _filterOperators;
   private final Map<String, String> _queryOptions;
 
-  public AndFilterOperator(List<BaseFilterOperator> filterOperators, Map<String, String> queryOptions) {
+  public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
+      int numDocs, boolean nullHandlingEnabled) {
+    super(numDocs, nullHandlingEnabled);
     _filterOperators = filterOperators;
     _queryOptions = queryOptions;
-  }
-
-  public AndFilterOperator(List<BaseFilterOperator> filterOperators) {
-    this(filterOperators, null);
   }
 
   @Override
@@ -85,5 +86,23 @@ public class AndFilterOperator extends BaseFilterOperator {
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected BlockDocIdSet getNulls() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  protected BlockDocIdSet getFalses() {
+    List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
+    for (BaseFilterOperator filterOperator : _filterOperators) {
+      if (filterOperator instanceof EmptyFilterOperator) {
+        blockDocIdSets.add(new MatchAllDocIdSet(_numDocs));
+      } else {
+        blockDocIdSets.add(filterOperator.getFalses());
+      }
+    }
+    return new OrDocIdSet(blockDocIdSets, _numDocs);
   }
 }

@@ -31,12 +31,11 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
 
   private final ImmutableRoaringBitmap _docIds;
   private final boolean _exclusive;
-  private final int _numDocs;
 
   public BitmapBasedFilterOperator(ImmutableRoaringBitmap docIds, boolean exclusive, int numDocs) {
+    super(numDocs, false);
     _docIds = docIds;
     _exclusive = exclusive;
-    _numDocs = numDocs;
   }
 
   @Override
