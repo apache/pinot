@@ -96,7 +96,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       LOGGER.info("Start generating task configs for table: {}", tableNameWithType);
 
       Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
-//      Map<String, String> compactionConfigs = getCompactionConfigs(taskConfigs);
       List<SegmentZKMetadata> completedSegments = getCompletedSegments(tableNameWithType, taskConfigs);
 
       if (completedSegments.isEmpty()) {
@@ -257,11 +256,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     }
     return maxTasks;
   }
-
-  private static final String[] VALID_CONFIG_KEYS = {
-      UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
-      UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT
-  };
 
   @VisibleForTesting
   static boolean validate(TableConfig tableConfig) {
