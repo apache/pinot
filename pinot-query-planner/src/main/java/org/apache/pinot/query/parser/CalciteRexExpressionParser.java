@@ -204,11 +204,14 @@ public class CalciteRexExpressionParser {
         functionName = functionKind.name();
         break;
     }
-    // When there is no argument, set an empty list as the operands
     List<RexExpression> childNodes = rexCall.getFunctionOperands();
     List<Expression> operands = new ArrayList<>(childNodes.size());
     for (RexExpression childNode : childNodes) {
       operands.add(toExpression(childNode, pinotQuery));
+    }
+    // for COUNT, add a star (*) identifier to operand list b/c V1 doesn't handle empty operand functions.
+    if (functionKind == SqlKind.COUNT && operands.isEmpty()) {
+      operands.add(RequestUtils.getIdentifierExpression("*"));
     }
     ParserUtils.validateFunction(functionName, operands);
     Expression functionExpression = getFunctionExpression(functionName);
