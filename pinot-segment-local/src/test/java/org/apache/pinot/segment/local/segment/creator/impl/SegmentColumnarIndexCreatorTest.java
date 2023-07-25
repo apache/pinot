@@ -299,8 +299,11 @@ public class SegmentColumnarIndexCreatorTest {
     props = new PropertiesConfiguration();
     byte[] byteMaxValueWithOverflowCondition = new byte[SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3];
     random.nextBytes(byteMinValue);
-    random.nextBytes(byteMaxValue);
-    byteMaxValueWithOverflowCondition[SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT / 2 - 1] = (byte) 127;
+    random.nextBytes(byteMaxValueWithOverflowCondition);
+    for (int i = (SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT / 2 - 4);
+        i < SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT; i++) {
+      byteMaxValueWithOverflowCondition[i] = (byte) 0xFF;
+    }
     String byteMaxValueWithOverflowConditionString = BytesUtils.toHexString(byteMaxValueWithOverflowCondition);
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", byteMinValueString,
         byteMaxValueWithOverflowConditionString, FieldSpec.DataType.BYTES);
@@ -320,9 +323,14 @@ public class SegmentColumnarIndexCreatorTest {
     Assert.assertEquals(columnMaxValue,
           SegmentColumnarIndexCreator.getValidPropertyValue(longMaxValue, true, dataType));
 
-
-    Assert.assertTrue(columnMinValue.compareTo(longMinValue) <= 0);
-    Assert.assertTrue(columnMaxValue.compareTo(longMaxValue) >= 0);
+    if (dataType == FieldSpec.DataType.BYTES || dataType == FieldSpec.DataType.STRING) {
+      Assert.assertTrue(columnMinValue.compareTo(longMinValue) < 0);
+      Assert.assertTrue(columnMaxValue.compareTo(longMaxValue) > 0);
+    } else {
+      // Int, Long, Float & Double will have the same value.
+      Assert.assertTrue(columnMinValue.compareTo(longMinValue) <= 0);
+      Assert.assertTrue(columnMaxValue.compareTo(longMaxValue) >= 0);
+    }
   }
 
   private String getEscapedValidPropertyValue(String input) {
