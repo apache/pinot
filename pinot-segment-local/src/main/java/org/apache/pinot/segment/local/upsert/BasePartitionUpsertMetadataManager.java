@@ -599,6 +599,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
 
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
+        ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _logger.info("Finished taking snapshot for {} immutable segments (out of {} total segments) in {}ms",
         numImmutableSegments, numTrackedSegments, System.currentTimeMillis() - startTimeMs);
   }
