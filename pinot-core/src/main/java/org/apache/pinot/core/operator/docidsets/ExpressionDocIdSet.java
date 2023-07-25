@@ -20,6 +20,8 @@ package org.apache.pinot.core.operator.docidsets;
 
 import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.operator.dociditerators.ExpressionEvaluatesToNullScanDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.ExpressionEvaluatesToTrueWithoutNullHandlingScanDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ExpressionScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
@@ -29,9 +31,26 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public final class ExpressionDocIdSet implements BlockDocIdSet {
   private final ExpressionScanDocIdIterator _docIdIterator;
 
-  public ExpressionDocIdSet(TransformFunction transformFunction, PredicateEvaluator predicateEvaluator,
+  public static ExpressionDocIdSet getExpressionEvaluatesToTrueWithoutNullHandlingDocIdSet(
+      TransformFunction transformFunction, PredicateEvaluator predicateEvaluator, Map<String, DataSource> dataSourceMap,
+      int numDocs) {
+    return new ExpressionDocIdSet(transformFunction, predicateEvaluator, dataSourceMap, numDocs);
+  }
+
+  private ExpressionDocIdSet(TransformFunction transformFunction, PredicateEvaluator predicateEvaluator,
       Map<String, DataSource> dataSourceMap, int numDocs) {
-    _docIdIterator = new ExpressionScanDocIdIterator(transformFunction, predicateEvaluator, dataSourceMap, numDocs);
+    _docIdIterator =
+        new ExpressionEvaluatesToTrueWithoutNullHandlingScanDocIdIterator(transformFunction, predicateEvaluator,
+            dataSourceMap, numDocs);
+  }
+
+  public static ExpressionDocIdSet getExpressionEvaluatesToNullDocIdSet(TransformFunction transformFunction,
+      Map<String, DataSource> dataSourceMap, int numDocs) {
+    return new ExpressionDocIdSet(transformFunction, dataSourceMap, numDocs);
+  }
+
+  private ExpressionDocIdSet(TransformFunction transformFunction, Map<String, DataSource> dataSourceMap, int numDocs) {
+    _docIdIterator = new ExpressionEvaluatesToNullScanDocIdIterator(transformFunction, dataSourceMap, numDocs);
   }
 
   @Override

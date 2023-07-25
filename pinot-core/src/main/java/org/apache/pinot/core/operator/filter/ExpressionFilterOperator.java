@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,10 +28,13 @@ import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
+import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
@@ -43,12 +47,14 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public class ExpressionFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_EXPRESSION";
 
+  private final QueryContext _queryContext;
   private final Map<String, DataSource> _dataSourceMap;
   private final TransformFunction _transformFunction;
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
     super(numDocs, queryContext.isNullHandlingEnabled());
+    _queryContext = queryContext;
 
     Set<String> columns = new HashSet<>();
     ExpressionContext lhs = predicate.getLhs();
@@ -61,7 +67,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       _dataSourceMap.put(column, dataSource);
       columnContextMap.put(column, ColumnContext.fromDataSource(dataSource));
     });
-    _transformFunction = TransformFunctionFactory.get(lhs, columnContextMap, queryContext);
+    _transformFunction = TransformFunctionFactory.get(lhs, columnContextMap, _queryContext);
     _predicateEvaluator =
         PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
             _transformFunction.getResultMetadata().getDataType());
@@ -69,7 +75,21 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
   @Override
   protected FilterBlock getNextBlock() {
-    return new FilterBlock(new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs));
+    if (_nullHandlingEnabled) {
+      return new FilterBlock(new AndDocIdSet(Arrays.asList(predicateEvaluatesToTrueWithoutNullHandling(),
+          new NotDocIdSet(predicateEvaluatesToNull(), _numDocs)), _queryContext.getQueryOptions()));
+    } else {
+      return new FilterBlock(predicateEvaluatesToTrueWithoutNullHandling());
+    }
+  }
+
+  private BlockDocIdSet predicateEvaluatesToTrueWithoutNullHandling() {
+    return ExpressionDocIdSet.getExpressionEvaluatesToTrueWithoutNullHandlingDocIdSet(_transformFunction,
+        _predicateEvaluator, _dataSourceMap, _numDocs);
+  }
+
+  private BlockDocIdSet predicateEvaluatesToNull() {
+    return ExpressionDocIdSet.getExpressionEvaluatesToNullDocIdSet(_transformFunction, _dataSourceMap, _numDocs);
   }
 
   @Override
