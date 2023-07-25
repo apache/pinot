@@ -107,9 +107,10 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     return 10;
   }
 
-  @Test
-  public void testThetaSketchQuery()
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testThetaSketchQueryV1(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     /*
     Original data:
 
@@ -206,7 +207,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       runAndAssert(query, expected);
     }
 
-     // gender = female DIFF course = history
+    // gender = female DIFF course = history
     {
       String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
           + "'dimName = ''gender'' and dimValue = ''Female''', 'dimName = ''course'' and dimValue = ''History''', "
@@ -219,6 +220,138 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
           + "'SET_DIFF(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
     }
+
+    // group by gender
+    {
+      String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
+          + " where dimName = 'gender' group by dimValue";
+      ImmutableMap<String, Integer> expected =
+          ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
+      runAndAssert(query, expected);
+    }
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testThetaSketchQueryV2(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    /*
+    Original data:
+
+    Gender    Course   Shard#1  Shard#2
+    --------  -------  -------  -------
+    Female    Math     50       110
+    Female    History  60       120
+    Female    Biology  70       130
+    Male      Math     80       140
+    Male      History  90       150
+    Male      Biology  100      160
+     */
+
+    // gender = female
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
+          + " where dimName = 'gender' and dimValue = 'Female'";
+      int expected = 50 + 60 + 70 + 110 + 120 + 130;
+      runAndAssert(query, expected);
+
+      /*
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Female''', "
+          + "'$1') from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender''', 'dimValue = ''Female''', 'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+       */
+    }
+
+    // gender = male
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
+          + " where dimName = 'gender' and dimValue = 'Male'";
+      int expected = 80 + 90 + 100 + 140 + 150 + 160;
+      runAndAssert(query, expected);
+
+      /*
+      query =
+          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Male''', '$1') "
+              + "from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender''', 'dimValue = ''Male''', 'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+       */
+    }
+
+    // course = math
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
+          + " where dimName = 'course' AND dimValue = 'Math'";
+      int expected = 50 + 80 + 110 + 140;
+      runAndAssert(query, expected);
+
+      /*
+      query =
+          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''course'' and dimValue = ''Math''', '$1') "
+              + "from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''course''', 'dimValue = ''Math''', 'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+       */
+    }
+
+    /*
+    // gender = female INTERSECT course = math
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender'' and dimValue = ''Female''', 'dimName = ''course'' and dimValue = ''Math''', "
+          + "'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+      int expected = 50 + 110;
+      runAndAssert(query, expected);
+
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''Math''', "
+          + "'SET_INTERSECT($1, $2, $3, $4)') from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''Math''', "
+          + "'SET_INTERSECT(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+
+    // gender = male UNION course = biology
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender'' and dimValue = ''Male''', 'dimName = ''course'' and dimValue = ''Biology''', "
+          + "'SET_UNION($1, $2)') from " + DEFAULT_TABLE_NAME;
+      int expected = 70 + 80 + 90 + 100 + 130 + 140 + 150 + 160;
+      runAndAssert(query, expected);
+
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender''', 'dimValue = ''Male''', 'dimName = ''course''', 'dimValue = ''Biology''', "
+          + "'SET_UNION(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+
+    // gender = female DIFF course = history
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender'' and dimValue = ''Female''', 'dimName = ''course'' and dimValue = ''History''', "
+          + "'SET_DIFF($1, $2)') from " + DEFAULT_TABLE_NAME;
+      int expected = 50 + 110 + 70 + 130;
+      runAndAssert(query, expected);
+
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''History''', "
+          + "'SET_DIFF(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+     */
 
     // group by gender
     {

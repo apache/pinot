@@ -16,23 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
+package org.apache.pinot.controller.api.resources;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.stream.StreamMessage;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import java.util.List;
 
 
-public class KafkaStreamMessage extends StreamMessage<byte[]> {
-  public KafkaStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
-    super(key, value, metadata, value.length);
+@ApiModel
+public class InstanceTagUpdateRequest {
+  @JsonProperty("instanceName")
+  @ApiModelProperty(example = "Server_a.b.com_20000")
+  private String _instanceName;
+  @JsonProperty("newTags")
+  private List<String> _newTags;
+
+  public String getInstanceName() {
+    return _instanceName;
   }
 
-  public long getNextOffset() {
-    if (_metadata != null) {
-      long offset = Long.parseLong(_metadata.getRecordMetadata().get(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY));
-      return offset < 0 ? -1 : offset + 1;
-    }
-    return -1;
+  public void setInstanceName(String instanceName) {
+    _instanceName = instanceName;
+  }
+
+  public List<String> getNewTags() {
+    return _newTags;
+  }
+
+  public void setNewTags(List<String> newTags) {
+    _newTags = newTags;
   }
 }

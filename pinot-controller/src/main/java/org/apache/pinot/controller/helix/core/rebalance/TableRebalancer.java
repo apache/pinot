@@ -60,12 +60,12 @@ import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -202,7 +202,7 @@ public class TableRebalancer {
       currentIdealState = _helixDataAccessor.getProperty(idealStatePropertyKey);
     } catch (Exception e) {
       LOGGER.warn(
-          "For rebalanceId: {}, caught exception while fetching IdealState for table: {}," + " aborting the rebalance",
+          "For rebalanceId: {}, caught exception while fetching IdealState for table: {}, aborting the rebalance",
           rebalanceJobId, tableNameWithType, e);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
           "Caught exception while fetching IdealState: " + e, null, null, null);
@@ -214,20 +214,22 @@ public class TableRebalancer {
           null, null, null);
     }
     if (!currentIdealState.isEnabled() && !downtime) {
-      LOGGER.warn(
-          "For rebalanceId: {}, cannot rebalance disabled table: {} without downtime, aborting the" + " rebalance",
+      LOGGER.warn("For rebalanceId: {}, cannot rebalance disabled table: {} without downtime, aborting the rebalance",
           rebalanceJobId, tableNameWithType);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
           "Cannot rebalance disabled table without downtime", null, null, null);
     }
 
-    LOGGER.info("For rebalanceId: {}, fetching/computing instance partitions, reassigning instances if configured for"
-        + " table: {}", rebalanceJobId, tableNameWithType);
+    LOGGER.info("For rebalanceId: {}, processing instance partitions for table: {}", rebalanceJobId, tableNameWithType);
 
     // Calculate instance partitions map
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap;
+    boolean instancePartitionsUnchanged;
     try {
-      instancePartitionsMap = getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
+      Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> instancePartitionsMapAndUnchanged =
+          getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
+      instancePartitionsMap = instancePartitionsMapAndUnchanged.getLeft();
+      instancePartitionsUnchanged = instancePartitionsMapAndUnchanged.getRight();
     } catch (Exception e) {
       LOGGER.warn("For rebalanceId: {}, caught exception while fetching/calculating instance partitions for table: {}, "
           + "aborting the rebalance", rebalanceJobId, tableNameWithType, e);
@@ -236,9 +238,22 @@ public class TableRebalancer {
     }
 
     // Calculate instance partitions for tiers if configured
-    List<Tier> sortedTiers = getSortedTiers(tableConfig);
-    Map<String, InstancePartitions> tierToInstancePartitionsMap =
-        getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
+    List<Tier> sortedTiers;
+    Map<String, InstancePartitions> tierToInstancePartitionsMap;
+    boolean tierInstancePartitionsUnchanged;
+    try {
+      sortedTiers = getSortedTiers(tableConfig);
+      Pair<Map<String, InstancePartitions>, Boolean> tierToInstancePartitionsMapAndUnchanged =
+          getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
+      tierToInstancePartitionsMap = tierToInstancePartitionsMapAndUnchanged.getLeft();
+      tierInstancePartitionsUnchanged = tierToInstancePartitionsMapAndUnchanged.getRight();
+    } catch (Exception e) {
+      LOGGER.warn(
+          "For rebalanceId: {}, caught exception while fetching/calculating tier instance partitions for table: {}, "
+              + "aborting the rebalance", rebalanceJobId, tableNameWithType, e);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
+          "Caught exception while fetching/calculating tier instance partitions: " + e, null, null, null);
+    }
 
     LOGGER.info("For rebalanceId: {}, calculating the target assignment for table: {}", rebalanceJobId,
         tableNameWithType);
@@ -256,9 +271,17 @@ public class TableRebalancer {
           tierToInstancePartitionsMap, null);
     }
 
-    if (currentAssignment.equals(targetAssignment)) {
+    boolean segmentAssignmentUnchanged = currentAssignment.equals(targetAssignment);
+    LOGGER.info("For rebalanceId: {}, instancePartitionsUnchanged: {}, tierInstancePartitionsUnchanged: {}, "
+            + "segmentAssignmentUnchanged: {} for table: {}", rebalanceJobId, instancePartitionsUnchanged,
+        tierInstancePartitionsUnchanged, segmentAssignmentUnchanged, tableNameWithType);
+
+    if (segmentAssignmentUnchanged) {
       LOGGER.info("Table: {} is already balanced", tableNameWithType);
-      if (reassignInstances) {
+      if (instancePartitionsUnchanged && tierInstancePartitionsUnchanged) {
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
+            instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
+      } else {
         if (dryRun) {
           return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.DONE,
               "Instance reassigned in dry-run mode, table is already balanced", instancePartitionsMap,
@@ -268,9 +291,6 @@ public class TableRebalancer {
               "Instance reassigned, table is already balanced", instancePartitionsMap, tierToInstancePartitionsMap,
               targetAssignment);
         }
-      } else {
-        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
-            instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
       }
     }
 
@@ -302,8 +322,9 @@ public class TableRebalancer {
                 + "reach the target segment assignment yet)", instancePartitionsMap, tierToInstancePartitionsMap,
             targetAssignment);
       } catch (Exception e) {
-        LOGGER.warn("For rebalanceId: {}, caught exception while updating IdealState for table: {},"
-            + " aborting the rebalance", rebalanceJobId, tableNameWithType, e);
+        LOGGER.warn(
+            "For rebalanceId: {}, caught exception while updating IdealState for table: {}, aborting the rebalance",
+            rebalanceJobId, tableNameWithType, e);
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
             "Caught exception while updating IdealState: " + e, instancePartitionsMap, tierToInstancePartitionsMap,
             targetAssignment);
@@ -329,8 +350,8 @@ public class TableRebalancer {
       // For non-negative value, use it as min available replicas
       if (minReplicasToKeepUpForNoDowntime >= numReplicas) {
         String errorMsg = String.format(
-            "For rebalanceId: %s, Illegal config for minReplicasToKeepUpForNoDowntime: %d for table: %s," + " must be"
-                + " less than number of " + "replicas: %d, aborting the rebalance", rebalanceJobId,
+            "For rebalanceId: %s, Illegal config for minReplicasToKeepUpForNoDowntime: %d for table: %s, "
+                + "must be less than number of replicas: %d, aborting the rebalance", rebalanceJobId,
             minReplicasToKeepUpForNoDowntime, tableNameWithType, numReplicas);
         LOGGER.warn(errorMsg);
         _tableRebalanceObserver.onError(errorMsg);
@@ -346,10 +367,9 @@ public class TableRebalancer {
 
     LOGGER.info(
         "For rebalanceId: {}, rebalancing table: {} with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, "
-            + "bestEfforts: {}, "
-            + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}", rebalanceJobId,
-        tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts, externalViewCheckIntervalInMs,
-        externalViewStabilizationTimeoutInMs);
+            + "bestEfforts: {}, externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}",
+        rebalanceJobId, tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts,
+        externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs);
     int expectedVersion = currentIdealState.getRecord().getVersion();
 
     while (true) {
@@ -375,8 +395,8 @@ public class TableRebalancer {
       ZNRecord idealStateRecord = idealState.getRecord();
       if (idealStateRecord.getVersion() != expectedVersion) {
         LOGGER.info(
-            "For rebalanceId: {}, idealState version changed while waiting for ExternalView to converge for table: {},"
-                + " re-calculating the " + "target assignment", rebalanceJobId, tableNameWithType);
+            "For rebalanceId: {}, idealState version changed while waiting for ExternalView to converge for table: {}, "
+                + "re-calculating the target assignment", rebalanceJobId, tableNameWithType);
         Map<String, Map<String, String>> oldAssignment = currentAssignment;
         currentAssignment = idealStateRecord.getMapFields();
         expectedVersion = idealStateRecord.getVersion();
@@ -389,8 +409,8 @@ public class TableRebalancer {
           Map<String, String> currentInstanceStateMap = currentAssignment.get(segment);
           if (!oldInstanceStateMap.equals(currentInstanceStateMap)) {
             LOGGER.info(
-                "For rebalanceId: {}, segment state changed in IdealState from: {} to: {} for table: {}, segment: {},"
-                    + " re-calculating the " + "target assignment based on the new IdealState", rebalanceJobId,
+                "For rebalanceId: {}, segment state changed in IdealState from: {} to: {} for table: {}, segment: {}, "
+                    + "re-calculating the target assignment based on the new IdealState", rebalanceJobId,
                 oldInstanceStateMap, currentInstanceStateMap, tableNameWithType, segment);
             segmentsToMoveChanged = true;
             break;
@@ -399,14 +419,16 @@ public class TableRebalancer {
         if (segmentsToMoveChanged) {
           try {
             // Re-calculate the instance partitions in case the instance configs changed during the rebalance
-            instancePartitionsMap = getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false);
+            instancePartitionsMap =
+                getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false).getLeft();
             tierToInstancePartitionsMap =
-                getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
+                getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap,
+                    dryRun).getLeft();
             targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
                 tierToInstancePartitionsMap, rebalanceConfig);
           } catch (Exception e) {
             String errorMsg = String.format(
-                "For rebalanceId: %s, caught exception while re-calculating the target assignment for table: %s," + " "
+                "For rebalanceId: %s, caught exception while re-calculating the target assignment for table: %s, "
                     + "aborting the rebalance", rebalanceJobId, tableNameWithType);
             LOGGER.warn(errorMsg, e);
             _tableRebalanceObserver.onError(errorMsg);
@@ -415,9 +437,9 @@ public class TableRebalancer {
                 tierToInstancePartitionsMap, targetAssignment);
           }
         } else {
-          LOGGER.info(
-              "For rebalanceId:{}, no state change found for segments to be moved, re-calculating the target assignment"
-                  + " based on the " + "previous target assignment for table: {}", rebalanceJobId, tableNameWithType);
+          LOGGER.info("For rebalanceId:{}, no state change found for segments to be moved, "
+                  + "re-calculating the target assignment based on the previous target assignment for table: {}",
+              rebalanceJobId, tableNameWithType);
           Map<String, Map<String, String>> oldTargetAssignment = targetAssignment;
           targetAssignment = new HashMap<>(currentAssignment);
           for (String segment : segmentsToMove) {
@@ -427,11 +449,9 @@ public class TableRebalancer {
       }
 
       if (currentAssignment.equals(targetAssignment)) {
-        String msg = String.format(
-            "For rebalanceId: %s, finished rebalancing table: %s with minAvailableReplicas: %d," + " "
-                + "enableStrictReplicaGroup: %b, " + "bestEfforts:" + " %b in %d ms.", rebalanceJobId,
-            tableNameWithType, minAvailableReplicas, enableStrictReplicaGroup, bestEfforts,
-            System.currentTimeMillis() - startTimeMs);
+        String msg = String.format("For rebalanceId: %s, finished rebalancing table: %s with minAvailableReplicas: %d, "
+                + "enableStrictReplicaGroup: %b, bestEfforts: %b in %d ms.", rebalanceJobId, tableNameWithType,
+            minAvailableReplicas, enableStrictReplicaGroup, bestEfforts, System.currentTimeMillis() - startTimeMs);
         LOGGER.info(msg);
         // Record completion
         _tableRebalanceObserver.onSuccess(msg);
@@ -446,8 +466,8 @@ public class TableRebalancer {
           targetAssignment);
       Map<String, Map<String, String>> nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup);
-      LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be moved to"
-              + " each instance: {}", rebalanceJobId, tableNameWithType,
+      LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be moved to "
+              + "each instance: {}", rebalanceJobId, tableNameWithType,
           SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, nextAssignment));
 
       // Reuse current IdealState to update the IdealState in cluster
@@ -465,7 +485,7 @@ public class TableRebalancer {
         LOGGER.info("For rebalanceId: {}, successfully updated the IdealState for table: {}", rebalanceJobId,
             tableNameWithType);
       } catch (ZkBadVersionException e) {
-        LOGGER.info("For rebalanceId:{}, version changed while updating IdealState for table: {}", rebalanceJobId,
+        LOGGER.info("For rebalanceId: {}, version changed while updating IdealState for table: {}", rebalanceJobId,
             tableNameWithType);
       } catch (Exception e) {
         String errorMsg = String.format(
@@ -480,22 +500,32 @@ public class TableRebalancer {
     }
   }
 
-  private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap(TableConfig tableConfig,
-      boolean reassignInstances, boolean bootstrap, boolean dryRun) {
+  /**
+   * Gets the instance partitions for instance partition types and also returns a boolean for whether they are unchanged
+   */
+  private Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
+      TableConfig tableConfig, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
+    boolean instancePartitionsUnchanged;
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     if (tableConfig.getTableType() == TableType.OFFLINE) {
-      instancePartitionsMap.put(InstancePartitionsType.OFFLINE,
-          getInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE, reassignInstances, bootstrap, dryRun));
+      Pair<InstancePartitions, Boolean> partitionAndUnchangedForOffline =
+          getInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE, reassignInstances, bootstrap, dryRun);
+      instancePartitionsMap.put(InstancePartitionsType.OFFLINE, partitionAndUnchangedForOffline.getLeft());
+      instancePartitionsUnchanged = partitionAndUnchangedForOffline.getRight();
     } else {
-      instancePartitionsMap.put(InstancePartitionsType.CONSUMING,
-          getInstancePartitions(tableConfig, InstancePartitionsType.CONSUMING, reassignInstances, bootstrap, dryRun));
+      Pair<InstancePartitions, Boolean> partitionAndUnchangedForConsuming =
+          getInstancePartitions(tableConfig, InstancePartitionsType.CONSUMING, reassignInstances, bootstrap, dryRun);
+      instancePartitionsMap.put(InstancePartitionsType.CONSUMING, partitionAndUnchangedForConsuming.getLeft());
+      instancePartitionsUnchanged = partitionAndUnchangedForConsuming.getRight();
       String tableNameWithType = tableConfig.getTableName();
       if (InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
+        Pair<InstancePartitions, Boolean> partitionAndUnchangedForCompleted =
+            getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, bootstrap, dryRun);
         LOGGER.info(
             "COMPLETED segments should be relocated, fetching/computing COMPLETED instance partitions for table: {}",
             tableNameWithType);
-        instancePartitionsMap.put(InstancePartitionsType.COMPLETED,
-            getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, bootstrap, dryRun));
+        instancePartitionsMap.put(InstancePartitionsType.COMPLETED, partitionAndUnchangedForCompleted.getLeft());
+        instancePartitionsUnchanged &= partitionAndUnchangedForCompleted.getRight();
       } else {
         LOGGER.info(
             "COMPLETED segments should not be relocated, skipping fetching/computing COMPLETED instance partitions "
@@ -509,67 +539,70 @@ public class TableRebalancer {
         }
       }
     }
-    return instancePartitionsMap;
+    return Pair.of(instancePartitionsMap, instancePartitionsUnchanged);
   }
 
-  private InstancePartitions getInstancePartitions(TableConfig tableConfig,
+  /**
+   * Fetches/computes the instance partitions and also returns a boolean for whether they are unchanged
+   */
+  private Pair<InstancePartitions, Boolean> getInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
-    if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
-      if (reassignInstances) {
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    String instancePartitionsName =
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString());
+    InstancePartitions existingInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
+
+    if (reassignInstances) {
+      if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
         boolean hasPreConfiguredInstancePartitions =
             TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
         if (hasPreConfiguredInstancePartitions) {
           String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
           InstancePartitions instancePartitions =
               InstancePartitionsUtils.fetchInstancePartitionsWithRename(_helixManager.getHelixPropertyStore(),
-                  referenceInstancePartitionsName, instancePartitionsType.getInstancePartitionsName(rawTableName));
-          if (!dryRun) {
+                  referenceInstancePartitionsName, instancePartitionsName);
+          boolean instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+          if (!dryRun && !instancePartitionsUnchanged) {
             LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
                 referenceInstancePartitionsName);
             InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
                 instancePartitions);
           }
-          return instancePartitions;
+          return Pair.of(instancePartitions, instancePartitionsUnchanged);
         }
-        // Set existing instance partition to null if bootstrap mode is enabled, so that the instance partition
-        // map can be fully recalculated.
-        InstancePartitions existingInstancePartitions = bootstrap ? null
-            : InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
-                InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
-                    instancePartitionsType.toString()));
         LOGGER.info("Reassigning {} instances for table: {}", instancePartitionsType, tableNameWithType);
         InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
+        // Assign instances with existing instance partition to null if bootstrap mode is enabled, so that the instance
+        // partition map can be fully recalculated.
         InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType,
             _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true),
-            existingInstancePartitions);
-        if (!dryRun) {
+            bootstrap ? null : existingInstancePartitions);
+        boolean instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+        if (!dryRun && !instancePartitionsUnchanged) {
           LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
           InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
         }
-        return instancePartitions;
+        return Pair.of(instancePartitions, instancePartitionsUnchanged);
       } else {
-        LOGGER.info("Fetching/computing {} instance partitions for table: {}", instancePartitionsType,
-            tableNameWithType);
-        return InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixManager, tableConfig,
-            instancePartitionsType);
+        LOGGER.info("{} instance assignment is not allowed, using default instance partitions for table: {}",
+            instancePartitionsType, tableNameWithType);
+        InstancePartitions instancePartitions =
+            InstancePartitionsUtils.computeDefaultInstancePartitions(_helixManager, tableConfig,
+                instancePartitionsType);
+        boolean noExistingInstancePartitions = existingInstancePartitions == null;
+        if (!dryRun && !noExistingInstancePartitions) {
+          LOGGER.info("Removing instance partitions: {} from ZK", instancePartitionsName);
+          InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(),
+              instancePartitionsName);
+        }
+        return Pair.of(instancePartitions, noExistingInstancePartitions);
       }
     } else {
-      LOGGER.info("{} instance assignment is not allowed, using default instance partitions for table: {}",
-          instancePartitionsType, tableNameWithType);
-      if (reassignInstances) {
-        LOGGER.warn("Cannot reassign {} instances (instance assignment is not allowed) for table: {}",
-            instancePartitionsType, tableNameWithType);
-      }
-      InstancePartitions instancePartitions =
-          InstancePartitionsUtils.computeDefaultInstancePartitions(_helixManager, tableConfig, instancePartitionsType);
-      if (!dryRun) {
-        String instancePartitionsName = instancePartitions.getInstancePartitionsName();
-        LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
-        InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
-      }
-      return instancePartitions;
+      LOGGER.info("Fetching/computing {} instance partitions for table: {}", instancePartitionsType, tableNameWithType);
+      return Pair.of(
+          InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixManager, tableConfig, instancePartitionsType),
+          true);
     }
   }
 
@@ -586,74 +619,86 @@ public class TableRebalancer {
     }
   }
 
-  @Nullable
-  private Map<String, InstancePartitions> getTierToInstancePartitionsMap(TableConfig tableConfig,
+  /**
+   * Fetches/computes the instance partitions for sorted tiers and also returns a boolean for whether the
+   * instance partitions are unchanged.
+   */
+  private Pair<Map<String, InstancePartitions>, Boolean> getTierToInstancePartitionsMap(TableConfig tableConfig,
       @Nullable List<Tier> sortedTiers, boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     if (sortedTiers == null) {
-      return null;
+      return Pair.of(null, true);
     }
+    boolean instancePartitionsUnchanged = true;
     Map<String, InstancePartitions> tierToInstancePartitionsMap = new HashMap<>();
     for (Tier tier : sortedTiers) {
       LOGGER.info("Fetching/computing instance partitions for tier: {} of table: {}", tier.getName(),
           tableConfig.getTableName());
-      tierToInstancePartitionsMap.put(tier.getName(),
-          getInstancePartitionsForTier(tableConfig, tier, reassignInstances, bootstrap, dryRun));
+      Pair<InstancePartitions, Boolean> partitionsAndUnchanged =
+          getInstancePartitionsForTier(tableConfig, tier, reassignInstances, bootstrap, dryRun);
+      tierToInstancePartitionsMap.put(tier.getName(), partitionsAndUnchanged.getLeft());
+      instancePartitionsUnchanged = instancePartitionsUnchanged && partitionsAndUnchanged.getRight();
     }
-    return tierToInstancePartitionsMap;
+    return Pair.of(tierToInstancePartitionsMap, instancePartitionsUnchanged);
   }
 
   /**
    * Computes the instance partitions for the given tier. If table's instanceAssignmentConfigMap has an entry for the
-   * tier, it's used to calculate the instance partitions. Else default instance partitions are returned
+   * tier, it's used to calculate the instance partitions. Else default instance partitions are returned. Also returns
+   * a boolean for whether the instance partition is unchanged.
    */
-  private InstancePartitions getInstancePartitionsForTier(TableConfig tableConfig, Tier tier, boolean reassignInstances,
-      boolean bootstrap, boolean dryRun) {
-    PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
-    InstancePartitions defaultInstancePartitions =
-        InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableConfig.getTableName(),
-            tier.getName(), storage.getServerTag());
-
-    if (tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
-        .containsKey(tier.getName())) {
-      LOGGER.info("Skipping fetching/computing instance partitions for tier {} for table: {}", tier.getName(),
-          tableConfig.getTableName());
-      if (!dryRun) {
-        String instancePartitionsName =
-            InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(), tier.getName());
-        LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
-        InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
-      }
-      return defaultInstancePartitions;
-    }
-
+  private Pair<InstancePartitions, Boolean> getInstancePartitionsForTier(TableConfig tableConfig, Tier tier,
+      boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     String tableNameWithType = tableConfig.getTableName();
+    String tierName = tier.getName();
     String instancePartitionsName =
-        InstancePartitionsUtils.getInstancePartitionsNameForTier(tableConfig.getTableName(), tier.getName());
+        InstancePartitionsUtils.getInstancePartitionsNameForTier(tableNameWithType, tierName);
+    InstancePartitions existingInstancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
+
     if (reassignInstances) {
-      // Set existing instance partition to null if bootstrap mode is enabled, so that the instance partition
-      // map can be fully recalculated.
-      InstancePartitions existingInstancePartitions = bootstrap ? null
-          : InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
+      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+      InstanceAssignmentConfig instanceAssignmentConfig =
+          instanceAssignmentConfigMap != null ? instanceAssignmentConfigMap.get(tierName) : null;
+      if (instanceAssignmentConfig == null) {
+        LOGGER.info(
+            "Instance assignment config for tier: {} does not exist for table: {}, using default instance partitions",
+            tierName, tableNameWithType);
+        PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
+        InstancePartitions instancePartitions =
+            InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tierName,
+                storage.getServerTag());
+        boolean noExistingInstancePartitions = existingInstancePartitions == null;
+        if (!dryRun && !noExistingInstancePartitions) {
+          LOGGER.info("Removing instance partitions: {} from ZK", instancePartitionsName);
+          InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(),
               instancePartitionsName);
-      InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
-      InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(tier.getName(),
-          _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true),
-          existingInstancePartitions, tableConfig.getInstanceAssignmentConfigMap().get(tier.getName()));
-      if (!dryRun) {
-        LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
-        InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+        }
+        return Pair.of(instancePartitions, noExistingInstancePartitions);
+      } else {
+        InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
+        // Assign instances with existing instance partition to null if bootstrap mode is enabled, so that the instance
+        // partition map can be fully recalculated.
+        InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(tierName,
+            _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true),
+            bootstrap ? null : existingInstancePartitions, instanceAssignmentConfig);
+        boolean instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+        if (!dryRun && !instancePartitionsUnchanged) {
+          LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
+          InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+        }
+        return Pair.of(instancePartitions, instancePartitionsUnchanged);
       }
-      return instancePartitions;
+    } else {
+      if (existingInstancePartitions != null) {
+        return Pair.of(existingInstancePartitions, true);
+      } else {
+        PinotServerTierStorage storage = (PinotServerTierStorage) tier.getStorage();
+        InstancePartitions instancePartitions =
+            InstancePartitionsUtils.computeDefaultInstancePartitionsForTag(_helixManager, tableNameWithType, tierName,
+                storage.getServerTag());
+        return Pair.of(instancePartitions, true);
+      }
     }
-
-    InstancePartitions instancePartitions =
-        InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(),
-            InstancePartitionsUtils.getInstancePartitionsNameForTier(tableNameWithType, tier.getName()));
-    if (instancePartitions != null) {
-      return instancePartitions;
-    }
-
-    return defaultInstancePartitions;
   }
 
   private IdealState waitForExternalViewToConverge(String tableNameWithType, boolean bestEfforts,

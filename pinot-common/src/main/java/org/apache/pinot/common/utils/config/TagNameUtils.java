@@ -102,6 +102,13 @@ public class TagNameUtils {
     return getTagForTenant(tenantName, REALTIME_SERVER_TAG_SUFFIX);
   }
 
+  /**
+   * Returns the server tag name for the given tenant and the given table type.
+   */
+  public static String getServerTagForTenant(@Nullable String tenantName, TableType type) {
+    return getTagForTenant(tenantName, String.format("_%s", type));
+  }
+
   private static String getTagForTenant(@Nullable String tenantName, String tagSuffix) {
     if (tenantName == null) {
       return DEFAULT_TENANT_NAME + tagSuffix;

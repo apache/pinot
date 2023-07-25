@@ -91,11 +91,6 @@ public class RequestContextUtils {
       for (Expression operand : operands) {
         arguments.add(getExpression(operand));
       }
-      // TODO(walterddr): a work-around for multi-stage query engine which might pass COUNT without argument, and
-      //  should be removed once that issue is fixed.
-      if (arguments.isEmpty() && functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-        arguments.add(ExpressionContext.forIdentifier("*"));
-      }
       return new FunctionContext(functionType, functionName, arguments);
     } else {
       return new FunctionContext(functionType, functionName, Collections.emptyList());

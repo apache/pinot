@@ -219,6 +219,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
   private Object[][] provideTestSqlAndRowCount() {
     return new Object[][]{
+        // special hint test, the table is not actually partitioned by col1, thus this hint gives wrong result. but
+        // b/c in order to test whether this hint produces the proper optimized plan, we are making this assumption
+        new Object[]{"SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, COUNT(*) FROM a "
+            + " GROUP BY 1 ORDER BY 2", 10},
+
+        // special hint test, we want to try if dynamic broadcast works for just any random table */
         new Object[]{"SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a "
             + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE b.col3 < 10) AND a.col3 > 0", 9},
 

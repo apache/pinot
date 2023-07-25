@@ -16,23 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
+package org.apache.pinot.plugin.stream.kinesis;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.stream.StreamMessage;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.pinot.spi.stream.PartitionLagState;
 
 
-public class KafkaStreamMessage extends StreamMessage<byte[]> {
-  public KafkaStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
-    super(key, value, metadata, value.length);
+public class KinesisConsumerPartitionLag extends PartitionLagState {
+  private final String _availabilityLagMs;
+
+  public KinesisConsumerPartitionLag(String availabilityLagMs) {
+    _availabilityLagMs = availabilityLagMs;
   }
 
-  public long getNextOffset() {
-    if (_metadata != null) {
-      long offset = Long.parseLong(_metadata.getRecordMetadata().get(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY));
-      return offset < 0 ? -1 : offset + 1;
-    }
-    return -1;
+  @Override
+  public String getAvailabilityLagMs() {
+    return _availabilityLagMs;
   }
 }

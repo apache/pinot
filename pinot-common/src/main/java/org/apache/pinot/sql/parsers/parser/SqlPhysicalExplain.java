@@ -16,23 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
+package org.apache.pinot.sql.parsers.parser;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.stream.StreamMessage;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.calcite.sql.SqlExplain;
+import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParserPos;
 
-
-public class KafkaStreamMessage extends StreamMessage<byte[]> {
-  public KafkaStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
-    super(key, value, metadata, value.length);
-  }
-
-  public long getNextOffset() {
-    if (_metadata != null) {
-      long offset = Long.parseLong(_metadata.getRecordMetadata().get(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY));
-      return offset < 0 ? -1 : offset + 1;
-    }
-    return -1;
+/**
+ * Calcite extension for creating a physical plan sql node from a EXPLAIN IMPLEMENTATION query.
+ *
+ * <p>Syntax: EXPLAIN IMPLEMENTATION PLAN [ [INCLUDING | EXCLUDING] [ALL] ATTRIBUTES ] FOR SELECT</p>
+ */
+public class SqlPhysicalExplain extends SqlExplain {
+  public SqlPhysicalExplain(SqlParserPos pos, SqlNode explicandum, SqlLiteral detailLevel, SqlLiteral depth,
+      SqlLiteral format, int dynamicParameterCount) {
+    super(pos, explicandum, detailLevel, depth, format, dynamicParameterCount);
   }
 }
