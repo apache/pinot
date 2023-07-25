@@ -79,7 +79,7 @@ public interface PulsarMetadataExtractor {
     return metadataMap;
   }
 
-  private static void populateMetadataField(PulsarStreamMessageMetadata.PulsarMessageMetadataValue value,
+  static void populateMetadataField(PulsarStreamMessageMetadata.PulsarMessageMetadataValue value,
       Message<?> message, Map<String, String> metadataMap) {
     switch (value) {
       case PUBLISH_TIME:
@@ -152,7 +152,7 @@ public interface PulsarMetadataExtractor {
     }
   }
 
-  private static void setMetadataMapField(Map<String, String> metadataMap,
+  static void setMetadataMapField(Map<String, String> metadataMap,
       PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue,
       String value) {
     if (StringUtils.isNotBlank(value)) {
@@ -160,19 +160,19 @@ public interface PulsarMetadataExtractor {
     }
   }
 
-  private static void setMetadataMapField(Map<String, String> metadataMap,
+  static void setMetadataMapField(Map<String, String> metadataMap,
       PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue,
       int value) {
     setMetadataMapField(metadataMap, metadataValue, String.valueOf(value));
   }
 
-  private static void setMetadataMapField(Map<String, String> metadataMap,
+  static void setMetadataMapField(Map<String, String> metadataMap,
       PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue,
       long value) {
     setMetadataMapField(metadataMap, metadataValue, String.valueOf(value));
   }
 
-  private static void setMetadataMapField(Map<String, String> metadataMap,
+  static void setMetadataMapField(Map<String, String> metadataMap,
       PulsarStreamMessageMetadata.PulsarMessageMetadataValue metadataValue,
       byte[] value) {
     if (value != null && value.length > 0) {
