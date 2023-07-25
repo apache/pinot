@@ -304,7 +304,7 @@ public class TableConfigsRestletResource {
    */
   @PUT
   @Path("/tableConfigs/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_CONFIG)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIGS)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json",

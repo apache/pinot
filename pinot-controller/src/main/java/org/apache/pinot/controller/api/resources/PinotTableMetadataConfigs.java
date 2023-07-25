@@ -64,7 +64,7 @@ public class PinotTableMetadataConfigs {
   @Deprecated
   @PUT
   @Path("/tables/{tableName}/metadataConfigs")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_CONFIG)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIG)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update table metadata", notes = "Updates table configuration")

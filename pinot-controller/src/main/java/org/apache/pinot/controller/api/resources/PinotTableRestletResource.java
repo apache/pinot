@@ -505,7 +505,7 @@ public class PinotTableRestletResource {
 
   @PUT
   @Path("/tables/{tableName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIG)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
@@ -1000,7 +1000,7 @@ public class PinotTableRestletResource {
 
   @POST
   @Path("tables/{tableName}/timeBoundary")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIG)
   @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata", notes = "Set "
       + "hybrid table query time boundary based on offline segments' metadata")
   @Produces(MediaType.APPLICATION_JSON)

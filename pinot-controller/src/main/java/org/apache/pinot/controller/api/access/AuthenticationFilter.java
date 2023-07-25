@@ -40,8 +40,6 @@ import javax.ws.rs.core.UriInfo;
 import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.glassfish.grizzly.http.server.Request;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -50,8 +48,6 @@ import org.slf4j.LoggerFactory;
  */
 @javax.ws.rs.ext.Provider
 public class AuthenticationFilter implements ContainerRequestFilter {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(AuthenticationFilter.class);
   private static final Set<String> UNPROTECTED_PATHS =
       new HashSet<>(Arrays.asList("", "help", "auth/info", "auth/verify", "health"));
   private static final String KEY_TABLE_NAME = "tableName";
@@ -104,7 +100,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     AccessType accessType = extractAccessType(endpointMethod);
     AccessControlUtils.validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
 
-    FineGrainedAuthUtils.validateFineGrainedAuth(endpointMethod, uriInfo, _httpHeaders, LOGGER, accessControl);
+    FineGrainedAuthUtils.validateFineGrainedAuth(endpointMethod, uriInfo, _httpHeaders, accessControl);
   }
 
   @VisibleForTesting

@@ -363,7 +363,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/fieldSpec")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_FIELD_SPEC)
+  @ManualAuthorization // Always allow this API
   @ApiOperation(value = "Get fieldSpec metadata", notes = "Get fieldSpec metadata")
   public String getFieldSpecMetadata() {
     try {

@@ -65,7 +65,7 @@ public class PinotTableIndexingConfigs {
   @Deprecated
   @PUT
   @Path("/tables/{tableName}/indexingConfigs")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_CONFIG)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIG)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update table indexing configuration")
   @Produces(MediaType.APPLICATION_JSON)

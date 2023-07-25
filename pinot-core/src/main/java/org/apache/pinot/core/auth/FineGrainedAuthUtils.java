@@ -27,7 +27,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.Logger;
 
 
 /**
@@ -54,11 +53,6 @@ public class FineGrainedAuthUtils {
     return name;
   }
 
-  private static void logAndThrow(Logger logger, String msg, Response.Status status) {
-    logger.error(msg);
-    throw new WebApplicationException(msg, status);
-  }
-
   /**
    * Validate fine-grained authorization for APIs.
    * There are 2 possible cases:
@@ -74,11 +68,10 @@ public class FineGrainedAuthUtils {
    * @param endpointMethod of the API
    * @param uriInfo of the API
    * @param httpHeaders of the API
-   * @param logger to log errors
    * @param accessControl to check the fine-grained authorization
    */
   public static void validateFineGrainedAuth(Method endpointMethod, UriInfo uriInfo, HttpHeaders httpHeaders,
-      Logger logger, FineGrainedAccessControl accessControl) {
+      FineGrainedAccessControl accessControl) {
     if (endpointMethod.isAnnotationPresent(Authorize.class)) {
       final Authorize auth = endpointMethod.getAnnotation(Authorize.class);
       String targetId = null;
@@ -87,7 +80,8 @@ public class FineGrainedAuthUtils {
       if (auth.targetType() == TargetType.TABLE) {
         // paramName is mandatory for table level authorization
         if (StringUtils.isEmpty(auth.paramName())) {
-          logAndThrow(logger, "paramName not found for table level authorization in API: " + uriInfo.getRequestUri(),
+          throw new WebApplicationException(
+              "paramName not found for table level authorization in API: " + uriInfo.getRequestUri(),
               Response.Status.INTERNAL_SERVER_ERROR);
         }
 
@@ -95,8 +89,9 @@ public class FineGrainedAuthUtils {
         targetId = findParam(auth.paramName(), uriInfo.getPathParameters(), uriInfo.getQueryParameters());
 
         if (StringUtils.isEmpty(targetId)) {
-          logAndThrow(logger, "Could not find paramName " + auth.paramName() + " in path or query params of the API: "
-              + uriInfo.getRequestUri(), Response.Status.INTERNAL_SERVER_ERROR);
+          throw new WebApplicationException(
+              "Could not find paramName " + auth.paramName() + " in path or query params of the API: "
+                  + uriInfo.getRequestUri(), Response.Status.INTERNAL_SERVER_ERROR);
         }
 
         // Table name may contain type, hence get raw table name for checking access
@@ -106,16 +101,17 @@ public class FineGrainedAuthUtils {
       } else if (auth.targetType() == TargetType.CLUSTER) {
         accessDeniedMsg = "Access denied to " + auth.action() + " in the cluster";
       } else {
-        logAndThrow(logger, "Unsupported targetType: " + auth.targetType() + " in API: " + uriInfo.getRequestUri(),
+        throw new WebApplicationException(
+            "Unsupported targetType: " + auth.targetType() + " in API: " + uriInfo.getRequestUri(),
             Response.Status.INTERNAL_SERVER_ERROR);
       }
 
       // Check for access now
       if (!accessControl.hasAccess(httpHeaders, auth.targetType(), targetId, auth.action())) {
-        logAndThrow(logger, accessDeniedMsg, Response.Status.FORBIDDEN);
+        throw new WebApplicationException(accessDeniedMsg, Response.Status.FORBIDDEN);
       }
     } else if (!accessControl.defaultAccess(httpHeaders)) {
-      logAndThrow(logger, "Access denied - default authorization failed", Response.Status.FORBIDDEN);
+      throw new WebApplicationException("Access denied - default authorization failed", Response.Status.FORBIDDEN);
     }
   }
 }

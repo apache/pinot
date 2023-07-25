@@ -379,7 +379,7 @@ public class PinotInstanceRestletResource {
 
   @PUT
   @Path("/instances/{instanceName}/updateTags")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TAG)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_INSTANCE)
   @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -417,7 +417,7 @@ public class PinotInstanceRestletResource {
 
   @POST
   @Path("/instances/{instanceName}/updateBrokerResource")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_RESOURCE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_BROKER_RESOURCE)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the tables served by the specified broker instance in the broker resource", notes =

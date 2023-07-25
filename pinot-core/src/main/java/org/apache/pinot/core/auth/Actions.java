@@ -47,15 +47,12 @@ public class Actions {
     public static final String GET_AUTH = "GetAuth";
     public static final String GET_BROKER = "GetBroker";
     public static final String GET_CLUSTER_CONFIG = "GetClusterConfig";
-    public static final String GET_FIELD_SPEC = "GetFieldSpec";
     public static final String GET_FORCE_COMMIT_STATUS = "GetForceCommitStatus";
     public static final String GET_HEALTH = "GetHealth";
-    public static final String GET_INFO = "GetInfo";
     public static final String GET_INSTANCE = "GetInstance";
     public static final String GET_LOGGER = "GetLogger";
     public static final String GET_LOG_FILE = "GetLogFile";
     public static final String GET_REBALANCE_STATUS = "GetRebalanceStatus";
-    public static final String GET_ROUTING = "GetRouting";
     public static final String GET_RUNNING_QUERY = "GetRunningQuery";
     public static final String GET_SCHEDULER_INFO = "GetSchedulerInfo";
     public static final String GET_SCHEMA = "GetSchema";
@@ -75,12 +72,11 @@ public class Actions {
     public static final String RESET_SEGMENT = "ResetSegment";
     public static final String RESUME_TASK = "ResumeTask";
     public static final String STOP_TASK = "StopTask";
+    public static final String UPDATE_BROKER_RESOURCE = "UpdateBrokerResource";
     public static final String UPDATE_CLUSTER_CONFIG = "UpdateClusterConfig";
     public static final String UPDATE_INSTANCE = "UpdateInstance";
     public static final String UPDATE_LOGGER = "UpdateLogger";
     public static final String UPDATE_QPS = "UpdateQPS";
-    public static final String UPDATE_RESOURCE = "UpdateResource";
-    public static final String UPDATE_TAG = "UpdateTag";
     public static final String UPDATE_TASK_QUEUE = "UpdateTaskQueue";
     public static final String UPDATE_TENANT = "UpdateTenant";
     public static final String UPDATE_TENANT_METADATA = "UpdateTenantMetadata";
@@ -92,11 +88,11 @@ public class Actions {
 
   // Action names for table
   public static class Table {
-    public static final String ASSIGN_INSTANCE = "AssignInstance";
     public static final String BUILD_ROUTING = "BuildRouting";
+    public static final String CREATE_INSTANCE_PARTITIONS = "CreateInstancePartitions";
     public static final String CREATE_SCHEMA = "CreateSchema";
     public static final String CREATE_TABLE = "CreateTable";
-    public static final String DELETE_PARTITION = "DeletePartition";
+    public static final String DELETE_INSTANCE_PARTITIONS = "DeleteInstancePartitions";
     public static final String DELETE_ROUTING = "DeleteRouting";
     public static final String DELETE_SCHEMA = "DeleteSchema";
     public static final String DELETE_SEGMENT = "DeleteSegment";
@@ -112,15 +108,16 @@ public class Actions {
     public static final String FORCE_COMMIT = "ForceCommit";
     public static final String GET_BROKER = "GetBroker";
     public static final String GET_CONFIG = "GetConfig";
-    public static final String GET_CONSUMING_SEGMENTS = "GetConsumingSegments"; // SK:
-    public static final String GET_CONTROLLER_JOBS = "GetControllerJobs"; // SK:
+    public static final String GET_CONSUMING_SEGMENTS = "GetConsumingSegments";
+    public static final String GET_CONTROLLER_JOBS = "GetControllerJobs";
     public static final String GET_DEBUG_INFO = "GetDebugInfo";
     public static final String GET_EXTERNAL_VIEW = "GetExternalView";
     public static final String GET_IDEAL_STATE = "GetIdealState";
     public static final String GET_INSTANCE = "GetInstance";
+    public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";
     public static final String GET_METADATA = "GetMetadata";
-    public static final String GET_PARTITION = "GetPartition";
     public static final String GET_PAUSE_STATUS = "GetPauseStatus";
+    public static final String GET_ROUTING = "GetRouting";
     public static final String GET_ROUTING_TABLE = "GetRoutingTable";
     public static final String GET_SCHEMA = "GetSchema";
     public static final String GET_SEGMENT = "GetSegment";
@@ -139,12 +136,12 @@ public class Actions {
     public static final String REBUILD_BROKER_RESOURCE = "RebuildBrokerResource";
     public static final String REFRESH_ROUTING = "RefreshRouting";
     public static final String RELOAD_SEGMENT = "ReloadSegment";
-    public static final String REPLACE_INSTANCE = "ReplaceInstance";
     public static final String REPLACE_SEGMENT = "ReplaceSegment";
     public static final String RESUME_CONSUMPTION = "ResumeConsumption";
-    public static final String UPDATE_CONFIG = "UpdateConfig";
+    public static final String UPDATE_INSTANCE_PARTITIONS = "UpdateInstancePartitions";
     public static final String UPDATE_SCHEMA = "UpdateSchema";
-    public static final String UPDATE_TABLE = "UpdateTable";
+    public static final String UPDATE_TABLE_CONFIG = "UpdateTableConfig";
+    public static final String UPDATE_TABLE_CONFIGS = "UpdateTableConfigs";
     public static final String UPLOAD_SEGMENT = "UploadSegment";
     public static final String VALIDATE_CONFIG = "ValidateConfig";
     public static final String VALIDATE_SCHEMA = "ValidateSchema";
