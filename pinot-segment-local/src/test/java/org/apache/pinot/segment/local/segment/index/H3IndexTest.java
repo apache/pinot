@@ -33,6 +33,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHea
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
 import org.apache.pinot.segment.local.segment.index.h3.H3IndexType;
 import org.apache.pinot.segment.local.segment.index.readers.geospatial.ImmutableH3IndexReader;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -89,13 +90,14 @@ public class H3IndexTest {
           h3IndexResolution);
           GeoSpatialIndexCreator offHeapCreator = new OffHeapH3IndexCreator(TEMP_DIR, offHeapColumnName,
               h3IndexResolution)) {
+        int docId = 0;
         while (expectedCardinalities.size() < numUniqueH3Ids) {
           double longitude = RANDOM.nextDouble() * 360 - 180;
           double latitude = RANDOM.nextDouble() * 180 - 90;
           Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude));
           onHeapCreator.add(point);
           offHeapCreator.add(point);
-          mutableH3Index.add(point);
+          mutableH3Index.add(GeometrySerializer.serialize(point), -1, docId++);
           long h3Id = H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
           expectedCardinalities.merge(h3Id, 1, Integer::sum);
         }
