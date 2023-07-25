@@ -52,8 +52,7 @@ public class PulsarConfig {
   private final SubscriptionInitialPosition _subscriptionInitialPosition;
   private final String _authenticationToken;
   private final String _tlsTrustCertsFilePath;
-
-  //"v0.13.* since pulsar supports record key extraction
+  // Deprecated since pulsar supports record key extraction
   @Deprecated
   private final boolean _enableKeyValueStitch;
   private final boolean _populateMetadata;
