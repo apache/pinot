@@ -188,41 +188,41 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     String jobId = forceCommit(getTableName());
 
     Set<String> finalConsumingSegments = consumingSegments;
+
     TestUtils.waitForCondition(aVoid -> {
       try {
         if (isForceCommitJobCompleted(jobId)) {
           assertTrue(_controllerStarter.getHelixResourceManager()
               .getOnlineSegmentsFromIdealState(getTableName() + "_REALTIME", false)
               .containsAll(finalConsumingSegments));
-          return true;
+
+          int snapshotFileCount = 0;
+          for (BaseServerStarter serverStarter : _serverStarters) {
+            String segmentDir =
+                serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR);
+            File[] files = new File(segmentDir, getTableName() + "_REALTIME").listFiles();
+            for (File file : files) {
+              if (file.getName().contains("tmp") || file.getName().contains("consumer")) {
+                continue;
+              }
+              if (file.isDirectory()) {
+                File segmentV3Dir = new File(file, "v3");
+                File[] segmentFiles = segmentV3Dir.listFiles();
+                for (File segmentFile : segmentFiles) {
+                  if (segmentFile.getName().endsWith(".snapshot")) {
+                    snapshotFileCount++;
+                  }
+                }
+              }
+            }
+          }
+          return snapshotFileCount == 5;
         }
         return false;
       } catch (Exception e) {
         return false;
       }
     }, 60000L, "Error verifying force commit operation on table!");
-
-    // check if snapshot files are created or not
-    int snapshotFileCount = 0;
-    for (BaseServerStarter serverStarter : _serverStarters) {
-      String segmentDir = serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR);
-      File[] files = new File(segmentDir, getTableName() + "_REALTIME").listFiles();
-      for (File file : files) {
-        if (file.getName().contains("tmp") || file.getName().contains("consumer")) {
-          continue;
-        }
-        if (file.isDirectory()) {
-          File segmentV3Dir = new File(file, "v3");
-          File[] segmentFiles = segmentV3Dir.listFiles();
-          for (File segmentFile : segmentFiles) {
-            if (segmentFile.getName().endsWith(".snapshot")) {
-              snapshotFileCount++;
-            }
-          }
-        }
-      }
-    }
-    assertEquals(snapshotFileCount, 5);
 
     // Restart the servers and check again
     restartServers();
