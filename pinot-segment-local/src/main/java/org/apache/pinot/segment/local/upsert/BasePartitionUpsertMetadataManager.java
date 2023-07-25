@@ -606,7 +606,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /**
    * Loads watermark from the file if exists.
    */
-  protected double loadWatermark() {
+  public double loadWatermark() {
     File watermarkFile = getWatermarkFile();
     if (watermarkFile.exists()) {
       try {
@@ -625,7 +625,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   /**
    * Persists watermark to the file.
    */
-  protected void persistWatermark(double watermark) {
+  public void persistWatermark(double watermark) {
     File watermarkFile = getWatermarkFile();
     try {
       if (watermarkFile.exists()) {
