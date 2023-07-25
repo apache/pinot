@@ -1480,6 +1480,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _partitionGroupConsumerSemaphore.release();
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
           "Failed to initialize segment data manager", e));
+      _segmentLogger.warn(
+          "Calling controller to mark the segment as OFFLINE in Ideal State because of initialization error: '{}'",
+          e.getMessage());
+      postStopConsumedMsg("Consuming segment initialization error");
       throw e;
     }
   }
