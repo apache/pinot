@@ -52,7 +52,9 @@ public class PulsarConfig {
   private final SubscriptionInitialPosition _subscriptionInitialPosition;
   private final String _authenticationToken;
   private final String _tlsTrustCertsFilePath;
-  @Deprecated(since = "v0.13.* since pulsar supports record key extraction")
+
+  //"v0.13.* since pulsar supports record key extraction
+  @Deprecated
   private final boolean _enableKeyValueStitch;
   private final boolean _populateMetadata;
   private final Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> _metadataFields;
