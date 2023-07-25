@@ -55,8 +55,12 @@ public class MutableH3Index implements H3IndexReader, MutableIndex {
 
   @Override
   public void add(@Nonnull Object value, int dictId, int docId) {
-    Geometry geometry = GeometrySerializer.deserialize((byte[]) value);
-    add(geometry);
+    try {
+      Geometry geometry = GeometrySerializer.deserialize((byte[]) value);
+      add(geometry);
+    } finally {
+      _nextDocId++;
+    }
   }
 
   @Override
@@ -73,7 +77,7 @@ public class MutableH3Index implements H3IndexReader, MutableIndex {
     Coordinate coordinate = geometry.getCoordinate();
     // TODO: support multiple resolutions
     long h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, _lowestResolution);
-    _bitmaps.computeIfAbsent(h3Id, k -> new ThreadSafeMutableRoaringBitmap()).add(_nextDocId++);
+    _bitmaps.computeIfAbsent(h3Id, k -> new ThreadSafeMutableRoaringBitmap()).add(_nextDocId);
   }
 
   @Override
