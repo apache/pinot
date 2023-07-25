@@ -24,8 +24,11 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -97,6 +100,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     Map<String, String> requestMetadataMap;
     requestMetadataMap = request.getMetadataMap();
     long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
+    long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
     try {
       distributedStagePlans = QueryPlanSerDeUtils.deserializeStagePlan(request);
     } catch (Exception e) {
@@ -104,16 +109,36 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
     }
-    // TODO: allow thrown exception to return back to broker in asynchronous manner.
+    BlockingQueue<String> stageSubmissionCallbacks = new LinkedBlockingQueue<>();
     distributedStagePlans.forEach(distributedStagePlan -> _querySubmissionExecutorService.submit(() -> {
           try {
             _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+            stageSubmissionCallbacks.offer(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK);
           } catch (Throwable t) {
             LOGGER.error("Caught exception while compiling opChain for request: {}, stage: {}", requestId,
                 distributedStagePlan.getStageId(), t);
+            stageSubmissionCallbacks.offer(t.getMessage());
           }
         })
     );
+
+    int successfulSubmissionCount = 0;
+    while (System.currentTimeMillis() < deadlineMs && successfulSubmissionCount < distributedStagePlans.size()) {
+      try {
+        String res = stageSubmissionCallbacks.poll(deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        if (!QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK.equals(res)) {
+          throw new RuntimeException("Exception occur during stage submission: " + res);
+        } else {
+          successfulSubmissionCount++;
+        }
+      } catch (Throwable t) {
+        LOGGER.error("error occurred during stage submission for {}:\n{}", requestId, t);
+        responseObserver.onNext(Worker.QueryResponse.newBuilder().putMetadata(
+            QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR, t.getMessage()).build());
+        responseObserver.onCompleted();
+        break;
+      }
+    }
     responseObserver.onNext(Worker.QueryResponse.newBuilder()
         .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
     responseObserver.onCompleted();
