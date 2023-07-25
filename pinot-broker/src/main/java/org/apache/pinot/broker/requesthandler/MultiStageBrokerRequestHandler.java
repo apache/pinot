@@ -75,6 +75,7 @@ import org.slf4j.LoggerFactory;
 
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
+  private static final String DEFAULT_MULTISTAGE_V2_TABLE = "default_multistage_v2_table";
   private final String _reducerHostname;
   private final int _reducerPort;
   private final long _defaultBrokerTimeoutMs;
@@ -236,6 +237,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     brokerResponse.setResultTable(queryResults);
     brokerResponse.setRequestId(String.valueOf(requestId));
 
+    boolean numGroupsLimitReached = false;
+
     for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
       if (entry.getKey() == 0) {
         // Root stats are aggregated and added separately to broker response for backward compatibility
@@ -250,15 +253,18 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         String rawTableName = TableNameBuilder.extractRawTableName(tableNames.iterator().next());
         entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics);
 
-        // Track number of queries with number of groups limit reached
-        if (brokerResponse.isNumGroupsLimitReached()) {
-          _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
-              1);
-        }
+        // Check if any of the stages had isNumGroupsLimitReached as true
+        numGroupsLimitReached = numGroupsLimitReached || brokerResponse.isNumGroupsLimitReached();
       } else {
         entry.getValue().setStageLevelStats(null, brokerResponseStats, null);
       }
       brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
+    }
+
+    // Track number of v2 queries where number of groups limit reached
+    if (numGroupsLimitReached) {
+      _brokerMetrics.addMeteredTableValue(DEFAULT_MULTISTAGE_V2_TABLE,
+              BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
     }
 
     requestContext.setQueryProcessingTime(totalTimeMs);
