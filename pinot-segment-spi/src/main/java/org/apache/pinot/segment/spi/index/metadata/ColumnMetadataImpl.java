@@ -251,8 +251,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     // NOTE: Use getProperty() instead of getString() to avoid variable substitution ('${anotherKey}'), which can cause
     //       problem for special values such as '$${' where the first '$' is identified as escape character.
     // TODO: Use getProperty() for other properties as well to avoid the overhead of variable substitution
-    String minString = (String) config.getProperty(Column.getKeyFor(column, Column.MIN_VALUE));
-    String maxString = (String) config.getProperty(Column.getKeyFor(column, Column.MAX_VALUE));
+    String minString = StringEscapeUtils.unescapeJava((String)
+        config.getProperty(Column.getKeyFor(column, Column.MIN_VALUE)));
+    String maxString = StringEscapeUtils.unescapeJava((String)
+        config.getProperty(Column.getKeyFor(column, Column.MAX_VALUE)));
     if (minString != null && maxString != null) {
       switch (dataType.getStoredType()) {
         case INT:
