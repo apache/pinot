@@ -669,10 +669,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         if (isMax) {
           int trimIndexValue = METADATA_PROPERTY_LENGTH_LIMIT - 1;
           // determining the index for the character having value less than '\uFFFF'
-          while (trimIndexValue < value.length() && value.charAt(trimIndexValue) == '\uFFFF') {
+          while (trimIndexValue < length && value.charAt(trimIndexValue) == '\uFFFF') {
             trimIndexValue++;
           }
-          alteredValue = value.substring(0, trimIndexValue) + '\uFFFF'; // assigning the '\uFFFF' to make the value max.
+          if (trimIndexValue == length) {
+            alteredValue = value;
+          } else {
+            // assigning the '\uFFFF' to make the value max.
+            alteredValue = value.substring(0, trimIndexValue) + '\uFFFF';
+          }
         } else {
           alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
         }
@@ -682,12 +687,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           byte[] valueInByteArray = BytesUtils.toBytes(value);
           int trimIndexValue = METADATA_PROPERTY_LENGTH_LIMIT / 2 - 1;
           // determining the index for the byte having value less than 0xFF
-          while (trimIndexValue < value.length() && (valueInByteArray[trimIndexValue] & 0xff) == 0xFF) {
+          while (trimIndexValue < valueInByteArray.length && valueInByteArray[trimIndexValue] == (byte) 0xFF) {
             trimIndexValue++;
           }
-          byte[] shortByteValue = Arrays.copyOf(valueInByteArray, trimIndexValue + 1);
-          shortByteValue[trimIndexValue] = (byte) 0xFF; // assigning the 0xFF to make the value max.
-          alteredValue = BytesUtils.toHexString(shortByteValue);
+          if (trimIndexValue == valueInByteArray.length) {
+            alteredValue = value;
+          } else {
+            byte[] shortByteValue = Arrays.copyOf(valueInByteArray, trimIndexValue + 1);
+            shortByteValue[trimIndexValue] = (byte) 0xFF; // assigning the 0xFF to make the value max.
+            alteredValue = BytesUtils.toHexString(shortByteValue);
+          }
         } else {
           alteredValue = BytesUtils.toHexString(
               Arrays.copyOf(BytesUtils.toBytes(value), (METADATA_PROPERTY_LENGTH_LIMIT / 2)));

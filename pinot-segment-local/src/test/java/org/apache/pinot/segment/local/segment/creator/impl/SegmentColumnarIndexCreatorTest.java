@@ -294,21 +294,44 @@ public class SegmentColumnarIndexCreatorTest {
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", byteMinValueString,
         byteMaxValueString, FieldSpec.DataType.BYTES);
     compareLongValuesWithColumnMinMax(byteMinValueString, byteMaxValueString, props, FieldSpec.DataType.BYTES);
+  }
 
-    // Byte value test with overflow condition at index 255
+  @Test
+  public void testAddMinMaxValueForLongValues() {
+    PropertiesConfiguration props = new PropertiesConfiguration();
+
+    // test for value length grater than METADATA_PROPERTY_LENGTH_LIMIT with last characters as '\uFFFF'
     props = new PropertiesConfiguration();
-    byte[] byteMaxValueWithOverflowCondition = new byte[SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3];
+    String stringMinValue = RandomStringUtils.
+        randomAlphanumeric(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
+    String stringMaxValue = RandomStringUtils.
+        randomAlphanumeric(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT - 2);
+    stringMaxValue = stringMaxValue + '\uFFFF' + '\uFFFF';
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", stringMinValue,
+        stringMaxValue, FieldSpec.DataType.STRING);
+    compareLongValuesWithColumnMinMax(stringMinValue, stringMaxValue, props, FieldSpec.DataType.STRING);
+    String columnMaxValue = getEscapedValidPropertyValue((String) props.getProperty(getKeyFor("colA", MAX_VALUE)));
+    Assert.assertEquals(columnMaxValue.length(), SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT);
+
+
+    // Byte value test with last byte values as 0xFF
+    props = new PropertiesConfiguration();
+    Random random = new Random();
+    byte[] byteMinValue = new byte[SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT];
+    byte[] byteMaxValueWithOverflowCondition = new byte[SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT];
     random.nextBytes(byteMinValue);
     random.nextBytes(byteMaxValueWithOverflowCondition);
     for (int i = (SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT / 2 - 4);
         i < SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT; i++) {
       byteMaxValueWithOverflowCondition[i] = (byte) 0xFF;
     }
+    String byteMinValueString = BytesUtils.toHexString(byteMinValue);
     String byteMaxValueWithOverflowConditionString = BytesUtils.toHexString(byteMaxValueWithOverflowCondition);
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", byteMinValueString,
         byteMaxValueWithOverflowConditionString, FieldSpec.DataType.BYTES);
     compareLongValuesWithColumnMinMax(byteMinValueString, byteMaxValueWithOverflowConditionString,
         props, FieldSpec.DataType.BYTES);
+    Assert.assertEquals(byteMinValueString.length(), SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT * 2);
   }
 
   private void compareLongValuesWithColumnMinMax(String longMinValue, String longMaxValue,
@@ -319,17 +342,26 @@ public class SegmentColumnarIndexCreatorTest {
     String columnMinValue = getEscapedValidPropertyValue((String) props.getProperty(getKeyFor("colA", MIN_VALUE)));
     String columnMaxValue = getEscapedValidPropertyValue((String) props.getProperty(getKeyFor("colA", MAX_VALUE)));
     Assert.assertEquals(columnMinValue,
-          SegmentColumnarIndexCreator.getValidPropertyValue(longMinValue, false, dataType));
+        getEscapedValidPropertyValue(
+            SegmentColumnarIndexCreator.getValidPropertyValue(longMinValue, false, dataType)));
     Assert.assertEquals(columnMaxValue,
-          SegmentColumnarIndexCreator.getValidPropertyValue(longMaxValue, true, dataType));
+        getEscapedValidPropertyValue(
+            SegmentColumnarIndexCreator.getValidPropertyValue(longMaxValue, true, dataType)));
 
-    if (dataType == FieldSpec.DataType.BYTES || dataType == FieldSpec.DataType.STRING) {
-      Assert.assertTrue(columnMinValue.compareTo(longMinValue) < 0);
-      Assert.assertTrue(columnMaxValue.compareTo(longMaxValue) > 0);
-    } else {
-      // Int, Long, Float & Double will have the same value.
+    // check the original value and reduced value based on the length
+    // if same length than should be equal otherwise smaller
+    if (columnMinValue.length() == longMinValue.length()) {
       Assert.assertTrue(columnMinValue.compareTo(longMinValue) <= 0);
+    } else {
+      Assert.assertTrue(columnMinValue.compareTo(longMinValue) < 0);
+    }
+
+    // check the original value and reduced value based on the length
+    // if same length than should be equal otherwise larger
+    if (columnMaxValue.length() == longMaxValue.length()) {
       Assert.assertTrue(columnMaxValue.compareTo(longMaxValue) >= 0);
+    } else {
+      Assert.assertTrue(columnMaxValue.compareTo(longMaxValue) > 0);
     }
   }
 
