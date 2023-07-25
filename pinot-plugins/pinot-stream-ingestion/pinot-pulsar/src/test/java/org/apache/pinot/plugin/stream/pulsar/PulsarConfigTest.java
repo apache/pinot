@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -53,17 +53,15 @@ public class PulsarConfigTest {
   public void testParsingMetadataConfigWithConfiguredFields() throws Exception {
     Map<String, String> streamConfigMap = getCommonStreamConfigMap();
     streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE),
-        "true");
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.METADATA_FIELDS),
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE), "true");
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.METADATA_FIELDS),
         "messageId,messageIdBytes, publishTime, eventTime, key, topicName, ");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
     PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
     Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
         pulsarConfig.getMetadataFields();
     Assert.assertEquals(metadataFieldsToExtract.size(), 6);
-    Assert.assertTrue(metadataFieldsToExtract.containsAll(List.of(
+    Assert.assertTrue(metadataFieldsToExtract.containsAll(ImmutableList.of(
         PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID,
         PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID_BYTES_B64,
         PulsarStreamMessageMetadata.PulsarMessageMetadataValue.PUBLISH_TIME,

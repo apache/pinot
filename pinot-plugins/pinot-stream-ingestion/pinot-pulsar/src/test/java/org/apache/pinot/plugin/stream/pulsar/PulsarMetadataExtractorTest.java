@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import com.google.common.collect.ImmutableSet;
 import java.nio.charset.StandardCharsets;
-import java.util.Set;
 import org.apache.pulsar.client.api.MessageId;
 import org.bouncycastle.util.encoders.Base64;
 import org.testng.annotations.BeforeClass;
@@ -38,7 +38,8 @@ public class PulsarMetadataExtractorTest {
 
   @BeforeClass
   public void setup() {
-    _metadataExtractor = PulsarMetadataExtractor.build(true, Set.of(MESSAGE_ID, MESSAGE_ID_BYTES_B64, MESSAGE_KEY));
+    _metadataExtractor =
+        PulsarMetadataExtractor.build(true, ImmutableSet.of(MESSAGE_ID, MESSAGE_ID_BYTES_B64, MESSAGE_KEY));
   }
 
   @Test
