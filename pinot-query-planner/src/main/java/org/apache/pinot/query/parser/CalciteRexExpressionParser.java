@@ -210,6 +210,10 @@ public class CalciteRexExpressionParser {
     for (RexExpression childNode : childNodes) {
       operands.add(toExpression(childNode, pinotQuery));
     }
+    // for COUNT, add a literal val 1 to operand list b/c V1 doesn't handle empty operand functions.
+    if (functionKind == SqlKind.COUNT) {
+      operands.add(RequestUtils.getLiteralExpression(1));
+    }
     ParserUtils.validateFunction(functionName, operands);
     Expression functionExpression = getFunctionExpression(functionName);
     functionExpression.getFunctionCall().setOperands(operands);
