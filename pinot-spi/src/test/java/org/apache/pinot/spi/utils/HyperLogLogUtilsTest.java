@@ -18,24 +18,28 @@
  */
 package org.apache.pinot.spi.utils;
 
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.RegisterSet;
+import org.testng.annotations.Test;
 
-public class HyperLogLogUtils {
-  private HyperLogLogUtils() {
+import static org.testng.Assert.assertEquals;
+
+public class HyperLogLogUtilsTest {
+
+  @Test
+  public void testByteSizeLog2M() {
+    int[] testCases = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+    for (int log2m : testCases) {
+      int expectedByteSize = (RegisterSet.getSizeForCount(1 << log2m) + 2) * Integer.BYTES;
+      assertEquals(HyperLogLogUtils.byteSize(log2m), expectedByteSize);
+    }
   }
 
-  /**
-   * Returns the byte size of the given HyperLogLog.
-   */
-  public static int byteSize(HyperLogLog value) {
-    return value.sizeof();
-  }
-
-  /**
-   * Returns the byte size of hyperloglog of a given log2m.
-   */
-  public static int byteSize(int log2m) {
-    return (RegisterSet.getSizeForCount(1 << log2m) + 2) * Integer.BYTES;
+  @Test
+  public void testByteSizeWithHLLObject() {
+    int[] testCases = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+    for (int log2m : testCases) {
+      int expectedByteSize = (RegisterSet.getSizeForCount(1 << log2m) + 2) * Integer.BYTES;
+      assertEquals(HyperLogLogUtils.byteSize(new com.clearspring.analytics.stream.cardinality.HyperLogLog(log2m)), expectedByteSize);
+    }
   }
 }
