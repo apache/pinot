@@ -90,6 +90,11 @@ public enum TransformFunctionType {
   // date type conversion functions
   CAST("cast"),
 
+  // object type
+  ARRAY_TO_MV("arrayToMV",
+      ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0), SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(SqlTypeFamily.ARRAY), "array_to_mv"),
+
   // string functions
   JSONEXTRACTSCALAR("jsonExtractScalar",
       ReturnTypes.cascade(opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2,
@@ -278,6 +283,13 @@ public enum TransformFunctionType {
       return inferTypeFromStringLiteral(operandType, opBinding.getTypeFactory());
     }
     return opBinding.getTypeFactory().createSqlType(defaultSqlType);
+  }
+
+  private static RelDataType positionalComponentReturnType(SqlOperatorBinding opBinding, int pos) {
+    if (opBinding.getOperandCount() > pos) {
+      return opBinding.getOperandType(pos).getComponentType();
+    }
+    throw new IllegalArgumentException("Invalid number of arguments for function " + opBinding.getOperator().getName());
   }
 
   private static RelDataType dateTimeConverterReturnTypeInference(SqlOperatorBinding opBinding) {

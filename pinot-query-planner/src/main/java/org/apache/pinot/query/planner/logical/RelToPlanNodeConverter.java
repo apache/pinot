@@ -63,12 +63,15 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.slf4j.Logger;
 
 
 /**
  * The {@link RelToPlanNodeConverter} converts a logical {@link RelNode} to a {@link PlanNode}.
  */
 public final class RelToPlanNodeConverter {
+
+  private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(RelToPlanNodeConverter.class);
 
   private RelToPlanNodeConverter() {
     // do not instantiate.
@@ -207,7 +210,7 @@ public final class RelToPlanNodeConverter {
 
   public static DataSchema.ColumnDataType convertToColumnDataType(RelDataType relDataType) {
     SqlTypeName sqlTypeName = relDataType.getSqlTypeName();
-    boolean isArray = sqlTypeName == SqlTypeName.ARRAY;
+    boolean isArray = (sqlTypeName == SqlTypeName.ARRAY);
     if (isArray) {
       sqlTypeName = relDataType.getComponentType().getSqlTypeName();
     }
@@ -240,6 +243,10 @@ public final class RelToPlanNodeConverter {
       case VARBINARY:
         return isArray ? DataSchema.ColumnDataType.BYTES_ARRAY : DataSchema.ColumnDataType.BYTES;
       default:
+        if (relDataType.getComponentType() != null) {
+          throw new IllegalArgumentException("Unsupported collection type: " + relDataType);
+        }
+        LOGGER.warn("Unexpected SQL type: {}, use BYTES instead", sqlTypeName);
         return DataSchema.ColumnDataType.BYTES;
     }
   }
