@@ -58,8 +58,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
-import static org.apache.pinot.spi.data.FieldSpec.DataType.BIG_DECIMAL;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
 
 
 public class ForwardIndexType
