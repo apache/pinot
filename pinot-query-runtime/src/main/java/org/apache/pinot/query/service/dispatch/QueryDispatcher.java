@@ -64,6 +64,7 @@ import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -86,18 +87,21 @@ public class QueryDispatcher {
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
   }
 
-  public ResultTable submitAndReduce(long requestId, DispatchableSubPlan dispatchableSubPlan,
+  public ResultTable submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan,
       MailboxService mailboxService, OpChainSchedulerService scheduler, long timeoutMs,
       Map<String, String> queryOptions, Map<Integer, ExecutionStatsAggregator> executionStatsAggregator,
       boolean traceEnabled)
       throws Exception {
+    final long requestId = context.getRequestId();
     try {
       // submit all the distributed stages.
       int reduceStageId = submit(requestId, dispatchableSubPlan, timeoutMs, queryOptions);
       // run reduce stage and return result.
-      return runReducer(requestId, dispatchableSubPlan, reduceStageId, timeoutMs, mailboxService, scheduler,
-          executionStatsAggregator,
-          traceEnabled);
+      long reduceStartTimeInNanos = System.nanoTime();
+      ResultTable resultTable = runReducer(requestId, dispatchableSubPlan, reduceStageId, timeoutMs, mailboxService,
+          scheduler, executionStatsAggregator, traceEnabled);
+      context.setReduceTimeNanos(System.nanoTime() - reduceStartTimeInNanos);
+      return resultTable;
     } catch (Exception e) {
       cancel(requestId, dispatchableSubPlan);
       throw new RuntimeException("Error executing query: "
