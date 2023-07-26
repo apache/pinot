@@ -278,7 +278,7 @@ public class ForwardIndexType
       if (isSingleValue) {
         String allocationContext = IndexUtil.buildAllocationContext(context.getSegmentName(),
             context.getFieldSpec().getName(), V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-        if (isFieldFixed(context.getFieldSpec(), fixedLengthBytes)) {
+        if (fixedLengthBytes > 0) {
           return new FixedByteSVMutableForwardIndex(false, storedType, fixedLengthBytes, context.getCapacity(),
               context.getMemoryManager(), allocationContext);
         } else {
@@ -319,14 +319,5 @@ public class ForwardIndexType
             FieldSpec.DataType.INT);
       }
     }
-  }
-
-  // We consider fields whose values have a fixed size to be fixed width fields.
-  private boolean isFieldFixed(FieldSpec fieldSpec, int fixedLengthBytes) {
-    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
-    return (storedType.isFixedWidth() || (
-        (storedType.getStoredType() == BYTES || storedType.getStoredType() == BIG_DECIMAL) && fixedLengthBytes > 0
-            && fixedLengthBytes != FieldSpec.DEFAULT_MAX_LENGTH)
-    );
   }
 }
