@@ -23,7 +23,6 @@ import java.util.List;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -53,7 +52,6 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
   private final DataSource _dataSource;
   private final FieldSpec.DataType _parameterType;
-  private final int _numDocs;
 
   static boolean canEvaluate(PredicateEvaluator predicateEvaluator, DataSource dataSource) {
     Predicate.Type type = predicateEvaluator.getPredicateType();
@@ -63,25 +61,26 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
   }
 
   @SuppressWarnings("unchecked")
-  public RangeIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  public RangeIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+      boolean nullHandlingEnabled) {
+    super(numDocs, nullHandlingEnabled);
     _predicateEvaluator = predicateEvaluator;
     _rangeIndexReader = (RangeIndexReader<ImmutableRoaringBitmap>) dataSource.getRangeIndex();
     _dataSource = dataSource;
-    _numDocs = numDocs;
     _parameterType = predicateEvaluator.isDictionaryBased() ? FieldSpec.DataType.INT : predicateEvaluator.getDataType();
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
+  protected BlockDocIdSet getTrues() {
     if (_rangeIndexReader.isExact()) {
       ImmutableRoaringBitmap matches = getMatchingDocIds();
       recordFilter(matches);
-      return new FilterBlock(new BitmapDocIdSet(matches, _numDocs));
+      return new BitmapDocIdSet(matches, _numDocs);
     }
     return evaluateLegacyRangeFilter();
   }
 
-  private FilterBlock evaluateLegacyRangeFilter() {
+  private BlockDocIdSet evaluateLegacyRangeFilter() {
     ImmutableRoaringBitmap matches = getMatchingDocIds();
     // if the implementation cannot match the entire query exactly, it will
     // yield partial matches, which need to be verified by scanning. If it
@@ -89,25 +88,25 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     ImmutableRoaringBitmap partialMatches = getPartiallyMatchingDocIds();
     // this branch is likely until RangeIndexReader reimplemented and enabled by default
     if (partialMatches == null) {
-      return new FilterBlock(new BitmapDocIdSet(matches == null ? new MutableRoaringBitmap() : matches, _numDocs));
+      return new BitmapDocIdSet(matches == null ? new MutableRoaringBitmap() : matches, _numDocs);
     }
     // TODO: support proper null handling in range index.
     // Need to scan the first and last range as they might be partially matched
     ScanBasedFilterOperator scanBasedFilterOperator =
         new ScanBasedFilterOperator(_predicateEvaluator, _dataSource, _numDocs, false);
-    BlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getNextBlock().getBlockDocIdSet();
+    BlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getTrues();
     MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(partialMatches);
     if (matches != null) {
       docIds.or(matches);
     }
     recordFilter(matches);
-    return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs) {
+    return new BitmapDocIdSet(docIds, _numDocs) {
       // Override this method to reflect the entries scanned
       @Override
       public long getNumEntriesScannedInFilter() {
         return scanBasedDocIdSet.getNumEntriesScannedInFilter();
       }
-    });
+    };
   }
 
   ImmutableRoaringBitmap getMatchingDocIds() {

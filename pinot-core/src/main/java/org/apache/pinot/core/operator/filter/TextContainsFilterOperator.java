@@ -21,8 +21,8 @@ package org.apache.pinot.core.operator.filter;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
@@ -38,18 +38,17 @@ public class TextContainsFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_TEXT_INDEX";
 
   private final TextIndexReader _textIndexReader;
-  private final int _numDocs;
   private final TextContainsPredicate _predicate;
 
   public TextContainsFilterOperator(TextIndexReader textIndexReader, TextContainsPredicate predicate, int numDocs) {
+    super(numDocs, false);
     _textIndexReader = textIndexReader;
     _predicate = predicate;
-    _numDocs = numDocs;
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
-    return new FilterBlock(new BitmapDocIdSet(_textIndexReader.getDocIds(_predicate.getValue()), _numDocs));
+  protected BlockDocIdSet getTrues() {
+    return new BitmapDocIdSet(_textIndexReader.getDocIds(_predicate.getValue()), _numDocs);
   }
 
   @Override
