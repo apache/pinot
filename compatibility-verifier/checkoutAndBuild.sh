@@ -99,14 +99,14 @@ function build() {
     if [ $? -eq 0 ]; then break; fi
     if [ $i -eq $maxRetry ]; then exit 1; fi
     echo ""
-    echo "Build failed, see last 1000 lines of output below."
+    echo "Build failed, see lamast 1000 lines of output below."
     tail -1000 ${outFile}
     echo "Retrying after 30 seconds..."
     sleep 30
   done
   if [ $buildTests -eq 1 ]; then
     for i in $(seq 1 $maxRetry); do
-      mvn -pl :pinot-integration-tests package -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
+      mvn package -am -pl :pinot-integration-tests -DskipTests -T1C ${versionOption} ${repoOption} ${PINOT_MAVEN_OPTS} 1>>${outFile} 2>&1
       if [ $? -eq 0 ]; then break; fi
       if [ $i -eq $maxRetry ]; then exit 1; fi
       echo ""
