@@ -94,15 +94,16 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         parallelQueue = new ConcurrentLinkedQueue<>(parallelTables);
         for (int i = 0; i < context.getDegreeOfParallelism(); i++) {
           _executorService.submit(() -> {
-            try {
-              while (true) {
+            while (!parallelQueue.isEmpty()) {
+              try {
                 String table = parallelQueue.remove();
                 Configuration config = extractRebalanceConfig(context);
                 config.setProperty(RebalanceConfigConstants.DRY_RUN, false);
                 config.setProperty(RebalanceConfigConstants.JOB_ID, rebalanceResult.get(table).getJobId());
                 rebalanceTable(table, config, observer);
+              } catch (NoSuchElementException ignore) {
+                return;
               }
-            } catch (NoSuchElementException ignore) {
             }
           });
         }
