@@ -39,7 +39,10 @@ public class HyperLogLogUtilsTest {
     int[] testCases = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     for (int log2m : testCases) {
       int expectedByteSize = (RegisterSet.getSizeForCount(1 << log2m) + 2) * Integer.BYTES;
-      assertEquals(HyperLogLogUtils.byteSize(new com.clearspring.analytics.stream.cardinality.HyperLogLog(log2m)), expectedByteSize);
+      assertEquals(
+          HyperLogLogUtils.byteSize(new com.clearspring.analytics.stream.cardinality.HyperLogLog(log2m)),
+          expectedByteSize
+      );
     }
   }
 }

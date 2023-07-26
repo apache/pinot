@@ -215,7 +215,11 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
 
   @Override
   public void setBytes(int docId, byte[] value) {
-    Preconditions.checkArgument(value.length == _valueSizeInBytes, "Expected value size to be: %s but got: %s ", _valueSizeInBytes, value.length);
+    Preconditions.checkArgument(
+        value.length == _valueSizeInBytes,
+        "Expected value size to be: %s but got: %s ",
+        _valueSizeInBytes, value.length
+    );
 
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setBytes(docId, value);
