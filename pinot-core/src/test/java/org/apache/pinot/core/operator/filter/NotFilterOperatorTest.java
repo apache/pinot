@@ -19,8 +19,10 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
@@ -36,11 +38,34 @@ public class NotFilterOperatorTest {
     Set<Integer> expectedResult = new HashSet();
     expectedResult.addAll(Arrays.asList(0, 1, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 19, 20, 25, 27, 29));
     Iterator<Integer> expectedIterator = expectedResult.iterator();
-    NotFilterOperator notFilterOperator = new NotFilterOperator(new TestFilterOperator(docIds1), 30);
+    NotFilterOperator notFilterOperator = new NotFilterOperator(new TestFilterOperator(docIds1, 30), 30, false);
     BlockDocIdIterator iterator = notFilterOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
       Assert.assertEquals(docId, expectedIterator.next().intValue());
     }
+  }
+
+  @Test
+  public void testNotWithNull() {
+    int numDocs = 10;
+    int[] docIds = new int[]{0, 1, 2, 3};
+    int[] nullDocIds = new int[]{4, 5, 6};
+
+    NotFilterOperator notFilterOperator =
+        new NotFilterOperator(new TestFilterOperator(docIds, nullDocIds, numDocs), numDocs, true);
+
+    Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getTrues()), List.of(7, 8, 9));
+    Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getFalses()), List.of(0, 1, 2, 3));
+  }
+
+  @Test
+  public void testNotEmptyFilterOperator() {
+    int numDocs = 5;
+
+    NotFilterOperator notFilterOperator = new NotFilterOperator(EmptyFilterOperator.getInstance(), numDocs, true);
+
+    Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getTrues()), List.of(0, 1, 2, 3, 4));
+    Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getFalses()), Collections.emptyList());
   }
 }

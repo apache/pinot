@@ -18,25 +18,24 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 
 
 public class NotFilterOperator extends BaseFilterOperator {
 
   private static final String EXPLAIN_NAME = "FILTER_NOT";
   private final BaseFilterOperator _filterOperator;
-  private final int _numDocs;
 
-  public NotFilterOperator(BaseFilterOperator filterOperator, int numDocs) {
+  public NotFilterOperator(BaseFilterOperator filterOperator, int numDocs, boolean nullHandlingEnabled) {
+    super(numDocs, nullHandlingEnabled);
     _filterOperator = filterOperator;
-    _numDocs = numDocs;
   }
-
 
   @Override
   public List<Operator> getChildOperators() {
@@ -50,8 +49,17 @@ public class NotFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
-    return new FilterBlock(new NotDocIdSet(_filterOperator.nextBlock().getBlockDocIdSet(), _numDocs));
+  protected BlockDocIdSet getTrues() {
+    if (_filterOperator.isResultEmpty()) {
+      return new MatchAllDocIdSet(_numDocs);
+    } else {
+      return _filterOperator.getFalses();
+    }
+  }
+
+  @Override
+  protected BlockDocIdSet getFalses() {
+    return _filterOperator.getTrues();
   }
 
   @Override
