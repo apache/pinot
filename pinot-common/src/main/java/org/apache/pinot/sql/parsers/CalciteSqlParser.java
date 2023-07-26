@@ -201,6 +201,9 @@ public class CalciteSqlParser {
       throws SqlCompilationException {
     validateGroupByClause(pinotQuery);
     validateDistinctQuery(pinotQuery);
+    if (pinotQuery.isSetFilterExpression()) {
+      validateFilters(pinotQuery.getFilterExpression());
+    }
   }
 
   private static void validateGroupByClause(PinotQuery pinotQuery)
@@ -263,6 +266,28 @@ public class CalciteSqlParser {
             }
           }
         }
+      }
+    }
+  }
+
+  private static void validateFilters(Expression filterExpression) {
+    if (!filterExpression.isSetFunctionCall()) {
+      return;
+    }
+
+    String operator = filterExpression.getFunctionCall().getOperator();
+    if (operator.equals("IN") || operator.equals("NOT_IN")) {
+      List<Expression> operands = filterExpression.getFunctionCall().getOperands();
+      for (int i = 1; i < operands.size(); i++) {
+        if (operands.get(i).getLiteral().isSetNullValue()) {
+          throw new IllegalStateException("IN/NOT_IN filter cannot contain NULL");
+        }
+      }
+    }
+
+    if (operator.equals("AND") || operator.equals("OR") || operator.equals("NOT")) {
+      for (Expression filter : filterExpression.getFunctionCall().getOperands()) {
+        validateFilters(filter);
       }
     }
   }

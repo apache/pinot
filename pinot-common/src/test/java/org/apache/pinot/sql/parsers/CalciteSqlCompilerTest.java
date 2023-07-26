@@ -3124,4 +3124,44 @@ public class CalciteSqlCompilerTest {
         CalciteSqlParser.compileToPinotQuery("SELECT key FROM T1"));
     Assert.assertEquals(join.getCondition(), CalciteSqlParser.compileToExpression("T1.key = self.key"));
   }
+
+  @Test
+  public void testInPredicateWithOutNullPasses() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2) AND column2 = 1");
+  }
+
+  @Test
+  public void testNotInPredicateWithOutNullPasses() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 NOT IN (1, 2) AND column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "IN/NOT_IN filter "
+      + "cannot contain NULL")
+  public void testSingleInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2, NULL)");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "IN/NOT_IN filter "
+      + "cannot contain NULL")
+  public void testSingleNotInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 NOT IN (1, 2, NULL)");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "IN/NOT_IN filter "
+      + "cannot contain NULL")
+  public void testAndFilterContainsInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2, NULL) AND column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "IN/NOT_IN filter "
+      + "cannot contain NULL")
+  public void testOrFilterContainsNotInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 NOT IN (1, 2, NULL) OR column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "IN/NOT_IN filter "
+      + "cannot contain NULL")
+  public void testNotFilterContainsInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE NOT(column1 IN (1, 2, NULL))");
+  }
 }
