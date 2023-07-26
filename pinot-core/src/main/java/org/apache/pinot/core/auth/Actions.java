@@ -103,7 +103,6 @@ public class Actions {
     public static final String ENABLE_TABLE = "EnableTable";
     public static final String FORCE_COMMIT = "ForceCommit";
     public static final String GET_BROKER = "GetBroker";
-    public static final String GET_CONFIG = "GetConfig";
     public static final String GET_CONSUMING_SEGMENTS = "GetConsumingSegments";
     public static final String GET_CONTROLLER_JOBS = "GetControllerJobs";
     public static final String GET_DEBUG_INFO = "GetDebugInfo";
@@ -123,6 +122,7 @@ public class Actions {
     public static final String GET_STATE = "GetState";
     public static final String GET_STORAGE_TIER = "GetStorageTier";
     public static final String GET_TABLE_CONFIG = "GetTableConfig";
+    public static final String GET_TABLE_CONFIGS = "GetTableConfigs";
     public static final String GET_TABLE_LEADER = "GetTableLeader";
     public static final String GET_TIME_BOUNDARY = "GetTimeBoundary";
     public static final String PAUSE_CONSUMPTION = "PauseConsumption";
@@ -138,7 +138,7 @@ public class Actions {
     public static final String UPDATE_TABLE_CONFIG = "UpdateTableConfig";
     public static final String UPDATE_TABLE_CONFIGS = "UpdateTableConfigs";
     public static final String UPLOAD_SEGMENT = "UploadSegment";
-    public static final String VALIDATE_CONFIG = "ValidateConfig";
     public static final String VALIDATE_SCHEMA = "ValidateSchema";
+    public static final String VALIDATE_TABLE_CONFIGS = "ValidateTableConfigs";
   }
 }

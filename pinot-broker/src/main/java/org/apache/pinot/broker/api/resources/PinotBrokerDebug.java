@@ -154,7 +154,7 @@ public class PinotBrokerDebug {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
 
     // TODO: Handle nested queries
-    if (brokerRequest.isSetPinotQuery() && brokerRequest.getPinotQuery().dataSource.isSetTableName()) {
+    if (brokerRequest.isSetQuerySource() && brokerRequest.getQuerySource().isSetTableName()) {
       if (!_accessControlFactory.create()
           .hasAccess(httpHeaders, TargetType.TABLE, brokerRequest.getQuerySource().getTableName(),
               Actions.Table.GET_ROUTING_TABLE)) {
