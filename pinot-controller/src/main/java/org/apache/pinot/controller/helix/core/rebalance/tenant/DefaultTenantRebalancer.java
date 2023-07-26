@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -81,8 +82,11 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     Set<String> parallelTables;
     Set<String> sequentialTables;
     final ConcurrentLinkedQueue<String> parallelQueue;
+    // ensure atleast 1 thread is created to run the sequential table rebalance operations
+    int parallelism = Math.max(context.getDegreeOfParallelism(), 1);
+    AtomicInteger activeThreads = new AtomicInteger(parallelism);
     try {
-      if (context.getDegreeOfParallelism() > 1) {
+      if (parallelism > 1) {
         if (!context.getParallelWhitelist().isEmpty()) {
           parallelTables = new HashSet<>(context.getParallelWhitelist());
         } else {
@@ -92,42 +96,37 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
           parallelTables = Sets.difference(parallelTables, context.getParallelBlacklist());
         }
         parallelQueue = new ConcurrentLinkedQueue<>(parallelTables);
-        for (int i = 0; i < context.getDegreeOfParallelism(); i++) {
-          _executorService.submit(() -> {
-            while (!parallelQueue.isEmpty()) {
-              try {
-                String table = parallelQueue.remove();
-                Configuration config = extractRebalanceConfig(context);
-                config.setProperty(RebalanceConfigConstants.DRY_RUN, false);
-                config.setProperty(RebalanceConfigConstants.JOB_ID, rebalanceResult.get(table).getJobId());
-                rebalanceTable(table, config, observer);
-              } catch (NoSuchElementException ignore) {
-                return;
-              }
-            }
-          });
-        }
         sequentialTables = Sets.difference(tables, parallelTables);
       } else {
         sequentialTables = new HashSet<>(tables);
         parallelQueue = new ConcurrentLinkedQueue<>();
       }
-      _executorService.submit(() -> {
-        while (!parallelQueue.isEmpty()) {
+      for (int i = 0; i < parallelism; i++) {
+        _executorService.submit(() -> {
           try {
-            Thread.sleep(5000);
-          } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            while (!parallelQueue.isEmpty()) {
+              String table = parallelQueue.remove();
+              Configuration config = extractRebalanceConfig(context);
+              config.setProperty(RebalanceConfigConstants.DRY_RUN, false);
+              config.setProperty(RebalanceConfigConstants.JOB_ID, rebalanceResult.get(table).getJobId());
+              rebalanceTable(table, config, observer);
+            }
+          } catch (NoSuchElementException ignore) {
+            // race condition between queue empty check and last element being dequeued
           }
-        }
-        Configuration config = extractRebalanceConfig(context);
-        config.setProperty(RebalanceConfigConstants.DRY_RUN, false);
-        for (String table : sequentialTables) {
-          config.setProperty(RebalanceConfigConstants.JOB_ID, rebalanceResult.get(table).getJobId());
-          rebalanceTable(table, config, observer);
-        }
-        observer.onSuccess(String.format("Successfully rebalanced tenant %s.", context.getTenantName()));
-      });
+          // Last parallel thread to finish the table rebalance job will pick up the
+          // sequential table rebalance execution
+          if (activeThreads.decrementAndGet() == 0) {
+            Configuration config = extractRebalanceConfig(context);
+            config.setProperty(RebalanceConfigConstants.DRY_RUN, false);
+            for (String table : sequentialTables) {
+              config.setProperty(RebalanceConfigConstants.JOB_ID, rebalanceResult.get(table).getJobId());
+              rebalanceTable(table, config, observer);
+            }
+            observer.onSuccess(String.format("Successfully rebalanced tenant %s.", context.getTenantName()));
+          }
+        });
+      }
     } catch (Exception exception) {
       observer.onError(String.format("Failed to rebalance the tenant %s. Cause: %s", context.getTenantName(),
           exception.getMessage()));
