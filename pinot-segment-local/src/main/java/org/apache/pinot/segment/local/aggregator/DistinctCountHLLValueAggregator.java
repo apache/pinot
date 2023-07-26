@@ -38,9 +38,6 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
   // Byte size won't change once we get the initial aggregated value
   private int _maxByteSize;
 
-  public DistinctCountHLLValueAggregator() {
-  }
-
   public DistinctCountHLLValueAggregator(List<ExpressionContext> arguments) {
     // length 1 means we use the default _log2m of 8
     if (arguments.size() <= 1) {
