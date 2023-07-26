@@ -283,6 +283,8 @@ broker:
   extra:
     configs: |-
       pinot.set.instance.id.to.hostname=true
+      pinot.query.server.port=7321
+      pinot.query.runner.port=7732
 
 # ------------------------------------------------------------------------------
 # Pinot Server:
@@ -375,6 +377,8 @@ server:
     configs: |-
       pinot.set.instance.id.to.hostname=true
       pinot.server.instance.realtime.alloc.offheap=true
+      pinot.query.server.port=7321
+      pinot.query.runner.port=7732
 
 # ------------------------------------------------------------------------------
 # Pinot Minion:
