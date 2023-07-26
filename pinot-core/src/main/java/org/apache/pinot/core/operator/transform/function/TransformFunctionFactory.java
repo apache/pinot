@@ -306,7 +306,7 @@ public class TransformFunctionFactory {
         return new IdentifierTransformFunction(columnName, columnContextMap.get(columnName));
       case LITERAL:
         return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
-                LiteralTransformFunction::new);
+            LiteralTransformFunction::new);
       default:
         throw new IllegalStateException();
     }
