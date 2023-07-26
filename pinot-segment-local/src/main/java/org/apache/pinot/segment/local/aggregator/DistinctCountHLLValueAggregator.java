@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.HyperLogLogUtils;
 
 
 public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, HyperLogLog> {
@@ -45,12 +46,10 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
     }
 
     try {
-      String log2mLit = arguments.get(1).getLiteral().getStringValue();
-      Preconditions.checkState(StringUtils.isNumeric(log2mLit), "log2m argument must be a numeric literal");
-
-      _log2m = Integer.parseInt(log2mLit);
-      _log2mByteSize = (new HyperLogLog(_log2m)).getBytes().length;
-    } catch (IOException e) {
+      _log2m = arguments.get(1).getLiteral().getIntValue();
+      _log2mByteSize = HyperLogLogUtils.byteSize(_log2m);
+      _maxByteSize = _log2mByteSize;
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
@@ -121,9 +120,6 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
 
   @Override
   public HyperLogLog deserializeAggregatedValue(byte[] bytes) {
-    if (bytes == null || bytes.length == 0) {
-      return new HyperLogLog(_log2m);
-    }
     return CustomSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytes);
   }
 }

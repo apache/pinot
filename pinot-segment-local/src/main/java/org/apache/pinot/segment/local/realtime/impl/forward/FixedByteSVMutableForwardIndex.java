@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -63,7 +64,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
 
   /**
    * @param storedType Data type of the values
-   * @param fixedLength Fixed length of values if known: only used for BYTES field and Hyperloglog values for now.
+   * @param fixedLength Fixed length of values if known: only used for BYTES field (HyperLogLog and BigDecimal storage)
    * @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
    * @param memoryManager Memory manager to be used for allocating memory.
    * @param allocationContext Allocation allocationContext.
@@ -73,6 +74,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
     _dictionaryEncoded = dictionaryEncoded;
     _storedType = storedType;
     if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL) {
+      Preconditions.checkState(fixedLength > 0, "Fixed length must be positive for BYTES and BIG_DECIMAL");
       _valueSizeInBytes = fixedLength;
     } else {
       _valueSizeInBytes = storedType.size();
@@ -213,9 +215,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
 
   @Override
   public void setBytes(int docId, byte[] value) {
-    if (value.length != _valueSizeInBytes) {
-      throw new IllegalArgumentException("Expected value size to be " + _valueSizeInBytes + " but was " + value.length);
-    }
+    Preconditions.checkArgument(value.length == _valueSizeInBytes, "Expected value size to be: %s but got: %s ", _valueSizeInBytes, value.length);
 
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setBytes(docId, value);

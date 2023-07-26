@@ -111,6 +111,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.BIG_DECIMAL;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
 
@@ -257,15 +258,20 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // Initialize for each column
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
-      String fieldSpecName = fieldSpec.getName();
-      if (metricsAggregators.containsKey(fieldSpecName)) {
-        int maxLength = metricsAggregators.get(fieldSpecName).getRight().getMaxAggregatedValueByteSize();
-        if (maxLength > 0) {
-          fieldSpec.setMaxLength(maxLength);
-        }
-      }
-
       String column = fieldSpec.getName();
+
+      int fixedByteSize = -1;
+      boolean consumingAggregatedMetric = false;
+      if (metricsAggregators.containsKey(column)) {
+        fixedByteSize = metricsAggregators.get(column).getRight().getMaxAggregatedValueByteSize();
+        consumingAggregatedMetric = true;
+      }
+      // We consider fields whose values have a fixed size to be fixed width fields.
+      FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+      boolean isFieldFixed = (storedType.isFixedWidth() || (
+          (storedType.getStoredType() == BYTES || storedType.getStoredType() == BIG_DECIMAL) && fixedByteSize > 0 && consumingAggregatedMetric)
+      );
+
       FieldIndexConfigs indexConfigs = Optional.ofNullable(config.getIndexConfigByCol().get(column))
           .orElse(FieldIndexConfigs.EMPTY);
       boolean isDictionary = !isNoDictionaryColumn(indexConfigs, fieldSpec, column);
@@ -276,6 +282,7 @@ public class MutableSegmentImpl implements MutableSegment {
               .withEstimatedColSize(_statsHistory.getEstimatedAvgColSize(column))
               .withAvgNumMultiValues(_statsHistory.getEstimatedAvgColSize(column))
               .withConsumerDir(config.getConsumerDir() != null ? new File(config.getConsumerDir()) : null)
+              .withFixedLengthBytes(isFieldFixed ? fixedByteSize : -1)
               .build();
 
       // Partition info
@@ -297,7 +304,6 @@ public class MutableSegmentImpl implements MutableSegment {
       // Check whether to generate raw index for the column while consuming
       // Only support generating raw index on single-value columns that do not have inverted index while
       // consuming. After consumption completes and the segment is built, all single-value columns can have raw index
-
 
       // Dictionary-encoded column
       MutableDictionary dictionary;
@@ -578,7 +584,6 @@ public class MutableSegmentImpl implements MutableSegment {
       if (dictionary == null) {
         continue;
       }
-
       Object value = row.getValue(entry.getKey());
       if (value == null) {
         recordIndexingError("DICTIONARY");
@@ -613,10 +618,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
         DataType dataType = fieldSpec.getDataType();
         value = indexContainer._valueAggregator.getInitialAggregatedValue(value);
-        // aggregator value has to be numeric, but can be a different type of Number from the one expected on the column
-        // therefore we need to do some value changes here.
-        // TODO: Precision may change from one value to other, so we may need to study if this is actually what we want
-        //  to do
+        // BIG_DECIMAL is actually stored as byte[] and hence can be supported here.
         switch (dataType.getStoredType()) {
           case INT:
             forwardIndex.add(((Number) value).intValue(), -1, docId);
@@ -1218,7 +1220,7 @@ public class MutableSegmentImpl implements MutableSegment {
     Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
     for (String metricName : segmentConfig.getSchema().getMetricNames()) {
       columnNameToAggregator.put(metricName, Pair.of(metricName,
-          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.EMPTY_LIST)));
+          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.emptyList())));
     }
     return columnNameToAggregator;
   }
@@ -1235,19 +1237,6 @@ public class MutableSegmentImpl implements MutableSegment {
           "aggregation function must be a function: %s", config);
       FunctionContext functionContext = expressionContext.getFunction();
       TableConfigUtils.validateIngestionAggregation(functionContext.getFunctionName());
-
-      if ("distinctcounthll".equalsIgnoreCase(functionContext.getFunctionName())) {
-        Preconditions.checkState(
-            functionContext.getArguments().size() >= 1 && functionContext.getArguments().size() <= 2,
-            "distinctcounthll function can have max two arguments: %s", config);
-      } else if ("sumprecision".equalsIgnoreCase(functionContext.getFunctionName())) {
-        Preconditions.checkState(
-            functionContext.getArguments().size() >= 1 && functionContext.getArguments().size() <= 3,
-            "sumprecision function can have max three arguments: %s", config);
-      } else {
-        Preconditions.checkState(functionContext.getArguments().size() == 1,
-            "aggregation function can only have one argument: %s", config);
-      }
 
       ExpressionContext argument = functionContext.getArguments().get(0);
       Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,

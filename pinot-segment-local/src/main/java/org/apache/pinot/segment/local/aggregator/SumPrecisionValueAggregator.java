@@ -38,11 +38,11 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
   }
 
   /*
-  Aggregate with a optimal maximum precision in mind. Scale is always only 1 32-bit
-  int and the storing of the scale value does not affect the size of the big decimal.
-  Given this, we won't care about scale in terms of the aggregations.
-  During query time, the optional scale parameter can be provided, but during aggregation,
-  we don't limit it.
+    Aggregate with a optimal maximum precision in mind. Scale is always only 1 32-bit
+    int and the storing of the scale value does not affect the size of the big decimal.
+    Given this, we won't care about scale in terms of the aggregations.
+    During query time, the optional scale parameter can be provided, but during aggregation,
+    we don't limit it.
    */
   public SumPrecisionValueAggregator(List<ExpressionContext> arguments) {
     // length 1 means we don't have any caps on maximum precision nor do we have a fixed size then
@@ -50,10 +50,7 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
       return;
     }
 
-    String precision = arguments.get(1).getLiteral().getStringValue();
-    Preconditions.checkState(StringUtils.isNumeric(precision), "precision must be a numeric literal");
-
-    _fixedSize = BigDecimalUtils.byteSizeForFixedPrecision(Integer.parseInt(precision));
+    _fixedSize = BigDecimalUtils.byteSizeForFixedPrecision(arguments.get(1).getLiteral().getIntValue());
   }
 
   @Override

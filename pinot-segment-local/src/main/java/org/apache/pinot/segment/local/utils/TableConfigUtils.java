@@ -389,8 +389,8 @@ public final class TableConfigUtils {
 
           List<ExpressionContext> arguments = functionContext.getArguments();
 
-          if (("distinctcounthll".equals(functionContext.getFunctionName()))
-              || ("sumprecision".equals(functionContext.getFunctionName()))) {
+          if ((DISTINCTCOUNTHLL.name().toLowerCase().equals(functionContext.getFunctionName()))
+              || (SUMPRECISION.name().toLowerCase().equals(functionContext.getFunctionName()))) {
             String destinationColumn = aggregationConfig.getColumnName();
             FieldSpec destinationFieldSpec = schema.getFieldSpecFor(destinationColumn);
 
@@ -400,7 +400,7 @@ public final class TableConfigUtils {
             }
             int maxLength = destinationFieldSpec.getMaxLength();
 
-            if ("distinctcounthll".equals(functionContext.getFunctionName())) {
+            if (DISTINCTCOUNTHLL.name().toLowerCase().equals(functionContext.getFunctionName())) {
               Preconditions.checkState(
                   functionContext.getArguments().size() >= 1 && functionContext.getArguments().size() <= 2,
                   "distinctcounthll function can have max two arguments: %s", aggregationConfig);
@@ -426,7 +426,7 @@ public final class TableConfigUtils {
                   "destination field for distinctcounthll must have maxLength property set to "
                       + expectedBytesForHLL
                       + ", the size of a HLL object with log2m of " + log2m);
-            } else if ("sumprecision".equals(functionContext.getFunctionName())) {
+            } else if (SUMPRECISION.name().toLowerCase().equals(functionContext.getFunctionName())) {
               Preconditions.checkState(functionContext.getArguments().size() >= 2
                       && functionContext.getArguments().size() <= 3,
                   "sumprecision must specify precision (required), scale (optional)",

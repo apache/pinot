@@ -37,17 +37,11 @@ public class SumValueAggregator implements ValueAggregator<Number, Double> {
 
   @Override
   public Double getInitialAggregatedValue(Number rawValue) {
-    if (rawValue == null) {
-      return 0.0;
-    }
     return rawValue.doubleValue();
   }
 
   @Override
   public Double applyRawValue(Double value, Number rawValue) {
-    if (rawValue == null) {
-      return value;
-    }
     return value + rawValue.doubleValue();
   }
 
