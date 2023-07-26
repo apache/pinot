@@ -124,8 +124,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
-    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _config
-        .getProperty(CommonConstants.Helix.CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS,
+    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
+        _config.getProperty(CommonConstants.Helix.CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS,
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
@@ -174,8 +174,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
     // Initialize data directory
     LOGGER.info("Initializing data directory");
-    File dataDir = new File(_config
-        .getProperty(CommonConstants.Helix.Instance.DATA_DIR_KEY, CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
+    File dataDir = new File(_config.getProperty(CommonConstants.Helix.Instance.DATA_DIR_KEY,
+        CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
     if (dataDir.exists()) {
       FileUtils.cleanDirectory(dataDir);
     } else {
@@ -195,8 +195,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
     // Install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_config, CommonConstants.Minion.MINION_TLS_PREFIX);
-    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils
-        .isNotBlank(tlsDefaults.getTrustStorePath())) {
+    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils.isNotBlank(
+        tlsDefaults.getTrustStorePath())) {
       LOGGER.info("Installing default SSL context for any client requests");
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
     }
@@ -237,8 +237,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     PinotConfiguration segmentUploaderConfig =
         _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER);
     if (segmentUploaderConfig.isEmpty()) {
-      segmentUploaderConfig =
-          _config.subset(CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER);
+      segmentUploaderConfig = _config.subset(CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER);
     }
     PinotConfiguration httpsConfig = segmentUploaderConfig.subset(CommonConstants.HTTPS_PROTOCOL);
     if (httpsConfig.getProperty(HTTPS_ENABLED, false)) {
@@ -254,7 +253,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _helixManager.connect();
     updateInstanceConfigIfNeeded();
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
-
+    minionContext.setHelixManager(_helixManager);
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _minionAdminApplication = new MinionAdminApiApplication(_instanceId, _config);
     _minionAdminApplication.start(_listenerConfigs);

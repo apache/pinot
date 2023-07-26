@@ -131,9 +131,12 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           "Converted segment name: %s does not match original segment name: %s",
           segmentConversionResult.getSegmentName(), segmentName);
 
+      File convertedSegmentDir = segmentConversionResult.getFile();
+      if (convertedSegmentDir == null) {
+        return segmentConversionResult;
+      }
       // Tar the converted segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Compressing segment: " + segmentName);
-      File convertedSegmentDir = segmentConversionResult.getFile();
       File convertedTarredSegmentFile =
           new File(tempDataDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
       TarGzCompressionUtils.createTarGzFile(convertedSegmentDir, convertedTarredSegmentFile);
@@ -184,8 +187,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           TableNameBuilder.extractRawTableName(tableNameWithType));
       NameValuePair tableTypeParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE,
           TableNameBuilder.getTableTypeFromTableName(tableNameWithType).toString());
-      List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter,
-          tableTypeParameter);
+      List<NameValuePair> parameters =
+          Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter, tableTypeParameter);
 
       // Upload the tarred segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Uploading segment: " + segmentName);
