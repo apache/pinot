@@ -153,10 +153,15 @@ public class PinotBrokerDebug {
       @Context HttpHeaders httpHeaders) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
 
-    if (!_accessControlFactory.create()
-        .hasAccess(httpHeaders, TargetType.TABLE, brokerRequest.getQuerySource().getTableName(),
-            Actions.Table.GET_ROUTING)) {
-      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+    // TODO: Handle nested queries
+    if (brokerRequest.isSetPinotQuery() && brokerRequest.getPinotQuery().dataSource.isSetTableName()) {
+      if (!_accessControlFactory.create()
+          .hasAccess(httpHeaders, TargetType.TABLE, brokerRequest.getQuerySource().getTableName(),
+              Actions.Table.GET_ROUTING_TABLE)) {
+        throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+      }
+    } else {
+      throw new WebApplicationException("Table name is not set in the query", Response.Status.BAD_REQUEST);
     }
 
     RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());

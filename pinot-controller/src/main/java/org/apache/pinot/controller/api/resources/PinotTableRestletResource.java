@@ -203,10 +203,8 @@ public class PinotTableRestletResource {
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
-      // Using schema name, since table name contains type (OFFLINE) suffix
       if (!_accessControlFactory.create()
-          .hasAccess(httpHeaders, TargetType.TABLE, tableConfig.getValidationConfig().getSchemaName(),
-              Actions.Table.CREATE_TABLE)) {
+          .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.CREATE_TABLE)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
@@ -402,10 +400,28 @@ public class PinotTableRestletResource {
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
-      // Convert the action to EnableTable, DisableTable and DropTable corresponding to StateType enum.
-      if (!_accessControlFactory.create().hasAccess(httpHeaders, TargetType.TABLE, tableName,
-          StringUtils.capitalize(stateType.name().toLowerCase()) + "Table")) {
-        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+
+      // Check access for different state types
+      var accessControl = _accessControlFactory.create();
+      switch (stateType) {
+        case ENABLE:
+          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.ENABLE_TABLE)) {
+            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+          }
+          break;
+        case DISABLE:
+          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DISABLE_TABLE)) {
+            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+          }
+          break;
+        case DROP:
+          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DELETE_TABLE)) {
+            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+          }
+          break;
+        default:
+          throw new ControllerApplicationException(LOGGER, "Invalid state type: " + stateType,
+              Response.Status.BAD_REQUEST);
       }
 
       ArrayNode ret = JsonUtils.newArrayNode();
@@ -585,10 +601,8 @@ public class PinotTableRestletResource {
     String endpointUrl = request.getRequestURL().toString();
     AccessControlUtils.validatePermission(tableName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
-    // Using schema name, since table name contains type (OFFLINE) suffix
     if (!_accessControlFactory.create()
-        .hasAccess(httpHeaders, TargetType.TABLE, tableConfig.getLeft().getValidationConfig().getSchemaName(),
-            Actions.Table.VALIDATE_TABLE)) {
+        .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.VALIDATE_CONFIG)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -627,7 +641,7 @@ public class PinotTableRestletResource {
     AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     if (!_accessControlFactory.create()
-        .hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.VALIDATE_TABLE)) {
+        .hasAccess(httpHeaders, TargetType.TABLE, tableConfig.getTableName(), Actions.Table.VALIDATE_CONFIG)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 

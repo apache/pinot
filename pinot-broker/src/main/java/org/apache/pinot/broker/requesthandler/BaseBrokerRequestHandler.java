@@ -390,7 +390,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       AccessControl accessControl = _accessControlFactory.create();
       boolean hasTableAccess =
           accessControl.hasAccess(requesterIdentity, serverBrokerRequest) && accessControl.hasAccess(
-              httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY_TABLE);
+              httpHeaders, TargetType.TABLE, tableName, Actions.Table.QUERY);
       if (!hasTableAccess) {
         _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);

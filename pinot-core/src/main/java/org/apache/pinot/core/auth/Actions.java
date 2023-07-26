@@ -98,12 +98,8 @@ public class Actions {
     public static final String DELETE_SEGMENT = "DeleteSegment";
     public static final String DELETE_TABLE = "DeleteTable";
     public static final String DELETE_TIME_BOUNDARY = "DeleteTimeBoundary";
-    // Used in /tables/{tableName} API with state as one of the parameters
     public static final String DISABLE_TABLE = "DisableTable";
     public static final String DOWNLOAD_SEGMENT = "DownloadSegment";
-    // Used in /tables/{tableName} API with state as one of the parameters
-    public static final String DROP_TABLE = "DropTable";
-    // Used in /tables/{tableName} API with state as one of the parameters
     public static final String ENABLE_TABLE = "EnableTable";
     public static final String FORCE_COMMIT = "ForceCommit";
     public static final String GET_BROKER = "GetBroker";
@@ -117,7 +113,6 @@ public class Actions {
     public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";
     public static final String GET_METADATA = "GetMetadata";
     public static final String GET_PAUSE_STATUS = "GetPauseStatus";
-    public static final String GET_ROUTING = "GetRouting";
     public static final String GET_ROUTING_TABLE = "GetRoutingTable";
     public static final String GET_SCHEMA = "GetSchema";
     public static final String GET_SEGMENT = "GetSegment";
@@ -131,7 +126,7 @@ public class Actions {
     public static final String GET_TABLE_LEADER = "GetTableLeader";
     public static final String GET_TIME_BOUNDARY = "GetTimeBoundary";
     public static final String PAUSE_CONSUMPTION = "PauseConsumption";
-    public static final String QUERY_TABLE = "QueryTable";
+    public static final String QUERY = "Query";
     public static final String REBALANCE_TABLE = "RebalanceTable";
     public static final String REBUILD_BROKER_RESOURCE = "RebuildBrokerResource";
     public static final String REFRESH_ROUTING = "RefreshRouting";
@@ -145,6 +140,5 @@ public class Actions {
     public static final String UPLOAD_SEGMENT = "UploadSegment";
     public static final String VALIDATE_CONFIG = "ValidateConfig";
     public static final String VALIDATE_SCHEMA = "ValidateSchema";
-    public static final String VALIDATE_TABLE = "ValidateTable";
   }
 }

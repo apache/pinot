@@ -35,7 +35,6 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -60,9 +59,6 @@ public class PinotControllerPeriodicTaskRestletResource {
 
   @Inject
   PeriodicTaskScheduler _periodicTaskScheduler;
-
-  @Inject
-  AccessControlFactory _accessControlFactory;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
