@@ -32,6 +32,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -51,6 +52,13 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
   public void setUp()
       throws Exception {
     TEST_INSTANCE.setupSharedStateAndValidate();
+  }
+
+  @AfterMethod
+  public void cleanup() {
+    // remove the additional, non-default broker instances
+    TEST_INSTANCE.stopFakeInstance("broker_999");
+    TEST_INSTANCE.stopFakeInstance("broker_1000");
   }
 
   @Test
