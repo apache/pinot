@@ -217,9 +217,9 @@ public class FunctionRegistry {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
-    @ScalarFunction(names = {"arrayToMV", "array_to_mv", "arrayToMultiValue", "array_to_multi_value"},
+    @ScalarFunction(names = {"arrayToMV", "array_to_mv"},
         isPlaceholder = true)
-    public static String arrayToMultiValue(Object multiValue) {
+    public static String arrayToMV(Object multiValue) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
   }

@@ -93,7 +93,7 @@ public enum TransformFunctionType {
   // object type
   ARRAY_TO_MV("arrayToMV",
       ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0), SqlTypeTransforms.FORCE_NULLABLE),
-      OperandTypes.family(SqlTypeFamily.ARRAY), "array_to_mv", "arrayToMultiValue", "array_to_multi_value"),
+      OperandTypes.family(SqlTypeFamily.ARRAY), "array_to_mv"),
 
   // string functions
   JSONEXTRACTSCALAR("jsonExtractScalar",

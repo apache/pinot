@@ -515,10 +515,13 @@ public class QueryGenerator {
         if (AGGREGATION_FUNCTIONS.contains(pinotAggregateFunction.substring(0, 3))) {
           // For multistage query, we need to explicit hoist the data type to avoid overflow.
           String aggFunctionName = pinotAggregateFunction.substring(0, 3);
+          String replacedPinotAggregationFunction =
+              pinotAggregateFunction.replace(aggFunctionName + "(", aggFunctionName + "(CAST(");
           if ("SUM".equalsIgnoreCase(aggFunctionName)) {
-            pinotAggregateColumnAndFunction = pinotAggregateFunction
-                .replace(aggFunctionName + "(", aggFunctionName + "(CAST(")
-                .replace(")", " AS BIGINT))");
+            pinotAggregateColumnAndFunction = replacedPinotAggregationFunction.replace(")", " AS BIGINT))");
+          }
+          if ("AVG".equalsIgnoreCase(aggFunctionName)) {
+            pinotAggregateColumnAndFunction = replacedPinotAggregationFunction.replace(")", " AS DOUBLE))");
           }
         }
         pinotAggregateColumnAndFunctions.add(pinotAggregateColumnAndFunction);

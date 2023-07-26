@@ -282,14 +282,19 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     query =
         "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND arrayToMV(DivAirportSeqIDs) IN "
-            + "(1078102, 1142303,"
-            + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
+            + "(1078102, 1142303, 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
     h2Query =
         "SELECT DistanceGroup FROM mytable WHERE `Month` BETWEEN 1 AND 1 AND (DivAirportSeqIDs[1] IN (1078102, "
             + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[2] IN (1078102, 1142303, 1530402, 1172102, "
             + "1291503) OR DivAirportSeqIDs[3] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
             + "DivAirportSeqIDs[4] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[5] IN "
             + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
+    testQuery(query, h2Query);
+
+    query = "SELECT MIN(ArrDelayMinutes), AVG(CAST(DestCityMarketID AS DOUBLE)) FROM mytable WHERE DivArrDelay < 196";
+    h2Query =
+        "SELECT MIN(CAST(`ArrDelayMinutes` AS DOUBLE)), AVG(CAST(`DestCityMarketID` AS DOUBLE)) FROM mytable WHERE "
+            + "`DivArrDelay` < 196";
     testQuery(query, h2Query);
   }
 
