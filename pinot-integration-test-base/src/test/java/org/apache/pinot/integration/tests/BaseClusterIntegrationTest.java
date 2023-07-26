@@ -400,15 +400,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * Creates a new Upsert enabled table config.
    */
   protected TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn, String deleteColumn,
-      int numPartitions, boolean enableSnapshot, boolean enablePreload) {
+      int numPartitions) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(deleteColumn);
-    upsertConfig.setEnablePreload(enablePreload);
-    upsertConfig.setEnableSnapshot(enableSnapshot);
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())

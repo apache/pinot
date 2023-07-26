@@ -34,6 +34,7 @@ import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -82,7 +83,9 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig tableConfig =
-        createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions(), true, true);
+        createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
+    tableConfig.getUpsertConfig().setEnablePreload(true);
+    tableConfig.getUpsertConfig().setEnableSnapshot(true);
     addTableConfig(tableConfig);
 
     // Create and upload segments
@@ -92,6 +95,12 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     pushAvroIntoKafka(avroFiles);
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
+        "1");
   }
 
   @AfterClass

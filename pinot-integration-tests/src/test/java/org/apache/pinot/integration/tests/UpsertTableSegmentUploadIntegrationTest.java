@@ -75,7 +75,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig tableConfig =
-        createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions(), false, false);
+        createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
     addTableConfig(tableConfig);
 
     // Create and upload segments
