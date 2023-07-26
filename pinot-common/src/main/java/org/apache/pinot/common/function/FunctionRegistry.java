@@ -21,7 +21,6 @@ package org.apache.pinot.common.function;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -126,10 +125,6 @@ public class FunctionRegistry {
 
   public static Map<String, List<Function>> getRegisteredCalciteFunctionMap() {
     return FUNCTION_MAP.map();
-  }
-
-  public static Collection<Function> getRegisteredCalciteFunctions(String name) {
-    return FUNCTION_MAP.map().get(name);
   }
 
   public static Set<String> getRegisteredCalciteFunctionNames() {
