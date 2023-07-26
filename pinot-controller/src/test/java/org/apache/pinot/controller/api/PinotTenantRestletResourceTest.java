@@ -54,13 +54,6 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     TEST_INSTANCE.setupSharedStateAndValidate();
   }
 
-  @AfterMethod
-  public void cleanup() {
-    // remove the additional, non-default broker instances
-    TEST_INSTANCE.stopFakeInstance("broker_999");
-    TEST_INSTANCE.stopFakeInstance("broker_1000");
-  }
-
   @Test
   public void testTableListForTenant()
       throws Exception {
@@ -143,6 +136,12 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
     tables = tableList.get("tables");
     assertEquals(tables.size(), 0);
+
+    // remove the additional, non-default table and broker instances
+    TEST_INSTANCE.dropOfflineTable(table2);
+    TEST_INSTANCE.stopAndDropFakeInstance("broker_999");
+    TEST_INSTANCE.stopAndDropFakeInstance("broker_1000");
+    TEST_INSTANCE.deleteBrokerTenant(brokerTag2);
   }
 
   @Test
