@@ -59,6 +59,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String INGESTION_CONFIG_KEY = "ingestionConfig";
   public static final String TIER_CONFIGS_LIST_KEY = "tierConfigs";
   public static final String TUNER_CONFIG_LIST_KEY = "tunerConfigs";
+  public static final String TIER_OVERWRITES_KEY = "tierOverwrites";
 
   // Double underscore is reserved for real-time segment name delimiter
   private static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
@@ -89,7 +90,7 @@ public class TableConfig extends BaseJsonConfig {
   private TableTaskConfig _taskConfig;
   private RoutingConfig _routingConfig;
   private QueryConfig _queryConfig;
-  private Map<InstancePartitionsType, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
+  private Map<String, InstanceAssignmentConfig> _instanceAssignmentConfigMap;
 
   @JsonPropertyDescription(value = "Point to an existing instance partitions")
   private Map<InstancePartitionsType, String> _instancePartitionsMap;
@@ -128,7 +129,7 @@ public class TableConfig extends BaseJsonConfig {
       @JsonProperty(ROUTING_CONFIG_KEY) @Nullable RoutingConfig routingConfig,
       @JsonProperty(QUERY_CONFIG_KEY) @Nullable QueryConfig queryConfig,
       @JsonProperty(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable
-          Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
+          Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap,
       @JsonProperty(FIELD_CONFIG_LIST_KEY) @Nullable List<FieldConfig> fieldConfigList,
       @JsonProperty(UPSERT_CONFIG_KEY) @Nullable UpsertConfig upsertConfig,
       @JsonProperty(DEDUP_CONFIG_KEY) @Nullable DedupConfig dedupConfig,
@@ -172,6 +173,30 @@ public class TableConfig extends BaseJsonConfig {
     _tunerConfigList = tunerConfigList;
     _instancePartitionsMap = instancePartitionsMap;
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
+  }
+
+  public TableConfig(TableConfig tableConfig) {
+    _tableType = tableConfig.getTableType();
+    _tableName = tableConfig.getTableName();
+    _validationConfig = tableConfig.getValidationConfig();
+    _tenantConfig = tableConfig.getTenantConfig();
+    _indexingConfig = tableConfig.getIndexingConfig();
+    _customConfig = tableConfig.getCustomConfig();
+    _quotaConfig = tableConfig.getQuotaConfig();
+    _taskConfig = tableConfig.getTaskConfig();
+    _routingConfig = tableConfig.getRoutingConfig();
+    _queryConfig = tableConfig.getQueryConfig();
+    _instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    _fieldConfigList = tableConfig.getFieldConfigList();
+    _upsertConfig = tableConfig.getUpsertConfig();
+    _dedupConfig = tableConfig.getDedupConfig();
+    _dimensionTableConfig = tableConfig.getDimensionTableConfig();
+    _ingestionConfig = tableConfig.getIngestionConfig();
+    _tierConfigsList = tableConfig.getTierConfigsList();
+    _dimTable = tableConfig.isDimTable();
+    _tunerConfigList = tableConfig.getTunerConfigsList();
+    _instancePartitionsMap = tableConfig.getInstancePartitionsMap();
+    _segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -267,12 +292,12 @@ public class TableConfig extends BaseJsonConfig {
 
   @JsonProperty(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY)
   @Nullable
-  public Map<InstancePartitionsType, InstanceAssignmentConfig> getInstanceAssignmentConfigMap() {
+  public Map<String, InstanceAssignmentConfig> getInstanceAssignmentConfigMap() {
     return _instanceAssignmentConfigMap;
   }
 
   public void setInstanceAssignmentConfigMap(
-      Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
   }
 
@@ -359,8 +384,14 @@ public class TableConfig extends BaseJsonConfig {
 
   @JsonIgnore
   @Nullable
-  public String getUpsertComparisonColumn() {
-    return _upsertConfig == null ? null : _upsertConfig.getComparisonColumn();
+  public List<String> getUpsertComparisonColumns() {
+    return _upsertConfig == null ? null : _upsertConfig.getComparisonColumns();
+  }
+
+  @JsonIgnore
+  @Nullable
+  public String getUpsertDeleteRecordColumn() {
+    return _upsertConfig == null ? null : _upsertConfig.getDeleteRecordColumn();
   }
 
   @JsonProperty(TUNER_CONFIG_LIST_KEY)

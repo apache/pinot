@@ -380,12 +380,12 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
         nodeDimensionValue = dimensionValue;
       }
     }
-    TreeNode laseNode = getNewNode();
-    laseNode._dimensionId = dimensionId;
-    laseNode._dimensionValue = nodeDimensionValue;
-    laseNode._startDocId = nodeStartDocId;
-    laseNode._endDocId = endDocId;
-    nodes.put(nodeDimensionValue, laseNode);
+    TreeNode lastNode = getNewNode();
+    lastNode._dimensionId = dimensionId;
+    lastNode._dimensionValue = nodeDimensionValue;
+    lastNode._startDocId = nodeStartDocId;
+    lastNode._endDocId = endDocId;
+    nodes.put(nodeDimensionValue, lastNode);
     return nodes;
   }
 

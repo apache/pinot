@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.operator.combine.merger.DistinctResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
@@ -30,45 +30,15 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * Combine operator for distinct queries.
  */
 @SuppressWarnings("rawtypes")
-public class DistinctCombineOperator extends BaseCombineOperator<DistinctResultsBlock> {
+public class DistinctCombineOperator extends BaseSingleBlockCombineOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "COMBINE_DISTINCT";
 
-  private final boolean _hasOrderBy;
-
   public DistinctCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
-    super(operators, queryContext, executorService);
-    _hasOrderBy = queryContext.getOrderByExpressions() != null;
+    super(new DistinctResultsBlockMerger(queryContext), operators, queryContext, executorService);
   }
 
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
-  }
-
-  @Override
-  protected boolean isQuerySatisfied(DistinctResultsBlock resultsBlock) {
-    if (_hasOrderBy) {
-      return false;
-    }
-    return resultsBlock.getDistinctTable().size() >= _queryContext.getLimit();
-  }
-
-  @Override
-  protected void mergeResultsBlocks(DistinctResultsBlock mergedBlock, DistinctResultsBlock blockToMerge) {
-    DistinctTable mergedDistinctTable = mergedBlock.getDistinctTable();
-    DistinctTable distinctTableToMerge = blockToMerge.getDistinctTable();
-    assert mergedDistinctTable != null && distinctTableToMerge != null;
-
-    // Convert the merged table into a main table if necessary in order to merge other tables
-    if (!mergedDistinctTable.isMainTable()) {
-      DistinctTable mainDistinctTable =
-          new DistinctTable(distinctTableToMerge.getDataSchema(), _queryContext.getOrderByExpressions(),
-              _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
-      mainDistinctTable.mergeTable(mergedDistinctTable);
-      mergedBlock.setDistinctTable(mainDistinctTable);
-      mergedDistinctTable = mainDistinctTable;
-    }
-
-    mergedDistinctTable.mergeTable(distinctTableToMerge);
   }
 }

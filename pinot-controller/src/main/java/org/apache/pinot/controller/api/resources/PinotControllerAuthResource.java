@@ -28,6 +28,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -72,7 +73,7 @@ public class PinotControllerAuthResource {
       @ApiResponse(code = 500, message = "Verification error")
   })
   public boolean verify(@ApiParam(value = "Table name without type") @QueryParam("tableName") String tableName,
-      @ApiParam(value = "API access type") @QueryParam("accessType") AccessType accessType,
+      @ApiParam(value = "API access type") @DefaultValue("READ") @QueryParam("accessType") AccessType accessType,
       @ApiParam(value = "Endpoint URL") @QueryParam("endpointUrl") String endpointUrl) {
     AccessControl accessControl = _accessControlFactory.create();
     return accessControl.hasAccess(tableName, accessType, _httpHeaders, endpointUrl);

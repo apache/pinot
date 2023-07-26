@@ -30,6 +30,7 @@ import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
@@ -102,6 +103,11 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   }
 
   @Override
+  public Geometry deserialize(byte[] bytes) {
+    return GeometrySerializer.deserialize(bytes);
+  }
+
+  @Override
   public void add(Geometry geometry)
       throws IOException {
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
@@ -151,9 +157,12 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
         FileChannel bitmapOffsetFileChannel = new RandomAccessFile(_bitmapOffsetFile, "r").getChannel();
         FileChannel bitmapValueFileChannel = new RandomAccessFile(_bitmapValueFile, "r").getChannel()) {
       indexFileChannel.write(headerBuffer);
-      dictionaryFileChannel.transferTo(0, _dictionaryFile.length(), indexFileChannel);
-      bitmapOffsetFileChannel.transferTo(0, _bitmapOffsetFile.length(), indexFileChannel);
-      bitmapValueFileChannel.transferTo(0, _bitmapValueFile.length(), indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(dictionaryFileChannel, 0, _dictionaryFile.length(),
+          indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(bitmapOffsetFileChannel, 0, _bitmapOffsetFile.length(),
+          indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(bitmapValueFileChannel, 0, _bitmapValueFile.length(),
+          indexFileChannel);
     }
   }
 

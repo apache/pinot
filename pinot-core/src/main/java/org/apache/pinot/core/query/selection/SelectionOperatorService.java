@@ -26,7 +26,8 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.spi.utils.LoopUtils;
+import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -55,7 +56,6 @@ import org.roaringbitmap.RoaringBitmap;
  *   </li>
  * </ul>
  */
-@SuppressWarnings("rawtypes")
 public class SelectionOperatorService {
   private final QueryContext _queryContext;
   private final List<String> _selectionColumns;
@@ -65,7 +65,7 @@ public class SelectionOperatorService {
   private final PriorityQueue<Object[]> _rows;
 
   /**
-   * Constructor for <code>SelectionOperatorService</code> with {@link DataSchema}. (Inter segment)
+   * Constructor for <code>SelectionOperatorService</code> with {@link DataSchema}. (Broker side)
    *
    * @param queryContext Selection order-by query
    * @param dataSchema data schema.
@@ -79,8 +79,8 @@ public class SelectionOperatorService {
     _numRowsToKeep = _offset + queryContext.getLimit();
     assert queryContext.getOrderByExpressions() != null;
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        SelectionOperatorUtils.getTypeCompatibleComparator(queryContext.getOrderByExpressions(), _dataSchema,
-            _queryContext.isNullHandlingEnabled()));
+        OrderByComparatorFactory.getComparator(queryContext.getOrderByExpressions(),
+            _queryContext.isNullHandlingEnabled()).reversed());
   }
 
   /**
@@ -95,6 +95,8 @@ public class SelectionOperatorService {
   /**
    * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
    * (Broker side)
+   * TODO: Do merge sort after releasing 0.13.0 when server side results are sorted
+   *       Can also consider adding a data table metadata to indicate whether the server side results are sorted
    */
   public void reduceWithOrdering(Collection<DataTable> dataTables, boolean nullHandlingEnabled) {
     for (DataTable dataTable : dataTables) {
@@ -105,7 +107,6 @@ public class SelectionOperatorService {
           nullBitmaps[colId] = dataTable.getNullRowIds(colId);
         }
         for (int rowId = 0; rowId < numRows; rowId++) {
-          LoopUtils.checkMergePhaseInterruption(rowId);
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
           for (int colId = 0; colId < nullBitmaps.length; colId++) {
             if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
@@ -113,12 +114,13 @@ public class SelectionOperatorService {
             }
           }
           SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       } else {
         for (int rowId = 0; rowId < numRows; rowId++) {
-          LoopUtils.checkMergePhaseInterruption(rowId);
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
           SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       }
     }

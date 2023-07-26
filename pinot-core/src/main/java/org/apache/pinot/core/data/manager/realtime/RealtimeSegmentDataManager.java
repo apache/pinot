@@ -31,6 +31,7 @@ import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 
 
 public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
+  public static final String RESOURCE_TEMP_DIR_NAME = "_tmp";
 
   @Override
   public abstract MutableSegment getSegment();

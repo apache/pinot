@@ -18,13 +18,17 @@
         "schema": [
           {"name": "strCol1", "type": "STRING"},
           {"name": "strCol2", "type": "STRING"},
-          {"name": "intCol", "type": "INT"}
+          {"name": "intCol", "type": "INT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "boolCol", "type": "BOOLEAN"}
         ],
         "inputs": [
-          ["a", "foo", 1],
-          ["a", "bar", 2],
-          ["b", "alice", 42],
-          ["b", "bob", 196883]
+          ["a", "foo", 1, 100.0, 12.0, 10000, true],
+          ["a", "bar", 2, 175.12, 22.22, 300000, false],
+          ["b", "alice", 42, 175.12, 22.22, 300000, true],
+          ["b", "bob", 196883, 175.12, 22.22, 300000, true]
         ]
       }
     },
@@ -40,26 +44,84 @@
         ]
       },
       {
+        "description": "single 'with' with all aggregations and group by",
+        "sql": "WITH w AS (SELECT strCol, SUM(intCol) AS c1, AVG(intCol) AS c2, MIN(intCol) AS c3, MAX(intCol) AS c4, COUNT(*) as c5, COUNT(DISTINCT(intCol)) as c6  FROM {tbl1} GROUP BY strCol) SELECT strCol, strCol2, c1, c2, c3, c4, c5, c6 FROM w JOIN {tbl2} ON w.strCol = {tbl2}.strCol1",
+        "outputs": [
+          ["a", "foo", 4, 2.0, 1, 3, 2, 2],
+          ["a", "bar", 4, 2.0, 1, 3, 2, 2],
+          ["b", "alice", 2, 2.0, 2.0, 2.0, 1, 1],
+          ["b", "bob", 2, 2.0, 2.0, 2.0, 1, 1]
+        ]
+      },
+      {
         "description": "multi 'with' table",
         "sql": "WITH agg1 AS ( SELECT strCol, sum(intCol) AS sumVal FROM {tbl1} GROUP BY strCol), agg2 AS (SELECT strCol1, avg(intCol) AS avgVal FROM {tbl2} GROUP BY strCol1) SELECT strCol, sumVal - avgVal FROM agg1, agg2 WHERE agg1.strCol = agg2.strCol1",
         "outputs": [
-          ["a", 3],
-          ["b", -98460]
+          ["a", 2.5],
+          ["b", -98460.5]
+        ]
+      },
+      {
+        "description": "multi 'with' table with all aggregations on int column",
+        "sql": "WITH agg1 AS ( SELECT strCol, sum(intCol) AS sumVal FROM {tbl1} GROUP BY strCol), agg2 AS (SELECT strCol1, SUM(intCol) AS c1, AVG(intCol) AS c2, MIN(intCol) AS c3, MAX(intCol) AS c4, COUNT(*) as c5, COUNT(DISTINCT(intCol)) AS c6 FROM {tbl2} GROUP BY strCol1) SELECT strCol, sumVal - c2, c1, c3, c4, c5, c6 FROM agg1, agg2 WHERE agg1.strCol = agg2.strCol1",
+        "outputs": [
+          ["a", 2.5, 3.0, 1, 2, 2, 2],
+          ["b", -98460.5, 196925.0, 42.0, 196883.0, 2, 2]
+        ]
+      },
+      {
+        "description": "multi 'with' table with all aggregations on double column",
+        "sql": "WITH agg1 AS ( SELECT strCol, sum(intCol) AS sumVal FROM {tbl1} GROUP BY strCol), agg2 AS (SELECT strCol1, SUM(doubleCol) AS c1, AVG(doubleCol) AS c2, MIN(doubleCol) AS c3, MAX(doubleCol) AS c4, COUNT(*) as c5, COUNT(DISTINCT(doubleCol)) AS c6 FROM {tbl2} GROUP BY strCol1) SELECT strCol, sumVal - c2, c1, c3, c4, c5, c6 FROM agg1, agg2 WHERE agg1.strCol = agg2.strCol1",
+        "outputs": [
+          ["a", -133.56, 275.12, 100.0, 175.12, 2, 2],
+          ["b", -173.12, 350.24, 175.12, 175.12, 2, 1]
+        ]
+      },
+      {
+        "description": "multi 'with' table with all aggregations on float column",
+        "sql": "WITH agg1 AS ( SELECT strCol, sum(intCol) AS sumVal FROM {tbl1} GROUP BY strCol), agg2 AS (SELECT strCol1, SUM(floatCol) AS c1, AVG(floatCol) AS c2, MIN(floatCol) AS c3, MAX(floatCol) AS c4, COUNT(*) as c5, COUNT(DISTINCT(floatCol)) AS c6 FROM {tbl2} GROUP BY strCol1) SELECT strCol, sumVal - c2, c1, c3, c4, c5, c6 FROM agg1, agg2 WHERE agg1.strCol = agg2.strCol1",
+        "outputs": [
+          ["a", -13.109999656677246, 34.21999931335449, 12.0, 22.219999313354492, 2, 2],
+          ["b", -20.219999313354492, 44.439998626708984, 22.219999313354492, 22.219999313354492, 2, 1]
+        ]
+      },
+      {
+        "description": "multi 'with' table with all aggregations on long column",
+        "sql": "WITH agg1 AS ( SELECT strCol, sum(intCol) AS sumVal FROM {tbl1} GROUP BY strCol), agg2 AS (SELECT strCol1, SUM(longCol) AS c1, AVG(longCol) AS c2, MIN(longCol) AS c3, MAX(longCol) AS c4, COUNT(*) as c5, COUNT(DISTINCT(longCol)) AS c6 FROM {tbl2} GROUP BY strCol1) SELECT strCol, sumVal - c2, c1, c3, c4, c5, c6 FROM agg1, agg2 WHERE agg1.strCol = agg2.strCol1",
+        "outputs": [
+          ["a", -154996.0, 310000.0, 10000.0, 300000.0, 2, 2],
+          ["b", -299998.0, 600000.0, 300000.0, 300000.0, 2, 1]
+        ]
+      },
+      {
+        "description": "multi 'with' table with all aggregations on string column",
+        "sql": "WITH agg1 AS ( SELECT strCol, sum(intCol) AS sumVal FROM {tbl1} GROUP BY strCol), agg2 AS (SELECT strCol1, COUNT(strCol2) as c1, COUNT(DISTINCT(strCol2)) AS c2 FROM {tbl2} GROUP BY strCol1) SELECT strCol, c1, c2 FROM agg1, agg2 WHERE agg1.strCol = agg2.strCol1",
+        "outputs": [
+          ["a", 2, 2],
+          ["b", 2, 2]
+        ]
+      },
+      {
+        "description": "multi 'with' table with all aggregations on bool column",
+        "sql": "WITH agg1 AS ( SELECT strCol, sum(intCol) AS sumVal FROM {tbl1} GROUP BY strCol), agg2 AS (SELECT strCol1, bool_and(boolCol) AS c1, bool_or(boolCol) as c2, COUNT(boolCol) as c3, COUNT(DISTINCT(boolCol)) AS c4 FROM {tbl2} GROUP BY strCol1) SELECT strCol, c1, c2, c3, c4 FROM agg1, agg2 WHERE agg1.strCol = agg2.strCol1",
+        "outputs": [
+          ["a", false, true, 2, 2],
+          ["b", true, true, 2, 1]
         ]
       },
       {
         "description": "nested 'with' on agg table: (with a as ( ... ), select ... ",
         "sql": "WITH agg1 AS (SELECT strCol1, strCol2, sum(intCol) AS sumVal FROM {tbl2} GROUP BY strCol1, strCol2) SELECT strCol1, avg(sumVal) AS avgVal FROM agg1 GROUP BY strCol1",
         "outputs": [
-          ["a", 1],
-          ["b", 98462]
+          ["a", 1.5],
+          ["b", 98462.5]
         ]
       },
       {
         "description": "nested multi 'with' table: (with a as ( ... ), with b as ( ... from a ... ) select ... ",
         "sql": "WITH agg1 AS (SELECT strCol1, strCol2, sum(intCol) AS sumVal FROM {tbl2} GROUP BY strCol1, strCol2), agg2 AS ( SELECT strCol1, avg(sumVal) AS avgVal FROM agg1 GROUP BY strCol1) SELECT strCol1, avgVal FROM agg2 WHERE avgVal < 100",
         "outputs": [
-          ["a", 1]
+          ["a", 1.5]
         ]
       },
       {
@@ -95,6 +157,61 @@
           ["a", 2, 3],
           ["b", 196883, 2]
         ]
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER()",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 11],
+          ["a", 1, 11],
+          ["b", 2, 11]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER() and empty filter on outer SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol > 5",
+        "outputs": []
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER() with filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} WHERE intCol < 5) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 6],
+          ["a", 1, 6],
+          ["b", 2, 6]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using empty OVER() with empty filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER() as sum FROM {tbl1} WHERE intCol > 5) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": []
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 4],
+          ["a", 1, 4],
+          ["b", 2, 2]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY and empty filter on outer SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} ) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol > 5",
+        "outputs": []
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY with filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} WHERE intCol > 1) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": [
+          ["a", 3, 3],
+          ["b", 2, 2]
+        ]
+      },
+      {
+        "description": "'with' statement using window functions using PARTITION BY with empty filter inside inner SELECT",
+        "sql": "WITH windowfunc AS (SELECT strCol, intCol, SUM(intCol) OVER(PARTITION BY strCol) as sum FROM {tbl1} WHERE intCol > 5) SELECT a.strCol, a.intCol, a.sum FROM windowfunc AS a WHERE a.intCol < 5",
+        "outputs": []
       },
       {
         "ignored": true,

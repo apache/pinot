@@ -4,13 +4,13 @@ rules:
   cache: true
   labels:
     version: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.numberOfTasks.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.numberOfTasks.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_minion_numberOfTasks_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(.*?)_(OFFLINE|REALTIME).(\\w+).(taskExecution|taskQueueing|numberTasksExecuted|numberTasksCompleted|numberTasksCancelled|numberTasksFailed|numberTasksFatalFailed)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.([^\\.]*?)_(OFFLINE|REALTIME).(\\w+).(taskExecution|taskQueueing|numberTasks|numberTasksExecuted|numberTasksCompleted|numberTasksCancelled|numberTasksFailed|numberTasksFatalFailed)\"><>(\\w+)"
   name: "pinot_minion_$4_$5"
   cache: true
   labels:

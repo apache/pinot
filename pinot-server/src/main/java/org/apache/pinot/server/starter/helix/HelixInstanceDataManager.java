@@ -22,7 +22,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -52,6 +54,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
@@ -64,6 +67,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -78,9 +82,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
-  // TODO: Make this configurable
-  private static final long EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = 20 * 60_000L; // 20 minutes
-  private static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
 
@@ -91,10 +92,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
   private Supplier<Boolean> _isServerReadyToServeQueries = () -> false;
+  private long _externalViewDroppedMaxWaitMs;
+  private long _externalViewDroppedCheckInternalMs;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
   private LoadingCache<Pair<String, String>, SegmentErrorInfo> _errorCache;
+  private ExecutorService _segmentRefreshExecutor;
+  private ExecutorService _segmentPreloadExecutor;
 
   @Override
   public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
@@ -112,12 +117,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _helixManager = helixManager;
     _serverMetrics = serverMetrics;
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
-        PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
+        ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
+
+    _externalViewDroppedMaxWaitMs = _instanceDataManagerConfig.getExternalViewDroppedMaxWaitMs();
+    _externalViewDroppedCheckInternalMs = _instanceDataManagerConfig.getExternalViewDroppedCheckIntervalMs();
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
-    if (!instanceDataDir.exists()) {
-      Preconditions.checkState(instanceDataDir.mkdirs());
-    }
+    initInstanceDataDir(instanceDataDir);
+
     File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
     if (!instanceSegmentTarDir.exists()) {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs());
@@ -125,7 +132,22 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     // Initialize segment build time lease extender executor
     SegmentBuildTimeLeaseExtender.initExecutor();
-
+    // Initialize a fixed thread pool to reload/refresh segments in parallel. The getMaxParallelRefreshThreads() is
+    // used to initialize a segment refresh semaphore to limit the parallelism, so create a pool of same size.
+    int poolSize = getMaxParallelRefreshThreads();
+    Preconditions.checkArgument(poolSize > 0,
+        "SegmentRefreshExecutor requires a positive pool size but got: " + poolSize);
+    _segmentRefreshExecutor = Executors.newFixedThreadPool(poolSize,
+        new ThreadFactoryBuilder().setNameFormat("segment-refresh-thread-%d").build());
+    LOGGER.info("Created SegmentRefreshExecutor with pool size: {}", poolSize);
+    poolSize = _instanceDataManagerConfig.getMaxSegmentPreloadThreads();
+    if (poolSize > 0) {
+      _segmentPreloadExecutor = Executors.newFixedThreadPool(poolSize,
+          new ThreadFactoryBuilder().setNameFormat("segment-preload-thread-%d").build());
+      LOGGER.info("Created SegmentPreloadExecutor with pool size: {}", poolSize);
+    } else {
+      LOGGER.info("SegmentPreloadExecutor was not created with pool size: {}", poolSize);
+    }
     // Initialize the table data manager provider
     TableDataManagerProvider.init(_instanceDataManagerConfig);
     LOGGER.info("Initialized Helix instance data manager");
@@ -141,6 +163,32 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         });
   }
 
+  private void initInstanceDataDir(File instanceDataDir) {
+    if (!instanceDataDir.exists()) {
+      Preconditions.checkState(instanceDataDir.mkdirs(), "Failed to create instance data dir: %s", instanceDataDir);
+    } else {
+      // Clean up the _tmp (consuming segments) dir and empty table data dir
+      File[] tableDataDirs = instanceDataDir.listFiles((dir, name) -> TableNameBuilder.isTableResource(name));
+      if (tableDataDirs != null) {
+        for (File tableDataDir : tableDataDirs) {
+          File resourceTempDir = new File(tableDataDir, RealtimeSegmentDataManager.RESOURCE_TEMP_DIR_NAME);
+          try {
+            FileUtils.deleteDirectory(resourceTempDir);
+          } catch (IOException e) {
+            LOGGER.error("Failed to delete temporary resource dir: {}, continue with error", resourceTempDir, e);
+          }
+          try {
+            if (FileUtils.isEmptyDirectory(tableDataDir)) {
+              FileUtils.deleteDirectory(tableDataDir);
+            }
+          } catch (IOException e) {
+            LOGGER.error("Failed to delete empty table data dir: {}, continue with error", tableDataDir, e);
+          }
+        }
+      }
+    }
+  }
+
   @Override
   public String getInstanceId() {
     return _instanceId;
@@ -154,6 +202,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void shutDown() {
+    _segmentRefreshExecutor.shutdownNow();
+    if (_segmentPreloadExecutor != null) {
+      _segmentPreloadExecutor.shutdownNow();
+    }
     for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
       tableDataManager.shutDown();
     }
@@ -195,7 +247,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(_instanceDataManagerConfig, tableConfig);
     TableDataManager tableDataManager =
         TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore,
-            _serverMetrics, _helixManager, _errorCache, _isServerReadyToServeQueries);
+            _serverMetrics, _helixManager, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
@@ -205,7 +257,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void deleteTable(String tableNameWithType)
       throws Exception {
     // Wait externalview to converge
-    long endTimeMs = System.currentTimeMillis() + EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS;
+    long endTimeMs = System.currentTimeMillis() + _externalViewDroppedMaxWaitMs;
     do {
       ExternalView externalView = _helixManager.getHelixDataAccessor()
           .getProperty(_helixManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType));
@@ -222,7 +274,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         });
         return;
       }
-      Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
+      Thread.sleep(_externalViewDroppedCheckInternalMs);
     } while (System.currentTimeMillis() < endTimeMs);
     throw new TimeoutException(
         "Timeout while waiting for ExternalView to converge for the table to delete: " + tableNameWithType);
@@ -231,11 +283,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void offloadSegment(String tableNameWithType, String segmentName) {
     LOGGER.info("Removing segment: {} from table: {}", segmentName, tableNameWithType);
-    _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
-      v.removeSegment(segmentName);
-      LOGGER.info("Removed segment: {} from table: {}", segmentName, k);
-      return v;
-    });
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      tableDataManager.removeSegment(segmentName);
+      LOGGER.info("Removed segment: {} from table: {}", segmentName, tableNameWithType);
+    } else {
+      LOGGER.warn("Failed to find data manager for table: {}, skipping removing segment: {}", tableNameWithType,
+          segmentName);
+    }
   }
 
   @Override
@@ -336,7 +391,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     Preconditions.checkNotNull(tableConfig);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
     List<String> failedSegments = new ArrayList<>();
-    ExecutorService workers = Executors.newCachedThreadPool();
     final AtomicReference<Exception> sampleException = new AtomicReference<>();
     //calling thread hasn't acquired any permit so we don't reload any segments using it.
     CompletableFuture.allOf(segmentsMetadata.stream().map(segmentMetadata -> CompletableFuture.runAsync(() -> {
@@ -353,10 +407,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         failedSegments.add(segmentName);
         sampleException.set(e);
       }
-    }, workers)).toArray(CompletableFuture[]::new)).get();
-
-    workers.shutdownNow();
-
+    }, _segmentRefreshExecutor)).toArray(CompletableFuture[]::new)).get();
     if (sampleException.get() != null) {
       throw new RuntimeException(
           String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),

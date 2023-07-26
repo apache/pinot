@@ -48,14 +48,6 @@
     <!-- Start Include Pinot Stream Ingestion Plugins-->
     <file>
       <source>
-        ${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-0.9/target/pinot-kafka-0.9-${project.version}-shaded.jar
-      </source>
-      <destName>
-        plugins/pinot-stream-ingestion/pinot-kafka-0.9/pinot-kafka-0.9-${project.version}-shaded.jar
-      </destName>
-    </file>
-    <file>
-      <source>
         ${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-kafka-${kafka.version}/target/pinot-kafka-${kafka.version}-${project.version}-shaded.jar
       </source>
       <destName>

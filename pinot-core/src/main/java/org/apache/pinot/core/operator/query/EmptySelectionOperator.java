@@ -22,12 +22,11 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -37,25 +36,25 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * <p>NOTE: this operator short circuit underlying operators and directly returns the data schema without any rows.
  */
 public class EmptySelectionOperator extends BaseOperator<SelectionResultsBlock> {
-
   private static final String EXPLAIN_NAME = "SELECT_EMPTY";
 
+  private final BaseProjectOperator<?> _projectOperator;
   private final DataSchema _dataSchema;
   private final ExecutionStatistics _executionStatistics;
-  private final TransformOperator _transformOperator;
 
   public EmptySelectionOperator(IndexSegment indexSegment, List<ExpressionContext> expressions,
-      TransformOperator transformOperator) {
+      BaseProjectOperator<?> projectOperator) {
+    _projectOperator = projectOperator;
+
     int numExpressions = expressions.size();
     String[] columnNames = new String[numExpressions];
-    _transformOperator = transformOperator;
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
       ExpressionContext expression = expressions.get(i);
-      TransformResultMetadata expressionMetadata = _transformOperator.getResultMetadata(expression);
       columnNames[i] = expression.toString();
+      ColumnContext columnContext = projectOperator.getResultColumnContext(expression);
       columnDataTypes[i] =
-          DataSchema.ColumnDataType.fromDataType(expressionMetadata.getDataType(), expressionMetadata.isSingleValue());
+          DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
     }
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
 
@@ -73,8 +72,8 @@ public class EmptySelectionOperator extends BaseOperator<SelectionResultsBlock> 
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    return Collections.singletonList(_transformOperator);
+  public List<BaseProjectOperator<?>> getChildOperators() {
+    return Collections.singletonList(_projectOperator);
   }
 
   @Override

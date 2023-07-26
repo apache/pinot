@@ -1,0 +1,66 @@
+{
+  "metadata_test": {
+    "comments": "metadata_test is used to test Tracing and Stats metadata returns",
+    "limitation": "due to current limitation, metadata test requires all data to be located on a single partition, see: https://github.com/apache/pinot/issues/10399",
+    "tables": {
+      "tbl1" : {
+        "schema": [
+          {"name": "col1", "type": "STRING"},
+          {"name": "col2", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", 1],
+          ["bar", 2]
+        ],
+        "partitionColumns": [ ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "col1", "type": "STRING"},
+          {"name": "col2", "type": "INT"},
+          {"name": "col3", "type": "DOUBLE"},
+          {"name": "partitionCol1", "type": "INT"},
+          {"name": "partitionCol2", "type": "STRING"}
+        ],
+        "inputs": [
+          ["foo", 1, 3.1416, 1, "charlie"],
+          ["foo", 3, 3.1416, 1, "charlie"],
+          ["bar", 2, 2.7183, 1, "charlie"],
+          ["------"],
+          ["bar", 4, 2.7183, 1, "charlie"]
+        ],
+        "partitionColumns": [
+          "partitionCol1", "partitionCol2"
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT * FROM {tbl1}",
+        "comment": "only 1 segment for tbl1",
+        "expectedNumSegments": 1
+      },
+      {
+        "sql": "SELECT col1, COUNT(*) FROM {tbl2} GROUP BY col1",
+        "comment": "2 segments for tbl2",
+        "expectedNumSegments": 2
+      },
+      {
+        "sql": "SELECT {tbl1}.col1, {tbl1}.col2, {tbl2}.col3 FROM {tbl1} JOIN {tbl2} ON {tbl1}.col1 = {tbl2}.col1",
+        "expectedNumSegments": 3
+      },
+      {
+        "sql": "SELECT {tbl1}.col1, {tbl1}.col2, COUNT(*) FROM {tbl1} JOIN {tbl2} ON {tbl1}.col1 = {tbl2}.col1 GROUP BY {tbl1}.col1, {tbl1}.col2",
+        "expectedNumSegments": 3
+      },
+      {
+        "sql": "SELECT {tbl1}.col1 FROM {tbl1} WHERE {tbl1}.col2 > (SELECT 0.5 * SUM({tbl2}.col3) FROM {tbl2} WHERE {tbl1}.col2 = {tbl1}.col2 AND {tbl1}.col1 = {tbl2}.col1)",
+        "comment": "This correlated subquery test is decorrelated to 2 JOINs, so one table is scanned twice, hence expected to scan 8 segments",
+        "expectedNumSegments": 4
+      }
+    ],
+    "extraProps": {
+      "noEmptySegment": "true"
+    }
+  }
+}

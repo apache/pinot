@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -78,6 +79,11 @@ public class HelixHelper {
 
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
+  private static int _minNumCharsInISToTurnOnCompression = -1;
+
+  public static synchronized void setMinNumCharsInISToTurnOnCompression(int minNumChars) {
+    _minNumCharsInISToTurnOnCompression = minNumChars;
+  }
   public static IdealState cloneIdealState(IdealState idealState) {
     return new IdealState(
         (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
@@ -127,7 +133,7 @@ public class HelixHelper {
             updatedIdealState.setNumPartitions(numPartitions);
 
             // If the ideal state is large enough, enable compression
-            boolean enableCompression = numPartitions > NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION;
+            boolean enableCompression = shouldCompress(updatedIdealState);
             if (enableCompression) {
               updatedZNRecord.setBooleanField(ENABLE_COMPRESSIONS_KEY, true);
             } else {
@@ -162,6 +168,34 @@ public class HelixHelper {
             idealStateWrapper._idealState = idealState;
             return true;
           }
+        }
+
+        private boolean shouldCompress(IdealState is) {
+          if (is.getNumPartitions() > NUM_PARTITIONS_THRESHOLD_TO_ENABLE_COMPRESSION) {
+            return true;
+          }
+
+          // Find the number of characters in one partition in idealstate, and extrapolate
+          // to estimate the number of characters.
+          // We could serialize the znode to determine the exact size, but that would mean serializing every
+          // idealstate znode twice. We avoid some extra GC by estimating the size instead. Such estimations
+          // should be good for most installations that have similar segment and instance names.
+          Iterator<String> it = is.getPartitionSet().iterator();
+          if (it.hasNext()) {
+            String partitionName = it.next();
+            int numChars = partitionName.length();
+            Map<String, String> stateMap = is.getInstanceStateMap(partitionName);
+            for (Map.Entry<String, String> entry : stateMap.entrySet()) {
+              numChars += entry.getKey().length();
+              numChars += entry.getValue().length();
+            }
+            numChars *= is.getNumPartitions();
+            if (_minNumCharsInISToTurnOnCompression > 0
+                && numChars > _minNumCharsInISToTurnOnCompression) {
+              return true;
+            }
+          }
+          return false;
         }
       });
       return idealStateWrapper._idealState;

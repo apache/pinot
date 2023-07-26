@@ -7,13 +7,14 @@
           {"name": "boolCol", "type": "BOOLEAN"},
           {"name": "floatCol", "type": "FLOAT"},
           {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "longCol", "type": "LONG"},
           {"name": "strCol", "type": "STRING"}
         ],
         "inputs": [
-          [1, true, 2.0, 3.0, "one"],
-          [2, false, 4.0, 6.0, "two"],
-          [3, true, 6.0, 9.0, "three"],
-          [4, false, 8.0, 12.0, "four"]
+          [1, true, 2.0, 3.0, 10, "one"],
+          [2, false, 4.0, 6.0, 20, "two"],
+          [3, true, 6.0, 9.0, 5, "three"],
+          [4, false, 8.0, 12.0, 2, "four"]
         ]
       }
     },
@@ -29,7 +30,23 @@
       { "sql": "SELECT intCol, CASE WHEN intCol % 2 = 0 THEN intCol ELSE intCol * 2 END AS intVal, strCol FROM {tbl1}"},
       { "sql": "SELECT intCol, CASE WHEN floatCol > 4.0 THEN floatCol ELSE floatCol / 2.0 END AS floatVal, strCol FROM {tbl1}"},
       { "sql": "SELECT intCol, CASE WHEN doubleCol > 6.0 THEN doubleCol ELSE doubleCol / 2.0 END AS doubleVal, strCol FROM {tbl1}"},
-      { "sql": "SELECT intCol, CASE WHEN (SELECT SUM(floatCol) FROM {tbl1}) > 16.0 THEN 'Large sum' ELSE 'Small sum' END AS aggVal, strCol FROM {tbl1}"}
+      { "sql": "SELECT intCol, CASE WHEN floatCol < 10 THEN floatCol ELSE floatCol * 2 END AS doubleVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN floatCol < 10 THEN doubleCol ELSE floatCol * 2 END AS doubleVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN floatCol < 10 THEN floatCol * 4 ELSE doubleCol * 2 END AS doubleVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN doubleCol < 10 THEN floatCol * 4 ELSE floatCol * 2 END AS doubleVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN doubleCol < 10 THEN doubleCol * 4 ELSE floatCol * 2 END AS doubleVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN doubleCol < 1.3 THEN doubleCol ELSE doubleCol / 2.0 END AS doubleVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN longCol > 10 THEN longCol * 4 ELSE longCol * 2 END AS longVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN longCol > 10 THEN longCol * 4 ELSE intCol * 2 END AS longVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN intCol > 10 THEN longCol * 4 ELSE intCol * 2 END AS longVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN longCol > 10 THEN intCol * 4 ELSE longCol * 2 END AS longVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN longCol > 10 THEN longCol * 4 ELSE longCol * 2 END AS longVal, strCol FROM {tbl1} WHERE longCol < 10 and doubleCol < 1.3 and floatCol < 10"},
+      {
+        "comment": "See https://github.com/apache/pinot/issues/10415 for more details",
+        "sql": "SELECT intCol, CASE WHEN (SELECT SUM(floatCol) FROM {tbl1}) > 16.0 THEN 'Large sum' ELSE 'Small sum' END AS aggVal, strCol FROM {tbl1}"
+      },
+      { "sql": "SELECT intCol, CASE WHEN (SELECT SUM(floatCol) FROM {tbl1} WHERE longCol < 10 and doubleCol < 1.3 and floatCol < 10 ) > 16.0 THEN 'Large sum' ELSE 'Small sum' END AS aggVal, strCol FROM {tbl1}"},
+      { "sql": "with tmp as (select sum(floatCol) as float_sum from {tbl1} group by floatCol) select * from tmp where float_sum < 10" }
     ]
   },
   "nested_case_when_test": {

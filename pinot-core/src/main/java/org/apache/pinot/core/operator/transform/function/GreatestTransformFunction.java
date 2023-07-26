@@ -16,13 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 
-
+/**
+ * The <code>GreatestTransformFunction</code> implements the Greatest operator.
+ *
+ * Return the greatest results for the arguments
+ *
+ * Expected result:
+ * greatest(columnA, columnB, columnC): largest among columnA, columnB, columnC
+ *
+ * Note that null values will be ignored for evaluation. If all values are null, we return null.
+ */
 public class GreatestTransformFunction extends SelectTupleElementTransformFunction {
 
   public GreatestTransformFunction() {
@@ -30,106 +39,36 @@ public class GreatestTransformFunction extends SelectTupleElementTransformFuncti
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
-    int[] values = _arguments.get(0).transformToIntValuesSV(projectionBlock);
-    System.arraycopy(values, 0, _intValuesSV, 0, numDocs);
-    for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToIntValuesSV(projectionBlock);
-      for (int j = 0; j < numDocs & j < values.length; j++) {
-        _intValuesSV[j] = Math.max(_intValuesSV[j], values[j]);
-      }
-    }
-    return _intValuesSV;
+  protected int binaryFunction(int a, int b) {
+    return Math.max(a, b);
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[numDocs];
-    }
-    long[] values = _arguments.get(0).transformToLongValuesSV(projectionBlock);
-    System.arraycopy(values, 0, _longValuesSV, 0, numDocs);
-    for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToLongValuesSV(projectionBlock);
-      for (int j = 0; j < numDocs & j < values.length; j++) {
-        _longValuesSV[j] = Math.max(_longValuesSV[j], values[j]);
-      }
-    }
-    return _longValuesSV;
+  protected long binaryFunction(long a, long b) {
+    return Math.max(a, b);
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
-    if (_floatValuesSV == null) {
-      _floatValuesSV = new float[numDocs];
-    }
-    float[] values = _arguments.get(0).transformToFloatValuesSV(projectionBlock);
-    System.arraycopy(values, 0, _floatValuesSV, 0, numDocs);
-    for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToFloatValuesSV(projectionBlock);
-      for (int j = 0; j < numDocs & j < values.length; j++) {
-        _floatValuesSV[j] = Math.max(_floatValuesSV[j], values[j]);
-      }
-    }
-    return _floatValuesSV;
+  protected float binaryFunction(float a, float b) {
+    return Math.max(a, b);
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[numDocs];
-    }
-    double[] values = _arguments.get(0).transformToDoubleValuesSV(projectionBlock);
-    System.arraycopy(values, 0, _doubleValuesSV, 0, numDocs);
-    for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToDoubleValuesSV(projectionBlock);
-      for (int j = 0; j < numDocs & j < values.length; j++) {
-        _doubleValuesSV[j] = Math.max(_doubleValuesSV[j], values[j]);
-      }
-    }
-    return _doubleValuesSV;
+  protected double binaryFunction(double a, double b) {
+    return Math.max(a, b);
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[numDocs];
-    }
-    BigDecimal[] values = _arguments.get(0).transformToBigDecimalValuesSV(projectionBlock);
-    System.arraycopy(values, 0, _bigDecimalValuesSV, 0, numDocs);
-    for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToBigDecimalValuesSV(projectionBlock);
-      for (int j = 0; j < numDocs & j < values.length; j++) {
-        _bigDecimalValuesSV[j] = _bigDecimalValuesSV[j].max(values[j]);
-      }
-    }
-    return _bigDecimalValuesSV;
+  protected BigDecimal binaryFunction(BigDecimal a, BigDecimal b) {
+    return a.max(b);
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[numDocs];
+  protected String binaryFunction(String a, String b) {
+    if (a.compareTo(b) < 0) {
+      return b;
+    } else {
+      return a;
     }
-    String[] values = _arguments.get(0).transformToStringValuesSV(projectionBlock);
-    System.arraycopy(values, 0, _stringValuesSV, 0, numDocs);
-    for (int i = 1; i < _arguments.size(); i++) {
-      values = _arguments.get(i).transformToStringValuesSV(projectionBlock);
-      for (int j = 0; j < numDocs & j < values.length; j++) {
-        if (_stringValuesSV[j].compareTo(values[j]) < 0) {
-          _stringValuesSV[j] = values[j];
-        }
-      }
-    }
-    return _stringValuesSV;
   }
 }

@@ -73,6 +73,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   // This can be set via the set method, or via config file input.
   private boolean _tenantIsolation = true;
 
+  @CommandLine.Option(names = {"-configOverride"}, required = false, split = ",")
   private Map<String, Object> _configOverrides = new HashMap<>();
 
   @Override

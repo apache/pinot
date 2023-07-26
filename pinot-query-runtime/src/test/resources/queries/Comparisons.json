@@ -110,6 +110,15 @@
         "inputs": [
           ["1.1", "1.2"], ["1.01", "1.1"], ["1.1", "1.1"], ["-1.1", "-1.2"], ["0.0", "0.0"], ["1E-307", "1E+307"]
         ]
+      },
+      "tbl1": {
+        "schema": [
+          {"name": "i1", "type": "BIG_DECIMAL"},
+          {"name": "i3", "type": "BIG_DECIMAL"}
+        ],
+        "inputs": [
+          ["1.1", "1.4"], ["1.1", "1.3"], ["1E-307", "1E+307"], ["-1.2", "-1.4"], ["-1.1", "-1.01"]
+        ]
       }
     },
     "queries": [
@@ -121,11 +130,13 @@
       { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
       { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
-      {
-        "ignored": true,
-        "comment": "fails with IllegalStateException... not sure why!",
-        "sql": "SELECT * FROM {tbl} WHERE i1 >= i2"
-      }
+      { "sql": "SELECT * FROM {tbl} WHERE i1 >= i2" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 <= i2" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 <> i2 and i2 <> i1" },
+      { "sql": "SELECT * FROM {tbl} WHERE i1 <> i2 and i2 <> i1 and (i1 != i2 or i2 != i1)" },
+      { "sql": "SELECT * FROM {tbl} JOIN {tbl1} ON {tbl}.i1 = {tbl1}.i1 WHERE {tbl}.i2 >= {tbl1}.i3" },
+      { "sql": "SELECT {tbl}.i1, {tbl}.i2, {tbl1}.i3 FROM {tbl} JOIN {tbl1} ON {tbl}.i1 = {tbl1}.i1 WHERE {tbl}.i2 >= {tbl1}.i3" },
+      { "sql": "SELECT {tbl}.i1 = {tbl}.i2 FROM {tbl} JOIN {tbl1} ON {tbl}.i1 = {tbl1}.i1 WHERE {tbl}.i2 >= {tbl1}.i3"}
     ]
   },
   "strings_comp": {
@@ -331,21 +342,17 @@
       { "sql": "SELECT i1 > i2, i2 > i1 FROM {tbl}" },
       { "sql": "SELECT i1 >= i2, i2 >= i1 FROM {tbl}" },
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
-      {
-        "ignored": true,
-        "comment": "we don't handle equality checks correctly for float/double",
-        "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}"
-      },
-      {
-        "ignored": true,
-        "comment": "we don't handle equality checks correctly for float/double",
-        "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}"
-      },
-      {
-        "ignored": true,
-        "comment": "we don't handle equality checks correctly for float/double",
-        "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}"
-      }
+      { "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}" },
+      { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
+      { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
+      { "sql": "SELECT i1 = i1, i2 = i2, i1 != i1, i2 != i2, i1 <> i1, i2 <> i2 FROM {tbl}" },
+      { "sql": "SELECT * FROM (SELECT i1 = i2, i2 = i1, i1 != i2, i2 != i1 FROM {tbl})" },
+      { "sql": "SELECT CASE WHEN i1 = i2 THEN 'Yes' ELSE 'No' END, CASE WHEN i2 = i1 THEN 'Yes' ELSE 'No' END FROM {tbl}"},
+      { "sql": "SELECT CASE WHEN i1 != i2 THEN 'Yes' ELSE 'No' END, CASE WHEN i2 != i1 THEN 'Yes' ELSE 'No' END FROM {tbl}"},
+      { "sql": "SELECT CASE WHEN i1 <> i2 THEN 'Yes' ELSE 'No' END, CASE WHEN i2 <> i1 THEN 'Yes' ELSE 'No' END FROM {tbl}"},
+      { "sql": "SELECT * FROM {tbl} WHERE i1 != i2 and i2 != i1" },
+      { "sql": "SELECT * FROM {tbl} WHERE (i1 = i2 or i2 = i1) and i2 > i1" },
+      { "sql": "SELECT * FROM {tbl} WHERE (i1 <> i2 or i2 <> i1) and i2 > 0" }
     ]
   },
   "float_x_numeric_comp": {

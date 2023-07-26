@@ -18,12 +18,21 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.SubscriptionInitialPosition;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PulsarUtils {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(PulsarUtils.class);
+
+  private static final ByteBuffer LENGTH_BUF = ByteBuffer.allocate(4);
 
   private PulsarUtils() {
   }
@@ -50,5 +59,36 @@ public class PulsarUtils {
     }
 
     throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria);
+  }
+
+  /**
+   * Stitch key and value bytes together using a simple format:
+   * 4 bytes for key length + key bytes + 4 bytes for value length + value bytes
+   */
+  protected static byte[] stitchKeyValue(byte[] keyBytes, byte[] valueBytes) {
+    int keyLen = keyBytes.length;
+    int valueLen = valueBytes.length;
+    int totalByteArrayLength = 8 + keyLen + valueLen;
+    try (ByteArrayOutputStream bos = new ByteArrayOutputStream(totalByteArrayLength)) {
+      LENGTH_BUF.clear();
+      bos.write(LENGTH_BUF.putInt(keyLen).array());
+      bos.write(keyBytes);
+      LENGTH_BUF.clear();
+      bos.write(LENGTH_BUF.putInt(valueLen).array());
+      bos.write(valueBytes);
+      return bos.toByteArray();
+    } catch (Exception e) {
+      LOGGER.error("Unable to stitch key and value bytes together", e);
+    }
+    return null;
+  }
+
+  protected static PulsarStreamMessage buildPulsarStreamMessage(Message<byte[]> message, boolean enableKeyValueStitch,
+      PulsarMetadataExtractor pulsarMetadataExtractor) {
+    byte[] key = message.getKeyBytes();
+    byte[] data = enableKeyValueStitch ? stitchKeyValue(key, message.getData()) : message.getData();
+    int dataLength = (data != null) ? data.length : 0;
+    return new PulsarStreamMessage(key, data, message.getMessageId(),
+        (PulsarStreamMessageMetadata) pulsarMetadataExtractor.extract(message), dataLength);
   }
 }

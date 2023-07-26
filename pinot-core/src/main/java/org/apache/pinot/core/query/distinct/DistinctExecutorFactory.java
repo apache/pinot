@@ -22,9 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedMultiColumnDistinctOrderByExecutor;
 import org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedSingleColumnDistinctOnlyExecutor;
@@ -44,6 +43,7 @@ import org.apache.pinot.core.query.distinct.raw.RawLongSingleColumnDistinctOrder
 import org.apache.pinot.core.query.distinct.raw.RawMultiColumnDistinctExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawStringSingleColumnDistinctOnlyExecutor;
 import org.apache.pinot.core.query.distinct.raw.RawStringSingleColumnDistinctOrderByExecutor;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -58,28 +58,28 @@ public class DistinctExecutorFactory {
   /**
    * Returns the {@link DistinctExecutor} for the given distinct query.
    */
-  public static DistinctExecutor getDistinctExecutor(DistinctAggregationFunction distinctAggregationFunction,
-      TransformOperator transformOperator, boolean nullHandlingEnabled) {
-    List<ExpressionContext> expressions = distinctAggregationFunction.getInputExpressions();
-    List<OrderByExpressionContext> orderByExpressions = distinctAggregationFunction.getOrderByExpressions();
-    int limit = distinctAggregationFunction.getLimit();
+  public static DistinctExecutor getDistinctExecutor(BaseProjectOperator<?> projectOperator,
+      QueryContext queryContext) {
+    List<ExpressionContext> expressions = queryContext.getSelectExpressions();
+    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+    int limit = queryContext.getLimit();
     if (orderByExpressions == null) {
-      return getDistinctOnlyExecutor(expressions, limit, transformOperator, nullHandlingEnabled);
+      return getDistinctOnlyExecutor(expressions, limit, projectOperator, queryContext.isNullHandlingEnabled());
     } else {
-      return getDistinctOrderByExecutor(
-          expressions, orderByExpressions, limit, transformOperator, nullHandlingEnabled);
+      return getDistinctOrderByExecutor(expressions, orderByExpressions, limit, projectOperator,
+          queryContext.isNullHandlingEnabled());
     }
   }
 
   private static DistinctExecutor getDistinctOnlyExecutor(List<ExpressionContext> expressions, int limit,
-      TransformOperator transformOperator, boolean nullHandlingEnabled) {
+      BaseProjectOperator<?> projectOperator, boolean nullHandlingEnabled) {
     int numExpressions = expressions.size();
     if (numExpressions == 1) {
       // Single column
       ExpressionContext expression = expressions.get(0);
-      TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
-      DataType dataType = expressionMetadata.getDataType();
-      Dictionary dictionary = transformOperator.getDictionary(expression);
+      ColumnContext columnContext = projectOperator.getResultColumnContext(expression);
+      DataType dataType = columnContext.getDataType();
+      Dictionary dictionary = columnContext.getDictionary();
       if (dictionary != null && !nullHandlingEnabled) {
         // Dictionary based
         return new DictionaryBasedSingleColumnDistinctOnlyExecutor(expression, dictionary, dataType, limit);
@@ -108,22 +108,21 @@ public class DistinctExecutorFactory {
       // Multiple columns
       boolean hasMVExpression = false;
       List<DataType> dataTypes = new ArrayList<>(numExpressions);
-      for (ExpressionContext expression : expressions) {
-        TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
-        if (!expressionMetadata.isSingleValue()) {
-          hasMVExpression = true;
-        }
-        dataTypes.add(expressionMetadata.getDataType());
-      }
       List<Dictionary> dictionaries = new ArrayList<>(numExpressions);
       boolean dictionaryBased = true;
       for (ExpressionContext expression : expressions) {
-        Dictionary dictionary = transformOperator.getDictionary(expression);
-        if (dictionary != null) {
-          dictionaries.add(dictionary);
-        } else {
-          dictionaryBased = false;
-          break;
+        ColumnContext columnContext = projectOperator.getResultColumnContext(expression);
+        if (!columnContext.isSingleValue()) {
+          hasMVExpression = true;
+        }
+        dataTypes.add(columnContext.getDataType());
+        if (dictionaryBased) {
+          Dictionary dictionary = columnContext.getDictionary();
+          if (dictionary != null) {
+            dictionaries.add(dictionary);
+          } else {
+            dictionaryBased = false;
+          }
         }
       }
       if (dictionaryBased) {
@@ -132,23 +131,24 @@ public class DistinctExecutorFactory {
             limit);
       } else {
         // Raw value based
-        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataTypes, null, limit);
+        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataTypes, null, nullHandlingEnabled,
+            limit);
       }
     }
   }
 
   private static DistinctExecutor getDistinctOrderByExecutor(List<ExpressionContext> expressions,
-      List<OrderByExpressionContext> orderByExpressions, int limit, TransformOperator transformOperator,
+      List<OrderByExpressionContext> orderByExpressions, int limit, BaseProjectOperator<?> projectOperator,
       boolean nullHandlingEnabled) {
     int numExpressions = expressions.size();
     if (numExpressions == 1) {
       // Single column
       ExpressionContext expression = expressions.get(0);
-      TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
-      DataType dataType = expressionMetadata.getDataType();
+      ColumnContext columnContext = projectOperator.getResultColumnContext(expression);
+      DataType dataType = columnContext.getDataType();
       assert orderByExpressions.size() == 1;
       OrderByExpressionContext orderByExpression = orderByExpressions.get(0);
-      Dictionary dictionary = transformOperator.getDictionary(expression);
+      Dictionary dictionary = columnContext.getDictionary();
       // Note: Use raw value based when dictionary is not sorted (consuming segments).
       if (dictionary != null && dictionary.isSorted() && !nullHandlingEnabled) {
         // Dictionary based
@@ -186,32 +186,32 @@ public class DistinctExecutorFactory {
       // Multiple columns
       boolean hasMVExpression = false;
       List<DataType> dataTypes = new ArrayList<>(numExpressions);
-      for (ExpressionContext expression : expressions) {
-        TransformResultMetadata expressionMetadata = transformOperator.getResultMetadata(expression);
-        if (!expressionMetadata.isSingleValue()) {
-          hasMVExpression = true;
-        }
-        dataTypes.add(expressionMetadata.getDataType());
-      }
       List<Dictionary> dictionaries = new ArrayList<>(numExpressions);
       boolean dictionaryBased = true;
       for (ExpressionContext expression : expressions) {
-        Dictionary dictionary = transformOperator.getDictionary(expression);
-        // Note: Use raw value based when dictionary is not sorted (consuming segments).
-        if (dictionary != null && dictionary.isSorted()) {
-          dictionaries.add(dictionary);
-        } else {
-          dictionaryBased = false;
-          break;
+        ColumnContext columnContext = projectOperator.getResultColumnContext(expression);
+        if (!columnContext.isSingleValue()) {
+          hasMVExpression = true;
+        }
+        dataTypes.add(columnContext.getDataType());
+        if (dictionaryBased) {
+          Dictionary dictionary = columnContext.getDictionary();
+          // Note: Use raw value based when dictionary is not sorted (consuming segments).
+          if (dictionary != null && dictionary.isSorted()) {
+            dictionaries.add(dictionary);
+          } else {
+            dictionaryBased = false;
+          }
         }
       }
-      if (dictionaryBased) {
+      if (dictionaryBased && !nullHandlingEnabled) {
         // Dictionary based
         return new DictionaryBasedMultiColumnDistinctOrderByExecutor(expressions, hasMVExpression, dictionaries,
             dataTypes, orderByExpressions, limit);
       } else {
         // Raw value based
-        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataTypes, orderByExpressions, limit);
+        return new RawMultiColumnDistinctExecutor(expressions, hasMVExpression, dataTypes, orderByExpressions,
+            nullHandlingEnabled, limit);
       }
     }
   }

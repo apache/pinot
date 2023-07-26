@@ -21,7 +21,9 @@ package org.apache.pinot.broker.broker;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -40,13 +42,20 @@ public class BasicAuthAccessControlTest {
 
   private AccessControl _accessControl;
 
+  Set<String> _tableNames;
+
   @BeforeClass
   public void setup() {
     Map<String, Object> config = new HashMap<>();
     config.put("principals", "admin,user");
     config.put("principals.admin.password", "verysecret");
     config.put("principals.user.password", "secret");
-    config.put("principals.user.tables", "lessImportantStuff");
+    config.put("principals.user.tables", "lessImportantStuff,lesserImportantStuff,leastImportantStuff");
+
+    _tableNames = new HashSet<>();
+    _tableNames.add("lessImportantStuff");
+    _tableNames.add("lesserImportantStuff");
+    _tableNames.add("leastImportantStuff");
 
     AccessControlFactory factory = new BasicAuthAccessControlFactory();
     factory.init(new PinotConfiguration(config));
@@ -56,7 +65,7 @@ public class BasicAuthAccessControlTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testNullEntity() {
-    _accessControl.hasAccess(null, null);
+    _accessControl.hasAccess(null, (BrokerRequest) null);
   }
 
   @Test
@@ -66,7 +75,7 @@ public class BasicAuthAccessControlTest {
     HttpRequesterIdentity identity = new HttpRequesterIdentity();
     identity.setHttpHeaders(headers);
 
-    Assert.assertFalse(_accessControl.hasAccess(identity, null));
+    Assert.assertFalse(_accessControl.hasAccess(identity, (BrokerRequest) null));
   }
 
   @Test
@@ -84,6 +93,7 @@ public class BasicAuthAccessControlTest {
     request.setQuerySource(source);
 
     Assert.assertTrue(_accessControl.hasAccess(identity, request));
+    Assert.assertTrue(_accessControl.hasAccess(identity, _tableNames));
   }
 
   @Test
@@ -101,6 +111,14 @@ public class BasicAuthAccessControlTest {
     request.setQuerySource(source);
 
     Assert.assertFalse(_accessControl.hasAccess(identity, request));
+
+    Set<String> tableNames = new HashSet<>();
+    tableNames.add("veryImportantStuff");
+    Assert.assertFalse(_accessControl.hasAccess(identity, tableNames));
+    tableNames.add("lessImportantStuff");
+    Assert.assertFalse(_accessControl.hasAccess(identity, tableNames));
+    tableNames.add("lesserImportantStuff");
+    Assert.assertFalse(_accessControl.hasAccess(identity, tableNames));
   }
 
   @Test
@@ -118,6 +136,13 @@ public class BasicAuthAccessControlTest {
     request.setQuerySource(source);
 
     Assert.assertTrue(_accessControl.hasAccess(identity, request));
+
+    Set<String> tableNames = new HashSet<>();
+    tableNames.add("lessImportantStuff");
+    tableNames.add("veryImportantStuff");
+    tableNames.add("lesserImportantStuff");
+
+    Assert.assertTrue(_accessControl.hasAccess(identity, tableNames));
   }
 
   @Test
@@ -131,6 +156,9 @@ public class BasicAuthAccessControlTest {
     BrokerRequest request = new BrokerRequest();
 
     Assert.assertTrue(_accessControl.hasAccess(identity, request));
+
+    Set<String> tableNames = new HashSet<>();
+    Assert.assertTrue(_accessControl.hasAccess(identity, tableNames));
   }
 
   @Test
@@ -148,5 +176,6 @@ public class BasicAuthAccessControlTest {
     request.setQuerySource(source);
 
     Assert.assertTrue(_accessControl.hasAccess(identity, request));
+    Assert.assertTrue(_accessControl.hasAccess(identity, _tableNames));
   }
 }

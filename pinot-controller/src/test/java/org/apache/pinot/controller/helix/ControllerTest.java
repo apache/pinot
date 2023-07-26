@@ -26,6 +26,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +43,7 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ClusterConfig;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.ResourceConfig;
@@ -57,6 +59,7 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
@@ -76,6 +79,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,6 +88,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_I
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.fail;
 
 
 public class ControllerTest {
@@ -103,6 +108,8 @@ public class ControllerTest {
   // NOTE: To add HLC realtime table, number of Server instances must be multiple of replicas
   public static final int DEFAULT_NUM_SERVER_INSTANCES = 4;
 
+  public static final long TIMEOUT_MS = 10_000L;
+
   /**
    * default static instance used to access all wrapped static instances.
    */
@@ -112,8 +119,8 @@ public class ControllerTest {
 
   protected static HttpClient _httpClient = null;
 
-  protected int _controllerPort;
-  protected String _controllerBaseApiUrl;
+  private int _controllerPort;
+  private String _controllerBaseApiUrl;
   protected ControllerConf _controllerConfig;
   protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
 
@@ -210,7 +217,12 @@ public class ControllerTest {
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
     // Enable groovy on the controller
     properties.put(ControllerConf.DISABLE_GROOVY, false);
+    overrideControllerConf(properties);
     return properties;
+  }
+
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    // do nothing, to be overridden by tests if they need something specific
   }
 
   public void startController()
@@ -615,6 +627,11 @@ public class ControllerTest {
     getControllerRequestClient().addSchema(schema);
   }
 
+  public void updateSchema(Schema schema)
+      throws IOException {
+    getControllerRequestClient().updateSchema(schema);
+  }
+
   public Schema getSchema(String schemaName) {
     Schema schema = _helixResourceManager.getSchema(schemaName);
     assertNotNull(schema);
@@ -656,6 +673,11 @@ public class ControllerTest {
   public void dropRealtimeTable(String tableName)
       throws IOException {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+  }
+
+  public void waitForEVToDisappear(String tableNameWithType) {
+    TestUtils.waitForCondition(aVoid -> _helixResourceManager.getTableExternalView(tableNameWithType) == null, 60_000L,
+        "Failed to clean up the external view for table: " + tableNameWithType);
   }
 
   public List<String> listSegments(String tableName)
@@ -754,6 +776,10 @@ public class ControllerTest {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
+  public static String sendPostRequest(String urlString)
+    throws IOException {
+    return sendPostRequest(urlString, null);
+  }
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
     return sendPostRequest(urlString, payload, Collections.emptyMap());
@@ -949,6 +975,24 @@ public class ControllerTest {
   }
 
   /**
+   * Checks if the number of online instances for a given resource matches the expected num of instances or not.
+   */
+  public void checkNumOnlineInstancesFromExternalView(String resourceName, int expectedNumOnlineInstances)
+      throws InterruptedException {
+    long endTime = System.currentTimeMillis() + TIMEOUT_MS;
+    while (System.currentTimeMillis() < endTime) {
+      ExternalView resourceExternalView = DEFAULT_INSTANCE.getHelixAdmin()
+          .getResourceExternalView(DEFAULT_INSTANCE.getHelixClusterName(), resourceName);
+      Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
+      if (instanceSet.size() == expectedNumOnlineInstances) {
+        return;
+      }
+      Thread.sleep(100L);
+    }
+    fail("Failed to reach " + expectedNumOnlineInstances + " online instances for resource: " + resourceName);
+  }
+
+  /**
    * Make sure shared state is setup and valid before each test case class is run.
    */
   public void setupSharedStateAndValidate()
@@ -979,19 +1023,28 @@ public class ControllerTest {
    * test functionality.
    */
   public void cleanup() {
-
-    // Delete all tables.
-    List<String> tables = getHelixResourceManager().getAllTables();
-    for (String table : tables) {
-      getHelixResourceManager().deleteOfflineTable(table);
-      getHelixResourceManager().deleteRealtimeTable(table);
+    // Delete all tables
+    List<String> tables = _helixResourceManager.getAllTables();
+    for (String tableNameWithType : tables) {
+      if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+        _helixResourceManager.deleteOfflineTable(tableNameWithType);
+      } else {
+        _helixResourceManager.deleteRealtimeTable(tableNameWithType);
+      }
     }
 
+    // Wait for all external views to disappear
+    Set<String> tablesWithEV = new HashSet<>(tables);
+    TestUtils.waitForCondition(aVoid -> {
+      tablesWithEV.removeIf(t -> _helixResourceManager.getTableExternalView(t) == null);
+      return tablesWithEV.isEmpty();
+    }, 60_000L, "Failed to clean up all the external views");
+
     // Delete all schemas.
-    List<String> schemaNames = getHelixResourceManager().getSchemaNames();
+    List<String> schemaNames = _helixResourceManager.getSchemaNames();
     if (CollectionUtils.isNotEmpty(schemaNames)) {
       for (String schemaName : schemaNames) {
-        getHelixResourceManager().deleteSchema(getHelixResourceManager().getSchema(schemaName));
+        getHelixResourceManager().deleteSchema(schemaName);
       }
     }
   }

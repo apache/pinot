@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import java.io.Closeable;
+import org.apache.pinot.segment.spi.index.IndexReader;
 
 
-public interface InvertedIndexReader<T> extends Closeable {
+public interface InvertedIndexReader<T> extends IndexReader {
 
   /**
    * Returns the document ids for the given dictionary id.

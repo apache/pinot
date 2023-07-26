@@ -28,6 +28,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class URIUtilsTest {
@@ -50,6 +51,18 @@ public class URIUtilsTest {
     assertEquals(URIUtils.getPath("http://foo/bar", "table", "segment+%25"), "http://foo/bar/table/segment+%25");
     assertEquals(URIUtils.getPath("/foo/bar", "table", "segment+%25"), "/foo/bar/table/segment+%25");
     assertEquals(URIUtils.getPath("file:/foo/bar", "table", "segment+%25"), "file:/foo/bar/table/segment+%25");
+  }
+
+  @Test
+  public void testGetLastPart() {
+    assertNull(URIUtils.getLastPart(null));
+    assertEquals(URIUtils.getLastPart(""), "");
+    assertEquals(URIUtils.getLastPart("http://foo/bar"), "bar");
+    assertEquals(URIUtils.getLastPart("http://foo/bar?moo=x"), "bar");
+    assertEquals(URIUtils.getLastPart("?"), "");
+    assertEquals(URIUtils.getLastPart("?moo=x"), "");
+    assertEquals(URIUtils.getLastPart("/foo/bar"), "bar");
+    assertEquals(URIUtils.getLastPart("file:/foo/bar"), "bar");
   }
 
   @Test

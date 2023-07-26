@@ -21,24 +21,19 @@ package org.apache.pinot.core.plan;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
-import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
 /**
  * Execution plan for distinct queries on a single segment.
  */
-@SuppressWarnings("rawtypes")
 public class DistinctPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
@@ -50,20 +45,17 @@ public class DistinctPlanNode implements PlanNode {
 
   @Override
   public Operator<DistinctResultsBlock> run() {
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null && aggregationFunctions.length == 1
-        && aggregationFunctions[0] instanceof DistinctAggregationFunction;
-    DistinctAggregationFunction distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
-    List<ExpressionContext> expressions = distinctAggregationFunction.getInputExpressions();
+    List<ExpressionContext> expressions = _queryContext.getSelectExpressions();
 
     // Use dictionary to solve the query if possible
-    if (_queryContext.getFilter() == null && !_queryContext.isNullHandlingEnabled() && expressions.size() == 1) {
-      ExpressionContext expression = expressions.get(0);
-      if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
-        DataSource dataSource = _indexSegment.getDataSource(expression.getIdentifier());
-        Dictionary dictionary = dataSource.getDictionary();
-        if (dictionary != null) {
-          DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    if (_queryContext.getFilter() == null && expressions.size() == 1) {
+      String column = expressions.get(0).getIdentifier();
+      if (column != null) {
+        DataSource dataSource = _indexSegment.getDataSource(column);
+        if (dataSource.getDictionary() != null) {
+          if (!_queryContext.isNullHandlingEnabled()) {
+            return new DictionaryBasedDistinctOperator(dataSource, _queryContext);
+          }
           // If nullHandlingEnabled is set to true, and the column contains null values, call DistinctOperator instead
           // of DictionaryBasedDistinctOperator since nullValueVectorReader is a form of a filter.
           // TODO: reserve special value in dictionary (e.g. -1) for null in the future so
@@ -71,15 +63,14 @@ public class DistinctPlanNode implements PlanNode {
           //  dictionary-encoded columns.
           NullValueVectorReader nullValueReader = dataSource.getNullValueVector();
           if (nullValueReader == null || nullValueReader.getNullBitmap().isEmpty()) {
-            return new DictionaryBasedDistinctOperator(dataSourceMetadata.getDataType(), distinctAggregationFunction,
-                dictionary, dataSourceMetadata.getNumDocs(), _queryContext.isNullHandlingEnabled());
+            return new DictionaryBasedDistinctOperator(dataSource, _queryContext);
           }
         }
       }
     }
 
-    TransformOperator transformOperator =
-        new TransformPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-    return new DistinctOperator(_indexSegment, distinctAggregationFunction, transformOperator, _queryContext);
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+    return new DistinctOperator(_indexSegment, projectOperator, _queryContext);
   }
 }

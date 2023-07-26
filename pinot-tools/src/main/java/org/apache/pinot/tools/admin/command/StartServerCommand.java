@@ -86,6 +86,7 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   // TODO support forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir"}
   private String _configFileName;
 
+  @CommandLine.Option(names = {"-configOverride"}, required = false, split = ",")
   private Map<String, Object> _configOverrides = new HashMap<>();
 
   @Override

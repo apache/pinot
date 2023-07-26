@@ -89,6 +89,12 @@ public class QueryOverrideWithHintsTest {
       return null;
     }
 
+    @Nullable
+    @Override
+    public ThreadSafeMutableRoaringBitmap getQueryableDocIds() {
+      return null;
+    }
+
     @Override
     public GenericRow getRecord(int docId, GenericRow reuse) {
       return null;

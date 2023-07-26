@@ -41,6 +41,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -103,6 +104,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *       <li>"/segments/{tableName}/crc": get a map from segment to CRC of the segment (OFFLINE table only)</li>
  *       <li>"/segments/{tableName}/{segmentName}/metadata: get the metadata for a segment</li>
  *       <li>"/segments/{tableName}/metadata: get the metadata for all segments from the server</li>
+ *       <li>"/segments/{tableName}/zkmetadata: get the zk metadata for all segments of a table</li>
  *       <li>"/segments/{tableName}/{segmentName}/tiers": get storage tier for the segment in the table</li>
  *       <li>"/segments/{tableName}/tiers": get storage tier for all segments in the table</li>
  *     </ul>
@@ -196,19 +198,19 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to exclude replaced segments in the response, which have been replaced"
           + " specified in the segment lineage entries and cannot be queried from the table")
-      @QueryParam("excludeReplacedSegments") String excludeReplacedSegments) {
-    List<String> tableNamesWithType = ResourceUtils
-        .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableTypeStr),
-            LOGGER);
+      @QueryParam("excludeReplacedSegments") String excludeReplacedSegments,
+      @ApiParam(value = "Start timestamp (inclusive)") @QueryParam("startTimestamp") @DefaultValue("")
+      String startTimestampStr,
+      @ApiParam(value = "End timestamp (exclusive)") @QueryParam("endTimestamp") @DefaultValue("")
+      String endTimestampStr,
+      @ApiParam(value = "Whether to exclude the segments overlapping with the timestamps, false by default")
+      @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping) {
     boolean shouldExcludeReplacedSegments = Boolean.parseBoolean(excludeReplacedSegments);
-    List<Map<TableType, List<String>>> resultList = new ArrayList<>(tableNamesWithType.size());
-    for (String tableNameWithType : tableNamesWithType) {
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      List<String> segments =
-          _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, shouldExcludeReplacedSegments);
-      resultList.add(Collections.singletonMap(tableType, segments));
-    }
-    return resultList;
+    return selectSegments(tableName, tableTypeStr, shouldExcludeReplacedSegments,
+        startTimestampStr, endTimestampStr, excludeOverlapping)
+        .stream()
+        .map(pair -> Collections.singletonMap(pair.getKey(), pair.getValue()))
+        .collect(Collectors.toList());
   }
 
   @GET
@@ -516,7 +518,7 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(
       value = "Resets a segment by first disabling it, waiting for external view to stabilize, and finally enabling "
-          + "it again", notes = "Resets a segment by disabling and then enabling the segment")
+          + "it again", notes = "Resets a segment by disabling and then enabling it")
   public SuccessResponse resetSegment(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
@@ -542,7 +544,7 @@ public class PinotSegmentRestletResource {
   }
 
   /**
-   * Resets all segments of the given table
+   * Resets all segments or segments with Error state of the given table
    * This API will take segments to OFFLINE state, wait for External View to stabilize, and then back to
    * ONLINE/CONSUMING state,
    * thus effective in resetting segments or consumers in error states.
@@ -552,18 +554,21 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(
-      value = "Resets all segments of the table, by first disabling them, waiting for external view to stabilize, and"
-          + " finally enabling the segments", notes = "Resets a segment by disabling and then enabling a segment")
-  public SuccessResponse resetAllSegments(
+      value = "Resets all segments (when errorSegmentsOnly = false) or segments with Error state (when "
+          + "errorSegmentsOnly = true) of the table, by first disabling them, waiting for external view to stabilize,"
+          + " and finally enabling them", notes = "Resets segments by disabling and then enabling them")
+  public SuccessResponse resetSegments(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
       @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
-          String targetInstance) {
+          String targetInstance,
+      @ApiParam(value = "Whether to reset only segments with error state") @QueryParam("errorSegmentsOnly")
+      @DefaultValue("false") boolean errorSegmentsOnly) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
-      _pinotHelixResourceManager.resetAllSegments(tableNameWithType, targetInstance);
-      return new SuccessResponse(String.format("Successfully reset all segments of table: %s", tableNameWithType));
+      _pinotHelixResourceManager.resetSegments(tableNameWithType, targetInstance, errorSegmentsOnly);
+      return new SuccessResponse(String.format("Successfully reset segments of table: %s", tableNameWithType));
     } catch (IllegalStateException e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to reset segments in table: %s. %s", tableNameWithType, e.getMessage()),
@@ -619,7 +624,8 @@ public class PinotSegmentRestletResource {
   public ServerReloadControllerJobStatusResponse getReloadJobStatus(
       @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
       throws Exception {
-    Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId);
+    Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.
+            getControllerJobZKMetadata(reloadJobId, ControllerJobType.RELOAD_SEGMENT);
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + reloadJobId,
           Status.NOT_FOUND);
@@ -629,11 +635,10 @@ public class PinotSegmentRestletResource {
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
     Map<String, List<String>> serverToSegments;
 
-    String singleSegmentName = null;
-    if (controllerJobZKMetadata.get(CommonConstants.ControllerJob.JOB_TYPE)
-        .equals(ControllerJobType.RELOAD_SEGMENT.toString())) {
+    String singleSegmentName =
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
+    if (singleSegmentName != null) {
       // No need to query servers where this segment is not supposed to be hosted
-      singleSegmentName = controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
       serverToSegments = new HashMap<>();
       List<String> segmentList = Arrays.asList(singleSegmentName);
       _pinotHelixResourceManager.getServers(tableNameWithType, singleSegmentName).forEach(server -> {
@@ -860,6 +865,52 @@ public class PinotSegmentRestletResource {
     }
   }
 
+  @DELETE
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableName}/choose")
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation(value = "Delete selected segments. An optional 'excludeReplacedSegments' parameter is used to get the"
+      + " list of segments which has not yet been replaced (determined by segment lineage entries) and can be queried"
+      + " from the table. The value is false by default.",
+      // TODO: more and more filters can be added later on, like excludeErrorSegments, excludeConsumingSegments, etc.
+      notes = "List all segments")
+  public SuccessResponse deleteSegmentsWithTimeWindow(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Whether to ignore replaced segments for deletion, which have been replaced"
+          + " specified in the segment lineage entries and cannot be queried from the table, false by default")
+      @QueryParam("excludeReplacedSegments") @DefaultValue("false") boolean excludeReplacedSegments,
+      @ApiParam(value = "Start timestamp (inclusive) in milliseconds", required = true) @QueryParam("startTimestamp")
+          String startTimestampStr,
+      @ApiParam(value = "End timestamp (exclusive) in milliseconds", required = true) @QueryParam("endTimestamp")
+          String endTimestampStr,
+      @ApiParam(value = "Whether to ignore segments that are partially overlapping with the [start, end)"
+          + "for deletion, true by default")
+      @QueryParam("excludeOverlapping") @DefaultValue("true") boolean excludeOverlapping,
+      @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
+          + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
+          + "Using 0d or -1d will instantly delete segments without retention")
+      @QueryParam("retention") String retentionPeriod) {
+    if (Strings.isNullOrEmpty(startTimestampStr) || Strings.isNullOrEmpty(endTimestampStr)) {
+      throw new ControllerApplicationException(LOGGER, "start and end timestamp must by non empty", Status.BAD_REQUEST);
+    }
+
+    int numSegments = 0;
+    for (Pair<TableType, List<String>> tableTypeSegments : selectSegments(
+        tableName, tableTypeStr, excludeReplacedSegments, startTimestampStr, endTimestampStr, excludeOverlapping)) {
+      TableType tableType = tableTypeSegments.getLeft();
+      List<String> segments = tableTypeSegments.getRight();
+      numSegments += segments.size();
+      if (segments.isEmpty()) {
+        continue;
+      }
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+      deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod);
+    }
+    return new SuccessResponse("Deleted " + numSegments + " segments from table: " + tableName);
+  }
+
   private void deleteSegmentsInternal(String tableNameWithType, List<String> segments, String retentionPeriod) {
     PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments,
         retentionPeriod);
@@ -896,6 +947,30 @@ public class PinotSegmentRestletResource {
           Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("segments/{tableName}/zkmetadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the zookeeper metadata for all table segments", notes = "Get the zookeeper metadata for "
+      + "all table segments")
+  public Map<String, Map<String, String>> getZookeeperMetadata(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr)
+      throws JsonProcessingException {
+    LOGGER.info("Received a request to fetch zookeeper metadata for all segments for table {}", tableName);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+    Map<String, Map<String, String>> segmentToMetadataMap = new HashMap<>();
+    List<SegmentZKMetadata> segmentZKMetadataList =
+        _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
+
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      segmentToMetadataMap.put(segmentZKMetadata.getSegmentName(), segmentZKMetadata.toMap());
+    }
+    return segmentToMetadataMap;
   }
 
   @GET
@@ -955,6 +1030,7 @@ public class PinotSegmentRestletResource {
     return tableTierDetails;
   }
 
+  @Deprecated
   @GET
   @Path("segments/{tableName}/select")
   @Produces(MediaType.APPLICATION_JSON)
@@ -969,14 +1045,22 @@ public class PinotSegmentRestletResource {
   public List<Map<TableType, List<String>>> getSelectedSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Start timestamp (inclusive)") @QueryParam("startTimestamp") @DefaultValue("")
+      @ApiParam(value = "Start timestamp (inclusive) in milliseconds") @QueryParam("startTimestamp") @DefaultValue("")
           String startTimestampStr,
-      @ApiParam(value = "End timestamp (exclusive)") @QueryParam("endTimestamp") @DefaultValue("")
+      @ApiParam(value = "End timestamp (exclusive) in milliseconds") @QueryParam("endTimestamp") @DefaultValue("")
           String endTimestampStr,
       @ApiParam(value = "Whether to exclude the segments overlapping with the timestamps, false by default")
       @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping) {
-    long startTimestamp = Strings.isNullOrEmpty(startTimestampStr) ? Long.MIN_VALUE : Long.parseLong(startTimestampStr);
-    long endTimestamp = Strings.isNullOrEmpty(endTimestampStr) ? Long.MAX_VALUE : Long.parseLong(endTimestampStr);
+    long startTimestamp;
+    long endTimestamp;
+    try {
+      startTimestamp = Strings.isNullOrEmpty(startTimestampStr) ? Long.MIN_VALUE : Long.parseLong(startTimestampStr);
+      endTimestamp = Strings.isNullOrEmpty(endTimestampStr) ? Long.MAX_VALUE : Long.parseLong(endTimestampStr);
+    } catch (NumberFormatException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to parse the start/end timestamp. Please make sure they are in 'millisSinceEpoch' format.",
+          Response.Status.BAD_REQUEST, e);
+    }
     Preconditions.checkArgument(startTimestamp < endTimestamp,
         "The value of startTimestamp should be smaller than the one of endTimestamp. Start timestamp: %d. End "
             + "timestamp: %d",
@@ -988,8 +1072,9 @@ public class PinotSegmentRestletResource {
     List<Map<TableType, List<String>>> resultList = new ArrayList<>(tableNamesWithType.size());
     for (String tableNameWithType : tableNamesWithType) {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      List<String> segments = _pinotHelixResourceManager
-          .getSegmentsForTableWithTimestamps(tableNameWithType, startTimestamp, endTimestamp, excludeOverlapping);
+      List<String> segments =
+          _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, true, startTimestamp, endTimestamp,
+              excludeOverlapping);
       resultList.add(Collections.singletonMap(tableType, segments));
     }
     return resultList;
@@ -1071,5 +1156,35 @@ public class PinotSegmentRestletResource {
             Response.Status.INTERNAL_SERVER_ERROR, e);
       }
       return new SuccessResponse("Successfully updated time interval zk metadata for table: " + tableNameWithType);
+  }
+
+  private List<Pair<TableType, List<String>>> selectSegments(
+      String tableName, String tableTypeStr, boolean excludeReplacedSegments, String startTimestampStr,
+      String endTimestampStr, boolean excludeOverlapping) {
+    long startTimestamp;
+    long endTimestamp;
+    try {
+      startTimestamp = Strings.isNullOrEmpty(startTimestampStr) ? Long.MIN_VALUE : Long.parseLong(startTimestampStr);
+      endTimestamp = Strings.isNullOrEmpty(endTimestampStr) ? Long.MAX_VALUE : Long.parseLong(endTimestampStr);
+    } catch (NumberFormatException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to parse the start/end timestamp. Please make sure they are in 'millisSinceEpoch' format.",
+          Response.Status.BAD_REQUEST, e);
+    }
+    Preconditions.checkArgument(startTimestamp < endTimestamp,
+        "The value of startTimestamp should be smaller than the one of endTimestamp. Start timestamp: %d. End "
+            + "timestamp: %d", startTimestamp, endTimestamp);
+
+    List<String> tableNamesWithType = ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName,
+        Constants.validateTableType(tableTypeStr), LOGGER);
+    List<Pair<TableType, List<String>>> resultList = new ArrayList<>(tableNamesWithType.size());
+    for (String tableNameWithType : tableNamesWithType) {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      List<String> segments =
+          _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, excludeReplacedSegments, startTimestamp,
+              endTimestamp, excludeOverlapping);
+      resultList.add(Pair.of(tableType, segments));
+    }
+    return resultList;
   }
 }

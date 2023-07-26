@@ -21,7 +21,7 @@ package org.apache.pinot.core.query.aggregation.groupby;
 import java.util.Collection;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
 /**
@@ -30,11 +30,9 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 public interface GroupByExecutor {
 
   /**
-   * Performs the group-by aggregation on the given transform block.
-   *
-   * @param transformBlock Transform block
+   * Performs the group-by aggregation on the given value block.
    */
-  void process(TransformBlock transformBlock);
+  void process(ValueBlock valueBlock);
 
   /**
    * Returns the result of group-by aggregation.

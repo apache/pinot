@@ -104,7 +104,8 @@ public class GitHubEventsQuickstart extends QuickStartBase {
     File tableConfigFile = new File(quickStartDataDir, "pullRequestMergedEvents_realtime_table_config.json");
 
     ClassLoader classLoader = Quickstart.class.getClassLoader();
-    URL resource = classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_schema.json");
+    URL resource = classLoader.getResource(
+        "examples/stream/pullRequestMergedEvents/pullRequestMergedEvents_schema.json");
     Preconditions.checkNotNull(resource);
     FileUtils.copyURLToFile(resource, schemaFile);
     String tableConfigFilePath = getTableConfigFilePath();
@@ -186,12 +187,12 @@ public class GitHubEventsQuickstart extends QuickStartBase {
     switch (_sourceType) {
       case KINESIS:
         tableConfigFilePath =
-            "examples/stream/githubEvents/pullRequestMergedEvents_kinesis_realtime_table_config.json";
+            "examples/stream/pullRequestMergedEvents/pullRequestMergedEvents_kinesis_realtime_table_config.json";
         break;
       case KAFKA:
       default:
         tableConfigFilePath =
-            "examples/stream/githubEvents/pullRequestMergedEvents_realtime_table_config.json";
+            "examples/stream/pullRequestMergedEvents/pullRequestMergedEvents_realtime_table_config.json";
         break;
     }
     return tableConfigFilePath;

@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.google.common.collect.Ordering;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -99,67 +100,6 @@ public class DataSchema {
       _storedColumnDataTypes = storedColumnDataTypes;
     }
     return storedColumnDataTypes;
-  }
-
-  /**
-   * Returns whether the given data schema is type compatible with this one.
-   * <ul>
-   *   <li>All numbers are type compatible with each other</li>
-   *   <li>Numbers are not type compatible with string</li>
-   *   <li>Non-array types are not type compatible with array types</li>
-   * </ul>
-   *
-   * @param anotherDataSchema Data schema to compare with
-   * @return Whether the two data schemas are type compatible
-   */
-  public boolean isTypeCompatibleWith(DataSchema anotherDataSchema) {
-    if (!Arrays.equals(_columnNames, anotherDataSchema._columnNames)) {
-      return false;
-    }
-    int numColumns = _columnNames.length;
-    for (int i = 0; i < numColumns; i++) {
-      if (!_columnDataTypes[i].isCompatible(anotherDataSchema._columnDataTypes[i])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Upgrade the current data schema to cover the column data types in the given data schema.
-   * <p>Data type <code>LONG</code> can cover <code>INT</code> and <code>LONG</code>.
-   * <p>Data type <code>DOUBLE</code> can cover all numbers, but with potential precision loss when use it to cover
-   * <code>LONG</code>.
-   * <p>NOTE: The given data schema should be type compatible with this one.
-   *
-   * @param originalSchema the original Data schema
-   * @param anotherDataSchema Data schema to cover
-   */
-  public static DataSchema upgradeToCover(DataSchema originalSchema, DataSchema anotherDataSchema) {
-    int numColumns = originalSchema._columnDataTypes.length;
-    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      ColumnDataType thisColumnDataType = originalSchema._columnDataTypes[i];
-      ColumnDataType thatColumnDataType = anotherDataSchema._columnDataTypes[i];
-      if (thisColumnDataType != thatColumnDataType) {
-        if (thisColumnDataType.isArray()) {
-          if (thisColumnDataType.isWholeNumberArray() && thatColumnDataType.isWholeNumberArray()) {
-            columnDataTypes[i] = ColumnDataType.LONG_ARRAY;
-          } else {
-            columnDataTypes[i] = ColumnDataType.DOUBLE_ARRAY;
-          }
-        } else {
-          if (thisColumnDataType.isWholeNumber() && thatColumnDataType.isWholeNumber()) {
-            columnDataTypes[i] = ColumnDataType.LONG;
-          } else {
-            columnDataTypes[i] = ColumnDataType.DOUBLE;
-          }
-        }
-      } else {
-        columnDataTypes[i] = originalSchema._columnDataTypes[i];
-      }
-    }
-    return new DataSchema(originalSchema._columnNames, columnDataTypes);
   }
 
   public byte[] toBytes()
@@ -270,7 +210,8 @@ public class DataSchema {
     BOOLEAN_ARRAY(INT_ARRAY, new int[0]),
     TIMESTAMP_ARRAY(LONG_ARRAY, new long[0]),
     STRING_ARRAY(new String[0]),
-    BYTES_ARRAY(new byte[0][]);
+    BYTES_ARRAY(new byte[0][]),
+    UNKNOWN(null);
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final Ordering<ColumnDataType> NUMERIC_TYPE_ORDERING = Ordering.explicit(INT, LONG, FLOAT, DOUBLE);
@@ -357,25 +298,35 @@ public class DataSchema {
     public DataType toDataType() {
       switch (this) {
         case INT:
+        case INT_ARRAY:
           return DataType.INT;
         case LONG:
+        case LONG_ARRAY:
           return DataType.LONG;
         case FLOAT:
+        case FLOAT_ARRAY:
           return DataType.FLOAT;
         case DOUBLE:
+        case DOUBLE_ARRAY:
           return DataType.DOUBLE;
         case BIG_DECIMAL:
           return DataType.BIG_DECIMAL;
         case BOOLEAN:
+        case BOOLEAN_ARRAY:
           return DataType.BOOLEAN;
         case TIMESTAMP:
+        case TIMESTAMP_ARRAY:
           return DataType.TIMESTAMP;
         case STRING:
+        case STRING_ARRAY:
           return DataType.STRING;
         case JSON:
           return DataType.JSON;
         case BYTES:
+        case BYTES_ARRAY:
           return DataType.BYTES;
+        case UNKNOWN:
+          return DataType.UNKNOWN;
         default:
           throw new IllegalStateException(String.format("Cannot convert ColumnDataType: %s to DataType", this));
       }
@@ -422,6 +373,7 @@ public class DataSchema {
           return toTimestampArray(value);
         case BYTES_ARRAY:
           return (byte[][]) value;
+        case UNKNOWN: // fall through
         case OBJECT:
           return (Serializable) value;
         default:
@@ -526,6 +478,8 @@ public class DataSchema {
     private static long[] toLongArray(Object value) {
       if (value instanceof long[]) {
         return (long[]) value;
+      } else if (value instanceof LongArrayList) {
+        return ((LongArrayList) value).elements();
       } else {
         int[] intValues = (int[]) value;
         int length = intValues.length;
@@ -586,6 +540,8 @@ public class DataSchema {
           return JSON;
         case BYTES:
           return BYTES;
+        case UNKNOWN:
+          return UNKNOWN;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }

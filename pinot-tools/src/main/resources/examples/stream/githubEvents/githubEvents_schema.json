@@ -1,0 +1,27 @@
+{
+  "schemaName": "githubEvents",
+  "dimensionFieldSpecs": [
+    {
+      "name": "id",
+      "dataType": "STRING"
+    },
+    {
+      "name": "type",
+      "dataType": "STRING"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "created_at",
+      "dataType": "STRING",
+      "format": "1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ssZ",
+      "granularity": "1:HOURS"
+    },
+    {
+      "name": "created_at_timestamp",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:TIMESTAMP",
+      "granularity": "1:SECONDS"
+    }
+  ]
+}

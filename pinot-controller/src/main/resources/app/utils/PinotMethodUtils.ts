@@ -17,6 +17,7 @@
  * under the License.
  */
 
+import jwtDecode from "jwt-decode";
 import { get, map, each, isEqual, isArray, keys, union } from 'lodash';
 import { DataTable, SQLResult } from 'Models';
 import moment from 'moment';
@@ -577,6 +578,7 @@ const getSegmentDetails = (tableName, segmentName) => {
     const segmentMetaDataJson = { ...segmentMetaData }
     delete segmentMetaDataJson.indexes
     delete segmentMetaDataJson.columns
+    const indexes = get(segmentMetaData, 'indexes', {})
 
     return {
       replicaSet: {
@@ -585,7 +587,7 @@ const getSegmentDetails = (tableName, segmentName) => {
       },
       indexes: {
         columns: ['Field Name', 'Bloom Filter', 'Dictionary', 'Forward Index', 'Sorted', 'Inverted Index', 'JSON Index', 'Null Value Vector Reader', 'Range Index'],
-        records: Object.keys(segmentMetaData.indexes).map(fieldName => [
+        records: Object.keys(indexes).map(fieldName => [
           fieldName,
           segmentMetaData.indexes[fieldName]["bloom-filter"] === "YES",
           segmentMetaData.indexes[fieldName]["dictionary"] === "YES",
@@ -1002,7 +1004,9 @@ const verifyAuth = (authToken) => {
 
 const getAccessTokenFromHashParams = () => {
   let accessToken = '';
-  const urlSearchParams = new URLSearchParams(location.hash.substr(1));
+  const hashParam = removeAllLeadingForwardSlash(location.hash.substring(1));
+  
+  const urlSearchParams = new URLSearchParams(hashParam);
   if (urlSearchParams.has('access_token')) {
     accessToken = urlSearchParams.get('access_token') as string;
   }
@@ -1010,6 +1014,13 @@ const getAccessTokenFromHashParams = () => {
   return accessToken;
 };
 
+const removeAllLeadingForwardSlash = (string: string) => {
+  if(!string) {
+    return "";
+  }
+
+  return string.replace(new RegExp("^/+", "g"), "");
+}
 
 // validates app redirect path with known routes
 const validateRedirectPath = (path: string): boolean => {
@@ -1144,6 +1155,52 @@ const updateUser = (userObject, passwordChanged) =>{
   })
 }
 
+const getAuthUserNameFromAccessToken = (
+  accessToken: string
+): string => {
+  if (!accessToken) {
+      return "";
+  }
+
+  let decoded;
+  try {
+      decoded = jwtDecode(accessToken);
+  } catch (e) {
+      return "";
+  }
+
+  if (!decoded) {
+      return "";
+  }
+
+  const name = get(decoded, "name") || "";
+  return name;
+};
+
+const getAuthUserEmailFromAccessToken = (
+  accessToken: string
+): string => {
+  if (!accessToken) {
+      return "";
+  }
+
+  let decoded;
+  try {
+      decoded = jwtDecode(accessToken);
+  } catch (e) {
+      return "";
+  }
+
+  if (!decoded) {
+      return "";
+  }
+
+  const email =
+      get(decoded, "email") || "";
+
+  return email;
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -1226,5 +1283,7 @@ export default {
   getUserList,
   addUser,
   deleteUser,
-  updateUser
+  updateUser,
+  getAuthUserNameFromAccessToken,
+  getAuthUserEmailFromAccessToken
 };

@@ -50,6 +50,7 @@ import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,14 +96,14 @@ public class ServerInstance {
 
     String instanceDataManagerClassName = serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Initializing instance data manager of class: {}", instanceDataManagerClassName);
-    _instanceDataManager = (InstanceDataManager) Class.forName(instanceDataManagerClassName).newInstance();
+    _instanceDataManager = PluginManager.get().createInstance(instanceDataManagerClassName);
     _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics);
 
     // Initialize FunctionRegistry before starting the query executor
     FunctionRegistry.init();
     String queryExecutorClassName = serverConf.getQueryExecutorClassName();
     LOGGER.info("Initializing query executor of class: {}", queryExecutorClassName);
-    _queryExecutor = (QueryExecutor) Class.forName(queryExecutorClassName).newInstance();
+    _queryExecutor = PluginManager.get().createInstance(queryExecutorClassName);
     PinotConfiguration queryExecutorConfig = serverConf.getQueryExecutorConfig();
     _queryExecutor.init(queryExecutorConfig, _instanceDataManager, _serverMetrics);
 

@@ -26,6 +26,7 @@ import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -74,7 +75,12 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
       if (functionInfo != null) {
         Object[] arguments = new Object[numOperands];
         for (int i = 0; i < numOperands; i++) {
-          arguments[i] = function.getOperands().get(i).getLiteral().getFieldValue();
+          Literal literal = function.getOperands().get(i).getLiteral();
+          if (literal.isSetNullValue()) {
+            arguments[i] = null;
+          } else {
+            arguments[i] = function.getOperands().get(i).getLiteral().getFieldValue();
+          }
         }
         try {
           FunctionInvoker invoker = new FunctionInvoker(functionInfo);

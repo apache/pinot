@@ -60,6 +60,7 @@ import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.minion.InMemoryTaskManagerStatusCache;
 import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
+import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TlsUtils;
@@ -97,6 +98,7 @@ import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
@@ -179,6 +181,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
 
     setupHelixSystemProperties();
+    HelixHelper.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
     _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
     _controllerMode = _config.getControllerMode();
     inferHostnameIfNeeded(_config);
@@ -242,19 +245,19 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
-    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _config
-        .getProperty(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
+    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
+        _config.getProperty(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
   private void setupHelixClusterConstraints() {
-    String maxStateTransitions = _config
-        .getProperty(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
+    String maxStateTransitions =
+        _config.getProperty(CommonConstants.Helix.CONFIG_OF_HELIX_INSTANCE_MAX_STATE_TRANSITIONS,
             CommonConstants.Helix.DEFAULT_HELIX_INSTANCE_MAX_STATE_TRANSITIONS);
     Map<ClusterConstraints.ConstraintAttribute, String> constraintAttributes = new HashMap<>();
     constraintAttributes.put(ClusterConstraints.ConstraintAttribute.INSTANCE, ".*");
-    constraintAttributes
-        .put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE, Message.MessageType.STATE_TRANSITION.name());
+    constraintAttributes.put(ClusterConstraints.ConstraintAttribute.MESSAGE_TYPE,
+        Message.MessageType.STATE_TRANSITION.name());
     ConstraintItem constraintItem = new ConstraintItem(constraintAttributes, maxStateTransitions);
 
     _helixControllerManager.getClusterManagmentTool()
@@ -319,6 +322,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   @Override
   public void start() {
     LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
+    LOGGER.info("Controller configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
     Utils.logVersions();
 
     // Set up controller metrics
@@ -367,8 +371,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   private void setUpPinotController() {
     // install default SSL context if necessary (even if not force-enabled everywhere)
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_config, ControllerConf.CONTROLLER_TLS_PREFIX);
-    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils
-        .isNotBlank(tlsDefaults.getTrustStorePath())) {
+    if (StringUtils.isNotBlank(tlsDefaults.getKeyStorePath()) || StringUtils.isNotBlank(
+        tlsDefaults.getTrustStorePath())) {
       LOGGER.info("Installing default SSL context for any client requests");
       TlsUtils.installDefaultSSLSocketFactory(tlsDefaults);
     }
@@ -388,8 +392,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         _config.getProperty(CommonConstants.Controller.CONFIG_OF_CONTROLLER_QUERY_REWRITER_CLASS_NAMES));
 
     LOGGER.info("Initializing Helix participant manager");
-    _helixParticipantManager = HelixManagerFactory
-        .getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
+    _helixParticipantManager =
+        HelixManagerFactory.getZKHelixManager(_helixClusterName, _helixParticipantInstanceId, InstanceType.PARTICIPANT,
+            _helixZkURL);
 
     // LeadControllerManager needs to be initialized before registering as Helix participant.
     LOGGER.info("Initializing lead controller manager");
@@ -406,6 +411,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
     _helixResourceManager.start(_helixParticipantManager);
+
+    // Initialize segment lifecycle event listeners
+    PinotSegmentLifecycleEventListenerManager.getInstance().init(_helixParticipantManager);
 
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager =
@@ -459,7 +467,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     }
 
     final MetadataEventNotifierFactory metadataEventNotifierFactory =
-        MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX));
+        MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX), _helixResourceManager);
 
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
@@ -665,7 +673,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _taskManagerStatusCache = getTaskManagerStatusCache();
     _taskManager =
         new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _leadControllerManager, _config,
-            _controllerMetrics, _taskManagerStatusCache);
+            _controllerMetrics, _taskManagerStatusCache, _executorService, _connectionManager);
     periodicTasks.add(_taskManager);
     _retentionManager =
         new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics);
@@ -685,8 +693,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
             _executorService);
     periodicTasks.add(_segmentStatusChecker);
-    _realtimeConsumerMonitor = new RealtimeConsumerMonitor(_config, _helixResourceManager, _leadControllerManager,
-        _controllerMetrics, _executorService);
+    _realtimeConsumerMonitor =
+        new RealtimeConsumerMonitor(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics,
+            _executorService);
     periodicTasks.add(_realtimeConsumerMonitor);
     _segmentRelocator = new SegmentRelocator(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         _executorService, _connectionManager);

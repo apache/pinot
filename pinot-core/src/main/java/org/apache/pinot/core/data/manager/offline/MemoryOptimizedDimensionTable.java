@@ -37,7 +37,7 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
   private final Map<PrimaryKey, LookupRecordLocation> _lookupTable;
   private final Schema _tableSchema;
   private final List<String> _primaryKeyColumns;
-  private final GenericRow _reuse = new GenericRow();
+  private final ThreadLocal<GenericRow> _reuse = ThreadLocal.withInitial(GenericRow::new);
   private final List<SegmentDataManager> _segmentDataManagers;
   private final TableDataManager _tableDataManager;
 
@@ -62,7 +62,9 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
     if (lookupRecordLocation == null) {
       return null;
     }
-    return lookupRecordLocation.getRecord(_reuse);
+    GenericRow reuse = _reuse.get();
+    reuse.clear();
+    return lookupRecordLocation.getRecord(reuse);
   }
 
   @Override

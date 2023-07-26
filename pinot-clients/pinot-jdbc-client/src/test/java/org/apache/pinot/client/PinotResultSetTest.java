@@ -23,7 +23,7 @@ import java.sql.ResultSetMetaData;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.utils.DateTimeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -189,7 +189,7 @@ public class PinotResultSetTest {
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
+    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
         throws PinotClientException {
       return null;
     }
@@ -201,7 +201,7 @@ public class PinotResultSetTest {
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
+    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
         throws PinotClientException {
       return null;
     }

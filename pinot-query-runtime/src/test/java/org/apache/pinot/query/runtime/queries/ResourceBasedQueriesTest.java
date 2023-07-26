@@ -33,16 +33,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.apache.pinot.common.datatable.DataTableFactory;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
-import org.apache.pinot.query.routing.WorkerInstance;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.QueryRunnerTestBase;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -50,6 +56,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -65,11 +72,11 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final Random RANDOM = new Random(42);
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
 
+  private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
+
   @BeforeClass
   public void setUp()
       throws Exception {
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
-
     // Setting up mock server factories.
     // All test data are loaded upfront b/c the mock server and brokers needs to be in sync.
     MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1");
@@ -88,6 +95,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
       for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
+        boolean allowEmptySegment = !BooleanUtils.toBoolean(extractExtraProps(testCase._extraProps, "noEmptySegment"));
         String tableName = testCaseName + "_" + tableEntry.getKey();
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
         String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
@@ -106,17 +114,21 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         for (GenericRow row : genericRows) {
           if (row == SEGMENT_BREAKER_ROW) {
-            factory1.addSegment(tableNameWithType, rows1);
-            factory2.addSegment(tableNameWithType, rows2);
-            rows1 = new ArrayList<>();
-            rows2 = new ArrayList<>();
+            if (allowEmptySegment || rows1.size() > 0) {
+              factory1.addSegment(tableNameWithType, rows1);
+              rows1 = new ArrayList<>();
+            }
+            if (allowEmptySegment || rows2.size() > 0) {
+              factory2.addSegment(tableNameWithType, rows2);
+              rows2 = new ArrayList<>();
+            }
           } else {
             long partition = 0;
             if (partitionColumns == null) {
               partition = RANDOM.nextInt(2);
             } else {
               for (String field : partitionColumns) {
-                partition = (partition + ((GenericRow) row).getValue(field).hashCode()) % 42;
+                partition = (partition + row.getValue(field).hashCode()) % 42;
               }
             }
             if (partition % 2 == 0) {
@@ -126,8 +138,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             }
           }
         }
-        factory1.addSegment(tableNameWithType, rows1);
-        factory2.addSegment(tableNameWithType, rows2);
+        if (allowEmptySegment || rows1.size() > 0) {
+          factory1.addSegment(tableNameWithType, rows1);
+        }
+        if (allowEmptySegment || rows2.size() > 0) {
+          factory2.addSegment(tableNameWithType, rows2);
+        }
       }
 
       boolean anyHaveOutput = testCase._queries.stream().anyMatch(q -> q._outputs != null);
@@ -158,9 +174,26 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _mailboxService = new GrpcMailboxService(_reducerHostname, _reducerGrpcPort, new PinotConfiguration(reducerConfig),
-        ignored -> { });
+    _reducerScheduler = new OpChainSchedulerService(new RoundRobinScheduler(10_000L), REDUCE_EXECUTOR);
+    _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
+        new PinotConfiguration(reducerConfig), _reducerScheduler::onDataAvailable);
+    _reducerScheduler.startAsync();
     _mailboxService.start();
+
+    Map<String, List<String>> tableToSegmentMap1 = factory1.buildTableSegmentNameMap();
+    Map<String, List<String>> tableToSegmentMap2 = factory2.buildTableSegmentNameMap();
+
+    for (Map.Entry<String, List<String>> entry : tableToSegmentMap1.entrySet()) {
+      _tableToSegmentMap.put(entry.getKey(), new HashSet<>(entry.getValue()));
+    }
+
+    for (Map.Entry<String, List<String>> entry : tableToSegmentMap2.entrySet()) {
+      if (_tableToSegmentMap.containsKey(entry.getKey())) {
+        _tableToSegmentMap.get(entry.getKey()).addAll(entry.getValue());
+      } else {
+        _tableToSegmentMap.put(entry.getKey(), new HashSet<>(entry.getValue()));
+      }
+    }
 
     _queryEnvironment =
         QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
@@ -171,8 +204,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     // this is only use for test identifier purpose.
     int port1 = server1.getPort();
     int port2 = server2.getPort();
-    _servers.put(new WorkerInstance("localhost", port1, port1, port1, port1), server1);
-    _servers.put(new WorkerInstance("localhost", port2, port2, port2, port2), server2);
+    _servers.put(new QueryServerInstance("localhost", port1, port1), server1);
+    _servers.put(new QueryServerInstance("localhost", port2, port2), server2);
   }
 
   @AfterClass
@@ -182,16 +215,18 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       server.shutDown();
     }
     _mailboxService.shutdown();
+    _reducerScheduler.stopAsync();
   }
 
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
-  public void testQueryTestCasesWithH2(String testCaseName, String sql, String expect)
+  public void testQueryTestCasesWithH2(String testCaseName, String sql, String h2Sql, String expect,
+      boolean keepOutputRowOrder)
       throws Exception {
     // query pinot
-    runQuery(sql, expect).ifPresent(rows -> {
+    runQuery(sql, expect, null).ifPresent(rows -> {
       try {
-        compareRowEquals(rows, queryH2(sql));
+        compareRowEquals(rows, queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
       }
@@ -199,15 +234,72 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
-  public void testQueryTestCasesWithOutput(String testCaseName, String sql, List<Object[]> expectedRows, String expect)
+  public void testQueryTestCasesWithOutput(String testCaseName, String sql, String h2Sql, List<Object[]> expectedRows,
+      String expect, boolean keepOutputRowOrder)
       throws Exception {
-    runQuery(sql, expect).ifPresent(rows -> compareRowEquals(rows, expectedRows));
+    runQuery(sql, expect, null).ifPresent(rows -> compareRowEquals(rows, expectedRows, keepOutputRowOrder));
   }
 
-  private Optional<List<Object[]>> runQuery(String sql, final String except) {
+  @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
+  public void testQueryTestCasesWithMetadata(String testCaseName, String sql, String h2Sql, String expect,
+      int numSegments)
+      throws Exception {
+    Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap = new HashMap<>();
+    runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(rows -> {
+      BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
+      executionStatsAggregatorMap.get(0).setStats(brokerResponseNative);
+      Assert.assertFalse(executionStatsAggregatorMap.isEmpty());
+      for (Integer stageId : executionStatsAggregatorMap.keySet()) {
+        if (stageId > 0) {
+          BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
+          executionStatsAggregatorMap.get(stageId).setStageLevelStats(null, brokerResponseStats, null);
+          brokerResponseNative.addStageStat(stageId, brokerResponseStats);
+        }
+      }
+
+      Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
+
+      Map<Integer, BrokerResponseStats> stageIdStats = brokerResponseNative.getStageIdStats();
+      int numTables = 0;
+      for (Integer stageId : stageIdStats.keySet()) {
+        // check stats only for leaf stage
+        BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
+
+        if (brokerResponseStats.getTableNames().isEmpty()) {
+          continue;
+        }
+
+        String tableName = brokerResponseStats.getTableNames().get(0);
+        Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
+        numTables++;
+        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+        if (tableType == null) {
+          tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+        }
+
+        Assert.assertNotNull(_tableToSegmentMap.get(tableName));
+        Assert.assertEquals(brokerResponseStats.getNumSegmentsQueried(), _tableToSegmentMap.get(tableName).size());
+
+        Assert.assertFalse(brokerResponseStats.getOperatorStats().isEmpty());
+        Map<String, Map<String, String>> operatorStats = brokerResponseStats.getOperatorStats();
+        for (Map.Entry<String, Map<String, String>> entry : operatorStats.entrySet()) {
+          if (entry.getKey().contains("LEAF_STAGE")) {
+            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName()));
+          } else {
+            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_BLOCKS.getName()));
+          }
+        }
+      }
+
+      Assert.assertTrue(numTables > 0);
+    });
+  }
+
+  private Optional<List<Object[]>> runQuery(String sql, final String except,
+      Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
     try {
       // query pinot
-      List<Object[]> resultRows = queryRunner(sql);
+      List<Object[]> resultRows = queryRunner(sql, executionStatsAggregatorMap);
 
       Assert.assertNull(except,
           "Expected error with message '" + except + "'. But instead rows were returned: " + resultRows.stream()
@@ -229,7 +321,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderBoth()
+  private Object[][] testResourceQueryTestCaseProviderBoth()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
@@ -247,12 +339,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         if (queryCase._outputs != null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
+          String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
+              : replaceTableName(testCaseName, queryCase._sql);
           List<List<Object>> orgRows = queryCase._outputs;
           List<Object[]> expectedRows = new ArrayList<>(orgRows.size());
           for (List<Object> objs : orgRows) {
             expectedRows.add(objs.toArray());
           }
-          Object[] testEntry = new Object[]{testCaseName, sql, expectedRows, queryCase._expectedException};
+          Object[] testEntry = new Object[]{
+              testCaseName, sql, h2Sql, expectedRows, queryCase._expectedException, queryCase._keepOutputRowOrder
+          };
           providerContent.add(testEntry);
         }
       }
@@ -261,7 +357,52 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @DataProvider
-  private static Object[][] testResourceQueryTestCaseProviderInputOnly()
+  private Object[][] testResourceQueryTestCaseProviderWithMetadata()
+      throws Exception {
+    Map<String, QueryTestCase> testCaseMap = getTestCases();
+    List<Object[]> providerContent = new ArrayList<>();
+    Set<String> validTestCases = new HashSet<>();
+    validTestCases.add("metadata_test");
+
+    for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
+      String testCaseName = testCaseEntry.getKey();
+      if (!validTestCases.contains(testCaseName)) {
+        continue;
+      }
+
+      if (testCaseEntry.getValue()._ignored) {
+        continue;
+      }
+
+      List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
+      for (QueryTestCase.Query queryCase : queryCases) {
+
+        if (queryCase._ignored) {
+          continue;
+        }
+
+        if (queryCase._outputs == null) {
+          String sql = replaceTableName(testCaseName, queryCase._sql);
+          String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
+              : replaceTableName(testCaseName, queryCase._sql);
+
+          int segmentCount = 0;
+          if (queryCase._expectedNumSegments != null) {
+            segmentCount = queryCase._expectedNumSegments;
+          } else {
+            throw new RuntimeException("Unable to test metadata without expected num segments configuration!");
+          }
+
+          Object[] testEntry = new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, segmentCount};
+          providerContent.add(testEntry);
+        }
+      }
+    }
+    return providerContent.toArray(new Object[][]{});
+  }
+
+  @DataProvider
+  private Object[][] testResourceQueryTestCaseProviderInputOnly()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
@@ -278,7 +419,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         }
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
-          Object[] testEntry = new Object[]{testCaseName, sql, queryCase._expectedException};
+          String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
+              : replaceTableName(testCaseName, queryCase._sql);
+          Object[] testEntry =
+              new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, queryCase._keepOutputRowOrder};
           providerContent.add(testEntry);
         }
       }
@@ -292,7 +436,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   // TODO: cache this test case generator
-  private static Map<String, QueryTestCase> getTestCases()
+  private Map<String, QueryTestCase> getTestCases()
       throws Exception {
     Map<String, QueryTestCase> testCaseMap = new HashMap<>();
     ClassLoader classLoader = ResourceBasedQueriesTest.class.getClassLoader();
@@ -319,11 +463,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       URL testFileUrl = classLoader.getResource(testCaseFile);
       // This test only supports local resource loading (e.g. must be a file), not support JAR test loading.
       if (testFileUrl != null && new File(testFileUrl.getFile()).exists()) {
-        Map<String, QueryTestCase> testCases = MAPPER.readValue(new File(testFileUrl.getFile()),
-            new TypeReference<Map<String, QueryTestCase>>() { });
+        Map<String, QueryTestCase> testCases =
+            MAPPER.readValue(new File(testFileUrl.getFile()), new TypeReference<Map<String, QueryTestCase>>() {
+            });
         {
           HashSet<String> hashSet = new HashSet<>(testCaseMap.keySet());
           hashSet.retainAll(testCases.keySet());
+
           if (!hashSet.isEmpty()) {
             throw new IllegalArgumentException("testCase already exist for the following names: " + hashSet);
           }
@@ -332,5 +478,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       }
     }
     return testCaseMap;
+  }
+
+  private static Object extractExtraProps(Map<String, Object> extraProps, String propKey) {
+    if (extraProps == null) {
+      return null;
+    }
+    return extraProps.getOrDefault(propKey, null);
   }
 }

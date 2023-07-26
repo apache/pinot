@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.google.common.base.Function;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,6 +37,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -54,6 +55,8 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamDataProducer;
+import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -262,7 +265,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return null;
   }
 
-  protected QueryConfig getQueryconfig() {
+  protected QueryConfig getQueryConfig() {
     // Enable groovy for tables used in the tests
     return new QueryConfig(null, false, null, null);
   }
@@ -275,11 +278,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected SegmentPartitionConfig getSegmentPartitionConfig() {
     return null;
   }
-
-  /**
-   * The following methods are based on the getters. Override the getters for non-default settings before calling these
-   * methods.
-   */
 
   /**
    * Creates a new schema.
@@ -323,7 +321,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryconfig())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
   }
@@ -394,17 +392,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryconfig())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
   /**
    * Creates a new Upsert enabled table config.
    */
-  protected TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn, int numPartitions) {
+  protected TableConfig createUpsertTableConfig(File sampleAvroFile, String primaryKeyColumn, String deleteColumn,
+      int numPartitions) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
+
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn(deleteColumn);
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
@@ -414,7 +416,62 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).build();
+        .setUpsertConfig(upsertConfig).build();
+  }
+
+  protected Map<String, String> getCSVDecoderProperties(@Nullable String delimiter,
+      @Nullable String csvHeaderProperty) {
+    String streamType = "kafka";
+    Map<String, String> csvDecoderProperties = new HashMap<>();
+    csvDecoderProperties.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        CSVMessageDecoder.class.getName());
+    if (delimiter != null) {
+      csvDecoderProperties.put(StreamConfigProperties.constructStreamProperty(streamType, "decoder.prop.delimiter"),
+          delimiter);
+    }
+    if (csvHeaderProperty != null) {
+      csvDecoderProperties.put(StreamConfigProperties.constructStreamProperty(streamType, "decoder.prop.header"),
+          csvHeaderProperty);
+    }
+    return csvDecoderProperties;
+  }
+
+  /**
+   * Creates a new Upsert enabled table config.
+   */
+  protected TableConfig createCSVUpsertTableConfig(String tableName, @Nullable String schemaName,
+      @Nullable String kafkaTopicName, int numPartitions, Map<String, String> streamDecoderProperties,
+      UpsertConfig upsertConfig, String primaryKeyColumn) {
+    if (schemaName == null) {
+      schemaName = getSchemaName();
+    }
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
+
+    if (upsertConfig == null) {
+      upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    }
+    if (kafkaTopicName == null) {
+      kafkaTopicName = getKafkaTopic();
+    }
+
+    Map<String, String> streamConfigsMap = getStreamConfigMap();
+    streamConfigsMap.put(
+        StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_TOPIC_NAME),
+        kafkaTopicName);
+    streamConfigsMap.putAll(streamDecoderProperties);
+
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setSchemaName(schemaName)
+        .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
+        .setLLC(useLlc()).setStreamConfigs(streamConfigsMap)
+        .setNullHandlingEnabled(UpsertConfig.Mode.PARTIAL.equals(upsertConfig.getMode()) || getNullHandlingEnabled())
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
+        .setUpsertConfig(upsertConfig).build();
   }
 
   /**
@@ -450,9 +507,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected org.apache.pinot.client.Connection getPinotConnection() {
     if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName());
+      _pinotConnection =
+          ConnectionFactory.fromZookeeper(getPinotConnectionProperties(), getZkUrl() + "/" + getHelixClusterName());
     }
     return _pinotConnection;
+  }
+
+  protected Properties getPinotConnectionProperties() {
+    Properties properties = new Properties();
+    properties.putAll(getExtraQueryProperties());
+    return properties;
   }
 
   /**
@@ -503,17 +567,23 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     _queryGenerator = new QueryGenerator(avroFiles, tableName, tableName);
   }
 
+  protected List<File> unpackAvroData(File outputDir)
+      throws Exception {
+    return unpackTarData(getAvroTarFileName(), outputDir);
+  }
+
   /**
-   * Unpack the tarred Avro data into the given directory.
+   * Unpack the tarred data into the given directory.
    *
+   * @param tarFileName Input tar filename
    * @param outputDir Output directory
    * @return List of files unpacked.
    * @throws Exception
    */
-  protected List<File> unpackAvroData(File outputDir)
+  protected List<File> unpackTarData(String tarFileName, File outputDir)
       throws Exception {
     InputStream inputStream =
-        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(getAvroTarFileName());
+        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(tarFileName);
     Assert.assertNotNull(inputStream);
     return TarGzCompressionUtils.untar(inputStream, outputDir);
   }
@@ -525,9 +595,56 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
-
     ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles, "localhost:" + getKafkaPort(), getKafkaTopic(),
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
+  }
+
+  /**
+   * Pushes the data in the given Avro files into a Kafka stream.
+   *
+   * @param csvFile List of CSV strings
+   */
+  protected void pushCsvIntoKafka(File csvFile, String kafkaTopic, @Nullable Integer partitionColumnIndex)
+      throws Exception {
+    String kafkaBroker = "localhost:" + getKafkaPort();
+    StreamDataProducer producer = null;
+    try {
+      producer =
+          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+              getDefaultKafkaProducerProperties(kafkaBroker));
+      ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, kafkaTopic, partitionColumnIndex, injectTombstones(),
+          producer);
+    } catch (Exception e) {
+      if (producer != null) {
+        producer.close();
+      }
+      throw e;
+    }
+  }
+
+  protected void pushCsvIntoKafka(List<String> csvRecords, String kafkaTopic, @Nullable Integer partitionColumnIndex) {
+    String kafkaBroker = "localhost:" + getKafkaPort();
+    StreamDataProducer producer = null;
+    try {
+      producer =
+          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+              getDefaultKafkaProducerProperties(kafkaBroker));
+      ClusterIntegrationTestUtils.pushCsvIntoKafka(csvRecords, kafkaTopic, partitionColumnIndex, injectTombstones(),
+          producer);
+    } catch (Exception e) {
+      if (producer != null) {
+        producer.close();
+      }
+    }
+  }
+
+  private Properties getDefaultKafkaProducerProperties(String kafkaBroker) {
+    Properties properties = new Properties();
+    properties.put("metadata.broker.list", kafkaBroker);
+    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
+    properties.put("request.required.acks", "1");
+    properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
+    return properties;
   }
 
   protected boolean injectTombstones() {
@@ -603,26 +720,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForDocsLoaded(timeoutMs, true);
-  }
-
-  protected void waitForDocsLoaded(long timeoutMs, boolean raiseError) {
-    waitForDocsLoaded(timeoutMs, raiseError, getTableName());
+    waitForDocsLoaded(timeoutMs, true, getTableName());
   }
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     final long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Nullable
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          return getCurrentCountStarResult(tableName) == countStarResult;
-        } catch (Exception e) {
-          return null;
-        }
-      }
-    }, 100L, timeoutMs, "Failed to load " + countStarResult + " documents", raiseError);
+    TestUtils.waitForCondition(
+        () -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
+        "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
   }
 
   /**
@@ -647,7 +752,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
-    ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
-        getH2Connection());
+    ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
+        getH2Connection(), null, getExtraQueryProperties());
+  }
+
+  /**
+   * Run equivalent Pinot and H2 query and compare the results.
+   */
+  protected void testQueryWithMatchingRowCount(String pinotQuery, String h2Query)
+      throws Exception {
+    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
+        h2Query, getH2Connection(), null, getExtraQueryProperties());
   }
 }

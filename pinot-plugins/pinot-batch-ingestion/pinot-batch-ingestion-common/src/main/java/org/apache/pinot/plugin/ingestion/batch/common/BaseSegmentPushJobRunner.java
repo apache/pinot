@@ -65,12 +65,11 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     }
 
     // Read Table config
-    if (_spec.getTableSpec().getTableConfigURI() == null) {
-      throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
+    if (_spec.getTableSpec().getTableConfigURI() != null) {
+      _tableConfig =
+          SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
+      _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_tableConfig);
     }
-
-    _tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
-    _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_tableConfig);
   }
 
   /**

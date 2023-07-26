@@ -22,11 +22,8 @@ import it.unimi.dsi.fastutil.doubles.DoubleHeapPriorityQueue;
 import it.unimi.dsi.fastutil.doubles.DoublePriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -46,39 +43,9 @@ public class RawDoubleSingleColumnDistinctOrderByExecutor extends BaseRawDoubleS
   }
 
   @Override
-  public boolean process(TransformBlock transformBlock) {
-    BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
-    int numDocs = transformBlock.getNumDocs();
-    if (blockValueSet.isSingleValue()) {
-      double[] values = blockValueSet.getDoubleValuesSV();
-      if (_nullHandlingEnabled) {
-        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-        for (int i = 0; i < numDocs; i++) {
-          if (nullBitmap != null && nullBitmap.contains(i)) {
-            _hasNull = true;
-          } else {
-            add(values[i]);
-          }
-        }
-      } else {
-        for (int i = 0; i < numDocs; i++) {
-          add(values[i]);
-        }
-      }
-    } else {
-      double[][] values = blockValueSet.getDoubleValuesMV();
-      for (int i = 0; i < numDocs; i++) {
-        for (double value : values[i]) {
-          add(value);
-        }
-      }
-    }
-    return false;
-  }
-
-  private void add(double value) {
+  protected boolean add(double value) {
     if (!_valueSet.contains(value)) {
-      if (_valueSet.size() < _limit - (_hasNull ? 1 : 0)) {
+      if (_valueSet.size() < _limit) {
         _valueSet.add(value);
         _priorityQueue.enqueue(value);
       } else {
@@ -91,5 +58,6 @@ public class RawDoubleSingleColumnDistinctOrderByExecutor extends BaseRawDoubleS
         }
       }
     }
+    return false;
   }
 }

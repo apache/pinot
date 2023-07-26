@@ -1170,8 +1170,7 @@ public class SegmentCompletionManager {
      */
     private boolean isWinnerPicked(String preferredInstance, long now, final String stopReason) {
       if ((SegmentCompletionProtocol.REASON_ROW_LIMIT.equals(stopReason)
-          || SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP.equals(stopReason)
-          || SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED.equals(stopReason))
+          || SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP.equals(stopReason))
           && _commitStateMap.size() == 1) {
         _winner = preferredInstance;
         _winningOffset = _commitStateMap.get(preferredInstance);

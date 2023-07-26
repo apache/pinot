@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -31,6 +33,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -52,8 +55,14 @@ import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
+import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
+import software.amazon.awssdk.services.s3.model.CompletedPart;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
+import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -69,6 +78,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
+import software.amazon.awssdk.services.s3.model.UploadPartRequest;
+import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider;
 import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
@@ -87,6 +98,8 @@ public class S3PinotFS extends BasePinotFS {
   private ServerSideEncryption _serverSideEncryption = null;
   private String _ssekmsKeyId;
   private String _ssekmsEncryptionContext;
+  private long _minObjectSizeToUploadInParts;
+  private long _multiPartUploadPartSize;
 
   @Override
   public void init(PinotConfiguration config) {
@@ -134,7 +147,11 @@ public class S3PinotFS extends BasePinotFS {
           throw new RuntimeException(e);
         }
       }
+      if (s3Config.getHttpClientBuilder() != null) {
+        s3ClientBuilder.httpClientBuilder(s3Config.getHttpClientBuilder());
+      }
       _s3Client = s3ClientBuilder.build();
+      setMultiPartUploadConfigs(s3Config);
     } catch (S3Exception e) {
       throw new RuntimeException("Could not initialize S3PinotFS", e);
     }
@@ -147,6 +164,7 @@ public class S3PinotFS extends BasePinotFS {
    */
   public void init(S3Client s3Client) {
     _s3Client = s3Client;
+    setMultiPartUploadConfigs(-1, -1);
   }
 
   /**
@@ -157,7 +175,10 @@ public class S3PinotFS extends BasePinotFS {
    */
   public void init(S3Client s3Client, String serverSideEncryption, PinotConfiguration serverSideEncryptionConfig) {
     _s3Client = s3Client;
-    setServerSideEncryption(serverSideEncryption, new S3Config(serverSideEncryptionConfig));
+    S3Config s3Config = new S3Config(serverSideEncryptionConfig);
+    setServerSideEncryption(serverSideEncryption, s3Config);
+    setMultiPartUploadConfigs(s3Config);
+    setDisableAcl(s3Config);
   }
 
   private void setServerSideEncryption(@Nullable String serverSideEncryption, S3Config s3Config) {
@@ -551,11 +572,76 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri)
       throws Exception {
-    LOGGER.info("Copy {} from local to {}", srcFile.getAbsolutePath(), dstUri);
-    URI base = getBase(dstUri);
-    String prefix = sanitizePath(base.relativize(dstUri).getPath());
-    PutObjectRequest putObjectRequest = generatePutObjectRequest(dstUri, prefix);
-    _s3Client.putObject(putObjectRequest, srcFile.toPath());
+    if (_minObjectSizeToUploadInParts > 0 && srcFile.length() > _minObjectSizeToUploadInParts) {
+      LOGGER.info("Copy {} from local to {} in parts", srcFile.getAbsolutePath(), dstUri);
+      uploadFileInParts(srcFile, dstUri);
+    } else {
+      LOGGER.info("Copy {} from local to {}", srcFile.getAbsolutePath(), dstUri);
+      String prefix = sanitizePath(getBase(dstUri).relativize(dstUri).getPath());
+      PutObjectRequest putObjectRequest = generatePutObjectRequest(dstUri, prefix);
+      _s3Client.putObject(putObjectRequest, srcFile.toPath());
+    }
+  }
+
+  private void uploadFileInParts(File srcFile, URI dstUri)
+      throws Exception {
+    String bucket = dstUri.getHost();
+    String prefix = sanitizePath(getBase(dstUri).relativize(dstUri).getPath());
+    CreateMultipartUploadResponse multipartUpload =
+        _s3Client.createMultipartUpload(CreateMultipartUploadRequest.builder().bucket(bucket).key(prefix).build());
+    String uploadId = multipartUpload.uploadId();
+    // Upload parts sequentially to overcome the 5GB limit of a single PutObject call.
+    // TODO: parts can be uploaded in parallel for higher throughput, given a thread pool.
+    try (FileInputStream inputStream = FileUtils.openInputStream(srcFile)) {
+      long totalUploaded = 0;
+      long fileSize = srcFile.length();
+      // The part number must start from 1 and no more than the max part num allowed, 10000 by default.
+      // The default configs can upload a single file of 1TB, so the if-branch should rarely happen.
+      int partNum = 1;
+      long partSizeToUse = _multiPartUploadPartSize;
+      if (partSizeToUse * S3Config.MULTI_PART_UPLOAD_MAX_PART_NUM < fileSize) {
+        partSizeToUse =
+            (fileSize + S3Config.MULTI_PART_UPLOAD_MAX_PART_NUM - 1) / S3Config.MULTI_PART_UPLOAD_MAX_PART_NUM;
+        LOGGER.info("Increased part size from {} to {} for large file size {} due to max allowed uploads {}",
+            _multiPartUploadPartSize, partSizeToUse, fileSize, S3Config.MULTI_PART_UPLOAD_MAX_PART_NUM);
+      }
+      List<CompletedPart> parts = new ArrayList<>();
+      while (totalUploaded < srcFile.length()) {
+        long nextPartSize = Math.min(partSizeToUse, fileSize - totalUploaded);
+        UploadPartResponse uploadPartResponse = _s3Client.uploadPart(
+            UploadPartRequest.builder().bucket(bucket).key(prefix).uploadId(uploadId).partNumber(partNum).build(),
+            RequestBody.fromInputStream(inputStream, nextPartSize));
+        parts.add(CompletedPart.builder().partNumber(partNum).eTag(uploadPartResponse.eTag()).build());
+        totalUploaded += nextPartSize;
+        LOGGER.debug("Uploaded part {} of size {}, with total uploaded {} and file size {}", partNum, nextPartSize,
+            totalUploaded, fileSize);
+        // set counters to upload the next part.
+        partNum++;
+      }
+      // complete the multipart upload
+      _s3Client.completeMultipartUpload(
+          CompleteMultipartUploadRequest.builder().uploadId(uploadId).bucket(bucket).key(prefix)
+              .multipartUpload(CompletedMultipartUpload.builder().parts(parts).build()).build());
+    } catch (Exception e) {
+      LOGGER.error("Failed to upload file {} to {} in parts. Abort upload request: {}", srcFile, dstUri, uploadId, e);
+      _s3Client.abortMultipartUpload(
+          AbortMultipartUploadRequest.builder().uploadId(uploadId).bucket(bucket).key(prefix).build());
+      throw e;
+    }
+  }
+
+  private void setMultiPartUploadConfigs(S3Config s3Config) {
+    setMultiPartUploadConfigs(s3Config.getMinObjectSizeForMultiPartUpload(), s3Config.getMultiPartUploadPartSize());
+  }
+
+  private void setDisableAcl(S3Config s3Config) {
+    _disableAcl = s3Config.getDisableAcl();
+  }
+
+  @VisibleForTesting
+  void setMultiPartUploadConfigs(long minObjectSizeToUploadInParts, long multiPartUploadPartSize) {
+    _minObjectSizeToUploadInParts = minObjectSizeToUploadInParts;
+    _multiPartUploadPartSize = multiPartUploadPartSize;
   }
 
   @Override

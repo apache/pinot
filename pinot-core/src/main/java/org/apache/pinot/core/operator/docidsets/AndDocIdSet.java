@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
@@ -37,9 +38,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * The FilterBlockDocIdSet to perform AND on all child FilterBlockDocIdSets.
+ * The BlockDocIdSet to perform AND on all child BlockDocIdSets.
  * <p>The AndBlockDocIdSet will construct the BlockDocIdIterator based on the BlockDocIdIterators from the child
- * FilterBlockDocIdSets:
+ * BlockDocIdSets:
  * <ul>
  *   <li>
  *     When there are at least one index-base BlockDocIdIterator (SortedDocIdIterator or BitmapBasedDocIdIterator) and
@@ -53,11 +54,11 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  *   </li>
  * </ul>
  */
-public final class AndDocIdSet implements FilterBlockDocIdSet {
-  private final List<FilterBlockDocIdSet> _docIdSets;
+public final class AndDocIdSet implements BlockDocIdSet {
+  private final List<BlockDocIdSet> _docIdSets;
   private final boolean _cardinalityBasedRankingForScan;
 
-  public AndDocIdSet(List<FilterBlockDocIdSet> docIdSets, Map<String, String> queryOptions) {
+  public AndDocIdSet(List<BlockDocIdSet> docIdSets, Map<String, String> queryOptions) {
     _docIdSets = docIdSets;
     _cardinalityBasedRankingForScan =
         !MapUtils.isEmpty(queryOptions) && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
@@ -66,7 +67,7 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
   @Override
   public BlockDocIdIterator iterator() {
     int numDocIdSets = _docIdSets.size();
-    // NOTE: Keep the order of FilterBlockDocIdSets to preserve the order decided within FilterOperatorUtils.
+    // NOTE: Keep the order of BlockDocIdSets to preserve the order decided within FilterOperatorUtils.
     // TODO: Consider deciding the order based on the stats of BlockDocIdIterators
     BlockDocIdIterator[] allDocIdIterators = new BlockDocIdIterator[numDocIdSets];
     List<SortedDocIdIterator> sortedDocIdIterators = new ArrayList<>();
@@ -170,7 +171,7 @@ public final class AndDocIdSet implements FilterBlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     long numEntriesScannedInFilter = 0L;
-    for (FilterBlockDocIdSet child : _docIdSets) {
+    for (BlockDocIdSet child : _docIdSets) {
       numEntriesScannedInFilter += child.getNumEntriesScannedInFilter();
     }
     return numEntriesScannedInFilter;

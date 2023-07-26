@@ -24,6 +24,7 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
+import org.apache.pinot.client.utils.BrokerSelectorUtils;
 import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -188,9 +190,17 @@ public class BrokerCache {
     _brokerData = getBrokerData(responses);
   }
 
-  public String getBroker(String tableName) {
-    List<String> brokers =
-        (tableName == null) ? _brokerData.getBrokers() : _brokerData.getTableToBrokerMap().get(tableName);
+  public String getBroker(String... tableNames) {
+    List<String> brokers = null;
+    if (tableNames != null) {
+       // returning list of common brokers hosting all the tables.
+       brokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+           _brokerData.getTableToBrokerMap());
+    }
+
+    if (brokers == null || brokers.isEmpty()) {
+      brokers = _brokerData.getBrokers();
+    }
     return brokers.get(_random.nextInt(brokers.size()));
   }
 

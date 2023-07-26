@@ -26,13 +26,16 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.docidsets.ExpressionFilterDocIdSet;
+import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
@@ -45,32 +48,33 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   private final TransformFunction _transformFunction;
   private final PredicateEvaluator _predicateEvaluator;
 
-  public ExpressionFilterOperator(IndexSegment segment, Predicate predicate, int numDocs) {
+  public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
     _numDocs = numDocs;
 
-    _dataSourceMap = new HashMap<>();
     Set<String> columns = new HashSet<>();
     ExpressionContext lhs = predicate.getLhs();
     lhs.getColumns(columns);
-    for (String column : columns) {
-      _dataSourceMap.put(column, segment.getDataSource(column));
-    }
-
-    _transformFunction = TransformFunctionFactory.get(lhs, _dataSourceMap);
-    _predicateEvaluator = PredicateEvaluatorProvider
-        .getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
+    int mapCapacity = HashUtil.getHashMapCapacity(columns.size());
+    _dataSourceMap = new HashMap<>(mapCapacity);
+    Map<String, ColumnContext> columnContextMap = new HashMap<>(mapCapacity);
+    columns.forEach(column -> {
+      DataSource dataSource = segment.getDataSource(column);
+      _dataSourceMap.put(column, dataSource);
+      columnContextMap.put(column, ColumnContext.fromDataSource(dataSource));
+    });
+    _transformFunction = TransformFunctionFactory.get(lhs, columnContextMap, queryContext);
+    _predicateEvaluator =
+        PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
             _transformFunction.getResultMetadata().getDataType());
   }
 
   @Override
   protected FilterBlock getNextBlock() {
-    return new FilterBlock(
-        new ExpressionFilterDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs));
+    return new FilterBlock(new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs));
   }
 
-
   @Override
-  public List<Operator> getChildOperators() {
+  public List<Operator<?>> getChildOperators() {
     return Collections.emptyList();
   }
 

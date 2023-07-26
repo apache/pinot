@@ -22,6 +22,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -32,7 +33,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class EmptyDataSource extends BaseDataSource {
 
   public EmptyDataSource(ColumnMetadata columnMetadata) {
-    super(new EmptyDataSourceMetadata(columnMetadata), null, null, null, null, null, null, null, null, null, null);
+    super(new EmptyDataSourceMetadata(columnMetadata), ColumnIndexContainer.Empty.INSTANCE);
   }
 
   private static class EmptyDataSourceMetadata implements DataSourceMetadata {

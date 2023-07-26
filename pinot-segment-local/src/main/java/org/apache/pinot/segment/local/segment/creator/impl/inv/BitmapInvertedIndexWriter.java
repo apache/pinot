@@ -56,15 +56,34 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   private final FileChannel _fileChannel;
   private final ByteBuffer _offsetBuffer;
   private ByteBuffer _bitmapBuffer;
-  private long _bytesWritten;
+  private long _currentBufferPosition;
+  private final boolean _ownsChannel;
 
   public BitmapInvertedIndexWriter(File outputFile, int numBitmaps)
       throws IOException {
+    this(new RandomAccessFile(outputFile, "rw").getChannel(), numBitmaps, true);
+  }
+
+  /**
+   * Creates a new writer that uses the given {@link FileChannel}.
+   * It will start to write on the current position of the channel assuming it is the last useful byte in the file.
+   * When this object is {@link #close() closed}, the channel is truncated to the last byte written by this writer.
+   * @param fileChannel the file channel to be used
+   * @param numBitmaps the number of bitmaps that are expected. The actual value cannot be higher than this value. Fewer
+   *                   bitmaps than the given value can be used, but in that case the representation will not be as
+   *                   expected.
+   * @param ownsChannel whether this writer owns the channel or not. If the channel is owned then it will be closed when
+   *                    this object is closed. Otherwise the owner will have to close it by itself. Even if this writer
+   *                    does not own the channel, it will be truncated when the writer is closed.
+   */
+  public BitmapInvertedIndexWriter(FileChannel fileChannel, int numBitmaps, boolean ownsChannel)
+      throws IOException {
+    _ownsChannel = ownsChannel;
     int sizeForOffsets = (numBitmaps + 1) * Integer.BYTES;
     long bitmapBufferEstimate = Math.min(PESSIMISTIC_BITMAP_SIZE_ESTIMATE * numBitmaps, MAX_INITIAL_BUFFER_SIZE);
-    _fileChannel = new RandomAccessFile(outputFile, "rw").getChannel();
-    _offsetBuffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, sizeForOffsets);
-    _bytesWritten = sizeForOffsets;
+    _fileChannel = fileChannel;
+    _offsetBuffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, _fileChannel.position(), sizeForOffsets);
+    _currentBufferPosition = sizeForOffsets + _fileChannel.position();
     mapBitmapBuffer(bitmapBufferEstimate);
   }
 
@@ -72,9 +91,9 @@ public final class BitmapInvertedIndexWriter implements Closeable {
       throws IOException {
     int length = bitmap.serializedSizeInBytes();
     resizeIfNecessary(length);
-    _offsetBuffer.putInt(asUnsignedInt(_bytesWritten));
+    _offsetBuffer.putInt(asUnsignedInt(_currentBufferPosition));
     bitmap.serialize(_bitmapBuffer);
-    _bytesWritten += length;
+    _currentBufferPosition += length;
   }
 
   public void add(byte[] bitmapBytes)
@@ -85,9 +104,9 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   public void add(byte[] bitmapBytes, int length)
       throws IOException {
     resizeIfNecessary(length);
-    _offsetBuffer.putInt(asUnsignedInt(_bytesWritten));
+    _offsetBuffer.putInt(asUnsignedInt(_currentBufferPosition));
     _bitmapBuffer.put(bitmapBytes, 0, length);
-    _bytesWritten += length;
+    _currentBufferPosition += length;
   }
 
   private void resizeIfNecessary(int required)
@@ -100,7 +119,7 @@ public final class BitmapInvertedIndexWriter implements Closeable {
   private void mapBitmapBuffer(long size)
       throws IOException {
     cleanBitmapBuffer();
-    _bitmapBuffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, _bytesWritten, size)
+    _bitmapBuffer = _fileChannel.map(FileChannel.MapMode.READ_WRITE, _currentBufferPosition, size)
         .order(ByteOrder.LITTLE_ENDIAN);
   }
 
@@ -111,13 +130,19 @@ public final class BitmapInvertedIndexWriter implements Closeable {
     }
   }
 
+  public long getLastWrittenPosition() {
+    return _currentBufferPosition;
+  }
+
   @Override
   public void close()
       throws IOException {
-    long fileLength = _bytesWritten;
+    long fileLength = _currentBufferPosition;
     _offsetBuffer.putInt(asUnsignedInt(fileLength));
     _fileChannel.truncate(fileLength);
-    _fileChannel.close();
+    if (_ownsChannel) {
+      _fileChannel.close();
+    }
     if (CleanerUtil.UNMAP_SUPPORTED) {
       CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
       cleaner.freeBuffer(_offsetBuffer);

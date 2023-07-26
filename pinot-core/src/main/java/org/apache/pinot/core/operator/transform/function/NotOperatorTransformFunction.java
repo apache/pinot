@@ -22,9 +22,10 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -48,11 +49,13 @@ public class NotOperatorTransformFunction extends BaseTransformFunction {
   private TransformFunction _argument;
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument1 is required for not transform function");
     TransformResultMetadata argumentMetadata = arguments.get(0).getResultMetadata();
+    FieldSpec.DataType storedType = argumentMetadata.getDataType().getStoredType();
     Preconditions.checkState(
-        argumentMetadata.isSingleValue() && argumentMetadata.getDataType().getStoredType().isNumeric(),
+        argumentMetadata.isSingleValue() && storedType.isNumeric() || storedType.isUnknown(),
         "Unsupported argument type. Expecting single-valued boolean/number");
     _argument = arguments.get(0);
   }
@@ -68,12 +71,10 @@ public class NotOperatorTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
-    int[] intValues = _argument.transformToIntValuesSV(projectionBlock);
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initIntValuesSV(numDocs);
+    int[] intValues = _argument.transformToIntValuesSV(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       _intValuesSV[i] = getLogicalNegate(intValues[i]);
     }

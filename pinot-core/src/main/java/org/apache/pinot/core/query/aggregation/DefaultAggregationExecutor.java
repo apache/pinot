@@ -20,11 +20,12 @@ package org.apache.pinot.core.query.aggregation;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class DefaultAggregationExecutor implements AggregationExecutor {
   protected final AggregationFunction[] _aggregationFunctions;
   protected final AggregationResultHolder[] _aggregationResultHolders;
@@ -39,13 +40,13 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
   }
 
   @Override
-  public void aggregate(TransformBlock transformBlock) {
+  public void aggregate(ValueBlock valueBlock) {
     int numAggregationFunctions = _aggregationFunctions.length;
-    int length = transformBlock.getNumDocs();
+    int length = valueBlock.getNumDocs();
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
       aggregationFunction.aggregate(length, _aggregationResultHolders[i],
-          AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, transformBlock));
+          AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, valueBlock));
     }
   }
 

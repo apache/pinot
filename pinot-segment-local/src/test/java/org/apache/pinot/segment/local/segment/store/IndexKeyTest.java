@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.segment.store;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -31,13 +31,13 @@ public class IndexKeyTest {
   @Test
   public void testCompareTo() {
     List<IndexKey> iks = Arrays
-        .asList(new IndexKey("foo", ColumnIndexType.INVERTED_INDEX), new IndexKey("bar", ColumnIndexType.BLOOM_FILTER),
-            new IndexKey("foo", ColumnIndexType.FORWARD_INDEX), new IndexKey("bar", ColumnIndexType.DICTIONARY),
-            new IndexKey("baz", ColumnIndexType.JSON_INDEX), new IndexKey("baz", ColumnIndexType.FST_INDEX));
+        .asList(new IndexKey("foo", StandardIndexes.inverted()), new IndexKey("bar", StandardIndexes.bloomFilter()),
+            new IndexKey("foo", StandardIndexes.forward()), new IndexKey("bar", StandardIndexes.dictionary()),
+            new IndexKey("baz", StandardIndexes.json()), new IndexKey("baz", StandardIndexes.fst()));
     Collections.sort(iks);
     assertEquals(iks, Arrays
-        .asList(new IndexKey("bar", ColumnIndexType.DICTIONARY), new IndexKey("bar", ColumnIndexType.BLOOM_FILTER),
-            new IndexKey("baz", ColumnIndexType.FST_INDEX), new IndexKey("baz", ColumnIndexType.JSON_INDEX),
-            new IndexKey("foo", ColumnIndexType.FORWARD_INDEX), new IndexKey("foo", ColumnIndexType.INVERTED_INDEX)));
+        .asList(new IndexKey("bar", StandardIndexes.bloomFilter()), new IndexKey("bar", StandardIndexes.dictionary()),
+            new IndexKey("baz", StandardIndexes.fst()), new IndexKey("baz", StandardIndexes.json()),
+            new IndexKey("foo", StandardIndexes.forward()), new IndexKey("foo", StandardIndexes.inverted())));
   }
 }

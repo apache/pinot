@@ -19,27 +19,63 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.pinot.common.request.context.LiteralContext;
+import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.when;
 
 
 public class LiteralTransformFunctionTest {
+  private static final int NUM_DOCS = 100;
+  private AutoCloseable _mocks;
+
+  @Mock
+  private ProjectionBlock _projectionBlock;
+
+  @BeforeMethod
+  public void setUp() {
+    _mocks = MockitoAnnotations.openMocks(this);
+    when(_projectionBlock.getNumDocs()).thenReturn(NUM_DOCS);
+  }
+
+  @AfterMethod
+  public void tearDown()
+      throws Exception {
+    _mocks.close();
+  }
 
   @Test
   public void testLiteralTransformFunction() {
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("abc"), DataType.STRING);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("123"), DataType.INT);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("2147483649"), DataType.LONG);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("1.2"), DataType.FLOAT);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("41241241.2412"), DataType.DOUBLE);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("1.7976931348623159e+308"), DataType.BIG_DECIMAL);
-    Assert.assertEquals(LiteralTransformFunction.inferLiteralDataType("2020-02-02 20:20:20.20"), DataType.TIMESTAMP);
     LiteralTransformFunction trueBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, true));
     Assert.assertEquals(trueBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
-    Assert.assertEquals(trueBoolean.getLiteral(), "true");
+    Assert.assertEquals(trueBoolean.getBooleanLiteral(), true);
     LiteralTransformFunction falseBoolean = new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, false));
     Assert.assertEquals(falseBoolean.getResultMetadata().getDataType(), DataType.BOOLEAN);
-    Assert.assertEquals(falseBoolean.getLiteral(), "false");
+    Assert.assertEquals(falseBoolean.getBooleanLiteral(), false);
+    LiteralTransformFunction nullLiteral = new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, true));
+    Assert.assertEquals(nullLiteral.getStringLiteral(), "null");
+  }
+
+  @Test
+  public void testNullTransform() {
+    LiteralTransformFunction nullLiteral = new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, true));
+    Assert.assertEquals(nullLiteral.getStringLiteral(), "null");
+    RoaringBitmap bitmap = nullLiteral.getNullBitmap(_projectionBlock);
+    RoaringBitmap expectedBitmap = new RoaringBitmap();
+    expectedBitmap.add(0L, NUM_DOCS);
+    Assert.assertEquals(bitmap, expectedBitmap);
+    int[] intValues = nullLiteral.transformToIntValuesSV(_projectionBlock);
+    Assert.assertEquals(intValues.length, NUM_DOCS);
+    for (int i = 0; i < NUM_DOCS; i++) {
+      Assert.assertEquals(intValues[i], 0);
+    }
+    Assert.assertEquals(nullLiteral.getNullBitmap(_projectionBlock), expectedBitmap);
   }
 }

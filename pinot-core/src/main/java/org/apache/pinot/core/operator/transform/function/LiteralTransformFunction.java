@@ -18,33 +18,31 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pinot.common.request.context.LiteralContext;
-import org.apache.pinot.common.utils.PinotDataType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
  * The <code>LiteralTransformFunction</code> class is a special transform function which is a wrapper on top of a
  * LITERAL. The data type is inferred from the literal string.
- * TODO: Preserve the type of the literal instead of inferring the type from the string
  */
 public class LiteralTransformFunction implements TransformFunction {
-  // TODO: Deprecate the string representation of literal.
-  private final String _literal;
+  public static final String FUNCTION_NAME = "literal";
+
+  private final Object _literal;
   private final DataType _dataType;
   private final int _intLiteral;
   private final long _longLiteral;
@@ -63,73 +61,50 @@ public class LiteralTransformFunction implements TransformFunction {
 
   public LiteralTransformFunction(LiteralContext literalContext) {
     Preconditions.checkNotNull(literalContext);
-    _literal = literalContext.getValue() == null ? "" : literalContext.getValue().toString();
-    if (literalContext.getType() == DataType.BOOLEAN) {
-      _bigDecimalLiteral = PinotDataType.BOOLEAN.toBigDecimal(literalContext.getValue());
-      _dataType = DataType.BOOLEAN;
-    } else {
-      _dataType = inferLiteralDataType(_literal);
-      if (_dataType.isNumeric()) {
-        _bigDecimalLiteral = new BigDecimal(_literal);
-      } else if (_dataType == DataType.TIMESTAMP) {
-        // inferLiteralDataType successfully interpreted the literal as TIMESTAMP. _bigDecimalLiteral is populated and
-        // assigned to _longLiteral.
-        _bigDecimalLiteral = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(_literal));
-      } else {
-        _bigDecimalLiteral = BigDecimal.ZERO;
-      }
-    }
+    _literal = literalContext.getValue();
+    _dataType = literalContext.getType();
+    _bigDecimalLiteral = literalContext.getBigDecimalValue();
     _intLiteral = _bigDecimalLiteral.intValue();
     _longLiteral = _bigDecimalLiteral.longValue();
     _floatLiteral = _bigDecimalLiteral.floatValue();
     _doubleLiteral = _bigDecimalLiteral.doubleValue();
   }
 
-  // TODO: Deprecate the usage case for this function.
-  @VisibleForTesting
-  static DataType inferLiteralDataType(String literal) {
-    // Try to interpret the literal as number
-    try {
-      Number number = NumberUtils.createNumber(literal);
-      if (number instanceof Integer) {
-        return DataType.INT;
-      } else if (number instanceof Long) {
-        return DataType.LONG;
-      } else if (number instanceof Float) {
-        return DataType.FLOAT;
-      } else if (number instanceof Double) {
-        return DataType.DOUBLE;
-      } else if (number instanceof BigDecimal | number instanceof BigInteger) {
-        return DataType.BIG_DECIMAL;
-      } else {
-        return DataType.STRING;
-      }
-    } catch (Exception e) {
-      // Ignored
-    }
-
-    // Try to interpret the literal as TIMESTAMP
-    try {
-      Timestamp.valueOf(literal);
-      return DataType.TIMESTAMP;
-    } catch (Exception e) {
-      // Ignored
-    }
-
-    return DataType.STRING;
+  public boolean getBooleanLiteral() {
+    return BooleanUtils.toBoolean(_literal);
   }
 
-  public String getLiteral() {
-    return _literal;
+  public int getIntLiteral() {
+    return _intLiteral;
+  }
+
+  public long getLongLiteral() {
+    return _longLiteral;
+  }
+
+  public float getFloatLiteral() {
+    return _floatLiteral;
+  }
+
+  public double getDoubleLiteral() {
+    return _doubleLiteral;
+  }
+
+  public BigDecimal getBigDecimalLiteral() {
+    return _bigDecimalLiteral;
+  }
+
+  public String getStringLiteral() {
+    return String.valueOf(_literal);
   }
 
   @Override
   public String getName() {
-    throw new UnsupportedOperationException();
+    return FUNCTION_NAME;
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
   }
 
   @Override
@@ -139,22 +114,22 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public Dictionary getDictionary() {
+    return null;
+  }
+
+  @Override
+  public int[] transformToDictIdsSV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
+  public int[][] transformToDictIdsMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     int[] intResult = _intResult;
     if (intResult == null || intResult.length < numDocs) {
       intResult = new int[numDocs];
@@ -171,8 +146,8 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     long[] longResult = _longResult;
     if (longResult == null || longResult.length < numDocs) {
       longResult = new long[numDocs];
@@ -181,7 +156,7 @@ public class LiteralTransformFunction implements TransformFunction {
           Arrays.fill(longResult, _longLiteral);
         }
       } else {
-        Arrays.fill(longResult, Timestamp.valueOf(_literal).getTime());
+        Arrays.fill(longResult, Timestamp.valueOf(getStringLiteral()).getTime());
       }
       _longResult = longResult;
     }
@@ -189,8 +164,8 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     float[] floatResult = _floatResult;
     if (floatResult == null || floatResult.length < numDocs) {
       floatResult = new float[numDocs];
@@ -203,8 +178,8 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     double[] doubleResult = _doubleResult;
     if (doubleResult == null || doubleResult.length < numDocs) {
       doubleResult = new double[numDocs];
@@ -217,8 +192,8 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     BigDecimal[] bigDecimalResult = _bigDecimalResult;
     if (bigDecimalResult == null || bigDecimalResult.length < numDocs) {
       bigDecimalResult = new BigDecimal[numDocs];
@@ -229,56 +204,69 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     String[] stringResult = _stringResult;
     if (stringResult == null || stringResult.length < numDocs) {
       stringResult = new String[numDocs];
-      Arrays.fill(stringResult, _literal);
+      Arrays.fill(stringResult, getStringLiteral());
       _stringResult = stringResult;
     }
     return stringResult;
   }
 
   @Override
-  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     byte[][] bytesResult = _bytesResult;
     if (bytesResult == null || bytesResult.length < numDocs) {
       bytesResult = new byte[numDocs][];
-      Arrays.fill(bytesResult, BytesUtils.toBytes(_literal));
+      // TODO: Handle null literal
+      Arrays.fill(bytesResult, BytesUtils.toBytes(getStringLiteral()));
       _bytesResult = bytesResult;
     }
     return bytesResult;
   }
 
   @Override
-  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
+  public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
+  public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
+  public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
+  public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
+  public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    // Treat all unknown type values as null regardless of the value.
+    if (_dataType != DataType.UNKNOWN) {
+      return null;
+    }
+    int length = valueBlock.getNumDocs();
+    RoaringBitmap bitmap = new RoaringBitmap();
+    bitmap.add(0L, length);
+    return bitmap;
   }
 }

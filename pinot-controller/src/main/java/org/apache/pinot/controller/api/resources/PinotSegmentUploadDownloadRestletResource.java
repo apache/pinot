@@ -69,6 +69,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
+import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.URIUtils;
@@ -94,7 +96,6 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
@@ -167,7 +168,12 @@ public class PinotSegmentUploadDownloadRestletResource {
     File segmentFile;
     // If the segment file is local, just use it as the return entity; otherwise copy it from remote to local first.
     if (CommonConstants.Segment.LOCAL_SEGMENT_SCHEME.equals(dataDirURI.getScheme())) {
-      segmentFile = new File(new File(dataDirURI), StringUtil.join(File.separator, tableName, segmentName));
+      File dataDir = new File(dataDirURI);
+      File tableDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(dataDir, tableName,
+          "Invalid table name: %s", tableName);
+      segmentFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName,
+          "Invalid segment name: %s", segmentName);
+
       if (!segmentFile.exists()) {
         throw new ControllerApplicationException(LOGGER,
             "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFile.getAbsolutePath(),
@@ -182,8 +188,13 @@ public class PinotSegmentUploadDownloadRestletResource {
             "Segment: " + segmentName + " of table: " + tableName + " not found at: " + remoteSegmentFileURI,
             Response.Status.NOT_FOUND);
       }
-      segmentFile = new File(new File(ControllerFilePathProvider.getInstance().getFileDownloadTempDir(), tableName),
-          segmentName + "-" + UUID.randomUUID());
+      File downloadTempDir = ControllerFilePathProvider.getInstance().getFileDownloadTempDir();
+      File tableDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(downloadTempDir, tableName,
+          "Invalid table name: %s", tableName);
+      segmentFile =
+          org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName + "-" + UUID.randomUUID(),
+              "Invalid segment name: %s", segmentName);
+
       pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
       // Streaming in the tmp file and delete it afterward.
       builder.entity((StreamingOutput) output -> {
@@ -629,7 +640,8 @@ public class PinotSegmentUploadDownloadRestletResource {
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     try {
       String segmentLineageEntryId = _pinotHelixResourceManager.startReplaceSegments(tableNameWithType,
-          startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup);
+          startReplaceSegmentsRequest.getSegmentsFrom(), startReplaceSegmentsRequest.getSegmentsTo(), forceCleanup,
+          startReplaceSegmentsRequest.getCustomMap());
       return Response.ok(JsonUtils.newObjectNode().put("segmentLineageEntryId", segmentLineageEntryId)).build();
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_START_REPLACE_FAILURE, 1);
@@ -646,7 +658,9 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
-      @QueryParam("segmentLineageEntryId") String segmentLineageEntryId) {
+      @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
+      @ApiParam(value = "Fields belonging to end replace segment request", required = false)
+          EndReplaceSegmentsRequest endReplaceSegmentsRequest) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -657,7 +671,8 @@ public class PinotSegmentUploadDownloadRestletResource {
     try {
       // Check that the segment lineage entry id is valid
       Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
-      _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId);
+      _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
+          endReplaceSegmentsRequest);
       return Response.ok().build();
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);
@@ -676,7 +691,9 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Segment lineage entry id to revert", required = true) @QueryParam("segmentLineageEntryId")
           String segmentLineageEntryId,
       @ApiParam(value = "Force revert in case the user knows that the lineage entry is interrupted")
-      @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert) {
+      @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert,
+      @ApiParam(value = "Fields belonging to revert replace segment request", required = false)
+          RevertReplaceSegmentsRequest revertReplaceSegmentsRequest) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -687,7 +704,8 @@ public class PinotSegmentUploadDownloadRestletResource {
     try {
       // Check that the segment lineage entry id is valid
       Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
-      _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert);
+      _pinotHelixResourceManager.revertReplaceSegments(tableNameWithType, segmentLineageEntryId, forceRevert,
+          revertReplaceSegmentsRequest);
       return Response.ok().build();
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_REVERT_REPLACE_FAILURE, 1);

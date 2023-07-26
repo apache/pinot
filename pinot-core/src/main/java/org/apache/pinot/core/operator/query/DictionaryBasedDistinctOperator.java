@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.query;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
@@ -29,11 +28,12 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
@@ -42,96 +42,77 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT_DICTIONARY";
 
-  private final DistinctAggregationFunction _distinctAggregationFunction;
-  private final Dictionary _dictionary;
-  private final int _numTotalDocs;
-  private final boolean _nullHandlingEnabled;
-  private final FieldSpec.DataType _dataType;
+  private final DataSource _dataSource;
+  private final QueryContext _queryContext;
 
-  private boolean _hasOrderBy;
-  private boolean _isAscending;
   private int _numDocsScanned;
 
-  public DictionaryBasedDistinctOperator(FieldSpec.DataType dataType,
-      DistinctAggregationFunction distinctAggregationFunction, Dictionary dictionary, int numTotalDocs,
-      boolean nullHandlingEnabled) {
-    _dataType = dataType;
-    _distinctAggregationFunction = distinctAggregationFunction;
-    _dictionary = dictionary;
-    _numTotalDocs = numTotalDocs;
-    _nullHandlingEnabled = nullHandlingEnabled;
-
-    List<OrderByExpressionContext> orderByExpressionContexts = _distinctAggregationFunction.getOrderByExpressions();
-    if (orderByExpressionContexts != null) {
-      OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-      _isAscending = orderByExpressionContext.isAsc();
-      _hasOrderBy = true;
-    }
+  public DictionaryBasedDistinctOperator(DataSource dataSource, QueryContext queryContext) {
+    _dataSource = dataSource;
+    _queryContext = queryContext;
   }
 
   @Override
   protected DistinctResultsBlock getNextBlock() {
-    return new DistinctResultsBlock(_distinctAggregationFunction, buildResult());
-  }
-
-  /**
-   * Build the final result for this operation
-   */
-  private DistinctTable buildResult() {
-
-    assert _distinctAggregationFunction.getType() == AggregationFunctionType.DISTINCT;
-
-    List<ExpressionContext> expressions = _distinctAggregationFunction.getInputExpressions();
-    ExpressionContext expression = expressions.get(0);
-    DataSchema dataSchema = new DataSchema(new String[]{expression.toString()},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.fromDataTypeSV(_dataType)});
-    int dictLength = _dictionary.length();
-    List<Record> records;
-
-    int limit = _distinctAggregationFunction.getLimit();
-    int actualLimit = Math.min(limit, dictLength);
+    String column = _queryContext.getSelectExpressions().get(0).getIdentifier();
+    Dictionary dictionary = _dataSource.getDictionary();
+    assert dictionary != null;
+    DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
+    DataSchema dataSchema = new DataSchema(new String[]{column},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.fromDataTypeSV(dataSourceMetadata.getDataType())});
+    int limit = _queryContext.getLimit();
+    int dictLength = dictionary.length();
+    int numValuesToKeep = Math.min(limit, dictLength);
+    boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
 
     // If ORDER BY is not present, we read the first limit values from the dictionary and return.
     // If ORDER BY is present and the dictionary is sorted, then we read the first/last limit values
     // from the dictionary. If not sorted, then we read the entire dictionary and return it.
-    if (!_hasOrderBy) {
-      records = new ArrayList<>(actualLimit);
-
-      _numDocsScanned = actualLimit;
-
-      for (int i = 0; i < actualLimit; i++) {
-        records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
-      }
+    DistinctTable distinctTable;
+    List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
+    if (orderByExpressions == null) {
+      distinctTable =
+          new DistinctTable(dataSchema, iterateOnDictionary(dictionary, numValuesToKeep), nullHandlingEnabled);
+      _numDocsScanned = numValuesToKeep;
     } else {
-      if (_dictionary.isSorted()) {
-        records = new ArrayList<>(actualLimit);
-        if (_isAscending) {
-          _numDocsScanned = actualLimit;
-          for (int i = 0; i < actualLimit; i++) {
-            records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
-          }
+      if (dictionary.isSorted()) {
+        if (orderByExpressions.get(0).isAsc()) {
+          distinctTable =
+              new DistinctTable(dataSchema, iterateOnDictionary(dictionary, numValuesToKeep), nullHandlingEnabled);
         } else {
-          _numDocsScanned = actualLimit;
-          for (int i = dictLength - 1; i >= (dictLength - actualLimit); i--) {
-            records.add(new Record(new Object[]{_dictionary.getInternal(i)}));
-          }
+          distinctTable =
+              new DistinctTable(dataSchema, iterateOnDictionaryDesc(dictionary, numValuesToKeep), nullHandlingEnabled);
         }
+        _numDocsScanned = numValuesToKeep;
       } else {
-        // DictionaryBasedDistinctOperator cannot handle nulls.
-        DistinctTable distinctTable =
-            new DistinctTable(dataSchema, _distinctAggregationFunction.getOrderByExpressions(), limit,
-                _nullHandlingEnabled);
-
-        _numDocsScanned = dictLength;
+        distinctTable = new DistinctTable(dataSchema, orderByExpressions, limit, nullHandlingEnabled);
         for (int i = 0; i < dictLength; i++) {
-          distinctTable.addWithOrderBy(new Record(new Object[]{_dictionary.getInternal(i)}));
+          distinctTable.addWithOrderBy(new Record(new Object[]{dictionary.getInternal(i)}));
         }
-
-        return distinctTable;
+        _numDocsScanned = dictLength;
       }
     }
 
-    return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
+    return new DistinctResultsBlock(distinctTable);
+  }
+
+  private static List<Record> iterateOnDictionary(Dictionary dictionary, int length) {
+    List<Record> records = new ArrayList<>(length);
+    for (int i = 0; i < length; i++) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+      records.add(new Record(new Object[]{dictionary.getInternal(i)}));
+    }
+    return records;
+  }
+
+  private static List<Record> iterateOnDictionaryDesc(Dictionary dictionary, int length) {
+    List<Record> records = new ArrayList<>(length);
+    int dictLength = dictionary.length();
+    for (int i = dictLength - 1, j = 0; i >= (dictLength - length); i--, j++) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(j);
+      records.add(new Record(new Object[]{dictionary.getInternal(i)}));
+    }
+    return records;
   }
 
   @Override
@@ -147,6 +128,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     // NOTE: Set numDocsScanned to numTotalDocs for backward compatibility.
-    return new ExecutionStatistics(_numDocsScanned, 0, _numDocsScanned, _numTotalDocs);
+    return new ExecutionStatistics(_numDocsScanned, 0, _numDocsScanned,
+        _dataSource.getDataSourceMetadata().getNumDocs());
   }
 }

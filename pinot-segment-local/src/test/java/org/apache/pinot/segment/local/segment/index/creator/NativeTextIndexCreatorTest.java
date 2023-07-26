@@ -23,6 +23,8 @@ import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -55,6 +57,7 @@ public class NativeTextIndexCreatorTest {
     uniqueValues[2] = "still";
     uniqueValues[3] = "zoobar";
 
+    FieldSpec fieldSpec = new DimensionFieldSpec("testFSTColumn", FieldSpec.DataType.STRING, true);
     try (NativeTextIndexCreator creator = new NativeTextIndexCreator("testFSTColumn", INDEX_DIR)) {
       for (int i = 0; i < 4; i++) {
         creator.add(uniqueValues[i]);

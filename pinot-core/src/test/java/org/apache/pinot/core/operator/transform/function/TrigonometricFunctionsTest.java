@@ -33,6 +33,7 @@ import org.apache.pinot.core.operator.transform.function.TrigonometricTransformF
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.SinhTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanhTransformFunction;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -159,5 +160,20 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
       expectedValues[i] = op.applyAsDouble(Double.parseDouble(_stringSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpression(String.format("%s(%s)", sqlFunction, INT_SV_NULL_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(clazz.isInstance(transformFunction));
+    Assert.assertEquals(transformFunction.getName(), sqlFunction);
+    expectedValues = new double[NUM_ROWS];
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        bitmap.add(i);
+      } else {
+        expectedValues[i] = op.applyAsDouble(_intSVValues[i]);
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
   }
 }

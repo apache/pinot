@@ -38,7 +38,6 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
-import org.apache.pinot.segment.spi.index.IndexingOverrides;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
@@ -166,6 +165,8 @@ public class ImmutableSegmentLoader {
           segmentMetadata.removeColumn(column);
         }
       }
+    } else {
+      indexLoadingConfig.addKnownColumns(columnMetadataMap.keySet());
     }
 
     URI indexDirURI = segmentDirectory.getIndexDir();
@@ -180,8 +181,7 @@ public class ImmutableSegmentLoader {
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
       // FIXME: text-index only works with local SegmentDirectory
       indexContainerMap.put(entry.getKey(),
-          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig, localIndexDir,
-              IndexingOverrides.getIndexReaderProvider()));
+          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
     }
 
     // Instantiate virtual columns
@@ -200,7 +200,7 @@ public class ImmutableSegmentLoader {
 
     // Load star-tree index if it exists
     StarTreeIndexContainer starTreeIndexContainer = null;
-    if (segmentMetadata.getStarTreeV2MetadataList() != null && segmentReader.getStarTreeIndex() != null) {
+    if (segmentReader.hasStarTreeIndex()) {
       starTreeIndexContainer = new StarTreeIndexContainer(segmentReader, segmentMetadata, indexContainerMap);
     }
 

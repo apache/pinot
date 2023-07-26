@@ -44,7 +44,7 @@ public class ImmutableSegmentDataManager extends SegmentDataManager {
   }
 
   @Override
-  public void destroy() {
+  protected void doDestroy() {
     _immutableSegment.destroy();
   }
 

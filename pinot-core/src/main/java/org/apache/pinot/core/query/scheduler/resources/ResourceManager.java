@@ -28,7 +28,6 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,8 +93,6 @@ public abstract class ResourceManager {
         CommonConstants.ExecutorService.PINOT_QUERY_WORKER_NAME_FORMAT);
     _queryWorkers =
         MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory));
-
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(_numQueryRunnerThreads, _numQueryWorkerThreads, config);
   }
 
   public void stop() {

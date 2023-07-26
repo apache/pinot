@@ -20,12 +20,13 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.joda.time.Chronology;
 import org.joda.time.DateTimeField;
 import org.joda.time.chrono.ISOChronology;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class ExtractTransformFunction extends BaseTransformFunction {
@@ -44,12 +45,12 @@ public class ExtractTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     if (arguments.size() != 2) {
       throw new IllegalArgumentException("Exactly 2 arguments are required for EXTRACT transform function");
     }
 
-    _field = Field.valueOf(((LiteralTransformFunction) arguments.get(0)).getLiteral());
+    _field = Field.valueOf(((LiteralTransformFunction) arguments.get(0)).getStringLiteral());
     _mainTransformFunction = arguments.get(1);
   }
 
@@ -59,12 +60,10 @@ public class ExtractTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int numDocs = projectionBlock.getNumDocs();
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[numDocs];
-    }
-    long[] timestamps = _mainTransformFunction.transformToLongValuesSV(projectionBlock);
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initIntValuesSV(numDocs);
+    long[] timestamps = _mainTransformFunction.transformToLongValuesSV(valueBlock);
     convert(timestamps, numDocs, _intValuesSV);
     return _intValuesSV;
   }
@@ -101,5 +100,10 @@ public class ExtractTransformFunction extends BaseTransformFunction {
           throw new IllegalArgumentException("Unsupported FIELD type");
       }
     }
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return _mainTransformFunction.getNullBitmap(valueBlock);
   }
 }

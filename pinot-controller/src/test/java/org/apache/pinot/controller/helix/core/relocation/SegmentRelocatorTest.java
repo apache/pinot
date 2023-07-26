@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.relocation;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,10 +33,7 @@ import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.tier.FixedTierSegmentSelector;
-import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -54,7 +49,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -117,39 +111,6 @@ public class SegmentRelocatorTest {
         fail("Unexpected server: " + server);
       }
     }
-  }
-
-  @Test
-  public void testUpdateSegmentTargetTierBackToDefault() {
-    String tableName = "table01_OFFLINE";
-    String segmentName = "seg01";
-    PinotHelixResourceManager helixMgrMock = mock(PinotHelixResourceManager.class);
-    when(helixMgrMock.getSegmentMetadataZnRecord(tableName, segmentName)).thenReturn(
-        createSegmentMetadataZNRecord(segmentName, "hotTier"));
-    // Move back to default as not tier configs.
-    List<Tier> sortedTiers = new ArrayList<>();
-    SegmentRelocator.updateSegmentTargetTier(tableName, "seg01", sortedTiers, helixMgrMock);
-    ArgumentCaptor<SegmentZKMetadata> recordCapture = ArgumentCaptor.forClass(SegmentZKMetadata.class);
-    verify(helixMgrMock).updateZkMetadata(eq(tableName), recordCapture.capture(), eq(10));
-    SegmentZKMetadata record = recordCapture.getValue();
-    assertNull(record.getTier());
-  }
-
-  @Test
-  public void testUpdateSegmentTargetTierToNewTier() {
-    String tableName = "table01_OFFLINE";
-    String segmentName = "seg01";
-    PinotHelixResourceManager helixMgrMock = mock(PinotHelixResourceManager.class);
-    when(helixMgrMock.getSegmentMetadataZnRecord(tableName, segmentName)).thenReturn(
-        createSegmentMetadataZNRecord(segmentName, "hotTier"));
-    // Move to new tier as set in tier configs.
-    List<Tier> sortedTiers = Collections.singletonList(
-        new Tier("coldTier", new FixedTierSegmentSelector(null, Collections.singleton("seg01")), null));
-    SegmentRelocator.updateSegmentTargetTier(tableName, "seg01", sortedTiers, helixMgrMock);
-    ArgumentCaptor<SegmentZKMetadata> recordCapture = ArgumentCaptor.forClass(SegmentZKMetadata.class);
-    verify(helixMgrMock).updateZkMetadata(eq(tableName), recordCapture.capture(), eq(10));
-    SegmentZKMetadata record = recordCapture.getValue();
-    assertEquals(record.getTier(), "coldTier");
   }
 
   @Test

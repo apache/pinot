@@ -56,7 +56,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   NUMBER_REVERT_REPLACE_FAILURE("NumRevertReplaceFailure", false),
   CRON_SCHEDULER_JOB_TRIGGERED("cronSchedulerJobTriggered", false),
   CRON_SCHEDULER_JOB_SKIPPED("cronSchedulerJobSkipped", false),
+  LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_SUCCESS("LLCSegmentDeepStoreUploadRetrySuccess", false),
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR("LLCSegmentDeepStoreUploadRetryError", false),
+  SEGMENT_MISSING_DEEP_STORE_LINK("RealtimeSegmentMissingDeepStoreLink", false),
   NUMBER_ADHOC_TASKS_SUBMITTED("adhocTasks", false);
 
 

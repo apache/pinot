@@ -24,17 +24,17 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.FilteredGroupByOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.core.startree.StarTreeUtils;
-import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
+import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
@@ -55,37 +55,23 @@ public class GroupByPlanNode implements PlanNode {
 
   @Override
   public Operator<GroupByResultsBlock> run() {
-    assert _queryContext.getAggregationFunctions() != null;
-    assert _queryContext.getGroupByExpressions() != null;
-
-    if (_queryContext.hasFilteredAggregations()) {
-      return buildFilteredGroupByPlan();
-    }
-    return buildNonFilteredGroupByPlan();
+    assert _queryContext.getAggregationFunctions() != null && _queryContext.getGroupByExpressions() != null;
+    return _queryContext.hasFilteredAggregations() ? buildFilteredGroupByPlan() : buildNonFilteredGroupByPlan();
   }
 
   private FilteredGroupByOperator buildFilteredGroupByPlan() {
-    int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    // Build the operator chain for the main predicate so the filter plan can be run only one time
-    Pair<FilterPlanNode, BaseFilterOperator> filterOperatorPair =
-        AggregationFunctionUtils.buildFilterOperator(_indexSegment, _queryContext);
-    ExpressionContext[] groupByExpressions = _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
-    TransformOperator transformOperator =
-        AggregationFunctionUtils.buildTransformOperatorForFilteredAggregates(_indexSegment, _queryContext,
-            filterOperatorPair.getRight(), groupByExpressions);
-
-    List<Pair<AggregationFunction[], TransformOperator>> aggToTransformOpList =
-        AggregationFunctionUtils.buildFilteredAggTransformPairs(_indexSegment, _queryContext,
-            filterOperatorPair.getRight(), transformOperator, groupByExpressions);
-    return new FilteredGroupByOperator(_queryContext.getAggregationFunctions(),
-        _queryContext.getFilteredAggregationFunctions(), aggToTransformOpList,
-        _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]), numTotalDocs, _queryContext);
+    List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators =
+        AggregationFunctionUtils.buildFilteredAggregateProjectOperators(_indexSegment, _queryContext);
+    return new FilteredGroupByOperator(_queryContext, projectOperators,
+        _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
   private GroupByOperator buildNonFilteredGroupByPlan() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    ExpressionContext[] groupByExpressions = _queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
+    List<ExpressionContext> groupByExpressionsList = _queryContext.getGroupByExpressions();
+    assert aggregationFunctions != null && groupByExpressionsList != null;
+    ExpressionContext[] groupByExpressions = groupByExpressionsList.toArray(new ExpressionContext[0]);
 
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
@@ -103,10 +89,10 @@ public class GroupByPlanNode implements PlanNode {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,
                 groupByExpressions, predicateEvaluatorsMap.keySet())) {
-              TransformOperator transformOperator =
-                  new StarTreeTransformPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs,
+              BaseProjectOperator<?> projectOperator =
+                  new StarTreeProjectPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs,
                       groupByExpressions, predicateEvaluatorsMap).run();
-              return new GroupByOperator(aggregationFunctions, groupByExpressions, transformOperator, numTotalDocs,
+              return new GroupByOperator(aggregationFunctions, groupByExpressions, projectOperator, numTotalDocs,
                   _queryContext, true);
             }
           }
@@ -115,11 +101,11 @@ public class GroupByPlanNode implements PlanNode {
     }
 
     Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
-    TransformOperator transformPlanNode =
-        new TransformPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressionsList);
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new GroupByOperator(aggregationFunctions, groupByExpressions, transformPlanNode, numTotalDocs, _queryContext,
+    return new GroupByOperator(aggregationFunctions, groupByExpressions, projectOperator, numTotalDocs, _queryContext,
         false);
   }
 }

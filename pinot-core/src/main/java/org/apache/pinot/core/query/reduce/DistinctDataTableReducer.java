@@ -27,17 +27,18 @@ import java.util.Map;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -45,11 +46,9 @@ import org.roaringbitmap.RoaringBitmap;
  * Helper class to reduce data tables and set results of distinct query into the BrokerResponseNative
  */
 public class DistinctDataTableReducer implements DataTableReducer {
-  private final DistinctAggregationFunction _distinctAggregationFunction;
   private final QueryContext _queryContext;
 
-  DistinctDataTableReducer(DistinctAggregationFunction distinctAggregationFunction, QueryContext queryContext) {
-    _distinctAggregationFunction = distinctAggregationFunction;
+  DistinctDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
   }
 
@@ -73,6 +72,8 @@ public class DistinctDataTableReducer implements DataTableReducer {
     // DataTable; if all returns are DataTable we can directly merge with priority queue (with dedup).
     List<DistinctTable> nonEmptyDistinctTables = new ArrayList<>(dataTableMap.size());
     for (DataTable dataTable : dataTableMap.values()) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+
       // Do not use the cached data schema because it might be either single object (legacy) or normal data table
       dataSchema = dataTable.getDataSchema();
       int numColumns = dataSchema.size();
@@ -112,18 +113,21 @@ public class DistinctDataTableReducer implements DataTableReducer {
       // All the DistinctTables are empty, construct an empty response
       // TODO: This returns schema with all STRING data types.
       //       There's no way currently to get the data types of the distinct columns for empty results
-      String[] columns = _distinctAggregationFunction.getColumns();
-
-      int numColumns = columns.length;
-      ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+      List<ExpressionContext> expressions = _queryContext.getSelectExpressions();
+      int numExpressions = expressions.size();
+      String[] columns = new String[numExpressions];
+      for (int i = 0; i < numExpressions; i++) {
+        columns[i] = expressions.get(i).toString();
+      }
+      ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
       Arrays.fill(columnDataTypes, ColumnDataType.STRING);
       brokerResponseNative.setResultTable(
           new ResultTable(new DataSchema(columns, columnDataTypes), Collections.emptyList()));
     } else {
       // Construct a main DistinctTable and merge all non-empty DistinctTables into it
-      DistinctTable mainDistinctTable = new DistinctTable(nonEmptyDistinctTables.get(0).getDataSchema(),
-          _distinctAggregationFunction.getOrderByExpressions(), _distinctAggregationFunction.getLimit(),
-          _queryContext.isNullHandlingEnabled());
+      DistinctTable mainDistinctTable =
+          new DistinctTable(nonEmptyDistinctTables.get(0).getDataSchema(), _queryContext.getOrderByExpressions(),
+              _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
       for (DistinctTable distinctTable : nonEmptyDistinctTables) {
         mainDistinctTable.mergeTable(distinctTable);
       }

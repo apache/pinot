@@ -27,6 +27,7 @@ import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -50,7 +51,7 @@ public class BloomFilterCreatorTest {
     int cardinality = 10000;
     String columnName = "testColumn";
     try (BloomFilterCreator bloomFilterCreator = new OnHeapGuavaBloomFilterCreator(TEMP_DIR, columnName, cardinality,
-        new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false))) {
+        new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false), FieldSpec.DataType.INT)) {
       for (int i = 0; i < 5; i++) {
         bloomFilterCreator.add(Integer.toString(i));
       }

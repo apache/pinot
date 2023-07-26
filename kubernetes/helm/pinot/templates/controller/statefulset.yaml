@@ -59,7 +59,7 @@ spec:
           {{- toYaml .Values.controller.securityContext | nindent 10 }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        args: [ "StartController", "-configFileName", "/var/pinot/controller/config/pinot-controller.conf" ]
+        args: [ "{{ .Values.controller.startCommand }}", "-configFileName", "/var/pinot/controller/config/pinot-controller.conf" ]
         env:
           - name: JAVA_OPTS
             value: "{{ .Values.controller.jvmOpts }} -Dlog4j2.configurationFile={{ .Values.controller.log4j2ConfFile }} -Dplugins.dir={{ .Values.controller.pluginsDir }}"
@@ -72,6 +72,9 @@ spec:
           - containerPort: {{ .Values.controller.service.port }}
             protocol: {{ .Values.controller.service.protocol }}
             name: {{ .Values.controller.service.name }}
+{{- if .Values.controller.service.extraPorts }}
+{{ toYaml .Values.controller.service.extraPorts | indent 10 }}
+{{- end }}           
         {{- if .Values.controller.probes.livenessEnabled }}
         livenessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}

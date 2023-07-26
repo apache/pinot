@@ -20,15 +20,19 @@ package org.apache.pinot.controller.api;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
@@ -36,14 +40,13 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
 public class PinotSegmentRestletResourceTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
-  private static final String TABLE_NAME = "pinotSegmentRestletResourceTestTable";
-  private static final String TABLE_NAME_OFFLINE = TABLE_NAME + "_OFFLINE";
 
   @BeforeClass
   public void setUp()
@@ -55,45 +58,42 @@ public class PinotSegmentRestletResourceTest {
   public void testListSegmentLineage()
       throws Exception {
     // Adding table
+    String rawTableName = "lineageTestTable";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(1).build();
-    TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
-
-    // Wait for the table addition
-    while (!TEST_INSTANCE.getHelixResourceManager().hasOfflineTable(TABLE_NAME)) {
-      Thread.sleep(100);
-    }
-
-    Map<String, SegmentMetadata> segmentMetadataTable = new HashMap<>();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1).build();
+    PinotHelixResourceManager resourceManager = TEST_INSTANCE.getHelixResourceManager();
+    resourceManager.addTable(tableConfig);
 
     // Upload Segments
+    Map<String, SegmentMetadata> segmentMetadataTable = new HashMap<>();
     for (int i = 0; i < 4; i++) {
-      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME, "s" + i);
-      TEST_INSTANCE.getHelixResourceManager()
-          .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentMetadata, "downloadUrl");
+      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName, "s" + i);
+      resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
       segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
 
     // There should be no segment lineage at this point.
-    String segmentLineageResponse = ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
-        .forListAllSegmentLineages(TABLE_NAME, TableType.OFFLINE.toString()));
+    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
+    String segmentLineageResponse =
+        ControllerTest.sendGetRequest(urlBuilder.forListAllSegmentLineages(rawTableName, TableType.OFFLINE.name()));
     assertEquals(segmentLineageResponse, "");
 
     // Now starts to replace segments.
     List<String> segmentsFrom = Arrays.asList("s0", "s1");
-    List<String> segmentsTo = Arrays.asList("some_segment");
-    String segmentLineageId = TEST_INSTANCE.getHelixResourceManager()
-        .startReplaceSegments(TABLE_NAME_OFFLINE, segmentsFrom, segmentsTo, false);
+    List<String> segmentsTo = Collections.singletonList("some_segment");
+    String segmentLineageId = resourceManager.startReplaceSegments(offlineTableName, segmentsFrom, segmentsTo, false,
+        null);
 
     // Replace more segments to add another entry to segment lineage.
     segmentsFrom = Arrays.asList("s2", "s3");
-    segmentsTo = Arrays.asList("another_segment");
-    String nextSegmentLineageId = TEST_INSTANCE.getHelixResourceManager()
-        .startReplaceSegments(TABLE_NAME_OFFLINE, segmentsFrom, segmentsTo, false);
+    segmentsTo = Collections.singletonList("another_segment");
+    String nextSegmentLineageId =
+        resourceManager.startReplaceSegments(offlineTableName, segmentsFrom, segmentsTo, false, null);
 
     // There should now be two segment lineage entries resulting from the operations above.
-    segmentLineageResponse = ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
-        .forListAllSegmentLineages(TABLE_NAME, TableType.OFFLINE.toString()));
+    segmentLineageResponse =
+        ControllerTest.sendGetRequest(urlBuilder.forListAllSegmentLineages(rawTableName, TableType.OFFLINE.toString()));
     assertTrue(segmentLineageResponse.contains("\"state\":\"IN_PROGRESS\""));
     assertTrue(segmentLineageResponse.contains("\"segmentsFrom\":[\"s0\",\"s1\"]"));
     assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"some_segment\"]"));
@@ -103,93 +103,110 @@ public class PinotSegmentRestletResourceTest {
     assertTrue(segmentLineageResponse.indexOf(segmentLineageId) < segmentLineageResponse.indexOf(nextSegmentLineageId));
 
     // List segment lineage should fail for non-existing table
-    assertThrows(IOException.class, () -> ControllerTest.sendGetRequest(TEST_INSTANCE.getControllerRequestURLBuilder()
-        .forListAllSegmentLineages("non-existing-table", TableType.OFFLINE.toString())));
+    assertThrows(IOException.class, () -> ControllerTest.sendGetRequest(
+        urlBuilder.forListAllSegmentLineages("non-existing-table", TableType.OFFLINE.toString())));
 
     // List segment lineage should also fail for invalid table type.
-    assertThrows(IOException.class, () -> ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forListAllSegmentLineages(TABLE_NAME, "invalid-type")));
-
-    // Delete segments
-    TEST_INSTANCE.getHelixResourceManager().deleteSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
-        segmentMetadataTable.values().iterator().next().getName());
-
-    // Delete offline table
-    TEST_INSTANCE.getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    assertThrows(IOException.class,
+        () -> ControllerTest.sendGetRequest(urlBuilder.forListAllSegmentLineages(rawTableName, "invalid-type")));
   }
 
   @Test
   public void testSegmentCrcApi()
       throws Exception {
     // Adding table
+    String rawTableName = "crcTestTable";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(1).build();
-    TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
-
-    // Wait for the table addition
-    while (!TEST_INSTANCE.getHelixResourceManager().hasOfflineTable(TABLE_NAME)) {
-      Thread.sleep(100);
-    }
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1).build();
+    PinotHelixResourceManager resourceManager = TEST_INSTANCE.getHelixResourceManager();
+    resourceManager.addTable(tableConfig);
 
     // Check when there is no segment.
     Map<String, SegmentMetadata> segmentMetadataTable = new HashMap<>();
-    checkCrcRequest(segmentMetadataTable, 0);
+    checkCrcRequest(rawTableName, segmentMetadataTable, 0);
 
     // Upload Segments
     for (int i = 0; i < 5; i++) {
-      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
-      TEST_INSTANCE.getHelixResourceManager()
-          .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentMetadata, "downloadUrl");
+      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName);
+      resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
       segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
 
     // Get crc info from API and check that they are correct.
-    checkCrcRequest(segmentMetadataTable, 5);
+    checkCrcRequest(rawTableName, segmentMetadataTable, 5);
 
     // validate the segment metadata
-    Map.Entry<String, SegmentMetadata> entry =
-        (Map.Entry<String, SegmentMetadata>) segmentMetadataTable.entrySet().toArray()[0];
+    String sampleSegment = segmentMetadataTable.keySet().iterator().next();
     String resp = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(TABLE_NAME, entry.getKey()));
+        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(rawTableName, sampleSegment));
     Map<String, String> fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
     assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // use table name with table type
     resp = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(TABLE_NAME + "_OFFLINE", entry.getKey()));
+        TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentMetadata(offlineTableName, sampleSegment));
     fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
     assertEquals(fetchedMetadata.get("segment.download.url"), "downloadUrl");
 
     // Add more segments
     for (int i = 0; i < 5; i++) {
-      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
-      TEST_INSTANCE.getHelixResourceManager()
-          .addNewSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentMetadata, "downloadUrl");
+      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName);
+      resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
       segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
 
     // Get crc info from API and check that they are correct.
-    checkCrcRequest(segmentMetadataTable, 10);
+    checkCrcRequest(rawTableName, segmentMetadataTable, 10);
 
-    // Delete segments
-    TEST_INSTANCE.getHelixResourceManager().deleteSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
-        segmentMetadataTable.values().iterator().next().getName());
+    // Delete one segment
+    resourceManager.deleteSegment(offlineTableName, sampleSegment);
 
     // Check crc api
-    checkCrcRequest(segmentMetadataTable, 9);
-
-    // Delete offline table
-    TEST_INSTANCE.getHelixResourceManager().deleteOfflineTable(TABLE_NAME);
+    checkCrcRequest(rawTableName, segmentMetadataTable, 9);
   }
 
-  private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize)
+  @Test
+  public void testDeleteSegmentsWithTimeWindow()
+      throws Exception {
+    // Adding table and segment
+    String rawTableName = "deleteWithTimeWindowTestTable";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1)
+            .setDeletedSegmentsRetentionPeriod("0d").build();
+    PinotHelixResourceManager resourceManager = TEST_INSTANCE.getHelixResourceManager();
+    resourceManager.addTable(tableConfig);
+    SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName,
+        10L, 20L, TimeUnit.MILLISECONDS);
+    resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
+
+    // Send query and verify
+    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
+    // case 1: no overlapping
+    String reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
+        rawTableName, 0L, 10L));
+    assertTrue(reply.contains("Deleted 0 segments"));
+
+    // case 2: partial overlapping
+    reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
+        rawTableName, 10L, 20L));
+    assertTrue(reply.contains("Deleted 0 segments"));
+
+    // case 3: fully within the time window
+    reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
+        rawTableName, 10L, 21L));
+    assertTrue(reply.contains("Deleted 1 segments"));
+  }
+
+  private void checkCrcRequest(String tableName, Map<String, SegmentMetadata> metadataTable, int expectedSize)
       throws Exception {
     String crcMapStr = ControllerTest.sendGetRequest(
-        TEST_INSTANCE.getControllerRequestURLBuilder().forListAllCrcInformationForTable(TABLE_NAME));
+        TEST_INSTANCE.getControllerRequestURLBuilder().forListAllCrcInformationForTable(tableName));
     Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);
-      assertTrue(metadata != null);
+      assertNotNull(metadata);
       assertEquals(crcMap.get(segmentName), metadata.getCrc());
     }
     assertEquals(crcMap.size(), expectedSize);

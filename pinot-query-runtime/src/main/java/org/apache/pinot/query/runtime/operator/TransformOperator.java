@@ -29,7 +29,8 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,10 +54,10 @@ public class TransformOperator extends MultiStageOperator {
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
   private TransferableBlock _upstreamErrorBlock;
-  private OperatorStats _operatorStats;
 
-  public TransformOperator(MultiStageOperator upstreamOperator, DataSchema resultSchema,
-      List<RexExpression> transforms, DataSchema upstreamDataSchema, long requestId, int stageId) {
+  public TransformOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+      DataSchema resultSchema, List<RexExpression> transforms, DataSchema upstreamDataSchema) {
+    super(context);
     Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
     Preconditions.checkState(resultSchema.size() == transforms.size(),
         "result schema size:" + resultSchema.size() + " doesn't match transform operand size:" + transforms.size());
@@ -67,7 +68,6 @@ public class TransformOperator extends MultiStageOperator {
       _transformOperandsList.add(TransformOperand.toTransformOperand(rexExpression, upstreamDataSchema));
     }
     _resultSchema = resultSchema;
-    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
   }
 
   @Override
@@ -78,23 +78,16 @@ public class TransformOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    _upstreamOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     try {
-      _operatorStats.endTimer();
       TransferableBlock block = _upstreamOperator.nextBlock();
-      _operatorStats.startTimer();
       return transform(block);
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
-    } finally {
-      _operatorStats.endTimer();
     }
   }
 
@@ -107,22 +100,23 @@ public class TransformOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
 
-    if (TransferableBlockUtils.isEndOfStream(block) || TransferableBlockUtils.isNoOpBlock(block)) {
+    if (TransferableBlockUtils.isEndOfStream(block)) {
       return block;
     }
 
-    List<Object[]> resultRows = new ArrayList<>();
+    if (TransferableBlockUtils.isNoOpBlock(block)) {
+      return block;
+    }
+
     List<Object[]> container = block.getContainer();
+    List<Object[]> resultRows = new ArrayList<>(container.size());
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
       for (int i = 0; i < _resultColumnSize; i++) {
-        resultRow[i] =
-            FunctionInvokeUtils.convert(_transformOperandsList.get(i).apply(row), _resultSchema.getColumnDataType(i));
+        resultRow[i] = TypeUtils.convert(_transformOperandsList.get(i).apply(row), _resultSchema.getColumnDataType(i));
       }
       resultRows.add(resultRow);
     }
-    _operatorStats.recordInput(1, container.size());
-    _operatorStats.recordOutput(1, resultRows.size());
     return new TransferableBlock(resultRows, _resultSchema, DataBlock.Type.ROW);
   }
 }

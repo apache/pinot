@@ -19,6 +19,11 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class AndOperatorTransformFunctionTest extends LogicalOperatorTransformFunctionTest {
@@ -31,5 +36,36 @@ public class AndOperatorTransformFunctionTest extends LogicalOperatorTransformFu
   @Override
   String getFunctionName() {
     return TransformFunctionType.AND.getName();
+  }
+
+  @Test
+  public void testAndNullLiteral() {
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("and(%s,null)", INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof AndOperatorTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.AND.getName());
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testAndNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("and(%s,%s)", INT_SV_COLUMN, INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof AndOperatorTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.AND.getName());
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = (_intSVValues[i] == 0) ? 0 : 1;
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

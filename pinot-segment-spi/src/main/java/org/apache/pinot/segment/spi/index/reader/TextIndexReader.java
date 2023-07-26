@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import java.io.Closeable;
+import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public interface TextIndexReader extends Closeable {
+public interface TextIndexReader extends IndexReader {
 
   /**
    * Returns the matching dictionary ids for the given search query (optional).

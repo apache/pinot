@@ -9,43 +9,43 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.helixZookeeperReconnects\"><>(\\w+)"
   name: "pinot_controller_helix_ZookeeperReconnects_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.idealstateZnodeSize.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.idealstateZnodeSize.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_idealstateZnodeSize_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.idealstateZnodeByteSize.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.idealstateZnodeByteSize.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_idealstateZnodeByteSize_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.numberOfReplicas.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.numberOfReplicas.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_numberOfReplicas_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.percentOfReplicas.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.percentOfReplicas.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_percentOfReplicas_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.percentSegmentsAvailable.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.percentSegmentsAvailable.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_percentSegmentsAvailable_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.segmentCount.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.segmentCount.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_segmentCount_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.segmentsInErrorState.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.segmentsInErrorState.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_segmentsInErrorState_$3"
   cache: true
   labels:
@@ -72,24 +72,30 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.offlineTableCount\"><>(\\w+)"
   name: "pinot_controller_offlineTableCount_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ValidationMetrics\", name=\"pinot.controller.(.*?)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ValidationMetrics\", name=\"pinot.controller.([^\\.]*?)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_validateion_$2_$3"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.cronSchedulerJobScheduled.(.*?)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.cronSchedulerJobScheduled.([^\\.]*?)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerJobScheduled_$3"
   cache: true
   labels:
     table: "$1"
     taskType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(.*?)\\.(\\w+).cronSchedulerTriggered\"><>(\\w+)"
-  name: "pinot_controller_cronSchedulerTriggered_$3"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.([^\\.]*?)\\.(\\w+).cronSchedulerJobTriggered\"><>(\\w+)"
+  name: "pinot_controller_cronSchedulerJobTriggered_$3"
   cache: true
   labels:
     table: "$1"
     taskType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(.*?)\\.(\\w+).cronSchedulerJobExecutionTimeMs\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.([^\\.]*?)\\.(\\w+).cronSchedulerJobSkipped\"><>(\\w+)"
+  name: "pinot_controller_cronSchedulerJobSkipped_$3"
+  cache: true
+  labels:
+    table: "$1"
+    taskType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.([^\\.]*?)\\.(\\w+).cronSchedulerJobExecutionTimeMs\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerJobExecutionTimeMs_$3"
   cache: true
   labels:
@@ -101,14 +107,14 @@ rules:
   labels:
     taskType: "$1"
     status: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastMinionTaskMetadataUpdate.(.*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastMinionTaskMetadataUpdate.([^\\.]*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_timeMsSinceLastMinionTaskMetadataUpdate_$4"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
     taskType: "$3"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError).(.*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.(numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError).([^\\.]*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$5"
   cache: true
   labels:
@@ -120,14 +126,14 @@ rules:
   cache: true
   labels:
     taskType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastSuccessfulMinionTaskGeneration.(.*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.timeMsSinceLastSuccessfulMinionTaskGeneration.([^\\.]*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_timeMsSinceLastSuccessfulMinionTaskGeneration_$4"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
     taskType: "$3"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.lastMinionTaskGenerationEncountersError.(.*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.lastMinionTaskGenerationEncountersError.([^\\.]*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_lastMinionTaskGenerationEncountersError_$4"
   cache: true
   labels:
@@ -137,44 +143,44 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.pinotLeadControllerResourceEnabled\"><>(\\w+)"
   name: "pinot_controller_pinotLeadControllerResourceEnabled_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.offlineTableEstimatedSize.(.*?)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.offlineTableEstimatedSize.([^\\.]*?)\"><>(\\w+)"
   name: "pinot_controller_offlineTableEstimatedSize_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.largestSegmentSizeOnServer.(.*?)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.largestSegmentSizeOnServer.([^\\.]*?)\"><>(\\w+)"
   name: "pinot_controller_largestSegmentSizeOnServer_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableTotalSizeOnServer.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableTotalSizeOnServer.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_tableTotalSizeOnServer_$3"
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableSizePerReplicaOnServer.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableSizePerReplicaOnServer.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_tableSizePerReplicaOnServer_$3"
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableCompressedSize.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableCompressedSize.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_tableCompressedSize_$3"
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableQuota.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableQuota.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_tableQuota_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageQuotaUtilization.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageQuotaUtilization.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_tableStorageQuotaUtilization_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageEstMissingSegmentPercent.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableStorageEstMissingSegmentPercent.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_tableStorageEstMissingSegmentPercent_$3"
   cache: true
   labels:
@@ -182,78 +188,78 @@ rules:
     tableType: "$2"
 
   # Pinot Broker
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?).authorization\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?).authorization\"><>(\\w+)"
   name: "pinot_broker_authorization_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.documentsScanned\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.documentsScanned\"><>(\\w+)"
   name: "pinot_broker_documentsScanned_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.entriesScannedInFilter\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.entriesScannedInFilter\"><>(\\w+)"
   name: "pinot_broker_entriesScannedInFilter_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.entriesScannedPostFilter\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.entriesScannedPostFilter\"><>(\\w+)"
   name: "pinot_broker_entriesScannedPostFilter_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.freshnessLagMs\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.freshnessLagMs\"><>(\\w+)"
   name: "pinot_broker_freshnessLagMs_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.queries\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.queries\"><>(\\w+)"
   name: "pinot_broker_queries_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.queryExecution\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.queryExecution\"><>(\\w+)"
   name: "pinot_broker_queryExecution_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.queryRouting\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.queryRouting\"><>(\\w+)"
   name: "pinot_broker_queryRouting_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.queryTotalTimeMs\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.queryTotalTimeMs\"><>(\\w+)"
   name: "pinot_broker_queryTotalTimeMs_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.reduce\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.reduce\"><>(\\w+)"
   name: "pinot_broker_reduce_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.requestCompilation\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.requestCompilation\"><>(\\w+)"
   name: "pinot_broker_requestCompilation_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.scatterGather\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.scatterGather\"><>(\\w+)"
   name: "pinot_broker_scatterGather_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.totalServerResponseSize\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.totalServerResponseSize\"><>(\\w+)"
   name: "pinot_broker_totalServerResponseSize_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)_(OFFLINE|REALTIME).groupBySize\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)_(OFFLINE|REALTIME).groupBySize\"><>(\\w+)"
   name: "pinot_broker_groupBySize_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)_(OFFLINE|REALTIME).noServingHostForSegment\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)_(OFFLINE|REALTIME).noServingHostForSegment\"><>(\\w+)"
   name: "pinot_broker_noServingHostForSegment_$3"
   cache: true
   labels:
@@ -286,63 +292,63 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.routingTableUpdateTime\"><>(\\w+)"
   name: "pinot_broker_routingTableUpdateTime_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.brokerResponsesWithPartialServersResponded\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.brokerResponsesWithPartialServersResponded\"><>(\\w+)"
   name: "pinot_broker_brokerResponsesWithPartialServersResponded_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.brokerResponsesWithProcessingExceptions\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.brokerResponsesWithProcessingExceptions\"><>(\\w+)"
   name: "pinot_broker_brokerResponsesWithProcessingExceptions_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.brokerResponsesWithNumGroupsLimitReached\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.brokerResponsesWithNumGroupsLimitReached\"><>(\\w+)"
   name: "pinot_broker_brokerResponsesWithNumGroupsLimitReached_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.queryQuotaExceeded\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.queryQuotaExceeded\"><>(\\w+)"
   name: "pinot_broker_queryQuotaExceeded_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)_(OFFLINE|REALTIME).serverMissingForRouting\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)_(OFFLINE|REALTIME).serverMissingForRouting\"><>(\\w+)"
   name: "pinot_broker_serverMissingForRouting_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.deserialization\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.deserialization\"><>(\\w+)"
   name: "pinot_broker_deserialization_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.(.*?)\\.requestConnectionWait\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.requestConnectionWait\"><>(\\w+)"
   name: "pinot_broker_requestConnectionWait_$2"
   cache: true
   labels:
     table: "$1"
 
 # Pinot Server
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.documentCount.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.documentCount.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_server_documentCount_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.segmentCount.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.segmentCount.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_server_segmentCount_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(.*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_$3_$4"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(.*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).realtimeRowsConsumed\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).realtimeRowsConsumed\"><>(\\w+)"
   name: "pinot_server_realtimeRowsConsumed_$5"
   cache: true
   labels:
@@ -356,7 +362,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.helixZookeeperReconnects\"><>(\\w+)"
   name: "pinot_server_helix_zookeeperReconnects_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestKafkaOffsetConsumed.(.*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestKafkaOffsetConsumed.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_highestKafkaOffsetConsumed_$5"
   cache: true
   labels:
@@ -364,7 +370,7 @@ rules:
     tableType: "$2"
     topic: "$3"
     partition: "$4"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestStreamOffsetConsumed.(.*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.highestStreamOffsetConsumed.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_highestStreamOffsetConsumed_$5"
   cache: true
   labels:
@@ -372,7 +378,7 @@ rules:
     tableType: "$2"
     topic: "$3"
     partition: "$4"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.lastRealtimeSegment(\\w+)Seconds.(.*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.lastRealtimeSegment(\\w+)Seconds.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_lastRealtimeSegment$1Seconds_$6"
   cache: true
   labels:
@@ -383,7 +389,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcControllerResponse(\\w+)\"><>(\\w+)"
   name: "pinot_server_llcControllerResponse_$1_$2"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcPartitionConsuming.(.*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.llcPartitionConsuming.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
   name: "pinot_server_llcPartitionConsuming_$5"
   cache: true
   labels:
@@ -403,7 +409,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeConsumptionExceptions\"><>(\\w+)"
   name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.(.*?)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.([^\\.]*?)\"><>(\\w+)"
   name: "pinot_server_realtime_offheapMemoryUsed_$2"
   cache: true
   labels:
@@ -428,25 +434,25 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.nettyConnection(\\w+)\"><>(\\w+)"
   name: "pinot_server_nettyConnection_$1_$2"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeSegmentNumPartitions.(.*?)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeSegmentNumPartitions.([^\\.]*?)\"><>(\\w+)"
   name: "pinot_server_realtimeSegmentNumPartitions_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.resizeTimeMs.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.resizeTimeMs.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_server_resizeTimeMs_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysCount.(.*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysCount.([^\\.]*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
   name: "pinot_server_upsertPrimaryKeysCount_$4"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
     partition: "$3"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeIngestionDelayMs.(.*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeIngestionDelayMs.([^\\.]*?)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_realtimeIngestionDelayMs_$4"
   cache: true
   labels:
@@ -455,13 +461,13 @@ rules:
     partition: "$3"
 
 # Pinot Minions
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.numberOfTasks.(.*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.numberOfTasks.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_minion_numberOfTasks_$3"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.(.*?)_(OFFLINE|REALTIME).(\\w+).(taskExecution|taskQueueing|numberTasksExecuted|numberTasksCompleted|numberTasksCancelled|numberTasksFailed|numberTasksFatalFailed)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", name=\"pinot.minion.([^\\.]*?)_(OFFLINE|REALTIME).(\\w+).(taskExecution|taskQueueing|numberTasks|numberTasksExecuted|numberTasksCompleted|numberTasksCancelled|numberTasksFailed|numberTasksFatalFailed)\"><>(\\w+)"
   name: "pinot_minion_$4_$5"
   cache: true
   labels:

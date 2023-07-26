@@ -23,21 +23,24 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFST;
 import org.apache.pinot.segment.local.utils.nativefst.mutablefst.MutableFSTImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
-import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-
-public class NativeMutableFSTIndex implements MutableTextIndex {
-  private final String _column;
+@Deprecated
+public class NativeMutableFSTIndex implements TextIndexReader {
   private final MutableFST _fst;
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
   private int _dictId;
 
-  public NativeMutableFSTIndex(String column) {
-    _column = column;
+  @Deprecated
+  public NativeMutableFSTIndex(String columnName) {
+    this();
+  }
+
+  public NativeMutableFSTIndex() {
     _fst = new MutableFSTImpl();
 
     ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
@@ -45,7 +48,6 @@ public class NativeMutableFSTIndex implements MutableTextIndex {
     _writeLock = readWriteLock.writeLock();
   }
 
-  @Override
   public void add(String document) {
     _writeLock.lock();
     try {
@@ -56,7 +58,6 @@ public class NativeMutableFSTIndex implements MutableTextIndex {
     }
   }
 
-  @Override
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     _readLock.lock();

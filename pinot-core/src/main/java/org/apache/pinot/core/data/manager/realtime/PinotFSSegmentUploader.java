@@ -26,10 +26,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,22 +48,34 @@ public class PinotFSSegmentUploader implements SegmentUploader {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSSegmentUploader.class);
   public static final int DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS = 10 * 1000;
 
-  private String _segmentStoreUriStr;
-  private ExecutorService _executorService = Executors.newCachedThreadPool();
-  private int _timeoutInMs;
+  private final String _segmentStoreUriStr;
+  private final ExecutorService _executorService = Executors.newCachedThreadPool();
+  private final int _timeoutInMs;
+  private final ServerMetrics _serverMetrics;
 
-  public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis) {
+  public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis, ServerMetrics serverMetrics) {
     _segmentStoreUriStr = segmentStoreDirUri;
     _timeoutInMs = timeoutMillis;
+    _serverMetrics = serverMetrics;
   }
 
+  @Override
   public URI uploadSegment(File segmentFile, LLCSegmentName segmentName) {
+    return uploadSegment(segmentFile, segmentName, _timeoutInMs);
+  }
+
+  @Override
+  public URI uploadSegment(File segmentFile, LLCSegmentName segmentName, int timeoutInMillis) {
     if (_segmentStoreUriStr == null || _segmentStoreUriStr.isEmpty()) {
+      LOGGER.error("Missing segment store uri. Failed to upload segment file {} for {}.", segmentFile.getName(),
+          segmentName.getSegmentName());
       return null;
     }
+    final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
     Callable<URI> uploadTask = () -> {
       URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
           segmentName.getSegmentName() + UUID.randomUUID().toString()));
+      long startTime = System.currentTimeMillis();
       try {
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());
         // Check and delete any existing segment file.
@@ -69,21 +86,32 @@ public class PinotFSSegmentUploader implements SegmentUploader {
         return destUri;
       } catch (Exception e) {
         LOGGER.warn("Failed copy segment tar file {} to segment store {}: {}", segmentFile.getName(), destUri, e);
+      } finally {
+        long duration = System.currentTimeMillis() - startTime;
+        _serverMetrics.addTimedTableValue(rawTableName, ServerTimer.SEGMENT_UPLOAD_TIME_MS, duration,
+            TimeUnit.MILLISECONDS);
       }
       return null;
     };
     Future<URI> future = _executorService.submit(uploadTask);
     try {
-      URI segmentLocation = future.get(_timeoutInMs, TimeUnit.MILLISECONDS);
+      URI segmentLocation = future.get(timeoutInMillis, TimeUnit.MILLISECONDS);
       LOGGER.info("Successfully upload segment {} to {}.", segmentName, segmentLocation);
+      _serverMetrics.addMeteredTableValue(rawTableName,
+          segmentLocation == null ? ServerMeter.SEGMENT_UPLOAD_FAILURE : ServerMeter.SEGMENT_UPLOAD_SUCCESS, 1);
       return segmentLocation;
     } catch (InterruptedException e) {
       LOGGER.info("Interrupted while waiting for segment upload of {} to {}.", segmentName, _segmentStoreUriStr);
       Thread.currentThread().interrupt();
+    } catch (TimeoutException e) {
+      // Emit a separate metric for timeout since this is relatively more common than other errors.
+      _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_TIMEOUT, 1);
+      LOGGER.warn("Timed out waiting to upload segment: {} for table: {}", segmentName.getSegmentName(), rawTableName);
     } catch (Exception e) {
       LOGGER
           .warn("Failed to upload file {} of segment {} for table {} ", segmentFile.getAbsolutePath(), segmentName, e);
     }
+    _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
 
     return null;
   }

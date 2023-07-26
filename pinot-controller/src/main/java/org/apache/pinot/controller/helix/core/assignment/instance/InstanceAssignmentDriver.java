@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
@@ -55,15 +56,31 @@ public class InstanceAssignmentDriver {
   public InstancePartitions assignInstances(InstancePartitionsType instancePartitionsType,
       List<InstanceConfig> instanceConfigs, @Nullable InstancePartitions existingInstancePartitions) {
     String tableNameWithType = _tableConfig.getTableName();
-    LOGGER.info("Starting {} instance assignment for table: {}", instancePartitionsType, tableNameWithType);
-
     InstanceAssignmentConfig assignmentConfig =
         InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(_tableConfig, instancePartitionsType);
+    return getInstancePartitions(
+        instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)),
+        assignmentConfig, instanceConfigs, existingInstancePartitions);
+  }
+
+  public InstancePartitions assignInstances(String tierName, List<InstanceConfig> instanceConfigs,
+      @Nullable InstancePartitions existingInstancePartitions, InstanceAssignmentConfig instanceAssignmentConfig) {
+    return getInstancePartitions(
+        InstancePartitionsUtils.getInstancePartitionsNameForTier(_tableConfig.getTableName(), tierName),
+        instanceAssignmentConfig, instanceConfigs, existingInstancePartitions);
+  }
+
+  private InstancePartitions getInstancePartitions(String instancePartitionsName,
+      InstanceAssignmentConfig instanceAssignmentConfig, List<InstanceConfig> instanceConfigs,
+      @Nullable InstancePartitions existingInstancePartitions) {
+    String tableNameWithType = _tableConfig.getTableName();
+    LOGGER.info("Starting {} instance assignment for table {}", instancePartitionsName, tableNameWithType);
+
     InstanceTagPoolSelector tagPoolSelector =
-        new InstanceTagPoolSelector(assignmentConfig.getTagPoolConfig(), tableNameWithType);
+        new InstanceTagPoolSelector(instanceAssignmentConfig.getTagPoolConfig(), tableNameWithType);
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = tagPoolSelector.selectInstances(instanceConfigs);
 
-    InstanceConstraintConfig constraintConfig = assignmentConfig.getConstraintConfig();
+    InstanceConstraintConfig constraintConfig = instanceAssignmentConfig.getConstraintConfig();
     List<InstanceConstraintApplier> constraintAppliers = new ArrayList<>();
     if (constraintConfig == null) {
       LOGGER.info("No instance constraint is configured, using default hash-based-rotate instance constraint");
@@ -75,10 +92,9 @@ public class InstanceAssignmentDriver {
     }
 
     InstancePartitionSelector instancePartitionSelector =
-        InstancePartitionSelectorFactory.getInstance(assignmentConfig.getPartitionSelector(),
-            assignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions);
-    InstancePartitions instancePartitions = new InstancePartitions(
-        instancePartitionsType.getInstancePartitionsName(TableNameBuilder.extractRawTableName(tableNameWithType)));
+        InstancePartitionSelectorFactory.getInstance(instanceAssignmentConfig.getPartitionSelector(),
+            instanceAssignmentConfig.getReplicaGroupPartitionConfig(), tableNameWithType, existingInstancePartitions);
+    InstancePartitions instancePartitions = new InstancePartitions(instancePartitionsName);
     instancePartitionSelector.selectInstances(poolToInstanceConfigsMap, instancePartitions);
     return instancePartitions;
   }

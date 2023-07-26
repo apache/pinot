@@ -120,6 +120,11 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
       type: instanceType,
       tags: instanceDetails.tags,
       pools: instanceDetails.pools,
+      grpcPort: instanceDetails.grpcPort,
+      adminPort: instanceDetails.adminPort,
+      queryServicePort: instanceDetails.queryServicePort,
+      queryMailboxPort: instanceDetails.queryMailboxPort,
+      queriesDisabled: instanceDetails.queriesDisabled,
     };
     setState({enabled: instanceDetails.enabled});
     setInstanceDetails(JSON.stringify(instancePutObj, null, 2));

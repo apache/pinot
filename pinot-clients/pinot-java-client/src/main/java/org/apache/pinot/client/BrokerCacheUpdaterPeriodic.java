@@ -65,7 +65,7 @@ public class BrokerCacheUpdaterPeriodic implements UpdatableBrokerCache {
     }
   }
 
-  public String getBroker(String tableName) {
+  public String getBroker(String... tableName) {
     return _brokerCache.getBroker(tableName);
   }
 

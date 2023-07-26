@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
+import com.google.common.base.Preconditions;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+
 /**
  * Support for RoaringBitmap inverted index:
  * <pre>
@@ -53,6 +58,17 @@ package org.apache.pinot.segment.spi.index.creator;
  * Support for Lucene based inverted index for text
  */
 public interface DictionaryBasedInvertedIndexCreator extends InvertedIndexCreator {
+  @Override
+  default void add(@Nonnull Object value, int dictId) {
+    Preconditions.checkArgument(dictId >= 0, "A dictionary id is required");
+    add(dictId);
+  }
+
+  @Override
+  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+    Preconditions.checkArgument(dictIds != null, "A dictionary id is required");
+    add(dictIds, dictIds.length);
+  }
 
   /**
    * For single-value column, adds the dictionary id for the next document.

@@ -18,15 +18,30 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
-import java.io.Closeable;
 import java.io.IOException;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.locationtech.jts.geom.Geometry;
 
 
 /**
  * Index creator for geospatial index.
  */
-public interface GeoSpatialIndexCreator extends Closeable {
+public interface GeoSpatialIndexCreator extends IndexCreator {
+
+  Geometry deserialize(byte[] bytes);
+
+  @Override
+  default void add(@Nonnull Object value, int dictId)
+      throws IOException {
+    add(deserialize((byte[]) value));
+  }
+
+  @Override
+  default void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+      throws IOException {
+  }
 
   /**
    * Adds the next geospatial value.

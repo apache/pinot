@@ -19,10 +19,13 @@
 package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.HashMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -64,6 +67,34 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final BigDecimal DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
+  public static final FieldSpecMetadata FIELD_SPEC_METADATA;
+
+  static {
+    // The metadata on the valid list of {@link DataType} for each {@link FieldType}
+    // and the default null values for each combination
+    FIELD_SPEC_METADATA = new FieldSpecMetadata();
+    for (FieldType fieldType : FieldType.values()) {
+      FieldTypeMetadata fieldTypeMetadata = new FieldTypeMetadata();
+      for (DataType dataType : DataType.values()) {
+        try {
+          Schema.validate(fieldType, dataType);
+          try {
+            fieldTypeMetadata.put(dataType, new DataTypeMetadata(getDefaultNullValue(fieldType, dataType, null)));
+          } catch (IllegalStateException ignored) {
+            // default null value not defined for the (DataType, FieldType) combination
+            // defaulting to null in such cases
+            fieldTypeMetadata.put(dataType, new DataTypeMetadata(null));
+          }
+        } catch (IllegalStateException ignored) {
+          // invalid DataType for the given FieldType
+        }
+      }
+      FIELD_SPEC_METADATA.put(fieldType, fieldTypeMetadata);
+    }
+    for (DataType dataType : DataType.values()) {
+      FIELD_SPEC_METADATA.put(dataType, new DataTypeProperties(dataType));
+    }
+  }
 
   protected String _name;
   protected DataType _dataType;
@@ -397,7 +428,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BYTES(false, false),
     STRUCT(false, false),
     MAP(false, false),
-    LIST(false, false);
+    LIST(false, false),
+    UNKNOWN(false, true);
 
     private final DataType _storedType;
     private final int _size;
@@ -459,6 +491,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
      */
     public boolean isNumeric() {
       return _numeric;
+    }
+
+    /**
+     * Returns {@code true} if the data type is unknown, {@code false} otherwise.
+     */
+    public boolean isUnknown() {
+      return _storedType == UNKNOWN;
     }
 
     /**
@@ -554,5 +593,56 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return EqualityUtils.isEqual(_name, oldFieldSpec._name)
             && EqualityUtils.isEqual(_dataType, oldFieldSpec._dataType)
             && EqualityUtils.isEqual(_isSingleValueField, oldFieldSpec._isSingleValueField);
+  }
+
+  public static class FieldSpecMetadata {
+    @JsonProperty("fieldTypes")
+    public Map<FieldType, FieldTypeMetadata> _fieldTypes = new HashMap<>();
+    @JsonProperty("dataTypes")
+    public Map<DataType, DataTypeProperties> _dataTypes = new HashMap<>();
+
+    void put(FieldType type, FieldTypeMetadata metadata) {
+      _fieldTypes.put(type, metadata);
+    }
+
+    void put(DataType type, DataTypeProperties metadata) {
+      _dataTypes.put(type, metadata);
+    }
+  }
+
+  public static class FieldTypeMetadata {
+    @JsonProperty("allowedDataTypes")
+    public Map<DataType, DataTypeMetadata> _allowedDataTypes = new HashMap<>();
+
+    void put(DataType dataType, DataTypeMetadata metadata) {
+      _allowedDataTypes.put(dataType, metadata);
+    }
+  }
+
+  public static class DataTypeMetadata {
+    @JsonProperty("nullDefault")
+    public Object _nullDefault;
+
+    public DataTypeMetadata(Object nullDefault) {
+      _nullDefault = nullDefault;
+    }
+  }
+
+  public static class DataTypeProperties {
+    @JsonProperty("storedType")
+    public final DataType _storedType;
+    @JsonProperty("size")
+    public final int _size;
+    @JsonProperty("sortable")
+    public final boolean _sortable;
+    @JsonProperty("numeric")
+    public final boolean _numeric;
+
+    public DataTypeProperties(DataType dataType) {
+      _storedType = dataType._storedType;
+      _sortable = dataType._sortable;
+      _numeric = dataType._numeric;
+      _size = dataType._size;
+    }
   }
 }

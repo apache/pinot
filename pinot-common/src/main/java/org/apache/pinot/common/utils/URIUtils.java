@@ -71,6 +71,19 @@ public class URIUtils {
   }
 
   /**
+   * Returns the last part for the given path split by the file separator.
+   * If the file separator is not found, returns the whole path as the last part.
+   */
+  public static String getLastPart(String path) {
+    if (path == null) {
+      return null;
+    }
+    int parameterIndex = path.indexOf("?");
+    path = parameterIndex >= 0 ? path.substring(0, parameterIndex) : path;
+    return path.substring(path.lastIndexOf(File.separator) + 1);
+  }
+
+  /**
    * Returns the download URL with the segment name encoded.
    */
   public static String constructDownloadUrl(String baseUrl, String rawTableName, String segmentName) {

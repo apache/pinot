@@ -17,4 +17,4 @@
 # under the License.
 #
 pinotdb>=0.4.5
-redis==3.4.1
+redis==4.5.4

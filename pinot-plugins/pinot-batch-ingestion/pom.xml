@@ -45,7 +45,6 @@
 
     <module>pinot-batch-ingestion-hadoop</module>
     <module>pinot-batch-ingestion-standalone</module>
-    <module>v0_deprecated</module>
   </modules>
 
   <dependencies>

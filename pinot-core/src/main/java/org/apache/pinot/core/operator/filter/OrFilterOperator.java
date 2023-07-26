@@ -20,9 +20,9 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
@@ -30,8 +30,8 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class OrFilterOperator extends BaseFilterOperator {
-
   private static final String EXPLAIN_NAME = "FILTER_OR";
+
   private final List<BaseFilterOperator> _filterOperators;
   private final int _numDocs;
 
@@ -43,13 +43,12 @@ public class OrFilterOperator extends BaseFilterOperator {
   @Override
   protected FilterBlock getNextBlock() {
     Tracing.activeRecording().setNumChildren(_filterOperators.size());
-    List<FilterBlockDocIdSet> filterBlockDocIdSets = new ArrayList<>(_filterOperators.size());
+    List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      filterBlockDocIdSets.add(filterOperator.nextBlock().getBlockDocIdSet());
+      blockDocIdSets.add(filterOperator.nextBlock().getBlockDocIdSet());
     }
-    return new FilterBlock(new OrDocIdSet(filterBlockDocIdSets, _numDocs));
+    return new FilterBlock(new OrDocIdSet(blockDocIdSets, _numDocs));
   }
-
 
   @Override
   public String toExplainString() {

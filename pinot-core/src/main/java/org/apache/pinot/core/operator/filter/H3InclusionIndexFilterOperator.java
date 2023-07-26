@@ -47,24 +47,23 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * A filter operator that uses H3 index for geospatial data inclusion
  */
 public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
-
   private static final String EXPLAIN_NAME = "INCLUSION_FILTER_H3_INDEX";
   private static final String LITERAL_H3_CELLS_CACHE_NAME = "st_contain_literal_h3_cells";
 
   private final IndexSegment _segment;
+  private final QueryContext _queryContext;
   private final Predicate _predicate;
   private final int _numDocs;
   private final H3IndexReader _h3IndexReader;
   private final Geometry _geometry;
   private final boolean _isPositiveCheck;
-  private final QueryContext _queryContext;
 
-  public H3InclusionIndexFilterOperator(IndexSegment segment, Predicate predicate, QueryContext queryContext,
+  public H3InclusionIndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate,
       int numDocs) {
     _segment = segment;
+    _queryContext = queryContext;
     _predicate = predicate;
     _numDocs = numDocs;
-    _queryContext = queryContext;
 
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
     EqPredicate eqPredicate = (EqPredicate) predicate;
@@ -72,10 +71,10 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
       _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
-      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteralString()));
+      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteral().getStringValue()));
     } else {
       _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
-      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteralString()));
+      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral().getStringValue()));
     }
     // must be some h3 index
     assert _h3IndexReader != null : "the column must have H3 index setup.";
@@ -125,7 +124,8 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
    * Returns the filter block based on the given the partial match doc ids.
    */
   private FilterBlock getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
-    ExpressionFilterOperator expressionFilterOperator = new ExpressionFilterOperator(_segment, _predicate, _numDocs);
+    ExpressionFilterOperator expressionFilterOperator =
+        new ExpressionFilterOperator(_segment, _queryContext, _predicate, _numDocs);
     ScanBasedDocIdIterator docIdIterator =
         (ScanBasedDocIdIterator) expressionFilterOperator.getNextBlock().getBlockDocIdSet().iterator();
     MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);

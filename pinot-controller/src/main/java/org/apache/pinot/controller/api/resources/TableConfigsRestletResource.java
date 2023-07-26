@@ -227,7 +227,7 @@ public class TableConfigsRestletResource {
         // Invoke delete on tables whether they exist or not, to account for metadata/segments etc.
         _pinotHelixResourceManager.deleteRealtimeTable(rawTableName);
         _pinotHelixResourceManager.deleteOfflineTable(rawTableName);
-        _pinotHelixResourceManager.deleteSchema(schema);
+        _pinotHelixResourceManager.deleteSchema(schema.getSchemaName());
         throw e;
       }
 
@@ -271,12 +271,9 @@ public class TableConfigsRestletResource {
       LOGGER.info("Deleted realtime table: {}", tableName);
       _pinotHelixResourceManager.deleteOfflineTable(tableName);
       LOGGER.info("Deleted offline table: {}", tableName);
-      Schema schema = _pinotHelixResourceManager.getSchema(tableName);
-      if (schema != null) {
-        _pinotHelixResourceManager.deleteSchema(schema);
-        LOGGER.info("Deleted schema: {}", tableName);
-      }
-      if (tableExists || schema != null) {
+      boolean schemaExists = _pinotHelixResourceManager.deleteSchema(tableName);
+      LOGGER.info("Deleted schema: {}", tableName);
+      if (tableExists || schemaExists) {
         return new SuccessResponse("Deleted TableConfigs: " + tableName);
       } else {
         return new SuccessResponse(
@@ -291,6 +288,9 @@ public class TableConfigsRestletResource {
    * Updated the {@link TableConfigs} by updating the schema tableName,
    * then updating the offline tableConfig or creating a new one if it doesn't already exist in the cluster,
    * then updating the realtime tableConfig or creating a new one if it doesn't already exist in the cluster.
+   *
+   * The option to skip table config validation (validationTypesToSkip) and force update the table schema
+   * (forceTableSchemaUpdate) are provided for testing purposes and should be used with caution.
    */
   @PUT
   @Path("/tableConfigs/{tableName}")
@@ -304,8 +304,10 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
-      @QueryParam("reload") boolean reload, String tableConfigsStr)
-      throws Exception {
+      @QueryParam("reload") boolean reload,
+      @ApiParam(value = "Force update the table schema") @DefaultValue("false")
+      @QueryParam("forceTableSchemaUpdate") boolean forceTableSchemaUpdate,
+      String tableConfigsStr) throws Exception {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     TableConfigs tableConfigs;
     try {
@@ -333,7 +335,7 @@ public class TableConfigsRestletResource {
     Schema schema = tableConfigs.getSchema();
 
     try {
-      _pinotHelixResourceManager.updateSchema(schema, reload);
+      _pinotHelixResourceManager.updateSchema(schema, reload, forceTableSchemaUpdate);
       LOGGER.info("Updated schema: {}", tableName);
 
       if (offlineTableConfig != null) {

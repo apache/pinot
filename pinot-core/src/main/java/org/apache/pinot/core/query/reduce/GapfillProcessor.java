@@ -280,7 +280,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
       if (expressionContext.getType() == ExpressionContext.Type.FUNCTION) {
         FunctionContext functionContext = expressionContext.getFunction();
         AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext);
+            AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext.isNullHandlingEnabled());
         GroupByResultHolder groupByResultHolder =
             aggregationFunction.createGroupByResultHolder(groupKeyIndexes.size(), groupKeyIndexes.size());
         if (aggregationFunction instanceof CountAggregationFunction) {
@@ -305,10 +305,10 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     if (expressionContext != null && expressionContext.getFunction() != null && GapfillUtils
         .isFill(expressionContext)) {
       List<ExpressionContext> args = expressionContext.getFunction().getArguments();
-      if (args.get(1).getLiteralString() == null) {
+      if (args.get(1).getLiteral() == null) {
         throw new UnsupportedOperationException("Wrong Sql.");
       }
-      GapfillUtils.FillType fillType = GapfillUtils.FillType.valueOf(args.get(1).getLiteralString());
+      GapfillUtils.FillType fillType = GapfillUtils.FillType.valueOf(args.get(1).getLiteral().getStringValue());
       if (fillType == GapfillUtils.FillType.FILL_DEFAULT_VALUE) {
         // TODO: may fill the default value from sql in the future.
         return GapfillUtils.getDefaultValue(dataType);

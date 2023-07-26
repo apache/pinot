@@ -39,6 +39,7 @@ public interface QueryExecutor {
   /**
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
+   * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.query.executor'
    */
   void init(PinotConfiguration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
       throws ConfigurationException;

@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
@@ -287,6 +288,25 @@ public class ObjectSerDeUtilsTest {
 
       for (int j = 0; j <= 100; j++) {
         assertEquals(actual.quantile(j / 100.0), expected.quantile(j / 100.0), 1e-5);
+      }
+    }
+
+    // Try some custom compression values
+    List<Double> compressionFactorsToTest = Arrays.asList(10d, 200d, 500d, 1000d, 10000d);
+    for (double compressionFactor : compressionFactorsToTest) {
+      for (int i = 0; i < NUM_ITERATIONS; i++) {
+        TDigest expected = TDigest.createMergingDigest(compressionFactor);
+        int size = RANDOM.nextInt(100) + 1;
+        for (int j = 0; j < size; j++) {
+          expected.add(RANDOM.nextDouble());
+        }
+
+        byte[] bytes = ObjectSerDeUtils.serialize(expected);
+        TDigest actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.TDigest);
+
+        for (int j = 0; j <= 100; j++) {
+          assertEquals(actual.quantile(j / 100.0), expected.quantile(j / 100.0), 1e-5);
+        }
       }
     }
   }

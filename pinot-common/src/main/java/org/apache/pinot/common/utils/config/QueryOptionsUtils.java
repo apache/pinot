@@ -25,6 +25,7 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
@@ -189,5 +190,9 @@ public class QueryOptionsUtils {
   public static Integer getGroupTrimThreshold(Map<String, String> queryOptions) {
     String groupByTrimThreshold = queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
     return groupByTrimThreshold != null ? Integer.parseInt(groupByTrimThreshold) : null;
+  }
+
+  public static boolean shouldDropResults(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.DROP_RESULTS));
   }
 }

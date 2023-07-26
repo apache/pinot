@@ -90,7 +90,7 @@ public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrati
     String sql = "SELECT SUM(AirTime), SUM(ArrDelay) FROM mytable";
     TestUtils.waitForCondition(aVoid -> {
       try {
-        JsonNode queryResult = postQuery(sql, _brokerBaseApiUrl);
+        JsonNode queryResult = postQuery(sql);
         JsonNode aggregationResults = queryResult.get("resultTable").get("rows").get(0);
         return aggregationResults.get(0).asInt() == -165429728 && aggregationResults.get(1).asInt() == -175625957;
       } catch (Exception e) {

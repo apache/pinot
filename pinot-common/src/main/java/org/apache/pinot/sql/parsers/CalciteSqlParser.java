@@ -20,6 +20,7 @@ package org.apache.pinot.sql.parsers;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,6 +37,7 @@ import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
@@ -57,11 +59,12 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.Join;
+import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
@@ -75,6 +78,11 @@ public class CalciteSqlParser {
   private CalciteSqlParser() {
   }
 
+  public static final String ASC = "asc";
+  public static final String DESC = "desc";
+  public static final String NULLS_LAST = "nullslast";
+  public static final String NULLS_FIRST = "nullsfirst";
+  public static final ImmutableSet<String> ORDER_BY_FUNCTIONS = ImmutableSet.of(ASC, DESC, NULLS_LAST, NULLS_FIRST);
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
@@ -110,9 +118,6 @@ public class CalciteSqlParser {
   public static SqlNodeAndOptions compileToSqlNodeAndOptions(String sql)
       throws SqlCompilationException {
     long parseStartTimeNs = System.nanoTime();
-
-    // Remove the comments from the query
-    sql = removeComments(sql);
 
     // Remove the terminating semicolon from the query
     sql = removeTerminatingSemicolon(sql);
@@ -253,7 +258,7 @@ public class CalciteSqlParser {
           List<Expression> distinctExpressions = getAliasLeftExpressionsFromDistinctExpression(function);
           for (Expression orderByExpression : orderByList) {
             // NOTE: Order-by is always a Function with the ordering of the Expression
-            if (!distinctExpressions.contains(orderByExpression.getFunctionCall().getOperands().get(0))) {
+            if (!distinctExpressions.contains(removeOrderByFunctions(orderByExpression))) {
               throw new IllegalStateException("ORDER-BY columns should be included in the DISTINCT columns");
             }
           }
@@ -413,12 +418,7 @@ public class CalciteSqlParser {
     // FROM
     SqlNode fromNode = selectNode.getFrom();
     if (fromNode != null) {
-      DataSource dataSource = new DataSource();
-      dataSource.setTableName(fromNode.toString());
-      pinotQuery.setDataSource(dataSource);
-      if (fromNode instanceof SqlSelect || fromNode instanceof SqlOrderBy) {
-        dataSource.setSubquery(compileSqlNodeToPinotQuery(fromNode));
-      }
+      pinotQuery.setDataSource(compileToDataSource(fromNode));
     }
     // WHERE
     SqlNode whereNode = selectNode.getWhere();
@@ -453,6 +453,62 @@ public class CalciteSqlParser {
 
     queryRewrite(pinotQuery);
     return pinotQuery;
+  }
+
+  private static DataSource compileToDataSource(SqlNode sqlNode) {
+    DataSource dataSource = new DataSource();
+    switch (sqlNode.getKind()) {
+      case IDENTIFIER:
+        dataSource.setTableName(sqlNode.toString());
+        break;
+      case AS:
+        List<SqlNode> operandList = ((SqlBasicCall) sqlNode).getOperandList();
+        dataSource.setSubquery(compileSqlNodeToPinotQuery(operandList.get(0)));
+        dataSource.setTableName(operandList.get(1).toString());
+        break;
+      case SELECT:
+      case ORDER_BY:
+        dataSource.setSubquery(compileSqlNodeToPinotQuery(sqlNode));
+        break;
+      case JOIN:
+        dataSource.setJoin(compileToJoin((SqlJoin) sqlNode));
+        break;
+      default:
+        throw new IllegalStateException("Unsupported SQL node kind as DataSource: " + sqlNode.getKind());
+    }
+    return dataSource;
+  }
+
+  private static Join compileToJoin(SqlJoin sqlJoin) {
+    Join join = new Join();
+    switch (sqlJoin.getJoinType()) {
+      case INNER:
+        join.setType(JoinType.INNER);
+        break;
+      case LEFT:
+        join.setType(JoinType.LEFT);
+        break;
+      case RIGHT:
+        join.setType(JoinType.RIGHT);
+        break;
+      case FULL:
+        join.setType(JoinType.FULL);
+        break;
+      default:
+        throw new IllegalStateException("Unsupported join type: " + sqlJoin.getJoinType());
+    }
+    join.setLeft(compileToDataSource(sqlJoin.getLeft()));
+    join.setRight(compileToDataSource(sqlJoin.getRight()));
+    switch (sqlJoin.getConditionType()) {
+      case ON:
+        join.setCondition(toExpression(sqlJoin.getCondition()));
+        break;
+      case NONE:
+        break;
+      default:
+        throw new IllegalStateException("Unsupported join condition type: " + sqlJoin.getConditionType());
+    }
+    return join;
   }
 
   private static void queryRewrite(PinotQuery pinotQuery) {
@@ -494,103 +550,6 @@ public class CalciteSqlParser {
     return options;
   }
 
-  /**
-   * Removes comments from the query.
-   * NOTE: Comment indicator within single quotes (literal) and double quotes (identifier) are ignored.
-   */
-  @VisibleForTesting
-  static String removeComments(String sql) {
-    boolean openSingleQuote = false;
-    boolean openDoubleQuote = false;
-    boolean commented = false;
-    boolean singleLineCommented = false;
-    boolean multiLineCommented = false;
-    int commentStartIndex = -1;
-    List<Pairs.IntPair> commentedParts = new ArrayList<>();
-
-    int length = sql.length();
-    int index = 0;
-    while (index < length) {
-      switch (sql.charAt(index)) {
-        case '\'':
-          if (!commented && !openDoubleQuote) {
-            openSingleQuote = !openSingleQuote;
-          }
-          break;
-        case '"':
-          if (!commented && !openSingleQuote) {
-            openDoubleQuote = !openDoubleQuote;
-          }
-          break;
-        case '-':
-          // Single line comment start indicator: --
-          if (!commented && !openSingleQuote && !openDoubleQuote && index < length - 1
-              && sql.charAt(index + 1) == '-') {
-            commented = true;
-            singleLineCommented = true;
-            commentStartIndex = index;
-            index++;
-          }
-          break;
-        case '\n':
-          // Single line comment end indicator: \n
-          if (singleLineCommented) {
-            commentedParts.add(new Pairs.IntPair(commentStartIndex, index + 1));
-            commented = false;
-            singleLineCommented = false;
-            commentStartIndex = -1;
-          }
-          break;
-        case '/':
-          // Multi-line comment start indicator: /*
-          if (!commented && !openSingleQuote && !openDoubleQuote && index < length - 1
-              && sql.charAt(index + 1) == '*') {
-            commented = true;
-            multiLineCommented = true;
-            commentStartIndex = index;
-            index++;
-          }
-          break;
-        case '*':
-          // Multi-line comment end indicator: */
-          if (multiLineCommented && index < length - 1 && sql.charAt(index + 1) == '/') {
-            commentedParts.add(new Pairs.IntPair(commentStartIndex, index + 2));
-            commented = false;
-            multiLineCommented = false;
-            commentStartIndex = -1;
-            index++;
-          }
-          break;
-        default:
-          break;
-      }
-      index++;
-    }
-
-    if (commentedParts.isEmpty()) {
-      if (singleLineCommented) {
-        return sql.substring(0, commentStartIndex);
-      } else {
-        return sql;
-      }
-    } else {
-      StringBuilder stringBuilder = new StringBuilder();
-      int startIndex = 0;
-      for (Pairs.IntPair commentedPart : commentedParts) {
-        stringBuilder.append(sql, startIndex, commentedPart.getLeft()).append(' ');
-        startIndex = commentedPart.getRight();
-      }
-      if (startIndex < length) {
-        if (singleLineCommented) {
-          stringBuilder.append(sql, startIndex, commentStartIndex);
-        } else {
-          stringBuilder.append(sql, startIndex, length);
-        }
-      }
-      return stringBuilder.toString();
-    }
-  }
-
   private static List<Expression> convertDistinctSelectList(SqlNodeList selectList) {
     List<Expression> selectExpr = new ArrayList<>();
     selectExpr.add(convertDistinctAndSelectListToFunctionExpression(selectList));
@@ -611,23 +570,34 @@ public class CalciteSqlParser {
 
   private static List<Expression> convertOrderByList(SqlNodeList orderList) {
     List<Expression> orderByExpr = new ArrayList<>();
-    final Iterator<SqlNode> iterator = orderList.iterator();
-    while (iterator.hasNext()) {
-      final SqlNode next = iterator.next();
-      orderByExpr.add(convertOrderBy(next));
+    for (SqlNode sqlNode : orderList) {
+      orderByExpr.add(convertOrderBy(sqlNode, true));
     }
     return orderByExpr;
   }
 
-  private static Expression convertOrderBy(SqlNode node) {
+  private static Expression convertOrderBy(SqlNode node, boolean createAscExpression) {
+    // If the order is ASC, the SqlNode will not have an ASC operator. In this case we need to create an ASC function in
+    // the expression.
+    // The SqlNode puts the NULLS FIRST/LAST operator in an outer level of the DESC operator.
     Expression expression;
-    if (node.getKind() == SqlKind.DESCENDING) {
+    if (node.getKind() == SqlKind.NULLS_LAST) {
       SqlBasicCall basicCall = (SqlBasicCall) node;
-      expression = RequestUtils.getFunctionExpression("desc");
-      expression.getFunctionCall().addToOperands(toExpression(basicCall.getOperandList().get(0)));
-    } else {
-      expression = RequestUtils.getFunctionExpression("asc");
+      expression = RequestUtils.getFunctionExpression(NULLS_LAST);
+      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), true));
+    } else if (node.getKind() == SqlKind.NULLS_FIRST) {
+      SqlBasicCall basicCall = (SqlBasicCall) node;
+      expression = RequestUtils.getFunctionExpression(NULLS_FIRST);
+      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), true));
+    } else if (node.getKind() == SqlKind.DESCENDING) {
+      SqlBasicCall basicCall = (SqlBasicCall) node;
+      expression = RequestUtils.getFunctionExpression(DESC);
+      expression.getFunctionCall().addToOperands(convertOrderBy(basicCall.getOperandList().get(0), false));
+    } else if (createAscExpression) {
+      expression = RequestUtils.getFunctionExpression(ASC);
       expression.getFunctionCall().addToOperands(toExpression(node));
+    } else {
+      return toExpression(node);
     }
     return expression;
   }
@@ -713,15 +683,16 @@ public class CalciteSqlParser {
         SqlNode elseOperand = caseSqlNode.getElseOperand();
         Expression caseFuncExpr = RequestUtils.getFunctionExpression("case");
         Preconditions.checkState(whenOperands.size() == thenOperands.size());
-        for (int i = 0; i < whenOperands.size(); i++) {
-          SqlNode whenSqlNode = whenOperands.get(i);
+        // TODO: convert this to new format once 0.13 is released
+        for (SqlNode whenSqlNode : whenOperands.getList()) {
           Expression whenExpression = toExpression(whenSqlNode);
           if (isAggregateExpression(whenExpression)) {
             throw new SqlCompilationException(
                 "Aggregation functions inside WHEN Clause is not supported - " + whenSqlNode);
           }
           caseFuncExpr.getFunctionCall().addToOperands(whenExpression);
-          SqlNode thenSqlNode = thenOperands.get(i);
+        }
+        for (SqlNode thenSqlNode : thenOperands.getList()) {
           Expression thenExpression = toExpression(thenSqlNode);
           if (isAggregateExpression(thenExpression)) {
             throw new SqlCompilationException(
@@ -963,5 +934,12 @@ public class CalciteSqlParser {
       return false;
     }
     return false;
+  }
+
+  public static Expression removeOrderByFunctions(Expression expression) {
+    while (expression.isSetFunctionCall() && ORDER_BY_FUNCTIONS.contains(expression.getFunctionCall().operator)) {
+      expression = expression.getFunctionCall().getOperands().get(0);
+    }
+    return expression;
   }
 }

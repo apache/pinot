@@ -55,7 +55,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     switch (expression.getType()) {
       case LITERAL:
         // TODO: pass literal with type into ConstantExecutionNode.
-        return new ConstantExecutionNode(expression.getLiteralString());
+        return new ConstantExecutionNode(expression.getLiteral().getStringValue());
       case IDENTIFIER:
         String columnName = expression.getIdentifier();
         ColumnExecutionNode columnExecutionNode = new ColumnExecutionNode(columnName, _arguments.size());

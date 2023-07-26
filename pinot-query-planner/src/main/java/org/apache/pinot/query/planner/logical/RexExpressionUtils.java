@@ -44,7 +44,7 @@ public class RexExpressionUtils {
     List<RexExpression> operands =
         rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     return new RexExpression.FunctionCall(rexCall.getKind(),
-        RelToStageConverter.convertToFieldSpecDataType(rexCall.getType()),
+        RelToPlanNodeConverter.convertToFieldSpecDataType(rexCall.getType()),
         "caseWhen", operands);
   }
 
@@ -56,8 +56,9 @@ public class RexExpressionUtils {
     Preconditions.checkState(operands.size() == 1, "CAST takes exactly 2 arguments");
     RelDataType castType = rexCall.getType();
     operands.add(new RexExpression.Literal(FieldSpec.DataType.STRING,
-        RelToStageConverter.convertToFieldSpecDataType(castType).name()));
-    return new RexExpression.FunctionCall(rexCall.getKind(), RelToStageConverter.convertToFieldSpecDataType(castType),
+        RelToPlanNodeConverter.convertToFieldSpecDataType(castType).name()));
+    return new RexExpression.FunctionCall(rexCall.getKind(),
+        RelToPlanNodeConverter.convertToFieldSpecDataType(castType),
         "CAST", operands);
   }
 
@@ -66,7 +67,7 @@ public class RexExpressionUtils {
     List<RexNode> operands = rexCall.getOperands();
     RexInputRef rexInputRef = (RexInputRef) operands.get(0);
     RexLiteral rexLiteral = (RexLiteral) operands.get(1);
-    FieldSpec.DataType dataType = RelToStageConverter.convertToFieldSpecDataType(rexLiteral.getType());
+    FieldSpec.DataType dataType = RelToPlanNodeConverter.convertToFieldSpecDataType(rexLiteral.getType());
     Sarg sarg = rexLiteral.getValueAs(Sarg.class);
     if (sarg.isPoints()) {
       return new RexExpression.FunctionCall(SqlKind.IN, dataType, SqlKind.IN.name(), toFunctionOperands(rexInputRef,
@@ -91,7 +92,7 @@ public class RexExpressionUtils {
 
   public static Integer getValueAsInt(RexNode in) {
     if (in == null) {
-      return 0;
+      return -1;
     }
 
     Preconditions.checkArgument(in instanceof RexLiteral, "expected literal, got " + in);

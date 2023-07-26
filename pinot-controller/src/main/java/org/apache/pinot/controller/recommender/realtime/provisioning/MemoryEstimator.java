@@ -23,14 +23,12 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
@@ -52,7 +50,9 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -77,22 +77,20 @@ public class MemoryEstimator {
 
   private final TableConfig _tableConfig;
   private final String _tableNameWithType;
+  private final Schema _schema;
   private final File _sampleCompletedSegment;
   private final long _sampleSegmentConsumedSeconds;
   private final int _totalDocsInSampleSegment;
   private final long _maxUsableHostMemory;
   private final int _tableRetentionHours;
 
-  private SegmentMetadataImpl _segmentMetadata;
-  private long _sampleCompletedSegmentSizeBytes;
-  private Set<String> _invertedIndexColumns = new HashSet<>();
-  private Set<String> _noDictionaryColumns = new HashSet<>();
-  private Set<String> _varLengthDictionaryColumns = new HashSet<>();
+  private final SegmentMetadataImpl _segmentMetadata;
+  private final long _sampleCompletedSegmentSizeBytes;
   int _avgMultiValues;
 
   // Working dir will contain statsFile and also the generated segment if requested.
   // It will get deleted after memory estimation is done.
-  private File _workingDir;
+  private final File _workingDir;
 
   private String[][] _activeMemoryPerHost;
   private String[][] _optimalSegmentSize;
@@ -103,11 +101,12 @@ public class MemoryEstimator {
   /**
    * Constructor used for processing the given completed segment
    */
-  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, double ingestionRatePerPartition,
-      long maxUsableHostMemory, int tableRetentionHours, File workingDir) {
+  public MemoryEstimator(TableConfig tableConfig, Schema schema, File sampleCompletedSegment,
+      double ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours, File workingDir) {
     _maxUsableHostMemory = maxUsableHostMemory;
     _tableConfig = tableConfig;
     _tableNameWithType = tableConfig.getTableName();
+    _schema = schema;
     _sampleCompletedSegment = sampleCompletedSegment;
     _tableRetentionHours = tableRetentionHours;
 
@@ -120,15 +119,6 @@ public class MemoryEstimator {
     _totalDocsInSampleSegment = _segmentMetadata.getTotalDocs();
     _sampleSegmentConsumedSeconds = (int) (_totalDocsInSampleSegment / ingestionRatePerPartition);
 
-    if (CollectionUtils.isNotEmpty(_tableConfig.getIndexingConfig().getNoDictionaryColumns())) {
-      _noDictionaryColumns.addAll(_tableConfig.getIndexingConfig().getNoDictionaryColumns());
-    }
-    if (CollectionUtils.isNotEmpty(_tableConfig.getIndexingConfig().getVarLengthDictionaryColumns())) {
-      _varLengthDictionaryColumns.addAll(_tableConfig.getIndexingConfig().getVarLengthDictionaryColumns());
-    }
-    if (CollectionUtils.isNotEmpty(_tableConfig.getIndexingConfig().getInvertedIndexColumns())) {
-      _invertedIndexColumns.addAll(_tableConfig.getIndexingConfig().getInvertedIndexColumns());
-    }
     _avgMultiValues = getAvgMultiValues();
     _workingDir = workingDir;
   }
@@ -139,7 +129,8 @@ public class MemoryEstimator {
   public MemoryEstimator(TableConfig tableConfig, Schema schema, SchemaWithMetaData schemaWithMetadata,
       int numberOfRows, double ingestionRatePerPartition, long maxUsableHostMemory, int tableRetentionHours,
       File workingDir) {
-    this(tableConfig, generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir),
+    this(tableConfig, schema,
+        generateCompletedSegment(schemaWithMetadata, schema, tableConfig, numberOfRows, workingDir),
         ingestionRatePerPartition, maxUsableHostMemory, tableRetentionHours, workingDir);
   }
 
@@ -167,13 +158,11 @@ public class MemoryEstimator {
 
     // create a config
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType)
+        new RealtimeSegmentConfig.Builder(_tableConfig, _schema).setTableNameWithType(_tableNameWithType)
             .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
             .setSchema(_segmentMetadata.getSchema()).setCapacity(_segmentMetadata.getTotalDocs())
-            .setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
-            .setVarLengthDictionaryColumns(_varLengthDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
-            .setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
-            .setStatsHistory(sampleStatsHistory);
+            .setAvgNumMultiValues(_avgMultiValues).setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
+            .setMemoryManager(memoryManager).setStatsHistory(sampleStatsHistory);
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
@@ -256,12 +245,14 @@ public class MemoryEstimator {
     }
 
     try {
+      int invertedColumnsCount = countInvertedColumns();
+
       for (int i = 0; i < numHours.length; i++) {
         int numHoursToConsume = numHours[i];
         if (numHoursToConsume > retentionHours) {
           continue;
         }
-        long secondsToConsume = numHoursToConsume * 3600;
+        long secondsToConsume = numHoursToConsume * 3600L;
         // consuming for _numHoursSampleSegmentConsumed, gives size sampleCompletedSegmentSizeBytes
         // hence, consuming for numHoursToConsume would give:
         long completedSegmentSizeBytes =
@@ -272,7 +263,8 @@ public class MemoryEstimator {
         int totalDocs = (int) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _totalDocsInSampleSegment);
         long memoryForConsumingSegmentPerPartition = getMemoryForConsumingSegmentPerPartition(statsFile, totalDocs);
 
-        memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(memoryForConsumingSegmentPerPartition);
+        memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(
+            memoryForConsumingSegmentPerPartition, invertedColumnsCount);
 
         int numActiveSegmentsPerPartition = (retentionHours + numHoursToConsume - 1) / numHoursToConsume;
         long activeMemoryForCompletedSegmentsPerPartition =
@@ -329,11 +321,10 @@ public class MemoryEstimator {
     SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(_segmentMetadata, totalDocs);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder().setTableNameWithType(_tableNameWithType)
+        new RealtimeSegmentConfig.Builder(_tableConfig, _schema).setTableNameWithType(_tableNameWithType)
             .setSegmentName(_segmentMetadata.getName()).setStreamName(_tableNameWithType)
             .setSchema(_segmentMetadata.getSchema()).setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues)
-            .setNoDictionaryColumns(_noDictionaryColumns).setVarLengthDictionaryColumns(_varLengthDictionaryColumns)
-            .setInvertedIndexColumns(_invertedIndexColumns).setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
+            .setSegmentZKMetadata(segmentZKMetadata).setOffHeap(true)
             .setMemoryManager(memoryManager).setStatsHistory(statsHistory);
 
     // create mutable segment impl
@@ -384,14 +375,21 @@ public class MemoryEstimator {
    * @param totalMemoryForConsumingSegment
    * @return
    */
-  private long getMemoryForInvertedIndex(long totalMemoryForConsumingSegment) {
+  private long getMemoryForInvertedIndex(long totalMemoryForConsumingSegment, int invertedColumnsCount) {
     // TODO: better way to estimate inverted indexes memory utilization
     long totalInvertedIndexSizeBytes = 0;
-    if (!_invertedIndexColumns.isEmpty()) {
+    if (invertedColumnsCount > 0) {
       long memoryForEachColumn = totalMemoryForConsumingSegment / _segmentMetadata.getAllColumns().size();
-      totalInvertedIndexSizeBytes = (long) (memoryForEachColumn * 0.3 * _invertedIndexColumns.size());
+      totalInvertedIndexSizeBytes = (long) (memoryForEachColumn * 0.3 * invertedColumnsCount);
     }
     return totalInvertedIndexSizeBytes;
+  }
+
+  private int countInvertedColumns() {
+    Map<String, IndexConfig> invertedConfig = StandardIndexes.inverted().getConfig(_tableConfig, _schema);
+    return (int) invertedConfig.values().stream()
+        .filter(IndexConfig::isEnabled)
+        .count();
   }
 
   /**

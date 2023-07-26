@@ -19,7 +19,7 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
@@ -46,12 +46,12 @@ public class StPolygonFunction extends ConstructFromTextFunction {
   }
 
   @Override
-  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
     if (_results == null) {
       _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
     }
-    String[] argumentValues = _transformFunction.transformToStringValuesSV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
+    String[] argumentValues = _transformFunction.transformToStringValuesSV(valueBlock);
+    int length = valueBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       try {
         Geometry geometry = _reader.read(argumentValues[i]);

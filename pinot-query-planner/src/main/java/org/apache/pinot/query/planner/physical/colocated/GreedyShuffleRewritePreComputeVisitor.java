@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.query.planner.physical.colocated;
 
-import org.apache.pinot.query.planner.stage.DefaultPostOrderTraversalVisitor;
-import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.TableScanNode;
+import org.apache.pinot.query.planner.plannode.DefaultPostOrderTraversalVisitor;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
 
 
 /**
@@ -31,37 +32,44 @@ import org.apache.pinot.query.planner.stage.TableScanNode;
 class GreedyShuffleRewritePreComputeVisitor
     extends DefaultPostOrderTraversalVisitor<Integer, GreedyShuffleRewriteContext> {
 
-  static GreedyShuffleRewriteContext preComputeContext(StageNode rootStageNode) {
+  static GreedyShuffleRewriteContext preComputeContext(PlanNode rootPlanNode) {
     GreedyShuffleRewriteContext context = new GreedyShuffleRewriteContext();
-    rootStageNode.visit(new GreedyShuffleRewritePreComputeVisitor(), context);
+    rootPlanNode.visit(new GreedyShuffleRewritePreComputeVisitor(), context);
     return context;
   }
 
   @Override
-  public Integer process(StageNode stageNode, GreedyShuffleRewriteContext context) {
-    int currentStageId = stageNode.getStageId();
-    context.setRootStageNode(currentStageId, stageNode);
+  public Integer process(PlanNode planNode, GreedyShuffleRewriteContext context) {
+    int currentStageId = planNode.getPlanFragmentId();
+    context.setRootStageNode(currentStageId, planNode);
     return 0;
   }
 
   @Override
   public Integer visitJoin(JoinNode joinNode, GreedyShuffleRewriteContext context) {
     super.visitJoin(joinNode, context);
-    context.markJoinStage(joinNode.getStageId());
+    context.markJoinStage(joinNode.getPlanFragmentId());
     return 0;
   }
 
   @Override
-  public Integer visitMailboxReceive(MailboxReceiveNode stageNode, GreedyShuffleRewriteContext context) {
-    super.visitMailboxReceive(stageNode, context);
-    context.addLeafNode(stageNode.getStageId(), stageNode);
+  public Integer visitMailboxReceive(MailboxReceiveNode planNode, GreedyShuffleRewriteContext context) {
+    super.visitMailboxReceive(planNode, context);
+    context.addLeafNode(planNode.getPlanFragmentId(), planNode);
     return 0;
   }
 
   @Override
-  public Integer visitTableScan(TableScanNode stageNode, GreedyShuffleRewriteContext context) {
-    super.visitTableScan(stageNode, context);
-    context.addLeafNode(stageNode.getStageId(), stageNode);
+  public Integer visitTableScan(TableScanNode planNode, GreedyShuffleRewriteContext context) {
+    super.visitTableScan(planNode, context);
+    context.addLeafNode(planNode.getPlanFragmentId(), planNode);
+    return 0;
+  }
+
+  @Override
+  public Integer visitSetOp(SetOpNode setOpNode, GreedyShuffleRewriteContext context) {
+    super.visitSetOp(setOpNode, context);
+    context.markSetOpStage(setOpNode.getPlanFragmentId());
     return 0;
   }
 }

@@ -300,6 +300,14 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
             segmentName);
       }
     }
+    // The SEQUENCE_ID used to identify each segment is only unique to each round of task generation. Across multiple
+    // rounds of task generation, the SEQUENCE_ID can be the same.
+    // This may lead to segment name collision, and existing segments will be overridden. Since old segments are
+    // overridden, corresponding files become un-ingested, the generator will generate new tasks, which generates
+    // segments with same names, and override existing segments again... It becomes an endless loop
+    // We add uuid to segment name to avoid segment collision across multiple rounds of task generation to solve the
+    // problem.
+    singleFileGenerationTaskConfig.put(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME, Boolean.toString(true));
     if ((outputDirURI == null) || (pushMode == null)) {
       singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE, DEFAULT_SEGMENT_PUSH_TYPE.toString());
     } else {

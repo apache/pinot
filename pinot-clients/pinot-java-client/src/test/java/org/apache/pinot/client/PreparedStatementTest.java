@@ -19,7 +19,7 @@
 package org.apache.pinot.client;
 
 import java.util.Collections;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -36,7 +36,8 @@ public class PreparedStatementTest {
   public void testPreparedStatementWithDynamicBroker() {
     // Create a connection with dynamic broker selector.
     BrokerSelector mockBrokerSelector = Mockito.mock(BrokerSelector.class);
-    Mockito.when(mockBrokerSelector.selectBroker(Mockito.anyString())).thenAnswer(i -> i.getArgument(0));
+    Mockito.when(mockBrokerSelector.selectBroker(Mockito.anyString()))
+        .thenAnswer(i -> i.getArgument(0));
     Connection connection = new Connection(mockBrokerSelector, _dummyPinotClientTransport);
 
     PreparedStatement preparedStatement = connection.prepareStatement("SELECT foo FROM bar WHERE baz = ?");
@@ -78,27 +79,21 @@ public class PreparedStatementTest {
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
+    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
         throws PinotClientException {
-      _lastBrokerAddress = brokerAddress;
-      _lastQuery = query;
-      return null;
+      return CompletableFuture.completedFuture(executeQuery(brokerAddress, query));
     }
 
     @Override
     public BrokerResponse executeQuery(String brokerAddress, Request request)
         throws PinotClientException {
-      _lastBrokerAddress = brokerAddress;
-      _lastQuery = request.getQuery();
-      return BrokerResponse.empty();
+      return executeQuery(brokerAddress, request.getQuery());
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
+    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
         throws PinotClientException {
-      _lastBrokerAddress = brokerAddress;
-      _lastQuery = request.getQuery();
-      return null;
+      return executeQueryAsync(brokerAddress, request.getQuery());
     }
 
     public String getLastQuery() {

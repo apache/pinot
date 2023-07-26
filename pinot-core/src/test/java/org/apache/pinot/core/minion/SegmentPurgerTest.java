@@ -31,10 +31,10 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -67,6 +67,7 @@ public class SegmentPurgerTest {
   private static final String D2 = "d2";
 
   private TableConfig _tableConfig;
+  private Schema _schema;
   private File _originalIndexDir;
   private int _expectedNumRecordsPurged;
   private int _expectedNumRecordsModified;
@@ -79,7 +80,7 @@ public class SegmentPurgerTest {
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Collections.singletonList(D1)).setCreateInvertedIndexDuringSegmentGeneration(true)
         .build();
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT)
+    _schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT)
         .addSingleValueDimension(D2, FieldSpec.DataType.INT).build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
@@ -98,7 +99,7 @@ public class SegmentPurgerTest {
     }
     GenericRowRecordReader genericRowRecordReader = new GenericRowRecordReader(rows);
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
     config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
 
@@ -125,7 +126,7 @@ public class SegmentPurgerTest {
     };
 
     SegmentPurger segmentPurger =
-        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, recordPurger, recordModifier);
+        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, _tableConfig, _schema, recordPurger, recordModifier);
     File purgedIndexDir = segmentPurger.purgeSegment();
 
     // Check the purge/modify counter in segment purger
@@ -167,8 +168,8 @@ public class SegmentPurgerTest {
         .load(purgedIndexDir.toURI(), new SegmentDirectoryLoaderContext.Builder().setTableConfig(_tableConfig)
             .setSegmentName(purgedSegmentMetadata.getName()).setSegmentDirectoryConfigs(new PinotConfiguration(props))
             .build()); SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-      assertTrue(reader.hasIndexFor(D1, ColumnIndexType.INVERTED_INDEX));
-      assertFalse(reader.hasIndexFor(D2, ColumnIndexType.INVERTED_INDEX));
+      assertTrue(reader.hasIndexFor(D1, StandardIndexes.inverted()));
+      assertFalse(reader.hasIndexFor(D2, StandardIndexes.inverted()));
     }
   }
 

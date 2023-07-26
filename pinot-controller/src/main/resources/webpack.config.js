@@ -38,7 +38,7 @@ module.exports = (env, argv) => {
       extensions: ['.ts', '.tsx', '.js'],
       modules: ['./app', 'node_modules'],
     },
-    entry: './app/App.tsx',
+    entry: './app/index.tsx',
     output: {
       path: path.resolve(__dirname, 'dist/webapp'),
       filename: './js/main.js'

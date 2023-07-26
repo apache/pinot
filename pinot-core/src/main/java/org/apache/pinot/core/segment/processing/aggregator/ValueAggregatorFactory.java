@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -31,6 +32,9 @@ public class ValueAggregatorFactory {
 
   /**
    * Constructs a ValueAggregator from the given aggregation type.
+   *
+   * When adding entries to this please add them to the Set in org.apache.pinot.segment.local.utils.TableConfigUtils
+   * named AVAILABLE_CORE_VALUE_AGGREGATORS so that they can be used in RealtimeToOfflineTask
    */
   public static ValueAggregator getValueAggregator(AggregationFunctionType aggregationType, DataType dataType) {
     switch (aggregationType) {
@@ -40,6 +44,17 @@ public class ValueAggregatorFactory {
         return new MaxValueAggregator(dataType);
       case SUM:
         return new SumValueAggregator(dataType);
+      case DISTINCTCOUNTHLL:
+      case DISTINCTCOUNTRAWHLL:
+        return new DistinctCountHLLAggregator();
+      case DISTINCTCOUNTTHETASKETCH:
+      case DISTINCTCOUNTRAWTHETASKETCH:
+        return new DistinctCountThetaSketchAggregator();
+      case DISTINCTCOUNTTUPLESKETCH:
+      case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
+      case SUMVALUESINTEGERSUMTUPLESKETCH:
+      case AVGVALUEINTEGERSUMTUPLESKETCH:
+        return new IntegerTupleSketchAggregator(IntegerSummary.Mode.Sum);
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

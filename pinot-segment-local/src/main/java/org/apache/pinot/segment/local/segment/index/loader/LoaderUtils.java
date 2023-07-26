@@ -25,14 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
-import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
-import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.index.IndexingOverrides;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -46,38 +40,6 @@ public class LoaderUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(LoaderUtils.class);
 
   /**
-   * Returns the forward index reader for the given column.
-   */
-  public static ForwardIndexReader<?> getForwardIndexReader(SegmentDirectory.Reader segmentReader,
-      ColumnMetadata columnMetadata)
-      throws IOException {
-    PinotDataBuffer dataBuffer =
-        segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.FORWARD_INDEX);
-    return IndexingOverrides.getIndexReaderProvider().newForwardIndexReader(dataBuffer, columnMetadata);
-  }
-
-  /**
-   * Returns the dictionary for the given column.
-   */
-  public static BaseImmutableDictionary getDictionary(SegmentDirectory.Reader segmentReader,
-      ColumnMetadata columnMetadata)
-      throws IOException {
-    PinotDataBuffer dataBuffer = segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
-    return PhysicalColumnIndexContainer.loadDictionary(dataBuffer, columnMetadata, false);
-  }
-
-  /**
-   * Returns the inverted index reader for the given column.
-   */
-  public static InvertedIndexReader<?> getInvertedIndexReader(SegmentDirectory.Reader segmentReader,
-      ColumnMetadata columnMetadata)
-      throws IOException {
-    PinotDataBuffer dataBuffer =
-        segmentReader.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.INVERTED_INDEX);
-    return IndexingOverrides.getIndexReaderProvider().newInvertedIndexReader(dataBuffer, columnMetadata);
-  }
-
-  /**
    * Write an index file to v3 format single index file and remove the old one.
    *
    * @param segmentWriter v3 format segment writer.
@@ -87,7 +49,7 @@ public class LoaderUtils {
    * @throws IOException
    */
   public static void writeIndexToV3Format(SegmentDirectory.Writer segmentWriter, String column, File indexFile,
-      ColumnIndexType indexType)
+      IndexType<?, ?, ?> indexType)
       throws IOException {
     long fileLength = indexFile.length();
     // NOTE: DO NOT close buffer here as it is managed in the SegmentDirectory.

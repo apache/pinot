@@ -44,6 +44,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +62,7 @@ import org.slf4j.LoggerFactory;
 public class SegmentMapper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMapper.class);
 
-  private final List<RecordReader> _recordReaders;
+  private List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private final SegmentProcessorConfig _processorConfig;
   private final File _mapperOutputDir;
 
@@ -75,8 +77,9 @@ public class SegmentMapper {
   // NOTE: Use TreeMap so that the order is deterministic
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
 
-  public SegmentMapper(List<RecordReader> recordReaders, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
-    _recordReaders = recordReaders;
+  public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
+      SegmentProcessorConfig processorConfig, File mapperOutputDir) {
+    _recordReaderFileConfigs = recordReaderFileConfigs;
     _processorConfig = processorConfig;
     _mapperOutputDir = mapperOutputDir;
 
@@ -97,8 +100,9 @@ public class SegmentMapper {
     }
     // Time partition + partition from partitioners
     _partitionsBuffer = new String[numPartitioners + 1];
+
     LOGGER.info("Initialized mapper with {} record readers, output dir: {}, timeHandler: {}, partitioners: {}",
-        _recordReaders.size(), _mapperOutputDir, _timeHandler.getClass(),
+        _recordReaderFileConfigs.size(), _mapperOutputDir, _timeHandler.getClass(),
         Arrays.stream(_partitioners).map(p -> p.getClass().toString()).collect(Collectors.joining(",")));
   }
 
@@ -108,34 +112,40 @@ public class SegmentMapper {
    */
   public Map<String, GenericRowFileManager> map()
       throws Exception {
+    try {
+      return doMap();
+    } catch (Exception e) {
+      // Cleaning up resources created by the mapper, leaving others to the caller like the input _recordReaders.
+      for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
+        fileManager.cleanUp();
+      }
+      throw e;
+    }
+  }
+
+  private Map<String, GenericRowFileManager> doMap()
+      throws Exception {
     Consumer<Object> observer = _processorConfig.getProgressObserver();
-    int totalCount = _recordReaders.size();
+    int totalCount = _recordReaderFileConfigs.size();
     int count = 1;
     GenericRow reuse = new GenericRow();
-    for (RecordReader recordReader : _recordReaders) {
-      observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count++, totalCount));
-      while (recordReader.hasNext()) {
-        reuse = recordReader.next(reuse);
-
-        // TODO: Add ComplexTypeTransformer here. Currently it is not idempotent so cannot add it
-
-        if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
-          //noinspection unchecked
-          for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-            GenericRow transformedRow = _recordTransformer.transform(row);
-            if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-              writeRecord(transformedRow);
-            }
-          }
-        } else {
-          GenericRow transformedRow = _recordTransformer.transform(reuse);
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            writeRecord(transformedRow);
+    for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
+      RecordReader recordReader = recordReaderFileConfig._recordReader;
+      if (recordReader == null) {
+        try {
+          recordReader =
+              RecordReaderFactory.getRecordReader(recordReaderFileConfig._fileFormat, recordReaderFileConfig._dataFile,
+                  recordReaderFileConfig._fieldsToRead, recordReaderFileConfig._recordReaderConfig);
+          mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
+        } finally {
+          if (recordReader != null) {
+            recordReader.close();
           }
         }
-
-        reuse.clear();
+      } else {
+        mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
       }
+      count++;
     }
 
     for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
@@ -143,6 +153,32 @@ public class SegmentMapper {
     }
 
     return _partitionToFileManagerMap;
+  }
+
+  private void mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
+      Consumer<Object> observer, int count, int totalCount) throws Exception {
+    observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
+    while (recordReader.hasNext()) {
+      reuse = recordReader.next(reuse);
+
+      // TODO: Add ComplexTypeTransformer here. Currently it is not idempotent so cannot add it
+
+      if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
+        //noinspection unchecked
+        for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
+          GenericRow transformedRow = _recordTransformer.transform(row);
+          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+            writeRecord(transformedRow);
+          }
+        }
+      } else {
+        GenericRow transformedRow = _recordTransformer.transform(reuse);
+        if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
+          writeRecord(transformedRow);
+        }
+      }
+      reuse.clear();
+    }
   }
 
   private void writeRecord(GenericRow row)

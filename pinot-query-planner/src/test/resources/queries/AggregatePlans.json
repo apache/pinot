@@ -1,0 +1,124 @@
+{
+  "aggregates_planning_tests": {
+    "queries": [
+      {
+        "description": "Select AVG aggregation for a BIG_DECIMAL column",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(avg=[/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n        LogicalProject(col2=[$1], col3=[$2], col4=[$3])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select many aggregations for a BIG_DECIMAL column",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg, SUM(a.col4) as sum, MAX(a.col4) as max FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(avg=[/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)], sum=[CASE(=($1, 0), null:DECIMAL(1000, 0), $0)], max=[$2])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], agg#2=[MAX($2)])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], agg#2=[MAX($2)])",
+          "\n        LogicalProject(col2=[$1], col3=[$2], col4=[$3])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select aggregates with filters and select alias",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(avg=[/(CAST(CASE(=($1, 0), null:INTEGER, $0)):DOUBLE, $1)], count=[$1])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select aggregates",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), COUNT(a.col1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:INTEGER, $0)], EXPR$1=[$1])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select aggregates with filters",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3), COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:INTEGER, $0)], EXPR$1=[$1])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select aggregates with filters and select alias",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(sum=[CASE(=($1, 0), null:INTEGER, $0)], count=[$1])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select aggregates with filters and select alias. The group by aggregate hint should be a no-op.",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ AVG(a.col3) as avg, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(avg=[/(CAST(CASE(=($1, 0), null:INTEGER, $0)):DOUBLE, $1)], count=[$1])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select aggregates with filters and select alias. The group by aggregate hint should be a no-op.",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ SUM(a.col3) as sum, COUNT(*) as count FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(sum=[CASE(=($1, 0), null:INTEGER, $0)], count=[$1])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      }
+    ]
+  }
+}

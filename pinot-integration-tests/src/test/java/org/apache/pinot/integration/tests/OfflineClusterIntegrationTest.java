@@ -49,6 +49,7 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
+import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -56,6 +57,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -138,9 +140,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String COLUMN_LENGTH_MAP_KEY = "columnLengthMap";
   private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
   private static final String MAX_NUM_MULTI_VALUES_MAP_KEY = "maxNumMultiValuesMap";
-  // TODO: This might lead to flaky test, as this disk size is not deterministic
-  //       as it depends on the iteration order of a HashSet.
-  private static final int DISK_SIZE_IN_BYTES = 20797128;
+  private static final int DISK_SIZE_IN_BYTES = 20797324;
   private static final int NUM_ROWS = 115545;
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
@@ -167,6 +167,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @BeforeClass
   public void setUp()
       throws Exception {
+    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -400,7 +401,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         TableNameBuilder.extractRawTableName(offlineTableName));
     parameters.add(tableNameParameter);
 
-    URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       // Refresh non-existing segment
       File segmentTarFile = segmentTarFiles[0];
@@ -518,12 +519,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // download, the original segment dir is deleted and then replaced with the newly downloaded segment, leaving a
     // small chance of race condition between getting table size check and replacing the segment dir, i.e. flaky test.
     addInvertedIndex();
-    // The table size gets larger for sure, but it does not necessarily equal to tableSizeWithNewIndex, because the
-    // order of entries in the index_map file can change when the raw segment adds/deletes indices back and forth.
-    long tableSizeAfterAddIndex = getTableSize(getTableName());
-    assertTrue(tableSizeAfterAddIndex > tableSizeAfterReloadSegment,
-        String.format("Table size: %d should increase after adding inverted index on segment: %s, as compared with %d",
-            tableSizeAfterAddIndex, segmentName, tableSizeAfterReloadSegment));
+    assertEquals(getTableSize(getTableName()), tableSizeWithNewIndex);
 
     // Force to download the whole table and use the original table config, so the disk usage should get back to
     // initial value.
@@ -575,7 +571,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testTimeFunc()
       throws Exception {
     String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z'), toDateTime(ago('PT1H'), 'yyyy-MM-dd z') FROM mytable";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     String todayStr = response.get("resultTable").get("rows").get(0).get(0).asText();
     String expectedTodayStr =
         Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
@@ -594,90 +590,90 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Test replace all.
     String sqlQuery = "SELECT regexpReplace('CA', 'C', 'TEST')";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     String result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "TESTA");
 
     sqlQuery = "SELECT regexpReplace('foobarbaz', 'b', 'X')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "fooXarXaz");
 
     sqlQuery = "SELECT regexpReplace('foobarbaz', 'b', 'XY')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "fooXYarXYaz");
 
     sqlQuery = "SELECT regexpReplace('Argentina', '(.)', '$1 ')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "A r g e n t i n a ");
 
     sqlQuery = "SELECT regexpReplace('Pinot is  blazing  fast', '( ){2,}', ' ')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "Pinot is blazing fast");
 
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, and wise','\\w+thy', 'something')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "something, something, and wise");
 
     sqlQuery = "SELECT regexpReplace('11234567898','(\\d)(\\d{3})(\\d{3})(\\d{4})', '$1-($2) $3-$4')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "1-(123) 456-7898");
 
     // Test replace starting at index.
 
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 4)";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "healthy, something, something and wise");
 
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 1)";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "hsomething, something, something and wise");
 
     // Test occurence
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "healthy, wealthy, something and wise");
 
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 0)";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "something, wealthy, stealthy and wise");
 
     // Test flags
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 0, 0, 'i')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "something, wealthy, stealthy and wise");
 
     // Negative test. Pattern match not found.
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "healthy, wealthy, stealthy and wise");
 
     // Negative test. Pattern match not found.
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 3, 21, 'i')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "healthy, wealthy, stealthy and wise");
 
     // Negative test - incorrect flag
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 3, 12, 'xyz')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "healthy, wealthy, stealthy and wise");
 
     // Test in select clause with column values
     sqlQuery = "SELECT regexpReplace(DestCityName, ' ', '', 0, -1, 'i') from myTable where OriginState = 'CA'";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
       JsonNode row = rows.get(i);
@@ -686,20 +682,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Test in where clause
     sqlQuery = "SELECT count(*) from myTable where regexpReplace(originState, '[VC]A', 'TEST') = 'TEST'";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     int count1 = response.get("resultTable").get("rows").get(0).get(0).asInt();
     sqlQuery = "SELECT count(*) from myTable where originState='CA' or originState='VA'";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     int count2 = response.get("resultTable").get("rows").get(0).get(0).asInt();
     assertEquals(count1, count2);
 
     // Test nested transform
     sqlQuery =
         "SELECT count(*) from myTable where contains(regexpReplace(originState, '(C)(A)', '$1TEST$2'), 'CTESTA')";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     count1 = response.get("resultTable").get("rows").get(0).get(0).asInt();
     sqlQuery = "SELECT count(*) from myTable where originState='CA'";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     count2 = response.get("resultTable").get("rows").get(0).get(0).asInt();
     assertEquals(count1, count2);
   }
@@ -710,7 +706,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // simple cast
     String sqlQuery = "SELECT DivLongestGTimes, CAST(DivLongestGTimes as DOUBLE) from myTable LIMIT 100";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"FLOAT_ARRAY\",\"DOUBLE_ARRAY\"]");
@@ -734,7 +730,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // nested cast
     sqlQuery = "SELECT DivAirportIDs, CAST(CAST(CAST(DivAirportIDs AS FLOAT) as INT) as STRING),"
         + " DivTotalGTimes, CAST(CAST(DivTotalGTimes AS STRING) AS LONG) from myTable ORDER BY CARRIER LIMIT 100";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnDataTypes").toString(),
@@ -773,7 +769,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     String sqlQuery = "SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
         + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') FROM myTable";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     String encodedString = response.get("resultTable").get("rows").get(0).get(0).asText();
     String expectedUrlStr = encodeUrl("key1=value 1&key2=value@!$2&key3=value%3");
     assertEquals(encodedString, expectedUrlStr);
@@ -789,7 +785,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // string literal
     String sqlQuery = "SELECT toBase64(toUtf8('hello!')), " + "fromUtf8(fromBase64('aGVsbG8h')) FROM myTable";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\"]");
@@ -806,7 +802,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     sqlQuery =
         "SELECT toBase64(toUtf8('this is a long string that will encode to more than 76 characters using base64')) "
             + "FROM myTable";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
     encodedString = rows.get(0).get(0).asText();
@@ -817,7 +813,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     sqlQuery = "SELECT fromUtf8(fromBase64"
         + "('dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0"
         + "')) FROM myTable";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
     decodedString = rows.get(0).get(0).asText();
@@ -826,7 +822,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // non-string literal
     sqlQuery = "SELECT toBase64(toUtf8(123)), fromUtf8(fromBase64(toBase64(toUtf8(123)))), 123 FROM myTable";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
     encodedString = rows.get(0).get(0).asText();
@@ -838,7 +834,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // identifier
     sqlQuery = "SELECT Carrier, toBase64(toUtf8(Carrier)), fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))), "
         + "fromBase64(toBase64(toUtf8(Carrier))) FROM myTable LIMIT 100";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\",\"BYTES\"]");
@@ -855,42 +851,42 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // invalid argument
     sqlQuery = "SELECT toBase64() FROM myTable";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
 
     // invalid argument
     sqlQuery = "SELECT fromBase64() FROM myTable";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
 
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM myTable";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SqlCompilationException"));
 
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM myTable";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
 
     // string literal used in a filter
     sqlQuery = "SELECT * FROM myTable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND "
         + "toBase64(toUtf8('hello!')) != Carrier LIMIT 10";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
 
     // non-string literal used in a filter
     sqlQuery = "SELECT * FROM myTable WHERE fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) != Carrier LIMIT 10";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
 
     // string identifier used in a filter
     sqlQuery = "SELECT * FROM myTable WHERE fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))) = Carrier LIMIT 10";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
@@ -898,7 +894,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // non-string identifier used in a filter
     sqlQuery = "SELECT fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))), AirlineID FROM myTable WHERE "
         + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) = AirlineID LIMIT 10";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"LONG\"]");
@@ -910,7 +906,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))) as decoded FROM myTable "
         + "GROUP BY Carrier, toBase64(toUtf8(Carrier)), fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))) "
         + "ORDER BY toBase64(toUtf8(Carrier)) LIMIT 10";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\"]");
@@ -930,7 +926,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) as decoded FROM myTable "
         + "GROUP BY AirlineID, toBase64(toUtf8(AirlineID)), fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) "
         + "ORDER BY fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) LIMIT 10";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"STRING\",\"STRING\"]");
@@ -1926,7 +1922,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
     caseStatementBuilder.append("ELSE 0 END");
     String sqlQuery = "SELECT origin, " + caseStatementBuilder + " AS origin_code FROM mytable LIMIT 1000";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     for (int i = 0; i < rows.size(); i++) {
@@ -1946,7 +1942,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String sqlQuery =
         "SELECT ArrDelay, CASE WHEN ArrDelay > 0 THEN ArrDelay WHEN ArrDelay < 0 THEN ArrDelay * -1 ELSE 0 END AS "
             + "ArrTimeDiff FROM mytable LIMIT 1000";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     for (int i = 0; i < rows.size(); i++) {
@@ -1965,7 +1961,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     String sqlQuery = "SELECT ArrDelay" + ", CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END"
         + ", CASE WHEN ArrDelay < 50 AND ArrDelay >= 10 THEN 10 ELSE 0 END" + " FROM mytable LIMIT 1000";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     for (int i = 0; i < rows.size(); i++) {
@@ -2002,10 +1998,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private void testCountVsCaseQuery(String predicate)
       throws Exception {
     String sqlQuery = String.format("SELECT COUNT(*) FROM mytable WHERE %s", predicate);
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     long countValue = response.get("resultTable").get("rows").get(0).get(0).asLong();
     sqlQuery = String.format("SELECT SUM(CASE WHEN %s THEN 1 ELSE 0 END) as sum1 FROM mytable", predicate);
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     long caseSum = response.get("resultTable").get("rows").get(0).get(0).asLong();
     assertEquals(caseSum, countValue);
   }
@@ -2265,11 +2261,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
 
     pinotQuery = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime-DepTime LIMIT 1000000";
-    h2Query = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime-DepTime";
+    h2Query = "SELECT CAST(ArrTime-DepTime AS FLOAT) FROM mytable GROUP BY CAST(ArrTime-DepTime AS FLOAT)";
     testQuery(pinotQuery, h2Query);
 
     pinotQuery = "SELECT ArrTime+DepTime AS A FROM mytable GROUP BY A LIMIT 1000000";
-    h2Query = "SELECT ArrTime+DepTime AS A FROM mytable GROUP BY A";
+    h2Query = "SELECT CAST(ArrTime+DepTime AS FLOAT) AS A FROM mytable GROUP BY A";
     testQuery(pinotQuery, h2Query);
   }
 
@@ -2380,7 +2376,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // The Accurate value is 6538.
     query = "SELECT distinctCount(FlightNum) FROM mytable ";
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), 6538);
-    assertEquals(postQuery(query, _brokerBaseApiUrl).get("resultTable").get("rows").get(0).get(0).asLong(), 6538);
+    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), 6538);
 
     // Expected distinctCountHll with different log2m value from 2 to 19. The Accurate value is 6538.
     long[] expectedResults = new long[]{
@@ -2390,14 +2386,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     for (int i = 2; i < 20; i++) {
       query = String.format("SELECT distinctCountHLL(FlightNum, %d) FROM mytable ", i);
       assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[i - 2]);
-      assertEquals(postQuery(query, _brokerBaseApiUrl).get("resultTable").get("rows").get(0).get(0).asLong(),
+      assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(),
           expectedResults[i - 2]);
     }
 
     // Default HLL is set as log2m=12
     query = "SELECT distinctCountHLL(FlightNum) FROM mytable ";
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
-    assertEquals(postQuery(query, _brokerBaseApiUrl).get("resultTable").get("rows").get(0).get(0).asLong(),
+    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(),
         expectedResults[10]);
   }
 
@@ -2419,7 +2415,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testExplainPlanQuery()
       throws Exception {
     String query1 = "EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1";
-    String response1 = postQuery(query1, _brokerBaseApiUrl).get("resultTable").toString();
+    String response1 = postQuery(query1).get("resultTable").toString();
 
     // Replace string "docs:[0-9]+" with "docs:*" so that test doesn't fail when number of documents change. This is
     // needed because both OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest run this test
@@ -2430,14 +2426,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},"
         + "\"rows\":[[\"BROKER_REDUCE(sort:[count(*) ASC],limit:10)\",1,0],[\"COMBINE_GROUP_BY\",2,1],"
         + "[\"PLAN_START(numSegmentsForThisPlan:1)\",-1,-1],"
-        + "[\"GROUP_BY(groupKeys:Carrier, aggregations:count(*))\",3,2],"
-        + "[\"TRANSFORM_PASSTHROUGH(Carrier)\",4,3],[\"PROJECT(Carrier)\",5,4],[\"DOC_ID_SET\",6,5],"
-        + "[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",7,6]]}");
+        + "[\"GROUP_BY(groupKeys:Carrier, aggregations:count(*))\",3,2],[\"PROJECT(Carrier)\",4,3],"
+        + "[\"DOC_ID_SET\",5,4],[\"FILTER_MATCH_ENTIRE_SEGMENT(docs:*)\",6,5]]}");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.
     String query2 = "EXPLAIN PLAN FOR SELECT * FROM mytable WHERE FlightNum < 0";
-    String response2 = postQuery(query2, _brokerBaseApiUrl).get("resultTable").toString();
+    String response2 = postQuery(query2).get("resultTable").toString();
 
     assertEquals(response2, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
         + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(limit:10)\",1,0],"
@@ -2450,19 +2445,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     // compare two string columns.
     String query1 = "SELECT count(*) FROM mytable WHERE OriginState = DestState";
-    String response1 = postQuery(query1, _brokerBaseApiUrl).get("resultTable").toString();
+    String response1 = postQuery(query1).get("resultTable").toString();
     assertEquals(response1,
         "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]}," + "\"rows\":[[14011]]}");
 
     // compare string function with string column.
     String query2 = "SELECT count(*) FROM mytable WHERE trim(OriginState) = DestState";
-    String response2 = postQuery(query2, _brokerBaseApiUrl).get("resultTable").toString();
+    String response2 = postQuery(query2).get("resultTable").toString();
     assertEquals(response2,
         "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]}," + "\"rows\":[[14011]]}");
 
     // compare string function with string function.
     String query3 = "SELECT count(*) FROM mytable WHERE substr(OriginState, 0, 1) = substr(DestState, 0, 1)";
-    String response3 = postQuery(query3, _brokerBaseApiUrl).get("resultTable").toString();
+    String response3 = postQuery(query3).get("resultTable").toString();
     assertEquals(response3,
         "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]}," + "\"rows\":[[19755]]}");
   }
@@ -2621,57 +2616,57 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testAggregateMetadataAPI()
       throws IOException {
     JsonNode oneSVColumnResponse = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DestCityMarketID"));
+        sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DestCityMarketID"));
     // DestCityMarketID is a SV column
     validateMetadataResponse(oneSVColumnResponse, 1, 0);
 
     JsonNode oneMVColumnResponse = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=DivLongestGTimes"));
+        sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DivLongestGTimes"));
     // DivLongestGTimes is a MV column
     validateMetadataResponse(oneMVColumnResponse, 1, 1);
 
-    JsonNode threeSVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+    JsonNode threeSVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
         + "/tables/mytable/metadata?columns=DivActualElapsedTime&columns=CRSElapsedTime&columns=OriginStateName"));
     validateMetadataResponse(threeSVColumnsResponse, 3, 0);
 
     JsonNode threeSVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "DivActualElapsedTime%26columns%3DCRSElapsedTime%26columns%3DOriginStateName"));
     validateMetadataResponse(threeSVColumnsWholeEncodedResponse, 3, 0);
 
-    JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl
+    JsonNode threeMVColumnsResponse = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl()
         + "/tables/mytable/metadata?columns=DivLongestGTimes&columns=DivWheelsOns&columns=DivAirports"));
     validateMetadataResponse(threeMVColumnsResponse, 3, 3);
 
     JsonNode threeMVColumnsWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "DivLongestGTimes%26columns%3DDivWheelsOns%26columns%3DDivAirports"));
     validateMetadataResponse(threeMVColumnsWholeEncodedResponse, 3, 3);
 
     JsonNode zeroColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata"));
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata"));
     validateMetadataResponse(zeroColumnResponse, 0, 0);
 
     JsonNode starColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=*"));
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=*"));
     validateMetadataResponse(starColumnResponse, 82, 9);
 
     JsonNode starEncodedColumnResponse =
-        JsonUtils.stringToJsonNode(sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/metadata?columns=%2A"));
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=%2A"));
     validateMetadataResponse(starEncodedColumnResponse, 82, 9);
 
     JsonNode starWithExtraColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=*&columns=OriginStateName"));
     validateMetadataResponse(starWithExtraColumnResponse, 82, 9);
 
     JsonNode starWithExtraEncodedColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
     validateMetadataResponse(starWithExtraEncodedColumnResponse, 82, 9);
 
     JsonNode starWithExtraColumnWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
-        _controllerBaseApiUrl + "/tables/mytable/metadata?columns="
+        getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime%26columns%3D%2A%26columns%3DOriginStateName"));
     validateMetadataResponse(starWithExtraColumnWholeEncodedResponse, 82, 9);
   }
@@ -2728,31 +2723,38 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     // Test boolean equal true case.
     String sqlQuery = "SELECT (true = true) = true FROM mytable where true = true";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertTrue(rows.get(0).get(0).asBoolean());
     // Test boolean equal false case.
     sqlQuery = "SELECT (true = true) = false FROM mytable";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertFalse(rows.get(0).get(0).asBoolean());
     // Test boolean not equal true case.
     sqlQuery = "SELECT true != false FROM mytable";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertTrue(rows.get(0).get(0).asBoolean());
     // Test boolean not equal false case.
     sqlQuery = "SELECT true != true FROM mytable";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertFalse(rows.get(0).get(0).asBoolean());
+  }
+
+  @Test
+  public void testBooleanAggregation()
+      throws Exception {
+    testQuery("SELECT BOOL_AND(CAST(Cancelled AS BOOLEAN)) FROM mytable");
+    testQuery("SELECT BOOL_OR(CAST(Diverted AS BOOLEAN)) FROM mytable");
   }
 }

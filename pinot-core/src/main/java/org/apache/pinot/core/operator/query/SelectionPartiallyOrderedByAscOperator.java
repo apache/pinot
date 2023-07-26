@@ -24,8 +24,8 @@ import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
@@ -41,8 +41,8 @@ public class SelectionPartiallyOrderedByAscOperator extends LinearSelectionOrder
   private int _numDocsScanned = 0;
 
   public SelectionPartiallyOrderedByAscOperator(IndexSegment indexSegment, QueryContext queryContext,
-      List<ExpressionContext> expressions, TransformOperator transformOperator, int numSortedExpressions) {
-    super(indexSegment, queryContext, expressions, transformOperator, numSortedExpressions);
+      List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
+    super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
     Preconditions.checkArgument(queryContext.getOrderByExpressions().stream()
             .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
             .findFirst()
@@ -56,10 +56,10 @@ public class SelectionPartiallyOrderedByAscOperator extends LinearSelectionOrder
     int numExpressions = _expressions.size();
     BlockValSet[] blockValSets = new BlockValSet[numExpressions];
     ListBuilder listBuilder = listBuilderSupplier.get();
-    TransformBlock transformBlock;
-    while ((transformBlock = _transformOperator.nextBlock()) != null) {
-      IntFunction<Object[]> rowFetcher = fetchBlock(transformBlock, blockValSets);
-      int numDocsFetched = transformBlock.getNumDocs();
+    ValueBlock valueBlock;
+    while ((valueBlock = _projectOperator.nextBlock()) != null) {
+      IntFunction<Object[]> rowFetcher = fetchBlock(valueBlock, blockValSets);
+      int numDocsFetched = valueBlock.getNumDocs();
       _numDocsScanned += numDocsFetched;
       for (int i = 0; i < numDocsFetched; i++) {
         if (listBuilder.add(rowFetcher.apply(i))) {

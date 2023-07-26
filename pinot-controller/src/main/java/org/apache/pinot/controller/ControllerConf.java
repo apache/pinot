@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -60,6 +61,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String ZK_STR = "controller.zk.str";
   // boolean: Update the statemodel on boot?
   public static final String UPDATE_SEGMENT_STATE_MODEL = "controller.update_segment_state_model";
+  public static final String MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = "controller.min_is_size_for_compression";
   public static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   public static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   public static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
@@ -74,6 +76,9 @@ public class ControllerConf extends PinotConfiguration {
   // Comma separated list of packages that contains javax service resources.
   public static final String CONTROLLER_RESOURCE_PACKAGES = "controller.restlet.api.resource.packages";
   public static final String DEFAULT_CONTROLLER_RESOURCE_PACKAGES = "org.apache.pinot.controller.api.resources";
+
+  // Consider tierConfigs when assigning new offline segment
+  public static final String CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT = "controller.segment.enableTieredAssignment";
 
   public enum ControllerMode {
     DUAL, PINOT_ONLY, HELIX_ONLY
@@ -208,6 +213,8 @@ public class ControllerConf extends PinotConfiguration {
     // Default value is false.
     public static final String ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT =
         "controller.realtime.segment.deepStoreUploadRetryEnabled";
+    public static final String DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS =
+        "controller.realtime.segment.deepStoreUploadRetry.timeoutMs";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
@@ -235,7 +242,6 @@ public class ControllerConf extends PinotConfiguration {
 
     private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
     private static final int DEFAULT_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS = 60 * 60;
-    private static final int DEFAULT_SEGMENT_TIER_ASSIGNER_FREQUENCY_IN_SECONDS = -1; // Disabled
 
     // Realtime Consumer Monitor
     private static final String RT_CONSUMER_MONITOR_FREQUENCY_PERIOD =
@@ -257,6 +263,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
   public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
   public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
+  public static final String LINEAGE_MANAGER_CLASS = "controller.lineage.manager.class";
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
@@ -284,7 +291,10 @@ public class ControllerConf extends PinotConfiguration {
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
   private static final String DEFAULT_ACCESS_CONTROL_USERNAME = "admin";
   private static final String DEFAULT_ACCESS_CONTROL_PASSWORD = "admin";
+  private static final String DEFAULT_LINEAGE_MANAGER =
+      "org.apache.pinot.controller.helix.core.lineage.DefaultLineageManager";
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
+  private static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
@@ -374,7 +384,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public void setDataDir(String dataDir) {
-    setProperty(DATA_DIR, dataDir);
+    setProperty(DATA_DIR, StringUtils.removeEnd(dataDir, "/"));
   }
 
   public void setRealtimeSegmentCommitTimeoutSeconds(int timeoutSec) {
@@ -383,6 +393,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setUpdateSegmentStateModel(String updateStateModel) {
     setProperty(UPDATE_SEGMENT_STATE_MODEL, updateStateModel);
+  }
+
+  public void setMinISSizeForCompression(int minSize) {
+    setProperty(MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION, minSize);
   }
 
   public void setZkStr(String zkStr) {
@@ -667,6 +681,14 @@ public class ControllerConf extends PinotConfiguration {
         Integer.toString(segmentRelocatorFrequencyInSeconds));
   }
 
+  public boolean tieredSegmentAssignmentEnabled() {
+    return getProperty(CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT, false);
+  }
+
+  public void setTieredSegmentAssignmentEnabled(boolean enabled) {
+    setProperty(CONTROLLER_ENABLE_TIERED_SEGMENT_ASSIGNMENT, enabled);
+  }
+
   public boolean tenantIsolationEnabled() {
     return getProperty(CLUSTER_TENANT_ISOLATION_ENABLE, true);
   }
@@ -832,8 +854,20 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(ACCESS_CONTROL_FACTORY_CLASS, accessControlFactoryClass);
   }
 
+  public String getLineageManagerClass() {
+    return getProperty(LINEAGE_MANAGER_CLASS, DEFAULT_LINEAGE_MANAGER);
+  }
+
+  public void setLineageManagerClass(String lineageModifierClass) {
+    setProperty(LINEAGE_MANAGER_CLASS, lineageModifierClass);
+  }
+
   public long getSegmentUploadTimeoutInMillis() {
     return getProperty(SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS, DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS);
+  }
+
+  public int getMinNumCharsInISToTurnOnCompression() {
+    return getProperty(MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION, DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION);
   }
 
   public void setSegmentUploadTimeoutInMillis(long segmentUploadTimeoutInMillis) {
@@ -885,6 +919,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isDeepStoreRetryUploadLLCSegmentEnabled() {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, false);
+  }
+
+  public int getDeepStoreRetryUploadTimeoutMs() {
+    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS, -1);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {

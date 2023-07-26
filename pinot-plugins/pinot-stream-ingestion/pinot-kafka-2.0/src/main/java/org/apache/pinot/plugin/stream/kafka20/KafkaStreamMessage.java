@@ -23,7 +23,7 @@ import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
-public class KafkaStreamMessage extends StreamMessage {
+public class KafkaStreamMessage extends StreamMessage<byte[]> {
   public KafkaStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
     super(key, value, metadata, value.length);
   }

@@ -35,8 +35,9 @@ import java.util.Iterator;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -62,14 +63,15 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   private int _numGroups = 0;
 
-  public NoDictionarySingleColumnGroupKeyGenerator(TransformOperator transformOperator,
+  public NoDictionarySingleColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext groupByExpression, int numGroupsLimit, boolean nullHandlingEnabled) {
     _groupByExpression = groupByExpression;
-    _storedType = transformOperator.getResultMetadata(_groupByExpression).getDataType().getStoredType();
+    ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
+    _storedType = columnContext.getDataType().getStoredType();
     _groupKeyMap = createGroupKeyMap(_storedType);
     _globalGroupIdUpperBound = numGroupsLimit;
     _nullHandlingEnabled = nullHandlingEnabled;
-    _isSingleValueExpression = transformOperator.getResultMetadata(groupByExpression).isSingleValue();
+    _isSingleValueExpression = columnContext.isSingleValue();
   }
 
   @Override
@@ -78,16 +80,16 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys) {
-    BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpression);
+  public void generateKeysForBlock(ValueBlock valueBlock, int[] groupKeys) {
+    BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpression);
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        generateKeysForBlockNullHandlingEnabled(transformBlock, groupKeys, nullBitmap);
+        generateKeysForBlockNullHandlingEnabled(valueBlock, groupKeys, nullBitmap);
         return;
       }
     }
-    int numDocs = transformBlock.getNumDocs();
+    int numDocs = valueBlock.getNumDocs();
 
     switch (_storedType) {
       case INT:
@@ -137,11 +139,11 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     }
   }
 
-  public void generateKeysForBlockNullHandlingEnabled(TransformBlock transformBlock, int[] groupKeys,
+  public void generateKeysForBlockNullHandlingEnabled(ValueBlock valueBlock, int[] groupKeys,
       RoaringBitmap nullBitmap) {
     assert nullBitmap != null;
-    BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpression);
-    int numDocs = transformBlock.getNumDocs();
+    BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpression);
+    int numDocs = valueBlock.getNumDocs();
 
     switch (_storedType) {
       case INT:
@@ -262,9 +264,9 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[][] groupKeys) {
-    int numDocs = transformBlock.getNumDocs();
-    BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpression);
+  public void generateKeysForBlock(ValueBlock valueBlock, int[][] groupKeys) {
+    int numDocs = valueBlock.getNumDocs();
+    BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpression);
 
     if (_isSingleValueExpression) {
       switch (_storedType) {
@@ -305,8 +307,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
           }
           break;
         default:
-          throw new IllegalArgumentException(
-              "Illegal data type for no-dictionary key generator: " + _storedType);
+          throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
       }
     } else {
       switch (_storedType) {
@@ -366,8 +367,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
           }
           break;
         default:
-          throw new IllegalArgumentException(
-              "Illegal data type for no-dictionary key generator: " + _storedType);
+          throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _storedType);
       }
     }
   }

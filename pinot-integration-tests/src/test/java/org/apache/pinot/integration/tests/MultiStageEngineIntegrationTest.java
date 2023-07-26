@@ -18,29 +18,31 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.google.common.collect.ImmutableMap;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.client.Connection;
-import org.apache.pinot.client.ConnectionFactory;
-import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.function.scalar.StringFunctions.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
-  private static final String SCHEMA_FILE_NAME =
-      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
+  private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
 
   @Override
   protected String getSchemaFileName() {
@@ -54,9 +56,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Start the Pinot cluster
     startZk();
-    startController();
+    startController(getDefaultControllerConfiguration());
     startBroker();
     startServer();
+    setupTenants();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -79,9 +82,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
 
-    // Setting data table version to 4
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
+  protected void setupTenants()
+      throws IOException {
+  }
+
+  @Override
+  protected boolean useMultiStageQueryEngine() {
+    return true;
   }
 
   @Test
@@ -104,38 +113,376 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     String pinotQuery = "SET multistageLeafLimit = 1; SELECT * FROM mytable;";
     String h2Query = "SELECT * FROM mytable limit 1";
-    ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, _brokerBaseApiUrl, getPinotConnection(),
-        h2Query, getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+    testQueryWithMatchingRowCount(pinotQuery, h2Query);
   }
 
-  @Override
-  protected Connection getPinotConnection() {
-    Properties properties = new Properties();
-    properties.put("queryOptions", "useMultistageEngine=true");
-    if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName());
-    }
-    return _pinotConnection;
-  }
-
-  @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
-    brokerConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, 8421);
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
-    serverConf.setProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, 8842);
-    serverConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, 8422);
-  }
-
-  @Override
-  protected void testQuery(String pinotQuery, String h2Query)
+  @Test
+  public void testMultiValueColumnSelectionQuery()
       throws Exception {
-    ClusterIntegrationTestUtils.testQuery(pinotQuery, _brokerBaseApiUrl, getPinotConnection(), h2Query,
-        getH2Connection(), null, ImmutableMap.of("queryOptions", "useMultistageEngine=true"));
+    String pinotQuery =
+        "SELECT DivAirportIDs, DivAirports FROM mytable WHERE DATE_TIME_CONVERT(DaysSinceEpoch, '1:DAYS:EPOCH', "
+            + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
+    String h2Query =
+        "SELECT DivAirportIDs[1], DivAirports[1] FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
+    testQueryWithMatchingRowCount(pinotQuery, h2Query);
+  }
+
+  @Test
+  public void testTimeFunc()
+      throws Exception {
+    String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z'), toDateTime(ago('PT1H'), 'yyyy-MM-dd z') FROM mytable";
+    JsonNode response = postQuery(sqlQuery);
+    System.out.println("response = " + response);
+    String todayStr = response.get("resultTable").get("rows").get(0).get(0).asText();
+    String expectedTodayStr =
+        Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    assertEquals(todayStr, expectedTodayStr);
+
+    String oneHourAgoTodayStr = response.get("resultTable").get("rows").get(0).get(1).asText();
+    String expectedOneHourAgoTodayStr = Instant.now().minus(Duration.parse("PT1H")).atZone(ZoneId.of("UTC"))
+        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    assertEquals(oneHourAgoTodayStr, expectedOneHourAgoTodayStr);
+  }
+
+  @Test
+  public void testRegexpReplace()
+      throws Exception {
+    // Correctness tests of regexpReplace.
+
+    // Test replace all.
+    String sqlQuery = "SELECT regexpReplace('CA', 'C', 'TEST')";
+    JsonNode response = postQuery(sqlQuery);
+    String result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "TESTA");
+
+    sqlQuery = "SELECT regexpReplace('foobarbaz', 'b', 'X')";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "fooXarXaz");
+
+    sqlQuery = "SELECT regexpReplace('foobarbaz', 'b', 'XY')";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "fooXYarXYaz");
+
+    sqlQuery = "SELECT regexpReplace('Argentina', '(.)', '$1 ')";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "A r g e n t i n a ");
+
+    sqlQuery = "SELECT regexpReplace('Pinot is  blazing  fast', '( ){2,}', ' ')";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "Pinot is blazing fast");
+
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, and wise','\\w+thy', 'something')";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "something, something, and wise");
+
+    sqlQuery = "SELECT regexpReplace('11234567898','(\\d)(\\d{3})(\\d{3})(\\d{4})', '$1-($2) $3-$4')";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "1-(123) 456-7898");
+
+    // Test replace starting at index.
+
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 4)";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "healthy, something, something and wise");
+
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 1)";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "hsomething, something, something and wise");
+
+    // Test occurence
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "healthy, wealthy, something and wise");
+
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 0)";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "something, wealthy, stealthy and wise");
+
+    // Test flags
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 0, 0, 'i')";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "something, wealthy, stealthy and wise");
+
+    // Negative test. Pattern match not found.
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something')";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "healthy, wealthy, stealthy and wise");
+
+    // Negative test. Pattern match not found.
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 3, 21, 'i')";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "healthy, wealthy, stealthy and wise");
+
+    // Negative test - incorrect flag
+    sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+tHy', 'something', 3, 12, 'xyz')";
+    response = postQuery(sqlQuery);
+    result = response.get("resultTable").get("rows").get(0).get(0).asText();
+    assertEquals(result, "healthy, wealthy, stealthy and wise");
+
+    // Test in select clause with column values
+    sqlQuery = "SELECT regexpReplace(DestCityName, ' ', '', 0, -1, 'i') from mytable where OriginState = 'CA'";
+    response = postQuery(sqlQuery);
+    JsonNode rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      assertFalse(row.get(0).asText().contains(" "));
+    }
+
+    // Test in where clause
+    sqlQuery = "SELECT count(*) from mytable where regexpReplace(OriginState, '[VC]A', 'TEST') = 'TEST'";
+    response = postQuery(sqlQuery);
+    int count1 = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    sqlQuery = "SELECT count(*) from mytable where OriginState='CA' or OriginState='VA'";
+    response = postQuery(sqlQuery);
+    int count2 = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(count1, count2);
+
+    // Test nested transform
+    sqlQuery =
+        "SELECT count(*) from mytable where contains(regexpReplace(OriginState, '(C)(A)', '$1TEST$2'), 'CTESTA')";
+    response = postQuery(sqlQuery);
+    count1 = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    sqlQuery = "SELECT count(*) from mytable where OriginState='CA'";
+    response = postQuery(sqlQuery);
+    count2 = response.get("resultTable").get("rows").get(0).get(0).asInt();
+    assertEquals(count1, count2);
+  }
+
+  @Test
+  public void testUrlFunc()
+      throws Exception {
+    String sqlQuery = "SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
+        + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') FROM mytable";
+    JsonNode response = postQuery(sqlQuery);
+    String encodedString = response.get("resultTable").get("rows").get(0).get(0).asText();
+    String expectedUrlStr = encodeUrl("key1=value 1&key2=value@!$2&key3=value%3");
+    assertEquals(encodedString, expectedUrlStr);
+
+    String decodedString = response.get("resultTable").get("rows").get(0).get(1).asText();
+    expectedUrlStr = decodeUrl("key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
+    assertEquals(decodedString, expectedUrlStr);
+  }
+
+  @Test
+  public void testBase64Func()
+      throws Exception {
+
+    // string literal
+    String sqlQuery = "SELECT toBase64(toUtf8('hello!')), " + "fromUtf8(fromBase64('aGVsbG8h')) FROM mytable";
+    JsonNode response = postQuery(sqlQuery);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\"]");
+    JsonNode rows = response.get("resultTable").get("rows");
+
+    String encodedString = rows.get(0).get(0).asText();
+    String expectedEncodedStr = toBase64(toUtf8("hello!"));
+    assertEquals(encodedString, expectedEncodedStr);
+    String decodedString = rows.get(0).get(1).asText();
+    String expectedDecodedStr = fromUtf8(fromBase64("aGVsbG8h"));
+    assertEquals(decodedString, expectedDecodedStr);
+
+    // long string literal encode
+    sqlQuery =
+        "SELECT toBase64(toUtf8('this is a long string that will encode to more than 76 characters using base64')) "
+            + "FROM mytable";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    encodedString = rows.get(0).get(0).asText();
+    assertEquals(encodedString,
+        toBase64(toUtf8("this is a long string that will encode to more than 76 characters using base64")));
+
+    // long string literal decode
+    sqlQuery = "SELECT fromUtf8(fromBase64"
+        + "('dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0"
+        + "')) FROM mytable";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    decodedString = rows.get(0).get(0).asText();
+    assertEquals(decodedString, fromUtf8(fromBase64(
+        "dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0")));
+
+    // non-string literal
+    sqlQuery = "SELECT toBase64(toUtf8(123)), fromUtf8(fromBase64(toBase64(toUtf8(123)))), 123 FROM mytable";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    encodedString = rows.get(0).get(0).asText();
+    decodedString = rows.get(0).get(1).asText();
+    String originalCol = rows.get(0).get(2).asText();
+    assertEquals(decodedString, originalCol);
+    assertEquals(encodedString, toBase64(toUtf8("123")));
+
+    // identifier
+    sqlQuery = "SELECT Carrier, toBase64(toUtf8(Carrier)), fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))), "
+        + "fromBase64(toBase64(toUtf8(Carrier))) FROM mytable LIMIT 100";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\",\"BYTES\"]");
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 100);
+    for (int i = 0; i < 100; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
+    }
+
+    // invalid argument
+    sqlQuery = "SELECT toBase64('hello!') FROM mytable";
+    response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SQLParsingError"));
+
+    // invalid argument
+    sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
+    response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+
+    // string literal used in a filter
+    sqlQuery = "SELECT * FROM mytable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND "
+        + "toBase64(toUtf8('hello!')) != Carrier LIMIT 10";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // non-string literal used in a filter
+    sqlQuery = "SELECT * FROM mytable WHERE fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) != Carrier LIMIT 10";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // string identifier used in a filter
+    sqlQuery = "SELECT * FROM mytable WHERE fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))) = Carrier LIMIT 10";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // non-string identifier used in a filter
+    sqlQuery = "SELECT fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))), AirlineID FROM mytable WHERE "
+        + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) = AirlineID LIMIT 10";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"LONG\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+
+    // string identifier used in group by order by
+    sqlQuery = "SELECT Carrier as originalCol, toBase64(toUtf8(Carrier)) as encoded, "
+        + "fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))) as decoded FROM mytable "
+        + "GROUP BY Carrier, toBase64(toUtf8(Carrier)), fromUtf8(fromBase64(toBase64(toUtf8(Carrier)))) "
+        + "ORDER BY toBase64(toUtf8(Carrier)) LIMIT 10";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"STRING\",\"STRING\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
+    }
+
+    // non-string identifier used in group by order by
+    sqlQuery = "SELECT AirlineID as originalCol, toBase64(toUtf8(CAST(AirlineID AS VARCHAR))) as encoded, "
+        + "fromUtf8(fromBase64(toBase64(toUtf8(CAST(AirlineID AS VARCHAR))))) as decoded FROM mytable "
+        + "GROUP BY AirlineID, toBase64(toUtf8(CAST(AirlineID AS VARCHAR))), "
+        + "fromUtf8(fromBase64(toBase64(toUtf8(CAST(AirlineID AS VARCHAR))))) "
+        + "ORDER BY fromUtf8(fromBase64(toBase64(toUtf8(CAST(AirlineID AS VARCHAR))))) LIMIT 10";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"STRING\",\"STRING\"]");
+    rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      String original = rows.get(0).asText();
+      String encoded = rows.get(1).asText();
+      String decoded = rows.get(2).asText();
+      assertEquals(original, decoded);
+      assertEquals(encoded, toBase64(toUtf8(original)));
+      assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
+    }
+  }
+
+  @Test
+  public void testLiteralOnlyFunc()
+      throws Exception {
+    long queryStartTimeMs = System.currentTimeMillis();
+    String sqlQuery =
+        "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
+            + "today, now(), ago('PT1H'), encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
+            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, toBase64"
+            + "(toUtf8('hello!')) as toBase64, fromUtf8(fromBase64('aGVsbG8h')) as fromBase64";
+    JsonNode response = postQuery(sqlQuery);
+    System.out.println("response = " + response.toPrettyString());
+    long queryEndTimeMs = System.currentTimeMillis();
+
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    JsonNode columnDataTypes = dataSchema.get("columnDataTypes");
+    assertEquals(columnDataTypes.get(0).asText(), "INT");
+    assertEquals(columnDataTypes.get(1).asText(), "LONG");
+    assertEquals(columnDataTypes.get(2).asText(), "LONG");
+    assertEquals(columnDataTypes.get(3).asText(), "STRING");
+    assertEquals(columnDataTypes.get(4).asText(), "STRING");
+    assertEquals(columnDataTypes.get(5).asText(), "LONG");
+    assertEquals(columnDataTypes.get(6).asText(), "LONG");
+    assertEquals(columnDataTypes.get(7).asText(), "STRING");
+    assertEquals(columnDataTypes.get(8).asText(), "STRING");
+    assertEquals(columnDataTypes.get(9).asText(), "STRING");
+    assertEquals(columnDataTypes.get(10).asText(), "STRING");
+
+    JsonNode results = resultTable.get("rows").get(0);
+    assertEquals(results.get(0).asInt(), 1);
+    long nowResult = results.get(1).asLong();
+    assertTrue(nowResult >= queryStartTimeMs);
+    assertTrue(nowResult <= queryEndTimeMs);
+    long oneHourAgoResult = results.get(2).asLong();
+    assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
+    assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
+    assertEquals(results.get(3).asText(), "abc");
+    String queryStartTimeDay = Instant.ofEpochMilli(queryStartTimeMs).atZone(ZoneId.of("UTC"))
+        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    String queryEndTimeDay = Instant.ofEpochMilli(queryEndTimeMs).atZone(ZoneId.of("UTC"))
+        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
+    String dateTimeResult = results.get(4).asText();
+    assertTrue(dateTimeResult.equals(queryStartTimeDay) || dateTimeResult.equals(queryEndTimeDay));
+    nowResult = results.get(5).asLong();
+    assertTrue(nowResult >= queryStartTimeMs);
+    assertTrue(nowResult <= queryEndTimeMs);
+    oneHourAgoResult = results.get(6).asLong();
+    assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
+    assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
+    assertEquals(results.get(7).asText(), "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
+    assertEquals(results.get(8).asText(), "key1=value 1&key2=value@!$2&key3=value%3");
+    assertEquals(results.get(9).asText(), "aGVsbG8h");
+    assertEquals(results.get(10).asText(), "hello!");
   }
 
   @AfterClass

@@ -29,10 +29,18 @@ import java.util.Set;
 public class OrderByExpressionContext {
   private final ExpressionContext _expression;
   private final boolean _isAsc;
+  private final Boolean _isNullsLast;
 
   public OrderByExpressionContext(ExpressionContext expression, boolean isAsc) {
     _expression = expression;
     _isAsc = isAsc;
+    _isNullsLast = null;
+  }
+
+  public OrderByExpressionContext(ExpressionContext expression, boolean isAsc, boolean isNullsLast) {
+    _expression = expression;
+    _isAsc = isAsc;
+    _isNullsLast = isNullsLast;
   }
 
   public ExpressionContext getExpression() {
@@ -45,6 +53,16 @@ public class OrderByExpressionContext {
 
   public boolean isDesc() {
     return !_isAsc;
+  }
+
+  public boolean isNullsLast() {
+    // By default, null values sort as if larger than any non-null value; that is, NULLS FIRST is the default for DESC
+    // order, and NULLS LAST otherwise.
+    if (_isNullsLast == null) {
+      return _isAsc;
+    } else {
+      return _isNullsLast;
+    }
   }
 
   /**
@@ -63,16 +81,20 @@ public class OrderByExpressionContext {
       return false;
     }
     OrderByExpressionContext that = (OrderByExpressionContext) o;
-    return _isAsc == that._isAsc && Objects.equals(_expression, that._expression);
+    return Objects.equals(_expression, that._expression) && _isAsc == that._isAsc && _isNullsLast == that._isNullsLast;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_expression, _isAsc);
+    return Objects.hash(_expression, _isAsc, _isNullsLast);
   }
 
   @Override
   public String toString() {
-    return _expression.toString() + (_isAsc ? " ASC" : " DESC");
+    if (_isNullsLast != null) {
+      return _expression.toString() + (_isAsc ? " ASC" : " DESC") + (_isNullsLast ? " NULLS LAST" : " NULLS FIRST");
+    } else {
+      return _expression.toString() + (_isAsc ? " ASC" : " DESC");
+    }
   }
 }

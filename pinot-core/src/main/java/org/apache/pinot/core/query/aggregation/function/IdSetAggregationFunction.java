@@ -82,7 +82,7 @@ public class IdSetAggregationFunction extends BaseSingleInputAggregationFunction
       int sizeThresholdInBytes = IdSets.DEFAULT_SIZE_THRESHOLD_IN_BYTES;
       int expectedInsertions = IdSets.DEFAULT_EXPECTED_INSERTIONS;
       double fpp = IdSets.DEFAULT_FPP;
-      String parametersString = parametersExpression.getLiteralString();
+      String parametersString = parametersExpression.getLiteral().getStringValue();
       StringUtils.deleteWhitespace(parametersString);
       String[] keyValuePairs = StringUtils.split(parametersString, PARAMETER_DELIMITER);
       for (String keyValuePair : keyValuePairs) {

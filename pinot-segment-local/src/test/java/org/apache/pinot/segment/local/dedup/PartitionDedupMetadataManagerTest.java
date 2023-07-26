@@ -25,7 +25,6 @@ import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
-import org.apache.pinot.segment.local.upsert.RecordInfo;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.HashFunction;
@@ -122,20 +121,16 @@ public class PartitionDedupMetadataManagerTest {
     metadataManager.addSegment(segment1);
 
     // Same PK exists
-    RecordInfo recordInfo = mock(RecordInfo.class);
-    when(recordInfo.getPrimaryKey()).thenReturn(getPrimaryKey(0));
     ImmutableSegmentImpl segment2 = mockSegment(2);
-    Assert.assertTrue(metadataManager.checkRecordPresentOrUpdate(recordInfo.getPrimaryKey(), segment2));
+    Assert.assertTrue(metadataManager.checkRecordPresentOrUpdate(getPrimaryKey(0), segment2));
     checkRecordLocation(recordLocationMap, 0, segment1, hashFunction);
 
     // New PK
-    when(recordInfo.getPrimaryKey()).thenReturn(getPrimaryKey(3));
-    Assert.assertFalse(metadataManager.checkRecordPresentOrUpdate(recordInfo.getPrimaryKey(), segment2));
+    Assert.assertFalse(metadataManager.checkRecordPresentOrUpdate(getPrimaryKey(3), segment2));
     checkRecordLocation(recordLocationMap, 3, segment2, hashFunction);
 
     // Same PK as the one recently ingested
-    when(recordInfo.getPrimaryKey()).thenReturn(getPrimaryKey(3));
-    Assert.assertTrue(metadataManager.checkRecordPresentOrUpdate(recordInfo.getPrimaryKey(), segment2));
+    Assert.assertTrue(metadataManager.checkRecordPresentOrUpdate(getPrimaryKey(3), segment2));
   }
 
   private static ImmutableSegmentImpl mockSegment(int sequenceNumber) {
@@ -160,7 +155,7 @@ public class PartitionDedupMetadataManagerTest {
     assertSame(indexSegment, segment);
   }
 
-  private static class TestMetadataManager extends PartitionDedupMetadataManager {
+  private static class TestMetadataManager extends ConcurrentMapPartitionDedupMetadataManager {
     Iterator<PrimaryKey> _primaryKeyIterator;
 
     TestMetadataManager(String tableNameWithType, List<String> primaryKeyColumns, int partitionId,

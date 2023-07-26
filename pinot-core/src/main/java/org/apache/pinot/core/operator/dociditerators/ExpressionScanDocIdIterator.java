@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
@@ -33,7 +35,9 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.BitmapDataProvider;
+import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -111,6 +115,19 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   }
 
   @Override
+  public MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
+    IntIterator intIterator = batchIterator.asIntIterator(new int[OPTIMAL_ITERATOR_BATCH_SIZE]);
+    ProjectionOperator projectionOperator =
+        new ProjectionOperator(_dataSourceMap, new BitmapDocIdSetOperator(intIterator, _docIdBuffer));
+    MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+    ProjectionBlock projectionBlock;
+    while ((projectionBlock = projectionOperator.nextBlock()) != null) {
+      processProjectionBlock(projectionBlock, matchingDocIds);
+    }
+    return matchingDocIds;
+  }
+
+  @Override
   public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     ProjectionOperator projectionOperator =
         new ProjectionOperator(_dataSourceMap, new BitmapDocIdSetOperator(docIds, _docIdBuffer));
@@ -180,6 +197,14 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             byte[][] bytesValues = _transformFunction.transformToBytesValuesSV(projectionBlock);
             for (int i = 0; i < numDocs; i++) {
               if (_predicateEvaluator.applySV(bytesValues[i])) {
+                matchingDocIds.add(_docIdBuffer[i]);
+              }
+            }
+            break;
+          case BIG_DECIMAL:
+            BigDecimal[] bigDecimalValues = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+            for (int i = 0; i < numDocs; i++) {
+              if (_predicateEvaluator.applySV(bigDecimalValues[i])) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }

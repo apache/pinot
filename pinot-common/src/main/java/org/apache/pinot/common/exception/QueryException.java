@@ -54,7 +54,7 @@ public class QueryException {
   public static final int ACCESS_DENIED_ERROR_CODE = 180;
   public static final int TABLE_DOES_NOT_EXIST_ERROR_CODE = 190;
   public static final int QUERY_EXECUTION_ERROR_CODE = 200;
-  public static final int QUERY_CANCELLATION_ERROR_CODE = 205;
+  public static final int QUERY_CANCELLATION_ERROR_CODE = 503;
   // TODO: Handle these errors in broker
   public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
   public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = 211;
@@ -130,6 +130,8 @@ public class QueryException {
   public static final ProcessingException UNKNOWN_COLUMN_ERROR = new ProcessingException(UNKNOWN_COLUMN_ERROR_CODE);
   public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
   public static final ProcessingException QUOTA_EXCEEDED_ERROR = new ProcessingException(TOO_MANY_REQUESTS_ERROR_CODE);
+  public static final ProcessingException BROKER_REQUEST_SEND_ERROR =
+      new ProcessingException(BROKER_REQUEST_SEND_ERROR_CODE);
 
   static {
     JSON_PARSING_ERROR.setMessage("JsonParsingError");

@@ -24,18 +24,19 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.inverted.InvertedIndexType;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
-import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexHandler;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -62,6 +63,9 @@ import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
  * TODO: Currently for multi-value columns generating the forward index can lead to a data loss as frequency information
  *       is not available for repeats within a given row. This needs to be addressed by tracking the frequency data
  *       as part of an on-disk structure when forward index is disabled for a column.
+ *
+ * TODO (index-spi): Rename this class, as it is not an implementation of
+ * {@link org.apache.pinot.segment.spi.index.IndexCreator}.
  */
 public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoCloseable {
   private static final Logger LOGGER =
@@ -75,9 +79,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private static final String FORWARD_INDEX_MAX_SIZE_BUFFER_SUFFIX = ".fwd.idx.maxsize.buf";
 
   private final String _columnName;
-  private final IndexLoadingConfig _indexLoadingConfig;
+  private final ForwardIndexConfig _forwardIndexConfig;
   private final SegmentDirectory.Writer _segmentWriter;
-  private final IndexCreatorProvider _indexCreatorProvider;
   private final boolean _isTemporaryForwardIndex;
 
   // Metadata
@@ -90,7 +93,6 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private final FieldSpec.DataType _storedType;
   private final int _totalNumberOfEntries;
   private final boolean _dictionaryEnabled;
-  private final ChunkCompressionType _chunkCompressionType;
   private final boolean _useMMapBuffer;
 
   // Files and temporary buffers
@@ -111,15 +113,13 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private PinotDataBuffer _forwardIndexMaxSizeBuffer;
 
   public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentDirectory segmentDirectory,
-      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter,
-      IndexCreatorProvider indexCreatorProvider, boolean isTemporaryForwardIndex)
+      boolean dictionaryEnabled, ForwardIndexConfig fwdConf, SegmentDirectory.Writer segmentWriter,
+      boolean isTemporaryForwardIndex)
       throws IOException {
     _columnName = columnName;
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentDirectory.getSegmentMetadata();
-    _indexLoadingConfig = indexLoadingConfig;
     _segmentWriter = segmentWriter;
-    _indexCreatorProvider = indexCreatorProvider;
     _isTemporaryForwardIndex = isTemporaryForwardIndex;
 
     _columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
@@ -129,8 +129,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     _totalNumberOfEntries = _columnMetadata.getTotalNumberOfEntries();
     _maxNumberOfMultiValues = _columnMetadata.getMaxNumberOfMultiValues();
     _storedType = _columnMetadata.getFieldSpec().getDataType().getStoredType();
-    _dictionaryEnabled = !_indexLoadingConfig.getNoDictionaryColumns().contains(columnName);
-    _chunkCompressionType = getColumnCompressionType();
+    _dictionaryEnabled = dictionaryEnabled;
     int numValues = _singleValue ? _numDocs : _totalNumberOfEntries;
     _useMMapBuffer = numValues > NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER;
 
@@ -145,6 +144,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       fileExtension = _singleValue ? V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION
           : V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
     }
+    _forwardIndexConfig = fwdConf;
     _forwardIndexFile = new File(indexDir, columnName + fileExtension);
     _forwardIndexValueBufferFile = new File(indexDir, columnName + FORWARD_INDEX_VALUE_BUFFER_SUFFIX);
     _forwardIndexLengthBufferFile = new File(indexDir, columnName + FORWARD_INDEX_LENGTH_BUFFER_SUFFIX);
@@ -175,24 +175,6 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     }
   }
 
-  private ChunkCompressionType getColumnCompressionType() {
-    if (_dictionaryEnabled) {
-      return null;
-    }
-
-    Map<String, ChunkCompressionType> compressionConfigs = _indexLoadingConfig.getCompressionConfigs();
-    Map<String, String> noDictionaryConfig = _indexLoadingConfig.getNoDictionaryConfig();
-    ChunkCompressionType compressionType;
-    if (compressionConfigs.containsKey(_columnName)) {
-      compressionType = compressionConfigs.get(_columnName);
-    } else if (noDictionaryConfig.containsKey(_columnName)) {
-      compressionType = ChunkCompressionType.valueOf(_indexLoadingConfig.getNoDictionaryConfig().get(_columnName));
-    } else {
-      compressionType = SegmentColumnarIndexCreator.getDefaultCompressionType(_columnMetadata.getFieldType());
-    }
-    return compressionType;
-  }
-
   public void regenerateForwardIndex()
       throws IOException {
     File indexDir = _segmentMetadata.getIndexDir();
@@ -220,7 +202,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       metadataProperties = createForwardIndexForMVColumn();
     }
 
-    LoaderUtils.writeIndexToV3Format(_segmentWriter, _columnName, _forwardIndexFile, ColumnIndexType.FORWARD_INDEX);
+    LoaderUtils.writeIndexToV3Format(_segmentWriter, _columnName, _forwardIndexFile, StandardIndexes.forward());
 
     try {
       // Update the metadata even for temporary forward index as other IndexHandlers may rely on the updated metadata
@@ -247,7 +229,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         LOGGER.info("Clean up indexes no longer needed or which need to be rewritten for segment: {}, column: {}",
             segmentName, _columnName);
         // Delete the dictionary
-        _segmentWriter.removeIndex(_columnName, ColumnIndexType.DICTIONARY);
+        _segmentWriter.removeIndex(_columnName, StandardIndexes.dictionary());
 
         // We remove indexes that have to be rewritten when a dictEnabled is toggled. Note that the respective index
         // handler will take care of recreating the index.
@@ -265,8 +247,9 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private Map<String, String> createForwardIndexForSVColumn()
       throws IOException {
     try (BitmapInvertedIndexReader invertedIndexReader =
-        (BitmapInvertedIndexReader) LoaderUtils.getInvertedIndexReader(_segmentWriter, _columnMetadata);
-        Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, _columnMetadata)) {
+        (BitmapInvertedIndexReader) InvertedIndexType.ReaderFactory
+            .INSTANCE.createSkippingForward(_segmentWriter, _columnMetadata);
+        Dictionary dictionary = DictionaryIndexType.read(_segmentWriter, _columnMetadata)) {
       boolean isFixedWidth = _columnMetadata.getFieldSpec().getDataType().isFixedWidth();
       int lengthOfLongestEntry = isFixedWidth ? -1 : 0;
       // Construct the forward index in the values buffer
@@ -279,11 +262,13 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         }
       }
 
-      IndexCreationContext.Forward context =
-          IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir())
-              .withColumnMetadata(_columnMetadata).withforwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
-              .withLengthOfLongestEntry(lengthOfLongestEntry).build()
-              .forForwardIndex(_chunkCompressionType, _indexLoadingConfig.getColumnProperties());
+      IndexCreationContext context = IndexCreationContext.builder()
+          .withIndexDir(_segmentMetadata.getIndexDir())
+          .withColumnMetadata(_columnMetadata)
+          .withForwardIndexDisabled(false)
+          .withDictionary(_dictionaryEnabled)
+          .withLengthOfLongestEntry(lengthOfLongestEntry)
+          .build();
 
       writeToForwardIndex(dictionary, context);
 
@@ -299,8 +284,9 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private Map<String, String> createForwardIndexForMVColumn()
       throws IOException {
     try (BitmapInvertedIndexReader invertedIndexReader =
-        (BitmapInvertedIndexReader) LoaderUtils.getInvertedIndexReader(_segmentWriter, _columnMetadata);
-        Dictionary dictionary = LoaderUtils.getDictionary(_segmentWriter, _columnMetadata)) {
+        (BitmapInvertedIndexReader) InvertedIndexType.ReaderFactory.INSTANCE
+            .createSkippingForward(_segmentWriter, _columnMetadata);
+        Dictionary dictionary = DictionaryIndexType.read(_segmentWriter, _columnMetadata)) {
       // Construct the forward index length buffer and create the inverted index values and length buffers
       int[] maxNumberOfMultiValues = new int[]{0};
       final boolean isFixedWidth = _columnMetadata.getFieldSpec().getDataType().isFixedWidth();
@@ -358,12 +344,16 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         });
       }
 
-      IndexCreationContext.Forward context =
-          IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir())
-              .withColumnMetadata(_columnMetadata).withforwardIndexDisabled(false).withDictionary(_dictionaryEnabled)
-              .withTotalNumberOfEntries(_nextValueId).withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
-              .withMaxRowLengthInBytes(maxRowLengthInBytes[0]).withLengthOfLongestEntry(lengthOfLongestEntry)
-              .build().forForwardIndex(_chunkCompressionType, _indexLoadingConfig.getColumnProperties());
+      IndexCreationContext context = IndexCreationContext.builder()
+          .withIndexDir(_segmentMetadata.getIndexDir())
+          .withColumnMetadata(_columnMetadata)
+          .withForwardIndexDisabled(false)
+          .withDictionary(_dictionaryEnabled)
+          .withTotalNumberOfEntries(_nextValueId)
+          .withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
+          .withMaxRowLengthInBytes(maxRowLengthInBytes[0])
+          .withLengthOfLongestEntry(lengthOfLongestEntry)
+          .build();
 
       writeToForwardIndex(dictionary, context);
 
@@ -427,9 +417,9 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     }
   }
 
-  private void writeToForwardIndex(Dictionary dictionary, IndexCreationContext.Forward context)
+  private void writeToForwardIndex(Dictionary dictionary, IndexCreationContext context)
       throws IOException {
-    try (ForwardIndexCreator creator = _indexCreatorProvider.newForwardIndexCreator(context)) {
+    try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, _forwardIndexConfig)) {
       if (_dictionaryEnabled) {
         if (_singleValue) {
           for (int docId = 0; docId < _numDocs; docId++) {

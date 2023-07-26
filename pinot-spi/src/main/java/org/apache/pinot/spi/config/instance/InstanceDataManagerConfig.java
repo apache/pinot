@@ -68,4 +68,8 @@ public interface InstanceDataManagerConfig {
   int getDeletedSegmentsCacheTtlMinutes();
 
   String getSegmentPeerDownloadScheme();
+
+  long getExternalViewDroppedMaxWaitMs();
+
+  long getExternalViewDroppedCheckIntervalMs();
 }

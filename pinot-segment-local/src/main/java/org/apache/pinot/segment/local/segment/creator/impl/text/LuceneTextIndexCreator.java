@@ -36,10 +36,12 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 
 
 /**
@@ -47,7 +49,7 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
  * Used for both offline from {@link SegmentColumnarIndexCreator}
  * and realtime from {@link RealtimeLuceneTextIndex}
  */
-public class LuceneTextIndexCreator implements TextIndexCreator {
+public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   // TODO: make buffer size configurable choosing a default value based on the heap usage results in design doc
   private static final int LUCENE_INDEX_MAX_BUFFER_SIZE_MB = 500;
 
@@ -113,6 +115,11 @@ public class LuceneTextIndexCreator implements TextIndexCreator {
       throw new RuntimeException(
           "Caught exception while instantiating the LuceneTextIndexCreator for column: " + column, e);
     }
+  }
+
+  public LuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
+    this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(),
+        indexConfig.getStopWordsInclude(), indexConfig.getStopWordsExclude());
   }
 
   public IndexWriter getIndexWriter() {

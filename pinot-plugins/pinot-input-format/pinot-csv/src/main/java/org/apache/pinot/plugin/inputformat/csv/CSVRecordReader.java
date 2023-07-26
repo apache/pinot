@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.csv;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVFormat;
@@ -148,6 +149,19 @@ public class CSVRecordReader implements RecordReader {
       throws IOException {
     _parser = _format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
     _iterator = _parser.iterator();
+  }
+
+  /**
+   * Returns a copy of the header map that iterates in column order.
+   * <p>
+   * The map keys are column names. The map values are 0-based indices.
+   * </p>
+   * @return a copy of the header map that iterates in column order.
+   */
+  public Map<String, Integer> getCSVHeaderMap() {
+    // if header row is not configured and input file doesn't contain a valid header record, the returned map would
+    // contain values from the first row in the input file.
+    return _parser.getHeaderMap();
   }
 
   @Override

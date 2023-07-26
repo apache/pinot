@@ -19,14 +19,15 @@
 package org.apache.pinot.core.operator.docidsets;
 
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.NotDocIdIterator;
 
 
-public class NotDocIdSet implements FilterBlockDocIdSet {
-  private final FilterBlockDocIdSet _childDocIdSet;
+public class NotDocIdSet implements BlockDocIdSet {
+  private final BlockDocIdSet _childDocIdSet;
   private final int _numDocs;
 
-  public NotDocIdSet(FilterBlockDocIdSet childDocIdSet, int numDocs) {
+  public NotDocIdSet(BlockDocIdSet childDocIdSet, int numDocs) {
     _childDocIdSet = childDocIdSet;
     _numDocs = numDocs;
   }

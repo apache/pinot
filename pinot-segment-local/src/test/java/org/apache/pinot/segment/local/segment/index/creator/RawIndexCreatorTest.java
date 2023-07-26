@@ -36,10 +36,10 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunk
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -269,7 +269,7 @@ public class RawIndexCreatorTest {
    */
   private PinotDataBuffer getIndexBufferForColumn(String column)
       throws IOException {
-    return _segmentReader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
+    return _segmentReader.getIndexFor(column, StandardIndexes.forward());
   }
 
   /**

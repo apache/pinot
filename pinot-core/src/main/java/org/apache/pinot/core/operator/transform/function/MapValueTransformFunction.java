@@ -21,9 +21,9 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 
 
@@ -59,7 +59,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     Preconditions.checkArgument(arguments.size() == 3,
         "3 arguments are required for MAP_VALUE transform function: keyColumn, keyValue, valueColumn, e.g. MAP_VALUE"
             + "(key, 'myKey', value)");
@@ -73,7 +73,7 @@ public class MapValueTransformFunction extends BaseTransformFunction {
     TransformFunction keyValueFunction = arguments.get(1);
     Preconditions.checkState(keyValueFunction instanceof LiteralTransformFunction,
         "Key value must be a literal (number or string)");
-    String keyValue = ((LiteralTransformFunction) keyValueFunction).getLiteral();
+    String keyValue = ((LiteralTransformFunction) keyValueFunction).getStringLiteral();
     _keyDictId = keyColumnDictionary.indexOf(keyValue);
 
     _valueColumnFunction = arguments.get(2);
@@ -95,13 +95,13 @@ public class MapValueTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_dictIds == null) {
+  public int[] transformToDictIdsSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    if (_dictIds == null || _dictIds.length < length) {
       _dictIds = new int[length];
     }
-    int[][] keyDictIdsMV = _keyColumnFunction.transformToDictIdsMV(projectionBlock);
-    int[][] valueDictIdsMV = _valueColumnFunction.transformToDictIdsMV(projectionBlock);
+    int[][] keyDictIdsMV = _keyColumnFunction.transformToDictIdsMV(valueBlock);
+    int[][] valueDictIdsMV = _valueColumnFunction.transformToDictIdsMV(valueBlock);
     for (int i = 0; i < length; i++) {
       int[] keyDictIds = keyDictIdsMV[i];
 

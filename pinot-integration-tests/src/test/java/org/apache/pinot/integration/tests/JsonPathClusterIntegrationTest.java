@@ -53,14 +53,14 @@ import org.testng.annotations.Test;
 
 
 public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
-  private static final int NUM_TOTAL_DOCS = 1000;
+  protected static final int NUM_TOTAL_DOCS = 1000;
   private static final String MY_MAP_STR_FIELD_NAME = "myMapStr";
   private static final String MY_MAP_STR_K1_FIELD_NAME = "myMapStr_k1";
   private static final String MY_MAP_STR_K2_FIELD_NAME = "myMapStr_k2";
   private static final String COMPLEX_MAP_STR_FIELD_NAME = "complexMapStr";
   private static final String COMPLEX_MAP_STR_K3_FIELD_NAME = "complexMapStr_k3";
 
-  private final List<String> _sortedSequenceIds = new ArrayList<>(NUM_TOTAL_DOCS);
+  protected final List<String> _sortedSequenceIds = new ArrayList<>(NUM_TOTAL_DOCS);
 
   @Override
   protected long getCountStarResult() {
@@ -144,9 +144,11 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     return avroFile;
   }
 
-  @Test
-  public void testQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
     //Selection Query
     String query = "Select myMapStr from " + DEFAULT_TABLE_NAME;
     JsonNode pinotResponse = postQuery(query);
@@ -194,9 +196,10 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  @Test
-  public void testComplexQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testComplexQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     //Selection Query
     String query = "Select complexMapStr from " + DEFAULT_TABLE_NAME;
     JsonNode pinotResponse = postQuery(query);
@@ -260,15 +263,21 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
       Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + seqId);
       Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), Double.parseDouble(seqId));
     }
+  }
+
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testComplexGroupByQueryV1(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     //Group By Query
-    query = "Select" + " jsonExtractScalar(complexMapStr,'$.k1','STRING'),"
+    String query = "Select" + " jsonExtractScalar(complexMapStr,'$.k1','STRING'),"
         + " sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT'))" + " from " + DEFAULT_TABLE_NAME
         + " group by jsonExtractScalar(complexMapStr,'$.k1','STRING')"
         + " order by sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT')) DESC";
-    pinotResponse = postQuery(query);
+    JsonNode pinotResponse = postQuery(query);
     Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
-    rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
+    ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
       String seqId = _sortedSequenceIds.get(NUM_TOTAL_DOCS - 1 - i);
       final JsonNode row = rows.get(i);
@@ -277,9 +286,66 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  @Test
-  void testFailedQuery()
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testComplexGroupByQueryV2(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    //Group By Query
+    String query = "Select" + " jsonExtractScalar(complexMapStr,'$.k1','STRING'),"
+        + " sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT'))" + " from " + DEFAULT_TABLE_NAME
+        + " group by jsonExtractScalar(complexMapStr,'$.k1','STRING')"
+        + " order by sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT')) DESC";
+    JsonNode pinotResponse = postQuery(query);
+    Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
+    ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      String seqId = String.valueOf(NUM_TOTAL_DOCS - 1 - i);
+      final JsonNode row = rows.get(i);
+      Assert.assertEquals(row.get(0).asText(), "value-k1-" + seqId);
+      Assert.assertEquals(row.get(1).asDouble(), Double.parseDouble(seqId));
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryWithIntegerDefault(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    //Group By Query
+    String query = "Select" + " jsonExtractScalar(complexMapStr,'$.inExistKey','STRING','defaultKey'),"
+        + " sum(jsonExtractScalar(complexMapStr,'$.inExistMet','INT','1'))" + " from " + DEFAULT_TABLE_NAME
+        + " group by jsonExtractScalar(complexMapStr,'$.inExistKey','STRING','defaultKey')"
+        + " order by sum(jsonExtractScalar(complexMapStr,'$.inExistMet','INT','1')) DESC";
+    JsonNode pinotResponse = postQuery(query);
+    Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
+    ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    final JsonNode row = rows.get(0);
+    Assert.assertEquals(row.get(0).asText(), "defaultKey");
+    Assert.assertEquals(row.get(1).asDouble(), 1000.0);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryWithDoubleDefault(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    //Group By Query
+    String query = "Select" + " jsonExtractScalar(complexMapStr,'$.inExistKey','STRING', 'defaultKey'),"
+        + " sum(jsonExtractScalar(complexMapStr,'$.inExistMet','DOUBLE','0.1'))" + " from " + DEFAULT_TABLE_NAME
+        + " group by jsonExtractScalar(complexMapStr,'$.inExistKey','STRING','defaultKey')"
+        + " order by sum(jsonExtractScalar(complexMapStr,'$.inExistMet','DOUBLE','0.1')) DESC";
+    JsonNode pinotResponse = postQuery(query);
+    Assert.assertNotNull(pinotResponse.get("resultTable").get("rows"));
+    ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    final JsonNode row = rows.get(0);
+    Assert.assertEquals(row.get(0).asText(), "defaultKey");
+    Assert.assertTrue(Math.abs(row.get(1).asDouble() - 100.0) < 1e-10);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  void testFailedQuery(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "Select jsonExtractScalar(myMapStr,\"$.k1\",\"STRING\") from " + DEFAULT_TABLE_NAME;
     JsonNode pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);

@@ -47,6 +47,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -165,7 +166,8 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Force commit job id", required = true) @PathParam("jobId") String forceCommitJobId)
       throws Exception {
     Map<String, String> controllerJobZKMetadata =
-        _pinotHelixResourceManager.getControllerJobZKMetadata(forceCommitJobId);
+        _pinotHelixResourceManager.getControllerJobZKMetadata(forceCommitJobId,
+            ControllerJobType.FORCE_COMMIT);
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + forceCommitJobId,
           Response.Status.NOT_FOUND);
@@ -227,8 +229,8 @@ public class PinotRealtimeTableResource {
       String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
       ConsumingSegmentInfoReader consumingSegmentInfoReader =
           new ConsumingSegmentInfoReader(_executor, _connectionManager, _pinotHelixResourceManager);
-      return consumingSegmentInfoReader
-          .getConsumingSegmentsInfo(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      return consumingSegmentInfoReader.getConsumingSegmentsInfo(tableNameWithType,
+          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to get consuming segments info for table %s. %s", realtimeTableName, e.getMessage()),

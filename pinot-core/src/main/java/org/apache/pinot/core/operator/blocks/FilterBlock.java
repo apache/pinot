@@ -19,50 +19,31 @@
 package org.apache.pinot.core.operator.blocks;
 
 import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockDocIdValueSet;
-import org.apache.pinot.core.common.BlockMetadata;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.core.common.BlockDocIdSet;
 
 
 /**
  * The {@code FilterBlock} class is the block holding the document Ids returned from the filter operator.
  */
 public class FilterBlock implements Block {
-  private final FilterBlockDocIdSet _filterBlockDocIdSet;
-  private FilterBlockDocIdSet _nonScanFilterBlockDocIdSet;
+  private final BlockDocIdSet _blockDocIdSet;
+  private BlockDocIdSet _nonScanBlockDocIdSet;
 
-  public FilterBlock(FilterBlockDocIdSet filterBlockDocIdSet) {
-    _filterBlockDocIdSet = filterBlockDocIdSet;
+  public FilterBlock(BlockDocIdSet blockDocIdSet) {
+    _blockDocIdSet = blockDocIdSet;
   }
 
   /**
    * Pre-scans the documents if needed, and returns a non-scan-based FilterBlockDocIdSet.
    */
-  public FilterBlockDocIdSet getNonScanFilterBLockDocIdSet() {
-    if (_nonScanFilterBlockDocIdSet == null) {
-      _nonScanFilterBlockDocIdSet = _filterBlockDocIdSet.toNonScanDocIdSet();
+  public BlockDocIdSet getNonScanFilterBLockDocIdSet() {
+    if (_nonScanBlockDocIdSet == null) {
+      _nonScanBlockDocIdSet = _blockDocIdSet.toNonScanDocIdSet();
     }
-    return _nonScanFilterBlockDocIdSet;
+    return _nonScanBlockDocIdSet;
   }
 
-  @Override
-  public FilterBlockDocIdSet getBlockDocIdSet() {
-    return _nonScanFilterBlockDocIdSet != null ? _nonScanFilterBlockDocIdSet : _filterBlockDocIdSet;
-  }
-
-  @Override
-  public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockDocIdValueSet getBlockDocIdValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockMetadata getMetadata() {
-    throw new UnsupportedOperationException();
+  public BlockDocIdSet getBlockDocIdSet() {
+    return _nonScanBlockDocIdSet != null ? _nonScanBlockDocIdSet : _blockDocIdSet;
   }
 }

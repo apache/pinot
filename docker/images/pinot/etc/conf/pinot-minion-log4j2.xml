@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<Configuration>
+  <Properties>
+    <Property name="LOG_DIR">logs/pinotMinion</Property>
+  </Properties>
+  <Appenders>
+    <Console name="console" target="SYSTEM_OUT">
+      <PatternLayout>
+        <pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</pattern>
+      </PatternLayout>
+    </Console>
+    <RollingFile
+        name="minionLog"
+        fileName="${env:LOG_DIR}/pinotMinion.log"
+        filePattern="${env:LOG_DIR}/pinotMinion.%d{yyyy-MM-dd}.%i.log.gz"
+        immediateFlush="false">
+      <PatternLayout>
+        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
+      </PatternLayout>
+      <Policies>
+        <OnStartupTriggeringPolicy/>
+        <SizeBasedTriggeringPolicy size="20 MB"/>
+        <TimeBasedTriggeringPolicy/>
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingFile>
+    <RollingFile
+        name="minionHelixLog"
+        fileName="${env:LOG_DIR}/pinotMinionHelix.log"
+        filePattern="${env:LOG_DIR}/pinotMinionHelix.%d{yyyy-MM-dd}.%i.log.gz"
+        immediateFlush="false">
+      <PatternLayout>
+        <Pattern>%d{yyyy/MM/dd HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n</Pattern>
+      </PatternLayout>
+      <Policies>
+        <OnStartupTriggeringPolicy/>
+        <SizeBasedTriggeringPolicy size="20 MB"/>
+        <TimeBasedTriggeringPolicy/>
+      </Policies>
+      <DefaultRolloverStrategy max="10"/>
+    </RollingFile>
+  </Appenders>
+  <Loggers>
+    <Root level="info" additivity="false">
+      <!-- Display warnings on the console -->
+      <AppenderRef ref="console" level="${env:LOG4J_CONSOLE_LEVEL:-warn}"/>
+      <!-- Direct most logs to the log file -->
+      <AppenderRef ref="minionLog"/>
+    </Root>
+    <!-- Output helix logs to dedicated files -->
+    <Logger name="org.apache.helix" level="info" additivity="false">
+      <AppenderRef ref="minionHelixLog"/>
+    </Logger>
+    <!-- Output minion starter logs to the console -->
+    <Logger name="org.apache.pinot.minion.MinionStarter" level="info" additivity="false">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <AsyncLogger name="org.reflections" level="error" additivity="false"/>
+  </Loggers>
+</Configuration>

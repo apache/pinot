@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.physical.colocated;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,23 +29,25 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.StageMetadata;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
-import org.apache.pinot.query.planner.stage.SortNode;
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.StageNodeVisitor;
-import org.apache.pinot.query.planner.stage.TableScanNode;
-import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -63,29 +66,28 @@ import org.slf4j.LoggerFactory;
  *
  * Also see: {@link ColocationKey} for its definition.
  */
-public class GreedyShuffleRewriteVisitor
-    implements StageNodeVisitor<Set<ColocationKey>, GreedyShuffleRewriteContext> {
+public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<ColocationKey>, GreedyShuffleRewriteContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GreedyShuffleRewriteVisitor.class);
 
   private final TableCache _tableCache;
-  private final Map<Integer, StageMetadata> _stageMetadataMap;
+  private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap;
   private boolean _canSkipShuffleForJoin;
 
-  public static void optimizeShuffles(QueryPlan queryPlan, TableCache tableCache) {
-    StageNode rootStageNode = queryPlan.getQueryStageMap().get(0);
-    Map<Integer, StageMetadata> stageMetadataMap = queryPlan.getStageMetadataMap();
-    GreedyShuffleRewriteContext context = GreedyShuffleRewritePreComputeVisitor.preComputeContext(rootStageNode);
-    // This assumes that if stageId(S1) > stageId(S2), then S1 is not an ancestor of S2.
+  public static void optimizeShuffles(PlanNode rootPlanNode,
+      Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap, TableCache tableCache) {
+    GreedyShuffleRewriteContext context = GreedyShuffleRewritePreComputeVisitor.preComputeContext(rootPlanNode);
+    // This assumes that if planFragmentId(S1) > planFragmentId(S2), then S1 is not an ancestor of S2.
     // TODO: If this assumption is wrong, we can compute the reverse topological ordering explicitly.
-    for (int stageId = stageMetadataMap.size() - 1; stageId >= 0; stageId--) {
-      StageNode stageNode = context.getRootStageNode(stageId);
-      stageNode.visit(new GreedyShuffleRewriteVisitor(tableCache, stageMetadataMap), context);
+    for (int planFragmentId = dispatchablePlanMetadataMap.size() - 1; planFragmentId >= 0; planFragmentId--) {
+      PlanNode planNode = context.getRootStageNode(planFragmentId);
+      planNode.visit(new GreedyShuffleRewriteVisitor(tableCache, dispatchablePlanMetadataMap), context);
     }
   }
 
-  private GreedyShuffleRewriteVisitor(TableCache tableCache, Map<Integer, StageMetadata> stageMetadataMap) {
+  private GreedyShuffleRewriteVisitor(TableCache tableCache,
+      Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap) {
     _tableCache = tableCache;
-    _stageMetadataMap = stageMetadataMap;
+    _dispatchablePlanMetadataMap = dispatchablePlanMetadataMap;
     _canSkipShuffleForJoin = false;
   }
 
@@ -113,8 +115,9 @@ public class GreedyShuffleRewriteVisitor
 
   @Override
   public Set<ColocationKey> visitJoin(JoinNode node, GreedyShuffleRewriteContext context) {
-    List<MailboxReceiveNode> innerLeafNodes = context.getLeafNodes(node.getStageId()).stream()
-        .map(x -> (MailboxReceiveNode) x).collect(Collectors.toList());
+    List<MailboxReceiveNode> innerLeafNodes =
+        context.getLeafNodes(node.getPlanFragmentId()).stream().map(x -> (MailboxReceiveNode) x)
+            .collect(Collectors.toList());
     Preconditions.checkState(innerLeafNodes.size() == 2);
 
     // Multiple checks need to be made to ensure that shuffle can be skipped for a join.
@@ -122,8 +125,10 @@ public class GreedyShuffleRewriteVisitor
     boolean canColocate = canJoinBeColocated(node);
     // Step-2: Only if the servers assigned to both left and right nodes are equal and the servers assigned to the join
     //         stage are a superset of those servers, can we skip shuffles.
-    canColocate = canColocate && canServerAssignmentAllowShuffleSkip(node.getStageId(),
-        innerLeafNodes.get(0).getSenderStageId(), innerLeafNodes.get(1).getSenderStageId());
+    canColocate =
+        canColocate && canServerAssignmentAllowShuffleSkip(node.getPlanFragmentId(),
+            innerLeafNodes.get(0).getSenderStageId(),
+            innerLeafNodes.get(1).getSenderStageId());
     // Step-3: For both left/right MailboxReceiveNode/MailboxSendNode pairs, check whether the key partitioning can
     //         allow shuffle skip.
     canColocate = canColocate && partitionKeyConditionForJoin(innerLeafNodes.get(0),
@@ -135,8 +140,8 @@ public class GreedyShuffleRewriteVisitor
     canColocate = canColocate && checkPartitionScheme(innerLeafNodes.get(0), innerLeafNodes.get(1), context);
     if (canColocate) {
       // If shuffle can be skipped, reassign servers.
-      _stageMetadataMap.get(node.getStageId()).setServerInstances(
-          _stageMetadataMap.get(innerLeafNodes.get(0).getSenderStageId()).getServerInstances());
+      _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).setServerInstanceToWorkerIdMap(
+          _dispatchablePlanMetadataMap.get(innerLeafNodes.get(0).getSenderStageId()).getServerInstanceToWorkerIdMap());
       _canSkipShuffleForJoin = true;
     }
 
@@ -147,8 +152,8 @@ public class GreedyShuffleRewriteVisitor
     Set<ColocationKey> colocationKeys = new HashSet<>(leftPKs);
 
     for (ColocationKey rightColocationKey : rightPks) {
-      ColocationKey newColocationKey = new ColocationKey(rightColocationKey.getNumPartitions(),
-          rightColocationKey.getHashAlgorithm());
+      ColocationKey newColocationKey =
+          new ColocationKey(rightColocationKey.getNumPartitions(), rightColocationKey.getHashAlgorithm());
       for (Integer index : rightColocationKey.getIndices()) {
         newColocationKey.addIndex(leftDataSchemaSize + index);
       }
@@ -163,38 +168,38 @@ public class GreedyShuffleRewriteVisitor
     KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
     Set<ColocationKey> oldColocationKeys = context.getColocationKeys(node.getSenderStageId());
     // If the current stage is not a join-stage, then we already know sender's distribution
-    if (!context.isJoinStage(node.getStageId())) {
+    if (!context.isJoinStage(node.getPlanFragmentId())) {
       if (selector == null) {
         return new HashSet<>();
-      } else if (colocationKeyCondition(oldColocationKeys, selector)
-          && areServersSuperset(node.getStageId(), node.getSenderStageId())) {
-        node.setExchangeType(RelDistribution.Type.SINGLETON);
-        _stageMetadataMap.get(node.getStageId()).setServerInstances(
-            _stageMetadataMap.get(node.getSenderStageId()).getServerInstances());
+      } else if (colocationKeyCondition(oldColocationKeys, selector) && areServersSuperset(node.getPlanFragmentId(),
+          node.getSenderStageId())) {
+        node.setDistributionType(RelDistribution.Type.SINGLETON);
+        _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).setServerInstanceToWorkerIdMap(
+            _dispatchablePlanMetadataMap.get(node.getSenderStageId()).getServerInstanceToWorkerIdMap());
         return oldColocationKeys;
       }
       // This means we can't skip shuffle and there's a partitioning enforced by receiver.
-      int numPartitions = _stageMetadataMap.get(node.getStageId()).getServerInstances().size();
-      List<ColocationKey> colocationKeys =
-          ((FieldSelectionKeySelector) selector).getColumnIndices().stream()
-              .map(x -> new ColocationKey(x, numPartitions, selector.hashAlgorithm())).collect(Collectors.toList());
+      int numPartitions =
+          _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).getServerInstanceToWorkerIdMap().size();
+      List<ColocationKey> colocationKeys = ((FieldSelectionKeySelector) selector).getColumnIndices().stream()
+          .map(x -> new ColocationKey(x, numPartitions, selector.hashAlgorithm())).collect(Collectors.toList());
       return new HashSet<>(colocationKeys);
     }
     // If the current stage is a join-stage then we already know whether shuffle can be skipped.
     if (_canSkipShuffleForJoin) {
-      node.setExchangeType(RelDistribution.Type.SINGLETON);
+      node.setDistributionType(RelDistribution.Type.SINGLETON);
       // For the join-case, servers are already re-assigned in visitJoin. Moreover, we haven't yet changed sender's
       // distribution.
-      ((MailboxSendNode) node.getSender()).setExchangeType(RelDistribution.Type.SINGLETON);
+      ((MailboxSendNode) node.getSender()).setDistributionType(RelDistribution.Type.SINGLETON);
       return oldColocationKeys;
     } else if (selector == null) {
       return new HashSet<>();
     }
     // This means we can't skip shuffle and there's a partitioning enforced by receiver.
-    int numPartitions = _stageMetadataMap.get(node.getStageId()).getServerInstances().size();
-    List<ColocationKey> colocationKeys =
-        ((FieldSelectionKeySelector) selector).getColumnIndices().stream()
-            .map(x -> new ColocationKey(x, numPartitions, selector.hashAlgorithm())).collect(Collectors.toList());
+    int numPartitions =
+        _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).getServerInstanceToWorkerIdMap().size();
+    List<ColocationKey> colocationKeys = ((FieldSelectionKeySelector) selector).getColumnIndices().stream()
+        .map(x -> new ColocationKey(x, numPartitions, selector.hashAlgorithm())).collect(Collectors.toList());
     return new HashSet<>(colocationKeys);
   }
 
@@ -207,19 +212,19 @@ public class GreedyShuffleRewriteVisitor
     // If receiver is not a join-stage, then we can determine distribution type now.
     if (!context.isJoinStage(node.getReceiverStageId())) {
       Set<ColocationKey> colocationKeys;
-      if (canSkipShuffleBasic && areServersSuperset(node.getReceiverStageId(), node.getStageId())) {
+      if (canSkipShuffleBasic && areServersSuperset(node.getReceiverStageId(), node.getPlanFragmentId())) {
         // Servers are not re-assigned on sender-side. If needed, they are re-assigned on the receiver side.
-        node.setExchangeType(RelDistribution.Type.SINGLETON);
+        node.setDistributionType(RelDistribution.Type.SINGLETON);
         colocationKeys = oldColocationKeys;
       } else {
         colocationKeys = new HashSet<>();
       }
-      context.setColocationKeys(node.getStageId(), colocationKeys);
+      context.setColocationKeys(node.getPlanFragmentId(), colocationKeys);
       return colocationKeys;
     }
     // If receiver is a join-stage, remember partition-keys of the child node of MailboxSendNode.
     Set<ColocationKey> mailboxSendColocationKeys = canSkipShuffleBasic ? oldColocationKeys : new HashSet<>();
-    context.setColocationKeys(node.getStageId(), mailboxSendColocationKeys);
+    context.setColocationKeys(node.getPlanFragmentId(), mailboxSendColocationKeys);
     return mailboxSendColocationKeys;
   }
 
@@ -246,9 +251,23 @@ public class GreedyShuffleRewriteVisitor
   }
 
   @Override
+  public Set<ColocationKey> visitWindow(WindowNode node, GreedyShuffleRewriteContext context) {
+    return node.getInputs().get(0).visit(this, context);
+  }
+
+  @Override
+  public Set<ColocationKey> visitSetOp(SetOpNode setOpNode, GreedyShuffleRewriteContext context) {
+    return ImmutableSet.of();
+  }
+
+  @Override
+  public Set<ColocationKey> visitExchange(ExchangeNode exchangeNode, GreedyShuffleRewriteContext context) {
+    throw new UnsupportedOperationException("ExchangeNode should not be visited by this visitor");
+  }
+
+  @Override
   public Set<ColocationKey> visitTableScan(TableScanNode node, GreedyShuffleRewriteContext context) {
-    TableConfig tableConfig =
-        _tableCache.getTableConfig(node.getTableName());
+    TableConfig tableConfig = _tableCache.getTableConfig(node.getTableName());
     if (tableConfig == null) {
       LOGGER.warn("Couldn't find tableConfig for {}", node.getTableName());
       return new HashSet<>();
@@ -288,8 +307,8 @@ public class GreedyShuffleRewriteVisitor
    * Checks if servers assigned to the receiver stage are a super-set of the sender stage.
    */
   private boolean areServersSuperset(int receiverStageId, int senderStageId) {
-    return _stageMetadataMap.get(receiverStageId).getServerInstances().containsAll(
-        _stageMetadataMap.get(senderStageId).getServerInstances());
+    return _dispatchablePlanMetadataMap.get(receiverStageId).getServerInstanceToWorkerIdMap().keySet()
+        .containsAll(_dispatchablePlanMetadataMap.get(senderStageId).getServerInstanceToWorkerIdMap().keySet());
   }
 
   /*
@@ -298,9 +317,12 @@ public class GreedyShuffleRewriteVisitor
    * 2. Servers assigned to the join-stage are a superset of S.
    */
   private boolean canServerAssignmentAllowShuffleSkip(int currentStageId, int leftStageId, int rightStageId) {
-    Set<ServerInstance> leftServerInstances = new HashSet<>(_stageMetadataMap.get(leftStageId).getServerInstances());
-    List<ServerInstance> rightServerInstances = _stageMetadataMap.get(rightStageId).getServerInstances();
-    List<ServerInstance> currentServerInstances = _stageMetadataMap.get(currentStageId).getServerInstances();
+    Set<QueryServerInstance> leftServerInstances = new HashSet<>(_dispatchablePlanMetadataMap.get(leftStageId)
+        .getServerInstanceToWorkerIdMap().keySet());
+    Set<QueryServerInstance> rightServerInstances = _dispatchablePlanMetadataMap.get(rightStageId)
+        .getServerInstanceToWorkerIdMap().keySet();
+    Set<QueryServerInstance> currentServerInstances = _dispatchablePlanMetadataMap.get(currentStageId)
+        .getServerInstanceToWorkerIdMap().keySet();
     return leftServerInstances.containsAll(rightServerInstances)
         && leftServerInstances.size() == rightServerInstances.size()
         && currentServerInstances.containsAll(leftServerInstances);
@@ -317,9 +339,9 @@ public class GreedyShuffleRewriteVisitor
     Set<ColocationKey> colocationKeys = new HashSet<>();
     for (ColocationKey colocationKey : oldColocationKeys) {
       boolean shouldDrop = false;
-      ColocationKey newColocationKey
-          = new ColocationKey(colocationKey.getNumPartitions(), colocationKey.getHashAlgorithm());
-      for (Integer index: colocationKey.getIndices()) {
+      ColocationKey newColocationKey =
+          new ColocationKey(colocationKey.getNumPartitions(), colocationKey.getHashAlgorithm());
+      for (Integer index : colocationKey.getIndices()) {
         if (!oldToNewIndex.containsKey(index)) {
           shouldDrop = true;
           break;
@@ -349,10 +371,9 @@ public class GreedyShuffleRewriteVisitor
   }
 
   private static boolean partitionKeyConditionForJoin(MailboxReceiveNode mailboxReceiveNode,
-      MailboxSendNode mailboxSendNode,
-      GreedyShuffleRewriteContext context) {
+      MailboxSendNode mailboxSendNode, GreedyShuffleRewriteContext context) {
     // First check ColocationKeyCondition for the sender <--> sender.getInputs().get(0) pair
-    Set<ColocationKey> oldColocationKeys = context.getColocationKeys(mailboxSendNode.getStageId());
+    Set<ColocationKey> oldColocationKeys = context.getColocationKeys(mailboxSendNode.getPlanFragmentId());
     KeySelector<Object[], Object[]> selector = mailboxSendNode.getPartitionKeySelector();
     if (!colocationKeyCondition(oldColocationKeys, selector)) {
       return false;
@@ -381,10 +402,10 @@ public class GreedyShuffleRewriteVisitor
       GreedyShuffleRewriteContext context) {
     int leftSender = leftReceiveNode.getSenderStageId();
     int rightSender = rightReceiveNode.getSenderStageId();
-    ColocationKey leftPKey = getEquivalentSenderKey(context.getColocationKeys(leftSender),
-        leftReceiveNode.getPartitionKeySelector());
-    ColocationKey rightPKey = getEquivalentSenderKey(context.getColocationKeys(rightSender),
-        rightReceiveNode.getPartitionKeySelector());
+    ColocationKey leftPKey =
+        getEquivalentSenderKey(context.getColocationKeys(leftSender), leftReceiveNode.getPartitionKeySelector());
+    ColocationKey rightPKey =
+        getEquivalentSenderKey(context.getColocationKeys(rightSender), rightReceiveNode.getPartitionKeySelector());
     if (leftPKey.getNumPartitions() != rightPKey.getNumPartitions()) {
       return false;
     }

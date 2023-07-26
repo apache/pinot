@@ -56,7 +56,7 @@ public class StreamingReduceServiceTest {
               threadPoolService,
               ImmutableMap.of(routingInstance, mockedResponse),
               1000,
-              mock(BaseReduceService.ExecutionStatsAggregator.class));
+              mock(ExecutionStatsAggregator.class));
           return null;
         }, cause -> cause.getMessage().contains(exceptionMessage))
     );
@@ -85,7 +85,7 @@ public class StreamingReduceServiceTest {
               threadPoolService,
               ImmutableMap.of(routingInstance, mockedResponse),
               10,
-              mock(BaseReduceService.ExecutionStatsAggregator.class));
+              mock(ExecutionStatsAggregator.class));
           return null;
         },
         (cause) -> cause instanceof TimeoutException));

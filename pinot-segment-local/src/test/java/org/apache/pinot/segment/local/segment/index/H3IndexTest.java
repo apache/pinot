@@ -18,29 +18,42 @@
  */
 package org.apache.pinot.segment.local.segment.index;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
+import org.apache.pinot.segment.local.segment.index.h3.H3IndexType;
 import org.apache.pinot.segment.local.segment.index.readers.geospatial.ImmutableH3IndexReader;
+import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Point;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class H3IndexTest {
@@ -77,13 +90,14 @@ public class H3IndexTest {
           h3IndexResolution);
           GeoSpatialIndexCreator offHeapCreator = new OffHeapH3IndexCreator(TEMP_DIR, offHeapColumnName,
               h3IndexResolution)) {
+        int docId = 0;
         while (expectedCardinalities.size() < numUniqueH3Ids) {
           double longitude = RANDOM.nextDouble() * 360 - 180;
           double latitude = RANDOM.nextDouble() * 180 - 90;
           Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(longitude, latitude));
           onHeapCreator.add(point);
           offHeapCreator.add(point);
-          mutableH3Index.add(point);
+          mutableH3Index.add(GeometrySerializer.serialize(point), -1, docId++);
           long h3Id = H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
           expectedCardinalities.merge(h3Id, 1, Integer::sum);
         }
@@ -105,6 +119,91 @@ public class H3IndexTest {
           }
         }
       }
+    }
+  }
+
+  public static class ConfTest extends AbstractSerdeIndexContract {
+
+    protected void assertEquals(H3IndexConfig expected) {
+      Assert.assertEquals(getActualConfig("dimStr", StandardIndexes.h3()), expected);
+    }
+
+    @Test
+    public void oldFieldConfigNull()
+        throws JsonProcessingException {
+      _tableConfig.setFieldConfigList(null);
+
+      assertEquals(H3IndexConfig.DISABLED);
+    }
+
+    @Test
+    public void oldEmptyFieldConfig()
+        throws JsonProcessingException {
+      cleanFieldConfig();
+
+      assertEquals(H3IndexConfig.DISABLED);
+    }
+
+    @Test
+    public void oldFieldConfigNotH3()
+        throws JsonProcessingException {
+      addFieldIndexConfig("{\n"
+          + "    \"name\": \"dimStr\",\n"
+          + "    \"indexTypes\" : []\n"
+          + " }");
+
+      assertEquals(H3IndexConfig.DISABLED);
+    }
+
+    @Test
+    public void oldFieldConfigH3Resolution()
+        throws JsonProcessingException {
+      addFieldIndexConfig("{\n"
+          + "    \"name\": \"dimStr\",\n"
+          + "    \"indexTypes\" : [\"H3\"],\n"
+          + "    \"properties\": {\n"
+          + "       \"resolutions\": \"3\""
+          + "     }\n"
+          + " }");
+
+      assertEquals(new H3IndexConfig(new H3IndexResolution(Lists.newArrayList(3))));
+    }
+
+    @Test
+    public void newConfEnabled()
+        throws JsonProcessingException {
+      addFieldIndexConfig("{\n"
+          + "    \"name\": \"dimStr\",\n"
+          + "    \"indexes\" : {\n"
+          + "       \"h3\": {\n"
+          + "          \"enabled\": \"true\",\n"
+          + "          \"resolution\": [3]\n"
+          + "       }\n"
+          + "    }\n"
+          + " }");
+      assertEquals(new H3IndexConfig(new H3IndexResolution(Lists.newArrayList(3))));
+    }
+
+    @Test
+    public void oldToNewConfConversion()
+        throws IOException {
+      addFieldIndexConfig("{\n"
+          + "    \"name\": \"dimStr\",\n"
+          + "    \"indexes\" : {\n"
+          + "       \"h3\": {\n"
+          + "          \"enabled\": \"true\",\n"
+          + "          \"resolution\": [3]\n"
+          + "       }\n"
+          + "    }\n"
+          + " }");
+      convertToUpdatedFormat();
+      assertNotNull(_tableConfig.getFieldConfigList());
+      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
+      FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimStr"))
+          .collect(Collectors.toList()).get(0);
+      assertNotNull(fieldConfig.getIndexes().get(H3IndexType.INDEX_DISPLAY_NAME));
+      assertTrue(fieldConfig.getIndexTypes().isEmpty());
     }
   }
 }

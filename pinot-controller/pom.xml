@@ -33,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <npm.script>build</npm.script>
+    <npm.script>build-ci</npm.script>
   </properties>
   <dependencies>
     <dependency>
@@ -157,12 +157,6 @@
     <dependency>
       <groupId>org.apache.helix</groupId>
       <artifactId>helix-core</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.101tec</groupId>
@@ -185,6 +179,10 @@
     <dependency>
       <groupId>org.quartz-scheduler</groupId>
       <artifactId>quartz</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-planner</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -235,13 +233,13 @@
             </configuration>
           </execution>
           <execution>
-            <id>npm install</id>
+            <id>npm ci</id>
             <goals>
               <goal>npm</goal>
             </goals>
             <phase>generate-resources</phase>
             <configuration>
-              <arguments>install</arguments>
+              <arguments>ci</arguments>
             </configuration>
           </execution>
           <execution>
@@ -277,4 +275,13 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>bin-dist</id>
+      <properties>
+        <npm.script>build</npm.script>
+      </properties>
+    </profile>
+  </profiles>
 </project>

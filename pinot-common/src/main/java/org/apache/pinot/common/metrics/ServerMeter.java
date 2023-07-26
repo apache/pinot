@@ -35,6 +35,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETED_SEGMENT_COUNT("segments", false),
   DELETE_TABLE_FAILURES("tables", false),
   REALTIME_ROWS_CONSUMED("rows", true),
+  REALTIME_ROWS_FILTERED("rows", false),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
   INCOMPLETE_REALTIME_ROWS_CONSUMED("rows", false),
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
@@ -45,6 +46,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   UPSERT_KEYS_IN_WRONG_SEGMENT("rows", false),
   PARTIAL_UPSERT_OUT_OF_ORDER("rows", false),
   PARTIAL_UPSERT_KEYS_NOT_REPLACED("rows", false),
+  UPSERT_OUT_OF_ORDER("rows", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
   LLC_CONTROLLER_RESPONSE_COMMIT("messages", true),
@@ -68,23 +70,35 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RELOAD_FAILURES("segments", false),
   REFRESH_FAILURES("segments", false),
   UNTAR_FAILURES("segments", false),
-  SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false),
+  SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false, "Counts the number of segment "
+      + "fetch failures"),
   SEGMENT_DIR_MOVEMENT_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_UPLOAD_FAILURE("segments", false),
+  SEGMENT_UPLOAD_SUCCESS("segments", false),
+  // Emitted only by Server to Deep-store segment uploader.
+  SEGMENT_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
 
   READINESS_CHECK_OK_CALLS("readinessCheck", true),
   READINESS_CHECK_BAD_CALLS("readinessCheck", true),
-  QUERIES_PREEMPTED("query", true),
+  QUERIES_KILLED("query", true),
+  HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
+  HEAP_PANIC_LEVEL_EXCEEDED("count", true),
 
   // Netty connection metrics
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+
+  // GRPC related metrics
+  GRPC_QUERIES("grpcQueries", true),
+  GRPC_BYTES_RECEIVED("grpcBytesReceived", true),
+  GRPC_BYTES_SENT("grpcBytesSent", true),
 
   NUM_SEGMENTS_PRUNED_INVALID("numSegmentsPrunedInvalid", false),
   NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", false),
@@ -93,11 +107,17 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   private final String _meterName;
   private final String _unit;
   private final boolean _global;
+  private final String _description;
 
   ServerMeter(String unit, boolean global) {
+    this(unit, global, "");
+  }
+
+  ServerMeter(String unit, boolean global, String description) {
     _unit = unit;
     _global = global;
     _meterName = Utils.toCamelCase(name().toLowerCase());
+    _description = description;
   }
 
   @Override
@@ -118,5 +138,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   @Override
   public boolean isGlobal() {
     return _global;
+  }
+
+  @Override
+  public String getDescription() {
+    return _description;
   }
 }

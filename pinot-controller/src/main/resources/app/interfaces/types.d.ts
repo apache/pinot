@@ -47,6 +47,11 @@ declare module 'Models' {
     hostName: string;
     enabled: boolean;
     port: number;
+    grpcPort: number;
+    adminPort: number;
+    queryServicePort: number;
+    queryMailboxPort: number;
+    queriesDisabled: boolean;
     tags: Array<string>;
     pools?: string;
   };
@@ -163,6 +168,11 @@ declare module 'Models' {
     NONE = 'NONE',
     BASIC = 'BASIC',
     OIDC = 'OIDC',
+  }
+
+  export const enum AuthLocalStorageKeys {
+    RedirectLocation = "redirectLocation",
+    AccessToken = "AccessToken",
   }
 
   export type TableList = {

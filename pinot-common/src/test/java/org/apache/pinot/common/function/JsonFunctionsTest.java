@@ -258,7 +258,7 @@ public class JsonFunctionsTest {
   public static Object[][] jsonPathStringTestCases() {
     return new Object[][]{
         {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.foo", "x"},
-        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.qux", "null"},
+        {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.qux", null},
         {ImmutableMap.of("foo", "x", "bar", ImmutableMap.of("foo", "y")), "$.bar", "{\"foo\":\"y\"}"},
     };
   }

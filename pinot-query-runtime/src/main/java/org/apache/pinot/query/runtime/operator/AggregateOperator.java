@@ -21,97 +21,128 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.IntermediateStageBlockValSet;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.query.planner.logical.LiteralHintUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
 /**
  *
  * AggregateOperator is used to aggregate values over a set of group by keys.
  * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
- * Currently, we only support SUM/COUNT/MIN/MAX aggregation.
+ * Currently, we only support the following aggregation functions:
+ * 1. SUM
+ * 2. COUNT
+ * 3. MIN
+ * 4. MAX
+ * 5. DistinctCount and Count(Distinct)
+ * 6. AVG
+ * 7. FourthMoment
+ * 8. BoolAnd and BoolOr
  *
  * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
  * In this case, the input can be any type.
  *
  * If the list of aggregation calls is not empty, the input of aggregation has to be a number.
- *
  * Note: This class performs aggregation over the double value of input.
  * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  */
+// TODO(Sonam): Rename to AggregateOperator when merging Planner support.
 public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
-  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
 
   private final MultiStageOperator _inputOperator;
-
-  // TODO: Deal with the case where _aggCalls is empty but we have groupSet setup, which means this is a Distinct call.
-  private final List<RexExpression.FunctionCall> _aggCalls;
-  private final List<RexExpression> _groupSet;
-
   private final DataSchema _resultSchema;
-  private final Accumulator[] _accumulators;
-  private final Map<Key, Object[]> _groupByKeyHolder;
-  private TransferableBlock _upstreamErrorBlock;
+  private final DataSchema _inputSchema;
+  private final AggType _aggType;
 
+  // Map that maintains the mapping between columnName and the column ordinal index. It is used to fetch the required
+  // column value from row-based container and fetch the input datatype for the column.
+  private final Map<String, Integer> _colNameToIndexMap;
+  private final Map<Integer, Map<Integer, Literal>> _aggCallSignatureMap;
+
+  private TransferableBlock _upstreamErrorBlock;
   private boolean _readyToConstruct;
   private boolean _hasReturnedAggregateBlock;
 
-  // TODO: Move to OperatorContext class.
-  private OperatorStats _operatorStats;
+  private final boolean _isGroupByAggregation;
+  private MultistageAggregationExecutor _aggregationExecutor;
+  private MultistageGroupByExecutor _groupByExecutor;
 
   // TODO: refactor Pinot Reducer code to support the intermediate stage agg operator.
   // aggCalls has to be a list of FunctionCall and cannot be null
   // groupSet has to be a list of InputRef and cannot be null
   // TODO: Add these two checks when we confirm we can handle error in upstream ctor call.
-  public AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
-      List<RexExpression> groupSet, DataSchema inputSchema, long requestId, int stageId) {
-    this(inputOperator, dataSchema, aggCalls, groupSet, inputSchema, AggregateOperator.Accumulator.MERGERS, requestId,
-        stageId);
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
+      DataSchema resultSchema, DataSchema inputSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet,
+      AggType aggType) {
+    this(context, inputOperator, resultSchema, inputSchema, aggCalls, groupSet, aggType,
+        new AbstractPlanNode.NodeHint());
   }
 
   @VisibleForTesting
-  AggregateOperator(MultiStageOperator inputOperator, DataSchema dataSchema, List<RexExpression> aggCalls,
-      List<RexExpression> groupSet, DataSchema inputSchema,
-      Map<String, Function<DataSchema.ColumnDataType, Merger>> mergers, long requestId, int stageId) {
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
+      DataSchema resultSchema, DataSchema inputSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet,
+      AggType aggType, AbstractPlanNode.NodeHint nodeHint) {
+    super(context);
     _inputOperator = inputOperator;
-    _groupSet = groupSet;
-    _upstreamErrorBlock = null;
-
-    // we expect all agg calls to be aggregate function calls
-    _aggCalls = aggCalls.stream().map(RexExpression.FunctionCall.class::cast).collect(Collectors.toList());
-
-    _accumulators = new Accumulator[_aggCalls.size()];
-    for (int i = 0; i < _aggCalls.size(); i++) {
-      RexExpression.FunctionCall agg = _aggCalls.get(i);
-      String functionName = agg.getFunctionName();
-      if (!mergers.containsKey(functionName)) {
-        throw new IllegalStateException("Unexpected value: " + functionName);
-      }
-      _accumulators[i] = new Accumulator(agg, mergers, functionName, inputSchema);
+    _resultSchema = resultSchema;
+    _inputSchema = inputSchema;
+    _aggType = aggType;
+    if (nodeHint != null && nodeHint._hintOptions != null
+        && nodeHint._hintOptions.get(PinotHintOptions.INTERNAL_AGG_OPTIONS) != null) {
+      _aggCallSignatureMap = LiteralHintUtils.hintStringToLiteralMap(nodeHint._hintOptions
+          .get(PinotHintOptions.INTERNAL_AGG_OPTIONS)
+          .get(PinotHintOptions.InternalAggregateOptions.AGG_CALL_SIGNATURE));
+    } else {
+      _aggCallSignatureMap = Collections.emptyMap();
     }
 
-    _groupByKeyHolder = new HashMap<>();
-    _resultSchema = dataSchema;
+    _upstreamErrorBlock = null;
     _readyToConstruct = false;
     _hasReturnedAggregateBlock = false;
-    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
+    _colNameToIndexMap = new HashMap<>();
+
+    // Convert groupSet to ExpressionContext that our aggregation functions understand.
+    List<ExpressionContext> groupByExpr = getGroupSet(groupSet);
+    List<FunctionContext> functionContexts = getFunctionContexts(aggCalls);
+    AggregationFunction[] aggFunctions = new AggregationFunction[functionContexts.size()];
+
+    for (int i = 0; i < functionContexts.size(); i++) {
+      aggFunctions[i] = AggregationFunctionFactory.getAggregationFunction(functionContexts.get(i), true);
+    }
+
+    // Initialize the appropriate executor.
+    if (!groupSet.isEmpty()) {
+      _isGroupByAggregation = true;
+      _groupByExecutor = new MultistageGroupByExecutor(groupByExpr, aggFunctions, aggType, _colNameToIndexMap,
+          _resultSchema);
+    } else {
+      _isGroupByAggregation = false;
+      _aggregationExecutor = new MultistageAggregationExecutor(aggFunctions, aggType, _colNameToIndexMap,
+          _resultSchema);
+    }
   }
 
   @Override
@@ -122,15 +153,11 @@ public class AggregateOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-    // TODO: move to close call;
-    _inputOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     try {
       if (!_readyToConstruct && !consumeInputBlocks()) {
         return TransferableBlockUtils.getNoOpTransferableBlock();
@@ -148,27 +175,21 @@ public class AggregateOperator extends MultiStageOperator {
       }
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
-    } finally {
-      _operatorStats.endTimer();
     }
   }
 
   private TransferableBlock produceAggregatedBlock() {
-    List<Object[]> rows = new ArrayList<>(_groupByKeyHolder.size());
-    for (Map.Entry<Key, Object[]> e : _groupByKeyHolder.entrySet()) {
-      Object[] row = new Object[_aggCalls.size() + _groupSet.size()];
-      Object[] keyElements = e.getValue();
-      System.arraycopy(keyElements, 0, row, 0, keyElements.length);
-      for (int i = 0; i < _accumulators.length; i++) {
-        row[i + _groupSet.size()] = _accumulators[i]._results.get(e.getKey());
-      }
-      rows.add(row);
-    }
+    List<Object[]> rows = _isGroupByAggregation ? _groupByExecutor.getResult() : _aggregationExecutor.getResult();
+
     _hasReturnedAggregateBlock = true;
     if (rows.size() == 0) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      if (!_isGroupByAggregation) {
+        Object[] row = _aggregationExecutor.constructEmptyAggResultRow();
+        return new TransferableBlock(Collections.singletonList(row), _resultSchema, DataBlock.Type.ROW);
+      } else {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      }
     } else {
-      _operatorStats.recordOutput(1, rows.size());
       return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
     }
   }
@@ -177,9 +198,7 @@ public class AggregateOperator extends MultiStageOperator {
    * @return whether or not the operator is ready to move on (EOS or ERROR)
    */
   private boolean consumeInputBlocks() {
-    _operatorStats.endTimer();
     TransferableBlock block = _inputOperator.nextBlock();
-    _operatorStats.startTimer();
     while (!block.isNoOpBlock()) {
       // setting upstream error block
       if (block.isErrorBlock()) {
@@ -190,167 +209,147 @@ public class AggregateOperator extends MultiStageOperator {
         return true;
       }
 
-      List<Object[]> container = block.getContainer();
-      for (Object[] row : container) {
-        Key key = extraRowKey(row, _groupSet);
-        _groupByKeyHolder.put(key, key.getValues());
-        for (int i = 0; i < _aggCalls.size(); i++) {
-          _accumulators[i].accumulate(key, row);
-        }
+      if (_isGroupByAggregation) {
+        _groupByExecutor.processBlock(block, _inputSchema);
+      } else {
+        _aggregationExecutor.processBlock(block, _inputSchema);
       }
-      _operatorStats.recordInput(1, container.size());
-      _operatorStats.endTimer();
+
       block = _inputOperator.nextBlock();
-      _operatorStats.startTimer();
     }
     return false;
   }
 
-  private static Key extraRowKey(Object[] row, List<RexExpression> groupSet) {
-    Object[] keyElements = new Object[groupSet.size()];
-    for (int i = 0; i < groupSet.size(); i++) {
-      keyElements[i] = row[((RexExpression.InputRef) groupSet.get(i)).getIndex()];
+  private List<FunctionContext> getFunctionContexts(List<RexExpression> aggCalls) {
+    List<RexExpression.FunctionCall> aggFunctionCalls =
+        aggCalls.stream().map(RexExpression.FunctionCall.class::cast).collect(Collectors.toList());
+    List<FunctionContext> functionContexts = new ArrayList<>();
+    for (int aggIdx = 0; aggIdx < aggFunctionCalls.size(); aggIdx++) {
+      RexExpression.FunctionCall functionCall = aggFunctionCalls.get(aggIdx);
+      FunctionContext funcContext = convertRexExpressionsToFunctionContext(aggIdx, functionCall);
+      functionContexts.add(funcContext);
     }
-    return new Key(keyElements);
+    return functionContexts;
   }
 
-  private static Object mergeSum(Object left, Object right) {
-    return ((Number) left).doubleValue() + ((Number) right).doubleValue();
-  }
+  private FunctionContext convertRexExpressionsToFunctionContext(int aggIdx,
+      RexExpression.FunctionCall aggFunctionCall) {
+    // Extract details from RexExpression aggFunctionCall.
+    String functionName = aggFunctionCall.getFunctionName();
+    List<RexExpression> functionOperands = aggFunctionCall.getFunctionOperands();
 
-  private static Object mergeMin(Object left, Object right) {
-    return Math.min(((Number) left).doubleValue(), ((Number) right).doubleValue());
-  }
-
-  private static Object mergeMax(Object left, Object right) {
-    return Math.max(((Number) left).doubleValue(), ((Number) right).doubleValue());
-  }
-
-  private static Object mergeCount(Object left, Object ignored) {
-    // TODO: COUNT(*) doesn't need to parse right object until we support NULL
-    return ((Number) left).doubleValue() + 1;
-  }
-
-  private static Boolean mergeBoolAnd(Object left, Object right) {
-    return ((Boolean) left) && ((Boolean) right);
-  }
-
-  private static Boolean mergeBoolOr(Object left, Object right) {
-    return ((Boolean) left) || ((Boolean) right);
-  }
-
-  // NOTE: the below two classes are needed depending on where the
-  // fourth moment is being executed - if the leaf stage gets a
-  // fourth moment pushed down to it, it will return a PinotFourthMoment
-  // as the result of the aggregation. If it is not possible (e.g. the
-  // input to the aggregate requires the result of a JOIN - such as
-  // FOURTHMOMENT(t1.a + t2.a)) then the input to the aggregate in the
-  // intermediate stage is a numeric.
-
-  private static class MergeFourthMomentNumeric implements Merger {
-
-    @Override
-    public Object merge(Object left, Object right) {
-      ((PinotFourthMoment) left).increment(((Number) right).doubleValue());
-      return left;
+    List<ExpressionContext> aggArguments = new ArrayList<>();
+    for (int argIdx = 0; argIdx < functionOperands.size(); argIdx++) {
+      RexExpression operand = functionOperands.get(argIdx);
+      ExpressionContext exprContext = convertRexExpressionToExpressionContext(aggIdx, argIdx, operand);
+      aggArguments.add(exprContext);
     }
 
-    @Override
-    public Object initialize(Object other) {
-      PinotFourthMoment moment = new PinotFourthMoment();
-      moment.increment(((Number) other).doubleValue());
-      return moment;
+    // add additional arguments for aggFunctionCall
+    if (_aggType.isInputIntermediateFormat()) {
+      rewriteAggArgumentForIntermediateInput(aggArguments, aggIdx);
     }
+    // This can only be true for COUNT aggregation functions on intermediate stage.
+    // The literal value here does not matter. We create a dummy literal here just so that the count aggregation
+    // has some column to process.
+    if (aggArguments.isEmpty()) {
+      aggArguments.add(ExpressionContext.forIdentifier("__PLACEHOLDER__"));
+    }
+
+    return new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, aggArguments);
   }
 
-  private static class MergeFourthMomentObject implements Merger {
-
-    @Override
-    public Object merge(Object left, Object right) {
-      PinotFourthMoment agg = (PinotFourthMoment) left;
-      agg.combine((PinotFourthMoment) right);
-      return agg;
-    }
-  }
-
-  interface Merger {
-    /**
-     * Initializes the merger based on the first input
-     */
-    default Object initialize(Object other) {
-      return other;
-    }
-
-    /**
-     * Merges the existing aggregate (the result of {@link #initialize(Object)}) with
-     * the new value coming in (which may be an aggregate in and of itself).
-     */
-    Object merge(Object agg, Object value);
-  }
-
-  private static class Accumulator {
-    private static final Map<String, Function<DataSchema.ColumnDataType, Merger>> MERGERS =
-        ImmutableMap.<String, Function<DataSchema.ColumnDataType, Merger>>builder()
-            .put("SUM", cdt -> AggregateOperator::mergeSum).put("$SUM", cdt -> AggregateOperator::mergeSum)
-            .put("$SUM0", cdt -> AggregateOperator::mergeSum).put("MIN", cdt -> AggregateOperator::mergeMin)
-            .put("$MIN", cdt -> AggregateOperator::mergeMin).put("$MIN0", cdt -> AggregateOperator::mergeMin)
-            .put("MAX", cdt -> AggregateOperator::mergeMax).put("$MAX", cdt -> AggregateOperator::mergeMax)
-            .put("$MAX0", cdt -> AggregateOperator::mergeMax).put("COUNT", cdt -> AggregateOperator::mergeCount)
-            .put("BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
-            .put("$BOOL_AND", cdt -> AggregateOperator::mergeBoolAnd)
-            .put("$BOOL_AND0", cdt -> AggregateOperator::mergeBoolAnd)
-            .put("BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
-            .put("$BOOL_OR", cdt -> AggregateOperator::mergeBoolOr)
-            .put("$BOOL_OR0", cdt -> AggregateOperator::mergeBoolOr).put("FOURTHMOMENT",
-                cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
-                    : new MergeFourthMomentNumeric()).put("$FOURTHMOMENT",
-                cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
-                    : new MergeFourthMomentNumeric()).put("$FOURTHMOMENT0",
-                cdt -> cdt == DataSchema.ColumnDataType.OBJECT ? new MergeFourthMomentObject()
-                    : new MergeFourthMomentNumeric()).build();
-
-    final int _inputRef;
-    final Object _literal;
-    final Map<Key, Object> _results = new HashMap<>();
-    final Merger _merger;
-
-    Accumulator(RexExpression.FunctionCall aggCall, Map<String, Function<DataSchema.ColumnDataType, Merger>> merger,
-        String functionName, DataSchema inputSchema) {
-      // agg function operand should either be a InputRef or a Literal
-      DataSchema.ColumnDataType dataType;
-      RexExpression rexExpression = toAggregationFunctionOperand(aggCall);
-      if (rexExpression instanceof RexExpression.InputRef) {
-        _inputRef = ((RexExpression.InputRef) rexExpression).getIndex();
-        _literal = null;
-        dataType = inputSchema.getColumnDataType(_inputRef);
-      } else {
-        _inputRef = -1;
-        _literal = ((RexExpression.Literal) rexExpression).getValue();
-        dataType = DataSchema.ColumnDataType.fromDataType(rexExpression.getDataType(), false);
-      }
-      _merger = merger.get(functionName).apply(dataType);
-    }
-
-    void accumulate(Key key, Object[] row) {
-      Map<Key, Object> keys = _results;
-
-      // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
-      Object currentRes = keys.get(key);
-      Object value = _inputRef == -1 ? _literal : row[_inputRef];
-
-      if (currentRes == null) {
-        keys.put(key, _merger.initialize(value));
-      } else {
-        Object mergedResult = _merger.merge(currentRes, value);
-        _results.put(key, mergedResult);
+  private void rewriteAggArgumentForIntermediateInput(List<ExpressionContext> aggArguments, int aggIdx) {
+    Map<Integer, Literal> aggCallSignature = _aggCallSignatureMap.get(aggIdx);
+    if (aggCallSignature != null && !aggCallSignature.isEmpty()) {
+      int argListSize = aggCallSignature.get(-1).getIntValue();
+      for (int argIdx = 1; argIdx < argListSize; argIdx++) {
+        Literal aggIdxLiteral = aggCallSignature.get(argIdx);
+        if (aggIdxLiteral != null) {
+          aggArguments.add(ExpressionContext.forLiteralContext(aggIdxLiteral));
+        } else {
+          aggArguments.add(ExpressionContext.forIdentifier("__PLACEHOLDER__"));
+        }
       }
     }
+  }
 
-    private RexExpression toAggregationFunctionOperand(RexExpression.FunctionCall rexExpression) {
-      List<RexExpression> functionOperands = rexExpression.getFunctionOperands();
-      Preconditions.checkState(functionOperands.size() < 2, "aggregate functions cannot have more than one operand");
-      return functionOperands.size() > 0 ? functionOperands.get(0)
-          : new RexExpression.Literal(FieldSpec.DataType.INT, 1);
+  private List<ExpressionContext> getGroupSet(List<RexExpression> groupBySetRexExpr) {
+    List<ExpressionContext> groupByExprContext = new ArrayList<>();
+    for (RexExpression groupByRexExpr : groupBySetRexExpr) {
+      ExpressionContext exprContext = convertRexExpressionToExpressionContext(-1, -1, groupByRexExpr);
+      groupByExprContext.add(exprContext);
     }
+
+    return groupByExprContext;
+  }
+
+  private ExpressionContext convertRexExpressionToExpressionContext(int aggIdx, int argIdx, RexExpression rexExpr) {
+    ExpressionContext exprContext;
+    if (_aggCallSignatureMap.get(aggIdx) != null && _aggCallSignatureMap.get(aggIdx).get(argIdx) != null) {
+      return ExpressionContext.forLiteralContext(_aggCallSignatureMap.get(aggIdx).get(argIdx));
+    }
+
+    // This is used only for aggregation arguments and groupby columns. The rexExpression can never be a function type.
+    switch (rexExpr.getKind()) {
+      case INPUT_REF: {
+        RexExpression.InputRef inputRef = (RexExpression.InputRef) rexExpr;
+        int identifierIndex = inputRef.getIndex();
+        String columnName = _inputSchema.getColumnName(identifierIndex);
+        // Calcite generates unique column names for aggregation functions. For example, select avg(col1), sum(col1)
+        // will generate names $f0 and $f1 for avg and sum respectively. We use a map to store the name -> index
+        // mapping to extract the required column value from row-based container and fetch the input datatype for the
+        // column.
+        _colNameToIndexMap.put(columnName, identifierIndex);
+        exprContext = ExpressionContext.forIdentifier(columnName);
+        break;
+      }
+      case LITERAL: {
+        RexExpression.Literal literalRexExp = (RexExpression.Literal) rexExpr;
+        Object value = literalRexExp.getValue();
+        exprContext = ExpressionContext.forLiteralContext(literalRexExp.getDataType(), value);
+        break;
+      }
+      default:
+        throw new IllegalStateException("Aggregation Function operands or GroupBy columns cannot be a function.");
+    }
+
+    return exprContext;
+  }
+
+  // TODO: If the previous block is not mailbox received, this method is not efficient.  Then getDataBlock() will
+  //  convert the unserialized format to serialized format of BaseDataBlock. Then it will convert it back to column
+  //  value primitive type.
+  static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggFunction,
+      TransferableBlock block, DataSchema inputDataSchema, Map<String, Integer> colNameToIndexMap) {
+    List<ExpressionContext> expressions = aggFunction.getInputExpressions();
+    int numExpressions = expressions.size();
+    if (numExpressions == 0) {
+      return Collections.emptyMap();
+    }
+
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    for (ExpressionContext expression : expressions) {
+      if (expression.getType().equals(ExpressionContext.Type.IDENTIFIER)
+          && !"__PLACEHOLDER__".equals(expression.getIdentifier())) {
+        int index = colNameToIndexMap.get(expression.getIdentifier());
+        DataSchema.ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
+        Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
+        blockValSetMap.put(expression, new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index));
+      }
+    }
+    return blockValSetMap;
+  }
+
+  static Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row,
+      Map<String, Integer> colNameToIndexMap) {
+    List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
+    ExpressionContext expr = expressions.get(0);
+    ExpressionContext.Type exprType = expr.getType();
+    if (exprType == ExpressionContext.Type.IDENTIFIER) {
+      return row[colNameToIndexMap.get(expr.getIdentifier())];
+    }
+    Preconditions.checkState(exprType == ExpressionContext.Type.LITERAL, "Unsupported expression type: %s", exprType);
+    return expr.getLiteral().getValue();
   }
 }

@@ -18,21 +18,22 @@
  */
 package org.apache.pinot.query.service;
 
-import io.grpc.Context;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import java.io.IOException;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,35 +43,49 @@ import org.slf4j.LoggerFactory;
  */
 public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryServer.class);
+  // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
+  // See https://github.com/apache/pinot/issues/10331
+  private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
 
-  private final Server _server;
+  private final int _port;
   private final QueryRunner _queryRunner;
+  // query submission service is only used for plan submission for now.
+  // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
+  //   directly return from submission response observer.
+  private final ExecutorService _querySubmissionExecutorService;
+
+  private Server _server = null;
 
   public QueryServer(int port, QueryRunner queryRunner) {
-    _server = ServerBuilder.forPort(port).addService(this).build();
+    _port = port;
     _queryRunner = queryRunner;
-
-    LOGGER.info("Initialized QueryWorker on port: {} with numWorkerThreads: {}", port,
-        ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    _querySubmissionExecutorService = Executors.newCachedThreadPool(
+        new NamedThreadFactory("query_submission_executor_on_" + _port + "_port"));
   }
 
   public void start() {
-    LOGGER.info("Starting QueryWorker");
+    LOGGER.info("Starting QueryServer");
     try {
+      if (_server == null) {
+        _server = ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+        LOGGER.info("Initialized QueryServer on port: {}", _port);
+      }
       _queryRunner.start();
       _server.start();
-    } catch (IOException | TimeoutException e) {
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
   public void shutdown() {
-    LOGGER.info("Shutting down QueryWorker");
+    LOGGER.info("Shutting down QueryServer");
     try {
       _queryRunner.shutDown();
-      _server.shutdown();
-      _server.awaitTermination();
-    } catch (InterruptedException | TimeoutException e) {
+      if (_server != null) {
+        _server.shutdown();
+        _server.awaitTermination();
+      }
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
@@ -78,36 +93,40 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
     // Deserialize the request
-    DistributedStagePlan distributedStagePlan;
+    List<DistributedStagePlan> distributedStagePlans;
     Map<String, String> requestMetadataMap;
+    requestMetadataMap = request.getMetadataMap();
+    long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
     try {
-      distributedStagePlan = QueryPlanSerDeUtils.deserialize(request.getStagePlan());
-      requestMetadataMap = request.getMetadataMap();
+      distributedStagePlans = QueryPlanSerDeUtils.deserializeStagePlan(request);
     } catch (Exception e) {
-      LOGGER.error("Caught exception while deserializing the request: {}", request, e);
+      LOGGER.error("Caught exception while deserializing the request: {}", requestId, e);
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
     }
-
-    // return dispatch successful.
-    // TODO: return meaningful value here.
+    // TODO: allow thrown exception to return back to broker in asynchronous manner.
+    distributedStagePlans.forEach(distributedStagePlan -> _querySubmissionExecutorService.submit(() -> {
+          try {
+            _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+          } catch (Throwable t) {
+            LOGGER.error("Caught exception while compiling opChain for request: {}, stage: {}", requestId,
+                distributedStagePlan.getStageId(), t);
+          }
+        })
+    );
     responseObserver.onNext(Worker.QueryResponse.newBuilder()
         .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
     responseObserver.onCompleted();
+  }
 
-    // start a new GRPC ctx has all the values as the current context, but won't be cancelled
-    Context ctx = Context.current().fork();
-    // Set ctx as the current context within the Runnable can start asynchronous work here that will not
-    // be cancelled when submit returns
-    ctx.run(() -> {
-      // Process the query
-      try {
-        // TODO: break this into parsing and execution, so that responseObserver can return upon parsing complete.
-        _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while processing request", e);
-        throw new RuntimeException(e);
-      }
-    });
+  @Override
+  public void cancel(Worker.CancelRequest request, StreamObserver<Worker.CancelResponse> responseObserver) {
+    try {
+      _queryRunner.cancel(request.getRequestId());
+    } catch (Throwable t) {
+      LOGGER.error("Caught exception while cancelling opChain for request: {}", request.getRequestId(), t);
+    }
+    // we always return completed even if cancel attempt fails, server will self clean up in this case.
+    responseObserver.onCompleted();
   }
 }

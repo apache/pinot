@@ -38,6 +38,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -228,9 +229,11 @@ public class SegmentDeletionManagerTest {
     tempDir.deleteOnExit();
     FakeDeletionManager deletionManager = new FakeDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, propertyStore, 7);
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
 
     // Test delete when deleted segments directory does not exists
-    deletionManager.removeAgedDeletedSegments();
+    deletionManager.removeAgedDeletedSegments(leadControllerManager);
 
     // Create deleted directory
     String deletedDirectoryPath = tempDir + File.separator + "Deleted_Segments";
@@ -238,7 +241,7 @@ public class SegmentDeletionManagerTest {
     deletedDirectory.mkdir();
 
     // Test delete when deleted segments directory is empty
-    deletionManager.removeAgedDeletedSegments();
+    deletionManager.removeAgedDeletedSegments(leadControllerManager);
 
     // Create dummy directories and files
     File dummyDir1 = new File(deletedDirectoryPath + File.separator + "dummy1");
@@ -249,7 +252,7 @@ public class SegmentDeletionManagerTest {
     dummyDir3.mkdir();
 
     // Test delete when there is no files but some directories exist
-    deletionManager.removeAgedDeletedSegments();
+    deletionManager.removeAgedDeletedSegments(leadControllerManager);
     Assert.assertEquals(dummyDir1.exists(), false);
     Assert.assertEquals(dummyDir2.exists(), false);
     Assert.assertEquals(dummyDir3.exists(), false);
@@ -279,7 +282,7 @@ public class SegmentDeletionManagerTest {
     Assert.assertEquals(dummyDir3.list().length, 3);
 
     // Try to remove files with the retention of 1 days.
-    deletionManager.removeAgedDeletedSegments();
+    deletionManager.removeAgedDeletedSegments(leadControllerManager);
 
     // Check that only 1 day retention file is remaining
     Assert.assertEquals(dummyDir1.list().length, 1);

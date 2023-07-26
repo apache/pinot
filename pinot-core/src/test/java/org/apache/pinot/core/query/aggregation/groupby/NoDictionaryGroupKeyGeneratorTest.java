@@ -31,10 +31,10 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.plan.TransformPlanNode;
+import org.apache.pinot.core.plan.ProjectPlanNode;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -96,8 +96,8 @@ public class NoDictionaryGroupKeyGeneratorTest {
 
   private final String[][] _stringValues = new String[NUM_UNIQUE_RECORDS][NUM_COLUMNS];
   private IndexSegment _indexSegment;
-  private TransformOperator _transformOperator;
-  private TransformBlock _transformBlock;
+  private BaseProjectOperator<?> _projectOperator;
+  private ValueBlock _valueBlock;
 
   @BeforeClass
   public void setUp()
@@ -154,10 +154,10 @@ public class NoDictionaryGroupKeyGeneratorTest {
     for (String column : COLUMNS) {
       expressions.add(ExpressionContext.forIdentifier(column));
     }
-    TransformPlanNode transformPlanNode =
-        new TransformPlanNode(_indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-    _transformOperator = transformPlanNode.run();
-    _transformBlock = _transformOperator.nextBlock();
+    ProjectPlanNode projectPlanNode =
+        new ProjectPlanNode(_indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    _projectOperator = projectPlanNode.run();
+    _valueBlock = _projectOperator.nextBlock();
   }
 
   /**
@@ -197,7 +197,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     int numGroupByColumns = groupByColumnIndexes.length;
     GroupKeyGenerator groupKeyGenerator;
     if (numGroupByColumns == 1) {
-      groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(_transformOperator,
+      groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(_projectOperator,
           ExpressionContext.forIdentifier(COLUMNS.get(groupByColumnIndexes[0])),
           InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false);
     } else {
@@ -205,10 +205,10 @@ public class NoDictionaryGroupKeyGeneratorTest {
       for (int i = 0; i < numGroupByColumns; i++) {
         groupByExpressions[i] = ExpressionContext.forIdentifier(COLUMNS.get(groupByColumnIndexes[i]));
       }
-      groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(_transformOperator, groupByExpressions,
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+      groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(_projectOperator, groupByExpressions,
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false);
     }
-    groupKeyGenerator.generateKeysForBlock(_transformBlock, new int[NUM_RECORDS]);
+    groupKeyGenerator.generateKeysForBlock(_valueBlock, new int[NUM_RECORDS]);
 
     // Assert total number of group keys is as expected
     Set<String> expectedGroupKeys = getExpectedGroupKeys(groupByColumnIndexes);

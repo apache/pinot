@@ -18,15 +18,18 @@
  */
 package org.apache.pinot.controller.api.events;
 
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public class DefaultMetadataEventNotifierFactory extends MetadataEventNotifierFactory {
 
-  public MetadataEventNotifier create() {
-    return new DefaultMetadataEventNotifier();
+  @Override
+  public void init(PinotConfiguration configuration, PinotHelixResourceManager pinotHelixResourceManager) {
   }
 
-  public void init(PinotConfiguration configuration) {
+  @Override
+  public MetadataEventNotifier create() {
+    return new DefaultMetadataEventNotifier();
   }
 }

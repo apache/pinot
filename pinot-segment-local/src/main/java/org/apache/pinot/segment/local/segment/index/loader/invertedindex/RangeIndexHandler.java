@@ -18,25 +18,30 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
-import java.io.IOException;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
-import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.creator.RangeIndexCreatorProvider;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.RangeIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,19 +51,24 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(RangeIndexHandler.class);
 
   private final Set<String> _columnsToAddIdx;
-  private final int _rangeIndexVersion;
 
+  @VisibleForTesting
   public RangeIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
     super(segmentDirectory, indexLoadingConfig);
     _columnsToAddIdx = indexLoadingConfig.getRangeIndexColumns();
-    _rangeIndexVersion = indexLoadingConfig.getRangeIndexVersion();
+  }
+
+  public RangeIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
+      @Nullable TableConfig tableConfig) {
+    super(segmentDirectory, fieldIndexConfigs, tableConfig);
+    _columnsToAddIdx = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.range(), _fieldIndexConfigs);
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
-    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.range());
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
@@ -78,23 +88,23 @@ public class RangeIndexHandler extends BaseIndexHandler {
   }
 
   @Override
-  public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
-      throws IOException {
+  public void updateIndices(SegmentDirectory.Writer segmentWriter)
+      throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
-    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.RANGE_INDEX);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.range());
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing range index from segment: {}, column: {}", segmentName, column);
-        segmentWriter.removeIndex(column, ColumnIndexType.RANGE_INDEX);
+        segmentWriter.removeIndex(column, StandardIndexes.range());
         LOGGER.info("Removed existing range index from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateRangeIndex(columnMetadata)) {
-        createRangeIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider, indexCreatorProvider);
+        createRangeIndexForColumn(segmentWriter, columnMetadata);
       }
     }
   }
@@ -104,9 +114,8 @@ public class RangeIndexHandler extends BaseIndexHandler {
     return columnMetadata != null && !columnMetadata.isSorted();
   }
 
-  private void createRangeIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      RangeIndexCreatorProvider rangeIndexCreatorProvider, IndexCreatorProvider indexCreatorProvider)
-      throws IOException {
+  private void createRangeIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
+      throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
@@ -125,19 +134,19 @@ public class RangeIndexHandler extends BaseIndexHandler {
     }
 
     // Create a temporary forward index if it is disabled and does not exist
-    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, indexCreatorProvider, true);
+    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
 
     // Create new range index for the column.
     LOGGER.info("Creating new range index for segment: {}, column: {}", segmentName, columnName);
     if (columnMetadata.hasDictionary()) {
-      handleDictionaryBasedColumn(segmentWriter, columnMetadata, rangeIndexCreatorProvider);
+      handleDictionaryBasedColumn(segmentWriter, columnMetadata);
     } else {
-      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata, rangeIndexCreatorProvider);
+      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata);
     }
 
     // For v3, write the generated range index file into the single file and remove it.
     if (_segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3) {
-      LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, rangeIndexFile, ColumnIndexType.RANGE_INDEX);
+      LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, rangeIndexFile, StandardIndexes.range());
     }
 
     // Delete the marker file.
@@ -146,13 +155,12 @@ public class RangeIndexHandler extends BaseIndexHandler {
     LOGGER.info("Created range index for segment: {}, column: {}", segmentName, columnName);
   }
 
-  private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      RangeIndexCreatorProvider indexCreatorProvider)
-      throws IOException {
+  private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
+      throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata, indexCreatorProvider)) {
+        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
       if (columnMetadata.isSingleValue()) {
         // Single-value column
         for (int i = 0; i < numDocs; i++) {
@@ -170,13 +178,12 @@ public class RangeIndexHandler extends BaseIndexHandler {
     }
   }
 
-  private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      RangeIndexCreatorProvider indexCreatorProvider)
-      throws IOException {
+  private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
+      throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
+    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata, indexCreatorProvider)) {
+        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
       if (columnMetadata.isSingleValue()) {
         // Single-value column.
         switch (columnMetadata.getDataType()) {
@@ -243,12 +250,15 @@ public class RangeIndexHandler extends BaseIndexHandler {
     }
   }
 
-  private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata,
-      RangeIndexCreatorProvider indexCreatorProvider)
-      throws IOException {
+  private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata)
+      throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
-    return indexCreatorProvider.newRangeIndexCreator(
-        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build()
-            .forRangeIndex(_rangeIndexVersion));
+    IndexCreationContext context = IndexCreationContext.builder()
+        .withIndexDir(indexDir)
+        .withColumnMetadata(columnMetadata)
+        .build();
+    RangeIndexConfig config = _fieldIndexConfigs.get(columnMetadata.getColumnName())
+        .getConfig(StandardIndexes.range());
+    return StandardIndexes.range().createIndexCreator(context, config);
   }
 }

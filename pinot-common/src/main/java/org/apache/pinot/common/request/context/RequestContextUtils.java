@@ -25,6 +25,7 @@ import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNotNullPredicate;
@@ -89,11 +90,6 @@ public class RequestContextUtils {
       List<ExpressionContext> arguments = new ArrayList<>(operands.size());
       for (Expression operand : operands) {
         arguments.add(getExpression(operand));
-      }
-      // TODO(walterddr): a work-around for multi-stage query engine which might pass COUNT without argument, and
-      //  should be removed once that issue is fixed.
-      if (arguments.isEmpty() && functionName.equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-        arguments.add(ExpressionContext.forIdentifier("*"));
       }
       return new FunctionContext(functionType, functionName, arguments);
     } else {
@@ -230,6 +226,9 @@ public class RequestContextUtils {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
+    if (thriftExpression.getLiteral().getSetField() == Literal._Fields.NULL_VALUE) {
+      return "null";
+    }
     return thriftExpression.getLiteral().getFieldValue().toString();
   }
 
@@ -356,6 +355,6 @@ public class RequestContextUtils {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
-    return expressionContext.getLiteralString();
+    return expressionContext.getLiteral().getStringValue();
   }
 }

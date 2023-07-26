@@ -19,12 +19,9 @@
 package org.apache.pinot.core.operator.docvalsets;
 
 import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
@@ -42,51 +39,26 @@ import org.roaringbitmap.RoaringBitmap;
  * <p>Caller is responsible for calling the correct method based on the data source metadata for the block value set.
  */
 public class TransformBlockValSet implements BlockValSet {
-  private final ProjectionBlock _projectionBlock;
+  private final ValueBlock _valueBlock;
   private final TransformFunction _transformFunction;
-  private final ExpressionContext _expression;
 
   private boolean _nullBitmapSet;
   private RoaringBitmap _nullBitmap;
 
   private int[] _numMVEntries;
 
-  public TransformBlockValSet(ProjectionBlock projectionBlock, TransformFunction transformFunction,
-      ExpressionContext expression) {
-    _projectionBlock = projectionBlock;
+  public TransformBlockValSet(ValueBlock valueBlock, TransformFunction transformFunction) {
+    _valueBlock = valueBlock;
     _transformFunction = transformFunction;
-    _expression = expression;
   }
 
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap() {
     if (!_nullBitmapSet) {
-      RoaringBitmap nullBitmap = null;
-      if (_expression.getType() == ExpressionContext.Type.FUNCTION) {
-        Set<String> columns = new HashSet<>();
-        _expression.getFunction().getColumns(columns);
-        for (String column : columns) {
-          BlockValSet blockValSet = _projectionBlock.getBlockValueSet(column);
-          RoaringBitmap columnNullBitmap = blockValSet.getNullBitmap();
-          if (columnNullBitmap != null) {
-            if (nullBitmap == null) {
-              nullBitmap = columnNullBitmap.clone();
-            }
-            nullBitmap.or(columnNullBitmap);
-          }
-        }
-      }
-      _nullBitmap = nullBitmap;
+      _nullBitmap = _transformFunction.getNullBitmap(_valueBlock);
       _nullBitmapSet = true;
     }
-
-    // The assumption is that any transformation applied to null values will result in null values.
-    // Examples:
-    //  CAST(null as STRING) -> null. This is similar to Presto behaviour.
-    //  YEAR(null) -> null. This is similar to Presto behaviour.
-    // TODO(nhejazi): revisit this part in the future because some transform functions can take null input and return
-    //  non-null result (e.g. isNull()), and we should move this logic into the specific transform function.
     return _nullBitmap;
   }
 
@@ -110,7 +82,7 @@ public class TransformBlockValSet implements BlockValSet {
   public int[] getDictionaryIdsSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, true);
-      return _transformFunction.transformToDictIdsSV(_projectionBlock);
+      return _transformFunction.transformToDictIdsSV(_valueBlock);
     }
   }
 
@@ -118,7 +90,7 @@ public class TransformBlockValSet implements BlockValSet {
   public int[] getIntValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, true);
-      return _transformFunction.transformToIntValuesSV(_projectionBlock);
+      return _transformFunction.transformToIntValuesSV(_valueBlock);
     }
   }
 
@@ -126,7 +98,7 @@ public class TransformBlockValSet implements BlockValSet {
   public long[] getLongValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.LONG, true);
-      return _transformFunction.transformToLongValuesSV(_projectionBlock);
+      return _transformFunction.transformToLongValuesSV(_valueBlock);
     }
   }
 
@@ -134,7 +106,7 @@ public class TransformBlockValSet implements BlockValSet {
   public float[] getFloatValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.FLOAT, true);
-      return _transformFunction.transformToFloatValuesSV(_projectionBlock);
+      return _transformFunction.transformToFloatValuesSV(_valueBlock);
     }
   }
 
@@ -142,7 +114,7 @@ public class TransformBlockValSet implements BlockValSet {
   public double[] getDoubleValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.DOUBLE, true);
-      return _transformFunction.transformToDoubleValuesSV(_projectionBlock);
+      return _transformFunction.transformToDoubleValuesSV(_valueBlock);
     }
   }
 
@@ -150,7 +122,7 @@ public class TransformBlockValSet implements BlockValSet {
   public BigDecimal[] getBigDecimalValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.BIG_DECIMAL, true);
-      return _transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+      return _transformFunction.transformToBigDecimalValuesSV(_valueBlock);
     }
   }
 
@@ -158,7 +130,7 @@ public class TransformBlockValSet implements BlockValSet {
   public String[] getStringValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.STRING, true);
-      return _transformFunction.transformToStringValuesSV(_projectionBlock);
+      return _transformFunction.transformToStringValuesSV(_valueBlock);
     }
   }
 
@@ -166,7 +138,7 @@ public class TransformBlockValSet implements BlockValSet {
   public byte[][] getBytesValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.BYTES, true);
-      return _transformFunction.transformToBytesValuesSV(_projectionBlock);
+      return _transformFunction.transformToBytesValuesSV(_valueBlock);
     }
   }
 
@@ -174,7 +146,7 @@ public class TransformBlockValSet implements BlockValSet {
   public int[][] getDictionaryIdsMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, false);
-      return _transformFunction.transformToDictIdsMV(_projectionBlock);
+      return _transformFunction.transformToDictIdsMV(_valueBlock);
     }
   }
 
@@ -182,7 +154,7 @@ public class TransformBlockValSet implements BlockValSet {
   public int[][] getIntValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.INT, false);
-      return _transformFunction.transformToIntValuesMV(_projectionBlock);
+      return _transformFunction.transformToIntValuesMV(_valueBlock);
     }
   }
 
@@ -190,7 +162,7 @@ public class TransformBlockValSet implements BlockValSet {
   public long[][] getLongValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.LONG, false);
-      return _transformFunction.transformToLongValuesMV(_projectionBlock);
+      return _transformFunction.transformToLongValuesMV(_valueBlock);
     }
   }
 
@@ -198,7 +170,7 @@ public class TransformBlockValSet implements BlockValSet {
   public float[][] getFloatValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.FLOAT, false);
-      return _transformFunction.transformToFloatValuesMV(_projectionBlock);
+      return _transformFunction.transformToFloatValuesMV(_valueBlock);
     }
   }
 
@@ -206,7 +178,7 @@ public class TransformBlockValSet implements BlockValSet {
   public double[][] getDoubleValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.DOUBLE, false);
-      return _transformFunction.transformToDoubleValuesMV(_projectionBlock);
+      return _transformFunction.transformToDoubleValuesMV(_valueBlock);
     }
   }
 
@@ -214,7 +186,7 @@ public class TransformBlockValSet implements BlockValSet {
   public String[][] getStringValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.STRING, false);
-      return _transformFunction.transformToStringValuesMV(_projectionBlock);
+      return _transformFunction.transformToStringValuesMV(_valueBlock);
     }
   }
 
@@ -222,7 +194,7 @@ public class TransformBlockValSet implements BlockValSet {
   public byte[][][] getBytesValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.BYTES, false);
-      return _transformFunction.transformToBytesValuesMV(_projectionBlock);
+      return _transformFunction.transformToBytesValuesMV(_valueBlock);
     }
   }
 
@@ -231,7 +203,7 @@ public class TransformBlockValSet implements BlockValSet {
     if (_numMVEntries == null) {
       _numMVEntries = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
-    int numDocs = _projectionBlock.getNumDocs();
+    int numDocs = _valueBlock.getNumDocs();
     TransformResultMetadata resultMetadata = _transformFunction.getResultMetadata();
     if (resultMetadata.hasDictionary()) {
       int[][] dictionaryIds = getDictionaryIdsMV();
@@ -279,7 +251,7 @@ public class TransformBlockValSet implements BlockValSet {
 
   private void recordTransformValues(InvocationRecording recording, DataType dataType, boolean singleValue) {
     if (recording.isEnabled()) {
-      int numDocs = _projectionBlock.getNumDocs();
+      int numDocs = _valueBlock.getNumDocs();
       recording.setNumDocsScanned(numDocs);
       recording.setFunctionName(_transformFunction.getName());
       recording.setOutputDataType(dataType, singleValue);

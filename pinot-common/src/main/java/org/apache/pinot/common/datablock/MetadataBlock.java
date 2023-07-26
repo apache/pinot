@@ -26,6 +26,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
 
 
 /**
@@ -76,15 +78,17 @@ public class MetadataBlock extends BaseDataBlock {
   static class Contents {
 
     private String _type;
+    private Map<String, String> _stats;
 
     @JsonCreator
-    public Contents(@JsonProperty("type") String type) {
+    public Contents(@JsonProperty("type") String type, @JsonProperty("stats") Map<String, String> stats) {
       _type = type;
+      _stats = stats;
     }
 
     @JsonCreator
     public Contents() {
-      _type = null;
+      this(null, new HashMap<>());
     }
 
     public String getType() {
@@ -94,13 +98,25 @@ public class MetadataBlock extends BaseDataBlock {
     public void setType(String type) {
       _type = type;
     }
+
+    public Map<String, String> getStats() {
+      return _stats;
+    }
+
+    public void setStats(Map<String, String> stats) {
+      _stats = stats;
+    }
   }
 
   private final Contents _contents;
 
   public MetadataBlock(MetadataBlockType type) {
-    super(0, null, new String[0], new byte[]{0}, toContents(new Contents(type.name())));
-    _contents = new Contents(type.name());
+    this(type, new HashMap<>());
+  }
+
+  public MetadataBlock(MetadataBlockType type, Map<String, String> stats) {
+    super(0, null, new String[0], new byte[]{0}, toContents(new Contents(type.name(), stats)));
+    _contents = new Contents(type.name(), stats);
   }
 
   private static byte[] toContents(Contents type) {
@@ -114,7 +130,7 @@ public class MetadataBlock extends BaseDataBlock {
   public MetadataBlock(ByteBuffer byteBuffer)
       throws IOException {
     super(byteBuffer);
-    if (_variableSizeDataBytes != null) {
+    if (_variableSizeDataBytes != null && _variableSizeDataBytes.length > 0) {
       _contents = JSON.readValue(_variableSizeDataBytes, Contents.class);
     } else {
       _contents = new Contents();
@@ -130,6 +146,10 @@ public class MetadataBlock extends BaseDataBlock {
     return type == null
         ? (getExceptions().isEmpty() ? MetadataBlockType.EOS : MetadataBlockType.ERROR)
         : MetadataBlockType.valueOf(type);
+  }
+
+  public Map<String, String> getStats() {
+    return _contents.getStats() != null ? _contents.getStats() : new HashMap<>();
   }
 
   @Override

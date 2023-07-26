@@ -37,12 +37,14 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FSTType;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.LoggerFactory;
@@ -64,6 +66,34 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final StandardAnalyzer _standardAnalyzer;
   private boolean _useANDForMultiTermQueries = false;
 
+  public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
+    _column = column;
+    try {
+      File indexFile = getTextIndexFile(indexDir);
+      _indexDirectory = FSDirectory.open(indexFile.toPath());
+      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexSearcher = new IndexSearcher(_indexReader);
+      if (!config.isEnableQueryCache()) {
+        // Disable Lucene query result cache. While it helps a lot with performance for
+        // repeated queries, on the downside it cause heap issues.
+        _indexSearcher.setQueryCache(null);
+      }
+      if (config.isUseANDForMultiTermQueries()) {
+        _useANDForMultiTermQueries = true;
+      }
+      // TODO: consider using a threshold of num docs per segment to decide between building
+      // mapping file upfront on segment load v/s on-the-fly during query processing
+      _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
+      _standardAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
+          config.getStopWordsInclude(), config.getStopWordsExclude()
+      );
+    } catch (Exception e) {
+      LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
+          e.getMessage());
+      throw new RuntimeException(e);
+    }
+  }
+
   /**
    * As part of loading the segment in ImmutableSegmentLoader,
    * we load the text index (per column if it exists) and store
@@ -75,34 +105,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
    */
   public LuceneTextIndexReader(String column, File indexDir, int numDocs,
       @Nullable Map<String, String> textIndexProperties) {
-    _column = column;
-    try {
-      File indexFile = getTextIndexFile(indexDir);
-      _indexDirectory = FSDirectory.open(indexFile.toPath());
-      _indexReader = DirectoryReader.open(_indexDirectory);
-      _indexSearcher = new IndexSearcher(_indexReader);
-      if (textIndexProperties == null || !Boolean
-          .parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_ENABLE_QUERY_CACHE))) {
-        // Disable Lucene query result cache. While it helps a lot with performance for
-        // repeated queries, on the downside it cause heap issues.
-        _indexSearcher.setQueryCache(null);
-      }
-      if (textIndexProperties != null && Boolean
-          .parseBoolean(textIndexProperties.get(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES))) {
-        _useANDForMultiTermQueries = true;
-      }
-      // TODO: consider using a threshold of num docs per segment to decide between building
-      // mapping file upfront on segment load v/s on-the-fly during query processing
-      _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
-      _standardAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
-          TextIndexUtils.extractStopWordsInclude(textIndexProperties),
-          TextIndexUtils.extractStopWordsExclude(textIndexProperties)
-      );
-    } catch (Exception e) {
-      LOGGER
-          .error("Failed to instantiate Lucene text index reader for column {}, exception {}", column, e.getMessage());
-      throw new RuntimeException(e);
-    }
+    this(column, indexDir, numDocs, new TextIndexConfigBuilder(FSTType.LUCENE)
+        .withProperties(textIndexProperties)
+        .build());
   }
 
   /**

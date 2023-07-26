@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import java.io.Closeable;
+import org.apache.pinot.segment.spi.index.IndexReader;
 
 
 /**
  * Interface for bloom filter reader.
  */
-public interface BloomFilterReader extends Closeable {
+public interface BloomFilterReader extends IndexReader {
 
   /**
    * Returns {@code true} if the given value might have been put in this bloom filer, {@code false} otherwise.

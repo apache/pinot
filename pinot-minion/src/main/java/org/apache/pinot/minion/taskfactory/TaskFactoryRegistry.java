@@ -58,6 +58,18 @@ import org.slf4j.MDC;
  */
 public class TaskFactoryRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(TaskFactoryRegistry.class);
+  // we use 1000 as the limit for the following reasons:
+  // 1. Task results reported (inlcudeing info messages) here will be saved into znode
+  //    (<pinot cluster name>/PROPERTYSTORE/TaskRebalancer/<Helix job name>), which has a default limit of 1M.
+  //    Since tasks belonging to the same helix job will be saved in the same znode, info messages cannot be too long,
+  //    Otherwise, the znode may be too large, causing communication issue between zookeeper clients and zookeeper,
+  //    which results in instance crash and znode not updatable.
+  // 2. Info messages stored in znode are fetched by minion task APIs (/tasks/{taskType}/debug, /tasks/{taskType}/debug,
+  //    /tasks/task/{taskName}/debug) for debugging purpose, so the info must contain enough info.
+  // 1000 is a reasonable choice, because with this length, the info message will contain relatively rich info for
+  // debugging. At the same time, with znode compressed, the helix job znode can hold ~1000 helix tasks (1M/1000=1000),
+  // which is enough in most use cases.
+  private static final int MAX_TASK_RESULT_INFO_LEN = 1000;
 
   private final Map<String, TaskFactory> _taskFactoryRegistry = new HashMap<>();
 
@@ -94,22 +106,26 @@ public class TaskFactoryRegistry {
                 PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(_taskConfig);
                 tableName = pinotTaskConfig.getTableName();
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS, 1L);
                 if (tableName != null) {
                   _minionMetrics
                       .addTimedTableValue(tableName, taskType, MinionTimer.TASK_QUEUEING,
                           jobDequeueTimeMs - jobInQueueTimeMs, TimeUnit.MILLISECONDS);
                   _minionMetrics.addValueToTableGauge(tableName, MinionGauge.NUMBER_OF_TASKS, 1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS, 1L);
                 }
                 MinionEventObservers.getInstance().addMinionEventObserver(_taskConfig.getId(), _eventObserver);
                 return runInternal(pinotTaskConfig);
               } finally {
                 MinionEventObservers.getInstance().removeMinionEventObserver(_taskConfig.getId());
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS, -1L);
                 long executionTimeMs = System.currentTimeMillis() - jobDequeueTimeMs;
                 _minionMetrics
                     .addTimedValue(taskType, MinionTimer.TASK_EXECUTION, executionTimeMs, TimeUnit.MILLISECONDS);
                 if (tableName != null) {
                   _minionMetrics.addValueToTableGauge(tableName, MinionGauge.NUMBER_OF_TASKS, -1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS, -1L);
                   _minionMetrics
                       .addTimedTableValue(tableName, taskType, MinionTimer.TASK_EXECUTION,
                           executionTimeMs, TimeUnit.MILLISECONDS);
@@ -155,7 +171,7 @@ public class TaskFactoryRegistry {
                       MinionMeter.NUMBER_TASKS_CANCELLED, 1L);
                 }
                 LOGGER.info("Task: {} got cancelled", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.CANCELED, ExceptionUtils.getStackTrace(e));
+                return new TaskResult(TaskResult.Status.CANCELED, extractAndTrimRootCauseMessage(e));
               } catch (FatalException e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
                 _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
@@ -164,7 +180,7 @@ public class TaskFactoryRegistry {
                       MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
                 }
                 LOGGER.error("Caught fatal exception while executing task: {}", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.FATAL_FAILED, ExceptionUtils.getStackTrace(e));
+                return new TaskResult(TaskResult.Status.FATAL_FAILED, extractAndTrimRootCauseMessage(e));
               } catch (Exception e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
                 _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_FAILED, 1L);
@@ -173,7 +189,7 @@ public class TaskFactoryRegistry {
                       MinionMeter.NUMBER_TASKS_FAILED, 1L);
                 }
                 LOGGER.error("Caught exception while executing task: {}", _taskConfig.getId(), e);
-                return new TaskResult(TaskResult.Status.FAILED, ExceptionUtils.getStackTrace(e));
+                return new TaskResult(TaskResult.Status.FAILED, extractAndTrimRootCauseMessage(e));
               }
             }
 
@@ -189,6 +205,14 @@ public class TaskFactoryRegistry {
       };
       _taskFactoryRegistry.put(taskType, taskFactory);
     }
+  }
+
+  private static String extractAndTrimRootCauseMessage(Throwable th) {
+    String rootCauseMessage = ExceptionUtils.getStackTrace(th);
+    if (rootCauseMessage != null && rootCauseMessage.length() > MAX_TASK_RESULT_INFO_LEN) {
+      return rootCauseMessage.substring(0, MAX_TASK_RESULT_INFO_LEN);
+    }
+    return rootCauseMessage;
   }
 
   /**

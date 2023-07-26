@@ -19,7 +19,6 @@
 
 package org.apache.pinot.core.query.reduce.function;
 
-import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -33,13 +32,11 @@ public class InternalReduceFunctions {
   private InternalReduceFunctions() {
   }
 
-  @ScalarFunction
-  public static double skewnessReduce(PinotFourthMoment fourthMoment) {
-    return fourthMoment.skew();
-  }
-
-  @ScalarFunction
-  public static double kurtosisReduce(PinotFourthMoment fourthMoment) {
-    return fourthMoment.kurtosis();
+  @ScalarFunction(nullableParameters = true)
+  public static Double avgReduce(Double intermediateResultSum, Long intermediateResultCount) {
+    if (intermediateResultCount == null || intermediateResultCount == 0L || intermediateResultSum == null) {
+      return null;
+    }
+    return intermediateResultSum / intermediateResultCount;
   }
 }

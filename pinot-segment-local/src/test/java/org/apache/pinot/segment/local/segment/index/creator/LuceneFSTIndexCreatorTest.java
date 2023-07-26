@@ -25,6 +25,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -56,7 +58,9 @@ public class LuceneFSTIndexCreatorTest {
     uniqueValues[1] = "hello-world123";
     uniqueValues[2] = "still";
 
-    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", uniqueValues);
+    FieldSpec fieldSpec = new DimensionFieldSpec("testFSTColumn", FieldSpec.DataType.STRING, true);
+    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(
+        INDEX_DIR, "testFSTColumn", uniqueValues);
     creator.seal();
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + FST_INDEX_FILE_EXTENSION);
     PinotDataBuffer pinotDataBuffer =

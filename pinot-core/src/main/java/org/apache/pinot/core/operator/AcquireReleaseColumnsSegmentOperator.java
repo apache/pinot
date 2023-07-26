@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator;
 
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.plan.PlanNode;
@@ -54,12 +55,16 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
     _fetchContext = fetchContext;
   }
 
+  public void materializeChildOperator() {
+    _childOperator = (Operator<BaseResultsBlock>) _planNode.run();
+  }
+
   /**
    * Runs the planNode to get the childOperator, and then proceeds with execution.
    */
   @Override
   protected BaseResultsBlock getNextBlock() {
-    _childOperator = (Operator<BaseResultsBlock>) _planNode.run();
+    materializeChildOperator();
     return _childOperator.nextBlock();
   }
 
@@ -69,7 +74,7 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
   public void acquire() {
     // do not acquire if interrupted (similar to the check inside the nextBlock())
     if (Thread.interrupted()) {
-      throw new EarlyTerminationException();
+      throw new EarlyTerminationException("Interrupted while acquiring segment");
     }
     _indexSegment.acquire(_fetchContext);
   }
@@ -81,6 +86,11 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
     _indexSegment.release(_fetchContext);
   }
 
+  @Override
+  public void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
+    acquire();
+    materializeChildOperator();
+  }
 
   @Override
   public String toExplainString() {

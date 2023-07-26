@@ -19,6 +19,7 @@
 package org.apache.pinot.core.routing;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -38,7 +39,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 public interface RoutingManager {
 
   /**
-   * Get all enabled server instances that are available for routing.
+   * Get all enabled server instances in the cluster.
    *
    * @return all currently enabled server instances.
    */
@@ -50,6 +51,7 @@ public interface RoutingManager {
    * @param brokerRequest the broker request constructed from a query.
    * @return the route table.
    */
+  @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
 
   /**
@@ -66,5 +68,20 @@ public interface RoutingManager {
    * @param offlineTableName offline table name
    * @return time boundary info.
    */
+  @Nullable
   TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName);
+
+  /**
+   * Returns the {@link TablePartitionInfo} for a given table.
+   */
+  @Nullable
+  TablePartitionInfo getTablePartitionInfo(String tableNameWithType);
+
+  /**
+   * Returns all enabled server instances for a given table's server tenant.
+   *
+   * @param tableNameWithType name of the table with type
+   * @return all enabled servers for a table's server tenant
+   */
+  Map<String, ServerInstance> getEnabledServersForTableTenant(String tableNameWithType);
 }

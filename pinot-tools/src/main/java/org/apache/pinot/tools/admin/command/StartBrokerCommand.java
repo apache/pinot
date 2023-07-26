@@ -67,6 +67,8 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
       // TODO: support forbids = {"-brokerHost", "-brokerPort"})
   private String _configFileName;
 
+  @CommandLine.Option(names = {"-configOverrides"}, required = false, split = ",",
+      description = "Proxy config overrides")
   private Map<String, Object> _configOverrides = new HashMap<>();
 
   public boolean getHelp() {

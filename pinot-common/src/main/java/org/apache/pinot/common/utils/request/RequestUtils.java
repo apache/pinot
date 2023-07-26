@@ -19,13 +19,17 @@
 package org.apache.pinot.common.utils.request;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -44,8 +48,14 @@ import org.slf4j.LoggerFactory;
 
 public class RequestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestUtils.class);
+  private static final JsonNode EMPTY_OBJECT_NODE = new ObjectMapper().createObjectNode();
 
   private RequestUtils() {
+  }
+
+  public static SqlNodeAndOptions parseQuery(String query)
+      throws SqlCompilationException {
+    return parseQuery(query, EMPTY_OBJECT_NODE);
   }
 
   public static SqlNodeAndOptions parseQuery(String query, JsonNode request)
@@ -115,10 +125,12 @@ public class RequestUtils {
         literal.setDoubleValue(node.bigDecimalValue().doubleValue());
       }
     } else {
-      // TODO: Support null literal and other types.
       switch (node.getTypeName()) {
         case BOOLEAN:
           literal.setBoolValue(node.booleanValue());
+          break;
+        case NULL:
+          literal.setNullValue(true);
           break;
         default:
           literal.setStringValue(StringUtils.replace(node.toValue(), "''", "'"));
@@ -166,7 +178,16 @@ public class RequestUtils {
     return expression;
   }
 
+  public static Expression getNullLiteralExpression() {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setNullValue(true);
+    return expression;
+  }
+
   public static Expression getLiteralExpression(Object object) {
+    if (object == null) {
+      return getNullLiteralExpression();
+    }
     if (object instanceof Integer || object instanceof Long) {
       return RequestUtils.getLiteralExpression(((Number) object).longValue());
     }
@@ -247,11 +268,19 @@ public class RequestUtils {
     return null;
   }
 
-  public static String getTableName(PinotQuery pinotQuery) {
-    while (pinotQuery.getDataSource().getSubquery() != null) {
-      pinotQuery = pinotQuery.getDataSource().getSubquery();
+  private static Set<String> getTableNames(DataSource dataSource) {
+    if (dataSource.getSubquery() != null) {
+      return getTableNames(dataSource.getSubquery());
+    } else if (dataSource.isSetJoin()) {
+      return ImmutableSet.<String>builder()
+          .addAll(getTableNames(dataSource.getJoin().getLeft()))
+          .addAll(getTableNames(dataSource.getJoin().getLeft())).build();
     }
-    return pinotQuery.getDataSource().getTableName();
+    return ImmutableSet.of(dataSource.getTableName());
+  }
+
+  public static Set<String> getTableNames(PinotQuery pinotQuery) {
+    return getTableNames(pinotQuery.getDataSource());
   }
 
   public static Map<String, String> getOptionsFromJson(JsonNode request, String optionsKey) {

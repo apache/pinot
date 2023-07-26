@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
-import java.util.Iterator;
 import java.util.List;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
+import java.util.function.Consumer;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
 /**
@@ -31,13 +31,16 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
  */
 class BroadcastExchange extends BlockExchange {
 
-  protected BroadcastExchange(MailboxService<TransferableBlock> mailbox, List<MailboxIdentifier> destinations,
-      BlockSplitter splitter) {
-    super(mailbox, destinations, splitter);
+  protected BroadcastExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Consumer<OpChainId> callback, long deadlineMs) {
+    super(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
   }
 
   @Override
-  protected Iterator<RoutedBlock> route(List<MailboxIdentifier> destinations, TransferableBlock block) {
-    return destinations.stream().map(dest -> new RoutedBlock(dest, block)).iterator();
+  protected void route(List<SendingMailbox> destinations, TransferableBlock block)
+      throws Exception {
+    for (SendingMailbox mailbox : destinations) {
+      sendBlock(mailbox, block);
+    }
   }
 }

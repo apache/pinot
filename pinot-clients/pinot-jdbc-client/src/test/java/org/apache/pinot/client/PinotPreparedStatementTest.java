@@ -26,6 +26,8 @@ import java.sql.Timestamp;
 import java.util.Properties;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.utils.DateTimeUtils;
+import org.apache.pinot.client.utils.DriverUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -35,6 +37,7 @@ public class PinotPreparedStatementTest {
       "SELECT * FROM dummy WHERE name = ? and age = ? and score = ? and ts = ? and eligible = ? and sub_score = ?";
   public static final String DATE_QUERY = "SELECT * FROM dummy WHERE date = ? and updated_at = ? and created_at = ?";
   public static final String SINGLE_STRING_QUERY = "SELECT * FROM dummy WHERE value = ?";
+  private static final String BASIC_TEST_QUERY = "SELECT * FROM dummy";
   private DummyPinotClientTransport _dummyPinotClientTransport = new DummyPinotClientTransport();
   private DummyPinotControllerTransport _dummyPinotControllerTransport = DummyPinotControllerTransport.create();
 
@@ -119,5 +122,33 @@ public class PinotPreparedStatementTest {
     lastExecutedQuery = _dummyPinotClientTransport.getLastQuery();
     Assert.assertEquals(lastExecutedQuery.substring(0, lastExecutedQuery.indexOf("LIMIT")).trim(),
         String.format("SELECT * FROM dummy WHERE value = '%s'", Hex.encodeHexString(value.getBytes())));
+  }
+
+  @Test
+  public void testSetEnableNullHandling()
+      throws Exception {
+    Properties props = new Properties();
+    props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    PinotConnection pinotConnection =
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    PreparedStatement preparedStatement = pinotConnection.prepareStatement(BASIC_TEST_QUERY);
+    preparedStatement.executeQuery();
+    String expectedSql =
+        DriverUtils.createSetQueryOptionString(QueryOptionKey.ENABLE_NULL_HANDLING, true) + BASIC_TEST_QUERY;
+    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery().substring(0, expectedSql.length()), expectedSql);
+  }
+
+  @Test
+  public void testSetEnableNullHandling2()
+      throws Exception {
+    Properties props = new Properties();
+    props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    PinotConnection pinotConnection =
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+    PreparedStatement preparedStatement = pinotConnection.prepareStatement("");
+    preparedStatement.executeQuery(BASIC_TEST_QUERY);
+    String expectedSql =
+        DriverUtils.createSetQueryOptionString(QueryOptionKey.ENABLE_NULL_HANDLING, true) + BASIC_TEST_QUERY;
+    Assert.assertEquals(_dummyPinotClientTransport.getLastQuery().substring(0, expectedSql.length()), expectedSql);
   }
 }

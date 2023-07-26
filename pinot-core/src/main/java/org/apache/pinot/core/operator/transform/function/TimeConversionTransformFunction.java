@@ -21,11 +21,12 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.transformer.timeunit.TimeUnitTransformer;
 import org.apache.pinot.core.operator.transform.transformer.timeunit.TimeUnitTransformerFactory;
-import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public class TimeConversionTransformFunction extends BaseTransformFunction {
@@ -40,7 +41,7 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     // Check that there are exactly 3 arguments
     if (arguments.size() != 3) {
       throw new IllegalArgumentException("Exactly 3 arguments are required for TIME_CONVERT transform function");
@@ -55,8 +56,8 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
     _mainTransformFunction = firstArgument;
 
     _timeUnitTransformer = TimeUnitTransformerFactory.getTimeUnitTransformer(
-        TimeUnit.valueOf(((LiteralTransformFunction) arguments.get(1)).getLiteral().toUpperCase()),
-        ((LiteralTransformFunction) arguments.get(2)).getLiteral());
+        TimeUnit.valueOf(((LiteralTransformFunction) arguments.get(1)).getStringLiteral().toUpperCase()),
+        ((LiteralTransformFunction) arguments.get(2)).getStringLiteral());
   }
 
   @Override
@@ -65,13 +66,15 @@ public class TimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
-    _timeUnitTransformer.transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _longValuesSV,
-        length);
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initLongValuesSV(length);
+    _timeUnitTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _longValuesSV, length);
     return _longValuesSV;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return _mainTransformFunction.getNullBitmap(valueBlock);
   }
 }

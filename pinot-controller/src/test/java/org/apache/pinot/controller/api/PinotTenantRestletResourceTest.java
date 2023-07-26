@@ -19,24 +19,33 @@
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
-public class PinotTenantRestletResourceTest {
+public class PinotTenantRestletResourceTest extends ControllerTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String TABLE_NAME = "restletTable_OFFLINE";
+  private static final String RAW_TABLE_NAME = "toggleTable";
+  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
+
 
   @BeforeClass
   public void setUp()
@@ -80,6 +89,83 @@ public class PinotTenantRestletResourceTest {
     tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
     tables = tableList.get("tables");
     assertEquals(tables.size(), 0);
+  }
+
+  @Test
+  public void testListInstance()
+      throws Exception {
+    String listInstancesUrl =
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTenantGet(TagNameUtils.DEFAULT_TENANT_NAME);
+    JsonNode instanceList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listInstancesUrl));
+    assertEquals(instanceList.get("ServerInstances").size(), DEFAULT_NUM_SERVER_INSTANCES);
+    assertEquals(instanceList.get("BrokerInstances").size(), DEFAULT_NUM_BROKER_INSTANCES);
+  }
+
+  @Test
+  public void testToggleTenantState()
+    throws Exception {
+    // Create an offline table
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(DEFAULT_MIN_NUM_REPLICAS)
+            .build();
+    sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate(), tableConfig.toJsonString());
+    assertEquals(TEST_INSTANCE.getHelixAdmin()
+        .getResourceIdealState(TEST_INSTANCE.getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+        .getInstanceSet(OFFLINE_TABLE_NAME).size(), DEFAULT_NUM_BROKER_INSTANCES);
+
+    // Add segments
+    for (int i = 0; i < DEFAULT_NUM_SERVER_INSTANCES; i++) {
+      TEST_INSTANCE.getHelixResourceManager()
+          .addNewSegment(OFFLINE_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME),
+              "downloadUrl");
+      assertEquals(TEST_INSTANCE.getHelixAdmin()
+          .getResourceIdealState(TEST_INSTANCE.getHelixClusterName(), OFFLINE_TABLE_NAME).getNumPartitions(), i + 1);
+    }
+
+    // Disable server instances
+    String disableServerInstanceUrl =
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTenantInstancesToggle(TagNameUtils.DEFAULT_TENANT_NAME,
+            "server", "disable");
+    JsonUtils.stringToJsonNode(ControllerTest.sendPostRequest(disableServerInstanceUrl));
+    checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, 0);
+
+    // Enable server instances
+    String enableServerInstanceUrl =
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTenantInstancesToggle(TagNameUtils.DEFAULT_TENANT_NAME,
+            "server", "enable");
+    JsonUtils.stringToJsonNode(ControllerTest.sendPostRequest(enableServerInstanceUrl));
+    checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, DEFAULT_NUM_SERVER_INSTANCES);
+
+    // Disable broker instances
+    String disableBrokerInstanceUrl =
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTenantInstancesToggle(TagNameUtils.DEFAULT_TENANT_NAME,
+            "broker", "disable");
+    JsonUtils.stringToJsonNode(ControllerTest.sendPostRequest(disableBrokerInstanceUrl));
+    checkNumOnlineInstancesFromExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, 0);
+
+    // Enable broker instances
+    String enableBrokerInstanceUrl =
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTenantInstancesToggle(TagNameUtils.DEFAULT_TENANT_NAME,
+            "broker", "enable");
+    JsonUtils.stringToJsonNode(ControllerTest.sendPostRequest(enableBrokerInstanceUrl));
+    checkNumOnlineInstancesFromExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
+        DEFAULT_NUM_BROKER_INSTANCES);
+
+    // Delete table
+    sendDeleteRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableDelete(RAW_TABLE_NAME));
+
+    // Check exception in case of enum mismatch of State
+    try {
+      String mismatchStateBrokerInstanceUrl =
+          TEST_INSTANCE.getControllerRequestURLBuilder().forTenantInstancesToggle(TagNameUtils.DEFAULT_TENANT_NAME,
+              "broker", "random");
+      sendPostRequest(mismatchStateBrokerInstanceUrl);
+      fail("Passing invalid state to tenant toggle state does not fail.");
+    } catch (IOException e) {
+      // Expected 500 Bad Request
+      assertTrue(e.getMessage().contains("Error: State mentioned random is wrong. "
+          + "Valid States: Enable, Disable"));
+    }
   }
 
   @AfterClass

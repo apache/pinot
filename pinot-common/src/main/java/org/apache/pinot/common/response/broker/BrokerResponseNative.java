@@ -41,7 +41,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * Supports serialization via JSON.
  */
 @JsonPropertyOrder({
-    "resultTable", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried",
+    "resultTable", "requestId", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried",
     "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
     "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
     "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
@@ -57,6 +57,7 @@ public class BrokerResponseNative implements BrokerResponse {
       new BrokerResponseNative(QueryException.TABLE_DOES_NOT_EXIST_ERROR);
   public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
+  private String _requestId;
   private int _numServersQueried = 0;
   private int _numServersResponded = 0;
   private long _numDocsScanned = 0L;
@@ -321,7 +322,10 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public void setResultTable(ResultTable resultTable) {
     _resultTable = resultTable;
-    _numRowsResultSet = resultTable.getRows().size();
+    // If query level parameter is set to not return the results, then resultTable will be null.
+    if (resultTable != null) {
+      _numRowsResultSet = resultTable.getRows().size();
+    }
   }
 
   @JsonProperty("exceptions")
@@ -553,5 +557,17 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public int getExceptionsSize() {
     return _processingExceptions.size();
+  }
+
+  @JsonProperty("requestId")
+  @Override
+  public String getRequestId() {
+    return _requestId;
+  }
+
+  @JsonProperty("requestId")
+  @Override
+  public void setRequestId(String requestId) {
+    _requestId = requestId;
   }
 }

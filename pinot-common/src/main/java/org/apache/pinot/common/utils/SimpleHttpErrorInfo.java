@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
@@ -30,6 +31,7 @@ public class SimpleHttpErrorInfo {
   private String _error;
 
   @JsonCreator
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public SimpleHttpErrorInfo(@JsonProperty("code") int code, @JsonProperty("error") String message) {
     _code = code;
     _error = message;

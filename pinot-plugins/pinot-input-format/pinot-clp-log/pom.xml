@@ -41,7 +41,10 @@
     <dependency>
       <groupId>com.yscope.clp</groupId>
       <artifactId>clp-ffi</artifactId>
-      <version>0.2.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-common</artifactId>
     </dependency>
   </dependencies>
 </project>

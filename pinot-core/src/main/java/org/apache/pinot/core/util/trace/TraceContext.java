@@ -189,8 +189,11 @@ public final class TraceContext {
    */
   public static String getTraceInfo() {
     ArrayNode jsonTraces = JsonUtils.newArrayNode();
-    for (Trace trace : REQUEST_TO_TRACES_MAP.get(TRACE_ENTRY_THREAD_LOCAL.get()._requestId)) {
-      jsonTraces.add(trace.toJson());
+    Queue<Trace> traces = REQUEST_TO_TRACES_MAP.get(TRACE_ENTRY_THREAD_LOCAL.get()._requestId);
+    if (traces != null && !traces.isEmpty()) {
+      for (Trace trace : traces) {
+        jsonTraces.add(trace.toJson());
+      }
     }
     return jsonTraces.toString();
   }

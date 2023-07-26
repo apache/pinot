@@ -47,15 +47,15 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandlerDelegate.class);
 
   private final BrokerRequestHandler _singleStageBrokerRequestHandler;
-  private final BrokerRequestHandler _multiStageWorkerRequestHandler;
+  private final BrokerRequestHandler _multiStageBrokerRequestHandler;
   private final BrokerMetrics _brokerMetrics;
   private final String _brokerId;
 
   public BrokerRequestHandlerDelegate(String brokerId, BrokerRequestHandler singleStageBrokerRequestHandler,
-      @Nullable BrokerRequestHandler multiStageWorkerRequestHandler, BrokerMetrics brokerMetrics) {
+      @Nullable BrokerRequestHandler multiStageBrokerRequestHandler, BrokerMetrics brokerMetrics) {
     _brokerId = brokerId;
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
-    _multiStageWorkerRequestHandler = multiStageWorkerRequestHandler;
+    _multiStageBrokerRequestHandler = multiStageBrokerRequestHandler;
     _brokerMetrics = brokerMetrics;
   }
 
@@ -64,8 +64,8 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     if (_singleStageBrokerRequestHandler != null) {
       _singleStageBrokerRequestHandler.start();
     }
-    if (_multiStageWorkerRequestHandler != null) {
-      _multiStageWorkerRequestHandler.start();
+    if (_multiStageBrokerRequestHandler != null) {
+      _multiStageBrokerRequestHandler.start();
     }
   }
 
@@ -74,8 +74,8 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     if (_singleStageBrokerRequestHandler != null) {
       _singleStageBrokerRequestHandler.shutDown();
     }
-    if (_multiStageWorkerRequestHandler != null) {
-      _multiStageWorkerRequestHandler.shutDown();
+    if (_multiStageBrokerRequestHandler != null) {
+      _multiStageBrokerRequestHandler.shutDown();
     }
   }
 
@@ -99,9 +99,9 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
           CommonConstants.Broker.Request.QUERY_OPTIONS));
     }
 
-    if (_multiStageWorkerRequestHandler != null && Boolean.parseBoolean(sqlNodeAndOptions.getOptions().get(
+    if (_multiStageBrokerRequestHandler != null && Boolean.parseBoolean(sqlNodeAndOptions.getOptions().get(
           CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
-        return _multiStageWorkerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
+        return _multiStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
     } else {
       return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
           requestContext);

@@ -25,11 +25,14 @@ import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -42,6 +45,7 @@ abstract class BaseRawBytesSingleColumnDistinctExecutor implements DistinctExecu
   final boolean _nullHandlingEnabled;
 
   final ObjectSet<ByteArray> _valueSet;
+  private boolean _hasNull;
 
   BaseRawBytesSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
       boolean nullHandlingEnabled) {
@@ -61,6 +65,36 @@ abstract class BaseRawBytesSingleColumnDistinctExecutor implements DistinctExecu
     for (ByteArray value : _valueSet) {
       records.add(new Record(new Object[]{value}));
     }
+    if (_hasNull) {
+      records.add(new Record(new Object[]{null}));
+    }
+    assert records.size() <= _limit + 1;
     return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
+
+  @Override
+  public boolean process(ValueBlock valueBlock) {
+    BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expression);
+    byte[][] values = blockValueSet.getBytesValuesSV();
+    int numDocs = valueBlock.getNumDocs();
+    if (_nullHandlingEnabled) {
+      RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+      for (int i = 0; i < numDocs; i++) {
+        if (nullBitmap != null && nullBitmap.contains(i)) {
+          _hasNull = true;
+        } else if (add(new ByteArray(values[i]))) {
+          return true;
+        }
+      }
+    } else {
+      for (int i = 0; i < numDocs; i++) {
+        if (add(new ByteArray(values[i]))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  protected abstract boolean add(ByteArray byteArray);
 }

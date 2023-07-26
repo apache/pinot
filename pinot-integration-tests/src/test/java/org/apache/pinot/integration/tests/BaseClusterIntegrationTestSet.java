@@ -145,6 +145,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws Exception {
     String query;
     String h2Query;
+
     query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
     query = "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND "
@@ -205,7 +206,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT MAX(ArrTime) FROM mytable GROUP BY DaysSinceEpoch ORDER BY MAX(ArrTime) - MIN(ArrTime)";
     testQuery(query);
     query = "SELECT MAX(ArrDelay), Month FROM mytable GROUP BY Month ORDER BY ABS(Month - 6) + MAX(ArrDelay)";
-    testQuery(query);
+    h2Query = "SELECT MAX(ArrDelay), `Month` FROM mytable GROUP BY `Month` ORDER BY ABS(`Month` - 6) + MAX(ArrDelay)";
+    testQuery(query, h2Query);
 
     // Post-aggregation in SELECT
     query = "SELECT MAX(ArrDelay) + MAX(AirTime) FROM mytable";
@@ -251,6 +253,33 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
     h2Query = "SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
     testQuery(query, h2Query);
+
+    // DateTimeConverter
+    query = "SELECT dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS'), COUNT(*) FROM mytable "
+        + "GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS') "
+        + "ORDER BY COUNT(*), dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS') DESC";
+    h2Query = "SELECT DaysSinceEpoch * 24, COUNT(*) FROM mytable "
+        + "GROUP BY DaysSinceEpoch * 24 "
+        + "ORDER BY COUNT(*), DaysSinceEpoch DESC";
+    testQuery(query, h2Query);
+
+    // TimeConvert
+    query = "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS'), COUNT(*) FROM mytable "
+        + "GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS') "
+        + "ORDER BY COUNT(*), timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC";
+    h2Query = "SELECT DaysSinceEpoch * 86400, COUNT(*) FROM mytable "
+        + "GROUP BY DaysSinceEpoch * 86400"
+        + "ORDER BY COUNT(*), DaysSinceEpoch * 86400 DESC";
+    testQuery(query, h2Query);
+
+    // test arithmetic operations on date time columns
+    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable "
+        + "GROUP BY sub(DaysSinceEpoch,25) "
+        + "ORDER BY COUNT(*),sub(DaysSinceEpoch,25) DESC";
+    h2Query = "SELECT DaysSinceEpoch - 25, COUNT(*) FROM mytable "
+        + "GROUP BY DaysSinceEpoch "
+        + "ORDER BY COUNT(*), DaysSinceEpoch DESC";
+    testQuery(query, h2Query);
   }
 
   private void testHardCodedQueriesV1()
@@ -271,10 +300,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303,"
             + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
     h2Query =
-        "SELECT DistanceGroup FROM mytable WHERE Month BETWEEN 1 AND 1 AND (DivAirportSeqIDs__MV0 IN (1078102, "
-            + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV1 IN (1078102, 1142303, 1530402, 1172102, "
-            + "1291503) OR DivAirportSeqIDs__MV2 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
-            + "DivAirportSeqIDs__MV3 IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs__MV4 IN "
+        "SELECT DistanceGroup FROM mytable WHERE `Month` BETWEEN 1 AND 1 AND (DivAirportSeqIDs[1] IN (1078102, "
+            + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[2] IN (1078102, 1142303, 1530402, 1172102, "
+            + "1291503) OR DivAirportSeqIDs[3] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
+            + "DivAirportSeqIDs[4] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[5] IN "
             + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
     testQuery(query, h2Query);
 
@@ -444,7 +473,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       QueryGenerator.Query query = queryGenerator.generateQuery();
       if (useMultistageEngine) {
         // multistage engine follows standard SQL thus should use H2 query string for testing.
-        testQuery(query.generateH2Query(), query.generateH2Query());
+        testQuery(query.generateH2Query().replace("`", "\""), query.generateH2Query());
       } else {
         testQuery(query.generatePinotQuery(), query.generateH2Query());
       }
@@ -622,7 +651,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Validate all fields are present
     assertEquals(jobStatus.get("metadata").get("jobId").asText(), jobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
+    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_SEGMENT");
     assertEquals(jobStatus.get("metadata").get("tableName").asText(), tableNameWithType);
     return jobId;
   }
@@ -633,7 +662,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
 
     assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
-    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_ALL_SEGMENTS");
+    assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_SEGMENT");
     return jobStatus.get("totalSegmentCount").asInt() == jobStatus.get("successCount").asInt();
   }
 

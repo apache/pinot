@@ -21,11 +21,11 @@ package org.apache.pinot.core.operator.filter;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
-import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.traits.DoubleRange;
 import org.apache.pinot.core.operator.filter.predicate.traits.DoubleValue;
@@ -95,7 +95,7 @@ public class RangeIndexBasedFilterOperator extends BaseFilterOperator {
     // Need to scan the first and last range as they might be partially matched
     ScanBasedFilterOperator scanBasedFilterOperator =
         new ScanBasedFilterOperator(_predicateEvaluator, _dataSource, _numDocs, false);
-    FilterBlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getNextBlock().getBlockDocIdSet();
+    BlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getNextBlock().getBlockDocIdSet();
     MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(partialMatches);
     if (matches != null) {
       docIds.or(matches);

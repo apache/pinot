@@ -91,6 +91,9 @@ public class MinionConstants {
     // Merge config
     public static final String MERGE_TYPE_KEY = "mergeType";
     public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
+    public static final String MODE = "mode";
+    public static final String PROCESS_FROM_WATERMARK_MODE = "processFromWatermark";
+    public static final String PROCESS_ALL_MODE = "processAll";
 
     // Segment config
     public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
@@ -115,6 +118,9 @@ public class MinionConstants {
     public static final String SEGMENT_ZK_METADATA_TIME_KEY = TASK_TYPE + TASK_TIME_SUFFIX;
 
     public static final String MERGED_SEGMENT_NAME_PREFIX = "merged_";
+
+    // Custom segment group manager class name
+    public static final String SEGMENT_GROUP_MANAGER_CLASS_NAME_KEY = "segment.group.manager.class.name";
   }
 
   /**
@@ -132,5 +138,24 @@ public class MinionConstants {
     public static final String TASK_TYPE = "SegmentGenerationAndPushTask";
     public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
         "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
+  }
+
+  public static class UpsertCompactionTask {
+    public static final String TASK_TYPE = "UpsertCompactionTask";
+    /**
+     * The time period to wait before picking segments for this task
+     * e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
+     */
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+    /**
+     * The maximum percent of old records allowed for a completed segment.
+     * e.g. if the percent surpasses 30, then the segment may be compacted
+     */
+    public static final String INVALID_RECORDS_THRESHOLD_PERCENT = "invalidRecordsThresholdPercent";
+    /**
+     * The maximum count of old records for a completed segment
+     * e.g. if the count surpasses 100k, then the segment may be compacted
+     */
+    public static final String INVALID_RECORDS_THRESHOLD_COUNT = "invalidRecordsThresholdCount";
   }
 }

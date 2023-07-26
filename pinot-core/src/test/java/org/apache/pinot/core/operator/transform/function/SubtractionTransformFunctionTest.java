@@ -19,16 +19,17 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
 public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest {
-
   @Test
   public void testSubtractionTransformFunction() {
     ExpressionContext expression =
@@ -116,5 +117,36 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
         String.format("sub(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)
     }
     };
+  }
+
+  @Test
+  public void testSubtractionNullLiteral() {
+    ExpressionContext expression = RequestContextUtils.getExpression("sub(null, 1)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof SubtractionTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.SUB.getName());
+    double[] expectedValues = new double[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testSubtractionNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("sub(%s, 0)", INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof SubtractionTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.SUB.getName());
+    double[] expectedValues = new double[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = _intSVValues[i];
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

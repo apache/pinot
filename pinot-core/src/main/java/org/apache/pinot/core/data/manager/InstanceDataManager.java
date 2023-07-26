@@ -46,6 +46,7 @@ public interface InstanceDataManager {
   /**
    * Initializes the data manager.
    * <p>Should be called only once and before calling any other method.
+   * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.instance'
    */
   void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
       throws ConfigurationException;

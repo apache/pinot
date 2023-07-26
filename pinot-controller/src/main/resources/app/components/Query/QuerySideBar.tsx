@@ -66,7 +66,8 @@ const useStyles = makeStyles((theme: Theme) =>
     },
     leftPanel: {
       width: 300,
-      padding: '0 20px'
+      padding: '0 20px',
+      wordBreak: 'break-all',
     },
   }),
 );
@@ -101,6 +102,7 @@ const Sidebar = ({ tableList, fetchSQLData, tableSchema, selectedTable, queryLoa
               cellClickCallback={fetchSQLData}
               isCellClickable
               showSearchBox={true}
+              inAccordionFormat
             />
 
             {!queryLoader && tableSchema.records.length ? (
@@ -109,6 +111,7 @@ const Sidebar = ({ tableList, fetchSQLData, tableSchema, selectedTable, queryLoa
                 data={tableSchema}
                 highlightBackground
                 showSearchBox={true}
+                inAccordionFormat
               />
             ) : null}
           </Grid>

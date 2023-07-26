@@ -22,11 +22,8 @@ import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectHeapPriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -41,43 +38,12 @@ public class RawStringSingleColumnDistinctOrderByExecutor extends BaseRawStringS
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
-    if (nullHandlingEnabled) {
-      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
-          (s1, s2) -> s1 == null ? (s2 == null ? 0 : 1) : (s2 == null ? -1 : s1.compareTo(s2)) * comparisonFactor);
-    } else {
-      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
-          (s1, s2) -> s1.compareTo(s2) * comparisonFactor);
-    }
+    _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
+        (s1, s2) -> s1.compareTo(s2) * comparisonFactor);
   }
 
   @Override
-  public boolean process(TransformBlock transformBlock) {
-    BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expression);
-    int numDocs = transformBlock.getNumDocs();
-    if (blockValueSet.isSingleValue()) {
-      String[] values = blockValueSet.getStringValuesSV();
-      if (_nullHandlingEnabled) {
-        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
-        for (int i = 0; i < numDocs; i++) {
-          add(nullBitmap != null && nullBitmap.contains(i) ? null : values[i]);
-        }
-      } else {
-        for (int i = 0; i < numDocs; i++) {
-          add(values[i]);
-        }
-      }
-    } else {
-      String[][] values = blockValueSet.getStringValuesMV();
-      for (int i = 0; i < numDocs; i++) {
-        for (String value : values[i]) {
-          add(value);
-        }
-      }
-    }
-    return false;
-  }
-
-  private void add(String value) {
+  protected boolean add(String value) {
     if (!_valueSet.contains(value)) {
       if (_valueSet.size() < _limit) {
         _valueSet.add(value);
@@ -92,5 +58,6 @@ public class RawStringSingleColumnDistinctOrderByExecutor extends BaseRawStringS
         }
       }
     }
+    return false;
   }
 }

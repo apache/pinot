@@ -18,49 +18,59 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
-import java.util.Arrays;
-import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.datablock.DataBlock;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
+
+
 public class MailboxSendOperatorTest {
+  private static final int SENDER_STAGE_ID = 1;
 
   private AutoCloseable _mocks;
 
   @Mock
-  private MultiStageOperator _input;
+  private VirtualServerAddress _server;
   @Mock
-  private MailboxService<TransferableBlock> _mailboxService;
+  private MultiStageOperator _sourceOperator;
   @Mock
-  private ServerInstance _server;
-  @Mock
-  private KeySelector<Object[], Object[]> _selector;
-  @Mock
-  private MailboxSendOperator.BlockExchangeFactory _exchangeFactory;
+  private MailboxService _mailboxService;
   @Mock
   private BlockExchange _exchange;
 
   @BeforeMethod
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_exchangeFactory.build(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
-        .thenReturn(_exchange);
+    when(_server.hostname()).thenReturn("mock");
+    when(_server.port()).thenReturn(0);
+    when(_server.workerId()).thenReturn(0);
+    when(_exchange.offerBlock(any(), anyLong())).thenReturn(true);
   }
 
   @AfterMethod
@@ -70,98 +80,111 @@ public class MailboxSendOperatorTest {
   }
 
   @Test
-  public void shouldSwallowNoOpBlockFromUpstream() {
+  public void shouldSwallowNoOpBlockFromUpstream()
+      throws Exception {
     // Given:
-    MailboxSendOperator operator = new MailboxSendOperator(
-        _mailboxService, _input, ImmutableList.of(_server), RelDistribution.Type.HASH_DISTRIBUTED, _selector,
-        server -> new JsonMailboxIdentifier("123", "from:1", "to:2"), _exchangeFactory, 1, 2);
-    Mockito.when(_input.nextBlock())
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
+    when(_sourceOperator.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    TransferableBlock block = getMailboxSendOperator().nextBlock();
 
     // Then:
-    Assert.assertTrue(block.isNoOpBlock(), "expected noop block to propagate");
-    Mockito.verify(_exchange, Mockito.never()).send(Mockito.any());
+    assertTrue(block.isNoOpBlock(), "expected noop block to propagate");
+    verify(_exchange, never()).offerBlock(any(), anyLong());
   }
 
   @Test
-  public void shouldSendErrorBlock() {
+  public void shouldSendErrorBlock()
+      throws Exception {
     // Given:
-    MailboxSendOperator operator = new MailboxSendOperator(
-        _mailboxService, _input, ImmutableList.of(_server), RelDistribution.Type.HASH_DISTRIBUTED, _selector,
-        server -> new JsonMailboxIdentifier("123", "from:1", "to:2"), _exchangeFactory, 1, 2);
-    TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!"));
-    Mockito.when(_input.nextBlock())
-        .thenReturn(errorBlock);
+    TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(new Exception("TEST ERROR"));
+    when(_sourceOperator.nextBlock()).thenReturn(errorBlock);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    TransferableBlock block = getMailboxSendOperator().nextBlock();
 
     // Then:
-    Assert.assertTrue(block.isErrorBlock(), "expected error block to propagate");
-    Mockito.verify(_exchange).send(errorBlock);
+    assertSame(block, errorBlock, "expected error block to propagate");
+    verify(_exchange).offerBlock(eq(errorBlock), anyLong());
   }
 
   @Test
-  public void shouldSendErrorBlockWhenInputThrows() {
+  public void shouldSendErrorBlockWhenInputThrows()
+      throws Exception {
     // Given:
-    MailboxSendOperator operator = new MailboxSendOperator(
-        _mailboxService, _input, ImmutableList.of(_server), RelDistribution.Type.HASH_DISTRIBUTED, _selector,
-        server -> new JsonMailboxIdentifier("123", "from:1", "to:2"), _exchangeFactory, 1, 2);
-    Mockito.when(_input.nextBlock())
-        .thenThrow(new RuntimeException("foo!"));
+    when(_sourceOperator.nextBlock()).thenThrow(new RuntimeException("TEST ERROR"));
+
+    // When:
+    TransferableBlock block = getMailboxSendOperator().nextBlock();
+
+    // Then:
+    assertTrue(block.isErrorBlock(), "expected error block to propagate");
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
-
-    // When:
-    TransferableBlock block = operator.nextBlock();
-
-    // Then:
-    Assert.assertTrue(block.isErrorBlock(), "expected error block when input throws error");
-    Mockito.verify(_exchange).send(captor.capture());
-    Assert.assertTrue(captor.getValue().isErrorBlock(), "expected to send error block to exchange");
+    verify(_exchange).offerBlock(captor.capture(), anyLong());
+    assertTrue(captor.getValue().isErrorBlock(), "expected to send error block to exchange");
   }
 
   @Test
-  public void shouldSendEosBlock() {
+  public void shouldSendEosBlock()
+      throws Exception {
     // Given:
-    MailboxSendOperator operator = new MailboxSendOperator(
-        _mailboxService, _input, ImmutableList.of(_server), RelDistribution.Type.HASH_DISTRIBUTED, _selector,
-        server -> new JsonMailboxIdentifier("123", "from:1", "to:2"), _exchangeFactory, 1, 2);
     TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    Mockito.when(_input.nextBlock())
-        .thenReturn(eosBlock);
+    when(_sourceOperator.nextBlock()).thenReturn(eosBlock);
 
     // When:
-    TransferableBlock block = operator.nextBlock();
+    TransferableBlock block = getMailboxSendOperator().nextBlock();
 
     // Then:
-    Assert.assertTrue(block.isEndOfStreamBlock(), "expected EOS block to propagate");
-    Mockito.verify(_exchange).send(eosBlock);
+    assertSame(block, eosBlock, "expected EOS block to propagate");
+    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    verify(_exchange).offerBlock(captor.capture(), anyLong());
+    assertTrue(captor.getValue().isSuccessfulEndOfStreamBlock(), "expected to send EOS block to exchange");
   }
 
   @Test
-  public void shouldSendDataBlock() {
+  public void shouldSendDataBlock()
+      throws Exception {
     // Given:
-    MailboxSendOperator operator = new MailboxSendOperator(
-        _mailboxService, _input, ImmutableList.of(_server), RelDistribution.Type.HASH_DISTRIBUTED, _selector,
-        server -> new JsonMailboxIdentifier("123", "from:1", "to:2"), _exchangeFactory, 1, 2);
-    TransferableBlock dataBlock = block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
-    Mockito.when(_input.nextBlock())
-        .thenReturn(dataBlock)
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
+    TransferableBlock dataBlock =
+        OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
+    TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    when(_sourceOperator.nextBlock()).thenReturn(dataBlock).thenReturn(dataBlock).thenReturn(eosBlock);
+    when(_exchange.getRemainingCapacity()).thenReturn(1).thenReturn(0).thenReturn(0);
+
+    MailboxSendOperator mailboxSendOperator = getMailboxSendOperator();
+    // When:
+    TransferableBlock block = mailboxSendOperator.nextBlock();
+    // Then:
+    assertSame(block, dataBlock, "expected data block to propagate first");
 
     // When:
-    operator.nextBlock();
-
+    block = mailboxSendOperator.nextBlock();
     // Then:
+    assertTrue(block.isNoOpBlock(), "expected No-op block to propagate next b/c remaining capacity is 0.");
+
+    // When:
+    block = mailboxSendOperator.nextBlock();
+    // Then:
+    assertSame(block, eosBlock, "expected EOS block to propagate next even if capacity is now 0.");
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
-    Mockito.verify(_exchange).send(captor.capture());
-    Assert.assertSame(captor.getValue().getType(), DataBlock.Type.ROW, "expected data block to propagate");
+    verify(_exchange, times(3)).offerBlock(captor.capture(), anyLong());
+    List<TransferableBlock> blocks = captor.getAllValues();
+    assertSame(blocks.get(0), dataBlock, "expected to send data block to exchange");
+    assertTrue(blocks.get(2).isSuccessfulEndOfStreamBlock(), "expected to send EOS block to exchange");
+
+    // EOS block should contain statistics
+    Map<String, OperatorStats> resultMetadata = blocks.get(2).getResultMetadata();
+    assertEquals(resultMetadata.size(), 1);
+    assertTrue(resultMetadata.containsKey(mailboxSendOperator.getOperatorId()));
   }
 
-  private static TransferableBlock block(DataSchema schema, Object[]... rows) {
-    return new TransferableBlock(Arrays.asList(rows), schema, DataBlock.Type.ROW);
+  private MailboxSendOperator getMailboxSendOperator() {
+    StageMetadata stageMetadata = new StageMetadata.Builder()
+        .setWorkerMetadataList(Collections.singletonList(
+            new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE,
+            stageMetadata, null, false);
+    return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }

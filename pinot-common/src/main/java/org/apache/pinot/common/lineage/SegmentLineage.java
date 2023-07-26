@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -46,18 +47,22 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class SegmentLineage {
   private static final String COMMA_SEPARATOR = ",";
+  private static final String CUSTOM_MAP_KEY = "custom.map";
 
   private final String _tableNameWithType;
   private final Map<String, LineageEntry> _lineageEntries;
+  private Map<String, String> _customMap = null;
 
   public SegmentLineage(String tableNameWithType) {
     _tableNameWithType = tableNameWithType;
     _lineageEntries = new HashMap<>();
   }
 
-  public SegmentLineage(String tableNameWithType, Map<String, LineageEntry> lineageEntries) {
+  public SegmentLineage(String tableNameWithType, Map<String, LineageEntry> lineageEntries,
+      @Nullable Map<String, String> customMap) {
     _tableNameWithType = tableNameWithType;
     _lineageEntries = lineageEntries;
+    _customMap = customMap;
   }
 
   public String getTableNameWithType() {
@@ -86,6 +91,10 @@ public class SegmentLineage {
     _lineageEntries.put(lineageEntryId, lineageEntry);
   }
 
+  public Map<String, LineageEntry> getLineageEntries() {
+    return _lineageEntries;
+  }
+
   /**
    * Retrieve lineage entry
    * @param lineageEntryId the id for the lineage entry
@@ -112,6 +121,22 @@ public class SegmentLineage {
   }
 
   /**
+   * Retrieve custom map
+   * @return custom map
+   */
+  public Map<String, String> getCustomMap() {
+    return _customMap;
+  }
+
+  /**
+   * Set custom map
+   * @param customMap
+   */
+  public void setCustomMap(Map<String, String> customMap) {
+    _customMap = customMap;
+  }
+
+  /**
    * Convert ZNRecord to segment lineage
    * @param record ZNRecord representation of the segment lineage
    * @return the segment lineage object
@@ -120,6 +145,7 @@ public class SegmentLineage {
     String tableNameWithType = record.getId();
     Map<String, LineageEntry> lineageEntries = new HashMap<>();
     Map<String, List<String>> listFields = record.getListFields();
+    Map<String, String> customMap = record.getMapField(CUSTOM_MAP_KEY);
     for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
       String lineageId = listField.getKey();
       List<String> value = listField.getValue();
@@ -130,7 +156,7 @@ public class SegmentLineage {
       long timestamp = Long.parseLong(value.get(3));
       lineageEntries.put(lineageId, new LineageEntry(segmentsFrom, segmentsTo, state, timestamp));
     }
-    return new SegmentLineage(tableNameWithType, lineageEntries);
+    return new SegmentLineage(tableNameWithType, lineageEntries, customMap);
   }
 
   /**
@@ -148,6 +174,9 @@ public class SegmentLineage {
       List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo, state, timestamp);
       znRecord.setListField(entry.getKey(), listEntry);
     }
+    if (_customMap != null) {
+      znRecord.setMapField(CUSTOM_MAP_KEY, _customMap);
+    }
     return znRecord;
   }
 
@@ -163,6 +192,9 @@ public class SegmentLineage {
         .sorted(Map.Entry.comparingByValue(Comparator.comparingLong(LineageEntry::getTimestamp)))
         .forEachOrdered(x -> sortedLineageEntries.put(x.getKey(), x.getValue()));
     jsonObject.set("lineageEntries", JsonUtils.objectToJsonNode(sortedLineageEntries));
+    if (_customMap != null) {
+      jsonObject.set("customMap", JsonUtils.objectToJsonNode(_customMap));
+    }
     return jsonObject;
   }
 }

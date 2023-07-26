@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.geospatial.transform.function;
 
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.locationtech.jts.geom.Geometry;
 
@@ -40,8 +40,8 @@ public class StEqualsFunction extends BaseBinaryGeoTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    return transformGeometryToIntValuesSV(projectionBlock);
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    return transformGeometryToIntValuesSV(valueBlock);
   }
 
   @Override

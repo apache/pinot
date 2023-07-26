@@ -187,7 +187,7 @@ public class FunctionRegistry {
     }
 
     @ScalarFunction(names = {"jsonExtractKey", "json_extract_key"}, isPlaceholder = true)
-    public static String jsonExtractKey(String jsonFieldName, String jsonPath) {
+    public static Object jsonExtractKey(String jsonFieldName, String jsonPath) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
 
@@ -203,6 +203,17 @@ public class FunctionRegistry {
 
     @ScalarFunction(names = {"jsonMatch", "json_match"}, isPlaceholder = true)
     public static boolean jsonMatch(String text, String pattern) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction(names = {"clpDecode", "clp_decode"}, isPlaceholder = true)
+    public static Object clpDecode(String logtypeFieldName, String dictVarsFieldName, String encodedVarsFieldName) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction(names = {"clpDecode", "clp_decode"}, isPlaceholder = true)
+    public static Object clpDecode(String logtypeFieldName, String dictVarsFieldName, String encodedVarsFieldName,
+        String defaultValue) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.api;
 
+import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -47,4 +48,14 @@ public interface AccessControl {
    * @return {@code true} if authorized, {@code false} otherwise
    */
   boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest);
+
+  /**
+   * Fine-grained access control on pinot tables.
+   *
+   * @param requesterIdentity requester identity
+   * @param tables Set of pinot tables used in the query. Table name can be with or without tableType.
+   *
+   * @return {@code true} if authorized, {@code false} otherwise
+   */
+  boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables);
 }

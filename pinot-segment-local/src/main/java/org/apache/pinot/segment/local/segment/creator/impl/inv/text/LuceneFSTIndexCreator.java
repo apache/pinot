@@ -26,7 +26,8 @@ import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +38,7 @@ import org.slf4j.LoggerFactory;
  * to dictionary id as an entry.
  *
  */
-public class LuceneFSTIndexCreator implements TextIndexCreator {
+public class LuceneFSTIndexCreator implements FSTIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
   private final File _fstIndexFile;
   private final FSTBuilder _fstBuilder;
@@ -64,6 +65,11 @@ public class LuceneFSTIndexCreator implements TextIndexCreator {
         _fstBuilder.addEntry(sortedEntries[_dictId], _dictId);
       }
     }
+  }
+
+  public LuceneFSTIndexCreator(IndexCreationContext context)
+      throws IOException {
+    this(context.getIndexDir(), context.getFieldSpec().getName(), (String[]) context.getSortedUniqueElementsArray());
   }
 
   // Expects dictionary entries in sorted order.

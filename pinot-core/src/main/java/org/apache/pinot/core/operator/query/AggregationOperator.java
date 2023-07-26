@@ -20,12 +20,11 @@ package org.apache.pinot.core.operator.query;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -40,16 +39,16 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE";
 
   private final AggregationFunction[] _aggregationFunctions;
-  private final TransformOperator _transformOperator;
+  private final BaseProjectOperator<?> _projectOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
 
   private int _numDocsScanned = 0;
 
-  public AggregationOperator(AggregationFunction[] aggregationFunctions, TransformOperator transformOperator,
+  public AggregationOperator(AggregationFunction[] aggregationFunctions, BaseProjectOperator<?> projectOperator,
       long numTotalDocs, boolean useStarTree) {
     _aggregationFunctions = aggregationFunctions;
-    _transformOperator = transformOperator;
+    _projectOperator = projectOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
   }
@@ -63,10 +62,10 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
     } else {
       aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions);
     }
-    TransformBlock transformBlock;
-    while ((transformBlock = _transformOperator.nextBlock()) != null) {
-      _numDocsScanned += transformBlock.getNumDocs();
-      aggregationExecutor.aggregate(transformBlock);
+    ValueBlock valueBlock;
+    while ((valueBlock = _projectOperator.nextBlock()) != null) {
+      _numDocsScanned += valueBlock.getNumDocs();
+      aggregationExecutor.aggregate(valueBlock);
     }
 
     // Build intermediate result block based on aggregation result from the executor
@@ -74,14 +73,14 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   }
 
   @Override
-  public List<Operator> getChildOperators() {
-    return Collections.singletonList(_transformOperator);
+  public List<BaseProjectOperator<?>> getChildOperators() {
+    return Collections.singletonList(_projectOperator);
   }
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = (long) _numDocsScanned * _transformOperator.getNumColumnsProjected();
+    long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = (long) _numDocsScanned * _projectOperator.getNumColumnsProjected();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         _numTotalDocs);
   }

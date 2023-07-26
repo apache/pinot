@@ -298,7 +298,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         (nReplicasIdealMax > 0) ? (nReplicasExternal * 100 / nReplicasIdealMax) : 100);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE, nErrors);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
-        (nSegments > 0) ? (100 - (nOffline * 100 / nSegments)) : 100);
+        (nSegments > 0) ? (nSegments - nOffline) * 100 / nSegments : 100);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_SIZE,
         tableCompressedSize);
 

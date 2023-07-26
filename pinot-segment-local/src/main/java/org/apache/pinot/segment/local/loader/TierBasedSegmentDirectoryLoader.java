@@ -26,6 +26,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
@@ -205,15 +206,18 @@ public class TierBasedSegmentDirectoryLoader implements SegmentDirectoryLoader {
     TableConfig tableConfig = loaderContext.getTableConfig();
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = loaderContext.getSegmentName();
-    try {
-      String tierDataDir =
-          TierConfigUtils.getDataDirForTier(tableConfig, segmentTier, loaderContext.getInstanceTierConfigs());
-      File tierTableDataDir = new File(tierDataDir, tableNameWithType);
-      return new File(tierTableDataDir, segmentName);
-    } catch (Exception e) {
-      LOGGER.warn("Failed to get dataDir for segment: {} of table: {} on tier: {} due to error: {}", segmentName,
-          tableNameWithType, segmentTier, e.getMessage());
+    String tierDataDir =
+        TierConfigUtils.getDataDirForTier(tableConfig, segmentTier, loaderContext.getInstanceTierConfigs());
+    if (StringUtils.isEmpty(tierDataDir)) {
+      LOGGER.warn("No dataDir for segment: {} of table: {} on tier: {}", segmentName, tableNameWithType, segmentTier);
       return null;
     }
+    File tierTableDataDir = new File(tierDataDir, tableNameWithType);
+    return new File(tierTableDataDir, segmentName);
+  }
+
+  @Override
+  public boolean needsTierMigration(String targetTier, String currentTier) {
+    return !StringUtils.equals(targetTier, currentTier);
   }
 }

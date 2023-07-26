@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.metrics;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -44,8 +43,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Common code for metrics implementations.
- * TODO: 1. With gauge updatable, we can remove _gaugeValues 2. Remove methods with callback in name since the callback
- *   function can not be updated.
  */
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter,
     G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
@@ -58,6 +55,9 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   private final Class _clazz;
 
+  // The purpose of having _gaugeValues is to make gauge metric updatable.
+  // Since gauge metric itself is updatable now (https://github.com/apache/pinot/pull/9961), we can deprecate it.
+  @Deprecated
   private final Map<String, AtomicLong> _gaugeValues = new ConcurrentHashMap<String, AtomicLong>();
 
   private final boolean _isTableLevelMetricsEnabled;
@@ -93,6 +93,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   public interface QueryPhase {
     String getQueryPhaseName();
+
+    default String getDescription() {
+      return "";
+    }
   }
 
   public interface Meter {
@@ -101,6 +105,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String getUnit();
 
     boolean isGlobal();
+
+    default String getDescription() {
+      return "";
+    }
   }
 
   public interface Gauge {
@@ -109,12 +117,18 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String getUnit();
 
     boolean isGlobal();
+    default String getDescription() {
+      return "";
+    }
   }
 
   public interface Timer {
     String getTimerName();
 
     boolean isGlobal();
+    default String getDescription() {
+      return "";
+    }
   }
 
   public void addPhaseTiming(String tableName, QP phase, long duration, TimeUnit timeUnit) {
@@ -326,12 +340,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * @deprecated Please use addMeteredTableValue(final String tableName, final M meter, final long unitCount), which is
+   * designed for tracking count and rates.
+   *
    * Logs a value to a table gauge.
    *
    * @param tableName The table name
    * @param gauge The gauge to use
    * @param unitCount The number of units to add to the gauge
    */
+  @Deprecated
   public void addValueToTableGauge(final String tableName, final G gauge, final long unitCount) {
     final String fullGaugeName = composeTableGaugeName(tableName, gauge);
 
@@ -425,11 +443,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * @deprecated Please use addMeteredGlobalValue(final M meter, final long unitCount), which is designed for tracking
+   * count and rates.
+   *
    * Adds a value to a table gauge.
    *
    * @param gauge The gauge to use
    * @param unitCount The number of units to add to the gauge
    */
+  @Deprecated
   public void addValueToGlobalGauge(final G gauge, final long unitCount) {
     String gaugeName = gauge.getGaugeName();
 
@@ -446,19 +468,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     } else {
       gaugeValue.addAndGet(unitCount);
     }
-  }
-
-  /**
-   * Gets the value of a table gauge.
-   *
-   * @param tableName The table name
-   * @param gauge The gauge to use
-   */
-  public long getValueOfTableGauge(final String tableName, final G gauge) {
-    final String fullGaugeName = composeTableGaugeName(tableName, gauge);
-
-    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
-    return gaugeValue == null ? 0 : gaugeValue.get();
   }
 
   /**
@@ -731,15 +740,5 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   protected String getTableName(String tableName) {
     return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
-  }
-
-  /**
-   * Check if the metric name appears in the gauge value map.
-   * @param metricName metric name
-   * @return True if the metric name appears on the gauge value map. False otherwise.
-   */
-  @VisibleForTesting
-  public boolean containsGauge(String metricName) {
-    return _gaugeValues.containsKey(metricName);
   }
 }
