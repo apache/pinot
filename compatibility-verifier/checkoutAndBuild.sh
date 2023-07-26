@@ -99,7 +99,7 @@ function build() {
     if [ $? -eq 0 ]; then break; fi
     if [ $i -eq $maxRetry ]; then exit 1; fi
     echo ""
-    echo "Build failed, see lamast 1000 lines of output below."
+    echo "Build failed, see last 1000 lines of output below."
     tail -1000 ${outFile}
     echo "Retrying after 30 seconds..."
     sleep 30
