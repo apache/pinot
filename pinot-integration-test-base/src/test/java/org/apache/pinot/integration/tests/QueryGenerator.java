@@ -99,9 +99,9 @@ public class QueryGenerator {
   private final List<PredicateGenerator> _multistageSingleValuePredicateGenerators =
       Arrays.asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
           new SingleValueBetweenPredicateGenerator());
+  // TODO: add MultiValueBetweenPredicateGenerator back once the BETWEEEN AND operator is supported in multistage engine
   private final List<PredicateGenerator> _multiValuePredicateGenerators =
-      Arrays.asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
-          new MultiValueBetweenPredicateGenerator());
+      Arrays.asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator());
 
   private final String _pinotTableName;
   private final String _h2TableName;
