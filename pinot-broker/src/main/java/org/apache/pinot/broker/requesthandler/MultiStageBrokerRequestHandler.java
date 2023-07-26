@@ -145,12 +145,18 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
     String query = sql.asText();
     requestContext.setQuery(query);
-    return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
+    BrokerResponse brokerResponse = handleRequest(sqlNodeAndOptions, request, requesterIdentity, requestContext);
+
+    brokerResponse.setRequestId(String.valueOf(requestId));
+    brokerResponse.setBrokerId(_brokerId);
+    brokerResponse.setBrokerReduceTimeMs(requestContext.getReduceTimeMillis());
+    return brokerResponse;
   }
 
-  private BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
-      throws Exception {
+  private BrokerResponse handleRequest(@Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext) {
+    final String query = requestContext.getQuery();
+    final long requestId = requestContext.getRequestId();
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     long compilationStartTimeNs;
@@ -168,7 +174,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
-          if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {
+          if (!hasTableAccess(requesterIdentity, tableNames, requestContext)) {
             throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
           }
 
@@ -194,13 +200,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.REQUEST_COMPILATION, compilationTimeNs);
 
     // Validate table access.
-    if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {
+    if (!hasTableAccess(requesterIdentity, tableNames, requestContext)) {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
 
     // Validate QPS quota
-    if (hasExceededQPSQuota(tableNames, requestId, requestContext)) {
+    if (hasExceededQPSQuota(tableNames, requestContext)) {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
@@ -217,7 +223,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long executionStartTimeNs = System.nanoTime();
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestId, dispatchableSubPlan, _mailboxService,
+      queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, _mailboxService,
           _reducerScheduler,
           queryTimeoutMs, sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
     } catch (Throwable t) {
@@ -234,7 +240,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
-    brokerResponse.setRequestId(String.valueOf(requestId));
 
     for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
       if (entry.getKey() == 0) {
@@ -263,26 +268,25 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /**
    * Validates whether the requester has access to all the tables.
    */
-  private boolean hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames, long requestId,
+  private boolean hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
       RequestContext requestContext) {
     boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, tableNames);
     if (!hasAccess) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      LOGGER.warn("Access denied for requestId {}", requestId);
+      LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       return false;
     }
-
     return true;
   }
 
   /**
    * Returns true if the QPS quota of the tables has exceeded.
    */
-  private boolean hasExceededQPSQuota(Set<String> tableNames, long requestId, RequestContext requestContext) {
+  private boolean hasExceededQPSQuota(Set<String> tableNames, RequestContext requestContext) {
     for (String tableName : tableNames) {
       if (!_queryQuotaManager.acquire(tableName)) {
-        LOGGER.warn("Request {}: query exceeds quota for table: {}", requestId, tableName);
+        LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
         requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
         String rawTableName = TableNameBuilder.extractRawTableName(tableName);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
