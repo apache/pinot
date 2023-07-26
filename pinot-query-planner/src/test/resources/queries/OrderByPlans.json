@@ -6,10 +6,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 FROM a ORDER BY a.col1",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0])",
-          "\n  LogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalProject(col1=[$0])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -19,10 +19,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1 FROM a ORDER BY a.col1",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0])",
-          "\n  LogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalProject(value1=[$0])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]

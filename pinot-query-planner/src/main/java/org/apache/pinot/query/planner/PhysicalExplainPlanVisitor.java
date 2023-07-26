@@ -42,14 +42,13 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 /**
  * A visitor that converts a {@code QueryPlan} into a human-readable string representation.
  *
- * <p>It is currently not used programmatically and cannot be accessed by the user. Instead,
- * it is intended for use in manual debugging (e.g. setting breakpoints and calling QueryPlan#explain()).
+ * <p>It is getting used for getting the physical plan of the query.</p>
  */
-public class ExplainPlanPlanVisitor implements PlanNodeVisitor<StringBuilder, ExplainPlanPlanVisitor.Context> {
+public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder, PhysicalExplainPlanVisitor.Context> {
 
   private final DispatchableSubPlan _dispatchableSubPlan;
 
-  public ExplainPlanPlanVisitor(DispatchableSubPlan dispatchableSubPlan) {
+  public PhysicalExplainPlanVisitor(DispatchableSubPlan dispatchableSubPlan) {
     _dispatchableSubPlan = dispatchableSubPlan;
   }
 
@@ -87,7 +86,7 @@ public class ExplainPlanPlanVisitor implements PlanNodeVisitor<StringBuilder, Ex
    */
   public static String explainFrom(DispatchableSubPlan dispatchableSubPlan, PlanNode node,
       QueryServerInstance rootServer) {
-    final ExplainPlanPlanVisitor visitor = new ExplainPlanPlanVisitor(dispatchableSubPlan);
+    final PhysicalExplainPlanVisitor visitor = new PhysicalExplainPlanVisitor(dispatchableSubPlan);
     return node
         .visit(visitor, new Context(rootServer, 0, "", "", new StringBuilder()))
         .toString();
@@ -199,7 +198,7 @@ public class ExplainPlanPlanVisitor implements PlanNodeVisitor<StringBuilder, Ex
             .getServerInstanceToWorkerIdMap();
     context._builder.append("->");
     String receivers = servers.entrySet().stream()
-        .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+        .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
         .map(s -> "[" + receiverStageId + "]@" + s)
         .collect(Collectors.joining(",", "{", "}"));
     return context._builder.append(receivers);

@@ -36,7 +36,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class InvertedIndexFilterOperator extends NullHandlingSupportedSingleColumnLeafFilterOperator {
+public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_INVERTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;

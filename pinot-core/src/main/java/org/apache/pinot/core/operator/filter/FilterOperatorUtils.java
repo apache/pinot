@@ -134,7 +134,8 @@ public class FilterOperatorUtils {
       } else {
         // Return the AND filter operator with re-ordered child filter operators
         reorderAndFilterChildOperators(queryContext, childFilterOperators);
-        return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions());
+        return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
+            queryContext.isNullHandlingEnabled());
       }
     }
 
@@ -158,7 +159,8 @@ public class FilterOperatorUtils {
         return childFilterOperators.get(0);
       } else {
         // Return the OR filter operator with child filter operators
-        return new OrFilterOperator(childFilterOperators, numDocs);
+        return new OrFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
+            queryContext.isNullHandlingEnabled());
       }
     }
 
@@ -171,7 +173,7 @@ public class FilterOperatorUtils {
         return new MatchAllFilterOperator(numDocs);
       }
 
-      return new NotFilterOperator(filterOperator, numDocs);
+      return new NotFilterOperator(filterOperator, numDocs, queryContext.isNullHandlingEnabled());
     }
 
 

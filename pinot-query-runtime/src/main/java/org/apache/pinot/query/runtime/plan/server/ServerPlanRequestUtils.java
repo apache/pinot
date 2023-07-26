@@ -237,7 +237,7 @@ public class ServerPlanRequestUtils {
 
   private static List<Expression> computeInOperands(List<Object[]> dataContainer, DataSchema dataSchema, int colIdx) {
     final DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(colIdx);
-    final FieldSpec.DataType storedType = columnDataType.getStoredType().toDataType();;
+    final FieldSpec.DataType storedType = columnDataType.getStoredType().toDataType();
     final int numRows = dataContainer.size();
     List<Expression> expressions = new ArrayList<>();
     switch (storedType) {

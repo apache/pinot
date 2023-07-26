@@ -509,4 +509,103 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
     assertArrayEquals(rows.get(0), new Object[]{false});
   }
+
+  @Test
+  public void testOrFiltering()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, -1);
+    insertRowWithTwoColumns(-1, null);
+    insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(null, -1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE OR(%s > 0, %s < 0) LIMIT 100", COLUMN1, COLUMN2, COLUMN1,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 3);
+  }
+
+  @Test
+  public void testNotFiltering()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(-1);
+    insertRow(1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT %s FROM testTable WHERE NOT(%s = 1) LIMIT 100", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{-1});
+  }
+
+  @Test
+  public void testNotAndFiltering()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, -1);
+    insertRowWithTwoColumns(-1, null);
+    insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(null, -1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE NOT(AND(%s > 0, %s < 0)) LIMIT 100", COLUMN1, COLUMN2,
+            COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 3 * NUM_OF_SEGMENT_COPIES);
+  }
+
+  @Test
+  public void testNotOrFiltering()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, -1);
+    insertRowWithTwoColumns(-1, null);
+    insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(null, -1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE NOT(OR(%s > 0, %s < 0)) LIMIT 100", COLUMN1, COLUMN2, COLUMN1,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{-1, 1});
+  }
 }

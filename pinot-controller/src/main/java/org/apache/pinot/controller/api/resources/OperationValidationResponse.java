@@ -58,13 +58,23 @@ public class OperationValidationResponse {
     return this;
   }
 
+  public OperationValidationResponse putAllIssues(List<ErrorWrapper> issues) {
+    _issues.addAll(issues);
+    return this;
+  }
+
   public String getIssueMessage(int index) {
     return _issues.get(index).getMessage();
   }
 
   public static class ErrorWrapper {
+    @JsonProperty("code")
     ErrorCode _code;
+    @JsonProperty("message")
     String _message;
+
+    public ErrorWrapper() {
+    }
 
     public ErrorWrapper(ErrorCode code, String... args) {
       _code = code;
@@ -82,7 +92,11 @@ public class OperationValidationResponse {
 
   public enum ErrorCode {
     IS_ALIVE("Instance %s is still live"),
-    CONTAINS_RESOURCE("Instance %s exists in ideal state for %s");
+    CONTAINS_RESOURCE("Instance %s exists in ideal state for %s"),
+    MINIMUM_INSTANCE_UNSATISFIED(
+        "Tenant '%s' will not satisfy minimum '%s' requirement if tag '%s' is removed from %s instance '%s'."),
+    ALREADY_DEFICIENT_TENANT("Tenant '%s' is low on '%s' instances by %s even after allocating instance %s"),
+    UNRECOGNISED_TAG_TYPE("The tag '%s' does not follow the suffix convention of either broker or server");
 
     public final String _description;
 

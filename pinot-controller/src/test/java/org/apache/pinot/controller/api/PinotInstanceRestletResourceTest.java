@@ -19,24 +19,34 @@
 package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
+import org.apache.pinot.controller.api.resources.InstanceTagUpdateRequest;
+import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
@@ -47,22 +57,24 @@ import static org.testng.Assert.assertTrue;
  */
 public class PinotInstanceRestletResourceTest extends ControllerTest {
 
+  private ControllerRequestURLBuilder _urlBuilder = null;
+
   @BeforeClass
   public void setUp()
       throws Exception {
     DEFAULT_INSTANCE.setupSharedStateAndValidate();
+    _urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
   }
 
   @Test
   public void testInstanceListingAndCreation()
       throws Exception {
-    ControllerRequestURLBuilder requestURLBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
-    String listInstancesUrl = requestURLBuilder.forInstanceList();
+    String listInstancesUrl = _urlBuilder.forInstanceList();
     int expectedNumInstances = 1 + DEFAULT_NUM_BROKER_INSTANCES + DEFAULT_NUM_SERVER_INSTANCES;
     checkNumInstances(listInstancesUrl, expectedNumInstances);
 
     // Create untagged broker and server instances
-    String createInstanceUrl = requestURLBuilder.forInstanceCreate();
+    String createInstanceUrl = _urlBuilder.forInstanceCreate();
     Instance brokerInstance1 = new Instance("1.2.3.4", 1234, InstanceType.BROKER, null, null, 0, 0, 0, 0, false);
     sendPostRequest(createInstanceUrl, brokerInstance1.toJsonString());
     Instance serverInstance1 =
@@ -110,14 +122,14 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
         new Instance("1.2.3.4", 1234, InstanceType.BROKER, Collections.singletonList(newBrokerTag), null, 0, 0, 0, 0,
             false);
     String brokerInstanceId = "Broker_1.2.3.4_1234";
-    String brokerInstanceUrl = requestURLBuilder.forInstance(brokerInstanceId);
+    String brokerInstanceUrl = _urlBuilder.forInstance(brokerInstanceId);
     sendPutRequest(brokerInstanceUrl, newBrokerInstance.toJsonString());
     String newServerTag = "new-server-tag";
     Instance newServerInstance =
         new Instance("1.2.3.4", 2345, InstanceType.SERVER, Collections.singletonList(newServerTag), null, 28090, 28091,
             28092, 28093, true);
     String serverInstanceId = "Server_1.2.3.4_2345";
-    String serverInstanceUrl = requestURLBuilder.forInstance(serverInstanceId);
+    String serverInstanceUrl = _urlBuilder.forInstance(serverInstanceId);
     sendPutRequest(serverInstanceUrl, newServerInstance.toJsonString());
 
     checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{newBrokerTag}, null, -1, -1, -1, -1, false);
@@ -126,9 +138,9 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
     // Test Instance updateTags API
     String brokerInstanceUpdateTagsUrl =
-        requestURLBuilder.forInstanceUpdateTags(brokerInstanceId, Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
+        _urlBuilder.forInstanceUpdateTags(brokerInstanceId, Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
     sendPutRequest(brokerInstanceUpdateTagsUrl);
-    String serverInstanceUpdateTagsUrl = requestURLBuilder.forInstanceUpdateTags(serverInstanceId,
+    String serverInstanceUpdateTagsUrl = _urlBuilder.forInstanceUpdateTags(serverInstanceId,
         Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
     sendPutRequest(serverInstanceUpdateTagsUrl);
     checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null, -1, -1, -1,
@@ -137,10 +149,10 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
         new String[]{"tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"}, null, 28090, 28091, 28092, 28093, true);
 
     // Test DELETE instance API
-    sendDeleteRequest(requestURLBuilder.forInstance("Broker_1.2.3.4_1234"));
-    sendDeleteRequest(requestURLBuilder.forInstance("Server_1.2.3.4_2345"));
-    sendDeleteRequest(requestURLBuilder.forInstance("Broker_2.3.4.5_1234"));
-    sendDeleteRequest(requestURLBuilder.forInstance("Server_2.3.4.5_2345"));
+    sendDeleteRequest(_urlBuilder.forInstance("Broker_1.2.3.4_1234"));
+    sendDeleteRequest(_urlBuilder.forInstance("Server_1.2.3.4_2345"));
+    sendDeleteRequest(_urlBuilder.forInstance("Broker_2.3.4.5_1234"));
+    sendDeleteRequest(_urlBuilder.forInstance("Server_2.3.4.5_2345"));
     checkNumInstances(listInstancesUrl, expectedNumInstances);
   }
 
@@ -163,7 +175,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       boolean queriesDisabled)
       throws Exception {
     JsonNode response = JsonUtils.stringToJsonNode(
-        ControllerTest.sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forInstance(instanceName)));
+        ControllerTest.sendGetRequest(_urlBuilder.forInstance(instanceName)));
     assertEquals(response.get("instanceName").asText(), instanceName);
     assertEquals(response.get("hostName").asText(), hostName);
     assertTrue(response.get("enabled").asBoolean());
@@ -191,6 +203,95 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     } else {
       assertNull(response.get("queriesDisabled"));
     }
+  }
+
+  @Test
+  public void instanceRetagHappyPathTest()
+      throws IOException {
+    Map<String, List<String>> currentInstanceTagsMap = getCurrentInstanceTagsMap();
+    List<InstanceTagUpdateRequest> request = new ArrayList<>();
+    currentInstanceTagsMap.forEach((instance, tags) -> {
+      if (instance.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)
+          || instance.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE)) {
+        InstanceTagUpdateRequest payload = new InstanceTagUpdateRequest();
+        payload.setInstanceName(instance);
+        payload.setNewTags(tags);
+        request.add(payload);
+      }
+    });
+    List<OperationValidationResponse> response = Arrays.asList(new ObjectMapper().readValue(
+        sendPostRequest(_urlBuilder.forUpdateTagsValidation(), JsonUtils.objectToString(request)),
+        OperationValidationResponse[].class));
+    assertNotNull(response);
+    response.forEach(item -> assertTrue(item.isSafe()));
+  }
+
+  @Test
+  public void instanceRetagServerDeficiencyTest()
+      throws Exception {
+    String tableName = "testTable";
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
+        .setNumReplicas(2).build();
+    // create table with replication as 2 so that DefaultTenant has a minimum server requirement as 2.
+    DEFAULT_INSTANCE.addTableConfig(tableConfig);
+    Map<String, List<String>> currentInstanceTagsMap = getCurrentInstanceTagsMap();
+    List<InstanceTagUpdateRequest> request = new ArrayList<>();
+    currentInstanceTagsMap.forEach((instance, tags) -> {
+      if (instance.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)
+          || instance.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE)) {
+        InstanceTagUpdateRequest payload = new InstanceTagUpdateRequest();
+        payload.setInstanceName(instance);
+        payload.setNewTags(Lists.newArrayList());
+        request.add(payload);
+      }
+    });
+    List<OperationValidationResponse> response = Arrays.asList(new ObjectMapper().readValue(
+        sendPostRequest(_urlBuilder.forUpdateTagsValidation(), JsonUtils.objectToString(request)),
+        OperationValidationResponse[].class));
+    assertNotNull(response);
+
+    int deficientServers = 2;
+    int deficientBrokers = 1;
+    for (OperationValidationResponse item : response) {
+      String instanceName = item.getInstanceName();
+      boolean validity = item.isSafe();
+      if (!validity) {
+        List<OperationValidationResponse.ErrorWrapper> issues = item.getIssues();
+        assertEquals(issues.size(), 1);
+        assertEquals(issues.get(0).getCode(), OperationValidationResponse.ErrorCode.MINIMUM_INSTANCE_UNSATISFIED);
+        if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+          deficientServers--;
+        } else if (instanceName.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE)) {
+          deficientBrokers--;
+        }
+      }
+    }
+    assertEquals(deficientServers, 0);
+    assertEquals(deficientBrokers, 0);
+    DEFAULT_INSTANCE.dropOfflineTable(tableName);
+  }
+
+  private Map<String, List<String>> getCurrentInstanceTagsMap()
+      throws IOException {
+    String listInstancesUrl = _urlBuilder.forInstanceList();
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(listInstancesUrl));
+    JsonNode instances = response.get("instances");
+    Map<String, List<String>> map = new HashMap<>(instances.size());
+    for (int i = 0; i < instances.size(); i++) {
+      String instance = instances.get(i).asText();
+      map.put(instance, getInstanceTags(instance));
+    }
+    return map;
+  }
+
+  private List<String> getInstanceTags(String instance)
+      throws IOException {
+    String getInstancesUrl = _urlBuilder.forInstance(instance);
+    List<String> tags = new ArrayList<>();
+    for (JsonNode tag : JsonUtils.stringToJsonNode(sendGetRequest(getInstancesUrl)).get("tags")) {
+      tags.add(tag.asText());
+    }
+    return tags;
   }
 
   @AfterClass

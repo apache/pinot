@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.Arrays;
 import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -29,30 +28,34 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public abstract class NullHandlingSupportedSingleColumnLeafFilterOperator extends BaseFilterOperator {
+public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
   protected final QueryContext _queryContext;
   protected final DataSource _dataSource;
-  protected final int _numDocs;
 
-  protected NullHandlingSupportedSingleColumnLeafFilterOperator(QueryContext queryContext, DataSource dataSource,
-      int numDocs) {
+  protected BaseColumnFilterOperator(QueryContext queryContext, DataSource dataSource, int numDocs) {
+    super(numDocs, queryContext.isNullHandlingEnabled());
     _queryContext = queryContext;
     _dataSource = dataSource;
-    _numDocs = numDocs;
-  }
-
-  @Override
-  protected FilterBlock getNextBlock() {
-    if (_queryContext.isNullHandlingEnabled()) {
-      ImmutableRoaringBitmap nullBitmap = getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        return new FilterBlock(excludeNulls(getNextBlockWithoutNullHandling(), nullBitmap));
-      }
-    }
-    return new FilterBlock(getNextBlockWithoutNullHandling());
   }
 
   protected abstract BlockDocIdSet getNextBlockWithoutNullHandling();
+
+  @Override
+  protected BlockDocIdSet getTrues() {
+    if (_nullHandlingEnabled) {
+      ImmutableRoaringBitmap nullBitmap = getNullBitmap();
+      if (nullBitmap != null && !nullBitmap.isEmpty()) {
+        return excludeNulls(getNextBlockWithoutNullHandling(), nullBitmap);
+      }
+    }
+    return getNextBlockWithoutNullHandling();
+  }
+
+
+  @Override
+  protected BlockDocIdSet getNulls() {
+    return new BitmapDocIdSet(getNullBitmap(), _numDocs);
+  }
 
   private BlockDocIdSet excludeNulls(BlockDocIdSet blockDocIdSet, ImmutableRoaringBitmap nullBitmap) {
     return new AndDocIdSet(Arrays.asList(blockDocIdSet,

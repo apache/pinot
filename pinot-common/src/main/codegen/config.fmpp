@@ -526,6 +526,7 @@ data: {
     # List of extended statement syntax to add
     statementParserMethods: [
       "SqlInsertFromFile()"
+      "SqlPhysicalExplain()"
     ]
 
     # List of custom function syntax to add

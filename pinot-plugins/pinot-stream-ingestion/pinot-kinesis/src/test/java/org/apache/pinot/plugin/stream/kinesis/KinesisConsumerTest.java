@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -91,6 +92,7 @@ public class KinesisConsumerTest {
     for (int i = 0; i < NUM_RECORDS; i++) {
       Record record =
           Record.builder().data(SdkBytes.fromUtf8String(DUMMY_RECORD_PREFIX + i)).partitionKey(PARTITION_KEY_PREFIX + i)
+              .approximateArrivalTimestamp(Instant.now())
               .sequenceNumber(String.valueOf(i + 1)).build();
       _recordList.add(record);
     }
@@ -122,7 +124,7 @@ public class KinesisConsumerTest {
     Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), NUM_RECORDS);
 
     for (int i = 0; i < NUM_RECORDS; i++) {
-      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i)), DUMMY_RECORD_PREFIX + i);
+      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i).getValue()), DUMMY_RECORD_PREFIX + i);
     }
 
     Assert.assertFalse(kinesisRecordsBatch.isEndOfPartitionGroup());
@@ -155,7 +157,7 @@ public class KinesisConsumerTest {
     Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), MAX_RECORDS_TO_FETCH);
 
     for (int i = 0; i < NUM_RECORDS; i++) {
-      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i)), DUMMY_RECORD_PREFIX + i);
+      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i).getValue()), DUMMY_RECORD_PREFIX + i);
     }
   }
 
@@ -191,7 +193,7 @@ public class KinesisConsumerTest {
     Assert.assertEquals(kinesisRecordsBatch.getMessageCount(), NUM_RECORDS);
 
     for (int i = 0; i < NUM_RECORDS; i++) {
-      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i)), DUMMY_RECORD_PREFIX + i);
+      Assert.assertEquals(baToString(kinesisRecordsBatch.getMessageAtIndex(i).getValue()), DUMMY_RECORD_PREFIX + i);
     }
   }
 

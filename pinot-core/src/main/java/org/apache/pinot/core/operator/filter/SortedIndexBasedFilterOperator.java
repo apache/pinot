@@ -35,7 +35,7 @@ import org.apache.pinot.spi.utils.Pairs.IntPair;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class SortedIndexBasedFilterOperator extends NullHandlingSupportedSingleColumnLeafFilterOperator {
+public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_SORTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;

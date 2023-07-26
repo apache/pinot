@@ -32,7 +32,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 
 
-public class ScanBasedFilterOperator extends NullHandlingSupportedSingleColumnLeafFilterOperator {
+public class ScanBasedFilterOperator extends BaseColumnFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_FULL_SCAN";
 
   private final PredicateEvaluator _predicateEvaluator;
@@ -57,8 +57,7 @@ public class ScanBasedFilterOperator extends NullHandlingSupportedSingleColumnLe
   protected BlockDocIdSet getNextBlockWithoutNullHandling() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
     if (dataSourceMetadata.isSingleValue()) {
-      return new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, false,
-          _batchSize);
+      return new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, false, _batchSize);
     } else {
       return new MVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs);
     }
