@@ -34,11 +34,8 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
   private int _maxByteSize;
   private int _fixedSize = -1;
 
-  public SumPrecisionValueAggregator() {
-  }
-
   /*
-    Aggregate with a optimal maximum precision in mind. Scale is always only 1 32-bit
+    Aggregate with an optimal maximum precision in mind. Scale is always only 1 32-bit
     int and the storing of the scale value does not affect the size of the big decimal.
     Given this, we won't care about scale in terms of the aggregations.
     During query time, the optional scale parameter can be provided, but during aggregation,
