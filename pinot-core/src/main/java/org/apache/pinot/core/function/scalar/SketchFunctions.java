@@ -194,76 +194,76 @@ public class SketchFunctions {
     return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());
   }
 
-  @ScalarFunction(names = {"get_sketch_estimate"})
-  public static Long getSketchEstimate(Object sketchObject) {
-    return Math.round(toSketch(sketchObject).getEstimate());
+  @ScalarFunction(names = {"getThetaSketchEstimate", "get_theta_sketch_estimate"})
+  public static long getThetaSketchEstimate(Object sketchObject) {
+    return Math.round(asThetaSketch(sketchObject).getEstimate());
   }
 
-  @ScalarFunction(names = {"sketch_union"})
-  public static Sketch sketchUnion(Object o1, Object o2) {
-    return sketchUnionVar(o1, o2);
+  @ScalarFunction(names = {"thetaSketchUnion", "theta_sketch_union"})
+  public static Sketch thetaSketchUnion(Object o1, Object o2) {
+    return thetaSketchUnionVar(o1, o2);
   }
 
-  @ScalarFunction(names = {"sketch_union"})
-  public static Sketch sketchUnion(Object o1, Object o2, Object o3) {
-    return sketchUnionVar(o1, o2, o3);
+  @ScalarFunction(names = {"thetaSketchUnion", "theta_sketch_union"})
+  public static Sketch thetaSketchUnion(Object o1, Object o2, Object o3) {
+    return thetaSketchUnionVar(o1, o2, o3);
   }
 
-  @ScalarFunction(names = {"sketch_union"})
-  public static Sketch sketchUnion(Object o1, Object o2, Object o3, Object o4) {
-    return sketchUnionVar(o1, o2, o3, o4);
+  @ScalarFunction(names = {"thetaSketchUnion", "theta_sketch_union"})
+  public static Sketch thetaSketchUnion(Object o1, Object o2, Object o3, Object o4) {
+    return thetaSketchUnionVar(o1, o2, o3, o4);
   }
 
-  @ScalarFunction(names = {"sketch_union"})
-  public static Sketch sketchUnion(Object o1, Object o2, Object o3, Object o4, Object o5) {
-    return sketchUnionVar(o1, o2, o3, o4, o5);
+  @ScalarFunction(names = {"thetaSketchUnion", "theta_sketch_union"})
+  public static Sketch thetaSketchUnion(Object o1, Object o2, Object o3, Object o4, Object o5) {
+    return thetaSketchUnionVar(o1, o2, o3, o4, o5);
   }
 
-  @ScalarFunction(names = {"sketch_intersect"})
-  public static Sketch sketchIntersect(Object o1, Object o2) {
-    return sketchIntersectVar(o1, o2);
+  @ScalarFunction(names = {"thetaSketchIntersect", "theta_sketch_intersect"})
+  public static Sketch thetaSketchIntersect(Object o1, Object o2) {
+    return thetaSketchIntersectVar(o1, o2);
   }
 
-  @ScalarFunction(names = {"sketch_intersect"})
-  public static Sketch sketchIntersect(Object o1, Object o2, Object o3) {
-    return sketchIntersectVar(o1, o2, o3);
+  @ScalarFunction(names = {"thetaSketchIntersect", "theta_sketch_intersect"})
+  public static Sketch thetaSketchIntersect(Object o1, Object o2, Object o3) {
+    return thetaSketchIntersectVar(o1, o2, o3);
   }
 
-  @ScalarFunction(names = {"sketch_intersect"})
-  public static Sketch sketchIntersect(Object o1, Object o2, Object o3, Object o4) {
-    return sketchIntersectVar(o1, o2, o3, o4);
+  @ScalarFunction(names = {"thetaSketchIntersect", "theta_sketch_intersect"})
+  public static Sketch thetaSketchIntersect(Object o1, Object o2, Object o3, Object o4) {
+    return thetaSketchIntersectVar(o1, o2, o3, o4);
   }
 
-  @ScalarFunction(names = {"sketch_intersect"})
-  public static Sketch sketchIntersect(Object o1, Object o2, Object o3, Object o4, Object o5) {
-    return sketchIntersectVar(o1, o2, o3, o4, o5);
+  @ScalarFunction(names = {"thetaSketchIntersect", "theta_sketch_intersect"})
+  public static Sketch thetaSketchIntersect(Object o1, Object o2, Object o3, Object o4, Object o5) {
+    return thetaSketchIntersectVar(o1, o2, o3, o4, o5);
   }
 
-  @ScalarFunction(names = {"sketch_diff"})
-  public static Sketch sketchDiff(Object sketchObjectA, Object sketchObjectB) {
+  @ScalarFunction(names = {"thetaSketchDiff", "theta_sketch_diff"})
+  public static Sketch thetaSketchDiff(Object sketchObjectA, Object sketchObjectB) {
     AnotB diff = SET_OPERATION_BUILDER.buildANotB();
-    diff.setA(toSketch(sketchObjectA));
-    diff.notB(toSketch(sketchObjectB));
+    diff.setA(asThetaSketch(sketchObjectA));
+    diff.notB(asThetaSketch(sketchObjectB));
     return diff.getResult(false, null, false);
   }
 
-  private static Sketch sketchUnionVar(Object... sketchObjects) {
+  private static Sketch thetaSketchUnionVar(Object... sketchObjects) {
     Union union = SET_OPERATION_BUILDER.buildUnion();
     for (Object sketchObj : sketchObjects) {
-      union.union(toSketch(sketchObj));
+      union.union(asThetaSketch(sketchObj));
     }
     return union.getResult(false, null);
   }
 
-  private static Sketch sketchIntersectVar(Object... sketchObjects) {
+  private static Sketch thetaSketchIntersectVar(Object... sketchObjects) {
     Intersection intersection = SET_OPERATION_BUILDER.buildIntersection();
     for (Object sketchObj : sketchObjects) {
-      intersection.intersect(toSketch(sketchObj));
+      intersection.intersect(asThetaSketch(sketchObj));
     }
     return intersection.getResult(false, null);
   }
 
-  private static Sketch toSketch(Object sketchObj) {
+  private static Sketch asThetaSketch(Object sketchObj) {
     if (sketchObj instanceof String) {
       byte[] decoded = Base64.getDecoder().decode((String) sketchObj);
       return Sketches.wrapSketch(Memory.wrap((decoded)));
