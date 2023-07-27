@@ -138,17 +138,9 @@ public final class TableConfigUtils {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
-    // Only allow realtime tables with LLC consumer.type
+    // Only allow realtime tables with non-null stream.type and LLC consumer.type
     if (tableConfig.getTableType() == TableType.REALTIME) {
-      Map<String, String> streamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
-      String streamType = streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE);
-      Preconditions.checkNotNull(streamType, "stream.type cannot be null for REALTIME table");
-      String streamConsumerType = streamConfigsMap.getOrDefault(
-          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-          StreamConfig.ConsumerType.LOWLEVEL.name());
-      Preconditions.checkState(StreamConfig.ConsumerType.LOWLEVEL.name()
-              .equalsIgnoreCase(streamConsumerType) || "simple".equalsIgnoreCase(streamConsumerType),
-          "Realtime tables with HLC consumer (consumer.type=highlevel) is no longer supported in Apache Pinot");
+      validateStreamConfigs(IngestionConfigUtils.getStreamConfigMap(tableConfig));
     }
 
     // skip all validation if skip type ALL is selected.
@@ -168,6 +160,21 @@ public final class TableConfigUtils {
         validateTaskConfigs(tableConfig, schema);
       }
     }
+  }
+
+  public static void validateStreamConfigs(Map<String, String> streamConfigsMap) {
+    String streamType = streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE);
+    Preconditions.checkNotNull(streamType, "stream.type cannot be null for REALTIME table");
+    Preconditions.checkState(isValidConsumerType(streamType, streamConfigsMap),
+        "Realtime tables with HLC consumer (consumer.type=highlevel) is no longer supported in Apache Pinot");
+  }
+
+  public static boolean isValidConsumerType(String streamType, Map<String, String> streamConfigsMap) {
+    String streamConsumerType = streamConfigsMap.getOrDefault(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        StreamConfig.ConsumerType.LOWLEVEL.name());
+    return StreamConfig.ConsumerType.LOWLEVEL.name().equalsIgnoreCase(streamConsumerType)
+        || "simple".equalsIgnoreCase(streamConsumerType);
   }
 
   private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {

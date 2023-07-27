@@ -100,6 +100,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -108,7 +109,6 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
-import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -500,13 +500,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       TableConfig tableConfig = _helixResourceManager.getTableConfig(rt);
       if (tableConfig != null) {
         Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
-        String streamType = streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka");
-        String consumerType = streamConfigMap.get(StreamConfigProperties.constructStreamProperty(streamType,
-            StreamConfigProperties.STREAM_CONSUMER_TYPES));
-        if (StreamConfig.ConsumerType.LOWLEVEL.name().equalsIgnoreCase(consumerType)
-            || "simple".equalsIgnoreCase(consumerType)) {
-          return;
-        } else {
+        if (!TableConfigUtils.isValidConsumerType(
+            streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"), streamConfigMap)) {
           existingHlcTables.add(rt);
         }
       }
