@@ -513,8 +513,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
     if (existingHlcTables.size() > 0) {
       LOGGER.error("High Level Consumer (HLC) based realtime tables are no longer supported. Please delete the "
-          + "following HLC tables before proceeding: \n");
-      existingHlcTables.forEach(s -> LOGGER.error("{}\n", s));
+          + "following HLC tables before proceeding: {}\n", existingHlcTables);
       throw new RuntimeException("Unable to start controller due to existing HLC tables!");
     }
 

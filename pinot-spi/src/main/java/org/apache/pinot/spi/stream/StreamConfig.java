@@ -126,7 +126,6 @@ public class StreamConfig {
     String consumerFactoryClassKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS);
     // For backward compatibility, default consumer factory is for Kafka.
-    // TODO: remove this default and make it mandatory to have a factory class
     _consumerFactoryClassName =
         streamConfigMap.getOrDefault(consumerFactoryClassKey, DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING);
 
