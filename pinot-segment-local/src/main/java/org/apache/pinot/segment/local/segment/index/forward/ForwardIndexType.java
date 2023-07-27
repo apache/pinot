@@ -215,7 +215,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   protected IndexReaderFactory<ForwardIndexReader> createReaderFactory() {
-    return ForwardIndexReaderFactory.INSTANCE;
+    return ForwardIndexReaderFactory._instance;
   }
 
   public String getFileExtension(ColumnMetadata columnMetadata) {

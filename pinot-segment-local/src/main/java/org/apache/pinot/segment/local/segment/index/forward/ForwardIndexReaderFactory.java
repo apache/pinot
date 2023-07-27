@@ -42,10 +42,10 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<ForwardIndexConfig, ForwardIndexReader> {
 
-  public static ForwardIndexReaderFactory INSTANCE = new ForwardIndexReaderFactory();
+  public static ForwardIndexReaderFactory _instance = new ForwardIndexReaderFactory();
 
   public static void setInstance(ForwardIndexReaderFactory factory) {
-    INSTANCE = factory;
+    _instance = factory;
   }
 
   @Override
