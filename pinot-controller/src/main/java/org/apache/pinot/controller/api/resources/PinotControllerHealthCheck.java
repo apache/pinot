@@ -41,6 +41,9 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -63,6 +66,7 @@ public class PinotControllerHealthCheck {
 
   @GET
   @Path("pinot-controller/admin")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)
@@ -75,6 +79,7 @@ public class PinotControllerHealthCheck {
 
   @GET
   @Path("health")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)

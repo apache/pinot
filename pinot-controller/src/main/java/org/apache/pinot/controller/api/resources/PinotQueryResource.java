@@ -130,6 +130,7 @@ public class PinotQueryResource {
 
   @GET
   @Path("sql")
+  @ManualAuthorization
   public String handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
       @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     try {

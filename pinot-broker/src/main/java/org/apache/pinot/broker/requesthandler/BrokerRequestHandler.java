@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -38,13 +39,13 @@ public interface BrokerRequestHandler {
   void shutDown();
 
   BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws Exception;
 
   default BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext)
+      RequestContext requestContext, HttpHeaders httpHeaders)
       throws Exception {
-    return handleRequest(request, null, requesterIdentity, requestContext);
+    return handleRequest(request, null, requesterIdentity, requestContext, httpHeaders);
   }
 
   Map<Long, String> getRunningQueries();
