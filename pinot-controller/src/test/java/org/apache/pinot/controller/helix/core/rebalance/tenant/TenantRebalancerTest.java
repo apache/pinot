@@ -128,7 +128,8 @@ public class TenantRebalancerTest extends ControllerTest {
     int retries = 5;
     while (retries > 0) {
       try {
-        if (getProgress(jobId).getRemainingTables() == 0) {
+        TenantRebalanceProgressStats stats = getProgress(jobId);
+        if (stats != null && stats.getRemainingTables() == 0) {
           return true;
         }
         retries--;
@@ -144,6 +145,9 @@ public class TenantRebalancerTest extends ControllerTest {
       throws JsonProcessingException {
     Map<String, String> controllerJobZKMetadata =
         _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TENANT_REBALANCE);
+    if (controllerJobZKMetadata == null) {
+      return null;
+    }
     return JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceConfigConstants.REBALANCE_PROGRESS_STATS),
         TenantRebalanceProgressStats.class);
   }
