@@ -268,14 +268,9 @@ public class MutableSegmentImpl implements MutableSegment {
       }
       // We consider fields whose values have a fixed size to be fixed width fields.
       FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
-      boolean isFieldFixed = (
-          storedType.isFixedWidth()
-              || (
-                  (storedType.getStoredType() == BYTES
-                      || storedType.getStoredType() == BIG_DECIMAL
-                  ) && fixedByteSize > 0 && consumingAggregatedMetric
-              )
-      );
+      if (storedType.isFixedWidth()) {
+        fixedByteSize = storedType.size();
+      }
 
       FieldIndexConfigs indexConfigs = Optional.ofNullable(config.getIndexConfigByCol().get(column))
           .orElse(FieldIndexConfigs.EMPTY);
@@ -287,7 +282,7 @@ public class MutableSegmentImpl implements MutableSegment {
               .withEstimatedColSize(_statsHistory.getEstimatedAvgColSize(column))
               .withAvgNumMultiValues(_statsHistory.getEstimatedAvgColSize(column))
               .withConsumerDir(config.getConsumerDir() != null ? new File(config.getConsumerDir()) : null)
-              .withFixedLengthBytes(isFieldFixed ? fixedByteSize : -1)
+              .withFixedLengthBytes(fixedByteSize)
               .build();
 
       // Partition info
