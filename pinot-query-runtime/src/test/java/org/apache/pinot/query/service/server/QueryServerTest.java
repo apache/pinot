@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.service;
+package org.apache.pinot.query.service.server;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -47,6 +47,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -107,23 +108,18 @@ public class QueryServerTest extends QueryTestSet {
   @Test
   public void testException() {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery("SELECT * FROM a");
-
-    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
-      if (stageId > 0) { // we do not test reduce stage.
-        // only get one worker request out.
-        Worker.QueryRequest queryRequest = getQueryRequest(dispatchableSubPlan, stageId);
-        QueryRunner mockRunner =
-            _queryRunnerMap.get(Integer.parseInt(queryRequest.getMetadataOrThrow(KEY_OF_SERVER_INSTANCE_PORT)));
-        Mockito.doThrow(new RuntimeException("foo")).when(mockRunner).processQuery(Mockito.any(), Mockito.anyMap());
-        // submit the request for testing.
-        Worker.QueryResponse resp = submitRequest(queryRequest);
-        // should contain error message pattern
-        String errorMessage = resp.getMetadataMap().get(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR);
-        Assert.assertTrue(errorMessage.contains("foo"));
-        // reset the mock runner.
-        Mockito.reset(mockRunner);
-      }
-    }
+    // only get one worker request out.
+    Worker.QueryRequest queryRequest = getQueryRequest(dispatchableSubPlan, 1);
+    QueryRunner mockRunner =
+        _queryRunnerMap.get(Integer.parseInt(queryRequest.getMetadataOrThrow(KEY_OF_SERVER_INSTANCE_PORT)));
+    Mockito.doThrow(new RuntimeException("foo")).when(mockRunner).processQuery(Mockito.any(), Mockito.anyMap());
+    // submit the request for testing.
+    Worker.QueryResponse resp = submitRequest(queryRequest);
+    // reset the mock runner before assert.
+    Mockito.reset(mockRunner);
+    // should contain error message pattern
+    String errorMessage = resp.getMetadataMap().get(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR);
+    Assert.assertTrue(errorMessage.contains("foo"));
   }
 
   @Test(dataProvider = "testSql")

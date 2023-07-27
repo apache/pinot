@@ -26,7 +26,7 @@ import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.QueryConfig;
-import org.apache.pinot.query.service.QueryServer;
+import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
