@@ -73,11 +73,16 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     startBroker();
     startServers(NUM_SERVERS);
 
-    // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
-
     // Start Kafka and push data into Kafka
     startKafka();
+
+    populateTables();
+  }
+
+  protected void populateTables()
+      throws Exception {
+    // Unpack the Avro files
+    List<File> avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload schema and table config
     Schema schema = createSchema();
@@ -192,6 +197,16 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
     assertEquals(getCurrentCountStarResultWithoutUpsert(), getCountStarResultWithoutUpsert());
 
+    waitForSnapshotCreation();
+
+    // Restart the servers and check again
+    restartServers();
+    verifyIdealState(7);
+    waitForAllDocsLoaded(600_000L);
+  }
+
+  private void waitForSnapshotCreation()
+      throws Exception {
     Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
     // trigger force commit for snapshots
     String jobId = forceCommit(getTableName());
@@ -211,7 +226,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
                 serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR);
             File[] files = new File(segmentDir, getTableName() + "_REALTIME").listFiles();
             for (File file : files) {
-              if (file.getName().contains("tmp") || file.getName().contains("consumer")) {
+              if (!file.getName().startsWith(getTableName())) {
                 continue;
               }
               if (file.isDirectory()) {
@@ -232,14 +247,9 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
         return false;
       }
     }, 60000L, "Error verifying force commit operation on table!");
-
-    // Restart the servers and check again
-    restartServers();
-    verifyIdealState(7);
-    waitForAllDocsLoaded(600_000L);
   }
 
-  private void verifyIdealState(int numSegmentsExpected) {
+  protected void verifyIdealState(int numSegmentsExpected) {
     IdealState idealState = HelixHelper.getTableIdealState(_helixManager, REALTIME_TABLE_NAME);
     Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
     assertEquals(segmentAssignment.size(), numSegmentsExpected);
@@ -295,7 +305,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     }
   }
 
-  public Set<String> getConsumingSegmentsFromIdealState(String tableNameWithType) {
+  protected Set<String> getConsumingSegmentsFromIdealState(String tableNameWithType) {
     IdealState tableIdealState = _controllerStarter.getHelixResourceManager().getTableIdealState(tableNameWithType);
     Map<String, Map<String, String>> segmentAssignment = tableIdealState.getRecord().getMapFields();
     Set<String> matchingSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
@@ -308,7 +318,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     return matchingSegments;
   }
 
-  public boolean isForceCommitJobCompleted(String forceCommitJobId)
+  protected boolean isForceCommitJobCompleted(String forceCommitJobId)
       throws Exception {
     String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forForceCommitJobStatus(forceCommitJobId));
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
@@ -318,7 +328,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     return jobStatus.get("numberOfSegmentsYetToBeCommitted").asInt(-1) == 0;
   }
 
-  private String forceCommit(String tableName)
+  protected String forceCommit(String tableName)
       throws Exception {
     String response = sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName), null);
     return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
