@@ -608,4 +608,24 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
     assertArrayEquals(rows.get(0), new Object[]{-1, 1});
   }
+
+  @Test
+  public void testBaseColumnFilterOperatorGetNullBitmapIsNull()
+      throws Exception {
+    initializeRows();
+    insertRow(false);
+    insertRow(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(Collections.singletonList(COLUMN1)).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE NOT(%s = false)", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{true});
+  }
 }

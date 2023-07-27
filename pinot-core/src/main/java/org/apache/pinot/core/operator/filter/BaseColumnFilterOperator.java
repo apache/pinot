@@ -19,9 +19,11 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
@@ -51,10 +53,14 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
     return getNextBlockWithoutNullHandling();
   }
 
-
   @Override
   protected BlockDocIdSet getNulls() {
-    return new BitmapDocIdSet(getNullBitmap(), _numDocs);
+    ImmutableRoaringBitmap nullBitmap = getNullBitmap();
+    if (nullBitmap != null && !nullBitmap.isEmpty()) {
+      return new BitmapDocIdSet(nullBitmap, _numDocs);
+    } else {
+      return EmptyDocIdSet.getInstance();
+    }
   }
 
   private BlockDocIdSet excludeNulls(BlockDocIdSet blockDocIdSet, ImmutableRoaringBitmap nullBitmap) {
@@ -63,6 +69,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
         _queryContext.getQueryOptions());
   }
 
+  @Nullable
   private ImmutableRoaringBitmap getNullBitmap() {
     NullValueVectorReader nullValueVector = _dataSource.getNullValueVector();
     if (nullValueVector != null) {
