@@ -26,11 +26,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
@@ -38,6 +36,7 @@ import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -64,6 +63,7 @@ import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.query.service.SubmissionService;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -136,9 +136,8 @@ public class QueryDispatcher {
       throws Exception {
     int reduceStageId = -1;
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
-    BlockingQueue<AsyncQueryDispatchResponse> dispatchCallbacks = new LinkedBlockingQueue<>();
-    int dispatchCalls = 0;
-
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
+    SubmissionService submissionService = new SubmissionService(_executorService);
     for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
       // stage rooting at a mailbox receive node means reduce stage.
       if (dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
@@ -154,39 +153,23 @@ public class QueryDispatcher {
           queryRequestBuilder.addStagePlan(
               QueryPlanSerDeUtils.serialize(dispatchableSubPlan, stageId, queryServerInstance,
                   queryServerEntry.getValue()));
-          dispatchCalls++;
           Worker.QueryRequest queryRequest =
               queryRequestBuilder.putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId))
                   .putMetadata(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS, String.valueOf(timeoutMs))
                   .putAllMetadata(queryOptions).build();
           DispatchClient client = getOrCreateDispatchClient(host, servicePort);
           int finalStageId = stageId;
-          _executorService.submit(() -> client.submit(queryRequest, finalStageId, queryServerInstance, deadline,
-              dispatchCallbacks::offer));
+          submissionService.submit(() -> {
+            client.submit(queryRequest, finalStageId, queryServerInstance, deadline);
+          });
         }
       }
     }
-    int successfulDispatchCalls = 0;
-    // TODO: Cancel all dispatched requests if one of the dispatch errors out or deadline is breached.
-    while (!deadline.isExpired() && successfulDispatchCalls < dispatchCalls) {
-      AsyncQueryDispatchResponse resp =
-          dispatchCallbacks.poll(DEFAULT_DISPATCHER_CALLBACK_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-      if (resp != null) {
-        if (resp.getThrowable() != null) {
-          throw new RuntimeException(
-              String.format("Error dispatching query to server=%s stage=%s", resp.getVirtualServer(),
-                  resp.getStageId()), resp.getThrowable());
-        } else {
-          Worker.QueryResponse response = resp.getQueryResponse();
-          if (response.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
-            throw new RuntimeException(
-                String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", resp.getStageId(),
-                    resp.getVirtualServer(),
-                    response.getMetadataOrDefault(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR, "null")));
-          }
-          successfulDispatchCalls++;
-        }
-      }
+    try {
+      submissionService.awaitFinish(deadlineMs);
+    } catch (Throwable t) {
+      throw new RuntimeException(String.format("Unable to execute query plan for %d.\nCaused by:\n%s", requestId,
+          QueryException.getTruncatedStackTrace(t)), t);
     }
     if (deadline.isExpired()) {
       throw new RuntimeException("Timed out waiting for response of async query-dispatch");

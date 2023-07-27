@@ -62,7 +62,6 @@ public class QueryDispatcherTest extends QueryTestSet {
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
 
   private QueryEnvironment _queryEnvironment;
-  private DispatchClient _dispatchClient;
 
   @BeforeClass
   public void setUp()
@@ -118,7 +117,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableSubPlan, 10_000L, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+      Assert.assertTrue(e.getMessage().contains("dispatch"), "Incorrect error msg: " + e.getMessage());
     }
     dispatcher.shutdown();
   }
@@ -146,7 +145,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Error executing query"));
+      Assert.assertTrue(e.getMessage().contains("executing"), "Incorrect error msg: " + e.getMessage());
     }
     // wait just a little, until the cancel is being called.
     Thread.sleep(50);
@@ -172,7 +171,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       System.out.println("e = " + e);
-      Assert.assertTrue(e.getMessage().contains("Error executing query"));
+      Assert.assertTrue(e.getMessage().contains("executing"), "Incorrect error msg: " + e.getMessage());
     }
     // wait just a little, until the cancel is being called.
     Thread.sleep(50);
@@ -203,7 +202,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableSubPlan, 10_000L, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+      Assert.assertTrue(e.getMessage().contains("dispatch"), "Incorrect error msg: " + e.getMessage());
     }
     dispatcher.shutdown();
   }
@@ -229,8 +228,8 @@ public class QueryDispatcherTest extends QueryTestSet {
       dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableSubPlan, 1_000, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Timed out waiting for response")
-          || e.getMessage().contains("Error dispatching query"));
+      Assert.assertTrue(e.getMessage().contains("Timeout")
+          || e.getMessage().contains("dispatch"), "Incorrect error msg: " + e.getMessage());
     }
     neverClosingLatch.countDown();
     dispatcher.shutdown();
@@ -245,7 +244,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       dispatcher.submit(RANDOM_REQUEST_ID_GEN.nextLong(), dispatchableSubPlan, -10_000, new HashMap<>());
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Timed out waiting"));
+      Assert.assertTrue(e.getMessage().contains("Timeout"), "Incorrect error msg: " + e.getMessage());
     }
     dispatcher.shutdown();
   }

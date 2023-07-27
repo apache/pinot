@@ -22,7 +22,8 @@ import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import java.util.function.Consumer;
+import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.routing.QueryServerInstance;
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 class DispatchClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(DispatchClient.class);
-  private static final StreamObserver<Worker.CancelResponse> NO_OP_CANCEL_STREAM_OBSERVER = new CancelObserver();
+  private static final StreamObserver<Worker.CancelResponse> NO_OP_CANCEL_STREAM_OBSERVER = new NoOpObserver();
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
@@ -51,14 +52,14 @@ class DispatchClient {
     return _channel;
   }
 
-  public void submit(Worker.QueryRequest request, int stageId, QueryServerInstance virtualServer, Deadline deadline,
-      Consumer<AsyncQueryDispatchResponse> callback) {
+  public void submit(Worker.QueryRequest request, int stageId, QueryServerInstance virtualServer, Deadline deadline) {
     try {
-      _dispatchStub.withDeadline(deadline).submit(request, new DispatchObserver(stageId, virtualServer, callback));
+      DispatchObserver dispatchObserver = new DispatchObserver(stageId, virtualServer);
+      _dispatchStub.withDeadline(deadline).submit(request, dispatchObserver);
+      dispatchObserver.await(deadline.timeRemaining(TimeUnit.MILLISECONDS));
     } catch (Exception e) {
       LOGGER.error("Query Dispatch failed at client-side", e);
-      callback.accept(new AsyncQueryDispatchResponse(
-          virtualServer, stageId, Worker.QueryResponse.getDefaultInstance(), e));
+      Utils.rethrowException(e);
     }
   }
 
@@ -68,6 +69,20 @@ class DispatchClient {
       _dispatchStub.cancel(cancelRequest, NO_OP_CANCEL_STREAM_OBSERVER);
     } catch (Exception e) {
       LOGGER.error("Query Cancellation failed at client-side", e);
+    }
+  }
+
+  private static class NoOpObserver implements StreamObserver<Worker.CancelResponse> {
+    @Override
+    public void onNext(Worker.CancelResponse cancelResponse) {
+    }
+
+    @Override
+    public void onError(Throwable throwable) {
+    }
+
+    @Override
+    public void onCompleted() {
     }
   }
 }

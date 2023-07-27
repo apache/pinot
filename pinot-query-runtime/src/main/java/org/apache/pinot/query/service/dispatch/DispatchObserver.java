@@ -19,25 +19,27 @@
 package org.apache.pinot.query.service.dispatch;
 
 import io.grpc.stub.StreamObserver;
-import java.util.function.Consumer;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.service.QueryConfig;
 
 
 /**
  * A {@link StreamObserver} used by {@link DispatchClient} to subscribe to the response of a async Query Dispatch call.
  */
 class DispatchObserver implements StreamObserver<Worker.QueryResponse> {
-  private int _stageId;
-  private QueryServerInstance _virtualServer;
-  private Consumer<AsyncQueryDispatchResponse> _callback;
-  private Worker.QueryResponse _queryResponse;
+  private final int _stageId;
+  private final QueryServerInstance _virtualServer;
+  private final CountDownLatch _latch = new CountDownLatch(1);
 
-  public DispatchObserver(int stageId, QueryServerInstance virtualServer,
-      Consumer<AsyncQueryDispatchResponse> callback) {
+  private Worker.QueryResponse _queryResponse;
+  private Throwable _throwable;
+
+  public DispatchObserver(int stageId, QueryServerInstance virtualServer) {
     _stageId = stageId;
     _virtualServer = virtualServer;
-    _callback = callback;
   }
 
   @Override
@@ -47,13 +49,29 @@ class DispatchObserver implements StreamObserver<Worker.QueryResponse> {
 
   @Override
   public void onError(Throwable throwable) {
-    _callback.accept(
-        new AsyncQueryDispatchResponse(_virtualServer, _stageId, Worker.QueryResponse.getDefaultInstance(),
-            throwable));
+    _throwable = throwable;
+    _latch.countDown();
   }
 
   @Override
   public void onCompleted() {
-    _callback.accept(new AsyncQueryDispatchResponse(_virtualServer, _stageId, _queryResponse, null));
+    _latch.countDown();
+  }
+
+  public void await(long timeoutMs) throws InterruptedException {
+    boolean awaitSuccess = _latch.await(timeoutMs, TimeUnit.MILLISECONDS);
+    if (_throwable != null) {
+      throw new RuntimeException(String.format("Unable to dispatch query plan at stage %s on server %s",
+          _stageId, _virtualServer), _throwable);
+    } else if (_queryResponse == null || !awaitSuccess) {
+      throw new RuntimeException(String.format("Unable to dispatch query plan at stage %s on server %s: ERROR: %s",
+          _stageId, _virtualServer, "Timeout occurred or query submission unable to return"));
+    } else {
+      if (_queryResponse.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
+        throw new RuntimeException(String.format("Unable to dispatch query plan at stage %s on server %s: ERROR: %s",
+            _stageId, _virtualServer, _queryResponse.getMetadataOrDefault(
+                QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR, "null")));
+      }
+    }
   }
 }
