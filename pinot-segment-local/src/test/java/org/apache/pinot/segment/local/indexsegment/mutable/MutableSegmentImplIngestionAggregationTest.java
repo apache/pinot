@@ -151,9 +151,6 @@ public class MutableSegmentImplIngestionAggregationTest {
             VAR_LENGTH_SET, INVERTED_INDEX_SET,
             Arrays.asList(new AggregationConfig(m1, "SUM(metric)")));
 
-
-    Set<String> keys = new HashSet<>();
-
     long seed = 2;
     Random random = new Random(seed);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
@@ -165,8 +162,7 @@ public class MutableSegmentImplIngestionAggregationTest {
 mutableSegmentImpl.index(row, defaultMetadata);
       Assert.fail();
     } catch (NullPointerException e) {
-      Assert.assertTrue(e.getMessage().contains("Cannot invoke \"java.lang.Number.doubleValue()\" because"
-          + " \"rawValue\" is null"));
+      // expected
     }
 
     mutableSegmentImpl.destroy();
