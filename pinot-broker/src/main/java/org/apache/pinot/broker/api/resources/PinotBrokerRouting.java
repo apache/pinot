@@ -36,6 +36,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -52,6 +55,7 @@ public class PinotBrokerRouting {
   @PUT
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/routing/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.BUILD_ROUTING)
   @ApiOperation(value = "Build/rebuild the routing for a table", notes = "Build/rebuild the routing for a table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -66,6 +70,7 @@ public class PinotBrokerRouting {
   @PUT
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/routing/refresh/{tableName}/{segmentName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REFRESH_ROUTING)
   @ApiOperation(value = "Refresh the routing for a segment", notes = "Refresh the routing for a segment")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -81,6 +86,7 @@ public class PinotBrokerRouting {
   @DELETE
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/routing/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_ROUTING)
   @ApiOperation(value = "Remove the routing for a table", notes = "Remove the routing for a table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
