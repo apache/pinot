@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
@@ -55,8 +55,8 @@ public class NotFilterOperatorTest {
     NotFilterOperator notFilterOperator =
         new NotFilterOperator(new TestFilterOperator(docIds, nullDocIds, numDocs), numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getTrues()), List.of(7, 8, 9));
-    Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getFalses()), List.of(0, 1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getTrues()), ImmutableList.of(7, 8, 9));
+    Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getFalses()), ImmutableList.of(0, 1, 2, 3));
   }
 
   @Test
@@ -65,7 +65,7 @@ public class NotFilterOperatorTest {
 
     NotFilterOperator notFilterOperator = new NotFilterOperator(EmptyFilterOperator.getInstance(), numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getTrues()), List.of(0, 1, 2, 3, 4));
+    Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getTrues()), ImmutableList.of(0, 1, 2, 3, 4));
     Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getFalses()), Collections.emptyList());
   }
 }
