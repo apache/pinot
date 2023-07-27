@@ -135,7 +135,7 @@ public class TransformQueriesTest extends BaseQueriesTest {
         .setIngestionConfig(new IngestionConfig(null, null, null,
             Arrays.asList(new TransformConfig(M1_V2, "Groovy({INT_COL1_V3  == null || "
                 + "INT_COL1_V3 == Integer.MIN_VALUE ? INT_COL1 : INT_COL1_V3 }, INT_COL1, INT_COL1_V3)")),
-            null, null))
+            null, null, null))
         .build();
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension(D1, FieldSpec.DataType.STRING)
