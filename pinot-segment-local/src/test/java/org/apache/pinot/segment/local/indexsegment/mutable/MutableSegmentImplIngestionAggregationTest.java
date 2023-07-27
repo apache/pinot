@@ -188,9 +188,6 @@ public class MutableSegmentImplIngestionAggregationTest {
   public void testDISTINCTCOUNTHLL() throws Exception {
     String m1 = "metric_DISTINCTCOUNTHLL";
     Schema schema = getSchemaBuilder().addMetric(m1, FieldSpec.DataType.BYTES).build();
-    // Size of hll object for when log2m is 12
-    schema.getFieldSpecFor(m1).setMaxLength(2740);
-
     MutableSegmentImpl mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(m1)),
             VAR_LENGTH_SET, INVERTED_INDEX_SET,
@@ -213,9 +210,8 @@ public class MutableSegmentImplIngestionAggregationTest {
 
     /*
     Assert that the distinct count is within an error margin. We assert on the cardinality of the HLL in the docID
-    and the
-    HLL we made, but also on the cardinality of the HLL in the docID and the actual cardinality from the set of
-    integers.
+    and the HLL we made, but also on the cardinality of the HLL in the docID and the actual cardinality from
+    the set of integers.
      */
     GenericRow reuse = new GenericRow();
     for (int docId = 0; docId < expected.size(); docId++) {

@@ -495,8 +495,6 @@ public class TableConfigUtilsTest {
     }
 
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.BYTES).build();
-    schema.getFieldSpecFor("d1").setMaxLength(180);
-
     // distinctcounthllmv is not supported, we expect this to not validate
     List<AggregationConfig> aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "DISTINCTCOUNTHLLMV(s1)"));
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
@@ -511,31 +509,27 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-// test the distinctcounthll validation for various log2m sizes
-    HashMap<Integer, Integer> log2mToExpectedSize = new HashMap<>();
-    log2mToExpectedSize.put(8, 180);
-    log2mToExpectedSize.put(12, 2740);
+    // distinctcounthll, expect that the function name in various forms (with and without underscores) still validates
+    aggregationConfigs = Arrays.asList(
+        new AggregationConfig("d1", "distinct_count_hll(s1)"),
+        new AggregationConfig("d1", "DISTINCTCOUNTHLL(s1)"),
+        new AggregationConfig("d1", "distinctcounthll(s1)"),
+        new AggregationConfig("d1", "DISTINCTCOUNT_HLL(s1)"),
+        new AggregationConfig("d1", "DISTINCT_COUNT_HLL(s1)")
+    );
 
-    for (Map.Entry<Integer, Integer> entry : log2mToExpectedSize.entrySet()) {
-      // set the max length to the HLL expected bytes size
-      schema.getFieldSpecFor("d1").setMaxLength(entry.getValue());
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
 
-      aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "DISTINCTCOUNTHLL(s1, " + entry.getKey() + ")"));
-      ingestionConfig.setAggregationConfigs(aggregationConfigs);
-      tableConfig =
-          new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
-              .setIngestionConfig(ingestionConfig).build();
-
-      try {
-        TableConfigUtils.validateIngestionConfig(tableConfig, schema);
-      } catch (IllegalStateException e) {
-        Assert.fail(
-            "The HLL object size based on the log2m doesn't match the destination BYTES field's maxLength property");
-      }
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.fail("Should not fail due to valid aggregation function");
     }
 
     // distinctcounthll, expect not specified log2m argument to default to 8
-    schema.getFieldSpecFor("d1").setMaxLength(180);
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "DISTINCTCOUNTHLL(s1)"));
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
@@ -545,7 +539,7 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
-      Assert.fail("Log2m defaulted to 8 but BYTES schema maxLength is not the expected size of 180");
+      Assert.fail("Log2m should have defaulted to 8");
     }
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "s1 + s2"));
@@ -559,6 +553,25 @@ public class TableConfigUtilsTest {
       Assert.fail("Should fail due to multiple arguments");
     } catch (IllegalStateException e) {
       // expected
+    }
+
+    // sumprecision, expect that the function name in various forms (with and without underscores) still validates
+    aggregationConfigs = Arrays.asList(
+        new AggregationConfig("d1", "sum_precision(s1, 10, 32)"),
+        new AggregationConfig("d1", "SUM_PRECISION(s1), 1"),
+        new AggregationConfig("d1", "sumprecision(s1, 2)"),
+        new AggregationConfig("d1", "SUMPRECISION(s1),10")
+    );
+
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.fail("Should not fail due to valid aggregation function");
     }
   }
 

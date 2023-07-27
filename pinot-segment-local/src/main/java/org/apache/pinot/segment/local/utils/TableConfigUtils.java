@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -385,51 +383,38 @@ public final class TableConfigUtils {
               "aggregation function must be a function for: %s", aggregationConfig);
 
           FunctionContext functionContext = expressionContext.getFunction();
+          AggregationFunctionType inputFunctionType =
+              AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
           validateIngestionAggregation(functionContext.getFunctionName());
 
           List<ExpressionContext> arguments = functionContext.getArguments();
 
-          if ((DISTINCTCOUNTHLL.name().toLowerCase().equals(functionContext.getFunctionName()))
-              || (SUMPRECISION.name().toLowerCase().equals(functionContext.getFunctionName()))) {
+          if (inputFunctionType.equals(DISTINCTCOUNTHLL) || inputFunctionType
+              .equals(SUMPRECISION)) {
             String destinationColumn = aggregationConfig.getColumnName();
             FieldSpec destinationFieldSpec = schema.getFieldSpecFor(destinationColumn);
 
             if (destinationFieldSpec == null) {
               throw new RuntimeException("couldn't find field config for " + destinationColumn
-                  + ". Unable to validate aggregation config for " + functionContext.getFunctionName());
+                  + ". Unable to validate aggregation config for " + inputFunctionType);
             }
             int maxLength = destinationFieldSpec.getMaxLength();
 
-            if (DISTINCTCOUNTHLL.name().toLowerCase().equals(functionContext.getFunctionName())) {
+            if (inputFunctionType.equals(DISTINCTCOUNTHLL)) {
               Preconditions.checkState(
                   functionContext.getArguments().size() >= 1 && functionContext.getArguments().size() <= 2,
-                  "distinctcounthll function can have max two arguments: %s", aggregationConfig);
+                  "%s can have max two arguments: %s", inputFunctionType, aggregationConfig);
 
-              int log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
               if (functionContext.getArguments().size() == 2) {
                 Preconditions.checkState(
                     StringUtils.isNumeric(functionContext.getArguments().get(1).getLiteral().getStringValue()
                     ),
-                    "distinctcounthll function second argument must be a number");
-
-                log2m = Integer.parseInt(functionContext.getArguments().get(1).getLiteral().getStringValue());
+                    "%s function second argument must be a number", inputFunctionType);
               }
-
-              int expectedBytesForHLL;
-              try {
-                expectedBytesForHLL = (new HyperLogLog(log2m)).getBytes().length;
-              } catch (IOException e) {
-                throw new RuntimeException(e);
-              }
-
-              Preconditions.checkState(maxLength == expectedBytesForHLL,
-                  "destination field for distinctcounthll must have maxLength property set to "
-                      + expectedBytesForHLL
-                      + ", the size of a HLL object with log2m of " + log2m);
-            } else if (SUMPRECISION.name().toLowerCase().equals(functionContext.getFunctionName())) {
+            } else if (inputFunctionType.equals(SUMPRECISION)) {
               Preconditions.checkState(functionContext.getArguments().size() >= 2
                       && functionContext.getArguments().size() <= 3,
-                  "sumprecision must specify precision (required), scale (optional)",
+                  SUMPRECISION + " must specify precision (required), scale (optional)",
                   aggregationConfig);
             }
           } else {
@@ -441,12 +426,10 @@ public final class TableConfigUtils {
           Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
               "aggregator function argument must be an identifier: %s", aggregationConfig);
 
-          AggregationFunctionType functionType =
-              AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
-          ValueAggregator valueAggregator = ValueAggregatorFactory.getValueAggregator(functionType, arguments);
+          ValueAggregator valueAggregator = ValueAggregatorFactory.getValueAggregator(inputFunctionType, arguments);
 
           if (schema != null && fieldSpec != null) {
-            if (functionType.equals(SUMPRECISION)) {
+            if (inputFunctionType.equals(SUMPRECISION)) {
               Preconditions.checkState(fieldSpec.getDataType() == DataType.BIG_DECIMAL,
                   "SUMPRECISION consuming aggregation requires the schema data type to be BIG_DECIMAL");
             } else {

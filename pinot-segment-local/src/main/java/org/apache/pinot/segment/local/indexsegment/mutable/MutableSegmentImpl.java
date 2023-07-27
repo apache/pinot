@@ -585,10 +585,10 @@ public class MutableSegmentImpl implements MutableSegment {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       IndexContainer indexContainer = entry.getValue();
       MutableDictionary dictionary = indexContainer._dictionary;
-
       if (dictionary == null) {
         continue;
       }
+
       Object value = row.getValue(entry.getKey());
       if (value == null) {
         recordIndexingError("DICTIONARY");
