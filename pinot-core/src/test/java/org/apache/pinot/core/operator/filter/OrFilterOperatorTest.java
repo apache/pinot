@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -120,8 +121,8 @@ public class OrFilterOperatorTest {
         Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
             new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, true);
 
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), List.of(0, 1, 2, 3));
-    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), List.of(8, 9));
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), ImmutableList.of(0, 1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), ImmutableList.of(8, 9));
   }
 
   @Test
