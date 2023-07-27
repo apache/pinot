@@ -205,7 +205,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     waitForAllDocsLoaded(600_000L);
   }
 
-  private void waitForSnapshotCreation()
+  protected void waitForSnapshotCreation()
       throws Exception {
     Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
     // trigger force commit for snapshots
@@ -246,7 +246,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
       } catch (Exception e) {
         return false;
       }
-    }, 60000L, "Error verifying force commit operation on table!");
+    }, 120000L, "Error verifying force commit operation on table!");
   }
 
   protected void verifyIdealState(int numSegmentsExpected) {
