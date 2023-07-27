@@ -173,29 +173,37 @@ public enum TransformFunctionType {
   SCALAR("scalar"),
 
   // Geo constructors
-  ST_GEOG_FROM_TEXT("ST_GeogFromText"),
-  ST_GEOM_FROM_TEXT("ST_GeomFromText"),
-  ST_GEOG_FROM_WKB("ST_GeogFromWKB"),
-  ST_GEOM_FROM_WKB("ST_GeomFromWKB"),
-  ST_POINT("ST_Point"),
-  ST_POLYGON("ST_Polygon"),
+  ST_GEOG_FROM_TEXT("ST_GeogFromText", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.STRING),
+  ST_GEOM_FROM_TEXT("ST_GeomFromText", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.STRING),
+  ST_GEOG_FROM_WKB("ST_GeogFromWKB", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.BINARY),
+  ST_GEOM_FROM_WKB("ST_GeomFromWKB", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.BINARY),
+  ST_POINT("ST_Point", ReturnTypes.explicit(SqlTypeName.VARBINARY),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC),
+          ordinal -> ordinal > 1 && ordinal < 4)),
+  ST_POLYGON("ST_Polygon", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.STRING),
 
   // Geo measurements
-  ST_AREA("ST_Area"),
-  ST_DISTANCE("ST_Distance"),
-  ST_GEOMETRY_TYPE("ST_GeometryType"),
+  ST_AREA("ST_Area", ReturnTypes.DOUBLE_NULLABLE, OperandTypes.BINARY),
+  ST_DISTANCE("ST_Distance", ReturnTypes.DOUBLE_NULLABLE,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.BINARY, SqlTypeFamily.BINARY))),
+  ST_GEOMETRY_TYPE("ST_GeometryType", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.BINARY),
 
   // Geo outputs
-  ST_AS_BINARY("ST_AsBinary"),
-  ST_AS_TEXT("ST_AsText"),
+  ST_AS_BINARY("ST_AsBinary", ReturnTypes.explicit(SqlTypeName.VARBINARY), OperandTypes.BINARY),
+  ST_AS_TEXT("ST_AsText", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.BINARY),
 
   // Geo relationship
-  ST_CONTAINS("ST_Contains"),
-  ST_EQUALS("ST_Equals"),
-  ST_WITHIN("ST_Within"),
+  ST_CONTAINS("ST_Contains", ReturnTypes.INTEGER,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.BINARY, SqlTypeFamily.BINARY))),
+  ST_EQUALS("ST_Equals", ReturnTypes.INTEGER,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.BINARY, SqlTypeFamily.BINARY))),
+  ST_WITHIN("ST_Within", ReturnTypes.INTEGER,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.BINARY, SqlTypeFamily.BINARY))),
 
   // Geo indexing
-  GEOTOH3("geoToH3"),
+  GEOTOH3("geoToH3", ReturnTypes.explicit(SqlTypeName.BIGINT),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC),
+          ordinal -> ordinal > 1 && ordinal < 4)),
 
   // Trigonometry
   SIN("sin"),
