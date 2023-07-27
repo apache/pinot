@@ -456,10 +456,8 @@ public final class TableConfigUtils {
       }
 
       JsonLogTransformerConfig jsonLogTransformerConfig = ingestionConfig.getJsonLogTransformerConfig();
-      if (null != jsonLogTransformerConfig) {
-        if (null != schema) {
-          JsonLogTransformer.validateSchema(schema, jsonLogTransformerConfig);
-        }
+      if (null != jsonLogTransformerConfig && null != schema) {
+        JsonLogTransformer.validateSchema(schema, jsonLogTransformerConfig);
       }
     }
   }
