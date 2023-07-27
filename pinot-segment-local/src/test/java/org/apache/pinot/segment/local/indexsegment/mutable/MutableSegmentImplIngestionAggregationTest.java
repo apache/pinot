@@ -140,7 +140,7 @@ public class MutableSegmentImplIngestionAggregationTest {
 
 
   @Test
-  public void testValuesAreNull()
+  public void testValuesAreNullThrowsException()
       throws Exception {
     String m1 = "sum1";
 
@@ -158,27 +158,15 @@ public class MutableSegmentImplIngestionAggregationTest {
     Random random = new Random(seed);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
-    for (int i = 0; i < NUM_ROWS; i++) {
-      // Generate random int to prevent overflow
-      GenericRow row = getRow(random, 1);
-      row.putValue(METRIC, null);
-      mutableSegmentImpl.index(row, defaultMetadata);
-
-      String key = buildKey(row);
-      keys.add(key);
-    }
-
-    int numDocsIndexed = mutableSegmentImpl.getNumDocsIndexed();
-    Assert.assertEquals(numDocsIndexed, keys.size());
-
-    // Assert that aggregation happened.
-    Assert.assertTrue(numDocsIndexed < NUM_ROWS);
-
-    GenericRow reuse = new GenericRow();
-    for (int docId = 0; docId < keys.size(); docId++) {
-      GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
-      String key = buildKey(row);
-      Assert.assertEquals(row.getValue(m1), 0, key);
+    // Generate random int to prevent overflow
+    GenericRow row = getRow(random, 1);
+    row.putValue(METRIC, null);
+    try {
+mutableSegmentImpl.index(row, defaultMetadata);
+      Assert.fail();
+    } catch (NullPointerException e) {
+      Assert.assertTrue(e.getMessage().contains("Cannot invoke \"java.lang.Number.doubleValue()\" because"
+          + " \"rawValue\" is null"));
     }
 
     mutableSegmentImpl.destroy();
