@@ -73,6 +73,7 @@ import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.ControllerConf;
@@ -248,7 +249,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       tempSegmentDir = new File(provider.getUntarredFileTempDir(), tempFileName);
 
       boolean uploadedSegmentIsEncrypted = StringUtils.isNotEmpty(crypterClassNameInHeader);
-      FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
+      FileUploadType uploadType = getUploadType(uploadTypeStr);
       File destFile = uploadedSegmentIsEncrypted ? tempEncryptedFile : tempDecryptedFile;
       long segmentSizeInBytes;
       switch (uploadType) {
@@ -344,11 +345,17 @@ public class PinotSegmentUploadDownloadRestletResource {
       if (tableConfig.getIngestionConfig() == null || tableConfig.getIngestionConfig().isSegmentTimeValueCheck()) {
         SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
       }
-      if (uploadType != FileUploadDownloadClient.FileUploadType.METADATA) {
-        SegmentValidationUtils.checkStorageQuota(tempSegmentDir, segmentMetadata, tableConfig,
-            _pinotHelixResourceManager, _controllerConf, _controllerMetrics, _connectionManager, _executor,
-            _leadControllerManager.isLeaderForTable(tableNameWithType));
+      long untarredSegmentSizeInBytes;
+      if (uploadType == FileUploadType.METADATA && segmentSizeInBytes > 0) {
+        // TODO: Include the untarred segment size when using the METADATA push rest API. Currently we can only use the
+        //       tarred segment size as an approximation.
+        untarredSegmentSizeInBytes = segmentSizeInBytes;
+      } else {
+        untarredSegmentSizeInBytes = FileUtils.sizeOfDirectory(tempSegmentDir);
       }
+      SegmentValidationUtils.checkStorageQuota(segmentName, untarredSegmentSizeInBytes, tableConfig,
+          _pinotHelixResourceManager, _controllerConf, _controllerMetrics, _connectionManager, _executor,
+          _leadControllerManager.isLeaderForTable(tableNameWithType));
 
       // Encrypt segment
       String crypterNameInTableConfig = tableConfig.getValidationConfig().getCrypterClassName();
@@ -741,11 +748,11 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
   }
 
-  private FileUploadDownloadClient.FileUploadType getUploadType(String uploadTypeStr) {
+  private FileUploadType getUploadType(String uploadTypeStr) {
     if (uploadTypeStr != null) {
-      return FileUploadDownloadClient.FileUploadType.valueOf(uploadTypeStr);
+      return FileUploadType.valueOf(uploadTypeStr);
     } else {
-      return FileUploadDownloadClient.FileUploadType.getDefaultUploadType();
+      return FileUploadType.getDefaultUploadType();
     }
   }
 

@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.controller.api.upload;
 
-import java.io.File;
 import java.util.concurrent.Executor;
 import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -65,7 +63,7 @@ public class SegmentValidationUtils {
     }
   }
 
-  public static void checkStorageQuota(File segmentDir, SegmentMetadata segmentMetadata, TableConfig tableConfig,
+  public static void checkStorageQuota(String segmentName, long segmentSizeInBytes, TableConfig tableConfig,
       PinotHelixResourceManager resourceManager, ControllerConf controllerConf, ControllerMetrics controllerMetrics,
       HttpConnectionManager connectionManager, Executor executor, boolean isLeaderForTable) {
     if (!controllerConf.getEnableStorageQuotaCheck()) {
@@ -77,18 +75,17 @@ public class SegmentValidationUtils {
         new StorageQuotaChecker(tableConfig, tableSizeReader, controllerMetrics, isLeaderForTable, resourceManager);
     StorageQuotaChecker.QuotaCheckerResponse response;
     try {
-      response =
-          quotaChecker.isSegmentStorageWithinQuota(segmentMetadata.getName(), FileUtils.sizeOfDirectory(segmentDir),
-              controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      response = quotaChecker.isSegmentStorageWithinQuota(segmentName, segmentSizeInBytes,
+          controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("Caught exception while checking the storage quota for segment: %s of table: %s",
-              segmentMetadata.getName(), tableConfig.getTableName()), Response.Status.INTERNAL_SERVER_ERROR);
+          String.format("Caught exception while checking the storage quota for segment: %s of table: %s", segmentName,
+              tableConfig.getTableName()), Response.Status.INTERNAL_SERVER_ERROR);
     }
     if (!response._isSegmentWithinQuota) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("Storage quota check failed for segment: %s of table: %s, reason: %s",
-              segmentMetadata.getName(), tableConfig.getTableName(), response._reason), Response.Status.FORBIDDEN);
+          String.format("Storage quota check failed for segment: %s of table: %s, reason: %s", segmentName,
+              tableConfig.getTableName(), response._reason), Response.Status.FORBIDDEN);
     }
   }
 }
