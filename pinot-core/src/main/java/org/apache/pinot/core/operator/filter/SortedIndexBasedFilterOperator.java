@@ -28,27 +28,28 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory.SortedDictionaryBasedRangePredicateEvaluator;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class SortedIndexBasedFilterOperator extends BaseFilterOperator {
+public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_SORTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;
   private final SortedIndexReader<?> _sortedIndexReader;
 
-  SortedIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
-      boolean nullHandlingEnabled) {
-    super(numDocs, nullHandlingEnabled);
+  SortedIndexBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
+      DataSource dataSource, int numDocs) {
+    super(queryContext, dataSource, numDocs);
     _predicateEvaluator = predicateEvaluator;
     _sortedIndexReader = (SortedIndexReader<?>) dataSource.getInvertedIndex();
   }
 
   @Override
-  protected BlockDocIdSet getTrues() {
+  protected BlockDocIdSet getNextBlockWithoutNullHandling() {
     // At this point, we need to create a list of matching docIdRanges.
     //
     // There are two kinds of operators:

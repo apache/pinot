@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
@@ -35,16 +36,16 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class InvertedIndexFilterOperator extends BaseFilterOperator {
+public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_INVERTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;
   private final InvertedIndexReader<ImmutableRoaringBitmap> _invertedIndexReader;
   private final boolean _exclusive;
 
-  InvertedIndexFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
-      boolean nullHandlingEnabled) {
-    super(numDocs, nullHandlingEnabled);
+  InvertedIndexFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator, DataSource dataSource,
+      int numDocs) {
+    super(queryContext, dataSource, numDocs);
     _predicateEvaluator = predicateEvaluator;
     @SuppressWarnings("unchecked")
     InvertedIndexReader<ImmutableRoaringBitmap> invertedIndexReader =
@@ -54,7 +55,7 @@ public class InvertedIndexFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected BlockDocIdSet getTrues() {
+  protected BlockDocIdSet getNextBlockWithoutNullHandling() {
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
     int numDictIds = dictIds.length;
     if (numDictIds == 0) {
