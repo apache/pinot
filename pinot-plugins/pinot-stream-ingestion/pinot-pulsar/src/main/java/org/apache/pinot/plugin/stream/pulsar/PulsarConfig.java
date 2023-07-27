@@ -43,7 +43,7 @@ public class PulsarConfig {
   public static final String AUTHENTICATION_TOKEN = "authenticationToken";
   public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
   public static final String ENABLE_KEY_VALUE_STITCH = "enableKeyValueStitch";
-  public static final String METADATA_FIELDS = "metadataFields"; //list of the metadata fields comma separated
+  public static final String METADATA_FIELDS = "metadata.fields"; //list of the metadata fields comma separated
 
   private final String _pulsarTopicName;
   private final String _subscriberId;
