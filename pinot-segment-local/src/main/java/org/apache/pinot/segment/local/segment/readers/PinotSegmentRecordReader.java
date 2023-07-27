@@ -215,6 +215,10 @@ public class PinotSegmentRecordReader implements RecordReader {
     return reuse;
   }
 
+  public String getSegmentName() {
+    return _indexSegment.getSegmentName();
+  }
+
   public void getRecord(int docId, GenericRow buffer) {
     for (Map.Entry<String, PinotSegmentColumnReader> entry : _columnReaderMap.entrySet()) {
       String column = entry.getKey();
