@@ -84,6 +84,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -402,7 +403,7 @@ public class PinotTableRestletResource {
           _accessControlFactory.create());
 
       // Check access for different state types
-      var accessControl = _accessControlFactory.create();
+      AccessControl accessControl = _accessControlFactory.create();
       switch (stateType) {
         case ENABLE:
           if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.ENABLE_TABLE)) {
