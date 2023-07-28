@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.service;
+package org.apache.pinot.query.service.server;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -33,6 +34,8 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.query.service.SubmissionService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,8 +62,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public QueryServer(int port, QueryRunner queryRunner) {
     _port = port;
     _queryRunner = queryRunner;
-    _querySubmissionExecutorService = Executors.newCachedThreadPool(
-        new NamedThreadFactory("query_submission_executor_on_" + _port + "_port"));
+    _querySubmissionExecutorService =
+        Executors.newCachedThreadPool(new NamedThreadFactory("query_submission_executor_on_" + _port + "_port"));
   }
 
   public void start() {
@@ -97,6 +100,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     Map<String, String> requestMetadataMap;
     requestMetadataMap = request.getMetadataMap();
     long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
+    long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
+    // 1. Deserialized request
     try {
       distributedStagePlans = QueryPlanSerDeUtils.deserializeStagePlan(request);
     } catch (Exception e) {
@@ -104,18 +110,24 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
     }
-    // TODO: allow thrown exception to return back to broker in asynchronous manner.
-    distributedStagePlans.forEach(distributedStagePlan -> _querySubmissionExecutorService.submit(() -> {
-          try {
-            _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
-          } catch (Throwable t) {
-            LOGGER.error("Caught exception while compiling opChain for request: {}, stage: {}", requestId,
-                distributedStagePlan.getStageId(), t);
-          }
-        })
-    );
-    responseObserver.onNext(Worker.QueryResponse.newBuilder()
-        .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
+    // 2. Submit distributed stage plans
+    SubmissionService submissionService = new SubmissionService(_querySubmissionExecutorService);
+    distributedStagePlans.forEach(distributedStagePlan -> submissionService.submit(() -> {
+      _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+    }));
+    // 3. await response successful or any failure which cancels all other tasks.
+    try {
+      submissionService.awaitFinish(deadlineMs);
+    } catch (Throwable t) {
+      LOGGER.error("error occurred during stage submission for {}:\n{}", requestId, t);
+      responseObserver.onNext(Worker.QueryResponse.newBuilder()
+          .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR, QueryException.getTruncatedStackTrace(t))
+          .build());
+      responseObserver.onCompleted();
+      return;
+    }
+    responseObserver.onNext(
+        Worker.QueryResponse.newBuilder().putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
     responseObserver.onCompleted();
   }
 

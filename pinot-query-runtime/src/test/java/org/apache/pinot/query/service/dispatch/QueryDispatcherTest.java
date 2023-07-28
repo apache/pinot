@@ -36,7 +36,7 @@ import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.service.QueryServer;
+import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
