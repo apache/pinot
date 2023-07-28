@@ -160,7 +160,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     return new TenantRebalanceResult(tenantRebalanceJobId, rebalanceResult, context.isVerboseResult());
   }
 
-  private Set<String> getDimensionalTables(String tenant) {
+  private Set<String> getDimensionalTables(String tenantName) {
     Set<String> dimTables = new HashSet<>();
     for (String table : _pinotHelixResourceManager.getAllTables()) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(table);
@@ -168,7 +168,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         LOGGER.error("Unable to retrieve table config for table: {}", table);
         continue;
       }
-      if (tenant.equals(tableConfig.getTenantConfig().getServer()) && tableConfig.isDimTable()) {
+      if (tenantName.equals(tableConfig.getTenantConfig().getServer()) && tableConfig.isDimTable()) {
         dimTables.add(table);
       }
     }
