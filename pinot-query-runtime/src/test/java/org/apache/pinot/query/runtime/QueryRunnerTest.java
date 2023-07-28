@@ -208,6 +208,13 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
           _reducerScheduler, null, false);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
+      // TODO: The actual message is (usually) something like:
+      //  Received error query execution result block: {200=QueryExecutionError:
+      //   java.lang.IllegalArgumentException: Illegal Json Path: $['path'] does not match document
+      //     at org.apache.pinot.core.common.evaluators.DefaultJsonPathEvaluator.throwPathNotFoundException(...)
+      //     at org.apache.pinot.core.common.evaluators.DefaultJsonPathEvaluator.processValue(...)
+      //     at org.apache.pinot.core.common.evaluators.DefaultJsonPathEvaluator.evaluateBlock(...)
+      //     at org.apache.pinot.core.common.DataFetcher$ColumnValueReader.readIntValues(DataFetcher.java:489)}
       Assert.assertTrue(rte.getMessage().contains(exceptionMsg), "Exception should contain: " + exceptionMsg
           + "! but found: " + rte.getMessage());
     }

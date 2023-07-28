@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -49,7 +50,7 @@ public class OpChainSchedulerService implements SchedulerService {
         @Override
         public void runJob() {
           boolean isFinished = false;
-          boolean returnedErrorBlock = false;
+          TransferableBlock returnedErrorBlock = null;
           Throwable thrown = null;
           try {
             LOGGER.trace("({}): Executing", operatorChain);
@@ -60,7 +61,7 @@ public class OpChainSchedulerService implements SchedulerService {
             }
             isFinished = true;
             if (result.isErrorBlock()) {
-              returnedErrorBlock = true;
+              returnedErrorBlock = result;
               LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
                   result.getDataBlock().getExceptions());
             } else {
@@ -70,7 +71,17 @@ public class OpChainSchedulerService implements SchedulerService {
             LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
             thrown = e;
           } finally {
-            if (returnedErrorBlock || thrown != null) {
+            if (returnedErrorBlock != null || thrown != null) {
+              if (thrown == null) {
+                String blockMsg;
+                if (returnedErrorBlock.getDataBlock() instanceof MetadataBlock) {
+                  MetadataBlock metadataBlock = (MetadataBlock) returnedErrorBlock.getDataBlock();
+                  blockMsg = String.join(", ", metadataBlock.getExceptions().values());
+                } else {
+                  blockMsg = "Unknown";
+                }
+                thrown = new RuntimeException("Error block " + blockMsg);
+              }
               cancelOpChain(operatorChain, thrown);
             } else if (isFinished) {
               closeOpChain(operatorChain);
