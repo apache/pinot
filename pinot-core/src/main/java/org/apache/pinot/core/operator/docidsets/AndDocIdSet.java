@@ -61,7 +61,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
   private final boolean _cardinalityBasedRankingForScan;
 
   public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions) {
-    _docIdSets = docIdSets;
+    _docIdSets = docIdSets instanceof ArrayList ? docIdSets : new ArrayList<>(docIdSets);
     _cardinalityBasedRankingForScan =
         !MapUtils.isEmpty(queryOptions) && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
   }

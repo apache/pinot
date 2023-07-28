@@ -52,7 +52,7 @@ public final class OrDocIdSet implements BlockDocIdSet {
   private final int _numDocs;
 
   public OrDocIdSet(List<BlockDocIdSet> docIdSets, int numDocs) {
-    _docIdSets = docIdSets;
+    _docIdSets = docIdSets instanceof ArrayList ? docIdSets : new ArrayList<>(docIdSets);
     _numDocs = numDocs;
   }
 
