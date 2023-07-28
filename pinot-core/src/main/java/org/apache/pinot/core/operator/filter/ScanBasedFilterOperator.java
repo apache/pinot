@@ -57,7 +57,7 @@ public class ScanBasedFilterOperator extends BaseColumnFilterOperator {
   protected BlockDocIdSet getNextBlockWithoutNullHandling() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
     if (dataSourceMetadata.isSingleValue()) {
-      return new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, false, _batchSize);
+      return new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _batchSize);
     } else {
       return new MVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs);
     }
