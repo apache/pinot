@@ -79,7 +79,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.INTERMEDIATE);
+            AggType.INTERMEDIATE, null, null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build
@@ -101,7 +101,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.LEAF);
+            AggType.LEAF, null, null);
 
     // When:
     TransferableBlock block = operator.nextBlock();
@@ -125,7 +125,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.LEAF);
+            AggType.LEAF, null, null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build when reading NoOp block
@@ -150,7 +150,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.INTERMEDIATE);
+            AggType.INTERMEDIATE, null, null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -177,7 +177,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, LONG});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.FINAL);
+            AggType.FINAL, null, null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -201,7 +201,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{STRING, DOUBLE});
     AggregateOperator sum0GroupBy1 = new AggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator,
         outSchema, inSchema, Collections.singletonList(agg),
-        Collections.singletonList(new RexExpression.InputRef(1)), AggType.LEAF);
+        Collections.singletonList(new RexExpression.InputRef(1)), AggType.LEAF, null, null);
     TransferableBlock result = sum0GroupBy1.getNextBlock();
     while (result.isNoOpBlock()) {
       result = sum0GroupBy1.getNextBlock();
@@ -229,7 +229,7 @@ public class AggregateOperatorTest {
     // When:
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.INTERMEDIATE);
+            AggType.INTERMEDIATE, null, null);
   }
 
   @Test
@@ -248,7 +248,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
         new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.INTERMEDIATE);
+            AggType.INTERMEDIATE, null, null);
 
     // When:
     TransferableBlock block = operator.nextBlock();

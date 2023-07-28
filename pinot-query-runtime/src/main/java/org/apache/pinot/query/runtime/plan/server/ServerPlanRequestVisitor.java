@@ -71,8 +71,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         .setGroupByList(CalciteRexExpressionParser.convertGroupByList(node.getGroupSet(), context.getPinotQuery()));
     // set agg list
     context.getPinotQuery().setSelectList(
-        CalciteRexExpressionParser.addSelectList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
-            context.getPinotQuery()));
+        CalciteRexExpressionParser.convertAggregateList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
+            node.getFilterArgIndices(), context.getPinotQuery()));
     return null;
   }
 
@@ -149,7 +149,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
     context.getPinotQuery()
-        .setSelectList(CalciteRexExpressionParser.overwriteSelectList(node.getProjects(), context.getPinotQuery()));
+        .setSelectList(CalciteRexExpressionParser.convertProjectList(node.getProjects(), context.getPinotQuery()));
     return null;
   }
 
