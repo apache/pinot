@@ -34,7 +34,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -59,7 +58,6 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
@@ -116,7 +114,7 @@ public class PinotTenantRestletResource {
   ControllerMetrics _controllerMetrics;
 
   @Inject
-  ExecutorService _executorService;
+  TenantRebalancer _tenantRebalancer;
 
   @POST
   @Path("/tenants")
@@ -587,8 +585,7 @@ public class PinotTenantRestletResource {
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
       @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceContext context) {
     context.setTenantName(tenantName);
-    TenantRebalancer tenantRebalancer = new DefaultTenantRebalancer(_pinotHelixResourceManager, _executorService);
-    return tenantRebalancer.rebalance(context);
+    return _tenantRebalancer.rebalance(context);
   }
 
   @GET
