@@ -21,6 +21,7 @@ package org.apache.pinot.query.service.dispatch;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.service.QueryConfig;
@@ -45,6 +46,7 @@ class DispatchObserver implements StreamObserver<Worker.QueryResponse> {
   @Override
   public void onNext(Worker.QueryResponse queryResponse) {
     _queryResponse = queryResponse;
+    _latch.countDown();
   }
 
   @Override
@@ -58,13 +60,13 @@ class DispatchObserver implements StreamObserver<Worker.QueryResponse> {
     _latch.countDown();
   }
 
-  public void await(long timeoutMs) throws InterruptedException {
+  public void await(long timeoutMs) throws Exception {
     boolean awaitSuccess = _latch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (_throwable != null) {
       throw new RuntimeException(String.format("Unable to dispatch query plan at stage %s on server %s",
           _stageId, _virtualServer), _throwable);
     } else if (_queryResponse == null || !awaitSuccess) {
-      throw new RuntimeException(String.format("Unable to dispatch query plan at stage %s on server %s: ERROR: %s",
+      throw new TimeoutException(String.format("Unable to dispatch query plan at stage %s on server %s: ERROR: %s",
           _stageId, _virtualServer, "Timeout occurred or query submission unable to return"));
     } else {
       if (_queryResponse.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {

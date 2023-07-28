@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
@@ -172,7 +173,7 @@ public class QueryDispatcher {
           QueryException.getTruncatedStackTrace(t)), t);
     }
     if (deadline.isExpired()) {
-      throw new RuntimeException("Timed out waiting for response of async query-dispatch");
+      throw new TimeoutException("Timed out waiting for response of async query-dispatch");
     }
     return reduceStageId;
   }

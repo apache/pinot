@@ -57,9 +57,9 @@ class DispatchClient {
       DispatchObserver dispatchObserver = new DispatchObserver(stageId, virtualServer);
       _dispatchStub.withDeadline(deadline).submit(request, dispatchObserver);
       dispatchObserver.await(deadline.timeRemaining(TimeUnit.MILLISECONDS));
-    } catch (Exception e) {
-      LOGGER.error("Query Dispatch failed at client-side", e);
-      Utils.rethrowException(e);
+    } catch (Throwable t) {
+      LOGGER.error("Query Dispatch failed!", t);
+      Utils.rethrowException(t);
     }
   }
 
@@ -68,7 +68,7 @@ class DispatchClient {
       Worker.CancelRequest cancelRequest = Worker.CancelRequest.newBuilder().setRequestId(requestId).build();
       _dispatchStub.cancel(cancelRequest, NO_OP_CANCEL_STREAM_OBSERVER);
     } catch (Exception e) {
-      LOGGER.error("Query Cancellation failed at client-side", e);
+      LOGGER.error("Query Cancellation failed!", e);
     }
   }
 
