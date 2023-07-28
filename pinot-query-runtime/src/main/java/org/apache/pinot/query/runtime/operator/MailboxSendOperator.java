@@ -118,45 +118,37 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    boolean canContinue = true;
     TransferableBlock transferableBlock;
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[SEND]== Enter getNextBlock from: " + _context.getId());
+    }
     try {
       transferableBlock = _sourceOperator.nextBlock();
-      if (transferableBlock.isNoOpBlock()) {
-        return transferableBlock;
-      } else if (transferableBlock.isEndOfStreamBlock()) {
-        if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
-          // Stats need to be populated here because the block is being sent to the mailbox
-          // and the receiving opChain will not be able to access the stats from the previous opChain
-          TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
-              OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
-          sendTransferableBlock(eosBlockWithStats);
-        } else {
-          sendTransferableBlock(transferableBlock);
-        }
-      } else { // normal blocks
-        // check whether we should continue depending on exchange queue condition.
-        canContinue = sendTransferableBlock(transferableBlock);
+      if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
+        // Stats need to be populated here because the block is being sent to the mailbox
+        // and the receiving opChain will not be able to access the stats from the previous opChain
+        TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
+            OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+        sendTransferableBlock(eosBlockWithStats, false);
+      } else {
+        sendTransferableBlock(transferableBlock, true);
       }
     } catch (Exception e) {
       transferableBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
       try {
         LOGGER.error("Exception while transferring data on opChain: " + _context.getId(), e);
-        sendTransferableBlock(transferableBlock);
+        sendTransferableBlock(transferableBlock, false);
       } catch (Exception e2) {
         LOGGER.error("Exception while sending error block.", e2);
       }
     }
-    // yield if we cannot continue to put transferable block into the sending queue
-    return canContinue ? transferableBlock : TransferableBlockUtils.getNoOpTransferableBlock();
+    return transferableBlock;
   }
 
-  private boolean sendTransferableBlock(TransferableBlock block)
+  private void sendTransferableBlock(TransferableBlock block, boolean throwIfTimeout)
       throws Exception {
     long timeoutMs = _context.getDeadlineMs() - System.currentTimeMillis();
-    if (_exchange.offerBlock(block, timeoutMs)) {
-      return _exchange.getRemainingCapacity() > 0;
-    } else {
+    if (!_exchange.offerBlock(block, timeoutMs) && throwIfTimeout) {
       throw new TimeoutException("Timeout while offering data block into the sending queue.");
     }
   }

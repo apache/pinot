@@ -32,6 +32,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -40,8 +41,6 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -77,20 +76,6 @@ public class MailboxSendOperatorTest {
   public void tearDown()
       throws Exception {
     _mocks.close();
-  }
-
-  @Test
-  public void shouldSwallowNoOpBlockFromUpstream()
-      throws Exception {
-    // Given:
-    when(_sourceOperator.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
-
-    // When:
-    TransferableBlock block = getMailboxSendOperator().nextBlock();
-
-    // Then:
-    assertTrue(block.isNoOpBlock(), "expected noop block to propagate");
-    verify(_exchange, never()).offerBlock(any(), anyLong());
   }
 
   @Test
@@ -148,8 +133,14 @@ public class MailboxSendOperatorTest {
     TransferableBlock dataBlock =
         OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
     TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    when(_sourceOperator.nextBlock()).thenReturn(dataBlock).thenReturn(dataBlock).thenReturn(eosBlock);
-    when(_exchange.getRemainingCapacity()).thenReturn(1).thenReturn(0).thenReturn(0);
+    when(_sourceOperator.nextBlock())
+        .thenReturn(dataBlock)
+        .thenReturn(dataBlock)
+        .thenReturn(eosBlock);
+    when(_exchange.offerBlock(any(), anyLong()))
+        .thenReturn(true)
+        .thenReturn(false)
+        .thenReturn(false);
 
     MailboxSendOperator mailboxSendOperator = getMailboxSendOperator();
     // When:
@@ -160,20 +151,23 @@ public class MailboxSendOperatorTest {
     // When:
     block = mailboxSendOperator.nextBlock();
     // Then:
-    assertTrue(block.isNoOpBlock(), "expected No-op block to propagate next b/c remaining capacity is 0.");
+    assertTrue(block.isErrorBlock(), "expected error block to propagate next b/c remaining capacity is 0.");
 
     // When:
     block = mailboxSendOperator.nextBlock();
     // Then:
     assertSame(block, eosBlock, "expected EOS block to propagate next even if capacity is now 0.");
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
-    verify(_exchange, times(3)).offerBlock(captor.capture(), anyLong());
+    verify(_exchange, Mockito.times(4)).offerBlock(captor.capture(), anyLong());
     List<TransferableBlock> blocks = captor.getAllValues();
-    assertSame(blocks.get(0), dataBlock, "expected to send data block to exchange");
-    assertTrue(blocks.get(2).isSuccessfulEndOfStreamBlock(), "expected to send EOS block to exchange");
+
+    assertSame(blocks.get(0), dataBlock, "expected to send data block to exchange on first call");
+    assertSame(blocks.get(1), dataBlock, "expected to send data block to exchange on second call");
+    assertTrue(blocks.get(2).isErrorBlock(), "expected to send error block to exchange on third call");
+    assertTrue(blocks.get(3).isSuccessfulEndOfStreamBlock(), "expected to send EOS block to exchange on last call");
 
     // EOS block should contain statistics
-    Map<String, OperatorStats> resultMetadata = blocks.get(2).getResultMetadata();
+    Map<String, OperatorStats> resultMetadata = blocks.get(3).getResultMetadata();
     assertEquals(resultMetadata.size(), 1);
     assertTrue(resultMetadata.containsKey(mailboxSendOperator.getOperatorId()));
   }

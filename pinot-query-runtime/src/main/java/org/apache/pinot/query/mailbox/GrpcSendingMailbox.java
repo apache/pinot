@@ -61,6 +61,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public void send(TransferableBlock block)
       throws IOException {
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[GRPC SEND]== sending data to: " + _id);
+    }
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
     }

@@ -61,6 +61,10 @@ public class ReceivingMailbox {
     return _id;
   }
 
+  public OpChainId getOpChainId() {
+    return MailboxIdUtils.toOpChainId(_id);
+  }
+
   /**
    * Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
    * added. If the block is not added, an error block is added to the mailbox.
@@ -79,6 +83,9 @@ public class ReceivingMailbox {
     try {
       if (_blocks.offer(block, timeoutMs, TimeUnit.MILLISECONDS)) {
         if (_errorBlock.get() == null) {
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("==[MAILBOX]== Returned block from mailbox: " + _id);
+          }
           _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
           return true;
         } else {

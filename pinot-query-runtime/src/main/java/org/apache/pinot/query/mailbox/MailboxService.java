@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,6 +33,7 @@ import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -90,15 +92,27 @@ public class MailboxService {
   private final ChannelManager _channelManager = new ChannelManager();
 
   private GrpcMailboxServer _grpcMailboxServer;
+  private ConcurrentHashMap<OpChainId, Consumer<OpChainId>> _onDataCallbacks = new ConcurrentHashMap<>();
 
   public MailboxService(String hostname, int port, PinotConfiguration config,
       Consumer<OpChainId> unblockOpChainCallback) {
     _hostname = hostname;
     _port = port;
     _config = config;
-    _unblockOpChainCallback = unblockOpChainCallback;
+    _unblockOpChainCallback = opChainId -> {
+      Consumer<OpChainId> opChainIdConsumer = _onDataCallbacks.get(opChainId);
+      if (opChainIdConsumer != null) {
+        opChainIdConsumer.accept(opChainId);
+      }
+      unblockOpChainCallback.accept(opChainId);
+    };
     _exchangeExecutor = Executors.newCachedThreadPool();
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
+  }
+
+  public MailboxService(String hostname, int port, PinotConfiguration config) {
+    this(hostname, port, config, ignoreMe -> {
+    });
   }
 
   /**
@@ -142,6 +156,12 @@ public class MailboxService {
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs);
     }
+  }
+
+  public ReceivingMailbox getReceivingMailbox(String mailboxId, BaseMailboxReceiveOperator receiveOperator) {
+    ReceivingMailbox receivingMailbox = getReceivingMailbox(mailboxId);
+    _onDataCallbacks.putIfAbsent(receivingMailbox.getOpChainId(), ignoreMe -> receiveOperator.onData());
+    return receivingMailbox;
   }
 
   /**

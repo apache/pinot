@@ -112,32 +112,6 @@ public class AggregateOperatorTest {
   }
 
   @Test
-  public void shouldHandleUpstreamNoOpBlocksWhileConstructing() {
-    // Given:
-    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
-    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
-
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
-    Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
-    AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.LEAF);
-
-    // When:
-    TransferableBlock block1 = operator.nextBlock(); // build when reading NoOp block
-    TransferableBlock block2 = operator.nextBlock(); // return when reading EOS block
-
-    // Then:
-    Mockito.verify(_input, Mockito.times(3)).nextBlock();
-    Assert.assertTrue(block1.isNoOpBlock());
-    Assert.assertEquals(block2.getContainer().size(), 1);
-  }
-
-  @Test
   public void shouldAggregateSingleInputBlock() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
@@ -157,7 +131,6 @@ public class AggregateOperatorTest {
     TransferableBlock block2 = operator.nextBlock();
 
     // Then:
-    Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
     Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1.0},
         "Expected two columns (group by key, agg value), agg value is intermediate type");
@@ -184,7 +157,6 @@ public class AggregateOperatorTest {
     TransferableBlock block2 = operator.nextBlock();
 
     // Then:
-    Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
     // second value is 1 (the literal) instead of 3 (the col val)
     Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1L},
@@ -203,9 +175,6 @@ public class AggregateOperatorTest {
         outSchema, inSchema, Collections.singletonList(agg),
         Collections.singletonList(new RexExpression.InputRef(1)), AggType.LEAF);
     TransferableBlock result = sum0GroupBy1.getNextBlock();
-    while (result.isNoOpBlock()) {
-      result = sum0GroupBy1.getNextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     Assert.assertEquals(resultRows.size(), 2);
     if (resultRows.get(0).equals("Aa")) {

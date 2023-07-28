@@ -40,8 +40,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -60,7 +58,6 @@ import org.slf4j.LoggerFactory;
 public class HashJoinOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final int INITIAL_HEURISTIC_SIZE = 16;
-  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
 
   private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES = ImmutableSet.of(
       JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL, JoinRelType.SEMI, JoinRelType.ANTI);
@@ -146,8 +143,6 @@ public class HashJoinOperator extends MultiStageOperator {
       }
       if (_upstreamErrorBlock != null) {
         return _upstreamErrorBlock;
-      } else if (!_isHashTableBuilt) {
-        return TransferableBlockUtils.getNoOpTransferableBlock();
       }
       TransferableBlock leftBlock = _leftTableOperator.nextBlock();
       // JOIN each left block with the right block.
@@ -159,15 +154,7 @@ public class HashJoinOperator extends MultiStageOperator {
 
   private void buildBroadcastHashTable() {
     TransferableBlock rightBlock = _rightTableOperator.nextBlock();
-    while (!rightBlock.isNoOpBlock()) {
-      if (rightBlock.isErrorBlock()) {
-        _upstreamErrorBlock = rightBlock;
-        return;
-      }
-      if (TransferableBlockUtils.isEndOfStream(rightBlock)) {
-        _isHashTableBuilt = true;
-        return;
-      }
+    while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
       List<Object[]> container = rightBlock.getContainer();
       // put all the rows into corresponding hash collections keyed by the key selector function.
       for (Object[] row : container) {
@@ -181,6 +168,11 @@ public class HashJoinOperator extends MultiStageOperator {
       }
       rightBlock = _rightTableOperator.nextBlock();
     }
+    if (rightBlock.isErrorBlock()) {
+      _upstreamErrorBlock = rightBlock;
+    } else {
+      _isHashTableBuilt = true;
+    }
   }
 
   private TransferableBlock buildJoinedDataBlock(TransferableBlock leftBlock)
@@ -189,14 +181,10 @@ public class HashJoinOperator extends MultiStageOperator {
       _upstreamErrorBlock = leftBlock;
       return _upstreamErrorBlock;
     }
-    if (leftBlock.isNoOpBlock() || (leftBlock.isSuccessfulEndOfStreamBlock() && !needUnmatchedRightRows())) {
-      if (!leftBlock.getResultMetadata().isEmpty()) {
-      }
-
+    if (leftBlock.isSuccessfulEndOfStreamBlock() && !needUnmatchedRightRows()) {
       if (leftBlock.isSuccessfulEndOfStreamBlock()) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
-
       return leftBlock;
     }
     // TODO: Moved to a different function.

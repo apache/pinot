@@ -80,16 +80,18 @@ class PipelineBreakerOperator extends MultiStageOperator {
     int numWorkers = _workerEntries.size();
     for (int i = 0; i < numWorkers; i++) {
       Map.Entry<Integer, Operator<TransferableBlock>> worker = _workerEntries.remove();
+      @Nullable
       TransferableBlock block = worker.getValue().nextBlock();
 
       // Release the mailbox worker when the block is end-of-stream
-      if (block != null && !block.isNoOpBlock() && block.isSuccessfulEndOfStreamBlock()) {
+      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
         continue;
       }
 
       // Add the worker back to the queue if the block is not end-of-stream
+      // TODO: Doesn't null also mean to be end of stream?
       _workerEntries.add(worker);
-      if (block != null && !block.isNoOpBlock()) {
+      if (block != null) {
         if (block.isErrorBlock()) {
           _errorBlock = block;
           constructErrorResponse(block);
@@ -105,7 +107,7 @@ class PipelineBreakerOperator extends MultiStageOperator {
     if (_workerEntries.isEmpty()) {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } else {
-      return TransferableBlockUtils.getNoOpTransferableBlock();
+      throw new UnsupportedOperationException("TODO: We need to rewrite this class");
     }
   }
 

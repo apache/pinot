@@ -19,17 +19,24 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,10 +49,15 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
 public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseMailboxReceiveOperator.class);
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
-  protected final Deque<ReceivingMailbox> _mailboxes;
+  protected final List<ReceivingMailbox> _mailboxes;
+  protected final ReentrantLock _lock = new ReentrantLock(false);
+  protected final Condition _notEmpty = _lock.newCondition();
+  protected int _lastRead;
+  private TransferableBlock _errorBlock = null;
 
   public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       int senderStageId) {
@@ -63,9 +75,11 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         "Failed to find mailbox for stage: %s",
         senderStageId);
     _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, senderMailBoxMetadatas);
-    _mailboxes = _mailboxIds.stream()
-        .map(mailboxId -> _mailboxService.getReceivingMailbox(mailboxId))
-        .collect(Collectors.toCollection(ArrayDeque::new));
+    _mailboxes = new ArrayList<>(_mailboxIds.size());
+    for (String mailboxId : _mailboxIds) {
+      _mailboxes.add(_mailboxService.getReceivingMailbox(mailboxId, this));
+    }
+    _lastRead = _mailboxes.size() - 1;
   }
 
   public List<String> getMailboxIds() {
@@ -90,9 +104,105 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   protected void cancelRemainingMailboxes() {
-    ReceivingMailbox mailbox;
-    while ((mailbox = _mailboxes.poll()) != null) {
+    for (ReceivingMailbox mailbox : _mailboxes) {
       mailbox.cancel();
     }
+  }
+
+  public void onData() {
+    _lock.lock();
+    try {
+      _notEmpty.signal();
+    } finally {
+      _lock.unlock();
+    }
+  }
+
+  protected TransferableBlock readBlockBlocking() {
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("==[RECEIVE]== Enter getNextBlock from: " + _context.getId() + " mailboxSize: " + _mailboxes.size());
+    }
+    TransferableBlock block = readDroppingSuccessEos();
+    if (block == null) {
+      boolean timeout = false;
+      _lock.lock();
+      try {
+        block = readDroppingSuccessEos();
+        while (block == null && !timeout) {
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("==[RECEIVE]== Yield : " + _context.getId());
+          }
+          timeout = !_notEmpty.await(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          block = readDroppingSuccessEos();
+        }
+        if (timeout) {
+          _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+          return _errorBlock;
+        }
+      } catch (InterruptedException ex) {
+        return TransferableBlockUtils.getErrorTransferableBlock(ex);
+      } finally {
+        _lock.unlock();
+      }
+    }
+    return block;
+  }
+
+  @Nullable
+  private TransferableBlock readDroppingSuccessEos() {
+    if (System.currentTimeMillis() > _context.getDeadlineMs()) {
+      _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+      return _errorBlock;
+    }
+
+    TransferableBlock block = readBlockOrNull();
+    while (block != null && block.isSuccessfulEndOfStreamBlock() && !_mailboxes.isEmpty()) {
+      ReceivingMailbox removed = _mailboxes.remove(_lastRead);
+      _lastRead--;
+      _mailboxService.releaseReceivingMailbox(removed);
+      _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("==[RECEIVE]== EOS received : " + _context.getId() + " in mailbox: " + removed.getId());
+      }
+
+      block = readBlockOrNull();
+    }
+    if (_mailboxes.isEmpty()) {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("==[RECEIVE]== Finished : " + _context.getId());
+      }
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    }
+    if (block != null) {
+      if (LOGGER.isTraceEnabled()) {
+        ReceivingMailbox mailbox = _mailboxes.get(_lastRead);
+        LOGGER.trace("==[RECEIVE]== Returned block from : " + _context.getId() + " in mailbox: " + mailbox.getId());
+      }
+      if (block.isErrorBlock()) {
+        _errorBlock = block;
+      }
+    }
+    return block;
+  }
+
+  @Nullable
+  private TransferableBlock readBlockOrNull() {
+    for (int i = _lastRead + 1; i < _mailboxes.size(); i++) {
+      ReceivingMailbox mailbox = _mailboxes.get(i);
+      TransferableBlock block = mailbox.poll();
+      if (block != null) {
+        _lastRead = i;
+        return block;
+      }
+    }
+    for (int i = 0; i <= _lastRead; i++) {
+      ReceivingMailbox mailbox = _mailboxes.get(i);
+      TransferableBlock block = mailbox.poll();
+      if (block != null) {
+        _lastRead = i;
+        return block;
+      }
+    }
+    return null;
   }
 }

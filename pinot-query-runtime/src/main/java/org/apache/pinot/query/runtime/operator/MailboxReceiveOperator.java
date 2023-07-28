@@ -19,21 +19,17 @@
 package org.apache.pinot.query.runtime.operator;
 
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
 /**
  * This {@code MailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
- * {@link MultiStageOperator#getNextBlock()}()} API.
+ * {@link MultiStageOperator#getNextBlock()} API.
  */
 public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private static final String EXPLAIN_NAME = "MAILBOX_RECEIVE";
-
-  private TransferableBlock _errorBlock;
 
   public MailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType, int senderStageId) {
     super(context, exchangeType, senderStageId);
@@ -46,41 +42,6 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (_errorBlock != null) {
-      return _errorBlock;
-    }
-    if (System.currentTimeMillis() > _context.getDeadlineMs()) {
-      _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
-      return _errorBlock;
-    }
-
-    // Poll from every mailbox in round-robin fashion:
-    // - Return the first content block
-    // - If no content block found but there are mailboxes not finished, return no-op block
-    // - If all content blocks are already returned, return end-of-stream block
-    int numMailboxes = _mailboxes.size();
-    for (int i = 0; i < numMailboxes; i++) {
-      ReceivingMailbox mailbox = _mailboxes.remove();
-      TransferableBlock block = mailbox.poll();
-
-      // Release the mailbox when the block is end-of-stream
-      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
-        _mailboxService.releaseReceivingMailbox(mailbox);
-        _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
-        continue;
-      }
-
-      // Add the mailbox back to the queue if the block is not end-of-stream
-      _mailboxes.add(mailbox);
-      if (block != null) {
-        if (block.isErrorBlock()) {
-          _errorBlock = block;
-        }
-        return block;
-      }
-    }
-
-    return _mailboxes.isEmpty() ? TransferableBlockUtils.getEndOfStreamTransferableBlock()
-        : TransferableBlockUtils.getNoOpTransferableBlock();
+    return readBlockBlocking();
   }
 }

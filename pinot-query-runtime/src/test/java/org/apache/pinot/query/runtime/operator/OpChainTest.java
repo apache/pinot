@@ -100,8 +100,8 @@ public class OpChainTest {
             new MailboxMetadata(ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)), ImmutableList.of(s),
                 ImmutableMap.of())).build()).collect(Collectors.toList())).build();
 
-    when(_mailboxService1.getReceivingMailbox(any())).thenReturn(_mailbox1);
-    when(_mailboxService2.getReceivingMailbox(any())).thenReturn(_mailbox2);
+    when(_mailboxService1.getReceivingMailbox(any(), any())).thenReturn(_mailbox1);
+    when(_mailboxService2.getReceivingMailbox(any(), any())).thenReturn(_mailbox2);
 
     try {
       doAnswer(invocation -> {
@@ -112,7 +112,8 @@ public class OpChainTest {
       when(_exchange.getRemainingCapacity()).thenReturn(1);
       when(_mailbox2.poll()).then(x -> {
         if (_blockList.isEmpty()) {
-          return TransferableBlockUtils.getNoOpTransferableBlock();
+          //return TransferableBlockUtils.getNoOpTransferableBlock();
+          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
         }
         return _blockList.remove(0);
       });
@@ -167,8 +168,10 @@ public class OpChainTest {
 
     Map<String, String> executionStats =
         opChain.getStats().getOperatorStatsMap().get(dummyMultiStageOperator.getOperatorId()).getExecutionStats();
-    assertTrue(Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) >= 1000);
-    assertTrue(Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) <= 2000);
+
+    long time = Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName()));
+    assertTrue(time >= 1000 && time <= 2000, "Expected " + DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS
+        + " to be in [1000, 2000] but found " + time);
   }
 
   @Test

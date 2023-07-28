@@ -122,72 +122,6 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
-  public void testShouldHandleUpstreamNoOpBlocksWhileConstructing() {
-    // Given:
-    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
-    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
-
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
-    Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
-    WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
-            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
-
-    // When:
-    TransferableBlock block1 = operator.nextBlock(); // build when reading NoOp block
-    TransferableBlock block2 = operator.nextBlock(); // return when reading EOS block
-
-    // Then:
-    Mockito.verify(_input, Mockito.times(3)).nextBlock();
-    Assert.assertTrue(block1.isNoOpBlock());
-    Assert.assertEquals(block2.getContainer().size(), 1);
-  }
-
-  @Test
-  public void testShouldHandleUpstreamNoOpBlocksWhileConstructingMultipleRows() {
-    // Given:
-    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
-    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
-
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
-    Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 2}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 2}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-
-    DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
-    WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
-            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
-
-    // When:
-    TransferableBlock block1 = operator.nextBlock(); // build when reading NoOp block
-    TransferableBlock block2 = operator.nextBlock(); // build when reading NoOp block
-    TransferableBlock block3 = operator.nextBlock(); // return when reading EOS block
-    TransferableBlock block4 = operator.nextBlock(); // EOS block
-
-    // Then:
-    Mockito.verify(_input, Mockito.times(6)).nextBlock();
-    Assert.assertTrue(block1.isNoOpBlock());
-    Assert.assertTrue(block2.isNoOpBlock());
-    Assert.assertEquals(block3.getContainer().size(), 3);
-    Assert.assertEquals(block3.getContainer().get(0), new Object[]{1, 1, 3.0});
-    Assert.assertEquals(block3.getContainer().get(1), new Object[]{1, 2, 3.0});
-    Assert.assertEquals(block3.getContainer().get(2), new Object[]{2, 2, 2});
-    Assert.assertTrue(block4.isEndOfStreamBlock());
-  }
-
-  @Test
   public void testShouldWindowAggregateOverSingleInputBlock() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
@@ -209,7 +143,6 @@ public class WindowAggregateOperatorTest {
     TransferableBlock block2 = operator.nextBlock();
 
     // Then:
-    Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
     Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1},
         "Expected three columns (original two columns, agg value)");
@@ -240,7 +173,6 @@ public class WindowAggregateOperatorTest {
     TransferableBlock block2 = operator.nextBlock();
 
     // Then:
-    Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
     Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1},
         "Expected three columns (original two columns, agg value)");
@@ -268,7 +200,6 @@ public class WindowAggregateOperatorTest {
     TransferableBlock block2 = operator.nextBlock();
 
     // Then:
-    Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
     Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1},
         "Expected three columns (original two columns, agg value)");
@@ -297,7 +228,6 @@ public class WindowAggregateOperatorTest {
     TransferableBlock block2 = operator.nextBlock();
 
     // Then:
-    Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
     // second value is 1 (the literal) instead of 3 (the col val)
     Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 3, 42},
@@ -359,9 +289,6 @@ public class WindowAggregateOperatorTest {
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     TransferableBlock result = sum0PartitionBy1.getNextBlock();
-    while (result.isNoOpBlock()) {
-      result = sum0PartitionBy1.getNextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows =
         Arrays.asList(new Object[]{2, "BB", 5.0}, new Object[]{3, "BB", 5.0}, new Object[]{1, "Aa", 1});
@@ -434,9 +361,6 @@ public class WindowAggregateOperatorTest {
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     TransferableBlock result = operator.getNextBlock();
-    while (result.isNoOpBlock()) {
-      result = operator.getNextBlock();
-    }
     TransferableBlock eosBlock = operator.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
     Map<Integer, List<Object[]>> expectedPartitionToRowsMap = new HashMap<>();
@@ -494,9 +418,6 @@ public class WindowAggregateOperatorTest {
             WindowNode.WindowFrameType.ROWS, Collections.emptyList(), outSchema, inSchema);
 
     TransferableBlock result = operator.getNextBlock();
-    while (result.isNoOpBlock()) {
-      result = operator.getNextBlock();
-    }
     TransferableBlock eosBlock = operator.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
     Map<Integer, List<Object[]>> expectedPartitionToRowsMap = new HashMap<>();
@@ -551,9 +472,6 @@ public class WindowAggregateOperatorTest {
             outSchema, inSchema);
 
     TransferableBlock result = operator.getNextBlock();
-    while (result.isNoOpBlock()) {
-      result = operator.getNextBlock();
-    }
     TransferableBlock eosBlock = operator.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "foo", 1}, new Object[]{2, "bar", 2},
@@ -649,7 +567,6 @@ public class WindowAggregateOperatorTest {
     TransferableBlock block2 = operator.nextBlock();
 
     // Then:
-    Mockito.verify(_input, Mockito.times(2)).nextBlock();
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
     Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, "foo", 2},
         "Expected three columns (original two columns, agg value)");

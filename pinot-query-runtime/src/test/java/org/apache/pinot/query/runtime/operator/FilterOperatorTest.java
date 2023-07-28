@@ -84,20 +84,6 @@ public class FilterOperatorTest {
   }
 
   @Test
-  public void shouldPropagateUpstreamNoop() {
-    RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
-
-    DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT
-    });
-    Mockito.when(_upstreamOperator.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
-    FilterOperator op =
-        new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, booleanLiteral);
-    TransferableBlock dataBlock = op.getNextBlock();
-    Assert.assertTrue(dataBlock.isNoOpBlock());
-  }
-
-  @Test
   public void shouldHandleTrueBooleanLiteralFilter() {
     RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
 

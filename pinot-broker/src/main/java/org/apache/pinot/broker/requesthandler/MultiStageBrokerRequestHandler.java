@@ -59,7 +59,6 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
@@ -113,12 +112,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
         QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
-    _reducerScheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
+    _reducerScheduler = new OpChainSchedulerService(
         Executors.newCachedThreadPool(new NamedThreadFactory("query_broker_reducer_" + _reducerPort + "_port")));
-    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, _reducerScheduler::onDataAvailable);
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config);
 
     // TODO: move this to a startUp() function.
-    _reducerScheduler.startAsync();
     _mailboxService.start();
   }
 
@@ -333,6 +331,5 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
-    _reducerScheduler.stopAsync();
   }
 }

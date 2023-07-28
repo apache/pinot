@@ -53,19 +53,7 @@ public class MetadataBlock extends BaseDataBlock {
      * some error during computation. To retrieve the error that
      * occurred, use {@link MetadataBlock#getExceptions()}
      */
-    ERROR,
-
-    /**
-     * A {@code NOOP} metadata block can be sent at any point to
-     * and should be ignored by downstream - it is often used to
-     * indicate that the operator chain either has nothing to process
-     * or has processed data but is not yet ready to emit a result
-     * block.
-     */
-    NOOP;
-
-    MetadataBlockType() {
-    }
+    ERROR
   }
 
   /**

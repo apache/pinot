@@ -80,7 +80,11 @@ public class OpChain implements AutoCloseable {
    */
   @Override
   public void close() {
-    _root.close();
+    try {
+      _root.close();
+    } finally {
+      _opChainFinishCallback.accept(getId());
+    }
   }
 
   /**
@@ -88,6 +92,10 @@ public class OpChain implements AutoCloseable {
    * @param e
    */
   public void cancel(Throwable e) {
-    _root.cancel(e);
+    try {
+      _root.cancel(e);
+    } finally {
+      _opChainFinishCallback.accept(getId());
+    }
   }
 }
