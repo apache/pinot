@@ -100,7 +100,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
 
-  // NOTE: for STRING column, this is the max number of characters; for BYTES column, this is the max number of bytes
+  // NOTE: This only applies to STRING column, which is the max number of characters
   private int _maxLength = DEFAULT_MAX_LENGTH;
 
   protected Object _defaultNullValue;

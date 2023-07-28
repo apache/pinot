@@ -16,37 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.startree.v2;
+package org.apache.pinot.segment.local.utils;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import java.util.Collections;
-import java.util.Random;
-import org.apache.pinot.segment.local.aggregator.DistinctCountHLLValueAggregator;
-import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import java.io.IOException;
+import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
-public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<Object, HyperLogLog> {
+public class HyperLogLogUtilsTest {
 
-  @Override
-  ValueAggregator<Object, HyperLogLog> getValueAggregator() {
-    return new DistinctCountHLLValueAggregator(Collections.emptyList());
-  }
-
-  @Override
-  DataType getRawValueType() {
-    return DataType.INT;
-  }
-
-  @Override
-  Object getRandomRawValue(Random random) {
-    return random.nextInt(100);
-  }
-
-  @Override
-  void assertAggregatedValue(HyperLogLog starTreeResult, HyperLogLog nonStarTreeResult) {
-    assertEquals(starTreeResult.cardinality(), nonStarTreeResult.cardinality());
+  @Test
+  public void testByteSize()
+      throws IOException {
+    for (int log2m = 0; log2m < 16; log2m++) {
+      HyperLogLog hll = new HyperLogLog(log2m);
+      int expectedByteSize = hll.getBytes().length;
+      assertEquals(HyperLogLogUtils.byteSize(log2m), expectedByteSize);
+      assertEquals(HyperLogLogUtils.byteSize(hll), expectedByteSize);
+    }
   }
 }
