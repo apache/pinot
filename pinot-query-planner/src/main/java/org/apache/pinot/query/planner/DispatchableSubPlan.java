@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.planner;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.util.Pair;
 
@@ -41,11 +43,14 @@ public class DispatchableSubPlan {
   private final List<DispatchablePlanFragment> _queryStageList;
   private final Set<String> _tableNames;
 
+  private final Map<String, Collection<String>> _tableToUnavailableSegmentsMap;
+
   public DispatchableSubPlan(List<Pair<Integer, String>> fields, List<DispatchablePlanFragment> queryStageList,
-      Set<String> tableNames) {
+      Set<String> tableNames, Map<String, Collection<String>> tableToUnavailableSegmentsMap) {
     _queryResultFields = fields;
     _queryStageList = queryStageList;
     _tableNames = tableNames;
+    _tableToUnavailableSegmentsMap = tableToUnavailableSegmentsMap;
   }
 
   /**
@@ -70,5 +75,13 @@ public class DispatchableSubPlan {
    */
   public Set<String> getTableNames() {
     return _tableNames;
+  }
+
+  /**
+   * Get the table to unavailable segments map
+   * @return table to unavailable segments map
+   */
+  public Map<String, Collection<String>> getTableToUnavailableSegmentsMap() {
+    return _tableToUnavailableSegmentsMap;
   }
 }

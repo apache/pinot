@@ -219,7 +219,7 @@ public class WorkerManager {
       serverInstances = fetchServersForIntermediateStage(tableNames);
     }
     if (serverInstances.isEmpty()) {
-      LOGGER.warn("[RequestId: {}] No server instance found for intermediate stage for tables: {}",
+      LOGGER.error("[RequestId: {}] No server instance found for intermediate stage for tables: {}",
           context.getRequestId(), tableNames);
       throw new IllegalStateException(
           "No server instance found for intermediate stage for tables: " + Arrays.toString(tableNames.toArray()));

@@ -20,11 +20,11 @@ package org.apache.pinot.query.planner.physical;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
@@ -55,7 +55,8 @@ public class DispatchablePlanMetadata implements Serializable {
   // workerId -> {planFragmentId -> mailbox list}
   private final Map<Integer, Map<Integer, MailboxMetadata>> _workerIdToMailboxesMap;
 
-  private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
+  // used for tracking unavailable segments from routing table, then assemble missing segments exception.
+  private final Map<String, Collection<String>> _tableToUnavailableSegmentsMap;
 
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
@@ -92,7 +93,8 @@ public class DispatchablePlanMetadata implements Serializable {
     return _workerIdToSegmentsMap;
   }
 
-  public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+  public void setWorkerIdToSegmentsMap(
+      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
   }
 
@@ -141,25 +143,15 @@ public class DispatchablePlanMetadata implements Serializable {
     _totalWorkerCount = totalWorkerCount;
   }
 
-  public void addTableToUnavailableSegmentsMap(String table, List<String> unavailableSegments) {
+  public void addTableToUnavailableSegmentsMap(String table, Collection<String> unavailableSegments) {
     if (!_tableToUnavailableSegmentsMap.containsKey(table)) {
       _tableToUnavailableSegmentsMap.put(table, new HashSet<>());
     }
     _tableToUnavailableSegmentsMap.get(table).addAll(unavailableSegments);
   }
 
-  public Map<String, Set<String>> getTableToUnavailableSegmentsMap() {
+  public Map<String, Collection<String>> getTableToUnavailableSegmentsMap() {
     return _tableToUnavailableSegmentsMap;
-  }
-
-  public void addTableToUnavailableSegmentsMap(Map<String, Set<String>> tableToUnavailableSegments) {
-    for (Map.Entry<String, Set<String>> entry : tableToUnavailableSegments.entrySet()) {
-      String table = entry.getKey();
-      if (!_tableToUnavailableSegmentsMap.containsKey(table)) {
-        _tableToUnavailableSegmentsMap.put(table, new HashSet<>());
-      }
-      _tableToUnavailableSegmentsMap.get(table).addAll(entry.getValue());
-    }
   }
 
   @Override

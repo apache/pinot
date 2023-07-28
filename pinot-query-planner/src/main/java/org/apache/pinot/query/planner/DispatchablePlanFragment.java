@@ -19,11 +19,9 @@
 package org.apache.pinot.query.planner;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerMetadata;
@@ -48,22 +46,17 @@ public class DispatchablePlanFragment {
   // used for passing custom properties to build StageMetadata on the server.
   private final Map<String, String> _customProperties;
 
-  // Used for passing unavailable segments to generate partial results.
-  private final Map<String, Collection<String>> _tableToUnavailableSegments;
-
   public DispatchablePlanFragment(PlanFragment planFragment) {
-    this(planFragment, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>());
+    this(planFragment, new ArrayList<>(), new HashMap<>(), new HashMap<>());
   }
 
   public DispatchablePlanFragment(PlanFragment planFragment, List<WorkerMetadata> workerMetadataList,
-      Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap, Map<String, String> customPropertyMap,
-      Map<String, Set<String>> tableToUnavailableSegments) {
+      Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap, Map<String, String> customPropertyMap) {
     _planFragment = planFragment;
     _workerMetadataList = workerMetadataList;
     _serverInstanceToWorkerIdMap = serverInstanceToWorkerIdMap;
     _workerIdToSegmentsMap = new HashMap<>();
     _customProperties = customPropertyMap;
-    _tableToUnavailableSegments = new HashMap<>();
   }
 
   public PlanFragment getPlanFragment() {
@@ -80,10 +73,6 @@ public class DispatchablePlanFragment {
 
   public Map<String, String> getCustomProperties() {
     return _customProperties;
-  }
-
-  public Map<String, Collection<String>> getTableToUnavailableSegments() {
-    return _tableToUnavailableSegments;
   }
 
   public String getTableName() {

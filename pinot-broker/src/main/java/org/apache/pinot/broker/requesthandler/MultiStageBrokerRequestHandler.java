@@ -21,7 +21,6 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -245,16 +244,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     brokerResponse.setTimeUsedMs(totalTimeMs);
     brokerResponse.setResultTable(queryResults);
 
-    Map<String, Collection<String>> tableToUnavailableSegments =
-        dispatchableSubPlan.getQueryStageList().get(0).getTableToUnavailableSegments();
-    if (!tableToUnavailableSegments.isEmpty()) {
-      for (String table : tableToUnavailableSegments.keySet()) {
-        brokerResponse.addToExceptions(
+    dispatchableSubPlan.getTableToUnavailableSegmentsMap().forEach(
+        (table, segmentList) -> brokerResponse.addToExceptions(
             new QueryProcessingException(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE,
                 String.format("Some segments are unavailable for table %s, unavailable segments: [%s]", table,
-                    Arrays.toString(tableToUnavailableSegments.get(table).toArray()))));
-      }
-    }
+                    Arrays.toString(segmentList.toArray())))));
 
     for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
       if (entry.getKey() == 0) {

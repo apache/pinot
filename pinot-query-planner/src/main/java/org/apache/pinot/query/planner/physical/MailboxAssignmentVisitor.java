@@ -43,9 +43,6 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
       DispatchablePlanMetadata senderMetadata = metadataMap.get(senderFragmentId);
       DispatchablePlanMetadata receiverMetadata = metadataMap.get(receiverFragmentId);
-      if (!senderMetadata.getTableToUnavailableSegmentsMap().isEmpty()) {
-        receiverMetadata.addTableToUnavailableSegmentsMap(senderMetadata.getTableToUnavailableSegmentsMap());
-      }
       Map<QueryServerInstance, List<Integer>> senderWorkerIdsMap = senderMetadata.getServerInstanceToWorkerIdMap();
       Map<QueryServerInstance, List<Integer>> receiverWorkerIdsMap = receiverMetadata.getServerInstanceToWorkerIdMap();
       Map<Integer, Map<Integer, MailboxMetadata>> senderMailboxesMap = senderMetadata.getWorkerIdToMailBoxIdsMap();
