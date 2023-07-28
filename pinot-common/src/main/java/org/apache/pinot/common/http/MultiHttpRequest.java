@@ -25,13 +25,11 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.function.Function;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpClient;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.commons.httpclient.HttpMethodBase;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.params.HttpClientParams;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
@@ -101,8 +99,8 @@ public class MultiHttpRequest {
    * @return instance of CompletionService. Completion service will provide
    *   results as they arrive. The order is NOT same as the order of URLs
    */
-  public CompletionService<HttpGet> execute(List<String> urls, @Nullable Map<String, String> requestHeaders,
-      int timeoutMs) {
+  public CompletionService<MultiHttpRequestResponse> execute(List<String> urls,
+      @Nullable Map<String, String> requestHeaders, int timeoutMs) {
     return execute(urls, requestHeaders, timeoutMs, "GET", HttpGet::new);
   }
 
@@ -112,34 +110,35 @@ public class MultiHttpRequest {
    * @param requestHeaders headers to set when making the request
    * @param timeoutMs timeout in milliseconds for each http request
    * @param httpMethodName the name of the http method like GET, DELETE etc.
-   * @param httpMethodSupplier a function to create a new http method object.
+   * @param httpRequestBaseSupplier a function to create a new http method object.
    * @return instance of CompletionService. Completion service will provide
    *   results as they arrive. The order is NOT same as the order of URLs
    */
-  public <T extends HttpRequestBase> CompletionService<T> execute(List<String> urls,
+  public <T extends HttpRequestBase> CompletionService<MultiHttpRequestResponse> execute(List<String> urls,
       @Nullable Map<String, String> requestHeaders, int timeoutMs, String httpMethodName,
-      Function<String, T> httpMethodSupplier) {
-    HttpClientParams clientParams = new HttpClientParams();
-    clientParams.setConnectionManagerTimeout(timeoutMs);
-    CloseableHttpClient client = HttpClients.custom().setConnectionManager(_connectionManager)
-        .build();
+      Function<String, T> httpRequestBaseSupplier) {
+    // Create global request configuration
+    RequestConfig defaultRequestConfig = RequestConfig.custom()
+        .setConnectionRequestTimeout(timeoutMs)
+        .setSocketTimeout(timeoutMs).build(); // setting the socket
 
-    CompletionService<T> completionService = new ExecutorCompletionService<>(_executor);
+    CloseableHttpClient client = HttpClients.custom().setConnectionManager(_connectionManager)
+        .setDefaultRequestConfig(defaultRequestConfig).build(); // try-catch
+
+    CompletionService<MultiHttpRequestResponse> completionService = new ExecutorCompletionService<>(_executor);
     for (String url : urls) {
       completionService.submit(() -> {
         try {
-          T httpMethod = httpMethodSupplier.apply(url);
-          // Explicitly cast type downwards to workaround a bug in jdk8: https://bugs.openjdk.org/browse/JDK-8056984
-          HttpRequestBase httpRequestBase = httpMethod;
+          T httpMethod = httpRequestBaseSupplier.apply(url);
           if (requestHeaders != null) {
-            requestHeaders.forEach(httpRequestBase::setHeader);
+            requestHeaders.forEach(((HttpRequestBase) httpMethod)::setHeader);
           }
-          httpRequestBase.setSoTimeout(timeoutMs);
-          client.execute(httpRequestBase);
-          return httpMethod;
+          CloseableHttpResponse response = client.execute(httpMethod);
+          return new MultiHttpRequestResponse(httpMethod.getURI(), response);
         } catch (Exception e) {
           // Log only exception type and message instead of the whole stack trace
           LOGGER.warn("Caught '{}' while executing: {} on URL: {}", e, httpMethodName, url);
+          client.close();
           throw e;
         }
       });

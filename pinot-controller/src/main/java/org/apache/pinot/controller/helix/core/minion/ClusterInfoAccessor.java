@@ -23,11 +23,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -54,12 +54,12 @@ public class ClusterInfoAccessor {
   private final ControllerMetrics _controllerMetrics;
   private final LeadControllerManager _leadControllerManager;
   private final Executor _executor;
-  private final MultiThreadedHttpConnectionManager _connectionManager;
+  private final PoolingHttpClientConnectionManager _connectionManager;
 
   public ClusterInfoAccessor(PinotHelixResourceManager pinotHelixResourceManager,
       PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager, Executor executor,
-      MultiThreadedHttpConnectionManager connectionManager) {
+      PoolingHttpClientConnectionManager connectionManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
     _controllerConf = controllerConf;
@@ -111,7 +111,7 @@ public class ClusterInfoAccessor {
   /**
    * Get shared connection manager
    */
-  public MultiThreadedHttpConnectionManager getConnectionManager() {
+  public PoolingHttpClientConnectionManager getConnectionManager() {
     return _connectionManager;
   }
 

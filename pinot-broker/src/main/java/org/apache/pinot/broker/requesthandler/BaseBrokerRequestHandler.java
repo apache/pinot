@@ -21,6 +21,8 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.net.URI;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,9 +43,10 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -54,6 +57,7 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.http.MultiHttpRequest;
+import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -197,21 +201,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       serverUrls.add(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId));
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
-    CompletionService<DeleteMethod> completionService =
-        new MultiHttpRequest(executor, connMgr).execute(serverUrls, null, timeoutMs, "DELETE", DeleteMethod::new);
+    CompletionService<MultiHttpRequestResponse> completionService =
+        new MultiHttpRequest(executor, connMgr).execute(serverUrls, null, timeoutMs, "DELETE", HttpDelete::new);
     List<String> errMsgs = new ArrayList<>(serverUrls.size());
     for (int i = 0; i < serverUrls.size(); i++) {
-      DeleteMethod deleteMethod = null;
+      MultiHttpRequestResponse httpRequestResponse = null;
       try {
         // Wait for all requests to respond before returning to be sure that the servers have handled the cancel
         // requests. The completion order is different from serverUrls, thus use uri in the response.
-        deleteMethod = completionService.take().get();
-        URI uri = deleteMethod.getURI();
-        int status = deleteMethod.getStatusCode();
+        httpRequestResponse = completionService.take().get();
+        URI uri = httpRequestResponse.getURI();
+        CloseableHttpResponse response =  httpRequestResponse.getResponse();
+        int status = response.getStatusLine().getStatusCode();
         // Unexpected server responses are collected and returned as exception.
         if (status != 200 && status != 404) {
+          String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
           throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,
-              deleteMethod.getResponseBodyAsString(), uri));
+              responseString, uri));
         }
         if (serverResponses != null) {
           serverResponses.put(uri.getHost() + ":" + uri.getPort(), status);
@@ -222,8 +228,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         // So just collect the error msg to throw them together after the for-loop.
         errMsgs.add(e.getMessage());
       } finally {
-        if (deleteMethod != null) {
-          deleteMethod.releaseConnection();
+        if (httpRequestResponse != null) {
+          httpRequestResponse.getResponse().close();
         }
       }
     }

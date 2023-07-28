@@ -20,16 +20,19 @@
 package org.apache.pinot.controller.util;
 
 import com.google.common.collect.BiMap;
+import java.net.URI;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
+import org.apache.commons.io.IOUtils;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.pinot.common.http.MultiHttpRequest;
+import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +59,8 @@ public class CompletionServiceHelper {
   }
 
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, int timeoutMs) {
+      boolean multiRequestPerServer, int timeoutMs)
+      throws Exception {
     return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs, null);
   }
 
@@ -77,33 +81,36 @@ public class CompletionServiceHelper {
    */
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
       boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs,
-      @Nullable String useCase) {
+      @Nullable String useCase)
+      throws Exception {
     CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
 
     // TODO: use some service other than completion service so that we know which server encounters the error
-    CompletionService<GetMethod> completionService =
+    CompletionService<MultiHttpRequestResponse> completionService =
         new MultiHttpRequest(_executor, _httpConnectionManager).execute(serverURLs, requestHeaders, timeoutMs);
     for (int i = 0; i < serverURLs.size(); i++) {
-      GetMethod getMethod = null;
+      MultiHttpRequestResponse multiHttpRequestResponse = null;
       try {
-        getMethod = completionService.take().get();
-        URI uri = getMethod.getURI();
+        multiHttpRequestResponse = completionService.take().get();
+        URI uri = multiHttpRequestResponse.getURI();
+        CloseableHttpResponse response =  multiHttpRequestResponse.getResponse();
         String instance =
             _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
-        if (getMethod.getStatusCode() >= 300) {
-          LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
+        if (response.getStatusLine().getStatusCode() >= 300) {
+          LOGGER.error("Server: {} returned error: {}", instance, response.getStatusLine().getStatusCode());
           completionServiceResponse._failedResponseCount++;
           continue;
         }
+        String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
         completionServiceResponse._httpResponses
-            .put(multiRequestPerServer ? uri.toString() : instance, getMethod.getResponseBodyAsString());
+            .put(multiRequestPerServer ? uri.toString() : instance, responseString);
       } catch (Exception e) {
         String reason = useCase == null ? "" : String.format(" in '%s'", useCase);
         LOGGER.error("Connection error{}. Details: {}", reason, e.getMessage());
         completionServiceResponse._failedResponseCount++;
       } finally {
-        if (getMethod != null) {
-          getMethod.releaseConnection();
+        if (multiHttpRequestResponse != null) {
+          multiHttpRequestResponse.getResponse().close();
         }
       }
     }
@@ -119,12 +126,14 @@ public class CompletionServiceHelper {
   }
 
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, int timeoutMs, @Nullable String useCase) {
+      boolean multiRequestPerServer, int timeoutMs, @Nullable String useCase)
+      throws Exception {
     return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs, useCase);
   }
 
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs) {
+      boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs)
+      throws Exception {
     return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, requestHeaders, timeoutMs, null);
   }
 

@@ -21,18 +21,20 @@ package org.apache.pinot.common.utils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.methods.DeleteMethod;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
-import org.apache.commons.httpclient.methods.multipart.Part;
-import org.apache.commons.httpclient.methods.multipart.StringPart;
-import org.apache.commons.httpclient.params.HttpMethodParams;
+import org.apache.commons.io.IOUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -47,7 +49,7 @@ import org.slf4j.LoggerFactory;
 public class SchemaUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(SchemaUtils.class);
 
-  private static final HttpClient HTTP_CLIENT = new HttpClient();
+  private static final CloseableHttpClient HTTP_CLIENT = HttpClientBuilder.create().build();
 
   private SchemaUtils() {
   }
@@ -83,10 +85,11 @@ public class SchemaUtils {
 
     try {
       URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas/" + schemaName);
-      GetMethod httpGet = new GetMethod(url.toString());
+      HttpGet httpGet = new HttpGet(url.toString());
       try {
-        int responseCode = HTTP_CLIENT.executeMethod(httpGet);
-        String response = httpGet.getResponseBodyAsString();
+        CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet);
+        int responseCode = response.getStatusLine().getStatusCode();
+        String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
         if (responseCode >= 400) {
           // File not find error code.
           if (responseCode == 404) {
@@ -96,7 +99,7 @@ public class SchemaUtils {
           }
           return null;
         }
-        return Schema.fromString(response);
+        return Schema.fromString(responseString);
       } finally {
         httpGet.releaseConnection();
       }
@@ -118,15 +121,16 @@ public class SchemaUtils {
 
     try {
       URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas");
-      PostMethod httpPost = new PostMethod(url.toString());
+      HttpPost httpPost = new HttpPost(url.toString());
       try {
-        Part[] parts = {new StringPart(schema.getSchemaName(), schema.toSingleLineJsonString())};
-        MultipartRequestEntity requestEntity = new MultipartRequestEntity(parts, new HttpMethodParams());
-        httpPost.setRequestEntity(requestEntity);
-        int responseCode = HTTP_CLIENT.executeMethod(httpPost);
+        HttpEntity requestEntity = MultipartEntityBuilder.create()
+            .addTextBody(schema.getSchemaName(), schema.toSingleLineJsonString()).build();
+        httpPost.setEntity(requestEntity);
+        CloseableHttpResponse response = HTTP_CLIENT.execute(httpPost);
+        int responseCode = response.getStatusLine().getStatusCode();
         if (responseCode >= 400) {
-          String response = httpPost.getResponseBodyAsString();
-          LOGGER.warn("Got error response code: {}, response: {}", responseCode, response);
+          String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+          LOGGER.warn("Got error response code: {}, response: {}", responseCode, responseString);
           return false;
         }
         return true;
@@ -152,12 +156,13 @@ public class SchemaUtils {
 
     try {
       URL url = new URL(CommonConstants.HTTP_PROTOCOL, host, port, "/schemas/" + schemaName);
-      DeleteMethod httpDelete = new DeleteMethod(url.toString());
+      HttpDelete httpDelete = new HttpDelete(url.toString());
       try {
-        int responseCode = HTTP_CLIENT.executeMethod(httpDelete);
+        CloseableHttpResponse response = HTTP_CLIENT.execute(httpDelete);
+        int responseCode = response.getStatusLine().getStatusCode();
         if (responseCode >= 400) {
-          String response = httpDelete.getResponseBodyAsString();
-          LOGGER.warn("Got error response code: {}, response: {}", responseCode, response);
+          String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+          LOGGER.warn("Got error response code: {}, response: {}", responseCode, responseString);
           return false;
         }
         return true;
