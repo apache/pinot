@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.docidsets;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -75,13 +76,19 @@ public final class AndDocIdSet implements BlockDocIdSet {
     List<BitmapBasedDocIdIterator> bitmapBasedDocIdIterators = new ArrayList<>();
     List<ScanBasedDocIdIterator> scanBasedDocIdIterators = new ArrayList<>();
     List<BlockDocIdIterator> remainingDocIdIterators = new ArrayList<>();
-    for (int i = 0; i < numDocIdSets; i++) {
-      BlockDocIdIterator docIdIterator = _docIdSets.get(i).iterator();
+
+    Iterator<BlockDocIdSet> iterator = _docIdSets.iterator();
+    for (int i = 0; iterator.hasNext(); i++) {
+      BlockDocIdIterator docIdIterator = iterator.next().iterator();
       allDocIdIterators[i] = docIdIterator;
       if (docIdIterator instanceof SortedDocIdIterator) {
         sortedDocIdIterators.add((SortedDocIdIterator) docIdIterator);
+        // do not keep holding on to the _docIdRanges since they will occupy heap space during the query execution
+        iterator.remove();
       } else if (docIdIterator instanceof BitmapBasedDocIdIterator) {
         bitmapBasedDocIdIterators.add((BitmapBasedDocIdIterator) docIdIterator);
+        // do not keep holding on to the bitmaps since they will occupy heap space during the query execution
+        iterator.remove();
       } else if (docIdIterator instanceof ScanBasedDocIdIterator) {
         scanBasedDocIdIterators.add((ScanBasedDocIdIterator) docIdIterator);
       } else {
