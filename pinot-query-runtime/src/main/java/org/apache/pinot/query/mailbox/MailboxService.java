@@ -22,18 +22,17 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -92,20 +91,13 @@ public class MailboxService {
   private final ChannelManager _channelManager = new ChannelManager();
 
   private GrpcMailboxServer _grpcMailboxServer;
-  private ConcurrentHashMap<OpChainId, Consumer<OpChainId>> _onDataCallbacks = new ConcurrentHashMap<>();
 
   public MailboxService(String hostname, int port, PinotConfiguration config,
       Consumer<OpChainId> unblockOpChainCallback) {
     _hostname = hostname;
     _port = port;
     _config = config;
-    _unblockOpChainCallback = opChainId -> {
-      Consumer<OpChainId> opChainIdConsumer = _onDataCallbacks.get(opChainId);
-      if (opChainIdConsumer != null) {
-        opChainIdConsumer.accept(opChainId);
-      }
-      unblockOpChainCallback.accept(opChainId);
-    };
+    _unblockOpChainCallback = unblockOpChainCallback;
     _exchangeExecutor = Executors.newCachedThreadPool();
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
@@ -158,21 +150,28 @@ public class MailboxService {
     }
   }
 
-  public ReceivingMailbox getReceivingMailbox(String mailboxId, BaseMailboxReceiveOperator receiveOperator) {
-    ReceivingMailbox receivingMailbox = getReceivingMailbox(mailboxId);
-    _onDataCallbacks.putIfAbsent(receivingMailbox.getOpChainId(), ignoreMe -> receiveOperator.onData());
-    return receivingMailbox;
+  public ReceivingMailbox getReceivingMailbox(String mailboxId, @Nullable Consumer<OpChainId> extraCallback) {
+    try {
+      Consumer<OpChainId> callback;
+      if (extraCallback == null) {
+        callback = _unblockOpChainCallback;
+      } else {
+        callback = opChainId -> {
+          extraCallback.accept(opChainId);
+          _unblockOpChainCallback.accept(opChainId);
+        };
+      }
+      return _receivingMailboxCache.get(mailboxId, () -> new ReceivingMailbox(mailboxId, callback));
+    } catch (ExecutionException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**
    * Returns the receiving mailbox for the given mailbox id.
    */
   public ReceivingMailbox getReceivingMailbox(String mailboxId) {
-    try {
-      return _receivingMailboxCache.get(mailboxId, () -> new ReceivingMailbox(mailboxId, _unblockOpChainCallback));
-    } catch (ExecutionException e) {
-      throw new RuntimeException(e);
-    }
+    return getReceivingMailbox(mailboxId, null);
   }
 
   /**

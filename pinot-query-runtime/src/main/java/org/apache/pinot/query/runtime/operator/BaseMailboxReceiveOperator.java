@@ -77,7 +77,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, senderMailBoxMetadatas);
     _mailboxes = new ArrayList<>(_mailboxIds.size());
     for (String mailboxId : _mailboxIds) {
-      _mailboxes.add(_mailboxService.getReceivingMailbox(mailboxId, this));
+      _mailboxes.add(_mailboxService.getReceivingMailbox(mailboxId, ignoreMe -> onData()));
     }
     _lastRead = _mailboxes.size() - 1;
   }
@@ -136,6 +136,9 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
           block = readDroppingSuccessEos();
         }
         if (timeout) {
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.warn("==[RECEIVE]== Timeout on: " + _context.getId());
+          }
           _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
           return _errorBlock;
         }

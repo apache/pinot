@@ -148,8 +148,22 @@ public class MailboxSendOperator extends MultiStageOperator {
   private void sendTransferableBlock(TransferableBlock block, boolean throwIfTimeout)
       throws Exception {
     long timeoutMs = _context.getDeadlineMs() - System.currentTimeMillis();
-    if (!_exchange.offerBlock(block, timeoutMs) && throwIfTimeout) {
-      throw new TimeoutException("Timeout while offering data block into the sending queue.");
+    boolean success = false;
+    try {
+      if (!_exchange.offerBlock(block, timeoutMs) && throwIfTimeout) {
+        throw new TimeoutException("Timeout while offering data block into the sending queue.");
+      }
+      success = true;
+    } finally {
+      if (success) {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("==[SEND]== Block " + block + " correctly sent from: " + _context.getId());
+        }
+      } else {
+        if (LOGGER.isWarnEnabled()) {
+          LOGGER.debug("==[SEND]== Block " + block + " cannot be sent from: " + _context.getId());
+        }
+      }
     }
   }
 
@@ -169,7 +183,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  public void cancel(Throwable t) {
+  public void cancel(@Nullable Throwable t) {
     super.cancel(t);
     _exchange.cancel(t);
   }

@@ -84,7 +84,7 @@ public class ReceivingMailbox {
       if (_blocks.offer(block, timeoutMs, TimeUnit.MILLISECONDS)) {
         if (_errorBlock.get() == null) {
           if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("==[MAILBOX]== Returned block from mailbox: " + _id);
+            LOGGER.debug("==[MAILBOX]== Block " + block + " ready to read from mailbox: " + _id);
           }
           _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
           return true;

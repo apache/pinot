@@ -24,6 +24,7 @@ import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
@@ -77,16 +78,17 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void cancel(Throwable t) {
+  public void cancel(@Nullable Throwable t) {
     if (!_statusObserver.isFinished()) {
       LOGGER.debug("Cancelling mailbox: {}", _id);
       if (_contentObserver == null) {
         _contentObserver = getContentObserver();
       }
       try {
+        String msg = t != null ? t.getMessage() : "Unknown";
         // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
         _contentObserver.onNext(toMailboxContent(TransferableBlockUtils.getErrorTransferableBlock(
-            new RuntimeException("Cancelled by sender with exception: " + t.getMessage(), t))));
+            new RuntimeException("Cancelled by sender with exception: " + msg, t))));
         _contentObserver.onCompleted();
       } catch (Exception e) {
         // Exception can be thrown if the stream is already closed, so we simply ignore it
