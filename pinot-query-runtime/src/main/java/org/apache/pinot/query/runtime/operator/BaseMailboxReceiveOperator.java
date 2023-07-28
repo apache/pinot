@@ -56,6 +56,11 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final List<ReceivingMailbox> _mailboxes;
   protected final ReentrantLock _lock = new ReentrantLock(false);
   protected final Condition _notEmpty = _lock.newCondition();
+  /**
+   * An index that used to calculate where do we are going to start reading.
+   * The invariant is that we are always going to start reading from {@code _lastRead + 1}.
+   * Therefore {@link #_lastRead} must be in the range {@code [-1, mailbox.size() - 1]}
+   */
   protected int _lastRead;
   private TransferableBlock _errorBlock = null;
 
@@ -120,17 +125,35 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     }
   }
 
+  /**
+   * Reads the next block for any ready mailbox or blocks until some of them is ready.
+   *
+   * The method implements a sequential read semantic. Meaning that:
+   * <ol>
+   *   <li>EOS is only returned when all mailboxes already emitted EOS or there are no mailboxes</li>
+   *   <li>If an error is read from a mailbox, the error is returned</li>
+   *   <li>If data is read from a mailbox, that data block is returned</li>
+   *   <li>If no mailbox is ready, the calling thread is blocked</li>
+   * </ol>
+   *
+   * Right now the implementation tries to be fair. If one call returned the block from mailbox {@code i}, then next
+   * call will look for mailbox {@code i+1}, {@code i+2}... in a circular manner.
+   *
+   * In order to unblock a thread blocked here, {@link #onData()} should be called.   *
+   */
   protected TransferableBlock readBlockBlocking() {
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("==[RECEIVE]== Enter getNextBlock from: " + _context.getId() + " mailboxSize: " + _mailboxes.size());
     }
+    // Standard optimistic execution. First we try to read without acquiring the lock.
     TransferableBlock block = readDroppingSuccessEos();
-    if (block == null) {
+    if (block == null) { // we didn't find a mailbox ready to read, so we need to be pessimistic
       boolean timeout = false;
       _lock.lock();
       try {
+        // let's try to read one more time now that we have the lock
         block = readDroppingSuccessEos();
-        while (block == null && !timeout) {
+        while (block == null && !timeout) { // still no data, we need to yield
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("==[RECEIVE]== Yield : " + _context.getId());
           }
@@ -144,7 +167,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
           _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
           return _errorBlock;
         }
-      } catch (InterruptedException ex) {
+      } catch (InterruptedException ex) { // we've got interrupted while waiting for the condition
         return TransferableBlockUtils.getErrorTransferableBlock(ex);
       } finally {
         _lock.unlock();
@@ -153,6 +176,16 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     return block;
   }
 
+  /**
+   * This is a utility method that reads tries to read from the different mailboxes in a circular manner.
+   *
+   * The method is a bit more complex than expected because ir order to simplify {@link #readBlockBlocking} we added
+   * some extra logic here. For example, this method checks for timeouts, add some logs, releases mailboxes that emitted
+   * EOS and in case an error block is found, stores it.
+   *
+   * @return the new block to consume or null if none is found. EOS is only emitted when all mailboxes already emitted
+   * EOS.
+   */
   @Nullable
   private TransferableBlock readDroppingSuccessEos() {
     if (System.currentTimeMillis() > _context.getDeadlineMs()) {
@@ -162,7 +195,9 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
 
     TransferableBlock block = readBlockOrNull();
     while (block != null && block.isSuccessfulEndOfStreamBlock() && !_mailboxes.isEmpty()) {
+      // we have read a EOS
       ReceivingMailbox removed = _mailboxes.remove(_lastRead);
+      // this is done in order to keep the invariant.
       _lastRead--;
       _mailboxService.releaseReceivingMailbox(removed);
       _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
@@ -190,8 +225,13 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     return block;
   }
 
+  /**
+   * The utility method that actually does the circular reading trying to be fair.
+   * @return The first block that is found on any mailbox, including EOS.
+   */
   @Nullable
   private TransferableBlock readBlockOrNull() {
+    // in case _lastRead is _mailboxes.size() - 1, we just skip this loop.
     for (int i = _lastRead + 1; i < _mailboxes.size(); i++) {
       ReceivingMailbox mailbox = _mailboxes.get(i);
       TransferableBlock block = mailbox.poll();
