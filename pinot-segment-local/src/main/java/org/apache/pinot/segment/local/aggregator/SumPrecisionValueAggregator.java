@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -27,7 +30,22 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigDecimal> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
+  private final int _fixedSize;
+
   private int _maxByteSize;
+
+  /**
+   * Optional second argument is the maximum precision. Scale is always stored as 2 bytes. During query time, the
+   * optional scale parameter can be provided, but during ingestion, we don't limit it.
+   */
+  public SumPrecisionValueAggregator(List<ExpressionContext> arguments) {
+    // length 1 means we don't have any caps on maximum precision nor do we have a fixed size then
+    if (arguments.size() <= 1) {
+      _fixedSize = -1;
+    } else {
+      _fixedSize = BigDecimalUtils.byteSizeForFixedPrecision(arguments.get(1).getLiteral().getIntValue());
+    }
+  }
 
   @Override
   public AggregationFunctionType getAggregationType() {
@@ -42,14 +60,18 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
   @Override
   public BigDecimal getInitialAggregatedValue(Object rawValue) {
     BigDecimal initialValue = toBigDecimal(rawValue);
-    _maxByteSize = Math.max(_maxByteSize, BigDecimalUtils.byteSize(initialValue));
+    if (_fixedSize < 0) {
+      _maxByteSize = Math.max(_maxByteSize, BigDecimalUtils.byteSize(initialValue));
+    }
     return initialValue;
   }
 
   @Override
   public BigDecimal applyRawValue(BigDecimal value, Object rawValue) {
     value = value.add(toBigDecimal(rawValue));
-    _maxByteSize = Math.max(_maxByteSize, BigDecimalUtils.byteSize(value));
+    if (_fixedSize < 0) {
+      _maxByteSize = Math.max(_maxByteSize, BigDecimalUtils.byteSize(value));
+    }
     return value;
   }
 
@@ -66,7 +88,9 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
   @Override
   public BigDecimal applyAggregatedValue(BigDecimal value, BigDecimal aggregatedValue) {
     value = value.add(aggregatedValue);
-    _maxByteSize = Math.max(_maxByteSize, BigDecimalUtils.byteSize(value));
+    if (_fixedSize < 0) {
+      _maxByteSize = Math.max(_maxByteSize, BigDecimalUtils.byteSize(value));
+    }
     return value;
   }
 
@@ -78,12 +102,14 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
 
   @Override
   public int getMaxAggregatedValueByteSize() {
-    return _maxByteSize;
+    Preconditions.checkState(_fixedSize > 0 || _maxByteSize > 0,
+        "Unknown max aggregated value byte size, please provide maximum precision as the second argument");
+    return _fixedSize > 0 ? _fixedSize : _maxByteSize;
   }
 
   @Override
   public byte[] serializeAggregatedValue(BigDecimal value) {
-    return BigDecimalUtils.serialize(value);
+    return _fixedSize > 0 ? BigDecimalUtils.serializeWithSize(value, _fixedSize) : BigDecimalUtils.serialize(value);
   }
 
   @Override

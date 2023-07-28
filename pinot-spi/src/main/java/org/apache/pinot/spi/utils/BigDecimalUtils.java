@@ -36,6 +36,15 @@ public class BigDecimalUtils {
   }
 
   /**
+   * This gets the expected byte size of a big decimal with a specific precision.
+   * It is equal to (ceil(log2(10^precision) - 1)
+   */
+  public static int byteSizeForFixedPrecision(int precision) {
+    BigDecimal bd = generateMaximumNumberWithPrecision(precision);
+    return byteSize(bd);
+  }
+
+  /**
    * Serializes a big decimal to a byte array.
    */
   public static byte[] serialize(BigDecimal value) {
@@ -46,6 +55,34 @@ public class BigDecimalUtils {
     valueBytes[0] = (byte) (scale >> 8);
     valueBytes[1] = (byte) scale;
     System.arraycopy(unscaledValueBytes, 0, valueBytes, 2, unscaledValueBytes.length);
+    return valueBytes;
+  }
+
+  public static byte[] serializeWithSize(BigDecimal value, int fixedSize) {
+    int scale = value.scale();
+    BigInteger unscaledValue = value.unscaledValue();
+    byte[] unscaledValueBytes = unscaledValue.toByteArray();
+
+    int unscaledBytesStartingIndex = fixedSize - unscaledValueBytes.length;
+    if (unscaledValueBytes.length > (fixedSize - 2)) {
+      throw new IllegalArgumentException("Big decimal of size " + (unscaledValueBytes.length + 2)
+          + " is too big to serialize into a fixed size of " + fixedSize + " bytes");
+    }
+
+    byte[] valueBytes = new byte[fixedSize];
+    valueBytes[0] = (byte) (scale >> 8);
+    valueBytes[1] = (byte) scale;
+
+    byte paddingByte = 0;
+    if (value.signum() < 0) {
+      paddingByte = -1;
+    }
+
+    for (int i = 2; i < unscaledBytesStartingIndex; i++) {
+      valueBytes[i] = paddingByte;
+    }
+
+    System.arraycopy(unscaledValueBytes, 0, valueBytes, unscaledBytesStartingIndex, unscaledValueBytes.length);
     return valueBytes;
   }
 
@@ -74,5 +111,9 @@ public class BigDecimalUtils {
     byte[] bytes = new byte[byteBuffer.remaining()];
     byteBuffer.get(bytes);
     return deserialize(bytes);
+  }
+
+  public static BigDecimal generateMaximumNumberWithPrecision(int precision) {
+    return (new BigDecimal("10")).pow(precision).subtract(new BigDecimal("1"));
   }
 }
