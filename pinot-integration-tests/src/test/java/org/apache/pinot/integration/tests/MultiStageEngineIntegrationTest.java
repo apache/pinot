@@ -129,6 +129,56 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testMultiValueColumnAggregationQuery()
+      throws Exception {
+    String pinotQuery =
+        "SELECT SUMMV(DivAirportIDs) FROM mytable";
+
+    JsonNode jsonNode = postQuery(pinotQuery);
+    System.out.println("pinotQuery = " + pinotQuery);
+    System.out.println(jsonNode.toPrettyString());
+
+    pinotQuery =
+        "SELECT countMV(DivAirports) FROM mytable";
+
+    jsonNode = postQuery(pinotQuery);
+    System.out.println("pinotQuery = " + pinotQuery);
+    System.out.println(jsonNode.toPrettyString());
+
+    pinotQuery =
+        "SELECT minMV(DivAirportIDs) FROM mytable";
+
+    jsonNode = postQuery(pinotQuery);
+    System.out.println("pinotQuery = " + pinotQuery);
+    System.out.println(jsonNode.toPrettyString());
+
+    pinotQuery =
+        "SELECT maxMV(DivAirportIDs) FROM mytable";
+
+    jsonNode = postQuery(pinotQuery);
+    System.out.println("pinotQuery = " + pinotQuery);
+    System.out.println(jsonNode.toPrettyString());
+  }
+
+  @Test
+  public void testMultiValueColumnAggregationQuery2()
+      throws Exception {
+    String pinotQuery =
+        "SELECT avgMV(DivAirportIDs) FROM mytable";
+
+    JsonNode jsonNode = postQuery(pinotQuery);
+    System.out.println("pinotQuery = " + pinotQuery);
+    System.out.println(jsonNode.toPrettyString());
+
+    pinotQuery =
+        "SELECT minmaxrangeMV(DivAirportIDs) FROM mytable";
+
+    jsonNode = postQuery(pinotQuery);
+    System.out.println("pinotQuery = " + pinotQuery);
+    System.out.println(jsonNode.toPrettyString());
+  }
+
+  @Test
   public void testTimeFunc()
       throws Exception {
     String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z'), toDateTime(ago('PT1H'), 'yyyy-MM-dd z') FROM mytable";
