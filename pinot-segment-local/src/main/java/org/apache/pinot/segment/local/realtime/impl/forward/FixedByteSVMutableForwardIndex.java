@@ -73,8 +73,8 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
       int numRowsPerChunk, PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     _dictionaryEncoded = dictionaryEncoded;
     _storedType = storedType;
-    if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL) {
-      Preconditions.checkState(fixedLength > 0, "Fixed length must be positive for BYTES and BIG_DECIMAL");
+    if (!storedType.isFixedWidth()) {
+      Preconditions.checkState(fixedLength > 0, "Fixed length must be provided for type: %s", storedType);
       _valueSizeInBytes = fixedLength;
     } else {
       _valueSizeInBytes = storedType.size();
@@ -87,7 +87,7 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   }
 
   public FixedByteSVMutableForwardIndex(boolean dictionaryEncoded, DataType valueType, int numRowsPerChunk,
-                                        PinotDataBufferMemoryManager memoryManager, String allocationContext) {
+      PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     this(dictionaryEncoded, valueType, -1, numRowsPerChunk, memoryManager, allocationContext);
   }
 
@@ -215,11 +215,8 @@ public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
 
   @Override
   public void setBytes(int docId, byte[] value) {
-    Preconditions.checkArgument(
-        value.length == _valueSizeInBytes,
-        "Expected value size to be: %s but got: %s ",
-        _valueSizeInBytes, value.length
-    );
+    Preconditions.checkArgument(value.length == _valueSizeInBytes, "Expected value size to be: %s but got: %s ",
+        _valueSizeInBytes, value.length);
 
     addBufferIfNeeded(docId);
     getWriterForRow(docId).setBytes(docId, value);

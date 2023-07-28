@@ -19,7 +19,7 @@
 package org.apache.pinot.core.startree.v2;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Random;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.DistinctCountHLLValueAggregator;
@@ -35,7 +35,7 @@ public class PreAggregatedDistinctCountHLLStarTreeV2Test extends BaseStarTreeV2T
 
   @Override
   ValueAggregator<Object, HyperLogLog> getValueAggregator() {
-    return new DistinctCountHLLValueAggregator(new ArrayList<>());
+    return new DistinctCountHLLValueAggregator(Collections.emptyList());
   }
 
   @Override

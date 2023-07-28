@@ -111,7 +111,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.pinot.spi.data.FieldSpec.DataType.BIG_DECIMAL;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
 
@@ -252,28 +251,27 @@ public class MutableSegmentImpl implements MutableSegment {
       metricsAggregators = getMetricsAggregators(config);
     }
 
-    Set<IndexType> specialIndexes = Sets.newHashSet(
-        StandardIndexes.dictionary(), // dictionaries implement other contract
-        StandardIndexes.nullValueVector()); // null value vector implement other contract
+    Set<IndexType> specialIndexes =
+        Sets.newHashSet(StandardIndexes.dictionary(), // dictionaries implement other contract
+            StandardIndexes.nullValueVector()); // null value vector implement other contract
 
     // Initialize for each column
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
 
       int fixedByteSize = -1;
-      boolean consumingAggregatedMetric = false;
-      if (metricsAggregators.containsKey(column)) {
-        fixedByteSize = metricsAggregators.get(column).getRight().getMaxAggregatedValueByteSize();
-        consumingAggregatedMetric = true;
-      }
-      // We consider fields whose values have a fixed size to be fixed width fields.
-      FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
-      if (storedType.isFixedWidth()) {
-        fixedByteSize = storedType.size();
+      DataType dataType = fieldSpec.getDataType();
+      DataType storedType = dataType.getStoredType();
+      if (!storedType.isFixedWidth()) {
+        // For aggregated metrics, we need to store values with fixed byte size so that in-place replacement is possible
+        Pair<String, ValueAggregator> aggregatorPair = metricsAggregators.get(column);
+        if (aggregatorPair != null) {
+          fixedByteSize = aggregatorPair.getRight().getMaxAggregatedValueByteSize();
+        }
       }
 
-      FieldIndexConfigs indexConfigs = Optional.ofNullable(config.getIndexConfigByCol().get(column))
-          .orElse(FieldIndexConfigs.EMPTY);
+      FieldIndexConfigs indexConfigs =
+          Optional.ofNullable(config.getIndexConfigByCol().get(column)).orElse(FieldIndexConfigs.EMPTY);
       boolean isDictionary = !isNoDictionaryColumn(indexConfigs, fieldSpec, column);
       MutableIndexContext context =
           MutableIndexContext.builder().withFieldSpec(fieldSpec).withMemoryManager(_memoryManager)
@@ -282,8 +280,7 @@ public class MutableSegmentImpl implements MutableSegment {
               .withEstimatedColSize(_statsHistory.getEstimatedAvgColSize(column))
               .withAvgNumMultiValues(_statsHistory.getEstimatedAvgColSize(column))
               .withConsumerDir(config.getConsumerDir() != null ? new File(config.getConsumerDir()) : null)
-              .withFixedLengthBytes(fixedByteSize)
-              .build();
+              .withFixedLengthBytes(fixedByteSize).build();
 
       // Partition info
       PartitionFunction partitionFunction = null;
@@ -321,8 +318,7 @@ public class MutableSegmentImpl implements MutableSegment {
         dictionary = null;
         if (!fieldSpec.isSingleValueField()) {
           // Raw MV columns
-          DataType dataType = fieldSpec.getDataType().getStoredType();
-          switch (dataType) {
+          switch (storedType) {
             case INT:
             case LONG:
             case FLOAT:
@@ -431,15 +427,14 @@ public class MutableSegmentImpl implements MutableSegment {
     // if the column is part of noDictionary set from table config
     if (fieldSpec instanceof DimensionFieldSpec && isAggregateMetricsEnabled() && (dataType == STRING
         || dataType == BYTES)) {
-      _logger.info(
-          "Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
+      _logger.info("Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
           column, dataType);
       return false;
     }
     // So don't create dictionary if the column (1) is member of noDictionary, and (2) is single-value or multi-value
     // with a fixed-width field, and (3) doesn't have an inverted index
-    return (fieldSpec.isSingleValueField() || fieldSpec.getDataType().isFixedWidth())
-        && indexConfigs.getConfig(StandardIndexes.inverted()).isDisabled();
+    return (fieldSpec.isSingleValueField() || fieldSpec.getDataType().isFixedWidth()) && indexConfigs.getConfig(
+        StandardIndexes.inverted()).isDisabled();
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
@@ -813,9 +808,9 @@ public class MutableSegmentImpl implements MutableSegment {
           }
           break;
         case BYTES:
-          Object currentValue = valueAggregator.deserializeAggregatedValue(forwardIndex.getBytes(docId));
-          Object newVal = valueAggregator.applyRawValue(currentValue, value);
-          forwardIndex.setBytes(docId, valueAggregator.serializeAggregatedValue(newVal));
+          Object oldValue = valueAggregator.deserializeAggregatedValue(forwardIndex.getBytes(docId));
+          Object newValue = valueAggregator.applyRawValue(oldValue, value);
+          forwardIndex.setBytes(docId, valueAggregator.serializeAggregatedValue(newValue));
           break;
         default:
           throw new UnsupportedOperationException(
@@ -1236,14 +1231,12 @@ public class MutableSegmentImpl implements MutableSegment {
       Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
           "aggregation function must be a function: %s", config);
       FunctionContext functionContext = expressionContext.getFunction();
-      TableConfigUtils.validateIngestionAggregation(functionContext.getFunctionName());
-
+      AggregationFunctionType functionType =
+          AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+      TableConfigUtils.validateIngestionAggregation(functionType);
       ExpressionContext argument = functionContext.getArguments().get(0);
       Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
           "aggregator function argument must be a identifier: %s", config);
-
-      AggregationFunctionType functionType =
-          AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
 
       columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(),
           ValueAggregatorFactory.getValueAggregator(functionType, functionContext.getArguments())));
@@ -1310,8 +1303,8 @@ public class MutableSegmentImpl implements MutableSegment {
             closeable.close();
           }
         } catch (Exception e) {
-          _logger.error("Caught exception while closing {} index for column: {}, continuing with error",
-              indexType, column, e);
+          _logger.error("Caught exception while closing {} index for column: {}, continuing with error", indexType,
+              column, e);
         }
       };
 

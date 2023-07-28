@@ -115,7 +115,8 @@ public class FixedByteSVMutableForwardIndexTest {
   }
 
   @Test
-  public void testBytes() throws IOException {
+  public void testBytes()
+      throws IOException {
     int rows = 10;
     Random r = new Random();
     final long seed = r.nextLong();
@@ -125,7 +126,8 @@ public class FixedByteSVMutableForwardIndexTest {
     }
   }
 
-  private void testBytes(final Random random, final int rows, final int div) throws IOException {
+  private void testBytes(final Random random, final int rows, final int div)
+      throws IOException {
     int hllLog2M12Size = 2740;
     int log2m = 12;
 

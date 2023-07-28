@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.utils;
+package org.apache.pinot.segment.local.utils;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.io.IOException;
@@ -24,29 +24,17 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
+
 public class HyperLogLogUtilsTest {
 
   @Test
-  public void testByteSizeLog2M()
+  public void testByteSize()
       throws IOException {
-    int[] testCases = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
-    for (int log2m : testCases) {
-      assertEquals(
-          HyperLogLogUtils.byteSize(log2m),
-          (new com.clearspring.analytics.stream.cardinality.HyperLogLog(log2m)).getBytes().length
-      );
-    }
-  }
-
-  @Test
-  public void testByteSizeWithHLLObject()
-      throws IOException {
-    int[] testCases = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
-    for (int log2m : testCases) {
-      assertEquals(
-          HyperLogLogUtils.byteSize(new com.clearspring.analytics.stream.cardinality.HyperLogLog(log2m)),
-          (new HyperLogLog(log2m)).getBytes().length
-      );
+    for (int log2m = 0; log2m < 16; log2m++) {
+      HyperLogLog hll = new HyperLogLog(log2m);
+      int expectedByteSize = hll.getBytes().length;
+      assertEquals(HyperLogLogUtils.byteSize(log2m), expectedByteSize);
+      assertEquals(HyperLogLogUtils.byteSize(hll), expectedByteSize);
     }
   }
 }

@@ -510,23 +510,13 @@ public class TableConfigUtilsTest {
     }
 
     // distinctcounthll, expect that the function name in various forms (with and without underscores) still validates
-    schema = new Schema
-        .SchemaBuilder()
-        .setSchemaName(TABLE_NAME)
-        .addMetric("d1", FieldSpec.DataType.BYTES)
-        .addMetric("d2", FieldSpec.DataType.BYTES)
-        .addMetric("d3", FieldSpec.DataType.BYTES)
-        .addMetric("d4", FieldSpec.DataType.BYTES)
-        .addMetric("d5", FieldSpec.DataType.BYTES)
-        .build();
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.BYTES)
+        .addMetric("d2", FieldSpec.DataType.BYTES).addMetric("d3", FieldSpec.DataType.BYTES)
+        .addMetric("d4", FieldSpec.DataType.BYTES).addMetric("d5", FieldSpec.DataType.BYTES).build();
 
-    aggregationConfigs = Arrays.asList(
-        new AggregationConfig("d1", "distinct_count_hll(s1)"),
-        new AggregationConfig("d2", "DISTINCTCOUNTHLL(s1)"),
-        new AggregationConfig("d3", "distinctcounthll(s1)"),
-        new AggregationConfig("d4", "DISTINCTCOUNT_HLL(s1)"),
-        new AggregationConfig("d5", "DISTINCT_COUNT_HLL(s1)")
-    );
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "distinct_count_hll(s1)"),
+        new AggregationConfig("d2", "DISTINCTCOUNTHLL(s1)"), new AggregationConfig("d3", "distinctcounthll(s1)"),
+        new AggregationConfig("d4", "DISTINCTCOUNT_HLL(s1)"), new AggregationConfig("d5", "DISTINCT_COUNT_HLL(s1)"));
 
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
@@ -540,11 +530,7 @@ public class TableConfigUtilsTest {
     }
 
     // distinctcounthll, expect not specified log2m argument to default to 8
-    schema = new Schema
-        .SchemaBuilder()
-        .setSchemaName(TABLE_NAME)
-        .addMetric("d1", FieldSpec.DataType.BYTES)
-        .build();
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.BYTES).build();
 
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "DISTINCTCOUNTHLL(s1)"));
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
@@ -572,45 +558,27 @@ public class TableConfigUtilsTest {
     }
 
     // sumprecision, expect that the function name in various forms (with and without underscores) still validates
-    schema = new Schema
-        .SchemaBuilder()
-        .setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("s1", FieldSpec.DataType.BIG_DECIMAL)
-        .addMetric("d1", FieldSpec.DataType.BIG_DECIMAL)
-        .addMetric("d2", FieldSpec.DataType.BIG_DECIMAL)
-        .addMetric("d3", FieldSpec.DataType.BIG_DECIMAL)
-        .addMetric("d4", FieldSpec.DataType.BIG_DECIMAL)
-        .build();
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("s1", FieldSpec.DataType.BIG_DECIMAL).addMetric("d1", FieldSpec.DataType.BIG_DECIMAL)
+        .addMetric("d2", FieldSpec.DataType.BIG_DECIMAL).addMetric("d3", FieldSpec.DataType.BIG_DECIMAL)
+        .addMetric("d4", FieldSpec.DataType.BIG_DECIMAL).build();
 
-    aggregationConfigs = Arrays.asList(
-        new AggregationConfig("d1", "sum_precision(s1, 10, 32)"),
-        new AggregationConfig("d2", "SUM_PRECISION(s1, 1)"),
-        new AggregationConfig("d3", "sumprecision(s1, 2)"),
-        new AggregationConfig("d4", "SUMPRECISION(s1, 10, 99)")
-    );
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "sum_precision(s1, 10, 32)"),
+        new AggregationConfig("d2", "SUM_PRECISION(s1, 1)"), new AggregationConfig("d3", "sumprecision(s1, 2)"),
+        new AggregationConfig("d4", "SUMPRECISION(s1, 10, 99)"));
 
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
-
-    try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
-    } catch (IllegalStateException e) {
-      Assert.fail("Should not fail due to valid aggregation function", e);
-    }
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
 
     // with too many arguments should fail
-    schema = new Schema
-        .SchemaBuilder()
-        .setSchemaName(TABLE_NAME)
-        .addSingleValueDimension("s1", FieldSpec.DataType.BIG_DECIMAL)
-        .addMetric("d1", FieldSpec.DataType.BIG_DECIMAL)
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("s1", FieldSpec.DataType.BIG_DECIMAL).addMetric("d1", FieldSpec.DataType.BIG_DECIMAL)
         .build();
 
-    aggregationConfigs = Arrays.asList(
-        new AggregationConfig("d1", "sum_precision(s1, 10, 32, 99)")
-    );
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "sum_precision(s1, 10, 32, 99)"));
 
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
@@ -621,8 +589,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
       Assert.fail("Should have failed with too many arguments but didn't");
     } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("SUMPRECISION must specify precision (required), scale (optional)"
-          + " [{\"columnName\":\"d1\",\"aggregationFunction\":\"sum_precision(s1, 10, 32, 99)\"}]"));
+      // Expected
     }
   }
 

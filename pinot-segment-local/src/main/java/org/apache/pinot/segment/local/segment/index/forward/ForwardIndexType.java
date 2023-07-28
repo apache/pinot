@@ -59,9 +59,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-
-public class ForwardIndexType
-    extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
+public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<ForwardIndexConfig> {
   public static final String INDEX_DISPLAY_NAME = "forward";
   // For multi-valued column, forward-index.
@@ -274,9 +272,10 @@ public class ForwardIndexType
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
     if (!context.hasDictionary()) {
       if (isSingleValue) {
-        String allocationContext = IndexUtil.buildAllocationContext(context.getSegmentName(),
-            context.getFieldSpec().getName(), V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-        if (fixedLengthBytes > 0) {
+        String allocationContext =
+            IndexUtil.buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
+                V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+        if (storedType.isFixedWidth() || fixedLengthBytes > 0) {
           return new FixedByteSVMutableForwardIndex(false, storedType, fixedLengthBytes, context.getCapacity(),
               context.getMemoryManager(), allocationContext);
         } else {

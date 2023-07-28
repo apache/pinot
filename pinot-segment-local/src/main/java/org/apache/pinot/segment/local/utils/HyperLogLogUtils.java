@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.utils;
+package org.apache.pinot.segment.local.utils;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.RegisterSet;
-import java.io.IOException;
 
 
 public class HyperLogLogUtils {
@@ -30,15 +29,16 @@ public class HyperLogLogUtils {
   /**
    * Returns the byte size of the given HyperLogLog.
    */
-  public static int byteSize(HyperLogLog value)
-      throws IOException {
-    return value.getBytes().length;
+  public static int byteSize(HyperLogLog value) {
+    // 8 bytes header (log2m & register set size) & register set data
+    return value.sizeof() + 2 * Integer.BYTES;
   }
 
   /**
-   * Returns the byte size of hyperloglog of a given log2m.
+   * Returns the byte size of HyperLogLog of a given log2m.
    */
   public static int byteSize(int log2m) {
-    return ((RegisterSet.getSizeForCount(1 << log2m) + 2) * Integer.BYTES);
+    // 8 bytes header (log2m & register set size) & register set data
+    return (RegisterSet.getSizeForCount(1 << log2m) + 2) * Integer.BYTES;
   }
 }

@@ -55,7 +55,7 @@ public class MutableSegmentImplIngestionAggregationTest {
   private static final String KEY_SEPARATOR = "\t\t";
   private static final int NUM_ROWS = 10001;
 
-  private static final Schema.SchemaBuilder getSchemaBuilder() {
+  private static Schema.SchemaBuilder getSchemaBuilder() {
     return new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING)
@@ -138,18 +138,15 @@ public class MutableSegmentImplIngestionAggregationTest {
     mutableSegmentImpl.destroy();
   }
 
-
   @Test
   public void testValuesAreNullThrowsException()
       throws Exception {
     String m1 = "sum1";
 
-    Schema schema =
-        getSchemaBuilder().addMetric(m1, FieldSpec.DataType.INT).build();
+    Schema schema = getSchemaBuilder().addMetric(m1, FieldSpec.DataType.INT).build();
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(m1)),
-            VAR_LENGTH_SET, INVERTED_INDEX_SET,
-            Arrays.asList(new AggregationConfig(m1, "SUM(metric)")));
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(m1), VAR_LENGTH_SET,
+            INVERTED_INDEX_SET, Collections.singletonList(new AggregationConfig(m1, "SUM(metric)")));
 
     long seed = 2;
     Random random = new Random(seed);
@@ -159,7 +156,7 @@ public class MutableSegmentImplIngestionAggregationTest {
     GenericRow row = getRow(random, 1);
     row.putValue(METRIC, null);
     try {
-mutableSegmentImpl.index(row, defaultMetadata);
+      mutableSegmentImpl.index(row, defaultMetadata);
       Assert.fail();
     } catch (NullPointerException e) {
       // expected
@@ -169,13 +166,14 @@ mutableSegmentImpl.index(row, defaultMetadata);
   }
 
   @Test
-  public void testDISTINCTCOUNTHLL() throws Exception {
-    String m1 = "metric_DISTINCTCOUNTHLL";
+  public void testDistinctCountHLL()
+      throws Exception {
+    String m1 = "hll1";
+
     Schema schema = getSchemaBuilder().addMetric(m1, FieldSpec.DataType.BYTES).build();
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(m1)),
-            VAR_LENGTH_SET, INVERTED_INDEX_SET,
-            Arrays.asList(new AggregationConfig(m1, "DISTINCTCOUNTHLL(metric, 12)")));
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(m1), VAR_LENGTH_SET,
+            INVERTED_INDEX_SET, Collections.singletonList(new AggregationConfig(m1, "distinctCountHLL(metric, 12)")));
 
     Map<String, HLLTestData> expected = new HashMap<>();
     List<Metric> metrics = addRowsDistinctCountHLL(998, mutableSegmentImpl);
@@ -183,20 +181,15 @@ mutableSegmentImpl.index(row, defaultMetadata);
       expected.put(metric.getKey(), (HLLTestData) metric.getValue());
     }
 
-    List<ExpressionContext> arguments =
-        List.of(
-            ExpressionContext.forIdentifier("distinctcounthll"),
-            ExpressionContext.forLiteralContext(Literal.stringValue("12"))
-        );
+    List<ExpressionContext> arguments = Arrays.asList(ExpressionContext.forIdentifier("metric"),
+        ExpressionContext.forLiteralContext(Literal.stringValue("12")));
     DistinctCountHLLValueAggregator valueAggregator = new DistinctCountHLLValueAggregator(arguments);
 
     Set<Integer> integers = new HashSet<>();
 
-    /*
-    Assert that the distinct count is within an error margin. We assert on the cardinality of the HLL in the docID
-    and the HLL we made, but also on the cardinality of the HLL in the docID and the actual cardinality from
-    the set of integers.
-     */
+    // Assert that the distinct count is within an error margin. We assert on the cardinality of the HLL in the docID
+    // and the HLL we made, but also on the cardinality of the HLL in the docID and the actual cardinality from the set
+    // of integers.
     GenericRow reuse = new GenericRow();
     for (int docId = 0; docId < expected.size(); docId++) {
       GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
@@ -216,9 +209,7 @@ mutableSegmentImpl.index(row, defaultMetadata);
               + "the integers.");
     }
 
-    /*
-    Assert that the aggregated HyperLogLog is also within the error margin
-     */
+    // Assert that the aggregated HyperLogLog is also within the error margin
     HyperLogLog togetherHLL = new HyperLogLog(12);
     expected.forEach((key, value) -> {
       try {
@@ -236,7 +227,7 @@ mutableSegmentImpl.index(row, defaultMetadata);
   }
 
   @Test
-  public void testCOUNT()
+  public void testCount()
       throws Exception {
     String m1 = "count1";
     String m2 = "count2";
@@ -250,8 +241,7 @@ mutableSegmentImpl.index(row, defaultMetadata);
 
     Map<String, Long> expectedCount = new HashMap<>();
     for (List<Metric> metrics : addRows(3, mutableSegmentImpl)) {
-      expectedCount.put(metrics.get(0).getKey(),
-          expectedCount.getOrDefault(metrics.get(0).getKey(), 0L) + 1L);
+      expectedCount.put(metrics.get(0).getKey(), expectedCount.getOrDefault(metrics.get(0).getKey(), 0L) + 1L);
     }
 
     GenericRow reuse = new GenericRow();
@@ -361,7 +351,7 @@ mutableSegmentImpl.index(row, defaultMetadata);
     return metrics;
   }
 
-  private List<Metric> addRowsSUMPRECISION(long seed, MutableSegmentImpl mutableSegmentImpl)
+  private List<Metric> addRowsSumPrecision(long seed, MutableSegmentImpl mutableSegmentImpl)
       throws Exception {
     List<Metric> metrics = new ArrayList<>();
 
@@ -371,9 +361,8 @@ mutableSegmentImpl.index(row, defaultMetadata);
     HashMap<String, BigDecimal> bdMap = new HashMap<>();
     HashMap<String, ArrayList<BigDecimal>> bdIndividualMap = new HashMap<>();
 
-    Integer rows = 50000;
-
-    for (int i = 0; i < (rows); i++) {
+    int numRows = 50000;
+    for (int i = 0; i < numRows; i++) {
       GenericRow row = getRow(random, 1);
       String key = buildKey(row);
 
@@ -411,7 +400,6 @@ mutableSegmentImpl.index(row, defaultMetadata);
     List<List<Metric>> metrics = new ArrayList<>();
     Set<String> keys = new HashSet<>();
 
-
     Random random = new Random(seed);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
 
@@ -440,25 +428,24 @@ mutableSegmentImpl.index(row, defaultMetadata);
   }
 
   @Test
-  public void testSUMPRECISION() throws Exception {
-    String m1 = "metric_SUMPRECISION";
+  public void testSumPrecision()
+      throws Exception {
+    String m1 = "sumPrecision1";
     Schema schema = getSchemaBuilder().addMetric(m1, FieldSpec.DataType.BIG_DECIMAL).build();
 
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(m1)),
-            VAR_LENGTH_SET, INVERTED_INDEX_SET,
-            // Setting precision to 38 in the arguments for SUMPRECISION
-            Arrays.asList(new AggregationConfig(m1, "SUMPRECISION(metric, 38)")));
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(m1), VAR_LENGTH_SET,
+            INVERTED_INDEX_SET,
+            // Setting precision to 38 in the arguments for SUM_PRECISION
+            Collections.singletonList(new AggregationConfig(m1, "SUM_PRECISION(metric, 38)")));
 
     Map<String, BigDecimal> expected = new HashMap<>();
-    List<Metric> metrics = addRowsSUMPRECISION(998, mutableSegmentImpl);
+    List<Metric> metrics = addRowsSumPrecision(998, mutableSegmentImpl);
     for (Metric metric : metrics) {
       expected.put(metric.getKey(), (BigDecimal) metric.getValue());
     }
 
-    /*
-    Assert that the aggregated values are correct
-     */
+    // Assert that the aggregated values are correct
     GenericRow reuse = new GenericRow();
     for (int docId = 0; docId < expected.size(); docId++) {
       GenericRow row = mutableSegmentImpl.getRecord(docId, reuse);
@@ -467,15 +454,14 @@ mutableSegmentImpl.index(row, defaultMetadata);
       BigDecimal expectedBigDecimal = expected.get(key);
       BigDecimal actualBigDecimal = (BigDecimal) row.getValue(m1);
 
-      Assert.assertEquals(actualBigDecimal, expectedBigDecimal,
-          "The aggregated SUM does not match the expected SUM");
+      Assert.assertEquals(actualBigDecimal, expectedBigDecimal, "The aggregated SUM does not match the expected SUM");
     }
     mutableSegmentImpl.destroy();
   }
 
   @Test
   public void testBigDecimalTooBig() {
-    String m1 = "metric_SUMPRECISION";
+    String m1 = "sumPrecision1";
     Schema schema = getSchemaBuilder().addMetric(m1, FieldSpec.DataType.BIG_DECIMAL).build();
 
     int seed = 1;
@@ -483,9 +469,8 @@ mutableSegmentImpl.index(row, defaultMetadata);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
     MutableSegmentImpl mutableSegmentImpl =
-        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(m1)),
-            VAR_LENGTH_SET, INVERTED_INDEX_SET,
-            Arrays.asList(new AggregationConfig(m1, "SUMPRECISION(metric, 3)")));
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(m1), VAR_LENGTH_SET,
+            INVERTED_INDEX_SET, Collections.singletonList(new AggregationConfig(m1, "SUM_PRECISION(metric, 3)")));
 
     // Make a big decimal larger than 3 precision and try to index it
     BigDecimal large = BigDecimalUtils.generateMaximumNumberWithPrecision(5);

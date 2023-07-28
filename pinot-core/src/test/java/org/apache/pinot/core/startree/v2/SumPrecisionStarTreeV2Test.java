@@ -19,7 +19,7 @@
 package org.apache.pinot.core.startree.v2;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.SumPrecisionValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -32,7 +32,7 @@ public class SumPrecisionStarTreeV2Test extends BaseStarTreeV2Test<Object, BigDe
 
   @Override
   ValueAggregator<Object, BigDecimal> getValueAggregator() {
-    return new SumPrecisionValueAggregator(new ArrayList<>());
+    return new SumPrecisionValueAggregator(Collections.emptyList());
   }
 
   @Override

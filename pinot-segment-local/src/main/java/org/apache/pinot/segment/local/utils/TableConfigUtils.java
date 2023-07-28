@@ -42,8 +42,6 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
@@ -354,13 +352,13 @@ public final class TableConfigUtils {
         Set<String> aggregationColumns = new HashSet<>();
         for (AggregationConfig aggregationConfig : aggregationConfigs) {
           String columnName = aggregationConfig.getColumnName();
-          FieldSpec fieldSpec = null;
           String aggregationFunction = aggregationConfig.getAggregationFunction();
           if (columnName == null || aggregationFunction == null) {
             throw new IllegalStateException(
                 "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
           }
 
+          FieldSpec fieldSpec = null;
           if (schema != null) {
             fieldSpec = schema.getFieldSpecFor(columnName);
             Preconditions.checkState(fieldSpec != null, "The destination column '" + columnName
@@ -383,63 +381,52 @@ public final class TableConfigUtils {
               "aggregation function must be a function for: %s", aggregationConfig);
 
           FunctionContext functionContext = expressionContext.getFunction();
-          AggregationFunctionType inputFunctionType =
+          AggregationFunctionType functionType =
               AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
-          validateIngestionAggregation(functionContext.getFunctionName());
+          validateIngestionAggregation(functionType);
 
           List<ExpressionContext> arguments = functionContext.getArguments();
-
-          if (inputFunctionType.equals(DISTINCTCOUNTHLL) || inputFunctionType
-              .equals(SUMPRECISION)) {
-            String destinationColumn = aggregationConfig.getColumnName();
-            FieldSpec destinationFieldSpec = schema.getFieldSpecFor(destinationColumn);
-
-            if (destinationFieldSpec == null) {
-              throw new RuntimeException("couldn't find field config for " + destinationColumn
-                  + ". Unable to validate aggregation config for " + inputFunctionType);
+          int numArguments = arguments.size();
+          if (functionType == DISTINCTCOUNTHLL) {
+            Preconditions.checkState(numArguments >= 1 && numArguments <= 2,
+                "DISTINCT_COUNT_HLL can have at most two arguments: %s", aggregationConfig);
+            if (numArguments == 2) {
+              ExpressionContext secondArgument = arguments.get(1);
+              Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+                  "Second argument of DISTINCT_COUNT_HLL must be literal: %s", aggregationConfig);
+              String literal = secondArgument.getLiteral().getStringValue();
+              Preconditions.checkState(StringUtils.isNumeric(literal),
+                  "Second argument of DISTINCT_COUNT_HLL must be a number: %s", aggregationConfig);
             }
-            int maxLength = destinationFieldSpec.getMaxLength();
-
-            if (inputFunctionType.equals(DISTINCTCOUNTHLL)) {
-              Preconditions.checkState(
-                  functionContext.getArguments().size() >= 1 && functionContext.getArguments().size() <= 2,
-                  "%s can have max two arguments: %s", inputFunctionType, aggregationConfig);
-
-              if (functionContext.getArguments().size() == 2) {
-                Preconditions.checkState(
-                    StringUtils.isNumeric(functionContext.getArguments().get(1).getLiteral().getStringValue()
-                    ),
-                    "%s function second argument must be a number", inputFunctionType);
-              }
-            } else if (inputFunctionType.equals(SUMPRECISION)) {
-              Preconditions.checkState(functionContext.getArguments().size() >= 2
-                      && functionContext.getArguments().size() <= 3,
-                  SUMPRECISION + " must specify precision (required), scale (optional)",
-                  aggregationConfig);
+            if (fieldSpec != null) {
+              DataType dataType = fieldSpec.getDataType();
+              Preconditions.checkState(dataType == DataType.BYTES,
+                  "Result type for DISTINCT_COUNT_HLL must be BYTES: %s", aggregationConfig);
+            }
+          } else if (functionType == SUMPRECISION) {
+            Preconditions.checkState(numArguments >= 2 && numArguments <= 3,
+                "SUM_PRECISION must specify precision (required), scale (optional): %s", aggregationConfig);
+            ExpressionContext secondArgument = arguments.get(1);
+            Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+                "Second argument of SUM_PRECISION must be literal: %s", aggregationConfig);
+            String literal = secondArgument.getLiteral().getStringValue();
+            Preconditions.checkState(StringUtils.isNumeric(literal),
+                "Second argument of SUM_PRECISION must be a number: %s", aggregationConfig);
+            if (fieldSpec != null) {
+              DataType dataType = fieldSpec.getDataType();
+              Preconditions.checkState(dataType == DataType.BIG_DECIMAL || dataType == DataType.BYTES,
+                  "Result type for DISTINCT_COUNT_HLL must be BIG_DECIMAL or BYTES: %s", aggregationConfig);
             }
           } else {
-            Preconditions.checkState(functionContext.getArguments().size() == 1,
-                "aggregation function can only have one argument: %s", aggregationConfig);
+            Preconditions.checkState(numArguments == 1, "%s can only have one argument: %s", functionType,
+                aggregationConfig);
           }
+          ExpressionContext firstArgument = arguments.get(0);
+          Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
+              "First argument of aggregation function: %s must be identifier, got: %s", functionType,
+              firstArgument.getType());
 
-          ExpressionContext argument = functionContext.getArguments().get(0);
-          Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
-              "aggregator function argument must be an identifier: %s", aggregationConfig);
-
-          ValueAggregator valueAggregator = ValueAggregatorFactory.getValueAggregator(inputFunctionType, arguments);
-
-          if (schema != null && fieldSpec != null) {
-            if (inputFunctionType.equals(SUMPRECISION)) {
-              Preconditions.checkState(fieldSpec.getDataType() == DataType.BIG_DECIMAL,
-                  "SUMPRECISION consuming aggregation requires the schema data type to be BIG_DECIMAL");
-            } else {
-              Preconditions.checkState(valueAggregator.getAggregatedValueType() == fieldSpec.getDataType(),
-                  "aggregator function datatype (%s) must be the same as the schema datatype (%s) for %s",
-                  valueAggregator.getAggregatedValueType(), fieldSpec.getDataType(), fieldSpec.getName());
-            }
-          }
-
-          aggregationSourceColumns.add(argument.getIdentifier());
+          aggregationSourceColumns.add(firstArgument.getIdentifier());
         }
         if (schema != null) {
           Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
@@ -507,21 +494,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Currently only, ValueAggregators with fixed width types are allowed, so MIN, MAX, SUM, and COUNT. The reason
-   * is that only the {@link org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex}
-   * supports random inserts and lookups. The
-   * {@link org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex only supports
-   * sequential inserts.
-   */
-  public static void validateIngestionAggregation(String name) {
-    for (AggregationFunctionType functionType : SUPPORTED_INGESTION_AGGREGATIONS) {
-      if (functionType.getName().toLowerCase().equals(name)) {
-        return;
-      }
-    }
-    throw new IllegalStateException(
-        String.format("aggregation function %s must be one of %s", name, SUPPORTED_INGESTION_AGGREGATIONS));
+  public static void validateIngestionAggregation(AggregationFunctionType functionType) {
+    Preconditions.checkState(SUPPORTED_INGESTION_AGGREGATIONS.contains(functionType),
+        "Aggregation function: %s must be one of: %s", functionType, SUPPORTED_INGESTION_AGGREGATIONS);
   }
 
   @VisibleForTesting

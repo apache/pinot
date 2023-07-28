@@ -149,11 +149,6 @@
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.clearspring.analytics</groupId>
-      <artifactId>stream</artifactId>
-      <version>2.7.0</version>
-    </dependency>
   </dependencies>
   <profiles>
     <profile>

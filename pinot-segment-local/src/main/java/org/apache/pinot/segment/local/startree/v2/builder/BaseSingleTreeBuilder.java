@@ -143,8 +143,9 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     for (AggregationFunctionColumnPair functionColumnPair : functionColumnPairs) {
       _metrics[index] = functionColumnPair.toColumnName();
       _functionColumnPairs[index] = functionColumnPair;
+      // TODO: Allow extra arguments in star-tree (e.g. log2m, precision)
       _valueAggregators[index] =
-          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.EMPTY_LIST);
+          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.emptyList());
 
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
