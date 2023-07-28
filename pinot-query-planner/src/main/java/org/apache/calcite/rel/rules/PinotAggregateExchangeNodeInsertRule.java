@@ -324,7 +324,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
         orgAggCall.isApproximate(),
         orgAggCall.ignoreNulls(),
         argList,
-        orgAggCall.filterArg,
+        aggType.isInputIntermediateFormat() ? -1 : orgAggCall.filterArg,
         orgAggCall.distinctKeys,
         orgAggCall.collation,
         numberGroups,
