@@ -72,7 +72,8 @@ public enum AggregationFunctionType {
   LASTWITHTIME("lastWithTime", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER)),
       ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  MINMAXRANGE("minMaxRange"),
+  MINMAXRANGE("minMaxRange", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC,
+      OperandTypes.NUMERIC, ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
   /**
    * for all distinct count family functions:
    * (1) distinct_count only supports single argument;
@@ -86,23 +87,32 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTHLL("distinctCountHLL", ImmutableList.of("DISTINCT_COUNT_HLL"), SqlKind.OTHER_FUNCTION,
       SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.ANY, ReturnTypes.BIGINT,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTRAWHLL("distinctCountRawHLL"),
-  DISTINCTCOUNTSMARTHLL("distinctCountSmartHLL"),
+  DISTINCTCOUNTRAWHLL("distinctCountRawHLL", ImmutableList.of("DISTINCT_COUNT_RAW_HLL"), SqlKind.OTHER_FUNCTION,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), ordinal -> ordinal > 0),
+      ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  DISTINCTCOUNTSMARTHLL("distinctCountSmartHLL", ImmutableList.of("DISTINCT_COUNT_SMART_HLL"), SqlKind.OTHER_FUNCTION,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
+      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
   FASTHLL("fastHLL"),
-  DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", ImmutableList.of("DISTINCT_COUNT_THETA_SKETCH"),
+  DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", null,
       SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
       ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", ImmutableList.of("DISTINCT_COUNT_RAW_THETA_SKETCH"),
+  DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", null,
       SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
       ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTSUM("distinctSum"),
-  DISTINCTAVG("distinctAvg"),
+  DISTINCTSUM("distinctSum", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC,
+      OperandTypes.NUMERIC, ReturnTypes.AGG_SUM, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  DISTINCTAVG("distinctAvg", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC,
+      OperandTypes.NUMERIC, ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   PERCENTILE("percentile", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.ARG0,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
+  // TODO: support percentile variance in v2
   PERCENTILEEST("percentileEst"),
   PERCENTILERAWEST("percentileRawEst"),
   PERCENTILETDIGEST("percentileTDigest"),
@@ -138,17 +148,23 @@ public enum AggregationFunctionType {
   FOURTHMOMENT("fourthMoment"),
 
   // DataSketches Tuple Sketch support
-  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch"),
+  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch", null,
+      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
+      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
+  // TODO: support Tuple sketches in V2
   // DataSketches Tuple Sketch support for Integer based Tuple Sketches
   DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH("distinctCountRawIntegerSumTupleSketch"),
 
   SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch"),
   AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch"),
 
+  // TODO: support Geo-spatial agg in V2
   // Geo aggregation functions
   STUNION("STUnion"),
 
+  // TODO: support MV aggs properly in V2
   // Aggregation functions for multi-valued columns
   COUNTMV("countMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.explicit(SqlTypeName.BIGINT),
@@ -208,6 +224,7 @@ public enum AggregationFunctionType {
       OperandTypes.BOOLEAN, ReturnTypes.BOOLEAN, ReturnTypes.explicit(SqlTypeName.INTEGER)),
 
   // argMin and argMax
+  // TODO: argmin/argmax syntax not conformed with Calcite. we need to migrate.
   ARGMIN("argMin"),
   ARGMAX("argMax"),
   PARENTARGMIN(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + ARGMIN.getName()),
@@ -216,6 +233,7 @@ public enum AggregationFunctionType {
   CHILDARGMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + ARGMAX.getName()),
 
   // funnel aggregate functions
+  // TODO: support funnel count in V2
   FUNNELCOUNT("funnelCount");
 
   private static final Set<String> NAMES = Arrays.stream(values()).flatMap(func -> Stream.of(func.name(),

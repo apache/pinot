@@ -83,6 +83,82 @@
       {
         "sql": "select /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ bool_col, GET_THETA_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_THETA_SKETCH(string_col, 'nominalEntries=16')), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(long_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT(DISTINCT_COUNT_RAW_THETA_SKETCH(double_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(float_col, 'nominalEntries=1000'))) FROM {tbl} GROUP BY bool_col",
         "outputs": [[true, 2, 0, 2, 3], [false, 2, 0, 4, 3]]
+      },
+      {
+        "sql": "select min_max_range(int_col), minMaxRange(long_col), MIN_MAX_RANGE(float_col), MINMAXRANGE(double_col) FROM {tbl}",
+        "outputs": [[173, 173, 399.0, 399.0]]
+      },
+      {
+        "sql": "select bool_col, min_max_range(int_col), minMaxRange(long_col), MIN_MAX_RANGE(float_col), MINMAXRANGE(double_col) FROM {tbl} GROUP BY bool_col",
+        "outputs": [[true, 173, 173, 398.25, 398.25], [false, 147, 147, 99.0, 99.0]]
+      },
+      {
+        "sql": "select /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ bool_col, min_max_range(int_col), minMaxRange(long_col), MIN_MAX_RANGE(float_col), MINMAXRANGE(double_col) FROM {tbl} GROUP BY bool_col",
+        "outputs": [[true, 173, 173, 398.25, 398.25], [false, 147, 147, 99.0, 99.0]]
+      },
+      {
+        "sql": "select distinct_sum(int_col), distinctSum(long_col), DISTINCT_SUM(float_col), DISTINCTSUM(double_col) FROM {tbl}",
+        "outputs": [[531, 531, 805.26, 805.26]]
+      },
+      {
+        "sql": "select string_col, distinct_sum(int_col), distinctSum(long_col), DISTINCT_SUM(float_col), DISTINCTSUM(double_col) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 2, 2, 700.0, 700.0], ["b", 103, 103, 101.0, 101.0], ["c", 426, 426, 4.26, 4.26]]
+      },
+      {
+        "sql": "select /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, distinct_sum(int_col), distinctSum(long_col), DISTINCT_SUM(float_col), DISTINCTSUM(double_col) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 2, 2, 700.0, 700.0], ["b", 103, 103, 101.0, 101.0], ["c", 426, 426, 4.26, 4.26]]
+      },
+      {
+        "sql": "select distinct_avg(int_col), distinctAvg(long_col), DISTINCT_AVG(float_col), DISTINCTAVG(double_col) FROM {tbl}",
+        "outputs": [[88.5, 88.5, 115.03714285, 115.03714285]]
+      },
+      {
+        "sql": "select string_col, distinct_avg(int_col), distinctAvg(long_col), DISTINCT_AVG(float_col), DISTINCTAVG(double_col) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 2.0, 2.0, 350.0, 350.0], ["b", 51.5, 51.5, 50.5, 50.5], ["c", 142.0, 142.0, 1.42, 1.42]]
+      },
+      {
+        "sql": "select /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, distinct_avg(int_col), distinctAvg(long_col), DISTINCT_AVG(float_col), DISTINCTAVG(double_col) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 2.0, 2.0, 350.0, 350.0], ["b", 51.5, 51.5, 50.5, 50.5], ["c", 142.0, 142.0, 1.42, 1.42]]
+      }
+    ]
+  },
+  "pinot_sketch_agg_udf_tests": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "long_col", "type": "LONG"},
+          {"name": "float_col", "type": "FLOAT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"},
+          {"name": "decimal_col", "type": "BIG_DECIMAL"},
+          {"name": "timestamp_col", "type": "TIMESTAMP"},
+          {"name": "bytes_col", "type": "BYTES"}
+        ],
+        "inputs": [
+          [2, 2, 300, 300, "a", true, "1E-307", "2020-01-01 03:10:12", "DEADBEEF"],
+          [2, 2, 400, 400, "a", true, "1E+307", "2020-01-01 03:39:12", "FDEADBEE"],
+          [3, 3, 100, 100, "b", false, "1E-308", "2020-01-01 08:32:12", "EFDEADBE"],
+          [100, 100, 1, 1, "b", false, "1E+308", "2020-02-06 03:32:12", "FDEADBEE"],
+          [101, 101, 1.01, 1.01, "c", false, "1E-317", "2020-05-01 03:32:12", "DEADBEEF"],
+          [150, 150, 1.5, 1.5, "c", false, "1E+317", "2020-02-03 03:32:12", "EFDEADBE"],
+          [175, 175, 1.75, 1.75, "c", true, "1E+328", "2020-01-02 03:32:12","EFDEADBE"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "select distinct_count_theta_sketch(int_col), distinctCountThetaSketch(long_col), DISTINCT_COUNT_THETA_SKETCH(float_col), DISTINCTCOUNTTHETASKETCH(double_col) FROM {tbl}",
+        "outputs": [[6, 6, 7, 7]]
+      },
+      {
+        "sql": "select string_col, distinct_count_theta_sketch(int_col), distinctCountThetaSketch(long_col), DISTINCT_COUNT_THETA_SKETCH(float_col), DISTINCTCOUNTTHETASKETCH(double_col) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 1, 1, 2, 2], ["b", 2, 2, 2, 2], ["c", 3, 3, 3, 3]]
+      },
+      {
+        "sql": "select /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, distinct_count_theta_sketch(int_col), distinctCountThetaSketch(long_col), DISTINCT_COUNT_THETA_SKETCH(float_col), DISTINCTCOUNTTHETASKETCH(double_col) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 1, 1, 2, 2], ["b", 2, 2, 2, 2], ["c", 3, 3, 3, 3]]
       }
     ]
   }
