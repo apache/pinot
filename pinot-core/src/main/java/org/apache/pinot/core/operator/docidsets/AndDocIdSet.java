@@ -59,6 +59,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public final class AndDocIdSet implements BlockDocIdSet {
   private final List<BlockDocIdSet> _docIdSets;
   private final boolean _cardinalityBasedRankingForScan;
+  private long _numEntriesScannedInFilter = 0L;
 
   public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions) {
     _docIdSets = docIdSets instanceof ArrayList ? docIdSets : new ArrayList<>(docIdSets);
@@ -79,7 +80,8 @@ public final class AndDocIdSet implements BlockDocIdSet {
 
     Iterator<BlockDocIdSet> iterator = _docIdSets.iterator();
     for (int i = 0; iterator.hasNext(); i++) {
-      BlockDocIdIterator docIdIterator = iterator.next().iterator();
+      BlockDocIdSet blockDocIdSet = iterator.next();
+      BlockDocIdIterator docIdIterator = blockDocIdSet.iterator();
       allDocIdIterators[i] = docIdIterator;
       if (docIdIterator instanceof SortedDocIdIterator) {
         sortedDocIdIterators.add((SortedDocIdIterator) docIdIterator);
@@ -88,6 +90,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
       } else if (docIdIterator instanceof BitmapBasedDocIdIterator) {
         bitmapBasedDocIdIterators.add((BitmapBasedDocIdIterator) docIdIterator);
         // do not keep holding on to the bitmaps since they will occupy heap space during the query execution
+        _numEntriesScannedInFilter += blockDocIdSet.getNumEntriesScannedInFilter();
         iterator.remove();
       } else if (docIdIterator instanceof ScanBasedDocIdIterator) {
         scanBasedDocIdIterators.add((ScanBasedDocIdIterator) docIdIterator);
@@ -178,10 +181,9 @@ public final class AndDocIdSet implements BlockDocIdSet {
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    long numEntriesScannedInFilter = 0L;
     for (BlockDocIdSet child : _docIdSets) {
-      numEntriesScannedInFilter += child.getNumEntriesScannedInFilter();
+      _numEntriesScannedInFilter += child.getNumEntriesScannedInFilter();
     }
-    return numEntriesScannedInFilter;
+    return _numEntriesScannedInFilter;
   }
 }

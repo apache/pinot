@@ -50,6 +50,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public final class OrDocIdSet implements BlockDocIdSet {
   private final List<BlockDocIdSet> _docIdSets;
   private final int _numDocs;
+  private long _numEntriesScannedInFilter = 0L;
 
   public OrDocIdSet(List<BlockDocIdSet> docIdSets, int numDocs) {
     _docIdSets = docIdSets instanceof ArrayList ? docIdSets : new ArrayList<>(docIdSets);
@@ -66,7 +67,8 @@ public final class OrDocIdSet implements BlockDocIdSet {
 
     Iterator<BlockDocIdSet> iterator = _docIdSets.iterator();
     for (int i = 0; iterator.hasNext(); i++) {
-      BlockDocIdIterator docIdIterator = iterator.next().iterator();
+      BlockDocIdSet blockDocIdSet = iterator.next();
+      BlockDocIdIterator docIdIterator = blockDocIdSet.iterator();
       allDocIdIterators[i] = docIdIterator;
       if (docIdIterator instanceof SortedDocIdIterator) {
         sortedDocIdIterators.add((SortedDocIdIterator) docIdIterator);
@@ -75,6 +77,7 @@ public final class OrDocIdSet implements BlockDocIdSet {
       } else if (docIdIterator instanceof BitmapBasedDocIdIterator) {
         bitmapBasedDocIdIterators.add((BitmapBasedDocIdIterator) docIdIterator);
         // do not keep holding on to the bitmaps since they will occupy heap space during the query execution
+        _numEntriesScannedInFilter += blockDocIdSet.getNumEntriesScannedInFilter();
         iterator.remove();
       } else {
         remainingDocIdIterators.add(docIdIterator);
@@ -119,10 +122,9 @@ public final class OrDocIdSet implements BlockDocIdSet {
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    long numEntriesScannedInFilter = 0L;
     for (BlockDocIdSet docIdSet : _docIdSets) {
-      numEntriesScannedInFilter += docIdSet.getNumEntriesScannedInFilter();
+      _numEntriesScannedInFilter += docIdSet.getNumEntriesScannedInFilter();
     }
-    return numEntriesScannedInFilter;
+    return _numEntriesScannedInFilter;
   }
 }
