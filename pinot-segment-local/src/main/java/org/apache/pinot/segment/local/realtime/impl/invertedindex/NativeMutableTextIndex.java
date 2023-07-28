@@ -63,9 +63,22 @@ public class NativeMutableTextIndex implements MutableTextIndex {
 
   @Override
   public void add(String document) {
-    Iterable<String> tokens;
+    addHelper(document);
+    _nextDocId++;
+  }
 
+  @Override
+  public void add(String[] documents) {
+    for (String document : documents) {
+      addHelper(document);
+    }
+    _nextDocId++;
+  }
+
+  private void addHelper(String document) {
+    Iterable<String> tokens;
     tokens = analyze(document);
+
     _writeLock.lock();
     try {
       for (String token : tokens) {
@@ -76,15 +89,9 @@ public class NativeMutableTextIndex implements MutableTextIndex {
         });
         _invertedIndex.add(currentDictId, _nextDocId);
       }
-      _nextDocId++;
     } finally {
       _writeLock.unlock();
     }
-  }
-
-  @Override
-  public void add(String[] documents) {
-    throw new UnsupportedOperationException("Mutable native text indexes are not supported for multi-valued columns");
   }
 
   @Override

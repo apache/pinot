@@ -90,6 +90,19 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
 
   @Override
   public void add(String document) {
+    addHelper(document);
+    _nextDocId++;
+  }
+
+  @Override
+  public void add(String[] documents, int length) {
+    for (int i = 0; i < length; i++) {
+      addHelper(documents[i]);
+    }
+    _nextDocId++;
+  }
+
+  private void addHelper(String document) {
     List<String> tokens;
     try {
       tokens = analyze(document, new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET));
@@ -100,13 +113,6 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
     for (String token : tokens) {
       addToPostingList(token);
     }
-
-    _nextDocId++;
-  }
-
-  @Override
-  public void add(String[] documents, int length) {
-    throw new UnsupportedOperationException("Native text index is not supported on MV column: " + _columnName);
   }
 
   @Override
