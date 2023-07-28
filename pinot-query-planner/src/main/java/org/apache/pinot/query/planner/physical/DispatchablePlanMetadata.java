@@ -21,8 +21,10 @@ package org.apache.pinot.query.planner.physical;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
@@ -39,7 +41,7 @@ import org.apache.pinot.query.routing.QueryServerInstance;
  * </ul>
  */
 public class DispatchablePlanMetadata implements Serializable {
-  private List<String> _scannedTables;
+  private final List<String> _scannedTables;
 
   // used for assigning server/worker nodes.
   private Map<QueryServerInstance, List<Integer>> _serverInstanceToWorkerIdMap;
@@ -51,7 +53,9 @@ public class DispatchablePlanMetadata implements Serializable {
 
   // used for build mailboxes between workers.
   // workerId -> {planFragmentId -> mailbox list}
-  private Map<Integer, Map<Integer, MailboxMetadata>> _workerIdToMailboxesMap;
+  private final Map<Integer, Map<Integer, MailboxMetadata>> _workerIdToMailboxesMap;
+
+  private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
 
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
@@ -69,6 +73,7 @@ public class DispatchablePlanMetadata implements Serializable {
     _workerIdToMailboxesMap = new HashMap<>();
     _timeBoundaryInfo = null;
     _requiresSingletonInstance = false;
+    _tableToUnavailableSegmentsMap = new HashMap<>();
   }
 
   public List<String> getScannedTables() {
@@ -87,8 +92,7 @@ public class DispatchablePlanMetadata implements Serializable {
     return _workerIdToSegmentsMap;
   }
 
-  public void setWorkerIdToSegmentsMap(
-      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+  public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
   }
 
@@ -137,11 +141,32 @@ public class DispatchablePlanMetadata implements Serializable {
     _totalWorkerCount = totalWorkerCount;
   }
 
+  public void addTableToUnavailableSegmentsMap(String table, List<String> unavailableSegments) {
+    if (!_tableToUnavailableSegmentsMap.containsKey(table)) {
+      _tableToUnavailableSegmentsMap.put(table, new HashSet<>());
+    }
+    _tableToUnavailableSegmentsMap.get(table).addAll(unavailableSegments);
+  }
+
+  public Map<String, Set<String>> getTableToUnavailableSegmentsMap() {
+    return _tableToUnavailableSegmentsMap;
+  }
+
+  public void addTableToUnavailableSegmentsMap(Map<String, Set<String>> tableToUnavailableSegments) {
+    for (Map.Entry<String, Set<String>> entry : tableToUnavailableSegments.entrySet()) {
+      String table = entry.getKey();
+      if (!_tableToUnavailableSegmentsMap.containsKey(table)) {
+        _tableToUnavailableSegmentsMap.put(table, new HashSet<>());
+      }
+      _tableToUnavailableSegmentsMap.get(table).addAll(entry.getValue());
+    }
+  }
+
   @Override
   public String toString() {
     return "DispatchablePlanMetadata{" + "_scannedTables=" + _scannedTables + ", _serverInstanceToWorkerIdMap="
         + _serverInstanceToWorkerIdMap + ", _workerIdToSegmentsMap=" + _workerIdToSegmentsMap
-        + ", _workerIdToMailboxesMap=" + _workerIdToMailboxesMap
-        + ", _timeBoundaryInfo=" + _timeBoundaryInfo + '}';
+        + ", _workerIdToMailboxesMap=" + _workerIdToMailboxesMap + ", _tableToUnavailableSegmentsMap="
+        + _tableToUnavailableSegmentsMap + ", _timeBoundaryInfo=" + _timeBoundaryInfo + '}';
   }
 }

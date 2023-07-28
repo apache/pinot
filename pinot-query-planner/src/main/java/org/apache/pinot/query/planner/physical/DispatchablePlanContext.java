@@ -126,7 +126,10 @@ public class DispatchablePlanContext {
         dispatchablePlanFragmentList.get(stageId)
             .setTimeBoundaryInfo(dispatchablePlanMetadata.getTimeBoundaryInfo());
       }
+      dispatchablePlanFragmentList.get(stageId).getTableToUnavailableSegments()
+          .putAll(dispatchablePlanMetadata.getTableToUnavailableSegmentsMap());
     }
+    populateTableUnavailableSegments(subPlanRoot);
     return dispatchablePlanFragmentList;
   }
 
@@ -136,5 +139,16 @@ public class DispatchablePlanContext {
     for (PlanFragment childPlanFragment : planFragmentRoot.getChildren()) {
       createDispatchablePlanFragmentList(dispatchablePlanFragmentArray, childPlanFragment);
     }
+  }
+
+  private void populateTableUnavailableSegments(PlanFragment subPlanRoot) {
+    subPlanRoot.getChildren().forEach(this::populateTableUnavailableSegments);
+    DispatchablePlanMetadata dispatchablePlanMetadata = _dispatchablePlanMetadataMap.get(subPlanRoot.getFragmentId());
+    subPlanRoot.getChildren().forEach(childPlanFragment -> {
+      DispatchablePlanMetadata childDispatchablePlanMetadata =
+          _dispatchablePlanMetadataMap.get(childPlanFragment.getFragmentId());
+      dispatchablePlanMetadata.addTableToUnavailableSegmentsMap(
+          childDispatchablePlanMetadata.getTableToUnavailableSegmentsMap());
+    });
   }
 }
