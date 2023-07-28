@@ -35,7 +35,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.IntermediateStageBlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.query.planner.logical.LiteralHintUtils;
@@ -44,6 +43,8 @@ import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.block.DataBlockValSet;
+import org.apache.pinot.query.runtime.operator.block.FilteredDataBlockValSet;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -110,9 +111,9 @@ public class AggregateOperator extends MultiStageOperator {
     // filter operand and literal hints
     if (nodeHint != null && nodeHint._hintOptions != null
         && nodeHint._hintOptions.get(PinotHintOptions.INTERNAL_AGG_OPTIONS) != null) {
-      _aggCallSignatureMap = LiteralHintUtils.hintStringToLiteralMap(nodeHint._hintOptions
-          .get(PinotHintOptions.INTERNAL_AGG_OPTIONS)
-          .get(PinotHintOptions.InternalAggregateOptions.AGG_CALL_SIGNATURE));
+      _aggCallSignatureMap = LiteralHintUtils.hintStringToLiteralMap(
+          nodeHint._hintOptions.get(PinotHintOptions.INTERNAL_AGG_OPTIONS)
+              .get(PinotHintOptions.InternalAggregateOptions.AGG_CALL_SIGNATURE));
     } else {
       _aggCallSignatureMap = Collections.emptyMap();
     }
@@ -135,12 +136,14 @@ public class AggregateOperator extends MultiStageOperator {
     // Initialize the appropriate executor.
     if (!groupSet.isEmpty()) {
       _isGroupByAggregation = true;
-      _groupByExecutor = new MultistageGroupByExecutor(groupByExpr, aggFunctions, filterArgIndexArray, aggType,
-          _colNameToIndexMap, _resultSchema);
+      _groupByExecutor =
+          new MultistageGroupByExecutor(groupByExpr, aggFunctions, filterArgIndexArray, aggType, _colNameToIndexMap,
+              _resultSchema);
     } else {
       _isGroupByAggregation = false;
-      _aggregationExecutor = new MultistageAggregationExecutor(aggFunctions, filterArgIndexArray, aggType,
-          _colNameToIndexMap, _resultSchema);
+      _aggregationExecutor =
+          new MultistageAggregationExecutor(aggFunctions, filterArgIndexArray, aggType, _colNameToIndexMap,
+              _resultSchema);
     }
   }
 
@@ -319,8 +322,8 @@ public class AggregateOperator extends MultiStageOperator {
   // TODO: If the previous block is not mailbox received, this method is not efficient.  Then getDataBlock() will
   //  convert the unserialized format to serialized format of BaseDataBlock. Then it will convert it back to column
   //  value primitive type.
-  static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggFunction,
-      TransferableBlock block, DataSchema inputDataSchema, Map<String, Integer> colNameToIndexMap, int filterArgIdx) {
+  static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggFunction, TransferableBlock block,
+      DataSchema inputDataSchema, Map<String, Integer> colNameToIndexMap, int filterArgIdx) {
     List<ExpressionContext> expressions = aggFunction.getInputExpressions();
     int numExpressions = expressions.size();
     if (numExpressions == 0) {
@@ -329,13 +332,17 @@ public class AggregateOperator extends MultiStageOperator {
 
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     for (ExpressionContext expression : expressions) {
-      if (expression.getType().equals(ExpressionContext.Type.IDENTIFIER)
-          && !"__PLACEHOLDER__".equals(expression.getIdentifier())) {
+      if (expression.getType().equals(ExpressionContext.Type.IDENTIFIER) && !"__PLACEHOLDER__".equals(
+          expression.getIdentifier())) {
         int index = colNameToIndexMap.get(expression.getIdentifier());
         DataSchema.ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
         Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
-        blockValSetMap.put(expression, new IntermediateStageBlockValSet(dataType, block.getDataBlock(), index,
-            filterArgIdx));
+        if (filterArgIdx == -1) {
+          blockValSetMap.put(expression, new DataBlockValSet(dataType, block.getDataBlock(), index));
+        } else {
+          blockValSetMap.put(expression,
+              new FilteredDataBlockValSet(dataType, block.getDataBlock(), index, filterArgIdx));
+        }
       }
     }
     return blockValSetMap;

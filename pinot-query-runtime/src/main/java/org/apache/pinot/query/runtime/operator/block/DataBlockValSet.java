@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common;
+package org.apache.pinot.query.runtime.operator.block;
 
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
@@ -34,19 +35,16 @@ import org.roaringbitmap.RoaringBitmap;
  * aggregations using v1 aggregation functions.
  * TODO: Support MV
  */
-public class IntermediateStageBlockValSet implements BlockValSet {
-  private final FieldSpec.DataType _dataType;
-  private final DataBlock _dataBlock;
-  private final int _colIndex;
-  private final int _filterArgIdx;
-  private final RoaringBitmap _nullBitMap;
+public class DataBlockValSet implements BlockValSet {
+  protected final FieldSpec.DataType _dataType;
+  protected final DataBlock _dataBlock;
+  protected final int _index;
+  protected final RoaringBitmap _nullBitMap;
 
-  public IntermediateStageBlockValSet(DataSchema.ColumnDataType columnDataType, DataBlock dataBlock, int colIndex,
-      int filterArgIdx) {
+  public DataBlockValSet(DataSchema.ColumnDataType columnDataType, DataBlock dataBlock, int colIndex) {
     _dataType = columnDataType.toDataType();
     _dataBlock = dataBlock;
-    _colIndex = colIndex;
-    _filterArgIdx = filterArgIdx;
+    _index = colIndex;
     _nullBitMap = dataBlock.getNullRowIds(colIndex);
   }
 
@@ -83,37 +81,37 @@ public class IntermediateStageBlockValSet implements BlockValSet {
 
   @Override
   public int[] getIntValuesSV() {
-    return DataBlockUtils.extractIntValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
+    return DataBlockUtils.extractIntValuesForColumn(_dataBlock, _index);
   }
 
   @Override
   public long[] getLongValuesSV() {
-    return DataBlockUtils.extractLongValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
+    return DataBlockUtils.extractLongValuesForColumn(_dataBlock, _index);
   }
 
   @Override
   public float[] getFloatValuesSV() {
-    return DataBlockUtils.extractFloatValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
+    return DataBlockUtils.extractFloatValuesForColumn(_dataBlock, _index);
   }
 
   @Override
   public double[] getDoubleValuesSV() {
-    return DataBlockUtils.extractDoubleValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
+    return DataBlockUtils.extractDoubleValuesForColumn(_dataBlock, _index);
   }
 
   @Override
   public BigDecimal[] getBigDecimalValuesSV() {
-    return DataBlockUtils.extractBigDecimalValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
+    return DataBlockUtils.extractBigDecimalValuesForColumn(_dataBlock, _index);
   }
 
   @Override
   public String[] getStringValuesSV() {
-    return DataBlockUtils.extractStringValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
+    return DataBlockUtils.extractStringValuesForColumn(_dataBlock, _index);
   }
 
   @Override
   public byte[][] getBytesValuesSV() {
-    return DataBlockUtils.extractBytesValuesForColumn(_dataBlock, _colIndex, _filterArgIdx);
+    return DataBlockUtils.extractBytesValuesForColumn(_dataBlock, _index);
   }
 
   @Override
