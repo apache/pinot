@@ -108,7 +108,7 @@ import org.slf4j.LoggerFactory;
  * </pre>
  * Notice that the transformer:
  * <ul>
- *   <li>Flattens nested which exist in the schema, like "tags.platform"</li>
+ *   <li>Flattens nested fields which exist in the schema, like "tags.platform"</li>
  *   <li>Moves fields which don't exist in the schema into the "indexableExtras" field</li>
  *   <li>Moves fields which don't exist in the schema and have the suffix "_noIndex" into the "unindexableExtras"
  *   field</li>
@@ -186,7 +186,7 @@ public class JsonLogTransformer implements RecordTransformer {
   /**
    * @return The field type for the given extras field
    */
-  static private DataType getAndValidateExtrasFieldType(Schema schema, @Nonnull String extrasFieldName) {
+  private static DataType getAndValidateExtrasFieldType(Schema schema, @Nonnull String extrasFieldName) {
     FieldSpec fieldSpec = schema.getFieldSpecFor(extrasFieldName);
     Preconditions.checkState(null != fieldSpec, "Field '%s' doesn't exist in schema", extrasFieldName);
     DataType fieldDataType = fieldSpec.getDataType();
@@ -256,7 +256,7 @@ public class JsonLogTransformer implements RecordTransformer {
    * @param subKeys Returns the sub-keys
    * @throws IllegalArgumentException if any sub-key is empty
    */
-  static private void getAndValidateSubKeys(String key, int firstKeySeparatorIdx, List<String> subKeys)
+  private static void getAndValidateSubKeys(String key, int firstKeySeparatorIdx, List<String> subKeys)
       throws IllegalArgumentException {
     int subKeyBeginIdx = 0;
     int subKeyEndIdx = firstKeySeparatorIdx;
