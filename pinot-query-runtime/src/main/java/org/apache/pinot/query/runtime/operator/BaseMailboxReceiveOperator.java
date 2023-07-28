@@ -77,7 +77,9 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, senderMailBoxMetadatas);
     _mailboxes = new ArrayList<>(_mailboxIds.size());
     for (String mailboxId : _mailboxIds) {
-      _mailboxes.add(_mailboxService.getReceivingMailbox(mailboxId, ignoreMe -> onData()));
+      ReceivingMailbox mailbox = _mailboxService.getReceivingMailbox(mailboxId);
+      _mailboxes.add(mailbox);
+      mailbox.registeredReader(this::onData);
     }
     _lastRead = _mailboxes.size() - 1;
   }

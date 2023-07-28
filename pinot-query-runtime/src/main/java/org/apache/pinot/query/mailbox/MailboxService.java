@@ -28,7 +28,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -150,28 +149,15 @@ public class MailboxService {
     }
   }
 
-  public ReceivingMailbox getReceivingMailbox(String mailboxId, @Nullable Consumer<OpChainId> extraCallback) {
-    try {
-      Consumer<OpChainId> callback;
-      if (extraCallback == null) {
-        callback = _unblockOpChainCallback;
-      } else {
-        callback = opChainId -> {
-          extraCallback.accept(opChainId);
-          _unblockOpChainCallback.accept(opChainId);
-        };
-      }
-      return _receivingMailboxCache.get(mailboxId, () -> new ReceivingMailbox(mailboxId, callback));
-    } catch (ExecutionException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   /**
    * Returns the receiving mailbox for the given mailbox id.
    */
   public ReceivingMailbox getReceivingMailbox(String mailboxId) {
-    return getReceivingMailbox(mailboxId, null);
+    try {
+      return _receivingMailboxCache.get(mailboxId, () -> new ReceivingMailbox(mailboxId, _unblockOpChainCallback));
+    } catch (ExecutionException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**

@@ -50,7 +50,6 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -138,7 +137,7 @@ public class SortedMailboxReceiveOperatorTest {
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Collation keys.*")
   public void shouldThrowOnEmptyCollationKey() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1), any())).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, RECEIVER_ADDRESS, System.currentTimeMillis() + 10L,
             _stageMetadata1);
@@ -150,7 +149,7 @@ public class SortedMailboxReceiveOperatorTest {
   @Test
   public void shouldTimeout()
       throws InterruptedException {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1), any())).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
 
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, RECEIVER_ADDRESS, System.currentTimeMillis() + 1000L,
@@ -168,7 +167,7 @@ public class SortedMailboxReceiveOperatorTest {
 
   @Test(enabled = false)
   public void shouldReceiveSingletonNullMailbox() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1), any())).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, RECEIVER_ADDRESS, Long.MAX_VALUE, _stageMetadata1);
     try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
@@ -180,7 +179,7 @@ public class SortedMailboxReceiveOperatorTest {
 
   @Test
   public void shouldReceiveEosDirectlyFromSender() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1), any())).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, RECEIVER_ADDRESS, Long.MAX_VALUE, _stageMetadata1);
@@ -193,7 +192,7 @@ public class SortedMailboxReceiveOperatorTest {
 
   @Test
   public void shouldReceiveSingletonMailbox() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1), any())).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] row = new Object[]{1, 1};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
@@ -211,7 +210,7 @@ public class SortedMailboxReceiveOperatorTest {
 
   @Test
   public void shouldReceiveSingletonErrorMailbox() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1), any())).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     String errorMessage = "TEST ERROR";
     when(_mailbox1.poll()).thenReturn(
         TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
@@ -228,9 +227,9 @@ public class SortedMailboxReceiveOperatorTest {
 
   @Test
   public void shouldReceiveMailboxFromTwoServersOneNull() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1), any())).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(null, TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2), any())).thenReturn(_mailbox2);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row = new Object[]{1, 1};
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
@@ -251,11 +250,11 @@ public class SortedMailboxReceiveOperatorTest {
 
   @Test
   public void shouldGetReceptionReceiveErrorMailbox() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1), any())).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     String errorMessage = "TEST ERROR";
     when(_mailbox1.poll()).thenReturn(
         TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException(errorMessage)));
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2), any())).thenReturn(_mailbox2);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row = new Object[]{3, 3};
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
         TransferableBlockUtils.getEndOfStreamTransferableBlock());
@@ -272,12 +271,12 @@ public class SortedMailboxReceiveOperatorTest {
 
   @Test
   public void shouldReceiveMailboxFromTwoServersWithCollationKey() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1), any())).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] row1 = new Object[]{3, 3};
     Object[] row2 = new Object[]{1, 1};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
         OperatorTestUtil.block(DATA_SCHEMA, row2), TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2), any())).thenReturn(_mailbox2);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row3 = new Object[]{4, 2};
     Object[] row4 = new Object[]{2, 4};
     Object[] row5 = new Object[]{-1, 95};
@@ -302,12 +301,12 @@ public class SortedMailboxReceiveOperatorTest {
     List<Direction> collationDirections = Arrays.asList(Direction.DESCENDING, Direction.ASCENDING);
     List<NullDirection> collationNullDirections = Arrays.asList(NullDirection.FIRST, NullDirection.LAST);
 
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1), any())).thenReturn(_mailbox1);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] row1 = new Object[]{3, 3, "queen"};
     Object[] row2 = new Object[]{1, 1, "pink floyd"};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(dataSchema, row1),
         OperatorTestUtil.block(dataSchema, row2), TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2), any())).thenReturn(_mailbox2);
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row3 = new Object[]{4, 2, "pink floyd"};
     Object[] row4 = new Object[]{2, 4, "aerosmith"};
     Object[] row5 = new Object[]{-1, 95, "foo fighters"};

@@ -100,8 +100,8 @@ public class OpChainTest {
             new MailboxMetadata(ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)), ImmutableList.of(s),
                 ImmutableMap.of())).build()).collect(Collectors.toList())).build();
 
-    when(_mailboxService1.getReceivingMailbox(any(), any())).thenReturn(_mailbox1);
-    when(_mailboxService2.getReceivingMailbox(any(), any())).thenReturn(_mailbox2);
+    when(_mailboxService1.getReceivingMailbox(any())).thenReturn(_mailbox1);
+    when(_mailboxService2.getReceivingMailbox(any())).thenReturn(_mailbox2);
 
     try {
       doAnswer(invocation -> {

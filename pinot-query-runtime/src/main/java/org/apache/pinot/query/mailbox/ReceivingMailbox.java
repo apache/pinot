@@ -51,10 +51,20 @@ public class ReceivingMailbox {
   // TODO: Revisit if this is the correct way to apply back pressure
   private final BlockingQueue<TransferableBlock> _blocks = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
   private final AtomicReference<TransferableBlock> _errorBlock = new AtomicReference<>();
+  @Nullable
+  private volatile Reader _reader;
 
   public ReceivingMailbox(String id, Consumer<OpChainId> receiveMailCallback) {
     _id = id;
     _receiveMailCallback = receiveMailCallback;
+  }
+
+  public void registeredReader(Reader reader) {
+    if (_reader != null) {
+      throw new IllegalArgumentException("Only one reader is supported");
+    }
+    LOGGER.debug("==[MAILBOX]== Reader registered for mailbox {}", _id);
+    _reader = reader;
   }
 
   public String getId() {
@@ -87,6 +97,7 @@ public class ReceivingMailbox {
             LOGGER.debug("==[MAILBOX]== Block " + block + " ready to read from mailbox: " + _id);
           }
           _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
+          notifyReader();
           return true;
         } else {
           LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
@@ -113,6 +124,7 @@ public class ReceivingMailbox {
     if (_errorBlock.compareAndSet(null, errorBlock)) {
       _blocks.clear();
       _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
+      notifyReader();
     }
   }
 
@@ -139,5 +151,16 @@ public class ReceivingMailbox {
 
   public int getNumPendingBlocks() {
     return _blocks.size();
+  }
+
+  private void notifyReader() {
+    Reader reader = _reader;
+    if (reader != null) {
+      reader.blockReadyToRead();
+    }
+  }
+
+  public interface Reader {
+    void blockReadyToRead();
   }
 }
