@@ -16,10 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.service;
+package org.apache.pinot.query.service.server;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.Comparator;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -45,6 +47,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
+import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -102,7 +105,23 @@ public class QueryServerTest extends QueryTestSet {
     }
   }
 
-  @SuppressWarnings("unchecked")
+  @Test
+  public void testException() {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery("SELECT * FROM a");
+    // only get one worker request out.
+    Worker.QueryRequest queryRequest = getQueryRequest(dispatchableSubPlan, 1);
+    QueryRunner mockRunner =
+        _queryRunnerMap.get(Integer.parseInt(queryRequest.getMetadataOrThrow(KEY_OF_SERVER_INSTANCE_PORT)));
+    Mockito.doThrow(new RuntimeException("foo")).when(mockRunner).processQuery(Mockito.any(), Mockito.anyMap());
+    // submit the request for testing.
+    Worker.QueryResponse resp = submitRequest(queryRequest);
+    // reset the mock runner before assert.
+    Mockito.reset(mockRunner);
+    // should contain error message pattern
+    String errorMessage = resp.getMetadataMap().get(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR);
+    Assert.assertTrue(errorMessage.contains("foo"));
+  }
+
   @Test(dataProvider = "testSql")
   public void testWorkerAcceptsWorkerRequestCorrect(String sql)
       throws Exception {
@@ -114,7 +133,8 @@ public class QueryServerTest extends QueryTestSet {
         Worker.QueryRequest queryRequest = getQueryRequest(dispatchableSubPlan, stageId);
 
         // submit the request for testing.
-        submitRequest(queryRequest);
+        Worker.QueryResponse resp = submitRequest(queryRequest);
+        Assert.assertNotNull(resp.getMetadataMap().get(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK));
 
         DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
 
@@ -207,15 +227,16 @@ public class QueryServerTest extends QueryTestSet {
     return true;
   }
 
-  private void submitRequest(Worker.QueryRequest queryRequest) {
+  private Worker.QueryResponse submitRequest(Worker.QueryRequest queryRequest) {
     String host = queryRequest.getMetadataMap().get(KEY_OF_SERVER_INSTANCE_HOST);
     int port = Integer.parseInt(queryRequest.getMetadataMap().get(KEY_OF_SERVER_INSTANCE_PORT));
+    long timeoutMs = Long.parseLong(queryRequest.getMetadataMap().get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
     ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
     PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub stub = PinotQueryWorkerGrpc.newBlockingStub(channel);
-    Worker.QueryResponse resp = stub.submit(queryRequest);
-    // TODO: validate meaningful return value
-    Assert.assertNotNull(resp.getMetadataMap().get(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK));
+    Worker.QueryResponse resp = stub.withDeadline(Deadline.after(timeoutMs, TimeUnit.MILLISECONDS))
+        .submit(queryRequest);
     channel.shutdown();
+    return resp;
   }
 
   private Worker.QueryRequest getQueryRequest(DispatchableSubPlan dispatchableSubPlan, int stageId) {
