@@ -273,11 +273,10 @@ public class CalciteSqlParser {
   /*
    * Throws an exception if the filter's rhs has NULL because:
    * - Predicate evaluator and pruning do not have NULL support.
-   * - It is not meaningful to have NULL in the filter's rhs.
-   *   - For most of the filters (e.g. GREATER_THAN, LIKE), the rhs being NULL leads to no record matched.
+   * - It is not useful to have NULL in the filter's rhs.
+   *   - For most of the filters (e.g. EQUALS, GREATER_THAN, LIKE), the rhs being NULL leads to no record matched.
    *   - For IN, adding NULL to the rhs list does not change the matched records.
    *   - For NOT IN, adding NULL to the rhs list leads to no record matched.
-   *   - For "= NULL" and "!= NULL", we have the IS_NULL and IS_NOT_NULL as workarounds.
    */
   private static void validateFilter(Expression filterExpression) {
     if (!filterExpression.isSetFunctionCall()) {
