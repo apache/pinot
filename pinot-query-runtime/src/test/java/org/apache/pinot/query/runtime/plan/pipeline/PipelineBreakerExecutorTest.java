@@ -186,7 +186,7 @@ public class PipelineBreakerExecutorTest {
   }
 
   @Test
-  public void shouldReturnErrorBlocksFailureWhenPBExecute() {
+  public void shouldReturnEmptyBlockWhenPBExecuteWithIncorrectMailboxNode() {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode =
         new MailboxReceiveNode(0, DATA_SCHEMA, 3, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
             null, null, false, false, null);
@@ -203,12 +203,9 @@ public class PipelineBreakerExecutorTest {
     Assert.assertNotNull(pipelineBreakerResult);
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 1);
     List<TransferableBlock> resultBlocks = pipelineBreakerResult.getResultMap().values().iterator().next();
-    Assert.assertEquals(resultBlocks.size(), 1);
-    Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
-    Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
+    Assert.assertEquals(resultBlocks.size(), 0);
 
-    // should have null stats from previous stage here
-    Assert.assertNull(pipelineBreakerResult.getOpChainStats());
+    Assert.assertNotNull(pipelineBreakerResult.getOpChainStats());
   }
 
   @Test
@@ -242,7 +239,7 @@ public class PipelineBreakerExecutorTest {
   }
 
   @Test
-  public void shouldReturnErrorBlocksWhenAnyPBFailure() {
+  public void shouldReturnWhenAnyPBReturnsEmpty() {
     MailboxReceiveNode mailboxReceiveNode1 =
         new MailboxReceiveNode(0, DATA_SCHEMA, 1, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
             null, null, false, false, null);
@@ -270,17 +267,13 @@ public class PipelineBreakerExecutorTest {
             System.currentTimeMillis() + 10_000L, 0, false);
 
     // then
-    // should fail even if one of the 2 PB returns correct results.
+    // should pass when one PB returns result, the other returns empty.
     Assert.assertNotNull(pipelineBreakerResult);
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 2);
-    for (List<TransferableBlock> resultBlocks : pipelineBreakerResult.getResultMap().values()) {
-      Assert.assertEquals(resultBlocks.size(), 1);
-      Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
-      Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
-    }
+    Assert.assertEquals(pipelineBreakerResult.getResultMap().get(0).size(), 1);
+    Assert.assertEquals(pipelineBreakerResult.getResultMap().get(1).size(), 0);
 
-    // should have null stats from previous stage here
-    Assert.assertNull(pipelineBreakerResult.getOpChainStats());
+    Assert.assertNotNull(pipelineBreakerResult.getOpChainStats());
   }
 
   @Test

@@ -351,7 +351,6 @@ public class QueryEnvironment {
 
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
-    pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
     return pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
   }
 
