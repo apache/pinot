@@ -177,8 +177,7 @@ public class QueryEnvironment {
       DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
       return new QueryPlannerResult(dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
     } catch (CalciteContextException e) {
-      throw new RuntimeException("Error composing query plan for '" + sqlQuery
-          + "': " + e.getMessage() + "'", e);
+      throw new RuntimeException("Error composing query plan for '" + sqlQuery + "': " + e.getMessage() + "'", e);
     } catch (Throwable t) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
     }
@@ -345,10 +344,9 @@ public class QueryEnvironment {
     QueryPlan queryPlan = pinotLogicalQueryPlanner.planQuery(relRoot);
     return pinotLogicalQueryPlanner.makePlan(queryPlan);
   }
-  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext,
-      long requestId) {
-    SubPlan subPlanRoot = toSubPlan(relRoot);
 
+  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
+    SubPlan subPlanRoot = toSubPlan(relRoot);
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
     return pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
