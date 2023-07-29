@@ -128,54 +128,53 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     testQueryWithMatchingRowCount(pinotQuery, h2Query);
   }
 
-  @Test
-  public void testMultiValueColumnAggregationQuery()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testMultiValueColumnAggregationQuery(boolean useMultiStageQueryEngine)
       throws Exception {
-    String pinotQuery =
-        "SELECT SUMMV(DivAirportIDs) FROM mytable";
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
+    String[] multiValueFunctions = new String[]{
+        "sumMV", "countMV", "minMV", "maxMV", "avgMV", "minMaxRangeMV", "distinctCountMV", "distinctCountBitmapMV",
+        "distinctCountHLLMV", "distinctSumMV", "distinctAvgMV"
+    };
+    double[] expectedResults = new double[]{
+        -5.421344202E9, 577725, -9999.0, 16271.0, -9383.95292223809, 26270.0, 312, 312, 328, 3954484.0,
+        12674.628205128205
+    };
+
+    Assert.assertEquals(multiValueFunctions.length, expectedResults.length);
+
+    for (int i = 0; i < multiValueFunctions.length; i++) {
+      String pinotQuery = String.format("SELECT %s(DivAirportIDs) FROM mytable", multiValueFunctions[i]);
+      JsonNode jsonNode = postQuery(pinotQuery);
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResults[i]);
+    }
+
+    String pinotQuery = "SELECT percentileMV(DivAirportIDs, 99) FROM mytable";
     JsonNode jsonNode = postQuery(pinotQuery);
-    System.out.println("pinotQuery = " + pinotQuery);
-    System.out.println(jsonNode.toPrettyString());
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), 13433.0);
 
-    pinotQuery =
-        "SELECT countMV(DivAirports) FROM mytable";
-
+    pinotQuery = "SELECT percentileEstMV(DivAirportIDs, 99) FROM mytable";
     jsonNode = postQuery(pinotQuery);
-    System.out.println("pinotQuery = " + pinotQuery);
-    System.out.println(jsonNode.toPrettyString());
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 13000);
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 14000);
 
-    pinotQuery =
-        "SELECT minMV(DivAirportIDs) FROM mytable";
-
+    pinotQuery = "SELECT percentileTDigestMV(DivAirportIDs, 99) FROM mytable";
     jsonNode = postQuery(pinotQuery);
-    System.out.println("pinotQuery = " + pinotQuery);
-    System.out.println(jsonNode.toPrettyString());
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 13000);
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 14000);
 
-    pinotQuery =
-        "SELECT maxMV(DivAirportIDs) FROM mytable";
-
+    pinotQuery = "SELECT percentileKLLMV(DivAirportIDs, 99) FROM mytable";
     jsonNode = postQuery(pinotQuery);
-    System.out.println("pinotQuery = " + pinotQuery);
-    System.out.println(jsonNode.toPrettyString());
-  }
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 12000);
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 15000);
 
-  @Test
-  public void testMultiValueColumnAggregationQuery2()
-      throws Exception {
-    String pinotQuery =
-        "SELECT avgMV(DivAirportIDs) FROM mytable";
-
-    JsonNode jsonNode = postQuery(pinotQuery);
-    System.out.println("pinotQuery = " + pinotQuery);
-    System.out.println(jsonNode.toPrettyString());
-
-    pinotQuery =
-        "SELECT minmaxrangeMV(DivAirportIDs) FROM mytable";
-
+    pinotQuery = "SELECT percentileKLLMV(DivAirportIDs, 99, 100) FROM mytable";
     jsonNode = postQuery(pinotQuery);
-    System.out.println("pinotQuery = " + pinotQuery);
-    System.out.println(jsonNode.toPrettyString());
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 12000);
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 15000);
+
+    setUseMultiStageQueryEngine(true);
   }
 
   @Test
@@ -183,7 +182,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z'), toDateTime(ago('PT1H'), 'yyyy-MM-dd z') FROM mytable";
     JsonNode response = postQuery(sqlQuery);
-    System.out.println("response = " + response);
     String todayStr = response.get("resultTable").get("rows").get(0).get(0).asText();
     String expectedTodayStr =
         Instant.now().atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd z"));
@@ -491,7 +489,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
             + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, toBase64"
             + "(toUtf8('hello!')) as toBase64, fromUtf8(fromBase64('aGVsbG8h')) as fromBase64";
     JsonNode response = postQuery(sqlQuery);
-    System.out.println("response = " + response.toPrettyString());
     long queryEndTimeMs = System.currentTimeMillis();
 
     JsonNode resultTable = response.get("resultTable");
