@@ -67,6 +67,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   private final File _tempDir;
   private final File _fstIndexFile;
   private final File _invertedIndexFile;
+  private Analyzer _analyzer;
   private final Map<String, RoaringBitmapWriter<RoaringBitmap>> _postingListMap = new TreeMap<>();
   private final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard = RoaringBitmapWriter.writer();
   private int _nextDocId = 0;
@@ -86,6 +87,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
     }
     _fstIndexFile = new File(_tempDir, FST_FILE_NAME);
     _invertedIndexFile = new File(_tempDir, INVERTED_INDEX_FILE_NAME);
+    _analyzer = new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET);
   }
 
   @Override
@@ -105,7 +107,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   private void addHelper(String document) {
     List<String> tokens;
     try {
-      tokens = analyze(document, new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET));
+      tokens = analyze(document, _analyzer);
     } catch (IOException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -138,17 +140,22 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   @Override
   public void close()
       throws IOException {
+    _analyzer.close();
     FileUtils.deleteDirectory(_tempDir);
   }
 
   public List<String> analyze(String text, Analyzer analyzer)
       throws IOException {
     List<String> result = new ArrayList<>();
-    TokenStream tokenStream = analyzer.tokenStream(_columnName, text);
-    CharTermAttribute attr = tokenStream.addAttribute(CharTermAttribute.class);
-    tokenStream.reset();
-    while (tokenStream.incrementToken()) {
-      result.add(attr.toString());
+    try (TokenStream tokenStream = analyzer.tokenStream(_columnName, text)) {
+      CharTermAttribute attr = tokenStream.addAttribute(CharTermAttribute.class);
+      tokenStream.reset();
+      while (tokenStream.incrementToken()) {
+        result.add(attr.toString());
+      }
+      tokenStream.end();
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while tokenizing the document for column: " + _columnName, e);
     }
     return result;
   }

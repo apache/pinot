@@ -121,8 +121,8 @@ public class NativeMutableTextIndex implements MutableTextIndex {
   private List<String> analyze(String document) {
     List<String> tokens = new ArrayList<>();
     try (TokenStream tokenStream = _analyzer.tokenStream(_column, document)) {
-      tokenStream.reset();
       CharTermAttribute attribute = tokenStream.getAttribute(CharTermAttribute.class);
+      tokenStream.reset();
       while (tokenStream.incrementToken()) {
         tokens.add(attribute.toString());
       }
