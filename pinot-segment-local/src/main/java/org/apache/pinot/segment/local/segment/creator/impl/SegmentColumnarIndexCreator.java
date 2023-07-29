@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
@@ -571,8 +572,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
       String maxValue, DataType dataType) {
-    properties.setProperty(getKeyFor(column, MIN_VALUE), getValidPropertyValue(minValue, false, dataType));
-    properties.setProperty(getKeyFor(column, MAX_VALUE), getValidPropertyValue(maxValue, true, dataType));
+    String validMinValue = getValidPropertyValue(minValue, false, dataType);
+    properties.setProperty(getKeyFor(column, MIN_VALUE), validMinValue);
+
+    String validMaxValue = getValidPropertyValue(maxValue, true, dataType);
+    properties.setProperty(getKeyFor(column, MAX_VALUE), validMaxValue);
+
+    // setting the property for signifying that the mon or max value is escaped.
+    if (validMinValue.compareTo(minValue) != 0
+        || validMaxValue.compareTo(maxValue) != 0) {
+      properties.setProperty(getKeyFor(column, IS_MIN_MAX_VALUE_ESCAPED), true);
+    }
   }
 
   /**
@@ -605,30 +615,30 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @VisibleForTesting
   static String getValidPropertyValue(String value, boolean isMax, DataType dataType) {
     String valueWithinLengthLimit = getValueWithinLengthLimit(value, isMax, dataType);
-    int length = valueWithinLengthLimit.length();
+    String escapedValue = StringEscapeUtils.escapeJava(valueWithinLengthLimit);
+    int length = escapedValue.length();
 
     if (length > 0) {
       // check and replace first character if it's a white space
-      if (Character.isWhitespace(valueWithinLengthLimit.charAt(0))) {
-        String unicodeValue = "\\u" + String.format("%04x", (int) valueWithinLengthLimit.charAt(0));
-        valueWithinLengthLimit = unicodeValue + valueWithinLengthLimit.substring(1);
+      if (Character.isWhitespace(escapedValue.charAt(0))) {
+        String unicodeValue = String.format("\\u%04x", (int) escapedValue.charAt(0));
+        escapedValue = unicodeValue + escapedValue.substring(1);
       }
 
       // check and replace last character if it's a white space
-      if (Character.isWhitespace(valueWithinLengthLimit.charAt(valueWithinLengthLimit.length() - 1))) {
-        String unicodeValue = "\\u"
-            + String.format("%04x", (int) valueWithinLengthLimit.charAt(valueWithinLengthLimit.length() - 1));
-        valueWithinLengthLimit =
-            valueWithinLengthLimit.substring(0, valueWithinLengthLimit.length() - 1) + unicodeValue;
+      if (Character.isWhitespace(escapedValue.charAt(escapedValue.length() - 1))) {
+        String unicodeValue =
+             String.format("\\u%04x", (int) escapedValue.charAt(escapedValue.length() - 1));
+        escapedValue =
+            escapedValue.substring(0, escapedValue.length() - 1) + unicodeValue;
       }
 
       // removing the ',' from the value if it's present.
-      if (valueWithinLengthLimit.contains(",")) {
-        valueWithinLengthLimit = valueWithinLengthLimit.replace(",", "\\,");
+      if (escapedValue.contains(",")) {
+        escapedValue = escapedValue.replace(",", "\\,");
       }
     }
-
-    return valueWithinLengthLimit;
+    return escapedValue;
   }
 
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {

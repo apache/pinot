@@ -215,7 +215,8 @@ public class SegmentColumnarIndexCreatorTest {
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", ",bar", "foo", FieldSpec.DataType.STRING);
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
-    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), ",bar");
+    Assert.assertEquals(
+        getEscapedValidPropertyValue(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE)))), ",bar");
 
     props = new PropertiesConfiguration();
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "  ", FieldSpec.DataType.STRING);
@@ -228,17 +229,19 @@ public class SegmentColumnarIndexCreatorTest {
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
     Assert.assertEquals(
-        StringEscapeUtils.unescapeJava(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE)))), "a\t");
+        getEscapedValidPropertyValue(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE)))), "a\t");
     Assert.assertEquals(
-        StringEscapeUtils.unescapeJava(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE)))), "\nb");
+        getEscapedValidPropertyValue((String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))))), "\nb");
 
     // test for values with 'v'.
     props = new PropertiesConfiguration();
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "aa,bb", "aa,bb,", FieldSpec.DataType.STRING);
     Assert.assertFalse(Boolean.parseBoolean(
         String.valueOf(props.getProperty(getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
-    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE))), "aa,bb");
-    Assert.assertEquals(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE))), "aa,bb,");
+    Assert.assertEquals(
+        getEscapedValidPropertyValue(String.valueOf(props.getProperty(getKeyFor("colA", MIN_VALUE)))), "aa,bb");
+    Assert.assertEquals(
+        getEscapedValidPropertyValue(String.valueOf(props.getProperty(getKeyFor("colA", MAX_VALUE)))), "aa,bb,");
 
     // test for value length grater than METADATA_PROPERTY_LENGTH_LIMIT
     props = new PropertiesConfiguration();
@@ -249,6 +252,16 @@ public class SegmentColumnarIndexCreatorTest {
     SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", stringMinValue,
         stringMaxValue, FieldSpec.DataType.STRING);
     compareLongValuesWithColumnMinMax(stringMinValue, stringMaxValue, props, FieldSpec.DataType.STRING);
+
+    // test for value length grater than METADATA_PROPERTY_LENGTH_LIMIT with random string having ascii characters.
+    props = new PropertiesConfiguration();
+    String stringAsciiMinValue = RandomStringUtils.
+        randomAlphanumeric(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
+    String stringAsciiMaxValue = RandomStringUtils.
+        randomAlphanumeric(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
+    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", stringAsciiMinValue,
+        stringAsciiMaxValue, FieldSpec.DataType.STRING);
+    compareLongValuesWithColumnMinMax(stringAsciiMinValue, stringAsciiMaxValue, props, FieldSpec.DataType.STRING);
 
     // long value test
     props = new PropertiesConfiguration();
@@ -301,7 +314,6 @@ public class SegmentColumnarIndexCreatorTest {
     PropertiesConfiguration props = new PropertiesConfiguration();
 
     // test for value length grater than METADATA_PROPERTY_LENGTH_LIMIT with last characters as '\uFFFF'
-    props = new PropertiesConfiguration();
     String stringMinValue = RandomStringUtils.
         randomAlphanumeric(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 3);
     String stringMaxValue = RandomStringUtils.
