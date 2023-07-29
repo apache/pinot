@@ -59,13 +59,15 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     int workerId = context.getServer().workerId();
     MailboxMetadata senderMailBoxMetadatas =
         context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(senderStageId);
-    Preconditions.checkState(senderMailBoxMetadatas != null && !senderMailBoxMetadatas.getMailBoxIdList().isEmpty(),
-        "Failed to find mailbox for stage: %s",
-        senderStageId);
-    _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, senderMailBoxMetadatas);
-    _mailboxes = _mailboxIds.stream()
-        .map(mailboxId -> _mailboxService.getReceivingMailbox(mailboxId))
-        .collect(Collectors.toCollection(ArrayDeque::new));
+    if (senderMailBoxMetadatas != null && !senderMailBoxMetadatas.getMailBoxIdList().isEmpty()) {
+      _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, senderMailBoxMetadatas);
+      _mailboxes = _mailboxIds.stream()
+          .map(mailboxId -> _mailboxService.getReceivingMailbox(mailboxId))
+          .collect(Collectors.toCollection(ArrayDeque::new));
+    } else {
+      _mailboxIds = Collections.emptyList();
+      _mailboxes = new ArrayDeque<>();
+    }
   }
 
   public List<String> getMailboxIds() {

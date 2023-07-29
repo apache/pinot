@@ -102,19 +102,6 @@ public class MailboxReceiveOperatorTest {
     _mocks.close();
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Failed to find mailbox.*")
-  public void shouldThrowSingletonNoMatchMailboxServer() {
-    VirtualServerAddress server1 = new VirtualServerAddress("localhost", 456, 0);
-    VirtualServerAddress server2 = new VirtualServerAddress("localhost", 789, 1);
-    StageMetadata stageMetadata = new StageMetadata.Builder().setWorkerMetadataList(
-        Stream.of(server1, server2).map(s -> new WorkerMetadata.Builder().setVirtualServerAddress(s).build())
-            .collect(Collectors.toList())).build();
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, RECEIVER_ADDRESS, Long.MAX_VALUE, stageMetadata);
-    //noinspection resource
-    new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1);
-  }
-
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*RANGE_DISTRIBUTED.*")
   public void shouldThrowRangeDistributionNotSupported() {
     OpChainExecutionContext context =
