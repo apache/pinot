@@ -574,14 +574,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       String maxValue, DataType dataType) {
     String validMinValue = getValidPropertyValue(minValue, false, dataType);
     properties.setProperty(getKeyFor(column, MIN_VALUE), validMinValue);
+    // setting the property for signifying that the min value is escaped.
+    if (validMinValue.compareTo(minValue) != 0) {
+      properties.setProperty(getKeyFor(column, IS_MIN_VALUE_ESCAPED), true);
+    }
 
     String validMaxValue = getValidPropertyValue(maxValue, true, dataType);
     properties.setProperty(getKeyFor(column, MAX_VALUE), validMaxValue);
-
-    // setting the property for signifying that the mon or max value is escaped.
-    if (validMinValue.compareTo(minValue) != 0
-        || validMaxValue.compareTo(maxValue) != 0) {
-      properties.setProperty(getKeyFor(column, IS_MIN_MAX_VALUE_ESCAPED), true);
+    // setting the property for signifying that the max value is escaped.
+    if (validMaxValue.compareTo(maxValue) != 0) {
+      properties.setProperty(getKeyFor(column, IS_MAX_VALUE_ESCAPED), true);
     }
   }
 

@@ -101,7 +101,8 @@ public class V1Constants {
       public static final String DEFAULT_NULL_VALUE = "defaultNullValue";
       public static final String MIN_VALUE = "minValue";
       public static final String MAX_VALUE = "maxValue";
-      public static final String IS_MIN_MAX_VALUE_ESCAPED = "isMinMaxValueEscaped";
+      public static final String IS_MIN_VALUE_ESCAPED = "isMinValueEscaped";
+      public static final String IS_MAX_VALUE_ESCAPED = "isMaxValueEscaped";
       public static final String MIN_MAX_VALUE_INVALID = "minMaxValueInvalid";
       public static final String PARTITION_FUNCTION = "partitionFunction";
       public static final String PARTITION_FUNCTION_CONFIG = "partitionFunctionConfig";
