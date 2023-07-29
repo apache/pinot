@@ -22,11 +22,14 @@ import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.service.QueryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,9 +57,10 @@ class DispatchClient {
 
   public void submit(Worker.QueryRequest request, int stageId, QueryServerInstance virtualServer, Deadline deadline) {
     try {
-      DispatchObserver dispatchObserver = new DispatchObserver(stageId, virtualServer);
+      CompletableFuture<Void> future = new CompletableFuture<>();
+      DispatchObserver dispatchObserver = new DispatchObserver(stageId, virtualServer, future);
       _dispatchStub.withDeadline(deadline).submit(request, dispatchObserver);
-      dispatchObserver.await(deadline.timeRemaining(TimeUnit.MILLISECONDS));
+      future.get(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
     } catch (Throwable t) {
       LOGGER.error("Query Dispatch failed!", t);
       Utils.rethrowException(t);
@@ -69,6 +73,43 @@ class DispatchClient {
       _dispatchStub.cancel(cancelRequest, NO_OP_CANCEL_STREAM_OBSERVER);
     } catch (Exception e) {
       LOGGER.error("Query Cancellation failed!", e);
+    }
+  }
+
+  private static class DispatchObserver implements StreamObserver<Worker.QueryResponse> {
+    private static final Void VOID = null;
+    private final int _stageId;
+    private final QueryServerInstance _virtualServer;
+    private final CompletableFuture<Void> _future;
+
+    DispatchObserver(int stageId, QueryServerInstance virtualServer, CompletableFuture<Void> future) {
+      _stageId = stageId;
+      _virtualServer = virtualServer;
+      _future = future;
+    }
+
+    @Override
+    public void onNext(Worker.QueryResponse queryResponse) {
+      if (queryResponse == null) {
+        _future.completeExceptionally(new TimeoutException(String.format("Unable to dispatch query plan at stage %s on"
+                + " server %s due to timeout.", _stageId, _virtualServer)));
+      } else if (queryResponse.containsMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR)) {
+        _future.completeExceptionally(new RuntimeException(String.format("Unable to dispatch query plan at stage %s on"
+                + " server %s: ERROR: %s", _stageId, _virtualServer,
+            queryResponse.getMetadataOrDefault(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR, "null"))));
+      } else {
+        _future.complete(VOID);
+      }
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      _future.completeExceptionally(t);
+    }
+
+    @Override
+    public void onCompleted() {
+      // do nothing.
     }
   }
 

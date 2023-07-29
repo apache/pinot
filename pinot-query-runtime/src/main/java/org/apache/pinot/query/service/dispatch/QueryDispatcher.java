@@ -32,7 +32,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -53,12 +52,10 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
-import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
@@ -276,10 +273,6 @@ public class QueryDispatcher {
       colTypes[i] = inputSchema.getColumnDataType(fields.get(i).left);
     }
     return new DataSchema(colNames, colTypes);
-  }
-
-  private static MailboxReceiveOperator createReduceStageOperator(OpChainExecutionContext context, int senderStageId) {
-    return new MailboxReceiveOperator(context, RelDistribution.Type.RANDOM_DISTRIBUTED, senderStageId);
   }
 
   public void shutdown() {
