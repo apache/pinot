@@ -36,7 +36,6 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.roaringbitmap.BatchIterator;
-import org.roaringbitmap.BitmapDataProvider;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
@@ -53,8 +52,9 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   private final PredicateEvaluator _predicateEvaluator;
   private final Map<String, DataSource> _dataSourceMap;
   private final int _endDocId;
-
   private final int[] _docIdBuffer = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+  private final boolean _nullHandlingEnabled;
+  private final PredicateEvaluationResult _predicateEvaluationResult;
 
   private int _blockEndDocId = 0;
   private PeekableIntIterator _docIdIterator;
@@ -64,11 +64,14 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   private long _numEntriesScanned = 0L;
 
   public ExpressionScanDocIdIterator(TransformFunction transformFunction, PredicateEvaluator predicateEvaluator,
-      Map<String, DataSource> dataSourceMap, int numDocs) {
+      Map<String, DataSource> dataSourceMap, int numDocs, boolean nullHandlingEnabled,
+      PredicateEvaluationResult predicateEvaluationResult) {
     _transformFunction = transformFunction;
     _predicateEvaluator = predicateEvaluator;
     _dataSourceMap = dataSourceMap;
     _endDocId = numDocs;
+    _nullHandlingEnabled = nullHandlingEnabled;
+    _predicateEvaluationResult = predicateEvaluationResult;
   }
 
   @Override
@@ -85,7 +88,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
       ProjectionBlock projectionBlock =
           new ProjectionOperator(_dataSourceMap, new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId))
               .nextBlock();
-      RoaringBitmap matchingDocIds = new RoaringBitmap();
+      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       processProjectionBlock(projectionBlock, matchingDocIds);
       if (!matchingDocIds.isEmpty()) {
         _docIdIterator = matchingDocIds.getIntIterator();
@@ -139,7 +142,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     return matchingDocIds;
   }
 
-  private void processProjectionBlock(ProjectionBlock projectionBlock, BitmapDataProvider matchingDocIds) {
+  private void processProjectionBlock(ProjectionBlock projectionBlock, MutableRoaringBitmap matchingDocIds) {
     int numDocs = projectionBlock.getNumDocs();
     TransformResultMetadata resultMetadata = _transformFunction.getResultMetadata();
     if (resultMetadata.isSingleValue()) {
@@ -212,8 +215,27 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
           default:
             throw new IllegalStateException();
         }
+        if (_nullHandlingEnabled) {
+          RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+          if (_predicateEvaluationResult == PredicateEvaluationResult.TRUE) {
+            if (nullBitmap != null) {
+              RoaringBitmap fullBitmap = new RoaringBitmap();
+              fullBitmap.add(0L, (long) numDocs);
+              nullBitmap.xor(fullBitmap);
+              matchingDocIds.and(nullBitmap.toMutableRoaringBitmap());
+            }
+          } else if (_predicateEvaluationResult == PredicateEvaluationResult.FALSE) {
+            MutableRoaringBitmap fullBitmap = new MutableRoaringBitmap();
+            fullBitmap.add(0L, (long) numDocs);
+            if (nullBitmap != null) {
+              matchingDocIds.or(nullBitmap.toMutableRoaringBitmap());
+            }
+            matchingDocIds.xor(fullBitmap);
+          }
+        }
       }
     } else {
+      // TODO(https://github.com/apache/pinot/issues/10882): support NULL for multi-value.
       if (resultMetadata.hasDictionary()) {
         int[][] dictIdsArray = _transformFunction.transformToDictIdsMV(projectionBlock);
         for (int i = 0; i < numDocs; i++) {
@@ -325,5 +347,9 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     public List<Operator> getChildOperators() {
       return Collections.emptyList();
     }
+  }
+
+  public enum PredicateEvaluationResult {
+    TRUE, FALSE
   }
 }

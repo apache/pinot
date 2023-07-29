@@ -628,4 +628,71 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
     assertArrayEquals(rows.get(0), new Object[]{true});
   }
+
+  @Test
+  public void testAdditionExpressionFilterOperator()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(Integer.MIN_VALUE);
+    insertRow(1);
+    insertRow(-1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT %s FROM testTable WHERE add(%s, 0) < 0", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 2);
+  }
+
+  @Test
+  public void testAdditionExpressionFilterOperatorInsideNotFilterOperator()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(Integer.MIN_VALUE);
+    insertRow(1);
+    insertRow(-1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT %s FROM testTable WHERE NOT(add(%s, 0) > 0)", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 2);
+  }
+
+  @Test
+  public void testGreatestExpressionFilterOperator()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    insertRowWithTwoColumns(Integer.MIN_VALUE, Integer.MIN_VALUE);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(-1, -1);
+    insertRowWithTwoColumns(-1, null);
+    insertRowWithTwoColumns(null, -1);
+    insertRowWithTwoColumns(1, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE GREATEST(%s, %s) < 0 LIMIT 100", COLUMN1, COLUMN2, COLUMN1,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 4);
+  }
 }
