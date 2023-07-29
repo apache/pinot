@@ -202,7 +202,7 @@ public class CalciteSqlParser {
     validateGroupByClause(pinotQuery);
     validateDistinctQuery(pinotQuery);
     if (pinotQuery.isSetFilterExpression()) {
-      validateFilters(pinotQuery.getFilterExpression());
+      validateFilter(pinotQuery.getFilterExpression());
     }
   }
 
@@ -270,24 +270,31 @@ public class CalciteSqlParser {
     }
   }
 
-  private static void validateFilters(Expression filterExpression) {
+  /*
+   * Throws an exception if the filter's rhs has NULL because:
+   * - Predicate evaluator and pruning do not have NULL support.
+   * - It is not meaningful to have NULL in the filter's rhs.
+   *   - For most of the filters (e.g. GREATER_THAN, LIKE), the rhs being NULL leads to no record matched.
+   *   - For IN, adding NULL to the rhs list does not change the matched records.
+   *   - For NOT IN, adding NULL to the rhs list leads to no record matched.
+   *   - For "= NULL" and "!= NULL", we have the IS_NULL and IS_NOT_NULL as workarounds.
+   */
+  private static void validateFilter(Expression filterExpression) {
     if (!filterExpression.isSetFunctionCall()) {
       return;
     }
-
     String operator = filterExpression.getFunctionCall().getOperator();
-    if (operator.equals("IN") || operator.equals("NOT_IN")) {
+    if (operator.equals(FilterKind.AND.name()) || operator.equals(FilterKind.OR.name()) || operator.equals(
+        FilterKind.NOT.name())) {
+      for (Expression filter : filterExpression.getFunctionCall().getOperands()) {
+        validateFilter(filter);
+      }
+    } else {
       List<Expression> operands = filterExpression.getFunctionCall().getOperands();
       for (int i = 1; i < operands.size(); i++) {
         if (operands.get(i).getLiteral().isSetNullValue()) {
-          throw new IllegalStateException("IN/NOT_IN filter cannot contain NULL");
+          throw new IllegalStateException(String.format("Using NULL in %s filter is not supported", operator));
         }
-      }
-    }
-
-    if (operator.equals("AND") || operator.equals("OR") || operator.equals("NOT")) {
-      for (Expression filter : filterExpression.getFunctionCall().getOperands()) {
-        validateFilters(filter);
       }
     }
   }
