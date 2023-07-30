@@ -205,6 +205,22 @@ public enum TransformFunctionType {
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC),
           ordinal -> ordinal > 1 && ordinal < 4)),
 
+  // Vector functions
+  // TODO: Once VECTOR type is defined, we should update here.
+  COSINE_DISTANCE("cosineDistance", ReturnTypes.explicit(SqlTypeName.DOUBLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC),
+          ordinal -> ordinal > 1 && ordinal < 4), "cosine_distance"),
+  INNER_PRODUCT("innerProduct", ReturnTypes.explicit(SqlTypeName.DOUBLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY)), "inner_product"),
+  L1_DISTANCE("l1Distance", ReturnTypes.explicit(SqlTypeName.DOUBLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY)), "l1_distance"),
+  L2_DISTANCE("l2Distance", ReturnTypes.explicit(SqlTypeName.DOUBLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY)), "l2_distance"),
+  VECTOR_DIMS("vectorDims", ReturnTypes.explicit(SqlTypeName.INTEGER),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY)), "vector_dims"),
+  VECTOR_NORM("vectorNorm", ReturnTypes.explicit(SqlTypeName.DOUBLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY)), "vector_norm"),
+
   // Trigonometry
   SIN("sin"),
   COS("cos"),
