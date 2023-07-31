@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -71,6 +72,7 @@ public abstract class BaseTransformFunctionTest {
   protected static final int NUM_ROWS = 1000;
   protected static final int MAX_NUM_MULTI_VALUES = 5;
   protected static final int MAX_MULTI_VALUE = 10;
+  protected static final int VECTOR_DIM_SIZE = 512;
   protected static final String INT_SV_COLUMN = "intSV";
   // INT_SV_NULL_COLUMN's even row equals to INT_SV_COLUMN. odd row is null.
   protected static final String INT_SV_NULL_COLUMN = "intSVNull";
@@ -82,6 +84,11 @@ public abstract class BaseTransformFunctionTest {
   protected static final String STRING_SV_NULL_COLUMN = "stringSVNull";
 
   protected static final String BYTES_SV_COLUMN = "bytesSV";
+
+  protected static final String VECTOR_1_COLUMN = "vector1";
+  protected static final String VECTOR_2_COLUMN = "vector2";
+  protected static final String ZERO_VECTOR_COLUMN = "zeroVector";
+
   protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
 
   protected static final String STRING_ALPHANUM_NULL_SV_COLUMN = "stringAlphaNumSVNull";
@@ -118,6 +125,8 @@ public abstract class BaseTransformFunctionTest {
   protected final String[][] _stringLongFormatMVValues = new String[NUM_ROWS][];
   protected final long[] _timeValues = new long[NUM_ROWS];
   protected final String[] _jsonValues = new String[NUM_ROWS];
+  protected final float[][] _vector1Values = new float[NUM_ROWS][];
+  protected final float[][] _vector2Values = new float[NUM_ROWS][];
 
   protected Map<String, DataSource> _dataSourceMap;
   protected ProjectionBlock _projectionBlock;
@@ -147,6 +156,8 @@ public abstract class BaseTransformFunctionTest {
       _stringMVValues[i] = new String[numValues];
       _stringAlphaNumericMVValues[i] = new String[numValues];
       _stringLongFormatMVValues[i] = new String[numValues];
+      _vector1Values[i] = new float[VECTOR_DIM_SIZE];
+      _vector2Values[i] = new float[VECTOR_DIM_SIZE];
 
       for (int j = 0; j < numValues; j++) {
         _intMVValues[i][j] = 1 + RANDOM.nextInt(MAX_MULTI_VALUE);
@@ -156,6 +167,11 @@ public abstract class BaseTransformFunctionTest {
         _stringMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextDouble());
         _stringAlphaNumericMVValues[i][j] = RandomStringUtils.randomAlphanumeric(26);
         _stringLongFormatMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextLong());
+      }
+
+      for (int j = 0; j < VECTOR_DIM_SIZE; j++) {
+        _vector1Values[i][j] = Math.abs(RandomUtils.nextFloat(0.0f, 1.0f));
+        _vector2Values[i][j] = Math.abs(RandomUtils.nextFloat(0.0f, 1.0f));
       }
 
       // Time in the past year
@@ -188,6 +204,7 @@ public abstract class BaseTransformFunctionTest {
         map.put(STRING_ALPHANUM_NULL_SV_COLUMN, _stringAlphaNumericSVValues[i]);
       }
       map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
+
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
       if (isNullRow(i)) {
         map.put(INT_MV_NULL_COLUMN, null);
@@ -196,6 +213,9 @@ public abstract class BaseTransformFunctionTest {
       }
       map.put(LONG_MV_COLUMN, ArrayUtils.toObject(_longMVValues[i]));
       map.put(FLOAT_MV_COLUMN, ArrayUtils.toObject(_floatMVValues[i]));
+      map.put(VECTOR_1_COLUMN, ArrayUtils.toObject(_vector1Values[i]));
+      map.put(VECTOR_2_COLUMN, ArrayUtils.toObject(_vector2Values[i]));
+      map.put(ZERO_VECTOR_COLUMN, ArrayUtils.toObject(new float[VECTOR_DIM_SIZE]));
       map.put(DOUBLE_MV_COLUMN, ArrayUtils.toObject(_doubleMVValues[i]));
       map.put(STRING_MV_COLUMN, _stringMVValues[i]);
       map.put(STRING_ALPHANUM_MV_COLUMN, _stringAlphaNumericMVValues[i]);
@@ -235,6 +255,9 @@ public abstract class BaseTransformFunctionTest {
         .addMultiValueDimension(STRING_MV_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(STRING_ALPHANUM_MV_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(STRING_LONG_MV_COLUMN, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(VECTOR_1_COLUMN, FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension(VECTOR_2_COLUMN, FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension(ZERO_VECTOR_COLUMN, FieldSpec.DataType.FLOAT)
         .addDateTime(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addDateTime(TIMESTAMP_COLUMN_NULL, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
@@ -401,9 +424,9 @@ public abstract class BaseTransformFunctionTest {
   protected void testTransformFunctionWithNull(TransformFunction transformFunction, double[] expectedValues,
       RoaringBitmap expectedNull) {
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
-    long[]longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
-    double[]doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     BigDecimal[] bigDecimalValues = null;
     try {
       // 1- Some transform functions cannot work with BigDecimal (e.g. exp, ln, and sqrt).
@@ -473,7 +496,7 @@ public abstract class BaseTransformFunctionTest {
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
-    BigDecimal[]bigDecimalValues =
+    BigDecimal[] bigDecimalValues =
         transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
 
     for (int i = 0; i < NUM_ROWS; i++) {

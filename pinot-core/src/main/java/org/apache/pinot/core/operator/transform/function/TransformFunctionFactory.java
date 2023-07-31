@@ -70,6 +70,12 @@ import org.apache.pinot.core.operator.transform.function.TrigonometricTransformF
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.SinhTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanhTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.CosineDistanceTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.InnerProductTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.L1DistanceTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.L2DistanceTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.VectorDimsTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.VectorNormTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -216,6 +222,14 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.TANH, TanhTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DEGREES, DegreesTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.RADIANS, RadiansTransformFunction.class);
+
+    // Vector functions
+    typeToImplementation.put(TransformFunctionType.COSINE_DISTANCE, CosineDistanceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.INNER_PRODUCT, InnerProductTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.L1_DISTANCE, L1DistanceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.L2_DISTANCE, L2DistanceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VECTOR_DIMS, VectorDimsTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VECTOR_NORM, VectorNormTransformFunction.class);
 
     Map<String, Class<? extends TransformFunction>> registry = new HashMap<>(typeToImplementation.size());
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {
