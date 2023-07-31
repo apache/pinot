@@ -64,14 +64,11 @@ jdk_version() {
 JAVA_VER="$(jdk_version)"
 
 # Build
+echo "Building Pinot to JAVA 11 source code Using JDK ${JAVA_VER}"
 PASS=0
 for i in $(seq 1 2)
 do
-  if [ "$JAVA_VER" -gt 11 ] ; then
-    mvn clean install -B -Dmaven.test.skip=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
-  else
-    mvn clean install -B -Dmaven.test.skip=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=${JAVA_VER}
-  fi
+  mvn clean install -B -T1C -Dmaven.test.skip=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
   if [ $? -eq 0 ]; then
     PASS=1
     break;
