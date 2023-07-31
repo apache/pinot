@@ -138,14 +138,22 @@ public final class TableConfigUtils {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
-    // Only allow realtime tables with non-null stream.type and LLC consumer.type
-    if (tableConfig.getTableType() == TableType.REALTIME) {
-      validateStreamConfigs(IngestionConfigUtils.getStreamConfigMap(tableConfig));
-    }
-
     // skip all validation if skip type ALL is selected.
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateValidationConfig(tableConfig, schema);
+
+      StreamConfig streamConfig = null;
+      // Only allow realtime tables with non-null stream.type and LLC consumer.type
+      if (tableConfig.getTableType() == TableType.REALTIME) {
+        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+        try {
+          // Validate that StreamConfig can be created
+          streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
+        } catch (Exception e) {
+          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
+        }
+        validateDecoder(streamConfig);
+      }
       validateIngestionConfig(tableConfig, schema, disableGroovy);
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
@@ -160,21 +168,6 @@ public final class TableConfigUtils {
         validateTaskConfigs(tableConfig, schema);
       }
     }
-  }
-
-  public static void validateStreamConfigs(Map<String, String> streamConfigsMap) {
-    String streamType = streamConfigsMap.get(StreamConfigProperties.STREAM_TYPE);
-    Preconditions.checkNotNull(streamType, "stream.type cannot be null for REALTIME table");
-    Preconditions.checkState(isValidConsumerType(streamType, streamConfigsMap),
-        "Realtime tables with HLC consumer (consumer.type=highlevel) is no longer supported in Apache Pinot");
-  }
-
-  public static boolean isValidConsumerType(String streamType, Map<String, String> streamConfigsMap) {
-    String streamConsumerType = streamConfigsMap.getOrDefault(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        StreamConfig.ConsumerType.LOWLEVEL.name());
-    return StreamConfig.ConsumerType.LOWLEVEL.name().equalsIgnoreCase(streamConsumerType)
-        || "simple".equalsIgnoreCase(streamConsumerType);
   }
 
   private static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
@@ -330,21 +323,13 @@ public final class TableConfigUtils {
       }
 
       // Stream
+      // stream config map can either be in ingestion config or indexing config. cannot be in both places
       if (ingestionConfig.getStreamIngestionConfig() != null) {
         IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
         Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
             "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
         List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
         Preconditions.checkState(streamConfigMaps.size() == 1, "Only 1 stream is supported in REALTIME table");
-
-        StreamConfig streamConfig;
-        try {
-          // Validate that StreamConfig can be created
-          streamConfig = new StreamConfig(tableNameWithType, streamConfigMaps.get(0));
-        } catch (Exception e) {
-          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
-        }
-        validateDecoder(streamConfig);
       }
 
       // Filter config
@@ -651,11 +636,6 @@ public final class TableConfigUtils {
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
-    // consumer type must be low-level
-    Map<String, String> streamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
-    StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigsMap);
-    Preconditions.checkState(streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType(),
-        "Upsert/Dedup table must use low-level streaming consumer type");
     // replica group is configured for routing
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
