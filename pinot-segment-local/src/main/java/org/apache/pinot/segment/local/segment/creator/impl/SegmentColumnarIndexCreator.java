@@ -66,6 +66,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
@@ -564,9 +565,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     String defaultNullValue = columnIndexCreationInfo.getDefaultNullValue().toString();
-    if (isValidPropertyValue(defaultNullValue)) {
-      properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+    if (dataType.getStoredType() == DataType.STRING) {
+      // NOTE: Do not limit length of default null value because we need exact value to determine whether the default
+      //       null value changes
+      defaultNullValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(defaultNullValue);
     }
+    properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
   }
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
@@ -576,96 +580,27 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   /**
-   * Helper method to check whether the given value is a valid property value.
-   * <p>Value is invalid iff:
-   * <ul>
-   *   <li>It contains more than 512 characters</li>
-   *   <li>It contains leading/trailing whitespace</li>
-   *   <li>It contains list separator (',')</li>
-   * </ul>
-   */
-  @VisibleForTesting
-  static boolean isValidPropertyValue(String value) {
-    int length = value.length();
-    if (length == 0) {
-      return true;
-    }
-    if (length > METADATA_PROPERTY_LENGTH_LIMIT) {
-      return false;
-    }
-    if (Character.isWhitespace(value.charAt(0)) || Character.isWhitespace(value.charAt(length - 1))) {
-      return false;
-    }
-    return value.indexOf(',') == -1;
-  }
-
-  /**
    * Helper method to get the valid value for setting min/max.
    */
-  @VisibleForTesting
-  static String getValidPropertyValue(String value, boolean isMax, DataType dataType) {
+  private static String getValidPropertyValue(String value, boolean isMax, DataType dataType) {
     String valueWithinLengthLimit = getValueWithinLengthLimit(value, isMax, dataType);
-    int length = valueWithinLengthLimit.length();
-
-    if (length > 0) {
-      // check and replace first character if it's a white space
-      if (Character.isWhitespace(valueWithinLengthLimit.charAt(0))) {
-        String unicodeValue = "\\u" + String.format("%04x", (int) valueWithinLengthLimit.charAt(0));
-        valueWithinLengthLimit = unicodeValue + valueWithinLengthLimit.substring(1);
-      }
-
-      // check and replace last character if it's a white space
-      if (Character.isWhitespace(valueWithinLengthLimit.charAt(valueWithinLengthLimit.length() - 1))) {
-        String unicodeValue = "\\u"
-            + String.format("%04x", (int) valueWithinLengthLimit.charAt(valueWithinLengthLimit.length() - 1));
-        valueWithinLengthLimit =
-            valueWithinLengthLimit.substring(0, valueWithinLengthLimit.length() - 1) + unicodeValue;
-      }
-
-      // removing the ',' from the value if it's present.
-      if (valueWithinLengthLimit.contains(",")) {
-        valueWithinLengthLimit = valueWithinLengthLimit.replace(",", "\\,");
-      }
-    }
-
-    return valueWithinLengthLimit;
-  }
-
-  public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
-    properties.subset(COLUMN_PROPS_KEY_PREFIX + column).clear();
-  }
-
-  @Override
-  public void close()
-      throws IOException {
-    List<IndexCreator> creators = _creatorsByColAndIndex.values().stream()
-        .flatMap(map -> map.values().stream())
-        .collect(Collectors.toList());
-    creators.addAll(_nullValueVectorCreatorMap.values());
-    creators.addAll(_dictionaryCreatorMap.values());
-    FileUtils.close(creators);
+    return dataType.getStoredType() == DataType.STRING
+        ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(valueWithinLengthLimit)
+        : valueWithinLengthLimit;
   }
 
   /**
-   * Returns the original string if its length is within the allowed limit.
-   * If the string's length exceeds the limit,
-   * it returns a truncated version of the string with maintaining min or max value.
-   *
+   * Returns the original string if its length is within the allowed limit. If the string's length exceeds the limit,
+   * returns a truncated version of the string with maintaining min or max value.
    */
   @VisibleForTesting
   static String getValueWithinLengthLimit(String value, boolean isMax, DataType dataType) {
     int length = value.length();
-
-    // if length is less, no need of trimming the value.
     if (length <= METADATA_PROPERTY_LENGTH_LIMIT) {
       return value;
     }
-
-    String alteredValue;
-    // For Numeric Data Type(INT, LONG, DOUBLE, FLOAT) value longer than METADATA_PROPERTY_LENGTH_LIMIT is not possible.
-    switch (dataType) {
+    switch (dataType.getStoredType()) {
       case STRING:
-      case JSON:
         if (isMax) {
           int trimIndexValue = METADATA_PROPERTY_LENGTH_LIMIT - 1;
           // determining the index for the character having value less than '\uFFFF'
@@ -673,15 +608,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             trimIndexValue++;
           }
           if (trimIndexValue == length) {
-            alteredValue = value;
+            return value;
           } else {
             // assigning the '\uFFFF' to make the value max.
-            alteredValue = value.substring(0, trimIndexValue) + '\uFFFF';
+            return value.substring(0, trimIndexValue) + '\uFFFF';
           }
         } else {
-          alteredValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
+          return value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
         }
-        break;
       case BYTES:
         if (isMax) {
           byte[] valueInByteArray = BytesUtils.toBytes(value);
@@ -691,20 +625,31 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             trimIndexValue++;
           }
           if (trimIndexValue == valueInByteArray.length) {
-            alteredValue = value;
+            return value;
           } else {
             byte[] shortByteValue = Arrays.copyOf(valueInByteArray, trimIndexValue + 1);
             shortByteValue[trimIndexValue] = (byte) 0xFF; // assigning the 0xFF to make the value max.
-            alteredValue = BytesUtils.toHexString(shortByteValue);
+            return BytesUtils.toHexString(shortByteValue);
           }
         } else {
-          alteredValue = BytesUtils.toHexString(
-              Arrays.copyOf(BytesUtils.toBytes(value), (METADATA_PROPERTY_LENGTH_LIMIT / 2)));
+          return BytesUtils.toHexString(Arrays.copyOf(BytesUtils.toBytes(value), (METADATA_PROPERTY_LENGTH_LIMIT / 2)));
         }
-        break;
       default:
         throw new IllegalStateException("Unsupported data type for property value length reduction: " + dataType);
     }
-    return alteredValue;
+  }
+
+  public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
+    properties.subset(COLUMN_PROPS_KEY_PREFIX + column).clear();
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    List<IndexCreator> creators =
+        _creatorsByColAndIndex.values().stream().flatMap(map -> map.values().stream()).collect(Collectors.toList());
+    creators.addAll(_nullValueVectorCreatorMap.values());
+    creators.addAll(_dictionaryCreatorMap.values());
+    FileUtils.close(creators);
   }
 }
