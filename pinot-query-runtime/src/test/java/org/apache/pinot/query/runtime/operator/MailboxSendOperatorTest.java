@@ -29,6 +29,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.OpChainExecutor;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
@@ -64,6 +65,7 @@ public class MailboxSendOperatorTest {
   @Mock
   private BlockExchange _exchange;
   private OpChainExecutor _executor;
+  private OpChainSchedulerService _scheduler;
 
   @BeforeMethod
   public void setUp()
@@ -74,6 +76,7 @@ public class MailboxSendOperatorTest {
     when(_server.workerId()).thenReturn(0);
     when(_exchange.offerBlock(any(), anyLong())).thenReturn(true);
     _executor = new OpChainExecutor(new NamedThreadFactory("worker_on_" + getClass().getSimpleName()));
+    _scheduler = new OpChainSchedulerService(_executor);
   }
 
   @AfterMethod
@@ -183,7 +186,7 @@ public class MailboxSendOperatorTest {
             new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE,
-            stageMetadata, null, false, _executor);
+            stageMetadata, null, false, _executor, _scheduler);
     return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }

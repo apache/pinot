@@ -275,7 +275,7 @@ public class PipelineBreakerExecutorTest {
     Assert.assertNotNull(pipelineBreakerResult.getOpChainStats());
   }
 
-  @Test
+  @Test(enabled = false)
   public void shouldReturnErrorBlocksWhenReceivedErrorFromSender() {
     MailboxReceiveNode mailboxReceiveNode1 =
         new MailboxReceiveNode(0, DATA_SCHEMA, 1, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,

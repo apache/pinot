@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import com.google.common.base.Preconditions;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -52,20 +51,10 @@ public class ReceivingMailbox {
   // TODO: Revisit if this is the correct way to apply back pressure
   private final BlockingQueue<TransferableBlock> _blocks = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
   private final AtomicReference<TransferableBlock> _errorBlock = new AtomicReference<>();
-  @Nullable
-  private volatile Reader _reader;
 
   public ReceivingMailbox(String id, Consumer<OpChainId> receiveMailCallback) {
     _id = id;
     _receiveMailCallback = receiveMailCallback;
-  }
-
-  public void registeredReader(Reader reader) {
-    if (_reader != null) {
-      throw new IllegalArgumentException("Only one reader is supported");
-    }
-    LOGGER.debug("==[MAILBOX]== Reader registered for mailbox {}", _id);
-    _reader = reader;
   }
 
   public String getId() {
@@ -98,7 +87,6 @@ public class ReceivingMailbox {
             LOGGER.debug("==[MAILBOX]== Block " + block + " ready to read from mailbox: " + _id);
           }
           _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
-          notifyReader();
           return true;
         } else {
           LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
@@ -125,7 +113,6 @@ public class ReceivingMailbox {
     if (_errorBlock.compareAndSet(null, errorBlock)) {
       _blocks.clear();
       _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
-      notifyReader();
     }
   }
 
@@ -135,7 +122,6 @@ public class ReceivingMailbox {
    */
   @Nullable
   public TransferableBlock poll() {
-    Preconditions.checkState(_reader != null, "A reader must be registere");
     TransferableBlock errorBlock = _errorBlock.get();
     return errorBlock != null ? errorBlock : _blocks.poll();
   }
@@ -153,19 +139,5 @@ public class ReceivingMailbox {
 
   public int getNumPendingBlocks() {
     return _blocks.size();
-  }
-
-  private void notifyReader() {
-    Reader reader = _reader;
-    if (reader != null) {
-      LOGGER.debug("Notifying reader");
-      reader.blockReadyToRead();
-    } else {
-      LOGGER.debug("No reader to notify");
-    }
-  }
-
-  public interface Reader {
-    void blockReadyToRead();
   }
 }

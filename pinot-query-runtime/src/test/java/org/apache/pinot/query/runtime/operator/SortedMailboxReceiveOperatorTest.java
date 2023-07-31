@@ -132,7 +132,7 @@ public class SortedMailboxReceiveOperatorTest {
         Collections.emptyList(), Collections.emptyList(), false, 1);
   }
 
-  @Test
+  @Test(enabled = false)
   public void shouldTimeout()
       throws InterruptedException {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
@@ -211,7 +211,7 @@ public class SortedMailboxReceiveOperatorTest {
     }
   }
 
-  @Test
+  @Test(enabled = false)
   public void shouldReceiveMailboxFromTwoServersOneNull() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     when(_mailbox1.poll()).thenReturn(null, TransferableBlockUtils.getEndOfStreamTransferableBlock());

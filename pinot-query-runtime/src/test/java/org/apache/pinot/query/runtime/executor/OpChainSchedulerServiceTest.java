@@ -45,11 +45,13 @@ public class OpChainSchedulerServiceTest {
   private AutoCloseable _mocks;
 
   private MultiStageOperator _operatorA;
+  private OpChainSchedulerService _scheduler;
 
   @BeforeClass
   public void beforeClass() {
     _mocks = MockitoAnnotations.openMocks(this);
     _executor = new OpChainExecutor(new NamedThreadFactory("worker_on_" + getClass().getSimpleName()));
+    _scheduler = new OpChainSchedulerService(_executor);
   }
 
   @AfterClass
@@ -68,7 +70,7 @@ public class OpChainSchedulerServiceTest {
   private OpChain getChain(MultiStageOperator operator) {
     VirtualServerAddress address = new VirtualServerAddress("localhost", 1234, 1);
     OpChainExecutionContext context = new OpChainExecutionContext(null, 123L, 1, address, 0, null, null, true,
-        _executor);
+        _executor, _scheduler);
     return new OpChain(context, operator, ImmutableList.of());
   }
 

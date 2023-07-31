@@ -95,7 +95,7 @@ public class QueryRunner {
       //TODO: make this configurable
       _opChainExecutor = new OpChainExecutor(new NamedThreadFactory("op_chain_worker_on_" + _port + "_port"));
       _scheduler = new OpChainSchedulerService(getQueryWorkerIntermExecutorService());
-      _mailboxService = new MailboxService(_hostname, _port, config);
+      _mailboxService = new MailboxService(_hostname, _port, config, _scheduler::setDataAvailable);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
     } catch (Exception e) {
@@ -180,7 +180,7 @@ public class QueryRunner {
     OpChainExecutionContext opChainContext = new OpChainExecutionContext(_mailboxService, requestId,
         stageRoot.getPlanFragmentId(), distributedStagePlan.getServer(), deadlineMs,
         distributedStagePlan.getStageMetadata(), pipelineBreakerResult, isTraceEnabled,
-        getQueryWorkerIntermExecutorService());
+        getQueryWorkerIntermExecutorService(), _scheduler);
     return PhysicalPlanVisitor.walkPlanNode(stageRoot,
         new PhysicalPlanContext(opChainContext, pipelineBreakerResult));
   }
@@ -191,7 +191,7 @@ public class QueryRunner {
     OpChainExecutionContext opChainContext = new OpChainExecutionContext(_mailboxService, requestId,
         distributedStagePlan.getStageId(), distributedStagePlan.getServer(), deadlineMs,
         distributedStagePlan.getStageMetadata(), pipelineBreakerResult, isTraceEnabled,
-        getQueryWorkerIntermExecutorService());
+        getQueryWorkerIntermExecutorService(), _scheduler);
     PhysicalPlanContext planContext = new PhysicalPlanContext(opChainContext, pipelineBreakerResult);
     List<ServerPlanRequestContext> serverPlanRequestContexts = ServerPlanRequestUtils.constructServerQueryRequests(
         planContext, distributedStagePlan, requestMetadataMap, _helixPropertyStore);
@@ -202,7 +202,7 @@ public class QueryRunner {
     }
     MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
     OpChainExecutionContext opChainExecutionContext = new OpChainExecutionContext(
-        planContext, getQueryWorkerIntermExecutorService());
+        planContext, getQueryWorkerIntermExecutorService(), _scheduler);
     MultiStageOperator leafStageOperator =
         new LeafStageTransferableBlockOperator(opChainExecutionContext, this::processServerQueryRequest,
             serverQueryRequests, sendNode.getDataSchema());

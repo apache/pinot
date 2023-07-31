@@ -19,9 +19,12 @@
 package org.apache.pinot.query.runtime.executor;
 
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.MetadataBlock;
@@ -38,10 +41,12 @@ public class OpChainSchedulerService implements SchedulerService {
 
   private final ExecutorService _executorService;
   private final ConcurrentHashMap<OpChainId, Future<?>> _submittedOpChainMap;
+  private final ConcurrentHashMap<OpChainId, OpChainStatus> _opChainStatusMap;
 
   public OpChainSchedulerService(ExecutorService executorService) {
     _executorService = executorService;
     _submittedOpChainMap = new ConcurrentHashMap<>();
+    _opChainStatusMap = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -112,5 +117,36 @@ public class OpChainSchedulerService implements SchedulerService {
 
   private void cancelOpChain(OpChain opChain, @Nullable Throwable t) {
     opChain.cancel(t);
+  }
+
+  @Override
+  public void awaitDataAvailable(OpChainId opChainId, long timeoutMs) {
+    OpChainStatus status = _opChainStatusMap.computeIfAbsent(opChainId, k -> new OpChainStatus());
+    status.awaitStatus(timeoutMs);
+  }
+
+  @Override
+  public void setDataAvailable(OpChainId opChainId) {
+    OpChainStatus status = _opChainStatusMap.computeIfAbsent(opChainId, k -> new OpChainStatus());
+    status.setDataAvailable();
+  }
+
+  private static class OpChainStatus {
+    private final BlockingQueue<Boolean> _queue = new ArrayBlockingQueue<>(1);
+    OpChainStatus() {
+    }
+
+    public void setDataAvailable() {
+      _queue.offer(true);
+    }
+
+    public boolean awaitStatus(long timeoutMs) {
+      try {
+        Boolean result = _queue.poll(timeoutMs, TimeUnit.MILLISECONDS);
+        return result != null;
+      } catch (InterruptedException e) {
+        return false;
+      }
+    }
   }
 }

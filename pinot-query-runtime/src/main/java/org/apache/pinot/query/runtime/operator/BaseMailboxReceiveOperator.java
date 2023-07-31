@@ -19,18 +19,16 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
-import org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -47,7 +45,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
-  private final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
+  protected final Deque<ReceivingMailbox> _mailboxes;
 
   public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       int senderStageId) {
@@ -63,18 +61,13 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(senderStageId);
     if (senderMailBoxMetadatas != null && !senderMailBoxMetadatas.getMailBoxIdList().isEmpty()) {
       _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, senderMailBoxMetadatas);
+      _mailboxes = _mailboxIds.stream()
+          .map(mailboxId -> _mailboxService.getReceivingMailbox(mailboxId))
+          .collect(Collectors.toCollection(ArrayDeque::new));
     } else {
       _mailboxIds = Collections.emptyList();
+      _mailboxes = new ArrayDeque<>();
     }
-    List<ReadMailboxAsyncStream> asyncStreams = _mailboxIds.stream()
-        .map(mailboxId -> new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this))
-        .collect(Collectors.toList());
-    _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(
-        context.getId(), context.getDeadlineMs(), asyncStreams);
-  }
-
-  protected BlockingMultiStreamConsumer.OfTransferableBlock getMultiConsumer() {
-    return _multiConsumer;
   }
 
   public List<String> getMailboxIds() {
@@ -89,48 +82,19 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   @Override
   public void close() {
     super.close();
-    _multiConsumer.close();
+    cancelRemainingMailboxes();
   }
 
   @Override
   public void cancel(Throwable t) {
     super.cancel(t);
-    _multiConsumer.cancel(t);
+    cancelRemainingMailboxes();
   }
 
-  private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
-    private final ReceivingMailbox _mailbox;
-    private final BaseMailboxReceiveOperator _operator;
-
-    public ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator operator) {
-      _mailbox = mailbox;
-      _operator = operator;
-    }
-
-    @Override
-    public Object getId() {
-      return _mailbox.getId();
-    }
-
-    @Nullable
-    @Override
-    public TransferableBlock poll() {
-      TransferableBlock block = _mailbox.poll();
-      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
-        _operator._mailboxService.releaseReceivingMailbox(_mailbox);
-        _operator._opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
-      }
-      return block;
-    }
-
-    @Override
-    public void addOnNewDataListener(OnNewData onNewData) {
-      _mailbox.registeredReader(onNewData::newDataAvailable);
-    }
-
-    @Override
-    public void cancel() {
-      _mailbox.cancel();
+  protected void cancelRemainingMailboxes() {
+    ReceivingMailbox mailbox;
+    while ((mailbox = _mailboxes.poll()) != null) {
+      mailbox.cancel();
     }
   }
 }

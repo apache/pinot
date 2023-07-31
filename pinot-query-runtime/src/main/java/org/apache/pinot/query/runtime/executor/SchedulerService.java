@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.executor;
 
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
 public interface SchedulerService {
@@ -26,4 +27,8 @@ public interface SchedulerService {
   void register(OpChain operatorChain);
 
   void cancel(long requestId);
+
+  void awaitDataAvailable(OpChainId opChainId, long timeoutMs);
+
+  void setDataAvailable(OpChainId opChainId);
 }

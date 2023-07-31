@@ -23,6 +23,7 @@ import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.executor.SchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
@@ -44,11 +45,13 @@ public class OpChainExecutionContext {
   private final OpChainStats _stats;
   private final boolean _traceEnabled;
   private final Executor _executor;
+  private final SchedulerService _schedulerService;
 
   @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
       VirtualServerAddress server, long deadlineMs, StageMetadata stageMetadata,
-      PipelineBreakerResult pipelineBreakerResult, boolean traceEnabled, Executor executor) {
+      PipelineBreakerResult pipelineBreakerResult, boolean traceEnabled, Executor executor,
+      SchedulerService schedulerService) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
@@ -56,6 +59,7 @@ public class OpChainExecutionContext {
     _deadlineMs = deadlineMs;
     _stageMetadata = stageMetadata;
     _executor = executor;
+    _schedulerService = schedulerService;
     _id = new OpChainId(requestId, server.workerId(), stageId);
     _stats = new OpChainStats(_id.toString());
     if (pipelineBreakerResult != null && pipelineBreakerResult.getOpChainStats() != null) {
@@ -65,10 +69,12 @@ public class OpChainExecutionContext {
     _traceEnabled = traceEnabled;
   }
 
-  public OpChainExecutionContext(PhysicalPlanContext physicalPlanContext, Executor executor) {
+  public OpChainExecutionContext(PhysicalPlanContext physicalPlanContext, Executor executor,
+      SchedulerService schedulerService) {
     this(physicalPlanContext.getMailboxService(), physicalPlanContext.getRequestId(), physicalPlanContext.getStageId(),
         physicalPlanContext.getServer(), physicalPlanContext.getDeadlineMs(), physicalPlanContext.getStageMetadata(),
-        physicalPlanContext.getPipelineBreakerResult(), physicalPlanContext.isTraceEnabled(), executor);
+        physicalPlanContext.getPipelineBreakerResult(), physicalPlanContext.isTraceEnabled(), executor,
+        schedulerService);
   }
 
   public MailboxService getMailboxService() {
@@ -118,5 +124,9 @@ public class OpChainExecutionContext {
    */
   public Executor getExecutor() {
     return _executor;
+  }
+
+  public void yield() {
+    _schedulerService.awaitDataAvailable(_id, _deadlineMs - System.currentTimeMillis());
   }
 }

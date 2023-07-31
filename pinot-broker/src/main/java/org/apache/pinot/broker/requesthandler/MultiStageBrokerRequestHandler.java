@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -116,14 +115,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
         QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
-    _reducerScheduler = new OpChainSchedulerService(
-        Executors.newCachedThreadPool(new NamedThreadFactory("query_broker_reducer_" + _reducerPort + "_port")));
-    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config);
+    //TODO: make this configurable
+    _opChainExecutor = new OpChainExecutor(new NamedThreadFactory("op_chain_worker_on_" + _reducerPort + "_port"));
+    _reducerScheduler = new OpChainSchedulerService(_opChainExecutor);
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, _reducerScheduler::setDataAvailable);
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
-    //TODO: make this configurable
-    _opChainExecutor = new OpChainExecutor(new NamedThreadFactory("op_chain_worker_on_" + _reducerPort + "_port"));
   }
 
   @Override

@@ -79,7 +79,7 @@ public class PipelineBreakerExecutor {
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainContext = new OpChainExecutionContext(mailboxService, requestId,
             stageRoot.getPlanFragmentId(), distributedStagePlan.getServer(), deadlineMs,
-            distributedStagePlan.getStageMetadata(), null, isTraceEnabled, executor);
+            distributedStagePlan.getStageMetadata(), null, isTraceEnabled, executor, scheduler);
         PhysicalPlanContext physicalPlanContext = new PhysicalPlanContext(opChainContext, null);
         return PipelineBreakerExecutor.execute(scheduler, pipelineBreakerContext, physicalPlanContext);
       } catch (Exception e) {
