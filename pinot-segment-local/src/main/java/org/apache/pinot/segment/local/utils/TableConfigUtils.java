@@ -143,6 +143,7 @@ public final class TableConfigUtils {
       validateValidationConfig(tableConfig, schema);
 
       StreamConfig streamConfig = null;
+      validateIngestionConfig(tableConfig, schema, disableGroovy);
       // Only allow realtime tables with non-null stream.type and LLC consumer.type
       if (tableConfig.getTableType() == TableType.REALTIME) {
         Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
@@ -154,7 +155,6 @@ public final class TableConfigUtils {
         }
         validateDecoder(streamConfig);
       }
-      validateIngestionConfig(tableConfig, schema, disableGroovy);
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
       validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);

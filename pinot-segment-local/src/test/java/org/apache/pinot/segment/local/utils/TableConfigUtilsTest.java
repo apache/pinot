@@ -134,7 +134,7 @@ public class TableConfigUtilsTest {
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME)
-            .setStreamConfigs(Map.of(StreamConfigProperties.STREAM_TYPE, "foo"))
+            .setStreamConfigs(getStreamConfigs())
             .setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
     TableConfigUtils.validate(tableConfig, schema);
 
@@ -616,14 +616,6 @@ public class TableConfigUtilsTest {
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigs)));
     TableConfigUtils.validateIngestionConfig(tableConfig, null);
 
-    streamConfigs.remove(StreamConfigProperties.STREAM_TYPE);
-    try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, null);
-      Assert.fail("Should fail for invalid stream configs map");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
     // validate the proto decoder
     streamConfigs = getStreamConfigs();
     streamConfigs.put("stream.kafka.decoder.class.name",
@@ -731,7 +723,7 @@ public class TableConfigUtilsTest {
 
     //realtime table
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setStreamConfigs(Map.of(StreamConfigProperties.STREAM_TYPE, "fakestream"))
+        .setStreamConfigs(getStreamConfigs())
         .setTierConfigList(Lists.newArrayList(
             new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
                 TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE", null, null),
@@ -1468,16 +1460,6 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "Upsert/Dedup table must use low-level streaming consumer type");
-    }
-
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).setStreamConfigs(streamConfigs).build();
-    try {
-      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
           "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
     }
@@ -1530,25 +1512,7 @@ public class TableConfigUtilsTest {
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
-    try {
-      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(),
-          "Could not find streamConfigs for REALTIME table: " + TABLE_NAME + "_REALTIME");
-    }
-
     Map<String, String> streamConfigs = getStreamConfigs();
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setUpsertConfig(upsertConfig)
-        .setStreamConfigs(streamConfigs).build();
-    try {
-      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "Upsert/Dedup table must use low-level streaming consumer type");
-    }
-
-    streamConfigs.put("stream.kafka.consumer.type", "simple");
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setUpsertConfig(upsertConfig)
         .setStreamConfigs(streamConfigs).build();
     try {
@@ -1780,9 +1744,8 @@ public class TableConfigUtilsTest {
 
     // invalid Upsert config with RealtimeToOfflineTask
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(
-            Map.of(StreamConfigProperties.STREAM_TYPE, "fake")).setTaskConfig(new TableTaskConfig(
-            ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(getStreamConfigs())
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
                 "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
     try {
       TableConfigUtils.validateTaskConfigs(tableConfig, schema);
@@ -2073,7 +2036,7 @@ public class TableConfigUtilsTest {
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "highLevel");
+    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
