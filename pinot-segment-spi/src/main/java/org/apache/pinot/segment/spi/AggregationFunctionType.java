@@ -85,7 +85,9 @@ public enum AggregationFunctionType {
       ReturnTypes.explicit(SqlTypeName.OTHER)),
   // TODO: support bitmap and segment partition in V2
   DISTINCTCOUNTBITMAP("distinctCountBitmap"),
-  SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount"),
+  SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount", null, SqlKind.OTHER_FUNCTION,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.ANY, ReturnTypes.BIGINT,
+      ReturnTypes.BIGINT),
   DISTINCTCOUNTHLL("distinctCountHLL", ImmutableList.of("DISTINCT_COUNT_HLL"), SqlKind.OTHER_FUNCTION,
       SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC), ordinal -> ordinal > 0),
