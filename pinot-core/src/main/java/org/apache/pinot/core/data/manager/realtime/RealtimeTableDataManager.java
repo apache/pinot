@@ -390,6 +390,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       return;
     }
 
+    // Assign table directory to not let the segment be moved during loading/preprocessing
+    indexLoadingConfig.setTableDataDir(_tableDataDir);
+
     File segmentDir = new File(_indexDir, segmentName);
     // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
     // segment backup directory existed), need to first try to recover from reload failure before checking the existence

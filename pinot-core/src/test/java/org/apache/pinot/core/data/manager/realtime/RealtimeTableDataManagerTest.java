@@ -158,6 +158,60 @@ public class RealtimeTableDataManagerTest {
   }
 
   @Test
+  public void testAddSegmentDefaultTierByTierBasedDirLoader()
+      throws Exception {
+    RealtimeTableDataManager tmgr1 = new RealtimeTableDataManager(null);
+    TableDataManagerConfig tableDataManagerConfig = createTableDataManagerConfig();
+    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    TableConfig tableConfig = setupTableConfig(propertyStore);
+    Schema schema = setupSchema(propertyStore);
+    tmgr1.init(tableDataManagerConfig, "server01", propertyStore,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
+        new TableDataManagerParams(0, false, -1));
+
+    // Create a raw segment and put it in deep store backed by local fs.
+    String segName = "seg_tiered_01";
+    SegmentZKMetadata segmentZKMetadata =
+        TableDataManagerTestUtils.makeRawSegment(segName, createSegment(tableConfig, schema, segName),
+            new File(TEMP_DIR, segName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION), true);
+    segmentZKMetadata.setStatus(Status.DONE);
+
+    // Local segment dir doesn't exist, thus downloading from deep store.
+    File localSegDir = new File(TABLE_DATA_DIR, segName);
+    assertFalse(localSegDir.exists());
+
+    // Add segment
+    IndexLoadingConfig indexLoadingConfig =
+        TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, schema);
+    tmgr1.addSegment(segName, indexLoadingConfig, segmentZKMetadata);
+    assertTrue(localSegDir.exists());
+    SegmentMetadataImpl llmd = new SegmentMetadataImpl(new File(TABLE_DATA_DIR, segName));
+    assertEquals(llmd.getTotalDocs(), 5);
+
+    // Now, repeat initialization of the table data manager
+    tmgr1.shutDown();
+    RealtimeTableDataManager tmgr2 = new RealtimeTableDataManager(null);
+    tableDataManagerConfig = createTableDataManagerConfig();
+    propertyStore = mock(ZkHelixPropertyStore.class);
+    tableConfig = setupTableConfig(propertyStore);
+    schema = setupSchema(propertyStore);
+    tmgr2.init(tableDataManagerConfig, "server01", propertyStore,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
+        new TableDataManagerParams(0, false, -1));
+
+    // Reinitialize index loading config and try adding the segment
+    indexLoadingConfig =
+        TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, schema);
+    tmgr2.addSegment(segName, indexLoadingConfig, segmentZKMetadata);
+
+    // Make sure that the segment hasn't been moved
+    assertTrue(localSegDir.exists());
+    llmd = new SegmentMetadataImpl(new File(TABLE_DATA_DIR, segName));
+    assertEquals(llmd.getTotalDocs(), 5);
+  }
+
+
+  @Test
   public void testAllowDownload() {
     RealtimeTableDataManager mgr = new RealtimeTableDataManager(null);
 
