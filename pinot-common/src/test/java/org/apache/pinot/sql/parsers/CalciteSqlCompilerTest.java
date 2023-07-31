@@ -3124,4 +3124,69 @@ public class CalciteSqlCompilerTest {
         CalciteSqlParser.compileToPinotQuery("SELECT key FROM T1"));
     Assert.assertEquals(join.getCondition(), CalciteSqlParser.compileToExpression("T1.key = self.key"));
   }
+
+  @Test
+  public void testInPredicateWithOutNullPasses() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2) AND column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
+      + "filter is not supported")
+  public void testSingleInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2, NULL)");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in NOT_IN "
+      + "filter is not supported")
+  public void testSingleNotInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 NOT IN (1, 2, NULL)");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
+  + "filter is not supported")
+  public void testAndFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2, NULL) AND column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in NOT_IN "
+  + "filter is not supported")
+  public void testOrFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 NOT IN (1, 2, NULL) OR column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
+  + "filter is not supported")
+  public void testNotFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE NOT(column1 IN (NULL, 1, 2))");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
+  + "GREATER_THAN filter is not supported")
+  public void testGreaterThanNullFilterFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 > null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
+  + "LESS_THAN_OR_EQUAL filter is not supported")
+  public void testLessThanOrEqualNullFilterFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 <= null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in LIKE "
+  + "filter is not supported")
+  public void testLikeFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 LIKE null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in EQUALS "
+  + "filter is not supported")
+  public void testEqualFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 = null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
+  + "NOT_EQUALS filter is not supported")
+  public void testInEqualFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 != null");
+  }
 }
