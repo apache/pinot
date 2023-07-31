@@ -40,9 +40,11 @@ import org.apache.commons.lang3.StringUtils;
 
 /**
  * Provide utility functions to manipulate Apache Commons {@link Configuration} instances.
- *
  */
-public abstract class CommonsConfigurationUtils {
+public class CommonsConfigurationUtils {
+  private CommonsConfigurationUtils() {
+  }
+
   /**
    * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
    * @param file containing properties
@@ -172,5 +174,44 @@ public abstract class CommonsConfigurationUtils {
     } else {
       throw new IllegalArgumentException(returnType + " is not a supported type for conversion.");
     }
+  }
+
+  /**
+   * Replaces the special character in the given property value.
+   * - Leading/trailing space is prefixed/suffixed with "\0"
+   * - Comma is replaces with "\0\0"
+   *
+   * Note:
+   * - '\0' is not allowed in string values, so we can use it as the replaced character
+   * - Escaping comma with backslash doesn't work when comma is preceded by a backslash
+   */
+  public static String replaceSpecialCharacterInPropertyValue(String value) {
+    if (value.isEmpty()) {
+      return value;
+    }
+    if (value.charAt(0) == ' ') {
+      value = "\0" + value;
+    }
+    if (value.charAt(value.length() - 1) == ' ') {
+      value = value + "\0";
+    }
+    return value.replace(",", "\0\0");
+  }
+
+  /**
+   * Recovers the special character in the given property value that is previous replaced by
+   * {@link #replaceSpecialCharacterInPropertyValue(String)}.
+   */
+  public static String recoverSpecialCharacterInPropertyValue(String value) {
+    if (value.isEmpty()) {
+      return value;
+    }
+    if (value.startsWith("\0 ")) {
+      value = value.substring(1);
+    }
+    if (value.endsWith(" \0")) {
+      value = value.substring(0, value.length() - 1);
+    }
+    return value.replace("\0\0", ",");
   }
 }
