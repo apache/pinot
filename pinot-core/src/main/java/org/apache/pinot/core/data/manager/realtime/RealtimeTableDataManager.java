@@ -445,14 +445,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       PartitionDedupMetadataManager partitionDedupMetadataManager =
           _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
               : null;
-      segmentDataManager =
+      LLRealtimeSegmentDataManager llRealtimeSegmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
               partitionDedupMetadataManager, _isTableReadyToConsumeData);
+      llRealtimeSegmentDataManager.startConsumption();
+      segmentDataManager = llRealtimeSegmentDataManager;
     } else {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
-      segmentDataManager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,
+      HLRealtimeSegmentDataManager hlRealtimeSegmentDataManager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,
           _indexDir.getAbsolutePath(), indexLoadingConfig, schema, _serverMetrics);
+      hlRealtimeSegmentDataManager.startConsumption();
+      segmentDataManager = hlRealtimeSegmentDataManager;
     }
 
     _logger.info("Initialized RealtimeSegmentDataManager - " + segmentName);

@@ -1285,7 +1285,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     cleanupMetrics();
   }
 
-  protected void startConsumerThread() {
+  @Override
+  public void startConsumption() {
     _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
     _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this);
     _consumerThread.start();
@@ -1472,7 +1473,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _segmentLogger
           .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", llcSegmentName,
               _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      startConsumerThread();
     } catch (Exception e) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.

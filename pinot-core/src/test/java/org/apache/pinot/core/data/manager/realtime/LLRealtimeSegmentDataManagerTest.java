@@ -1052,7 +1052,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected void startConsumerThread() {
+    public void startConsumption() {
       // Do nothing.
     }
 
