@@ -32,8 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public abstract class BlockingMultiConsumer<E> implements AutoCloseable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BlockingMultiConsumer.class);
+public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BlockingMultiStreamConsumer.class);
   private final Object _id;
   protected final List<? extends AsyncStream<E>> _mailboxes;
   protected final ReentrantLock _lock = new ReentrantLock(false);
@@ -47,7 +47,7 @@ public abstract class BlockingMultiConsumer<E> implements AutoCloseable {
   protected int _lastRead;
   private E _errorBlock = null;
 
-  public BlockingMultiConsumer(Object id, long deadlineMs, List<? extends AsyncStream<E>> asyncProducers) {
+  public BlockingMultiStreamConsumer(Object id, long deadlineMs, List<? extends AsyncStream<E>> asyncProducers) {
     _id = id;
     _deadlineMs = deadlineMs;
     AsyncStream.OnNewData onNewData = this::onData;
@@ -56,7 +56,7 @@ public abstract class BlockingMultiConsumer<E> implements AutoCloseable {
     _lastRead = _mailboxes.size() - 1;
   }
 
-  public BlockingMultiConsumer(Object id, long deadlineMs, Executor executor,
+  public BlockingMultiStreamConsumer(Object id, long deadlineMs, Executor executor,
       List<? extends BlockingStream<E>> blockingProducers) {
     this(id, deadlineMs,
         blockingProducers.stream().map(p -> new BlockingToAsyncStream<>(executor, p)).collect(Collectors.toList()));
@@ -126,7 +126,7 @@ public abstract class BlockingMultiConsumer<E> implements AutoCloseable {
         block = readDroppingSuccessEos();
         while (block == null && !timeout) { // still no data, we need to yield
           if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("==[RECEIVE]== Yield : " + _id);
+            LOGGER.debug("==[RECEIVE]== Blocked on : " + _id);
           }
           timeout = !_notEmpty.await(_deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
           block = readDroppingSuccessEos();
@@ -137,6 +137,8 @@ public abstract class BlockingMultiConsumer<E> implements AutoCloseable {
           }
           _errorBlock = onTimeout();
           return _errorBlock;
+        } else if (LOGGER.isTraceEnabled()) {
+          LOGGER.trace("==[RECEIVE]== Ready to emit on: " + _id);
         }
       } catch (InterruptedException ex) { // we've got interrupted while waiting for the condition
         return onException(ex);
@@ -171,7 +173,8 @@ public abstract class BlockingMultiConsumer<E> implements AutoCloseable {
       // this is done in order to keep the invariant.
       _lastRead--;
       if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("==[RECEIVE]== EOS received : " + _id + " in mailbox: " + removed.getId());
+        LOGGER.debug("==[RECEIVE]== EOS received : " + _id + " in mailbox: " + removed.getId()
+            + " (" + _mailboxes.size() + " mailboxes alive)");
       }
 
       block = readBlockOrNull();
@@ -188,6 +191,8 @@ public abstract class BlockingMultiConsumer<E> implements AutoCloseable {
         LOGGER.trace("==[RECEIVE]== Returned block from : " + _id + " in mailbox: " + mailbox.getId());
       }
       if (isError(block)) {
+        AsyncStream<E> mailbox = _mailboxes.get(_lastRead);
+        LOGGER.info("==[RECEIVE]== Error block found from : " + _id + " in mailbox " + mailbox.getId());
         _errorBlock = block;
       }
     }
@@ -220,7 +225,7 @@ public abstract class BlockingMultiConsumer<E> implements AutoCloseable {
     return null;
   }
 
-  public static class OfTransferableBlock extends BlockingMultiConsumer<TransferableBlock> {
+  public static class OfTransferableBlock extends BlockingMultiStreamConsumer<TransferableBlock> {
     public OfTransferableBlock(Object id, long deadlineMs,
         List<? extends AsyncStream<TransferableBlock>> asyncProducers) {
       super(id, deadlineMs, asyncProducers);

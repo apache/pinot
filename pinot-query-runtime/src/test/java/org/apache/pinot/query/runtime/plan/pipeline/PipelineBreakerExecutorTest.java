@@ -73,7 +73,7 @@ public class PipelineBreakerExecutorTest {
 
   private VirtualServerAddress _server = new VirtualServerAddress("localhost", 123, 0);
   private OpChainExecutor _executor =
-      new OpChainExecutor(new NamedThreadFactory("worker_on_" + getClass().getSimpleName()));
+      new OpChainExecutor(new NamedThreadFactory("worker_on_asd_" + getClass().getSimpleName()));
   private OpChainSchedulerService _scheduler = new OpChainSchedulerService(_executor);
   private StageMetadata _stageMetadata1 = new StageMetadata.Builder().setWorkerMetadataList(Stream.of(_server).map(
       s -> new WorkerMetadata.Builder().setVirtualServerAddress(s)
@@ -100,6 +100,9 @@ public class PipelineBreakerExecutorTest {
     _mocks = MockitoAnnotations.openMocks(this);
     when(_mailboxService.getHostname()).thenReturn("localhost");
     when(_mailboxService.getPort()).thenReturn(123);
+
+    when(_mailbox1.getId()).thenReturn("mailbox1");
+    when(_mailbox2.getId()).thenReturn("mailbox2");
   }
 
   @AfterMethod

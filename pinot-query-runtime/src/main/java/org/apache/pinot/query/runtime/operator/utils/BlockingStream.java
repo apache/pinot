@@ -18,10 +18,30 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
+/**
+ * An interface that represents an abstract blocking stream of elements that can be consumed.
+ *
+ * These streams are designed to be consumed by a single thread and do not support null elements.
+ *
+ * @param <E> The type of the elements, usually a {@link org.apache.pinot.query.runtime.blocks.TransferableBlock}
+ */
 public interface BlockingStream<E> {
+  /**
+   * The id of the stream. Mostly used for logging.
+   *
+   * Implementations of this method must be thread safe.
+   */
   Object getId();
 
+  /**
+   * Returns the next element on the stream, blocking if there is no element ready.
+   */
   E get();
 
+  /**
+   * Cancels the stream.
+   *
+   * This method can be called by any thread.
+   */
   void cancel();
 }

@@ -24,6 +24,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -31,6 +33,8 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * by send/receive stages.
  */
 public class OpChain implements AutoCloseable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OpChain.class);
+
   private final MultiStageOperator _root;
   private final List<String> _receivingMailboxIds;
   private final OpChainId _id;
@@ -58,10 +62,6 @@ public class OpChain implements AutoCloseable {
     return _receivingMailboxIds;
   }
 
-  public Consumer<OpChainId> getOpChainFinishCallback() {
-    return _opChainFinishCallback;
-  }
-
   public OpChainId getId() {
     return _id;
   }
@@ -78,6 +78,9 @@ public class OpChain implements AutoCloseable {
 
   /**
    * close() is called when we finish execution successfully.
+   *
+   * Once the {@link OpChain} is being executed, this method should only be called from the thread that is actually
+   * executing it.
    */
   @Override
   public void close() {
@@ -85,11 +88,15 @@ public class OpChain implements AutoCloseable {
       _root.close();
     } finally {
       _opChainFinishCallback.accept(getId());
+      LOGGER.trace("OpChain callback called");
     }
   }
 
   /**
    * cancel() is called when execution runs into error.
+   *
+   * Once the {@link OpChain} is being executed, this method should only be called from the thread that is actually
+   * executing it.
    * @param e
    */
   public void cancel(@Nullable Throwable e) {
@@ -97,6 +104,7 @@ public class OpChain implements AutoCloseable {
       _root.cancel(e);
     } finally {
       _opChainFinishCallback.accept(getId());
+      LOGGER.trace("OpChain callback called");
     }
   }
 }

@@ -34,7 +34,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
-import org.apache.pinot.query.runtime.operator.utils.BlockingMultiConsumer;
+import org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer;
 import org.apache.pinot.query.runtime.operator.utils.BlockingStream;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
@@ -43,7 +43,7 @@ class PipelineBreakerOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
   private final Map<Integer, List<TransferableBlock>> _resultMap;
   private final ImmutableSet<Integer> _expectedKeySet;
-  private final BlockingMultiConsumer<Pair<Integer, TransferableBlock>> _blockConsumer;
+  private final BlockingMultiStreamConsumer<Pair<Integer, TransferableBlock>> _blockConsumer;
 
 
   public PipelineBreakerOperator(OpChainExecutionContext context,
@@ -92,7 +92,7 @@ class PipelineBreakerOperator extends MultiStageOperator {
     }
   }
 
-  private static class MyBlockingMultiConsumer extends BlockingMultiConsumer<Pair<Integer, TransferableBlock>> {
+  private static class MyBlockingMultiConsumer extends BlockingMultiStreamConsumer<Pair<Integer, TransferableBlock>> {
     public MyBlockingMultiConsumer(Object id, long deadlineMs, Executor executor,
         Collection<Map.Entry<Integer, Operator<TransferableBlock>>> entries) {
       super(id, deadlineMs, executor, entries.stream()

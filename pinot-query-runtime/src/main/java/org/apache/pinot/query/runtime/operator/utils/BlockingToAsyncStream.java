@@ -21,17 +21,26 @@ package org.apache.pinot.query.runtime.operator.utils;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 
 
 public class BlockingToAsyncStream<E> implements AsyncStream<E> {
   private final BlockingStream<E> _blockingStream;
-  private final ReentrantLock _lock = new ReentrantLock();
   private final Executor _executor;
+  /**
+   * A completable future that contains the next element to return.
+   *
+   * Only the thread that calls {@link #poll()} is allowed to modify or read this attribute.
+   */
   @Nullable
   private CompletableFuture<E> _blockToRead;
-  private OnNewData _onNewData;
+  /**
+   * The callback used to indicate that there is more data.
+   *
+   * It is mandatory to register a callback here before calling {@link #poll()}.
+   */
+  private final AtomicReference<OnNewData> _onNewData = new AtomicReference<>();
 
   public BlockingToAsyncStream(Executor executor, BlockingStream<E> blockingStream) {
     _executor = executor;
@@ -46,59 +55,48 @@ public class BlockingToAsyncStream<E> implements AsyncStream<E> {
   @Nullable
   @Override
   public E poll() {
-    _lock.lock();
-    try {
-      if (_blockToRead == null) {
-        _blockToRead = CompletableFuture.supplyAsync(this::askForNewBlock, _executor);
-        return null;
-      } else if (_blockToRead.isDone()) {
-        E block = _blockToRead.getNow(null);
-        assert block != null;
+    Preconditions.checkState(_onNewData.get() != null, "Reading while no new data callback is added may imply data "
+        + "loss");
+    CompletableFuture<E> blockToRead = _blockToRead;
+    if (blockToRead == null) {
+      _blockToRead = CompletableFuture.supplyAsync(this::askForNewBlock, _executor);
+      return null;
+    } else if (blockToRead.isDone()) {
+      E block = blockToRead.getNow(null);
+      assert block != null;
 
-        _blockToRead = CompletableFuture.supplyAsync(this::askForNewBlock, _executor);
-        return block;
-      } else {
-        return null;
-      }
-    } finally {
-      _lock.unlock();
+      _blockToRead = CompletableFuture.supplyAsync(this::askForNewBlock, _executor);
+      return block;
+    } else {
+      return null;
     }
   }
 
   private E askForNewBlock() {
     E block = _blockingStream.get();
-    _lock.lock();
-    try {
-      if (_onNewData != null) {
-        _onNewData.newDataAvailable();
-      }
-      return block;
-    } finally {
-      _lock.unlock();
+    OnNewData onNewData = _onNewData.get();
+    if (onNewData != null) {
+      onNewData.newDataAvailable();
     }
+    return block;
   }
 
   @Override
   public void addOnNewDataListener(OnNewData onNewData) {
-    _lock.lock();
-    try {
-      Preconditions.checkState(_onNewData == null, "Another listener has been added");
-      _onNewData = onNewData;
-    } finally {
-      _lock.unlock();
+    boolean success = _onNewData.compareAndSet(null, onNewData);
+    if (!success) {
+      throw new IllegalArgumentException("Another listener has been added");
     }
   }
 
   @Override
   public void cancel() {
-    _blockingStream.cancel();
-    _lock.lock();
     try {
+      _blockingStream.cancel();
+    } finally {
       if (_blockToRead != null) {
         _blockToRead.cancel(true);
       }
-    } finally {
-      _lock.unlock();
     }
   }
 }

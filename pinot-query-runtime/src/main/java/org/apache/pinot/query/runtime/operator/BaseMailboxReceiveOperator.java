@@ -30,7 +30,7 @@ import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
-import org.apache.pinot.query.runtime.operator.utils.BlockingMultiConsumer;
+import org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -47,7 +47,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
-  private final BlockingMultiConsumer.OfTransferableBlock _multiConsumer;
+  private final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
 
   public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       int senderStageId) {
@@ -69,11 +69,11 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     List<ReadMailboxAsyncStream> asyncStreams = _mailboxIds.stream()
         .map(mailboxId -> new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this))
         .collect(Collectors.toList());
-    _multiConsumer = new BlockingMultiConsumer.OfTransferableBlock(
+    _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(
         context.getId(), context.getDeadlineMs(), asyncStreams);
   }
 
-  protected BlockingMultiConsumer.OfTransferableBlock getMultiConsumer() {
+  protected BlockingMultiStreamConsumer.OfTransferableBlock getMultiConsumer() {
     return _multiConsumer;
   }
 
