@@ -108,7 +108,7 @@ public class PipelineBreakerExecutorTest {
     _mocks.close();
   }
 
-  @Test(enabled = false) // TODO: Enable once pipeline breaker is adapted
+  @Test
   public void shouldReturnBlocksUponNormalOperation() {
     MailboxReceiveNode mailboxReceiveNode =
         new MailboxReceiveNode(0, DATA_SCHEMA, 1, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
@@ -139,7 +139,7 @@ public class PipelineBreakerExecutorTest {
     Assert.assertEquals(pipelineBreakerResult.getOpChainStats().getOperatorStatsMap().size(), 1);
   }
 
-  @Test(enabled = false) // TODO: Enable once pipeline breaker is adapted
+  @Test
   public void shouldWorkWithMultiplePBNodeUponNormalOperation() {
     MailboxReceiveNode mailboxReceiveNode1 =
         new MailboxReceiveNode(0, DATA_SCHEMA, 1, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
@@ -181,7 +181,7 @@ public class PipelineBreakerExecutorTest {
     Assert.assertEquals(pipelineBreakerResult.getOpChainStats().getOperatorStatsMap().size(), 2);
   }
 
-  @Test(enabled = false) // TODO: Enable once pipeline breaker is adapted
+  @Test
   public void shouldReturnEmptyBlockWhenPBExecuteWithIncorrectMailboxNode() {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode =
         new MailboxReceiveNode(0, DATA_SCHEMA, 3, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
@@ -204,7 +204,7 @@ public class PipelineBreakerExecutorTest {
     Assert.assertNotNull(pipelineBreakerResult.getOpChainStats());
   }
 
-  @Test(enabled = false) // TODO: Enable once pipeline breaker is adapted
+  @Test
   public void shouldReturnErrorBlocksFailureWhenPBTimeout() {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode =
         new MailboxReceiveNode(0, DATA_SCHEMA, 1, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
@@ -234,7 +234,7 @@ public class PipelineBreakerExecutorTest {
     Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
   }
 
-  @Test(enabled = false) // TODO: Enable once pipeline breaker is adapted
+  @Test
   public void shouldReturnWhenAnyPBReturnsEmpty() {
     MailboxReceiveNode mailboxReceiveNode1 =
         new MailboxReceiveNode(0, DATA_SCHEMA, 1, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
@@ -272,7 +272,7 @@ public class PipelineBreakerExecutorTest {
     Assert.assertNotNull(pipelineBreakerResult.getOpChainStats());
   }
 
-  @Test(enabled = false) // TODO: Enable once pipeline breaker is adapted
+  @Test
   public void shouldReturnErrorBlocksWhenReceivedErrorFromSender() {
     MailboxReceiveNode mailboxReceiveNode1 =
         new MailboxReceiveNode(0, DATA_SCHEMA, 1, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,

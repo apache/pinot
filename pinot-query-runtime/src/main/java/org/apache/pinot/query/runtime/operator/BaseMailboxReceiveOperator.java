@@ -73,6 +73,10 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         context.getId(), context.getDeadlineMs(), asyncStreams);
   }
 
+  protected BlockingMultiConsumer.OfTransferableBlock getMultiConsumer() {
+    return _multiConsumer;
+  }
+
   public List<String> getMailboxIds() {
     return _mailboxIds;
   }
