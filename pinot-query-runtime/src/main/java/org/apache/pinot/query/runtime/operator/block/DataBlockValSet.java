@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.common;
+package org.apache.pinot.query.runtime.operator.block;
 
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
@@ -34,13 +35,13 @@ import org.roaringbitmap.RoaringBitmap;
  * aggregations using v1 aggregation functions.
  * TODO: Support MV
  */
-public class IntermediateStageBlockValSet implements BlockValSet {
-  private final FieldSpec.DataType _dataType;
-  private final DataBlock _dataBlock;
-  private final int _index;
-  private final RoaringBitmap _nullBitMap;
+public class DataBlockValSet implements BlockValSet {
+  protected final FieldSpec.DataType _dataType;
+  protected final DataBlock _dataBlock;
+  protected final int _index;
+  protected final RoaringBitmap _nullBitMap;
 
-  public IntermediateStageBlockValSet(DataSchema.ColumnDataType columnDataType, DataBlock dataBlock, int colIndex) {
+  public DataBlockValSet(DataSchema.ColumnDataType columnDataType, DataBlock dataBlock, int colIndex) {
     _dataType = columnDataType.toDataType();
     _dataBlock = dataBlock;
     _index = colIndex;

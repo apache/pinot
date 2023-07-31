@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -555,5 +556,315 @@ public final class DataBlockUtils {
     }
 
     return rows;
+  }
+
+  /**
+   * Given a datablock and the column index, extracts the integer values for the column. Prefer using this function over
+   * extractRowFromDatablock if the desired datatype is known to prevent autoboxing to Object and later unboxing to the
+   * desired type.
+   * This only works on ROW format.
+   * TODO: Add support for COLUMNAR format.
+   * @return int array of values in the column
+   */
+  public static int[] extractIntValuesForColumn(DataBlock dataBlock, int columnIndex, int filterArgIdx) {
+    DataSchema dataSchema = dataBlock.getDataSchema();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+
+    // Get null bitmap for the column.
+    RoaringBitmap nullBitmap = extractNullBitmaps(dataBlock)[columnIndex];
+    int numRows = dataBlock.getNumberOfRows();
+
+    int[] rows = new int[numRows];
+    int outRowId = 0;
+    for (int inRowId = 0; inRowId < numRows; inRowId++) {
+      if (dataBlock.getInt(inRowId, filterArgIdx) == 1) {
+        if (nullBitmap != null && nullBitmap.contains(inRowId)) {
+          outRowId++;
+          continue;
+        }
+        switch (columnDataTypes[columnIndex]) {
+          case INT:
+          case BOOLEAN:
+            rows[outRowId++] = dataBlock.getInt(inRowId, columnIndex);
+            break;
+          case LONG:
+            rows[outRowId++] = (int) dataBlock.getLong(inRowId, columnIndex);
+            break;
+          case FLOAT:
+            rows[outRowId++] = (int) dataBlock.getFloat(inRowId, columnIndex);
+            break;
+          case DOUBLE:
+            rows[outRowId++] = (int) dataBlock.getDouble(inRowId, columnIndex);
+            break;
+          case BIG_DECIMAL:
+            rows[outRowId++] = dataBlock.getBigDecimal(inRowId, columnIndex).intValue();
+            break;
+          default:
+            throw new IllegalStateException(
+                String.format("Unsupported data type: %s for column: %s", columnDataTypes[columnIndex], columnIndex));
+        }
+      }
+    }
+    return Arrays.copyOfRange(rows, 0, outRowId);
+  }
+
+  /**
+   * Given a datablock and the column index, extracts the long values for the column. Prefer using this function over
+   * extractRowFromDatablock if the desired datatype is known to prevent autoboxing to Object and later unboxing to the
+   * desired type.
+   * This only works on ROW format.
+   * TODO: Add support for COLUMNAR format.
+   * @return long array of values in the column
+   */
+  public static long[] extractLongValuesForColumn(DataBlock dataBlock, int columnIndex, int filterArgIdx) {
+    DataSchema dataSchema = dataBlock.getDataSchema();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+
+    // Get null bitmap for the column.
+    RoaringBitmap nullBitmap = extractNullBitmaps(dataBlock)[columnIndex];
+    int numRows = dataBlock.getNumberOfRows();
+
+    long[] rows = new long[numRows];
+    int outRowId = 0;
+    for (int inRowId = 0; inRowId < numRows; inRowId++) {
+      if (dataBlock.getInt(inRowId, filterArgIdx) == 1) {
+        if (nullBitmap != null && nullBitmap.contains(inRowId)) {
+          outRowId++;
+          continue;
+        }
+        switch (columnDataTypes[columnIndex]) {
+          case INT:
+          case BOOLEAN:
+            rows[outRowId++] = dataBlock.getInt(inRowId, columnIndex);
+            break;
+          case LONG:
+            rows[outRowId++] = dataBlock.getLong(inRowId, columnIndex);
+            break;
+          case FLOAT:
+            rows[outRowId++] = (long) dataBlock.getFloat(inRowId, columnIndex);
+            break;
+          case DOUBLE:
+            rows[outRowId++] = (long) dataBlock.getDouble(inRowId, columnIndex);
+            break;
+          case BIG_DECIMAL:
+            rows[outRowId++] = dataBlock.getBigDecimal(inRowId, columnIndex).longValue();
+            break;
+          default:
+            throw new IllegalStateException(
+                String.format("Unsupported data type: %s for column: %s", columnDataTypes[columnIndex], columnIndex));
+        }
+      }
+    }
+    return Arrays.copyOfRange(rows, 0, outRowId);
+  }
+
+  /**
+   * Given a datablock and the column index, extracts the float values for the column. Prefer using this function over
+   * extractRowFromDatablock if the desired datatype is known to prevent autoboxing to Object and later unboxing to the
+   * desired type.
+   * This only works on ROW format.
+   * TODO: Add support for COLUMNAR format.
+   * @return float array of values in the column
+   */
+  public static float[] extractFloatValuesForColumn(DataBlock dataBlock, int columnIndex, int filterArgIdx) {
+    DataSchema dataSchema = dataBlock.getDataSchema();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+
+    // Get null bitmap for the column.
+    RoaringBitmap nullBitmap = extractNullBitmaps(dataBlock)[columnIndex];
+    int numRows = dataBlock.getNumberOfRows();
+
+    float[] rows = new float[numRows];
+    int outRowId = 0;
+    for (int inRowId = 0; inRowId < numRows; inRowId++) {
+      if (dataBlock.getInt(inRowId, filterArgIdx) == 1) {
+        if (nullBitmap != null && nullBitmap.contains(inRowId)) {
+          outRowId++;
+          continue;
+        }
+        switch (columnDataTypes[columnIndex]) {
+          case INT:
+          case BOOLEAN:
+            rows[outRowId++] = dataBlock.getInt(inRowId, columnIndex);
+            break;
+          case LONG:
+            rows[outRowId++] = dataBlock.getLong(inRowId, columnIndex);
+            break;
+          case FLOAT:
+            rows[outRowId++] = dataBlock.getFloat(inRowId, columnIndex);
+            break;
+          case DOUBLE:
+            rows[outRowId++] = (float) dataBlock.getDouble(inRowId, columnIndex);
+            break;
+          case BIG_DECIMAL:
+            rows[outRowId++] = dataBlock.getBigDecimal(inRowId, columnIndex).floatValue();
+            break;
+          default:
+            throw new IllegalStateException(
+                String.format("Unsupported data type: %s for column: %s", columnDataTypes[columnIndex], columnIndex));
+        }
+      }
+    }
+    return Arrays.copyOfRange(rows, 0, outRowId);
+  }
+
+  /**
+   * Given a datablock and the column index, extracts the double values for the column. Prefer using this function over
+   * extractRowFromDatablock if the desired datatype is known to prevent autoboxing to Object and later unboxing to the
+   * desired type.
+   * This only works on ROW format.
+   * TODO: Add support for COLUMNAR format.
+   * @return double array of values in the column
+   */
+  public static double[] extractDoubleValuesForColumn(DataBlock dataBlock, int columnIndex, int filterArgIdx) {
+    DataSchema dataSchema = dataBlock.getDataSchema();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+
+    // Get null bitmap for the column.
+    RoaringBitmap nullBitmap = extractNullBitmaps(dataBlock)[columnIndex];
+    int numRows = dataBlock.getNumberOfRows();
+
+    double[] rows = new double[numRows];
+    int outRowId = 0;
+    for (int inRowId = 0; inRowId < numRows; inRowId++) {
+      if (dataBlock.getInt(inRowId, filterArgIdx) == 1) {
+        if (nullBitmap != null && nullBitmap.contains(inRowId)) {
+          outRowId++;
+          continue;
+        }
+        switch (columnDataTypes[columnIndex]) {
+          case INT:
+          case BOOLEAN:
+            rows[outRowId++] = dataBlock.getInt(inRowId, columnIndex);
+            break;
+          case LONG:
+            rows[outRowId++] = dataBlock.getLong(inRowId, columnIndex);
+            break;
+          case FLOAT:
+            rows[outRowId++] = dataBlock.getFloat(inRowId, columnIndex);
+            break;
+          case DOUBLE:
+            rows[outRowId++] = dataBlock.getDouble(inRowId, columnIndex);
+            break;
+          case BIG_DECIMAL:
+            rows[outRowId++] = dataBlock.getBigDecimal(inRowId, columnIndex).doubleValue();
+            break;
+          default:
+            throw new IllegalStateException(
+                String.format("Unsupported data type: %s for column: %s", columnDataTypes[columnIndex], columnIndex));
+        }
+      }
+    }
+    return Arrays.copyOfRange(rows, 0, outRowId);
+  }
+
+  /**
+   * Given a datablock and the column index, extracts the BigDecimal values for the column. Prefer using this function
+   * over extractRowFromDatablock if the desired datatype is known to prevent autoboxing to Object and later unboxing to
+   * the desired type.
+   * This only works on ROW format.
+   * TODO: Add support for COLUMNAR format.
+   * @return BigDecimal array of values in the column
+   */
+  public static BigDecimal[] extractBigDecimalValuesForColumn(DataBlock dataBlock, int columnIndex, int filterArgIdx) {
+    DataSchema dataSchema = dataBlock.getDataSchema();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+
+    // Get null bitmap for the column.
+    RoaringBitmap nullBitmap = extractNullBitmaps(dataBlock)[columnIndex];
+    int numRows = dataBlock.getNumberOfRows();
+
+    BigDecimal[] rows = new BigDecimal[numRows];
+    int outRowId = 0;
+    for (int inRowId = 0; inRowId < numRows; inRowId++) {
+      if (dataBlock.getInt(inRowId, filterArgIdx) == 1) {
+        if (nullBitmap != null && nullBitmap.contains(inRowId)) {
+          outRowId++;
+          continue;
+        }
+        switch (columnDataTypes[columnIndex]) {
+          case INT:
+          case BOOLEAN:
+            rows[outRowId++] = BigDecimal.valueOf(dataBlock.getInt(inRowId, columnIndex));
+            break;
+          case LONG:
+            rows[outRowId++] = BigDecimal.valueOf(dataBlock.getLong(inRowId, columnIndex));
+            break;
+          case FLOAT:
+            rows[outRowId++] = BigDecimal.valueOf(dataBlock.getFloat(inRowId, columnIndex));
+            break;
+          case DOUBLE:
+            rows[outRowId++] = BigDecimal.valueOf(dataBlock.getDouble(inRowId, columnIndex));
+            break;
+          case BIG_DECIMAL:
+            rows[outRowId++] = BigDecimal.valueOf(dataBlock.getBigDecimal(inRowId, columnIndex).doubleValue());
+            break;
+          default:
+            throw new IllegalStateException(
+                String.format("Unsupported data type: %s for column: %s", columnDataTypes[columnIndex], columnIndex));
+        }
+      }
+    }
+    return Arrays.copyOfRange(rows, 0, outRowId);
+  }
+
+  /**
+   * Given a datablock and the column index, extracts the String values for the column. Prefer using this function over
+   * extractRowFromDatablock if the desired datatype is known to prevent autoboxing to Object and later unboxing to the
+   * desired type.
+   * This only works on ROW format.
+   * TODO: Add support for COLUMNAR format.
+   * @return String array of values in the column
+   */
+  public static String[] extractStringValuesForColumn(DataBlock dataBlock, int columnIndex, int filterArgIdx) {
+    DataSchema dataSchema = dataBlock.getDataSchema();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+
+    // Get null bitmap for the column.
+    RoaringBitmap nullBitmap = extractNullBitmaps(dataBlock)[columnIndex];
+    int numRows = dataBlock.getNumberOfRows();
+
+    String[] rows = new String[numRows];
+    int outRowId = 0;
+    for (int inRowId = 0; inRowId < numRows; inRowId++) {
+      if (dataBlock.getInt(inRowId, filterArgIdx) == 1) {
+        if (nullBitmap != null && nullBitmap.contains(inRowId)) {
+          outRowId++;
+          continue;
+        }
+        rows[outRowId++] = dataBlock.getString(inRowId, columnIndex);
+      }
+    }
+    return Arrays.copyOfRange(rows, 0, outRowId);
+  }
+
+  /**
+   * Given a datablock and the column index, extracts the byte values for the column. Prefer using this function over
+   * extractRowFromDatablock if the desired datatype is known to prevent autoboxing to Object and later unboxing to the
+   * desired type.
+   * This only works on ROW format.
+   * TODO: Add support for COLUMNAR format.
+   * @return byte array of values in the column
+   */
+  public static byte[][] extractBytesValuesForColumn(DataBlock dataBlock, int columnIndex, int filterArgIdx) {
+    DataSchema dataSchema = dataBlock.getDataSchema();
+    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+
+    // Get null bitmap for the column.
+    RoaringBitmap nullBitmap = extractNullBitmaps(dataBlock)[columnIndex];
+    int numRows = dataBlock.getNumberOfRows();
+
+    byte[][] rows = new byte[numRows][];
+    int outRowId = 0;
+    for (int inRowId = 0; inRowId < numRows; inRowId++) {
+      if (dataBlock.getInt(inRowId, filterArgIdx) == 1) {
+        if (nullBitmap != null && nullBitmap.contains(inRowId)) {
+          outRowId++;
+          continue;
+        }
+        rows[outRowId++] = dataBlock.getBytes(inRowId, columnIndex).getBytes();
+      }
+    }
+    return Arrays.copyOfRange(rows, 0, outRowId);
   }
 }

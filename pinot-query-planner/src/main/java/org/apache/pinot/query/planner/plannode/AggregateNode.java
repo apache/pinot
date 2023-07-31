@@ -36,6 +36,8 @@ public class AggregateNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RexExpression> _aggCalls;
   @ProtoProperties
+  private List<Integer> _filterArgIndices;
+  @ProtoProperties
   private List<RexExpression> _groupSet;
   @ProtoProperties
   private AggType _aggType;
@@ -49,6 +51,7 @@ public class AggregateNode extends AbstractPlanNode {
     super(planFragmentId, dataSchema);
     Preconditions.checkState(areHintsValid(relHints), "invalid sql hint for agg node: {}", relHints);
     _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+    _filterArgIndices = aggCalls.stream().map(c -> c.filterArg).collect(Collectors.toList());
     _groupSet = groupSet;
     _nodeHint = new NodeHint(relHints);
     _aggType = AggType.valueOf(PinotHintStrategyTable.getHintOption(relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS,
@@ -61,6 +64,10 @@ public class AggregateNode extends AbstractPlanNode {
 
   public List<RexExpression> getAggCalls() {
     return _aggCalls;
+  }
+
+  public List<Integer> getFilterArgIndices() {
+    return _filterArgIndices;
   }
 
   public List<RexExpression> getGroupSet() {

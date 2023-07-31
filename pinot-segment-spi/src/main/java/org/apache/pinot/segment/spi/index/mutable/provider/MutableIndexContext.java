@@ -28,6 +28,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class MutableIndexContext {
   private final int _capacity;
   private final FieldSpec _fieldSpec;
+  private final int _fixedLengthBytes;
   private final boolean _hasDictionary;
   private final boolean _offHeap;
   private final int _estimatedColSize;
@@ -37,10 +38,11 @@ public class MutableIndexContext {
   private final PinotDataBufferMemoryManager _memoryManager;
   private final File _consumerDir;
 
-  public MutableIndexContext(FieldSpec fieldSpec, boolean hasDictionary, String segmentName,
+  public MutableIndexContext(FieldSpec fieldSpec, int fixedLengthBytes, boolean hasDictionary, String segmentName,
       PinotDataBufferMemoryManager memoryManager, int capacity, boolean offHeap, int estimatedColSize,
       int estimatedCardinality, int avgNumMultiValues, File consumerDir) {
     _fieldSpec = fieldSpec;
+    _fixedLengthBytes = fixedLengthBytes;
     _hasDictionary = hasDictionary;
     _segmentName = segmentName;
     _memoryManager = memoryManager;
@@ -62,6 +64,10 @@ public class MutableIndexContext {
 
   public FieldSpec getFieldSpec() {
     return _fieldSpec;
+  }
+
+  public int getFixedLengthBytes() {
+    return _fixedLengthBytes;
   }
 
   public boolean hasDictionary() {
@@ -99,6 +105,7 @@ public class MutableIndexContext {
 
   public static class Builder {
     private FieldSpec _fieldSpec;
+    private int _fixedLengthBytes;
     private String _segmentName;
     private boolean _hasDictionary = true;
     private boolean _offHeap = true;
@@ -160,8 +167,13 @@ public class MutableIndexContext {
       return this;
     }
 
+    public Builder withFixedLengthBytes(int fixedLengthBytes) {
+      _fixedLengthBytes = fixedLengthBytes;
+      return this;
+    }
+
     public MutableIndexContext build() {
-      return new MutableIndexContext(Objects.requireNonNull(_fieldSpec), _hasDictionary,
+      return new MutableIndexContext(Objects.requireNonNull(_fieldSpec), _fixedLengthBytes, _hasDictionary,
           Objects.requireNonNull(_segmentName), Objects.requireNonNull(_memoryManager), _capacity, _offHeap,
           _estimatedColSize, _estimatedCardinality, _avgNumMultiValues, _consumerDir);
     }
