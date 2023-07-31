@@ -453,8 +453,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       segmentDataManager = llRealtimeSegmentDataManager;
     } else {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
-      HLRealtimeSegmentDataManager hlRealtimeSegmentDataManager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,
-          _indexDir.getAbsolutePath(), indexLoadingConfig, schema, _serverMetrics);
+      HLRealtimeSegmentDataManager hlRealtimeSegmentDataManager = new HLRealtimeSegmentDataManager(segmentZKMetadata,
+              tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(),
+              indexLoadingConfig, schema, _serverMetrics);
       hlRealtimeSegmentDataManager.startConsumption();
       segmentDataManager = hlRealtimeSegmentDataManager;
     }
