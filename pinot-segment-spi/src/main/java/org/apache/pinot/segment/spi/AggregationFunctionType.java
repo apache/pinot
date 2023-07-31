@@ -63,6 +63,7 @@ public enum AggregationFunctionType {
       ReturnTypes.AGG_SUM_EMPTY_IS_ZERO, ReturnTypes.explicit(SqlTypeName.DOUBLE)),
   SUMPRECISION("sumPrecision", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.ANY, ReturnTypes.explicit(SqlTypeName.DECIMAL), ReturnTypes.explicit(SqlTypeName.OTHER)),
+  // NO NEEDED in v2, AVG is compiled as SUM/COUNT
   AVG("avg"),
   MODE("mode"),
 
@@ -82,11 +83,13 @@ public enum AggregationFunctionType {
   DISTINCTCOUNT("distinctCount", null, SqlKind.OTHER_FUNCTION,
       SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.ANY, ReturnTypes.BIGINT,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
+  // TODO: support bitmap and segment partition in V2
   DISTINCTCOUNTBITMAP("distinctCountBitmap"),
   SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount"),
   DISTINCTCOUNTHLL("distinctCountHLL", ImmutableList.of("DISTINCT_COUNT_HLL"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.ANY, ReturnTypes.BIGINT,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
+      SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC), ordinal -> ordinal > 0),
+      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
   DISTINCTCOUNTRAWHLL("distinctCountRawHLL", ImmutableList.of("DISTINCT_COUNT_RAW_HLL"), SqlKind.OTHER_FUNCTION,
       SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), ordinal -> ordinal > 0),
@@ -95,6 +98,7 @@ public enum AggregationFunctionType {
       SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
       ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  // DEPRECATED in v2
   FASTHLL("fastHLL"),
   DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", null,
       SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
@@ -121,8 +125,10 @@ public enum AggregationFunctionType {
   PERCENTILEKLL("percentileKLL"),
   PERCENTILERAWKLL("percentileRawKLL"),
 
+  // DEPRECATED in v2
   IDSET("idSet"),
 
+  // TODO: support histogram
   HISTOGRAM("histogram"),
 
   // TODO: support underscore separated version of the stats functions
@@ -147,13 +153,10 @@ public enum AggregationFunctionType {
       OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
   FOURTHMOMENT("fourthMoment"),
 
-  // DataSketches Tuple Sketch support
-  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch", null,
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
-      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-
   // TODO: support Tuple sketches in V2
+  // DataSketches Tuple Sketch support
+  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch"),
+
   // DataSketches Tuple Sketch support for Integer based Tuple Sketches
   DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH("distinctCountRawIntegerSumTupleSketch"),
 

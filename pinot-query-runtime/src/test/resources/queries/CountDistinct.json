@@ -109,7 +109,7 @@
         "outputs": [[3]]
       },
       {
-        "sql": "SELECT groupingCol, DISTINCTCOUNTHLL(val) FROM {tbl1} GROUP BY groupingCol",
+        "sql": "SELECT groupingCol, DISTINCTCOUNTHLL(val, 8) FROM {tbl1} GROUP BY groupingCol",
         "outputs": [["b", 2], ["a", 2]]
       },
       {
@@ -117,7 +117,7 @@
         "outputs": [["b", 2, 3], ["a", 2, 3]]
       },
       {
-        "sql": "SELECT l.groupingCol, DISTINCTCOUNTHLL(CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "sql": "SELECT l.groupingCol, DISTINCTCOUNTHLL(CONCAT(l.val, r.val), 8) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
         "outputs": [["b", 6], ["a", 6]]
       },
       {
@@ -133,7 +133,7 @@
         "outputs": [["b", 6], ["a", 6]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, DISTINCTCOUNTHLL(val) FROM {tbl1} GROUP BY groupingCol",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, DISTINCTCOUNTHLL(val, 8) FROM {tbl1} GROUP BY groupingCol",
         "outputs": [["b", 2], ["a", 2]]
       },
       {
@@ -141,15 +141,15 @@
         "outputs": [["b", 2, 3], ["a", 2, 3]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, DISTINCTCOUNTHLL(CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, DISTINCTCOUNTHLL(CONCAT(l.val, r.val), 8) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
         "outputs": [["b", 6], ["a", 6]]
       },
       {
-        "sql": "SELECT DISTINCTCOUNTSMARTHLL(val) FROM {tbl1}",
+        "sql": "SELECT DISTINCTCOUNTSMARTHLL(val, 'hllLog2m=2') FROM {tbl1}",
         "outputs": [[3]]
       },
       {
-        "sql": "SELECT groupingCol, DISTINCTCOUNTSMARTHLL(val) FROM {tbl1} GROUP BY groupingCol",
+        "sql": "SELECT groupingCol, DISTINCTCOUNTSMARTHLL(val, 'hllConversionThreshold=10;hllLog2m=8') FROM {tbl1} GROUP BY groupingCol",
         "outputs": [["b", 2], ["a", 2]]
       },
       {
@@ -157,11 +157,11 @@
         "outputs": [["b", 2, 3], ["a", 2, 3]]
       },
       {
-        "sql": "SELECT l.groupingCol, DISTINCTCOUNTSMARTHLL(CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "sql": "SELECT l.groupingCol, DISTINCTCOUNTSMARTHLL(CONCAT(l.val, r.val), 'threshold=10;hllLog2m=2') FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
         "outputs": [["b", 6], ["a", 6]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, DISTINCTCOUNTSMARTHLL(val) FROM {tbl1} GROUP BY groupingCol",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, DISTINCTCOUNTSMARTHLL(val, 'hllConversionThreshold=10;hllLog2m=8') FROM {tbl1} GROUP BY groupingCol",
         "outputs": [["b", 2], ["a", 2]]
       },
       {
@@ -169,7 +169,7 @@
         "outputs": [["b", 2, 3], ["a", 2, 3]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, DISTINCTCOUNTSMARTHLL(CONCAT(l.val, r.val)) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, DISTINCTCOUNTSMARTHLL(CONCAT(l.val, r.val), 'threshold=10;hllLog2m=2') FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
         "outputs": [["b", 6], ["a", 6]]
       },
       {
@@ -177,8 +177,8 @@
         "outputs": [["000000020000000400000460"]]
       },
       {
-        "sql": "SELECT groupingCol, DISTINCTCOUNTRAWHLL(val, 2) FROM {tbl1} GROUP BY groupingCol",
-        "outputs": [["a", "000000020000000400000060"], ["b", "000000020000000400000420"]]
+        "sql": "SELECT groupingCol, DISTINCTCOUNTRAWHLL(val) FROM {tbl1} GROUP BY groupingCol",
+        "outputs": [["a", "00000008000000ac00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"], ["b", "00000008000000ac00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"]]
       },
       {
         "sql": "SELECT l.groupingCol, DISTINCTCOUNTRAWHLL(l.val, 2), DISTINCTCOUNTRAWHLL(r.val, 2) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
@@ -189,8 +189,8 @@
         "outputs": [["a", "000000020000000400028842"], ["b", "000000020000000400008405"]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, DISTINCTCOUNTRAWHLL(val, 2) FROM {tbl1} GROUP BY groupingCol",
-        "outputs": [["a", "000000020000000400000060"], ["b", "000000020000000400000420"]]
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, DISTINCTCOUNTRAWHLL(val) FROM {tbl1} GROUP BY groupingCol",
+        "outputs": [["a", "00000008000000ac00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"], ["b", "00000008000000ac00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"]]
       },
       {
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, DISTINCTCOUNTRAWHLL(l.val, 2), DISTINCTCOUNTRAWHLL(r.val, 2) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
