@@ -22,7 +22,7 @@ import { makeStyles } from '@material-ui/core/styles';
 import { Box, Button, FormControlLabel, Grid, Switch, Tooltip, Typography } from '@material-ui/core';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { DISPLAY_SEGMENT_STATUS, TableData, TableSegmentJobs } from 'Models';
+import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType } from 'Models';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
 import TableToolbar from '../components/TableToolbar';
@@ -246,19 +246,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   };
 
   const toggleTableState = async () => {
-    const result = await PinotMethodUtils.toggleTableState(tableName, state.enabled ? 'disable' : 'enable', tableType.toLowerCase());
-    if(!result.error && result[0].state){
-      if(result[0].state.successful){
-        dispatch({type: 'success', message: result[0].state.message, show: true});
-        setState({ enabled: !state.enabled });
-        fetchTableData();
-      } else {
-        dispatch({type: 'error', message: result[0].state.message, show: true});
-      }
-      closeDialog();
-    } else {
-      syncResponse(result);
-    }
+    const result = await PinotMethodUtils.toggleTableState(tableName, state.enabled ? InstanceState.DISABLE : InstanceState.ENABLE, tableType.toLowerCase() as TableType);
+    syncResponse(result);
   };
 
   const handleConfigChange = (value: string) => {
