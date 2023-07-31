@@ -173,7 +173,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _reducerScheduler = new OpChainSchedulerService(REDUCE_EXECUTOR);
+    _reducerScheduler = new OpChainSchedulerService(EXECUTOR);
     _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
         new PinotConfiguration(reducerConfig), ignoreMe -> {
     });

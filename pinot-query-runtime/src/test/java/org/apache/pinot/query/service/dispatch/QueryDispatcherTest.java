@@ -24,17 +24,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PlannerUtils;
+import org.apache.pinot.query.runtime.OpChainExecutor;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -53,10 +51,8 @@ import org.testng.collections.Lists;
 public class QueryDispatcherTest extends QueryTestSet {
   private static final Random RANDOM_REQUEST_ID_GEN = new Random();
   private static final int QUERY_SERVER_COUNT = 2;
-  private static final ExecutorService LEAF_WORKER_EXECUTOR_SERVICE = Executors.newFixedThreadPool(
-      ResourceManager.DEFAULT_QUERY_WORKER_THREADS, new NamedThreadFactory("QueryDispatcherTest_LeafWorker"));
-  private static final ExecutorService INTERM_WORKER_EXECUTOR_SERVICE = Executors.newCachedThreadPool(
-      new NamedThreadFactory("QueryDispatcherTest_IntermWorker"));
+  private static final OpChainExecutor EXECUTOR = new OpChainExecutor(
+      new NamedThreadFactory("worker_on_" + QueryDispatcherTest.class.getSimpleName()));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
@@ -71,8 +67,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
-      Mockito.when(queryRunner.getQueryWorkerLeafExecutorService()).thenReturn(LEAF_WORKER_EXECUTOR_SERVICE);
-      Mockito.when(queryRunner.getQueryWorkerIntermExecutorService()).thenReturn(INTERM_WORKER_EXECUTOR_SERVICE);
+      Mockito.when(queryRunner.getQueryWorkerLeafExecutorService()).thenReturn(EXECUTOR);
+      Mockito.when(queryRunner.getQueryWorkerIntermExecutorService()).thenReturn(EXECUTOR);
       QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer = Mockito.spy(queryServer);
       queryServer.start();
@@ -93,6 +89,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (QueryServer worker : _queryServerMap.values()) {
       worker.shutdown();
     }
+    EXECUTOR.close();
   }
 
   @Test(dataProvider = "testSql")
@@ -143,7 +140,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     RequestContext context = new DefaultRequestContext();
     context.setRequestId(requestId);
     try {
-      dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false);
+      dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false,
+          EXECUTOR);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error executing query"));
@@ -168,7 +166,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     context.setRequestId(requestId);
     try {
       // will throw b/c mailboxService is null
-      dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false);
+      dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false,
+          EXECUTOR);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       System.out.println("e = " + e);

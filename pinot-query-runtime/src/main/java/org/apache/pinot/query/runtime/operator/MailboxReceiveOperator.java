@@ -42,6 +42,6 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    return readBlockBlocking();
+    return getMultiConsumer().readBlockBlocking();
   }
 }

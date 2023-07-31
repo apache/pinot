@@ -75,7 +75,7 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     while (true) { // loop in order to keep asking if we receive data blocks
-      TransferableBlock block = readBlockBlocking();
+      TransferableBlock block = getMultiConsumer().readBlockBlocking();
       if (block.isDataBlock()) {
         _rows.addAll(block.getContainer());
       } else if (block.isErrorBlock()) {

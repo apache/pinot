@@ -19,28 +19,31 @@
 package org.apache.pinot.query.runtime.plan.pipeline;
 
 import com.google.common.collect.ImmutableSet;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.utils.BlockingMultiConsumer;
+import org.apache.pinot.query.runtime.operator.utils.BlockingStream;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
 class PipelineBreakerOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
-  private final Deque<Map.Entry<Integer, Operator<TransferableBlock>>> _workerEntries;
   private final Map<Integer, List<TransferableBlock>> _resultMap;
   private final ImmutableSet<Integer> _expectedKeySet;
-  private TransferableBlock _errorBlock;
+  private final BlockingMultiConsumer<Pair<Integer, TransferableBlock>> _blockConsumer;
 
 
   public PipelineBreakerOperator(OpChainExecutionContext context,
@@ -48,11 +51,11 @@ class PipelineBreakerOperator extends MultiStageOperator {
     super(context);
     _resultMap = new HashMap<>();
     _expectedKeySet = ImmutableSet.copyOf(pipelineWorkerMap.keySet());
-    _workerEntries = new ArrayDeque<>();
-    _workerEntries.addAll(pipelineWorkerMap.entrySet());
     for (int workerKey : _expectedKeySet) {
       _resultMap.put(workerKey, new ArrayList<>());
     }
+    _blockConsumer = new MyBlockingMultiConsumer(context.getId(), context.getDeadlineMs(), context.getExecutor(),
+        pipelineWorkerMap.entrySet());
   }
 
   public Map<Integer, List<TransferableBlock>> getResultMap() {
@@ -67,47 +70,16 @@ class PipelineBreakerOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (System.currentTimeMillis() > _context.getDeadlineMs()) {
-      _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
-      constructErrorResponse(_errorBlock);
-      return _errorBlock;
-    }
-
-    // Poll from every mailbox operator in round-robin fashion:
-    // - Return the first content block
-    // - If no content block found but there are mailboxes not finished, return no-op block
-    // - If all content blocks are already returned, return end-of-stream block
-    int numWorkers = _workerEntries.size();
-    for (int i = 0; i < numWorkers; i++) {
-      Map.Entry<Integer, Operator<TransferableBlock>> worker = _workerEntries.remove();
-      @Nullable
-      TransferableBlock block = worker.getValue().nextBlock();
-
-      // Release the mailbox worker when the block is end-of-stream
-      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
-        continue;
-      }
-
-      // Add the worker back to the queue if the block is not end-of-stream
-      // TODO: Doesn't null also mean to be end of stream?
-      _workerEntries.add(worker);
-      if (block != null) {
-        if (block.isErrorBlock()) {
-          _errorBlock = block;
-          constructErrorResponse(block);
-          return _errorBlock;
-        }
-        if (!block.isEndOfStreamBlock()) {
-          _resultMap.get(worker.getKey()).add(block);
-        }
-        return block;
-      }
-    }
-
-    if (_workerEntries.isEmpty()) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    Pair<Integer, TransferableBlock> pair = _blockConsumer.readBlockBlocking();
+    TransferableBlock block = pair.getRight();
+    if (block.isDataBlock()) {
+      _resultMap.get(pair.getLeft()).add(block);
+      return block;
+    } else if (block.isErrorBlock()) {
+      constructErrorResponse(block);
+      return block;
     } else {
-      throw new UnsupportedOperationException("TODO: We need to rewrite this class");
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
   }
 
@@ -117,6 +89,63 @@ class PipelineBreakerOperator extends MultiStageOperator {
   private void constructErrorResponse(TransferableBlock errorBlock) {
     for (int key : _expectedKeySet) {
       _resultMap.put(key, Collections.singletonList(errorBlock));
+    }
+  }
+
+  private static class MyBlockingMultiConsumer extends BlockingMultiConsumer<Pair<Integer, TransferableBlock>> {
+    public MyBlockingMultiConsumer(Object id, long deadlineMs, Executor executor,
+        Collection<Map.Entry<Integer, Operator<TransferableBlock>>> entries) {
+      super(id, deadlineMs, executor, entries.stream()
+          .map(PipelineBlockProducer::new)
+          .collect(Collectors.toList()));
+    }
+
+    @Override
+    protected boolean isError(Pair<Integer, TransferableBlock> element) {
+      return element.getRight().isErrorBlock();
+    }
+
+    @Override
+    protected boolean isEos(Pair<Integer, TransferableBlock> element) {
+      return element.getRight().isSuccessfulEndOfStreamBlock();
+    }
+
+    @Override
+    protected Pair<Integer, TransferableBlock> onTimeout() {
+      return Pair.of(-1, TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR));
+    }
+
+    @Override
+    protected Pair<Integer, TransferableBlock> onException(Exception e) {
+      return Pair.of(-1, TransferableBlockUtils.getErrorTransferableBlock(e));
+    }
+
+    @Override
+    protected Pair<Integer, TransferableBlock> onEos() {
+      return Pair.of(-1, TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    }
+  }
+
+  private static class PipelineBlockProducer implements BlockingStream<Pair<Integer, TransferableBlock>> {
+    private final Map.Entry<Integer, Operator<TransferableBlock>> _workEntry;
+
+    public PipelineBlockProducer(Map.Entry<Integer, Operator<TransferableBlock>> workEntry) {
+      _workEntry = workEntry;
+    }
+
+    @Override
+    public Object getId() {
+      return _workEntry.getKey();
+    }
+
+    @Override
+    public Pair<Integer, TransferableBlock> get() {
+      return Pair.of(_workEntry.getKey(), _workEntry.getValue().nextBlock());
+    }
+
+    @Override
+    public void cancel() {
+      // Nothing to do
     }
   }
 }

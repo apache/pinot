@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.plan;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -42,17 +43,19 @@ public class OpChainExecutionContext {
   private final OpChainId _id;
   private final OpChainStats _stats;
   private final boolean _traceEnabled;
+  private final Executor _executor;
 
   @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
       VirtualServerAddress server, long deadlineMs, StageMetadata stageMetadata,
-      PipelineBreakerResult pipelineBreakerResult, boolean traceEnabled) {
+      PipelineBreakerResult pipelineBreakerResult, boolean traceEnabled, Executor executor) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
     _server = server;
     _deadlineMs = deadlineMs;
     _stageMetadata = stageMetadata;
+    _executor = executor;
     _id = new OpChainId(requestId, server.workerId(), stageId);
     _stats = new OpChainStats(_id.toString());
     if (pipelineBreakerResult != null && pipelineBreakerResult.getOpChainStats() != null) {
@@ -62,10 +65,10 @@ public class OpChainExecutionContext {
     _traceEnabled = traceEnabled;
   }
 
-  public OpChainExecutionContext(PhysicalPlanContext physicalPlanContext) {
+  public OpChainExecutionContext(PhysicalPlanContext physicalPlanContext, Executor executor) {
     this(physicalPlanContext.getMailboxService(), physicalPlanContext.getRequestId(), physicalPlanContext.getStageId(),
         physicalPlanContext.getServer(), physicalPlanContext.getDeadlineMs(), physicalPlanContext.getStageMetadata(),
-        physicalPlanContext.getPipelineBreakerResult(), physicalPlanContext.isTraceEnabled());
+        physicalPlanContext.getPipelineBreakerResult(), physicalPlanContext.isTraceEnabled(), executor);
   }
 
   public MailboxService getMailboxService() {
@@ -106,5 +109,14 @@ public class OpChainExecutionContext {
 
   public boolean isTraceEnabled() {
     return _traceEnabled;
+  }
+
+  /**
+   * Returns an executor that can be used to spawn new tasks.
+   *
+   * Callers can assume the returned executor will have as many threads as needed to avoid interblocking problems.
+   */
+  public Executor getExecutor() {
+    return _executor;
   }
 }

@@ -26,6 +26,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.QueryRunnerTest;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -75,22 +76,25 @@ public class OperatorTestUtil {
 
   public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService,
       VirtualServerAddress receiverAddress, long deadlineMs, StageMetadata stageMetadata) {
-    return new OpChainExecutionContext(mailboxService, 0, 0, receiverAddress, deadlineMs, stageMetadata, null, false);
+    return new OpChainExecutionContext(mailboxService, 0, 0, receiverAddress, deadlineMs, stageMetadata, null, false,
+        QueryRunnerTest.EXECUTOR);
   }
 
   public static OpChainExecutionContext getDefaultContext() {
     VirtualServerAddress virtualServerAddress = new VirtualServerAddress("mock", 80, 0);
-    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE, null, null, true);
+    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE, null, null, true,
+        QueryRunnerTest.EXECUTOR);
   }
 
   public static OpChainExecutionContext getDefaultContextWithTracingDisabled() {
     VirtualServerAddress virtualServerAddress = new VirtualServerAddress("mock", 80, 0);
-    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE, null, null, false);
+    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE, null, null, false,
+        QueryRunnerTest.EXECUTOR);
   }
 
   public static OpChainExecutionContext getContext(long requestId, int stageId,
       VirtualServerAddress virtualServerAddress) {
     return new OpChainExecutionContext(null, requestId, stageId, virtualServerAddress, Long.MAX_VALUE, null, null,
-        true);
+        true, QueryRunnerTest.EXECUTOR);
   }
 }

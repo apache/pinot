@@ -20,10 +20,10 @@ package org.apache.pinot.query.runtime.executor;
 
 import com.google.common.collect.ImmutableList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.OpChainExecutor;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -41,7 +41,7 @@ import static org.mockito.Mockito.clearInvocations;
 
 public class OpChainSchedulerServiceTest {
 
-  private ExecutorService _executor;
+  private OpChainExecutor _executor;
   private AutoCloseable _mocks;
 
   private MultiStageOperator _operatorA;
@@ -49,12 +49,14 @@ public class OpChainSchedulerServiceTest {
   @BeforeClass
   public void beforeClass() {
     _mocks = MockitoAnnotations.openMocks(this);
+    _executor = new OpChainExecutor(new NamedThreadFactory("worker_on_" + getClass().getSimpleName()));
   }
 
   @AfterClass
   public void afterClass()
       throws Exception {
     _mocks.close();
+    _executor.close();
   }
 
   @BeforeMethod
@@ -63,20 +65,16 @@ public class OpChainSchedulerServiceTest {
     clearInvocations(_operatorA);
   }
 
-  private void initExecutor(int numThreads) {
-    _executor = Executors.newFixedThreadPool(numThreads);
-  }
-
   private OpChain getChain(MultiStageOperator operator) {
     VirtualServerAddress address = new VirtualServerAddress("localhost", 1234, 1);
-    OpChainExecutionContext context = new OpChainExecutionContext(null, 123L, 1, address, 0, null, null, true);
+    OpChainExecutionContext context = new OpChainExecutionContext(null, 123L, 1, address, 0, null, null, true,
+        _executor);
     return new OpChain(context, operator, ImmutableList.of());
   }
 
   @Test
   public void shouldScheduleSingleOpChainRegisteredAfterStart()
       throws InterruptedException {
-    initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
 
@@ -94,7 +92,6 @@ public class OpChainSchedulerServiceTest {
   @Test
   public void shouldScheduleSingleOpChainRegisteredBeforeStart()
       throws InterruptedException {
-    initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
 
@@ -112,7 +109,6 @@ public class OpChainSchedulerServiceTest {
   @Test
   public void shouldCallCloseOnOperatorsThatFinishSuccessfully()
       throws InterruptedException {
-    initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
 
@@ -131,7 +127,6 @@ public class OpChainSchedulerServiceTest {
   @Test
   public void shouldCallCancelOnOperatorsThatReturnErrorBlock()
       throws InterruptedException {
-    initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
 
@@ -195,7 +190,6 @@ public class OpChainSchedulerServiceTest {
   @Test
   public void shouldCallCancelOnOpChainsThatThrow()
       throws InterruptedException {
-    initExecutor(1);
     OpChain opChain = getChain(_operatorA);
     OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
 

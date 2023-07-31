@@ -65,7 +65,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       new Object[]{"charlie", "bar", 1},
   };
   public static final Schema.SchemaBuilder SCHEMA_BUILDER;
-
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder()
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -128,7 +127,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _reducerScheduler = new OpChainSchedulerService(REDUCE_EXECUTOR);
+    _reducerScheduler = new OpChainSchedulerService(EXECUTOR);
     _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
         new PinotConfiguration(reducerConfig));
     _mailboxService.start();
@@ -205,7 +204,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     try {
       QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
           Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
-          _reducerScheduler, null, false);
+          _reducerScheduler, null, false, EXECUTOR);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
       // TODO: The actual message is (usually) something like:

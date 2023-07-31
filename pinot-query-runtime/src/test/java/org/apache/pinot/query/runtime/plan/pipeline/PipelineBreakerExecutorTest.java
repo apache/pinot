@@ -22,13 +22,13 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -37,6 +37,7 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.OpChainExecutor;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
@@ -46,6 +47,7 @@ import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -70,7 +72,9 @@ public class PipelineBreakerExecutorTest {
   private ReceivingMailbox _mailbox2;
 
   private VirtualServerAddress _server = new VirtualServerAddress("localhost", 123, 0);
-  private OpChainSchedulerService _scheduler = new OpChainSchedulerService(Executors.newCachedThreadPool());
+  private OpChainExecutor _executor =
+      new OpChainExecutor(new NamedThreadFactory("worker_on_" + getClass().getSimpleName()));
+  private OpChainSchedulerService _scheduler = new OpChainSchedulerService(_executor);
   private StageMetadata _stageMetadata1 = new StageMetadata.Builder().setWorkerMetadataList(Stream.of(_server).map(
       s -> new WorkerMetadata.Builder().setVirtualServerAddress(s)
           .addMailBoxInfoMap(0, new MailboxMetadata(
@@ -98,6 +102,11 @@ public class PipelineBreakerExecutorTest {
     _mocks.close();
   }
 
+  @AfterClass
+  public void afterClass() {
+    _executor.close();
+  }
+
   @Test(enabled = false) // TODO: Enable once pipeline breaker is adapted
   public void shouldReturnBlocksUponNormalOperation() {
     MailboxReceiveNode mailboxReceiveNode =
@@ -116,7 +125,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            System.currentTimeMillis() + 10_000L, 0, false, _executor);
 
     // then
     // should have single PB result, receive 2 data blocks, EOS block shouldn't be included
@@ -155,7 +164,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            System.currentTimeMillis() + 10_000L, 0, false, _executor);
 
     // then
     // should have two PB result, receive 2 data blocks, one each, EOS block shouldn't be included
@@ -182,7 +191,7 @@ public class PipelineBreakerExecutorTest {
     // when
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            System.currentTimeMillis() + 10_000L, 0, false, _executor);
 
     // then
     // should contain only failure error blocks
@@ -215,7 +224,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() - 10_000L, 0, false);
+            System.currentTimeMillis() - 10_000L, 0, false, _executor);
 
     // then
     // should contain only failure error blocks
@@ -253,7 +262,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            System.currentTimeMillis() + 10_000L, 0, false, _executor);
 
     // then
     // should fail even if one of the 2 PB returns correct results.
@@ -295,7 +304,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            System.currentTimeMillis() + 10_000L, 0, false, _executor);
 
     // then
     // should fail even if one of the 2 PB doesn't contain error block from sender.

@@ -37,18 +37,16 @@ public class PhysicalPlanContext {
   private final OpChainExecutionContext _opChainExecutionContext;
   private final boolean _traceEnabled;
 
-  public PhysicalPlanContext(MailboxService mailboxService, long requestId, int stageId, long deadlineMs,
-      VirtualServerAddress server, StageMetadata stageMetadata, PipelineBreakerResult pipelineBreakerResult,
-      boolean traceEnabled) {
-    _mailboxService = mailboxService;
-    _requestId = requestId;
-    _stageId = stageId;
-    _deadlineMs = deadlineMs;
-    _server = server;
-    _stageMetadata = stageMetadata;
+  public PhysicalPlanContext(OpChainExecutionContext opChainContext, PipelineBreakerResult pipelineBreakerResult) {
+    _mailboxService = opChainContext.getMailboxService();
+    _requestId = opChainContext.getRequestId();
+    _stageId = opChainContext.getStageId();
+    _deadlineMs = opChainContext.getDeadlineMs();
+    _server = opChainContext.getServer();
+    _stageMetadata = opChainContext.getStageMetadata();
     _pipelineBreakerResult = pipelineBreakerResult;
-    _traceEnabled = traceEnabled;
-    _opChainExecutionContext = new OpChainExecutionContext(this);
+    _traceEnabled = opChainContext.isTraceEnabled();
+    _opChainExecutionContext = opChainContext;
   }
 
   public long getRequestId() {

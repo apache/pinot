@@ -38,8 +38,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
@@ -55,6 +53,7 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.service.QueryConfig;
@@ -73,8 +72,17 @@ import org.testng.Assert;
 
 
 public abstract class QueryRunnerTestBase extends QueryTestSet {
-  protected static final ExecutorService REDUCE_EXECUTOR = Executors.newCachedThreadPool(
-      new NamedThreadFactory("TEST_REDUCER_SCHEDULER_EXECUTOR"));
+  // TODO: Find a better way to create the global test executor
+  public static final OpChainExecutor EXECUTOR = new OpChainExecutor(
+      new NamedThreadFactory("worker_on_" + OperatorTestUtil.class.getSimpleName()) {
+        @Override
+        public Thread newThread(Runnable r) {
+          Thread thread = super.newThread(r);
+          thread.setDaemon(true);
+          return thread;
+        }
+      }
+  );
   protected static final double DOUBLE_CMP_EPSILON = 0.0001d;
   protected static final String SEGMENT_BREAKER_KEY = "__SEGMENT_BREAKER_KEY__";
   protected static final String SEGMENT_BREAKER_STR = "------";
@@ -131,7 +139,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     Preconditions.checkState(reducerStageId != -1);
     ResultTable resultTable = QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
         Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
-        _reducerScheduler, executionStatsAggregatorMap, true);
+        _reducerScheduler, executionStatsAggregatorMap, true, EXECUTOR);
     return resultTable.getRows();
   }
 

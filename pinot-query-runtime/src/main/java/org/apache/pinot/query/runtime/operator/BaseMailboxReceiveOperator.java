@@ -19,24 +19,19 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
+import org.apache.pinot.query.runtime.operator.utils.BlockingMultiConsumer;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -49,20 +44,10 @@ import org.slf4j.LoggerFactory;
  * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
 public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseMailboxReceiveOperator.class);
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
-  protected final List<ReceivingMailbox> _mailboxes;
-  protected final ReentrantLock _lock = new ReentrantLock(false);
-  protected final Condition _notEmpty = _lock.newCondition();
-  /**
-   * An index that used to calculate where do we are going to start reading.
-   * The invariant is that we are always going to start reading from {@code _lastRead + 1}.
-   * Therefore {@link #_lastRead} must be in the range {@code [-1, mailbox.size() - 1]}
-   */
-  protected int _lastRead;
-  private TransferableBlock _errorBlock = null;
+  private final BlockingMultiConsumer.OfTransferableBlock _multiConsumer;
 
   public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       int senderStageId) {
@@ -80,13 +65,16 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         "Failed to find mailbox for stage: %s",
         senderStageId);
     _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, senderMailBoxMetadatas);
-    _mailboxes = new ArrayList<>(_mailboxIds.size());
-    for (String mailboxId : _mailboxIds) {
-      ReceivingMailbox mailbox = _mailboxService.getReceivingMailbox(mailboxId);
-      _mailboxes.add(mailbox);
-      mailbox.registeredReader(this::onData);
-    }
-    _lastRead = _mailboxes.size() - 1;
+
+    List<ReadMailboxAsyncStream> asyncStreams = _mailboxIds.stream()
+        .map(mailboxId -> new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this))
+        .collect(Collectors.toList());
+    _multiConsumer = new BlockingMultiConsumer.OfTransferableBlock(
+        context.getId(), context.getDeadlineMs(), asyncStreams);
+  }
+
+  protected BlockingMultiConsumer.OfTransferableBlock getMultiConsumer() {
+    return _multiConsumer;
   }
 
   public List<String> getMailboxIds() {
@@ -101,153 +89,48 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   @Override
   public void close() {
     super.close();
-    cancelRemainingMailboxes();
+    _multiConsumer.close();
   }
 
   @Override
   public void cancel(Throwable t) {
     super.cancel(t);
-    cancelRemainingMailboxes();
+    _multiConsumer.cancel(t);
   }
 
-  protected void cancelRemainingMailboxes() {
-    for (ReceivingMailbox mailbox : _mailboxes) {
-      mailbox.cancel();
-    }
-  }
+  private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
+    private final ReceivingMailbox _mailbox;
+    private final BaseMailboxReceiveOperator _operator;
 
-  public void onData() {
-    _lock.lock();
-    try {
-      _notEmpty.signal();
-    } finally {
-      _lock.unlock();
-    }
-  }
-
-  /**
-   * Reads the next block for any ready mailbox or blocks until some of them is ready.
-   *
-   * The method implements a sequential read semantic. Meaning that:
-   * <ol>
-   *   <li>EOS is only returned when all mailboxes already emitted EOS or there are no mailboxes</li>
-   *   <li>If an error is read from a mailbox, the error is returned</li>
-   *   <li>If data is read from a mailbox, that data block is returned</li>
-   *   <li>If no mailbox is ready, the calling thread is blocked</li>
-   * </ol>
-   *
-   * Right now the implementation tries to be fair. If one call returned the block from mailbox {@code i}, then next
-   * call will look for mailbox {@code i+1}, {@code i+2}... in a circular manner.
-   *
-   * In order to unblock a thread blocked here, {@link #onData()} should be called.   *
-   */
-  protected TransferableBlock readBlockBlocking() {
-    if (LOGGER.isTraceEnabled()) {
-      LOGGER.trace("==[RECEIVE]== Enter getNextBlock from: " + _context.getId() + " mailboxSize: " + _mailboxes.size());
-    }
-    // Standard optimistic execution. First we try to read without acquiring the lock.
-    TransferableBlock block = readDroppingSuccessEos();
-    if (block == null) { // we didn't find a mailbox ready to read, so we need to be pessimistic
-      boolean timeout = false;
-      _lock.lock();
-      try {
-        // let's try to read one more time now that we have the lock
-        block = readDroppingSuccessEos();
-        while (block == null && !timeout) { // still no data, we need to yield
-          if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("==[RECEIVE]== Yield : " + _context.getId());
-          }
-          timeout = !_notEmpty.await(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-          block = readDroppingSuccessEos();
-        }
-        if (timeout) {
-          if (LOGGER.isDebugEnabled()) {
-            LOGGER.warn("==[RECEIVE]== Timeout on: " + _context.getId());
-          }
-          _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
-          return _errorBlock;
-        }
-      } catch (InterruptedException ex) { // we've got interrupted while waiting for the condition
-        return TransferableBlockUtils.getErrorTransferableBlock(ex);
-      } finally {
-        _lock.unlock();
-      }
-    }
-    return block;
-  }
-
-  /**
-   * This is a utility method that reads tries to read from the different mailboxes in a circular manner.
-   *
-   * The method is a bit more complex than expected because ir order to simplify {@link #readBlockBlocking} we added
-   * some extra logic here. For example, this method checks for timeouts, add some logs, releases mailboxes that emitted
-   * EOS and in case an error block is found, stores it.
-   *
-   * @return the new block to consume or null if none is found. EOS is only emitted when all mailboxes already emitted
-   * EOS.
-   */
-  @Nullable
-  private TransferableBlock readDroppingSuccessEos() {
-    if (System.currentTimeMillis() > _context.getDeadlineMs()) {
-      _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
-      return _errorBlock;
+    public ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator operator) {
+      _mailbox = mailbox;
+      _operator = operator;
     }
 
-    TransferableBlock block = readBlockOrNull();
-    while (block != null && block.isSuccessfulEndOfStreamBlock() && !_mailboxes.isEmpty()) {
-      // we have read a EOS
-      ReceivingMailbox removed = _mailboxes.remove(_lastRead);
-      // this is done in order to keep the invariant.
-      _lastRead--;
-      _mailboxService.releaseReceivingMailbox(removed);
-      _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("==[RECEIVE]== EOS received : " + _context.getId() + " in mailbox: " + removed.getId());
-      }
+    @Override
+    public Object getId() {
+      return _mailbox.getId();
+    }
 
-      block = readBlockOrNull();
-    }
-    if (_mailboxes.isEmpty()) {
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("==[RECEIVE]== Finished : " + _context.getId());
+    @Nullable
+    @Override
+    public TransferableBlock poll() {
+      TransferableBlock block = _mailbox.poll();
+      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
+        _operator._mailboxService.releaseReceivingMailbox(_mailbox);
+        _operator._opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
       }
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return block;
     }
-    if (block != null) {
-      if (LOGGER.isTraceEnabled()) {
-        ReceivingMailbox mailbox = _mailboxes.get(_lastRead);
-        LOGGER.trace("==[RECEIVE]== Returned block from : " + _context.getId() + " in mailbox: " + mailbox.getId());
-      }
-      if (block.isErrorBlock()) {
-        _errorBlock = block;
-      }
-    }
-    return block;
-  }
 
-  /**
-   * The utility method that actually does the circular reading trying to be fair.
-   * @return The first block that is found on any mailbox, including EOS.
-   */
-  @Nullable
-  private TransferableBlock readBlockOrNull() {
-    // in case _lastRead is _mailboxes.size() - 1, we just skip this loop.
-    for (int i = _lastRead + 1; i < _mailboxes.size(); i++) {
-      ReceivingMailbox mailbox = _mailboxes.get(i);
-      TransferableBlock block = mailbox.poll();
-      if (block != null) {
-        _lastRead = i;
-        return block;
-      }
+    @Override
+    public void addOnNewDataListener(OnNewData onNewData) {
+      _mailbox.registeredReader(onNewData::newDataAvailable);
     }
-    for (int i = 0; i <= _lastRead; i++) {
-      ReceivingMailbox mailbox = _mailboxes.get(i);
-      TransferableBlock block = mailbox.poll();
-      if (block != null) {
-        _lastRead = i;
-        return block;
-      }
+
+    @Override
+    public void cancel() {
+      _mailbox.cancel();
     }
-    return null;
   }
 }

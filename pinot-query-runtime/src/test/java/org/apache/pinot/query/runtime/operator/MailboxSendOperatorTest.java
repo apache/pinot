@@ -22,9 +22,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.OpChainExecutor;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -61,6 +63,7 @@ public class MailboxSendOperatorTest {
   private MailboxService _mailboxService;
   @Mock
   private BlockExchange _exchange;
+  private OpChainExecutor _executor;
 
   @BeforeMethod
   public void setUp()
@@ -70,12 +73,14 @@ public class MailboxSendOperatorTest {
     when(_server.port()).thenReturn(0);
     when(_server.workerId()).thenReturn(0);
     when(_exchange.offerBlock(any(), anyLong())).thenReturn(true);
+    _executor = new OpChainExecutor(new NamedThreadFactory("worker_on_" + getClass().getSimpleName()));
   }
 
   @AfterMethod
   public void tearDown()
       throws Exception {
     _mocks.close();
+    _executor.close();
   }
 
   @Test
@@ -178,7 +183,7 @@ public class MailboxSendOperatorTest {
             new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE,
-            stageMetadata, null, false);
+            stageMetadata, null, false, _executor);
     return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }
