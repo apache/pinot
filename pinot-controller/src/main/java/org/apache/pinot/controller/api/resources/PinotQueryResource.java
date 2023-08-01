@@ -30,6 +30,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -202,7 +203,7 @@ public class PinotQueryResource {
     QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
     List<String> tableNames = queryEnvironment.getTableNamesForQuery(query);
-    String brokerTenant;
+    Set<String> brokerTenants;
     if (tableNames.size() != 0) {
       List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
       if (tableConfigList == null || tableConfigList.size() == 0) {
@@ -214,31 +215,19 @@ public class PinotQueryResource {
       // tenants can be completely disjoint. The leaf stages which access segments will be processed on the respective
       // server tenants for each table. The intermediate stages can be processed in either or all of the server tenants
       // belonging to the tables.
-      brokerTenant = getCommonBrokerTenant(tableConfigList);
-      if (brokerTenant == null) {
+      brokerTenants = getCommonBrokerTenants(tableConfigList);
+      if (brokerTenants.isEmpty()) {
         return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR, new Exception(
             String.format("Unable to dispatch multistage query with multiple tables : %s " + "on different tenant",
                 tableNames))).toString();
       }
     } else {
       // TODO fail these queries going forward. Added this logic to take care of tautologies like BETWEEN 0 and -1.
-      List<String> allBrokerList = new ArrayList<>(_pinotHelixResourceManager.getAllBrokerTenantNames());
-      brokerTenant = allBrokerList.get(RANDOM.nextInt(allBrokerList.size()));
+      brokerTenants = _pinotHelixResourceManager.getAllBrokerTenantNames();
       LOGGER.error("Unable to find table name from SQL {} thus dispatching to random broker.", query);
     }
-    List<String> instanceIds = new ArrayList<>(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(brokerTenant));
-
-    if (instanceIds.isEmpty()) {
-      return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
-    }
-
-    instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
-    if (instanceIds.isEmpty()) {
-      return QueryException.BROKER_INSTANCE_MISSING_ERROR.toString();
-    }
-
-    // Send query to a random broker.
-    String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
+    List<String> instanceIds = findCommonBrokerInstance(brokerTenants);
+    String instanceId = selectInstanceId(instanceIds);
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
 
@@ -265,18 +254,7 @@ public class PinotQueryResource {
 
     // Get brokers for the resource table.
     List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
-    if (instanceIds.isEmpty()) {
-      return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
-    }
-
-    // Retain only online brokers.
-    instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
-    if (instanceIds.isEmpty()) {
-      return QueryException.BROKER_INSTANCE_MISSING_ERROR.toString();
-    }
-
-    // Send query to a random broker.
-    String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
+    String instanceId = selectInstanceId(instanceIds);
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
 
@@ -299,16 +277,40 @@ public class PinotQueryResource {
     return allTableConfigList;
   }
 
+  private String selectInstanceId(List<String> instanceIds) {
+    if (instanceIds.isEmpty()) {
+      return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
+    }
+
+    instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
+    if (instanceIds.isEmpty()) {
+      return QueryException.BROKER_INSTANCE_MISSING_ERROR.toString();
+    }
+
+    // Send query to a random broker.
+    return instanceIds.get(RANDOM.nextInt(instanceIds.size()));
+  }
+
+  private List<String> findCommonBrokerInstance(Set<String> brokerTenants) {
+    Set<String> commonInstances = null;
+    for (String brokerTenant : brokerTenants) {
+      Set<String> instances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(brokerTenant);
+      if (commonInstances == null) {
+        commonInstances = instances;
+      } else {
+        commonInstances.retainAll(instances);
+      }
+    }
+    return commonInstances == null ? Collections.emptyList() : new ArrayList<>(commonInstances);
+  }
+
   // return the brokerTenant if all table configs point to the same broker, else returns null
-  private String getCommonBrokerTenant(List<TableConfig> tableConfigList) {
-    Set<String> tableBrokers = new HashSet<>();
+  private Set<String> getCommonBrokerTenants(List<TableConfig> tableConfigList) {
+    Set<String> tableBrokerTenants = new HashSet<>();
     for (TableConfig tableConfig : tableConfigList) {
-      tableBrokers.add(tableConfig.getTenantConfig().getBroker());
+      tableBrokerTenants.add(tableConfig.getTenantConfig().getBroker());
     }
-    if (tableBrokers.size() != 1) {
-      return null;
-    }
-    return (String) (tableBrokers.toArray()[0]);
+    return tableBrokerTenants;
   }
 
   private String sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,
