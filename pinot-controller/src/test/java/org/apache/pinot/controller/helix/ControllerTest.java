@@ -597,6 +597,11 @@ public class ControllerTest {
     }
   }
 
+  public void stopAndDropFakeInstance(String instanceId) {
+    stopFakeInstance(instanceId);
+    _helixResourceManager.dropInstance(instanceId);
+  }
+
   public static Schema createDummySchema(String tableName) {
     Schema schema = new Schema();
     schema.setSchemaName(tableName);
@@ -733,6 +738,11 @@ public class ControllerTest {
   public void updateBrokerTenant(String tenantName, int numBrokers)
       throws IOException {
     getControllerRequestClient().updateBrokerTenant(tenantName, numBrokers);
+  }
+
+  public void deleteBrokerTenant(String tenantName)
+      throws IOException {
+    getControllerRequestClient().deleteBrokerTenant(tenantName);
   }
 
   public void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)

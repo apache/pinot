@@ -85,6 +85,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables");
   }
 
+  public String forTablesFromTenant(String tenantName, String componentType) {
+    return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables") + "?type=" + componentType;
+  }
+
   // V2 API started
   public String forTenantCreate() {
     return StringUtil.join("/", _baseUrl, "tenants");
