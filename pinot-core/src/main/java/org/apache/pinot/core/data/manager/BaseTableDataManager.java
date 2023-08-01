@@ -232,7 +232,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
+
     indexLoadingConfig.setTableDataDir(_tableDataDir);
+    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, indexLoadingConfig.getSchema()));
   }
 
