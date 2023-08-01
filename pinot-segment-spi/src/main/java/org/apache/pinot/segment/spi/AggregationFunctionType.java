@@ -147,7 +147,8 @@ public enum AggregationFunctionType {
   AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch"),
 
   // Geo aggregation functions
-  STUNION("STUnion"),
+  STUNION("STUnion", ImmutableList.of("ST_UNION"), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.BINARY, ReturnTypes.explicit(SqlTypeName.VARBINARY), ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   // Aggregation functions for multi-valued columns
   COUNTMV("countMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
