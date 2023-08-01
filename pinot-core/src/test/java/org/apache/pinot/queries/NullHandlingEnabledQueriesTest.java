@@ -695,4 +695,28 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 4);
   }
+
+  @Test
+  public void testExpressionFilterOperatorApplyAndForGetFalses()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    insertRowWithTwoColumns(Integer.MIN_VALUE, null);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(-1, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s FROM testTable WHERE AND(NOT(add(%s, 0) > 0) AND %s IS NULL)", COLUMN1, COLUMN1,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
+  }
 }

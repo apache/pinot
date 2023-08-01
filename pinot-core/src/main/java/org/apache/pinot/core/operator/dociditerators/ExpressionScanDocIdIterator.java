@@ -36,6 +36,7 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.roaringbitmap.BatchIterator;
+import org.roaringbitmap.BitmapDataProvider;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
@@ -88,7 +89,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
       ProjectionBlock projectionBlock =
           new ProjectionOperator(_dataSourceMap, new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId))
               .nextBlock();
-      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+      RoaringBitmap matchingDocIds = new RoaringBitmap();
       processProjectionBlock(projectionBlock, matchingDocIds);
       if (!matchingDocIds.isEmpty()) {
         _docIdIterator = matchingDocIds.getIntIterator();
@@ -142,96 +143,156 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     return matchingDocIds;
   }
 
-  private void processProjectionBlock(ProjectionBlock projectionBlock, MutableRoaringBitmap matchingDocIds) {
+  private void processProjectionBlock(ProjectionBlock projectionBlock, BitmapDataProvider matchingDocIds) {
     int numDocs = projectionBlock.getNumDocs();
     TransformResultMetadata resultMetadata = _transformFunction.getResultMetadata();
     if (resultMetadata.isSingleValue()) {
       _numEntriesScanned += numDocs;
+      boolean predicateEvaluationResult = _predicateEvaluationResult == PredicateEvaluationResult.TRUE;
       if (resultMetadata.hasDictionary()) {
         int[] dictIds = _transformFunction.transformToDictIdsSV(projectionBlock);
-        for (int i = 0; i < numDocs; i++) {
-          if (_predicateEvaluator.applySV(dictIds[i])) {
-            matchingDocIds.add(_docIdBuffer[i]);
+        if (_nullHandlingEnabled) {
+          RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+          for (int i = 0; i < numDocs; i++) {
+            if (_predicateEvaluator.applySV(dictIds[i]) == predicateEvaluationResult && !isNull(nullBitmap, i)) {
+              matchingDocIds.add(_docIdBuffer[i]);
+            }
+          }
+        } else {
+          for (int i = 0; i < numDocs; i++) {
+            if (_predicateEvaluator.applySV(dictIds[i]) == predicateEvaluationResult) {
+              matchingDocIds.add(_docIdBuffer[i]);
+            }
           }
         }
       } else {
         switch (resultMetadata.getDataType().getStoredType()) {
           case INT:
             int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              if (_predicateEvaluator.applySV(intValues[i])) {
-                matchingDocIds.add(_docIdBuffer[i]);
+            if (_nullHandlingEnabled) {
+              RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(intValues[i]) == predicateEvaluationResult && !isNull(nullBitmap, i)) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(intValues[i]) == predicateEvaluationResult) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
               }
             }
             break;
           case LONG:
             long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              if (_predicateEvaluator.applySV(longValues[i])) {
-                matchingDocIds.add(_docIdBuffer[i]);
+            if (_nullHandlingEnabled) {
+              RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(longValues[i]) == predicateEvaluationResult && !isNull(nullBitmap, i)) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(longValues[i]) == predicateEvaluationResult) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
               }
             }
             break;
           case FLOAT:
             float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              if (_predicateEvaluator.applySV(floatValues[i])) {
-                matchingDocIds.add(_docIdBuffer[i]);
+            if (_nullHandlingEnabled) {
+              RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(floatValues[i]) == predicateEvaluationResult && !isNull(nullBitmap,
+                    i)) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(floatValues[i]) == predicateEvaluationResult) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
               }
             }
             break;
           case DOUBLE:
             double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              if (_predicateEvaluator.applySV(doubleValues[i])) {
-                matchingDocIds.add(_docIdBuffer[i]);
+            if (_nullHandlingEnabled) {
+              RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(doubleValues[i]) == predicateEvaluationResult && !isNull(nullBitmap,
+                    i)) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(doubleValues[i]) == predicateEvaluationResult) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
               }
             }
             break;
           case STRING:
             String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              if (_predicateEvaluator.applySV(stringValues[i])) {
-                matchingDocIds.add(_docIdBuffer[i]);
+            if (_nullHandlingEnabled) {
+              RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(stringValues[i]) == predicateEvaluationResult && !isNull(nullBitmap,
+                    i)) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(stringValues[i]) == predicateEvaluationResult) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
               }
             }
             break;
           case BYTES:
             byte[][] bytesValues = _transformFunction.transformToBytesValuesSV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              if (_predicateEvaluator.applySV(bytesValues[i])) {
-                matchingDocIds.add(_docIdBuffer[i]);
+            if (_nullHandlingEnabled) {
+              RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(bytesValues[i]) == predicateEvaluationResult && !isNull(nullBitmap,
+                    i)) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(bytesValues[i]) == predicateEvaluationResult) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
               }
             }
             break;
           case BIG_DECIMAL:
             BigDecimal[] bigDecimalValues = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
-            for (int i = 0; i < numDocs; i++) {
-              if (_predicateEvaluator.applySV(bigDecimalValues[i])) {
-                matchingDocIds.add(_docIdBuffer[i]);
+            if (_nullHandlingEnabled) {
+              RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(bigDecimalValues[i]) == predicateEvaluationResult && !isNull(nullBitmap,
+                    i)) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
+              }
+            } else {
+              for (int i = 0; i < numDocs; i++) {
+                if (_predicateEvaluator.applySV(bigDecimalValues[i]) == predicateEvaluationResult) {
+                  matchingDocIds.add(_docIdBuffer[i]);
+                }
               }
             }
             break;
           default:
             throw new IllegalStateException();
-        }
-        if (_nullHandlingEnabled) {
-          RoaringBitmap nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
-          if (_predicateEvaluationResult == PredicateEvaluationResult.TRUE) {
-            if (nullBitmap != null) {
-              RoaringBitmap fullBitmap = new RoaringBitmap();
-              fullBitmap.add(0L, (long) numDocs);
-              nullBitmap.xor(fullBitmap);
-              matchingDocIds.and(nullBitmap.toMutableRoaringBitmap());
-            }
-          } else if (_predicateEvaluationResult == PredicateEvaluationResult.FALSE) {
-            MutableRoaringBitmap fullBitmap = new MutableRoaringBitmap();
-            fullBitmap.add(0L, (long) numDocs);
-            if (nullBitmap != null) {
-              matchingDocIds.or(nullBitmap.toMutableRoaringBitmap());
-            }
-            matchingDocIds.xor(fullBitmap);
-          }
         }
       }
     } else {
@@ -307,6 +368,14 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             throw new IllegalStateException();
         }
       }
+    }
+  }
+
+  private boolean isNull(RoaringBitmap nullBitmap, int docId) {
+    if (nullBitmap == null || nullBitmap.isEmpty()) {
+      return false;
+    } else {
+      return nullBitmap.contains(docId);
     }
   }
 
