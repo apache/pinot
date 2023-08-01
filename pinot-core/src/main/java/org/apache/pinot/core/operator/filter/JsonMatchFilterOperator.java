@@ -21,8 +21,8 @@ package org.apache.pinot.core.operator.filter;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
@@ -38,21 +38,20 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_JSON_INDEX";
 
   private final JsonIndexReader _jsonIndex;
-  private final int _numDocs;
   private final JsonMatchPredicate _predicate;
 
   public JsonMatchFilterOperator(JsonIndexReader jsonIndex, JsonMatchPredicate predicate,
       int numDocs) {
+    super(numDocs, false);
     _jsonIndex = jsonIndex;
     _predicate = predicate;
-    _numDocs = numDocs;
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
+  protected BlockDocIdSet getTrues() {
     ImmutableRoaringBitmap bitmap = _jsonIndex.getMatchingDocIds(_predicate.getValue());
     record(bitmap);
-    return new FilterBlock(new BitmapDocIdSet(bitmap, _numDocs));
+    return new BitmapDocIdSet(bitmap, _numDocs);
   }
 
   @Override

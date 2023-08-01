@@ -20,6 +20,7 @@ package org.apache.pinot.query.routing;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -129,6 +130,11 @@ public class WorkerManager {
         Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue()) == null,
             "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
       }
+
+      // attach unavailable segments to metadata
+      if (!routingTable.getUnavailableSegments().isEmpty()) {
+        metadata.addTableToUnavailableSegmentsMap(logicalTableName, routingTable.getUnavailableSegments());
+      }
     }
     int globalIdx = 0;
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap = new HashMap<>();
@@ -211,6 +217,12 @@ public class WorkerManager {
       serverInstances = new ArrayList<>(_routingManager.getEnabledServerInstanceMap().values());
     } else {
       serverInstances = fetchServersForIntermediateStage(tableNames);
+    }
+    if (serverInstances.isEmpty()) {
+      LOGGER.error("[RequestId: {}] No server instance found for intermediate stage for tables: {}",
+          context.getRequestId(), tableNames);
+      throw new IllegalStateException(
+          "No server instance found for intermediate stage for tables: " + Arrays.toString(tableNames.toArray()));
     }
     DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId());
     Map<String, String> options = context.getPlannerContext().getOptions();

@@ -20,10 +20,10 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 
 
 /**
@@ -31,6 +31,8 @@ import org.apache.pinot.core.operator.blocks.FilterBlock;
  */
 public final class EmptyFilterOperator extends BaseFilterOperator {
   private EmptyFilterOperator() {
+    // We will never call its getFalses() method.
+    super(0, false);
   }
 
 
@@ -58,8 +60,8 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
-    return EmptyFilterBlock.getInstance();
+  protected BlockDocIdSet getTrues() {
+    return EmptyDocIdSet.getInstance();
   }
 
 

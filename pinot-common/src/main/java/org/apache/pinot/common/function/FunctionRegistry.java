@@ -21,7 +21,6 @@ package org.apache.pinot.common.function;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -128,10 +127,6 @@ public class FunctionRegistry {
     return FUNCTION_MAP.map();
   }
 
-  public static Collection<Function> getRegisteredCalciteFunctions(String name) {
-    return FUNCTION_MAP.map().get(name);
-  }
-
   public static Set<String> getRegisteredCalciteFunctionNames() {
     return FUNCTION_MAP.map().keySet();
   }
@@ -214,6 +209,12 @@ public class FunctionRegistry {
     @ScalarFunction(names = {"clpDecode", "clp_decode"}, isPlaceholder = true)
     public static Object clpDecode(String logtypeFieldName, String dictVarsFieldName, String encodedVarsFieldName,
         String defaultValue) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction(names = {"arrayToMV", "array_to_mv"},
+        isPlaceholder = true)
+    public static String arrayToMV(Object multiValue) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
   }

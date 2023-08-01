@@ -255,15 +255,15 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       int expected = 50 + 60 + 70 + 110 + 120 + 130;
       runAndAssert(query, expected);
 
-      /*
-      query = "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Female''', "
-          + "'$1') from " + DEFAULT_TABLE_NAME;
+      query = "select getThetaSketchEstimate(distinctCountRAWThetaSketch(thetaSketchCol)"
+          + " FILTER (WHERE dimName = 'gender' and dimValue = 'Female')) from " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
-      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender''', 'dimValue = ''Female''', 'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'),"
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Female'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
-       */
     }
 
     // gender = male
@@ -273,16 +273,15 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       int expected = 80 + 90 + 100 + 140 + 150 + 160;
       runAndAssert(query, expected);
 
-      /*
-      query =
-          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''gender'' and dimValue = ''Male''', '$1') "
-              + "from " + DEFAULT_TABLE_NAME;
+      query = "select getThetaSketchEstimate(distinctCountRAWThetaSketch(thetaSketchCol)"
+          + " FILTER (WHERE dimName = 'gender' and dimValue = 'Male')) from " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
-      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender''', 'dimValue = ''Male''', 'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'),"
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Male'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
-       */
     }
 
     // course = math
@@ -292,66 +291,89 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       int expected = 50 + 80 + 110 + 140;
       runAndAssert(query, expected);
 
-      /*
-      query =
-          "select distinctCountThetaSketch(thetaSketchCol, '', 'dimName = ''course'' and dimValue = ''Math''', '$1') "
-              + "from " + DEFAULT_TABLE_NAME;
+      query = "select getThetaSketchEstimate(distinctCountRAWThetaSketch(thetaSketchCol)"
+          + " FILTER (WHERE dimName = 'course' and dimValue = 'Math')) from " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
-      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''course''', 'dimValue = ''Math''', 'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'course'),"
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Math'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
-       */
     }
 
-    /*
     // gender = female INTERSECT course = math
     {
-      String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender'' and dimValue = ''Female''', 'dimName = ''course'' and dimValue = ''Math''', "
-          + "'SET_INTERSECT($1, $2)') from " + DEFAULT_TABLE_NAME;
+      String query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'gender' and dimValue = 'Female'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'course' and dimValue = 'Math'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
       int expected = 50 + 110;
       runAndAssert(query, expected);
 
-      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''Math''', "
-          + "'SET_INTERSECT($1, $2, $3, $4)') from " + DEFAULT_TABLE_NAME;
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Female'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'course'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Math'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
 
-      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''Math''', "
-          + "'SET_INTERSECT(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT(THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Female')), "
+          + "  THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'course'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Math')))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
     }
 
     // gender = male UNION course = biology
     {
-      String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender'' and dimValue = ''Male''', 'dimName = ''course'' and dimValue = ''Biology''', "
-          + "'SET_UNION($1, $2)') from " + DEFAULT_TABLE_NAME;
+      String query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'gender' and dimValue = 'Male'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'course' and dimValue = 'Biology'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
       int expected = 70 + 80 + 90 + 100 + 130 + 140 + 150 + 160;
       runAndAssert(query, expected);
 
-      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender''', 'dimValue = ''Male''', 'dimName = ''course''', 'dimValue = ''Biology''', "
-          + "'SET_UNION(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION("
+          + "  THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Male')), "
+          + "  THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'course'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Biology')))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
     }
 
     // gender = female DIFF course = history
     {
-      String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender'' and dimValue = ''Female''', 'dimName = ''course'' and dimValue = ''History''', "
-          + "'SET_DIFF($1, $2)') from " + DEFAULT_TABLE_NAME;
+      String query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'gender' and dimValue = 'Female'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'course' and dimValue = 'History'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
       int expected = 50 + 110 + 70 + 130;
       runAndAssert(query, expected);
 
-      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
-          + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''History''', "
-          + "'SET_DIFF(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF("
+          + "  THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Female')), "
+          + "  THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'course'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'History')))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
       runAndAssert(query, expected);
     }
-     */
 
     // group by gender
     {

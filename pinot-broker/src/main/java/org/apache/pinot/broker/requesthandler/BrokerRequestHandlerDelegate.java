@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.exception.QueryException;
@@ -81,7 +82,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws Exception {
     requestContext.setBrokerId(_brokerId);
     if (sqlNodeAndOptions == null) {
@@ -101,10 +102,10 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
     if (_multiStageBrokerRequestHandler != null && Boolean.parseBoolean(sqlNodeAndOptions.getOptions().get(
           CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
-        return _multiStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext);
+        return _multiStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext, httpHeaders);
     } else {
       return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
-          requestContext);
+          requestContext, httpHeaders);
     }
   }
 

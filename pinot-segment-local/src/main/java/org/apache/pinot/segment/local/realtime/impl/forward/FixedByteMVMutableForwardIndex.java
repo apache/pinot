@@ -163,7 +163,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
    */
   private void addDataBuffer(int rowCapacity) {
     try {
-      long size = rowCapacity * _columnSizeInBytes;
+      long size = (long) rowCapacity * (long) _columnSizeInBytes;
       LOGGER.info("Allocating data buffer of size {} for column {}", size, _context);
       // NOTE: PinotDataBuffer is tracked in PinotDataBufferMemoryManager. No need to track and close inside the class.
       PinotDataBuffer dataBuffer = _memoryManager.allocate(size, _context);

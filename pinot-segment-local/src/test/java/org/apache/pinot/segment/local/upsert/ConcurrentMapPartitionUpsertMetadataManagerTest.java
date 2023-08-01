@@ -50,6 +50,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -71,10 +72,15 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       new File(FileUtils.getTempDirectory(), "ConcurrentMapPartitionUpsertMetadataManagerTest");
 
   @BeforeClass
-  public void setup()
-      throws Exception {
-    FileUtils.deleteQuietly(INDEX_DIR);
+  public void setUp()
+      throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    FileUtils.forceDelete(INDEX_DIR);
   }
 
   @Test

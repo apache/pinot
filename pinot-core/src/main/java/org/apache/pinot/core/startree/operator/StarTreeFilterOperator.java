@@ -33,9 +33,9 @@ import java.util.Queue;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
@@ -115,6 +115,8 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
   public StarTreeFilterOperator(QueryContext queryContext, StarTreeV2 starTreeV2,
       Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns) {
+    // This filter operator does not support AND/OR/NOT operations.
+    super(0, false);
     _queryContext = queryContext;
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
@@ -123,11 +125,11 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
+  protected BlockDocIdSet getTrues() {
     if (_resultEmpty) {
-      return EmptyFilterBlock.getInstance();
+      return EmptyDocIdSet.getInstance();
     }
-    return getFilterOperator().nextBlock();
+    return getFilterOperator().nextBlock().getBlockDocIdSet();
   }
 
   @Override
@@ -178,13 +180,14 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         if (numPredicateEvaluators == 1) {
           // Single predicate evaluator
           childFilterOperators.add(
-              FilterOperatorUtils.getLeafFilterOperator(predicateEvaluators.get(0), dataSource, numDocs));
+              FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluators.get(0), dataSource,
+                  numDocs));
         } else {
           // Predicate evaluators conjoined with OR
           List<BaseFilterOperator> orChildFilterOperators = new ArrayList<>(numPredicateEvaluators);
           for (PredicateEvaluator childPredicateEvaluator : predicateEvaluators) {
             orChildFilterOperators.add(
-                FilterOperatorUtils.getLeafFilterOperator(childPredicateEvaluator, dataSource, numDocs));
+                FilterOperatorUtils.getLeafFilterOperator(_queryContext, childPredicateEvaluator, dataSource, numDocs));
           }
           childFilterOperators.add(
               FilterOperatorUtils.getOrFilterOperator(_queryContext, orChildFilterOperators, numDocs));

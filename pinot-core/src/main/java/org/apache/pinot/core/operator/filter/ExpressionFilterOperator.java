@@ -27,9 +27,9 @@ import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ColumnContext;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
@@ -43,13 +43,12 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public class ExpressionFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_EXPRESSION";
 
-  private final int _numDocs;
   private final Map<String, DataSource> _dataSourceMap;
   private final TransformFunction _transformFunction;
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
-    _numDocs = numDocs;
+    super(numDocs, queryContext.isNullHandlingEnabled());
 
     Set<String> columns = new HashSet<>();
     ExpressionContext lhs = predicate.getLhs();
@@ -69,8 +68,8 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
-    return new FilterBlock(new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs));
+  protected BlockDocIdSet getTrues() {
+    return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs);
   }
 
   @Override

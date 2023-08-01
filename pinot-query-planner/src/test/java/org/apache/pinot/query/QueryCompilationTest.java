@@ -476,7 +476,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   private Object[][] provideQueriesWithExplainedPhysicalPlan() {
     //@formatter:off
     return new Object[][] {
-new Object[]{"EXPLAIN IMPLEMENTATION PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
+new Object[]{"EXPLAIN IMPLEMENTATION PLAN INCLUDING ALL ATTRIBUTES FOR SELECT col1, col3 FROM a",
   "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
   + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
   + "│   └── [1]@localhost:2 PROJECT\n"
@@ -484,7 +484,7 @@ new Object[]{"EXPLAIN IMPLEMENTATION PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR S
   + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
   + "   └── [1]@localhost:1 PROJECT\n"
   + "      └── [1]@localhost:1 TABLE SCAN (a) null\n"},
-new Object[]{"EXPLAIN IMPLEMENTATION PLAN EXCLUDING ATTRIBUTES AS DOT FOR "
+new Object[]{"EXPLAIN IMPLEMENTATION PLAN EXCLUDING ATTRIBUTES FOR "
     + "SELECT col1, COUNT(*) FROM a GROUP BY col1",
   "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
   + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"

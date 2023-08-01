@@ -70,6 +70,9 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -114,6 +117,7 @@ public class DebugResource {
 
   @GET
   @Path("tables/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for table.", notes = "Debug information for table.")
   @ApiResponses(value = {
@@ -145,6 +149,7 @@ public class DebugResource {
 
   @GET
   @Path("segments/{tableName}/{segmentName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for segment.", notes = "Debug information for segment.")
   @ApiResponses(value = {
@@ -344,7 +349,7 @@ public class DebugResource {
           Map<String, SegmentServerDebugInfo> segmentServerDebugInfoMap = segmentEntry.getValue();
           SegmentServerDebugInfo segmentServerDebugInfo = segmentServerDebugInfoMap.get(segmentName);
 
-          if (verbosity > 0 || (segmentServerDebugInfo != null) && segmentHasErrors(segmentServerDebugInfo, evState)) {
+          if (segmentServerDebugInfo != null && (verbosity > 0 || segmentHasErrors(segmentServerDebugInfo, evState))) {
             segmentServerState.put(instanceName,
                 new TableDebugInfo.SegmentState(isState, evState, segmentServerDebugInfo.getSegmentSize(),
                     segmentServerDebugInfo.getConsumerInfo(), segmentServerDebugInfo.getErrorInfo()));

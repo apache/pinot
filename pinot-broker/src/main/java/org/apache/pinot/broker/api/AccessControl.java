@@ -20,13 +20,14 @@ package org.apache.pinot.broker.api;
 
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.auth.FineGrainedAccessControl;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public interface AccessControl {
+public interface AccessControl extends FineGrainedAccessControl {
   /**
    * First-step access control when processing broker requests. Decides whether request is allowed to acquire resources
    * for further processing. Request may still be rejected at table-level later on.

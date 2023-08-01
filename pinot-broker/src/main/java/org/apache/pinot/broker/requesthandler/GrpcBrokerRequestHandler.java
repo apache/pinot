@@ -103,8 +103,11 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
       sendRequest(requestId, TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap,
           requestContext.isSampledRequest());
     }
-    return _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs,
-        _brokerMetrics);
+    final long startReduceTimeNanos = System.nanoTime();
+    BrokerResponseNative brokerResponse = _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest,
+        responseMap, timeoutMs, _brokerMetrics);
+    requestContext.setReduceTimeNanos(System.nanoTime() - startReduceTimeNanos);
+    return brokerResponse;
   }
 
   /**

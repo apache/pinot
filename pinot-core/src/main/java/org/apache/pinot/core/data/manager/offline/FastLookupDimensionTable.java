@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -27,9 +26,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-class FastLookupDimensionTable implements DimensionTable {
-
-  private Map<PrimaryKey, GenericRow> _lookupTable;
+public class FastLookupDimensionTable implements DimensionTable {
+  private final Map<PrimaryKey, GenericRow> _lookupTable;
   private final Schema _tableSchema;
   private final List<String> _primaryKeyColumns;
 
@@ -61,7 +59,6 @@ class FastLookupDimensionTable implements DimensionTable {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() {
   }
 }

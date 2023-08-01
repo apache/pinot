@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -31,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-class MemoryOptimizedDimensionTable implements DimensionTable {
+public class MemoryOptimizedDimensionTable implements DimensionTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MemoryOptimizedDimensionTable.class);
 
   private final Map<PrimaryKey, LookupRecordLocation> _lookupTable;
@@ -39,15 +39,17 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
   private final List<String> _primaryKeyColumns;
   private final ThreadLocal<GenericRow> _reuse = ThreadLocal.withInitial(GenericRow::new);
   private final List<SegmentDataManager> _segmentDataManagers;
+  private final List<PinotSegmentRecordReader> _recordReaders;
   private final TableDataManager _tableDataManager;
 
   MemoryOptimizedDimensionTable(Schema tableSchema, List<String> primaryKeyColumns,
       Map<PrimaryKey, LookupRecordLocation> lookupTable, List<SegmentDataManager> segmentDataManagers,
-      TableDataManager tableDataManager) {
+      List<PinotSegmentRecordReader> recordReaders, TableDataManager tableDataManager) {
     _tableSchema = tableSchema;
     _primaryKeyColumns = primaryKeyColumns;
     _lookupTable = lookupTable;
     _segmentDataManagers = segmentDataManagers;
+    _recordReaders = recordReaders;
     _tableDataManager = tableDataManager;
   }
 
@@ -78,16 +80,14 @@ class MemoryOptimizedDimensionTable implements DimensionTable {
   }
 
   @Override
-  public void close()
-      throws IOException {
-    for (LookupRecordLocation lookupRecordLocation : _lookupTable.values()) {
+  public void close() {
+    for (PinotSegmentRecordReader recordReader : _recordReaders) {
       try {
-        lookupRecordLocation.getPinotSegmentRecordReader().close();
+        recordReader.close();
       } catch (Exception e) {
-        LOGGER.warn("Cannot close segment record reader", e);
+        LOGGER.error("Caught exception while closing record reader for segment: {}", recordReader.getSegmentName(), e);
       }
     }
-
     for (SegmentDataManager segmentDataManager : _segmentDataManagers) {
       _tableDataManager.releaseSegment(segmentDataManager);
     }
