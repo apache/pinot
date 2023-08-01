@@ -19,10 +19,9 @@
 package org.apache.pinot.query.runtime.operator.utils;
 
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
@@ -36,8 +35,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BlockingMultiStreamConsumer.class);
   private final Object _id;
   protected final List<? extends AsyncStream<E>> _mailboxes;
-  protected final ReentrantLock _lock = new ReentrantLock(false);
-  protected final Condition _notEmpty = _lock.newCondition();
+  protected final ArrayBlockingQueue<Boolean> _newDataReady = new ArrayBlockingQueue<>(1);
   private final long _deadlineMs;
   /**
    * An index that used to calculate where do we are going to start reading.
@@ -88,11 +86,10 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   }
 
   public void onData() {
-    _lock.lock();
-    try {
-      _notEmpty.signal();
-    } finally {
-      _lock.unlock();
+    if (_newDataReady.offer(Boolean.TRUE)) {
+      LOGGER.trace("New data notification delivered on " + _id + ". " + System.identityHashCode(_newDataReady));
+    } else {
+      LOGGER.trace("New data notification ignored on " + _id + ". " + System.identityHashCode(_newDataReady));
     }
   }
 
@@ -118,33 +115,29 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     }
     // Standard optimistic execution. First we try to read without acquiring the lock.
     E block = readDroppingSuccessEos();
-    if (block == null) { // we didn't find a mailbox ready to read, so we need to be pessimistic
-      boolean timeout = false;
-      _lock.lock();
-      try {
-        // let's try to read one more time now that we have the lock
+    long timeoutMs = _deadlineMs - System.currentTimeMillis();
+    boolean timeout = false;
+    try {
+      while (block == null) { // we didn't find a mailbox ready to read, so we need to be pessimistic
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("==[RECEIVE]== Blocked on : " + _id + ". " + System.identityHashCode(_newDataReady));
+        }
+        timeout = _newDataReady.poll(timeoutMs, TimeUnit.MILLISECONDS) == null;
+        LOGGER.debug("==[RECEIVE]== More data available. Trying to read again");
         block = readDroppingSuccessEos();
-        while (block == null && !timeout) { // still no data, we need to yield
-          if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("==[RECEIVE]== Blocked on : " + _id);
-          }
-          timeout = !_notEmpty.await(_deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-          block = readDroppingSuccessEos();
-        }
-        if (timeout) {
-          if (LOGGER.isDebugEnabled()) {
-            LOGGER.warn("==[RECEIVE]== Timeout on: " + _id);
-          }
-          _errorBlock = onTimeout();
-          return _errorBlock;
-        } else if (LOGGER.isTraceEnabled()) {
-          LOGGER.trace("==[RECEIVE]== Ready to emit on: " + _id);
-        }
-      } catch (InterruptedException ex) { // we've got interrupted while waiting for the condition
-        return onException(ex);
-      } finally {
-        _lock.unlock();
       }
+
+      if (timeout) {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.warn("==[RECEIVE]== Timeout on: " + _id);
+        }
+        _errorBlock = onTimeout();
+        return _errorBlock;
+      } else if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace("==[RECEIVE]== Ready to emit on: " + _id);
+      }
+    } catch (InterruptedException ex) {
+      return onException(ex);
     }
     return block;
   }
