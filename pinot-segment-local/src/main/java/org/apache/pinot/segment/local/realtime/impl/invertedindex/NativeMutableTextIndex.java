@@ -76,9 +76,7 @@ public class NativeMutableTextIndex implements MutableTextIndex {
   }
 
   private void addHelper(String document) {
-    Iterable<String> tokens;
-    tokens = analyze(document);
-
+    Iterable<String> tokens = analyze(document);
     _writeLock.lock();
     try {
       for (String token : tokens) {
