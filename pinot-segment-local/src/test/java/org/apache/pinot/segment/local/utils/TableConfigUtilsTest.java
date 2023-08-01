@@ -472,23 +472,6 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    ingestionConfig.setAggregationConfigs(
-        Collections.singletonList(new AggregationConfig("m1", "DISTINCTCOUNTHLL(s1)")));
-    try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
-      Assert.fail("Should fail due to not supported aggregation function");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
-    ingestionConfig.setAggregationConfigs(Collections.singletonList(new AggregationConfig("m1", "s1 + s2")));
-    try {
-      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
-      Assert.fail("Should fail due to multiple arguments");
-    } catch (IllegalStateException e) {
-      // expected
-    }
-
     ingestionConfig.setAggregationConfigs(Collections.singletonList(new AggregationConfig("m1", "SUM(s1 - s2)")));
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
@@ -509,6 +492,104 @@ public class TableConfigUtilsTest {
       Assert.fail("Should fail due to one metric column not being aggregated");
     } catch (IllegalStateException e) {
       // expected
+    }
+
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.BYTES).build();
+    // distinctcounthllmv is not supported, we expect this to not validate
+    List<AggregationConfig> aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "DISTINCTCOUNTHLLMV(s1)"));
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      Assert.fail("Should fail due to not supported aggregation function");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // distinctcounthll, expect that the function name in various forms (with and without underscores) still validates
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.BYTES)
+        .addMetric("d2", FieldSpec.DataType.BYTES).addMetric("d3", FieldSpec.DataType.BYTES)
+        .addMetric("d4", FieldSpec.DataType.BYTES).addMetric("d5", FieldSpec.DataType.BYTES).build();
+
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "distinct_count_hll(s1)"),
+        new AggregationConfig("d2", "DISTINCTCOUNTHLL(s1)"), new AggregationConfig("d3", "distinctcounthll(s1)"),
+        new AggregationConfig("d4", "DISTINCTCOUNT_HLL(s1)"), new AggregationConfig("d5", "DISTINCT_COUNT_HLL(s1)"));
+
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.fail("Should not fail due to valid aggregation function", e);
+    }
+
+    // distinctcounthll, expect not specified log2m argument to default to 8
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.BYTES).build();
+
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "DISTINCTCOUNTHLL(s1)"));
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.fail("Log2m should have defaulted to 8", e);
+    }
+
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "s1 + s2"));
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      Assert.fail("Should fail due to multiple arguments");
+    } catch (IllegalArgumentException e) {
+      // expected
+    }
+
+    // sumprecision, expect that the function name in various forms (with and without underscores) still validates
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("s1", FieldSpec.DataType.BIG_DECIMAL).addMetric("d1", FieldSpec.DataType.BIG_DECIMAL)
+        .addMetric("d2", FieldSpec.DataType.BIG_DECIMAL).addMetric("d3", FieldSpec.DataType.BIG_DECIMAL)
+        .addMetric("d4", FieldSpec.DataType.BIG_DECIMAL).build();
+
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "sum_precision(s1, 10, 32)"),
+        new AggregationConfig("d2", "SUM_PRECISION(s1, 1)"), new AggregationConfig("d3", "sumprecision(s1, 2)"),
+        new AggregationConfig("d4", "SUMPRECISION(s1, 10, 99)"));
+
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+    TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+
+    // with too many arguments should fail
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("s1", FieldSpec.DataType.BIG_DECIMAL).addMetric("d1", FieldSpec.DataType.BIG_DECIMAL)
+        .build();
+
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "sum_precision(s1, 10, 32, 99)"));
+
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      Assert.fail("Should have failed with too many arguments but didn't");
+    } catch (IllegalStateException e) {
+      // Expected
     }
   }
 
@@ -924,8 +1005,8 @@ public class TableConfigUtilsTest {
       // be rebuilt without a dictionary, the constraint to have a dictionary has been lifted.
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null,
-          fieldConfigProperties);
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, null, null, null, fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -938,8 +1019,8 @@ public class TableConfigUtilsTest {
       // lifted.
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, null, null, null, null,
-          fieldConfigProperties);
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, null, null, null, null, fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -964,8 +1045,9 @@ public class TableConfigUtilsTest {
       // Enable forward index disabled flag for a column with inverted index
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY,
-          FieldConfig.IndexType.INVERTED, null, null, null, fieldConfigProperties);
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null, null,
+              null, fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -979,8 +1061,9 @@ public class TableConfigUtilsTest {
       // Enable forward index disabled flag for a column with inverted index and is sorted
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY,
-          FieldConfig.IndexType.INVERTED, null, null, null, fieldConfigProperties);
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED, null, null,
+              null, fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -994,9 +1077,10 @@ public class TableConfigUtilsTest {
       // Enable forward index disabled flag for a multi-value column with inverted index and range index
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY,
-          FieldConfig.IndexType.INVERTED, Arrays.asList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE),
-          null, null, fieldConfigProperties);
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED,
+              Arrays.asList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null, null,
+              fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for MV myCol2 with forward index disabled but has range and inverted index");
@@ -1011,9 +1095,10 @@ public class TableConfigUtilsTest {
       // Enable forward index disabled flag for a singe-value column with inverted index and range index v1
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig = new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY,
-          FieldConfig.IndexType.INVERTED, Arrays.asList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE),
-          null, null, fieldConfigProperties);
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol1", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.INVERTED,
+              Arrays.asList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null, null,
+              fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       tableConfig.getIndexingConfig().setRangeIndexVersion(1);
       TableConfigUtils.validate(tableConfig, schema);
@@ -1030,14 +1115,15 @@ public class TableConfigUtilsTest {
       // Enable forward index disabled flag for a column with inverted index and disable dictionary
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.RAW,
-          FieldConfig.IndexType.INVERTED, null, null, null, fieldConfigProperties);
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.INVERTED, null, null, null,
+              fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should not be able to disable dictionary but keep inverted index");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Cannot create an Inverted index on column myCol2 specified in the "
-          + "noDictionaryColumns config");
+      Assert.assertEquals(e.getMessage(),
+          "Cannot create an Inverted index on column myCol2 specified in the " + "noDictionaryColumns config");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1046,8 +1132,9 @@ public class TableConfigUtilsTest {
       // Enable forward index disabled flag for a column with FST index and disable dictionary
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig = new FieldConfig("myCol2", FieldConfig.EncodingType.RAW,
-          FieldConfig.IndexType.FST, null, null, null, fieldConfigProperties);
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null, null, null,
+              fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should not be able to disable dictionary but keep inverted index");
@@ -1061,8 +1148,9 @@ public class TableConfigUtilsTest {
       // Enable forward index disabled flag for a column with FST index and disable dictionary
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig = new FieldConfig("intCol", FieldConfig.EncodingType.RAW,
-          FieldConfig.IndexType.RANGE, null, null, null, fieldConfigProperties);
+      FieldConfig fieldConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.RANGE, null, null, null,
+              fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
@@ -1415,8 +1503,7 @@ public class TableConfigUtilsTest {
   @Test
   public void testValidateUpsertConfig() {
     Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-            .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .build();
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     TableConfig tableConfig =
@@ -1526,12 +1613,10 @@ public class TableConfigUtilsTest {
     // Table upsert with delete column
     String incorrectTypeDelCol = "incorrectTypeDeleteCol";
     String delCol = "myDelCol";
-    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(incorrectTypeDelCol, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN)
-        .build();
+        .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN).build();
     streamConfigs = getStreamConfigs();
     streamConfigs.put("stream.kafka.consumer.type", "simple");
 
@@ -1783,16 +1868,14 @@ public class TableConfigUtilsTest {
     InstanceAssignmentConfig instanceAssignmentConfig = Mockito.mock(InstanceAssignmentConfig.class);
 
     TableConfig tableConfigWithoutInstancePartitionsMap =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-            .build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
 
     // Call validate with a table-config without any instance partitions or instance assignment config
     TableConfigUtils.validateInstancePartitionsTypeMapConfig(tableConfigWithoutInstancePartitionsMap);
 
     TableConfig tableConfigWithInstancePartitionsMap =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-            .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
-            .build();
+            .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_OFFLINE")).build();
 
     // Call validate with a table-config with instance partitions set but not instance assignment config
     TableConfigUtils.validateInstancePartitionsTypeMapConfig(tableConfigWithInstancePartitionsMap);
@@ -1800,8 +1883,7 @@ public class TableConfigUtilsTest {
     TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInstancePartitionsMap(ImmutableMap.of(InstancePartitionsType.OFFLINE, "test_OFFLINE"))
         .setInstanceAssignmentConfigMap(
-            ImmutableMap.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig))
-            .build();
+            ImmutableMap.of(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig)).build();
     try {
       // Call validate with instance partitions and config set for the same type
       TableConfigUtils.validateInstancePartitionsTypeMapConfig(invalidTableConfig);
@@ -1811,14 +1893,148 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateTTLConfigForUpsertConfig() {
+    // Default comparison column (timestamp)
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setMetadataTTL(3600);
+    upsertConfig.setEnableSnapshot(true);
+    TableConfig tableConfigWithoutComparisonColumn =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
+    TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithoutComparisonColumn, schema);
+
+    // Invalid comparison columns: "myCol"
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setComparisonColumns(Collections.singletonList("myCol"));
+    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setMetadataTTL(3600);
+    TableConfig tableConfigWithInvalidComparisonColumn =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
+    try {
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidComparisonColumn, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      // Expected
+    }
+
+    // Invalid comparison columns: multiple comparison columns are not supported for TTL-enabled upsert table.
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setComparisonColumns(Lists.newArrayList(TIME_COLUMN, "myCol"));
+    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setMetadataTTL(3600);
+    TableConfig tableConfigWithInvalidComparisonColumn2 =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
+    try {
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidComparisonColumn2, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      // Expected
+    }
+
+    // Invalid config with TTLConfig but Snapshot is not enabled
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setMetadataTTL(3600);
+    upsertConfig.setEnableSnapshot(false);
+    TableConfig tableConfigWithInvalidTTLConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
+    try {
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithInvalidTTLConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      // Expected
+    }
+
+    // Invalid config with both delete and TTL enabled
+    String delCol = "myDelCol";
+    schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .addSingleValueDimension(delCol, FieldSpec.DataType.STRING)
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setMetadataTTL(3600);
+    upsertConfig.setEnableSnapshot(true);
+    upsertConfig.setDeleteRecordColumn(delCol);
+    TableConfig tableConfigWithBothDeleteAndTTL =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+            .setUpsertConfig(upsertConfig).build();
+    try {
+      TableConfigUtils.validateTTLForUpsertConfig(tableConfigWithBothDeleteAndTTL, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      // Expected
+    }
+  }
+
+  @Test
+  public void testUpsertCompactionTaskConfig() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+    Map<String, String> upsertCompactionTaskConfig =
+        ImmutableMap.of("bufferTimePeriod", "5d", "invalidRecordsThresholdPercent", "1", "invalidRecordsThresholdCount",
+            "1");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
+
+    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
+
+    // test with invalid invalidRecordsThresholdPercents
+    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "0");
+    TableConfig zeroPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateTaskConfigs(zeroPercentTableConfig, schema));
+    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "110");
+    TableConfig hundredTenPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateTaskConfigs(hundredTenPercentTableConfig, schema));
+
+    // test with invalid invalidRecordsThresholdCount
+    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdCount", "0");
+    TableConfig invalidCountTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateTaskConfigs(invalidCountTableConfig, schema));
+
+    // test without invalidRecordsThresholdPercent or invalidRecordsThresholdCount
+    upsertCompactionTaskConfig = ImmutableMap.of("bufferTimePeriod", "5d");
+    TableConfig invalidTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
+        .build();
+    Assert.assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateTaskConfigs(invalidTableConfig, schema));
+  }
+
+  @Test
   public void testValidatePartitionedReplicaGroupInstance() {
     String partitionColumn = "testPartitionCol";
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
-        new ReplicaGroupStrategyConfig(partitionColumn, 2);
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig(partitionColumn, 2);
 
     TableConfig tableConfigWithoutReplicaGroupStrategyConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-            .build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     // Call validate with a table-config without replicaGroupStrategyConfig or replicaGroupPartitionConfig.
     TableConfigUtils.validatePartitionedReplicaGroupInstance(tableConfigWithoutReplicaGroupStrategyConfig);
 
@@ -1833,12 +2049,12 @@ public class TableConfigUtilsTest {
     InstanceAssignmentConfig instanceAssignmentConfig = Mockito.mock(InstanceAssignmentConfig.class);
     InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
         new InstanceReplicaGroupPartitionConfig(true, 0, 0, 0, 2, 0, false, partitionColumn);
-    Mockito.doReturn(instanceReplicaGroupPartitionConfig)
-        .when(instanceAssignmentConfig).getReplicaGroupPartitionConfig();
+    Mockito.doReturn(instanceReplicaGroupPartitionConfig).when(instanceAssignmentConfig)
+        .getReplicaGroupPartitionConfig();
 
-    TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(TABLE_NAME).setInstanceAssignmentConfigMap(
-            ImmutableMap.of(TableType.OFFLINE.toString(), instanceAssignmentConfig)).build();
+    TableConfig invalidTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInstanceAssignmentConfigMap(ImmutableMap.of(TableType.OFFLINE.toString(), instanceAssignmentConfig))
+        .build();
     invalidTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
 
     try {

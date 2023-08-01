@@ -20,8 +20,8 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -31,20 +31,19 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
 
   private final ImmutableRoaringBitmap _docIds;
   private final boolean _exclusive;
-  private final int _numDocs;
 
   public BitmapBasedFilterOperator(ImmutableRoaringBitmap docIds, boolean exclusive, int numDocs) {
+    super(numDocs, false);
     _docIds = docIds;
     _exclusive = exclusive;
-    _numDocs = numDocs;
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
+  protected BlockDocIdSet getTrues() {
     if (_exclusive) {
-      return new FilterBlock(new BitmapDocIdSet(ImmutableRoaringBitmap.flip(_docIds, 0L, _numDocs), _numDocs));
+      return new BitmapDocIdSet(ImmutableRoaringBitmap.flip(_docIds, 0L, _numDocs), _numDocs);
     } else {
-      return new FilterBlock(new BitmapDocIdSet(_docIds, _numDocs));
+      return new BitmapDocIdSet(_docIds, _numDocs);
     }
   }
 

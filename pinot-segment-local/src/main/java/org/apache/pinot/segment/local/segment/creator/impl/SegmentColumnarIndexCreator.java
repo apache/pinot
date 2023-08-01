@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -83,7 +86,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   // TODO Refactor class name to match interface name
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
   // Allow at most 512 characters for the metadata property
-  private static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
+  static final int METADATA_PROPERTY_LENGTH_LIMIT = 512;
   private SegmentGeneratorConfig _config;
   private TreeMap<String, ColumnIndexCreationInfo> _indexCreationInfoMap;
   private final Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
@@ -557,52 +560,83 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Object min = columnIndexCreationInfo.getMin();
       Object max = columnIndexCreationInfo.getMax();
       if (min != null && max != null) {
-        addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString());
+        addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString(), fieldSpec.getDataType());
       }
     }
 
     String defaultNullValue = columnIndexCreationInfo.getDefaultNullValue().toString();
-    if (isValidPropertyValue(defaultNullValue)) {
-      properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+    if (dataType.getStoredType() == DataType.STRING) {
+      // NOTE: Do not limit length of default null value because we need exact value to determine whether the default
+      //       null value changes
+      defaultNullValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(defaultNullValue);
     }
+    properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
   }
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
-      String maxValue) {
-    if (isValidPropertyValue(minValue)) {
-      properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
-    } else {
-      properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
-    }
-    if (isValidPropertyValue(maxValue)) {
-      properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
-    } else {
-      properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
-    }
+      String maxValue, DataType dataType) {
+    properties.setProperty(getKeyFor(column, MIN_VALUE), getValidPropertyValue(minValue, false, dataType));
+    properties.setProperty(getKeyFor(column, MAX_VALUE), getValidPropertyValue(maxValue, true, dataType));
   }
 
   /**
-   * Helper method to check whether the given value is a valid property value.
-   * <p>Value is invalid iff:
-   * <ul>
-   *   <li>It contains more than 512 characters</li>
-   *   <li>It contains leading/trailing whitespace</li>
-   *   <li>It contains list separator (',')</li>
-   * </ul>
+   * Helper method to get the valid value for setting min/max.
+   */
+  private static String getValidPropertyValue(String value, boolean isMax, DataType dataType) {
+    String valueWithinLengthLimit = getValueWithinLengthLimit(value, isMax, dataType);
+    return dataType.getStoredType() == DataType.STRING
+        ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(valueWithinLengthLimit)
+        : valueWithinLengthLimit;
+  }
+
+  /**
+   * Returns the original string if its length is within the allowed limit. If the string's length exceeds the limit,
+   * returns a truncated version of the string with maintaining min or max value.
    */
   @VisibleForTesting
-  static boolean isValidPropertyValue(String value) {
+  static String getValueWithinLengthLimit(String value, boolean isMax, DataType dataType) {
     int length = value.length();
-    if (length == 0) {
-      return true;
+    if (length <= METADATA_PROPERTY_LENGTH_LIMIT) {
+      return value;
     }
-    if (length > METADATA_PROPERTY_LENGTH_LIMIT) {
-      return false;
+    switch (dataType.getStoredType()) {
+      case STRING:
+        if (isMax) {
+          int trimIndexValue = METADATA_PROPERTY_LENGTH_LIMIT - 1;
+          // determining the index for the character having value less than '\uFFFF'
+          while (trimIndexValue < length && value.charAt(trimIndexValue) == '\uFFFF') {
+            trimIndexValue++;
+          }
+          if (trimIndexValue == length) {
+            return value;
+          } else {
+            // assigning the '\uFFFF' to make the value max.
+            return value.substring(0, trimIndexValue) + '\uFFFF';
+          }
+        } else {
+          return value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
+        }
+      case BYTES:
+        if (isMax) {
+          byte[] valueInByteArray = BytesUtils.toBytes(value);
+          int trimIndexValue = METADATA_PROPERTY_LENGTH_LIMIT / 2 - 1;
+          // determining the index for the byte having value less than 0xFF
+          while (trimIndexValue < valueInByteArray.length && valueInByteArray[trimIndexValue] == (byte) 0xFF) {
+            trimIndexValue++;
+          }
+          if (trimIndexValue == valueInByteArray.length) {
+            return value;
+          } else {
+            byte[] shortByteValue = Arrays.copyOf(valueInByteArray, trimIndexValue + 1);
+            shortByteValue[trimIndexValue] = (byte) 0xFF; // assigning the 0xFF to make the value max.
+            return BytesUtils.toHexString(shortByteValue);
+          }
+        } else {
+          return BytesUtils.toHexString(Arrays.copyOf(BytesUtils.toBytes(value), (METADATA_PROPERTY_LENGTH_LIMIT / 2)));
+        }
+      default:
+        throw new IllegalStateException("Unsupported data type for property value length reduction: " + dataType);
     }
-    if (Character.isWhitespace(value.charAt(0)) || Character.isWhitespace(value.charAt(length - 1))) {
-      return false;
-    }
-    return value.indexOf(',') == -1;
   }
 
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
@@ -612,9 +646,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void close()
       throws IOException {
-    List<IndexCreator> creators = _creatorsByColAndIndex.values().stream()
-        .flatMap(map -> map.values().stream())
-        .collect(Collectors.toList());
+    List<IndexCreator> creators =
+        _creatorsByColAndIndex.values().stream().flatMap(map -> map.values().stream()).collect(Collectors.toList());
     creators.addAll(_nullValueVectorCreatorMap.values());
     creators.addAll(_dictionaryCreatorMap.values());
     FileUtils.close(creators);

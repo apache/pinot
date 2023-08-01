@@ -50,6 +50,7 @@ public class KinesisConnectionHandler {
   private final String _secretKey;
   private final String _endpoint;
   private final KinesisConfig _kinesisConfig;
+  protected final KinesisMetadataExtractor _kinesisMetadataExtractor;
 
   public KinesisConnectionHandler(KinesisConfig kinesisConfig) {
     _stream = kinesisConfig.getStreamTopicName();
@@ -58,6 +59,7 @@ public class KinesisConnectionHandler {
     _secretKey = kinesisConfig.getSecretKey();
     _endpoint = kinesisConfig.getEndpoint();
     _kinesisConfig = kinesisConfig;
+    _kinesisMetadataExtractor = KinesisMetadataExtractor.build(kinesisConfig.isPopulateMetadata());
     createConnection();
   }
 
@@ -69,6 +71,7 @@ public class KinesisConnectionHandler {
     _secretKey = kinesisConfig.getSecretKey();
     _endpoint = kinesisConfig.getEndpoint();
     _kinesisConfig = kinesisConfig;
+    _kinesisMetadataExtractor = KinesisMetadataExtractor.build(kinesisConfig.isPopulateMetadata());
     _kinesisClient = kinesisClient;
   }
 

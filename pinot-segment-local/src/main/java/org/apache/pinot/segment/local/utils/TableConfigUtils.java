@@ -100,12 +100,14 @@ public final class TableConfigUtils {
 
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
   private static final String REALTIME_TO_OFFLINE_TASK_TYPE = "RealtimeToOfflineSegmentsTask";
+  private static final String UPSERT_COMPACTION_TASK_TYPE = "UpsertCompactionTask";
 
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
   private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
-      EnumSet.of(SUM, MIN, MAX, COUNT);
+      EnumSet.of(SUM, MIN, MAX, COUNT, DISTINCTCOUNTHLL, SUMPRECISION);
+
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
           RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
@@ -356,8 +358,9 @@ public final class TableConfigUtils {
                 "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
           }
 
+          FieldSpec fieldSpec = null;
           if (schema != null) {
-            FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+            fieldSpec = schema.getFieldSpecFor(columnName);
             Preconditions.checkState(fieldSpec != null, "The destination column '" + columnName
                 + "' of the aggregation function must be present in the schema");
             Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
@@ -378,15 +381,52 @@ public final class TableConfigUtils {
               "aggregation function must be a function for: %s", aggregationConfig);
 
           FunctionContext functionContext = expressionContext.getFunction();
-          validateIngestionAggregation(functionContext.getFunctionName());
-          Preconditions.checkState(functionContext.getArguments().size() == 1,
-              "aggregation function can only have one argument: %s", aggregationConfig);
+          AggregationFunctionType functionType =
+              AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+          validateIngestionAggregation(functionType);
 
-          ExpressionContext argument = functionContext.getArguments().get(0);
-          Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
-              "aggregator function argument must be a identifier: %s", aggregationConfig);
+          List<ExpressionContext> arguments = functionContext.getArguments();
+          int numArguments = arguments.size();
+          if (functionType == DISTINCTCOUNTHLL) {
+            Preconditions.checkState(numArguments >= 1 && numArguments <= 2,
+                "DISTINCT_COUNT_HLL can have at most two arguments: %s", aggregationConfig);
+            if (numArguments == 2) {
+              ExpressionContext secondArgument = arguments.get(1);
+              Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+                  "Second argument of DISTINCT_COUNT_HLL must be literal: %s", aggregationConfig);
+              String literal = secondArgument.getLiteral().getStringValue();
+              Preconditions.checkState(StringUtils.isNumeric(literal),
+                  "Second argument of DISTINCT_COUNT_HLL must be a number: %s", aggregationConfig);
+            }
+            if (fieldSpec != null) {
+              DataType dataType = fieldSpec.getDataType();
+              Preconditions.checkState(dataType == DataType.BYTES,
+                  "Result type for DISTINCT_COUNT_HLL must be BYTES: %s", aggregationConfig);
+            }
+          } else if (functionType == SUMPRECISION) {
+            Preconditions.checkState(numArguments >= 2 && numArguments <= 3,
+                "SUM_PRECISION must specify precision (required), scale (optional): %s", aggregationConfig);
+            ExpressionContext secondArgument = arguments.get(1);
+            Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+                "Second argument of SUM_PRECISION must be literal: %s", aggregationConfig);
+            String literal = secondArgument.getLiteral().getStringValue();
+            Preconditions.checkState(StringUtils.isNumeric(literal),
+                "Second argument of SUM_PRECISION must be a number: %s", aggregationConfig);
+            if (fieldSpec != null) {
+              DataType dataType = fieldSpec.getDataType();
+              Preconditions.checkState(dataType == DataType.BIG_DECIMAL || dataType == DataType.BYTES,
+                  "Result type for DISTINCT_COUNT_HLL must be BIG_DECIMAL or BYTES: %s", aggregationConfig);
+            }
+          } else {
+            Preconditions.checkState(numArguments == 1, "%s can only have one argument: %s", functionType,
+                aggregationConfig);
+          }
+          ExpressionContext firstArgument = arguments.get(0);
+          Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
+              "First argument of aggregation function: %s must be identifier, got: %s", functionType,
+              firstArgument.getType());
 
-          aggregationSourceColumns.add(argument.getIdentifier());
+          aggregationSourceColumns.add(firstArgument.getIdentifier());
         }
         if (schema != null) {
           Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
@@ -454,21 +494,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Currently only, ValueAggregators with fixed width types are allowed, so MIN, MAX, SUM, and COUNT. The reason
-   * is that only the {@link org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex}
-   * supports random inserts and lookups. The
-   * {@link org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex only supports
-   * sequential inserts.
-   */
-  public static void validateIngestionAggregation(String name) {
-    for (AggregationFunctionType functionType : SUPPORTED_INGESTION_AGGREGATIONS) {
-      if (functionType.getName().equals(name)) {
-        return;
-      }
-    }
-    throw new IllegalStateException(
-        String.format("aggregation function %s must be one of %s", name, SUPPORTED_INGESTION_AGGREGATIONS));
+  public static void validateIngestionAggregation(AggregationFunctionType functionType) {
+    Preconditions.checkState(SUPPORTED_INGESTION_AGGREGATIONS.contains(functionType),
+        "Aggregation function: %s must be one of: %s", functionType, SUPPORTED_INGESTION_AGGREGATIONS);
   }
 
   @VisibleForTesting
@@ -543,6 +571,33 @@ public final class TableConfigUtils {
               }
             }
           }
+        } else if (taskTypeConfigName.equals(UPSERT_COMPACTION_TASK_TYPE)) {
+          // check table is realtime
+          Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+              "UpsertCompactionTask only supports realtime tables!");
+          // check upsert enabled
+          Preconditions.checkState(tableConfig.isUpsertEnabled(), "Upsert must be enabled for UpsertCompactionTask");
+
+          // check no malformed period
+          if (taskTypeConfig.containsKey("bufferTimePeriod")) {
+            TimeUtils.convertPeriodToMillis(taskTypeConfig.get("bufferTimePeriod"));
+          }
+          // check maxNumRecordsPerSegment
+          if (taskTypeConfig.containsKey("invalidRecordsThresholdPercent")) {
+            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) > 0
+                    && Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) <= 100,
+                "invalidRecordsThresholdPercent must be > 0 and <= 100");
+          }
+          // check invalidRecordsThresholdCount
+          if (taskTypeConfig.containsKey("invalidRecordsThresholdCount")) {
+            Preconditions.checkState(Long.parseLong(taskTypeConfig.get("invalidRecordsThresholdCount")) >= 1,
+                "invalidRecordsThresholdCount must be >= 1");
+          }
+          // check that either invalidRecordsThresholdPercent or invalidRecordsThresholdCount was provided
+          Preconditions.checkState(
+              taskTypeConfig.containsKey("invalidRecordsThresholdPercent") || taskTypeConfig.containsKey(
+                  "invalidRecordsThresholdCount"),
+              "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
         }
       }
     }
@@ -581,8 +636,8 @@ public final class TableConfigUtils {
     Preconditions.checkState(streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType(),
         "Upsert/Dedup table must use low-level streaming consumer type");
     // replica group is configured for routing
-    Preconditions.checkState(tableConfig.getRoutingConfig() != null
-            && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
+    Preconditions.checkState(
+        tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
 
     // specifically for upsert
@@ -611,6 +666,35 @@ public final class TableConfigUtils {
       }
     }
     validateAggregateMetricsForUpsertConfig(tableConfig);
+    validateTTLForUpsertConfig(tableConfig, schema);
+  }
+
+  /**
+   * Validates the upsert config related to TTL.
+   */
+  @VisibleForTesting
+  static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig == null || upsertConfig.getMetadataTTL() == 0) {
+      return;
+    }
+
+    List<String> comparisonColumns = upsertConfig.getComparisonColumns();
+    if (CollectionUtils.isNotEmpty(comparisonColumns)) {
+      Preconditions.checkState(comparisonColumns.size() == 1,
+          "Upsert TTL does not work with multiple comparison columns");
+      String comparisonColumn = comparisonColumns.get(0);
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "Upsert TTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
+    }
+
+    Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
+
+    // TODO: Support deletion for TTL. Need to construct queryableDocIds when adding segments out of TTL.
+    Preconditions.checkState(upsertConfig.getDeleteRecordColumn() == null,
+        "Upsert TTL doesn't work with record deletion");
   }
 
   /**
@@ -620,8 +704,8 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validateInstancePartitionsTypeMapConfig(TableConfig tableConfig) {
-    if (MapUtils.isEmpty(tableConfig.getInstancePartitionsMap())
-        || MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+    if (MapUtils.isEmpty(tableConfig.getInstancePartitionsMap()) || MapUtils.isEmpty(
+        tableConfig.getInstanceAssignmentConfigMap())) {
       return;
     }
     for (InstancePartitionsType instancePartitionsType : tableConfig.getInstancePartitionsMap().keySet()) {
@@ -639,11 +723,11 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validatePartitionedReplicaGroupInstance(TableConfig tableConfig) {
-    if (tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() == null
-        || MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+    if (tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() == null || MapUtils.isEmpty(
+        tableConfig.getInstanceAssignmentConfigMap())) {
       return;
     }
-    for (Map.Entry<String, InstanceAssignmentConfig> entry: tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
+    for (Map.Entry<String, InstanceAssignmentConfig> entry : tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
       boolean isNullReplicaGroupPartitionConfig = entry.getValue().getReplicaGroupPartitionConfig() == null;
       Preconditions.checkState(isNullReplicaGroupPartitionConfig,
           "Both replicaGroupStrategyConfig and replicaGroupPartitionConfig is provided");
@@ -996,8 +1080,8 @@ public final class TableConfigUtils {
       return;
     }
 
-    boolean forwardIndexDisabled =
-        Boolean.parseBoolean(fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
+    boolean forwardIndexDisabled = Boolean.parseBoolean(
+        fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
             FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
     if (!forwardIndexDisabled) {
       return;
@@ -1016,20 +1100,23 @@ public final class TableConfigUtils {
     }
 
     Preconditions.checkState(
-        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(),
-        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
-            + " not supported with forward index for column: %s, disabled", columnName));
+        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(), String.format(
+            "Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
+                + " not supported with forward index for column: %s, disabled", columnName));
 
-    boolean hasDictionary = fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
-        || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName);
-    boolean hasInvertedIndex = indexingConfigs.getInvertedIndexColumns() != null
-        && indexingConfigs.getInvertedIndexColumns().contains(columnName);
+    boolean hasDictionary =
+        fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY || noDictionaryColumns == null
+            || !noDictionaryColumns.contains(columnName);
+    boolean hasInvertedIndex =
+        indexingConfigs.getInvertedIndexColumns() != null && indexingConfigs.getInvertedIndexColumns()
+            .contains(columnName);
 
     if (!hasDictionary || !hasInvertedIndex) {
       LOGGER.warn("Forward index has been disabled for column {}. Either dictionary ({}) and / or inverted index ({}) "
               + "has been disabled. If the forward index needs to be regenerated or another index added please refresh "
               + "or back-fill the forward index as it cannot be rebuilt without dictionary and inverted index.",
-          columnName, hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
+          columnName,
+          hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
     }
   }
 
@@ -1242,9 +1329,7 @@ public final class TableConfigUtils {
     if (clone.getFieldConfigList() != null) {
       List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
       for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
-        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
-            .withIndexTypes(null)
-            .build());
+        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig).withIndexTypes(null).build());
       }
       clone.setFieldConfigList(cleanFieldConfigList);
     }

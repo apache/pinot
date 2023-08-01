@@ -32,6 +32,8 @@ items:
         pinot.server.instance.dataDir=/var/pinot/server/data/index
         pinot.server.instance.segmentTarDir=/var/pinot/server/data/segmentTar
         pinot.set.instance.id.to.hostname=true
+        pinot.query.server.port=7321
+        pinot.query.runner.port=7732
   - apiVersion: apps/v1
     kind: StatefulSet
     metadata:

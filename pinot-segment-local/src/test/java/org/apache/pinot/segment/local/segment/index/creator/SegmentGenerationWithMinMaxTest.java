@@ -40,17 +40,18 @@ import org.testng.annotations.Test;
 /**
  * Tests filtering of records during segment generation
  */
-public class SegmentGenerationWithMinMaxInvalidTest {
+public class SegmentGenerationWithMinMaxTest {
   private static final String STRING_COLUMN = "col1";
-  private static final String[] STRING_VALUES_INVALID = {"A,", "B,", "C,", "D,", "E"};
+  private static final String[] STRING_VALUES_WITH_COMMA_CHARACTER = {"A,,", ",B,", "C,Z,", "D,", "E,"};
+  private static final String[] STRING_VALUES_WITH_WHITESPACE_CHARACTERS = {"A ", " B ", "  Z ", "  \r D", "E"};
   private static final String[] STRING_VALUES_VALID = {"A", "B", "C", "D", "E"};
   private static final String LONG_COLUMN = "col2";
   private static final long[] LONG_VALUES =
       {1588316400000L, 1588489200000L, 1588662000000L, 1588834800000L, 1589007600000L};
 
   private static final String SEGMENT_DIR_NAME =
-      FileUtils.getTempDirectoryPath() + File.separator + "segmentMinMaxInvalidTest";
-  private static final String SEGMENT_NAME = "testSegmentMinMaxInvalid";
+      FileUtils.getTempDirectoryPath() + File.separator + "segmentMinMaxTest";
+  private static final String SEGMENT_NAME = "testSegmentMinMax";
 
   private Schema _schema;
   private TableConfig _tableConfig;
@@ -63,7 +64,7 @@ public class SegmentGenerationWithMinMaxInvalidTest {
   }
 
   @Test
-  public void testMinMaxInvalidFlagInMetadata()
+  public void testMinMaxInMetadata()
       throws Exception {
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
     File segmentDir = buildSegment(_tableConfig, _schema, STRING_VALUES_VALID);
@@ -74,12 +75,20 @@ public class SegmentGenerationWithMinMaxInvalidTest {
     Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMaxValue(), "E");
 
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
-    segmentDir = buildSegment(_tableConfig, _schema, STRING_VALUES_INVALID);
+    segmentDir = buildSegment(_tableConfig, _schema, STRING_VALUES_WITH_COMMA_CHARACTER);
     metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getTotalDocs(), 5);
-    Assert.assertTrue(metadata.getColumnMetadataFor("col1").isMinMaxValueInvalid());
-    Assert.assertNull(metadata.getColumnMetadataFor("col1").getMinValue());
-    Assert.assertNull(metadata.getColumnMetadataFor("col1").getMaxValue());
+    Assert.assertFalse(metadata.getColumnMetadataFor("col1").isMinMaxValueInvalid());
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMinValue(), ",B,");
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMaxValue(), "E,");
+
+    FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
+    segmentDir = buildSegment(_tableConfig, _schema, STRING_VALUES_WITH_WHITESPACE_CHARACTERS);
+    metadata = new SegmentMetadataImpl(segmentDir);
+    Assert.assertEquals(metadata.getTotalDocs(), 5);
+    Assert.assertFalse(metadata.getColumnMetadataFor("col1").isMinMaxValueInvalid());
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMinValue(), "  \r D");
+    Assert.assertEquals(metadata.getColumnMetadataFor("col1").getMaxValue(), "E");
   }
 
   private File buildSegment(final TableConfig tableConfig, final Schema schema, String[] stringValues)

@@ -20,8 +20,15 @@ package org.apache.pinot.core.function.scalar;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.math.BigDecimal;
+import java.util.Base64;
 import javax.annotation.Nullable;
+import org.apache.datasketches.memory.Memory;
+import org.apache.datasketches.theta.AnotB;
+import org.apache.datasketches.theta.Intersection;
+import org.apache.datasketches.theta.SetOperationBuilder;
+import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Sketches;
+import org.apache.datasketches.theta.Union;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
@@ -65,6 +72,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * }
  */
 public class SketchFunctions {
+  private static final SetOperationBuilder SET_OPERATION_BUILDER = new SetOperationBuilder();
+
   private SketchFunctions() {
   }
 
@@ -183,5 +192,88 @@ public class SketchFunctions {
       }
     }
     return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());
+  }
+
+  @ScalarFunction(names = {"getThetaSketchEstimate", "get_theta_sketch_estimate"})
+  public static long getThetaSketchEstimate(Object sketchObject) {
+    return Math.round(asThetaSketch(sketchObject).getEstimate());
+  }
+
+  @ScalarFunction(names = {"thetaSketchUnion", "theta_sketch_union"})
+  public static Sketch thetaSketchUnion(Object o1, Object o2) {
+    return thetaSketchUnionVar(o1, o2);
+  }
+
+  @ScalarFunction(names = {"thetaSketchUnion", "theta_sketch_union"})
+  public static Sketch thetaSketchUnion(Object o1, Object o2, Object o3) {
+    return thetaSketchUnionVar(o1, o2, o3);
+  }
+
+  @ScalarFunction(names = {"thetaSketchUnion", "theta_sketch_union"})
+  public static Sketch thetaSketchUnion(Object o1, Object o2, Object o3, Object o4) {
+    return thetaSketchUnionVar(o1, o2, o3, o4);
+  }
+
+  @ScalarFunction(names = {"thetaSketchUnion", "theta_sketch_union"})
+  public static Sketch thetaSketchUnion(Object o1, Object o2, Object o3, Object o4, Object o5) {
+    return thetaSketchUnionVar(o1, o2, o3, o4, o5);
+  }
+
+  @ScalarFunction(names = {"thetaSketchIntersect", "theta_sketch_intersect"})
+  public static Sketch thetaSketchIntersect(Object o1, Object o2) {
+    return thetaSketchIntersectVar(o1, o2);
+  }
+
+  @ScalarFunction(names = {"thetaSketchIntersect", "theta_sketch_intersect"})
+  public static Sketch thetaSketchIntersect(Object o1, Object o2, Object o3) {
+    return thetaSketchIntersectVar(o1, o2, o3);
+  }
+
+  @ScalarFunction(names = {"thetaSketchIntersect", "theta_sketch_intersect"})
+  public static Sketch thetaSketchIntersect(Object o1, Object o2, Object o3, Object o4) {
+    return thetaSketchIntersectVar(o1, o2, o3, o4);
+  }
+
+  @ScalarFunction(names = {"thetaSketchIntersect", "theta_sketch_intersect"})
+  public static Sketch thetaSketchIntersect(Object o1, Object o2, Object o3, Object o4, Object o5) {
+    return thetaSketchIntersectVar(o1, o2, o3, o4, o5);
+  }
+
+  @ScalarFunction(names = {"thetaSketchDiff", "theta_sketch_diff"})
+  public static Sketch thetaSketchDiff(Object sketchObjectA, Object sketchObjectB) {
+    AnotB diff = SET_OPERATION_BUILDER.buildANotB();
+    diff.setA(asThetaSketch(sketchObjectA));
+    diff.notB(asThetaSketch(sketchObjectB));
+    return diff.getResult(false, null, false);
+  }
+
+  private static Sketch thetaSketchUnionVar(Object... sketchObjects) {
+    Union union = SET_OPERATION_BUILDER.buildUnion();
+    for (Object sketchObj : sketchObjects) {
+      union.union(asThetaSketch(sketchObj));
+    }
+    return union.getResult(false, null);
+  }
+
+  private static Sketch thetaSketchIntersectVar(Object... sketchObjects) {
+    Intersection intersection = SET_OPERATION_BUILDER.buildIntersection();
+    for (Object sketchObj : sketchObjects) {
+      intersection.intersect(asThetaSketch(sketchObj));
+    }
+    return intersection.getResult(false, null);
+  }
+
+  private static Sketch asThetaSketch(Object sketchObj) {
+    if (sketchObj instanceof String) {
+      byte[] decoded = Base64.getDecoder().decode((String) sketchObj);
+      return Sketches.wrapSketch(Memory.wrap((decoded)));
+    } else if (sketchObj instanceof Sketch) {
+      return (Sketch) sketchObj;
+    } else if (sketchObj instanceof byte[]) {
+      return Sketches.wrapSketch(Memory.wrap((byte[]) sketchObj));
+    } else {
+      throw new RuntimeException("Exception occurred getting estimate from Theta Sketch, unsupported Object type: "
+          + sketchObj.getClass());
+    }
   }
 }

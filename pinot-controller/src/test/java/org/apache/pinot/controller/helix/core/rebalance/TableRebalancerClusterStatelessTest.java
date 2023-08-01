@@ -246,13 +246,15 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     tableConfig.setInstanceAssignmentConfigMap(null);
     _helixResourceManager.updateTableConfig(tableConfig);
 
-    // Without instances reassignment, the rebalance should return status NO_OP as instance partitions are already
-    // generated
+    // Without instances reassignment, the rebalance should return status NO_OP, and the existing instance partitions
+    // should be used
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new BaseConfiguration());
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+    assertEquals(rebalanceResult.getInstanceAssignment(), instanceAssignment);
+    assertEquals(rebalanceResult.getSegmentAssignment(), newSegmentAssignment);
 
-    // With instances reassignment, the instance partitions should be removed, and the default instance partitions
-    // should be used for segment assignment
+    // With instances reassignment, the rebalance should return status DONE, the existing instance partitions should be
+    // removed, and the default instance partitions should be used
     rebalanceConfig = new BaseConfiguration();
     rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);

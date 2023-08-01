@@ -77,8 +77,9 @@ public class GeoToH3Function extends BaseTransformFunction {
       TransformFunction transformFunction = arguments.get(0);
       Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
           "First argument must be single-valued for transform function: %s", getName());
-      Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
-          "The first argument must be bytes");
+      Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES
+          || transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.STRING,
+          "The first argument must be bytes/string");
       _firstArgument = transformFunction;
       transformFunction = arguments.get(1);
       Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),

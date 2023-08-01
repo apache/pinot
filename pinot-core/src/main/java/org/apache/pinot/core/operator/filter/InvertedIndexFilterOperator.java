@@ -21,11 +21,12 @@ package org.apache.pinot.core.operator.filter;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
@@ -35,30 +36,30 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class InvertedIndexFilterOperator extends BaseFilterOperator {
+public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_INVERTED_INDEX";
 
   private final PredicateEvaluator _predicateEvaluator;
   private final InvertedIndexReader<ImmutableRoaringBitmap> _invertedIndexReader;
   private final boolean _exclusive;
-  private final int _numDocs;
 
-  InvertedIndexFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  InvertedIndexFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator, DataSource dataSource,
+      int numDocs) {
+    super(queryContext, dataSource, numDocs);
     _predicateEvaluator = predicateEvaluator;
     @SuppressWarnings("unchecked")
     InvertedIndexReader<ImmutableRoaringBitmap> invertedIndexReader =
         (InvertedIndexReader<ImmutableRoaringBitmap>) dataSource.getInvertedIndex();
     _invertedIndexReader = invertedIndexReader;
     _exclusive = predicateEvaluator.isExclusive();
-    _numDocs = numDocs;
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
+  protected BlockDocIdSet getNextBlockWithoutNullHandling() {
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
     int numDictIds = dictIds.length;
     if (numDictIds == 0) {
-      return EmptyFilterBlock.getInstance();
+      return EmptyDocIdSet.getInstance();
     }
     if (numDictIds == 1) {
       ImmutableRoaringBitmap docIds = _invertedIndexReader.getDocIds(dictIds[0]);
@@ -66,12 +67,12 @@ public class InvertedIndexFilterOperator extends BaseFilterOperator {
         if (docIds instanceof MutableRoaringBitmap) {
           MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) docIds;
           mutableRoaringBitmap.flip(0L, _numDocs);
-          return new FilterBlock(new BitmapDocIdSet(mutableRoaringBitmap, _numDocs));
+          return new BitmapDocIdSet(mutableRoaringBitmap, _numDocs);
         } else {
-          return new FilterBlock(new BitmapDocIdSet(ImmutableRoaringBitmap.flip(docIds, 0L, _numDocs), _numDocs));
+          return new BitmapDocIdSet(ImmutableRoaringBitmap.flip(docIds, 0L, _numDocs), _numDocs);
         }
       } else {
-        return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs));
+        return new BitmapDocIdSet(docIds, _numDocs);
       }
     } else {
       ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[numDictIds];
@@ -88,7 +89,7 @@ public class InvertedIndexFilterOperator extends BaseFilterOperator {
         recording.setNumDocsMatchingAfterFilter(docIds.getCardinality());
         recording.setFilter(FilterType.INDEX, String.valueOf(_predicateEvaluator.getPredicateType()));
       }
-      return new FilterBlock(new BitmapDocIdSet(docIds, _numDocs));
+      return new BitmapDocIdSet(docIds, _numDocs);
     }
   }
 

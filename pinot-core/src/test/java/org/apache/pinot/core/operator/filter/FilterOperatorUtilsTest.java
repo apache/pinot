@@ -41,7 +41,8 @@ public class FilterOperatorUtilsTest {
   private static final int NUM_DOCS = 10;
   private static final BaseFilterOperator EMPTY_FILTER_OPERATOR = EmptyFilterOperator.getInstance();
   private static final BaseFilterOperator MATCH_ALL_FILTER_OPERATOR = new MatchAllFilterOperator(NUM_DOCS);
-  private static final BaseFilterOperator REGULAR_FILTER_OPERATOR = new TestFilterOperator(new int[]{1, 4, 7});
+  private static final BaseFilterOperator REGULAR_FILTER_OPERATOR =
+      new TestFilterOperator(new int[]{1, 4, 7}, NUM_DOCS);
 
   @Test
   public void testGetAndFilterOperator() {
@@ -123,8 +124,8 @@ public class FilterOperatorUtilsTest {
     H3InclusionIndexFilterOperator h3Inclusion = mock(H3InclusionIndexFilterOperator.class);
     AndFilterOperator andFilterOperator = mock(AndFilterOperator.class);
     OrFilterOperator orFilterOperator = mock(OrFilterOperator.class);
-    NotFilterOperator notWithHighPriority = new NotFilterOperator(sorted, NUM_DOCS);
-    NotFilterOperator notWithLowPriority = new NotFilterOperator(orFilterOperator, NUM_DOCS);
+    NotFilterOperator notWithHighPriority = new NotFilterOperator(sorted, NUM_DOCS, false);
+    NotFilterOperator notWithLowPriority = new NotFilterOperator(orFilterOperator, NUM_DOCS, false);
 
     ExpressionFilterOperator expression = mock(ExpressionFilterOperator.class);
     BaseFilterOperator unknown = mock(BaseFilterOperator.class);
@@ -132,8 +133,7 @@ public class FilterOperatorUtilsTest {
     MockedPrioritizedFilterOperator prioritizedBetweenSortedAndBitmap = mock(MockedPrioritizedFilterOperator.class);
     OptionalInt betweenSortedAndBitmapPriority =
         OptionalInt.of((PrioritizedFilterOperator.HIGH_PRIORITY + PrioritizedFilterOperator.MEDIUM_PRIORITY) / 2);
-    when(prioritizedBetweenSortedAndBitmap.getPriority())
-        .thenReturn(betweenSortedAndBitmapPriority);
+    when(prioritizedBetweenSortedAndBitmap.getPriority()).thenReturn(betweenSortedAndBitmapPriority);
 
     MockedPrioritizedFilterOperator notPrioritized = mock(MockedPrioritizedFilterOperator.class);
     when(prioritizedBetweenSortedAndBitmap.getPriority())
@@ -186,5 +186,9 @@ public class FilterOperatorUtilsTest {
 
   private static abstract class MockedPrioritizedFilterOperator extends BaseFilterOperator
       implements PrioritizedFilterOperator<FilterBlock> {
+    public MockedPrioritizedFilterOperator() {
+      // This filter operator does not support AND/OR/NOT operations.
+      super(0, false);
+    }
   }
 }

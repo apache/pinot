@@ -201,6 +201,9 @@ public class CalciteSqlParser {
       throws SqlCompilationException {
     validateGroupByClause(pinotQuery);
     validateDistinctQuery(pinotQuery);
+    if (pinotQuery.isSetFilterExpression()) {
+      validateFilter(pinotQuery.getFilterExpression());
+    }
   }
 
   private static void validateGroupByClause(PinotQuery pinotQuery)
@@ -262,6 +265,34 @@ public class CalciteSqlParser {
               throw new IllegalStateException("ORDER-BY columns should be included in the DISTINCT columns");
             }
           }
+        }
+      }
+    }
+  }
+
+  /*
+   * Throws an exception if the filter's rhs has NULL because:
+   * - Predicate evaluator and pruning do not have NULL support.
+   * - It is not useful to have NULL in the filter's rhs.
+   *   - For most of the filters (e.g. EQUALS, GREATER_THAN, LIKE), the rhs being NULL leads to no record matched.
+   *   - For IN, adding NULL to the rhs list does not change the matched records.
+   *   - For NOT IN, adding NULL to the rhs list leads to no record matched.
+   */
+  private static void validateFilter(Expression filterExpression) {
+    if (!filterExpression.isSetFunctionCall()) {
+      return;
+    }
+    String operator = filterExpression.getFunctionCall().getOperator();
+    if (operator.equals(FilterKind.AND.name()) || operator.equals(FilterKind.OR.name()) || operator.equals(
+        FilterKind.NOT.name())) {
+      for (Expression filter : filterExpression.getFunctionCall().getOperands()) {
+        validateFilter(filter);
+      }
+    } else {
+      List<Expression> operands = filterExpression.getFunctionCall().getOperands();
+      for (int i = 1; i < operands.size(); i++) {
+        if (operands.get(i).getLiteral().isSetNullValue()) {
+          throw new IllegalStateException(String.format("Using NULL in %s filter is not supported", operator));
         }
       }
     }

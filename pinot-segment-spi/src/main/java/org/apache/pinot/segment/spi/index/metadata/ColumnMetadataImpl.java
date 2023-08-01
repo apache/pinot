@@ -47,6 +47,7 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -223,7 +224,11 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     FieldType fieldType =
         FieldType.valueOf(config.getString(Column.getKeyFor(column, Column.COLUMN_TYPE)).toUpperCase());
     DataType dataType = DataType.valueOf(config.getString(Column.getKeyFor(column, Column.DATA_TYPE)).toUpperCase());
+    DataType storedType = dataType.getStoredType();
     String defaultNullValueString = config.getString(Column.getKeyFor(column, Column.DEFAULT_NULL_VALUE), null);
+    if (defaultNullValueString != null && storedType == DataType.STRING) {
+      defaultNullValueString = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(defaultNullValueString);
+    }
     FieldSpec fieldSpec;
     switch (fieldType) {
       case DIMENSION:
@@ -254,7 +259,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     String minString = (String) config.getProperty(Column.getKeyFor(column, Column.MIN_VALUE));
     String maxString = (String) config.getProperty(Column.getKeyFor(column, Column.MAX_VALUE));
     if (minString != null && maxString != null) {
-      switch (dataType.getStoredType()) {
+      switch (storedType) {
         case INT:
           builder.setMinValue(Integer.valueOf(minString));
           builder.setMaxValue(Integer.valueOf(maxString));
@@ -276,8 +281,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
           builder.setMaxValue(new BigDecimal(maxString));
           break;
         case STRING:
-          builder.setMinValue(minString);
-          builder.setMaxValue(maxString);
+          builder.setMinValue(CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(minString));
+          builder.setMaxValue(CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(maxString));
           break;
         case BYTES:
           builder.setMinValue(BytesUtils.toByteArray(minString));

@@ -59,8 +59,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class ForwardIndexType
-    extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
+public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, ForwardIndexReader, ForwardIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<ForwardIndexConfig> {
   public static final String INDEX_DISPLAY_NAME = "forward";
   // For multi-valued column, forward-index.
@@ -269,13 +268,15 @@ public class ForwardIndexType
     String column = context.getFieldSpec().getName();
     String segmentName = context.getSegmentName();
     FieldSpec.DataType storedType = context.getFieldSpec().getDataType().getStoredType();
+    int fixedLengthBytes = context.getFixedLengthBytes();
     boolean isSingleValue = context.getFieldSpec().isSingleValueField();
     if (!context.hasDictionary()) {
       if (isSingleValue) {
-        String allocationContext = IndexUtil.buildAllocationContext(context.getSegmentName(),
-            context.getFieldSpec().getName(), V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-        if (storedType.isFixedWidth()) {
-          return new FixedByteSVMutableForwardIndex(false, storedType, context.getCapacity(),
+        String allocationContext =
+            IndexUtil.buildAllocationContext(context.getSegmentName(), context.getFieldSpec().getName(),
+                V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+        if (storedType.isFixedWidth() || fixedLengthBytes > 0) {
+          return new FixedByteSVMutableForwardIndex(false, storedType, fixedLengthBytes, context.getCapacity(),
               context.getMemoryManager(), allocationContext);
         } else {
           // RealtimeSegmentStatsHistory does not have the stats for no-dictionary columns from previous consuming
