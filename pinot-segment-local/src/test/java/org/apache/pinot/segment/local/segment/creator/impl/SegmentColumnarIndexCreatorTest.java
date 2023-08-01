@@ -171,12 +171,12 @@ public class SegmentColumnarIndexCreatorTest {
     minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.BYTES);
     byte[] minBytes = BytesUtils.toBytes(minValue);
     assertEquals(minBytes.length, numBytes - 1);
-    assertTrue(Arrays.equals(minBytes, 0, numBytes - 1, bytes, 0, numBytes - 1));
+    assertEquals(Arrays.copyOfRange(minBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
     assertTrue(ByteArray.compare(minBytes, bytes) < 0);
     maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.BYTES);
     byte[] maxBytes = BytesUtils.toBytes(maxValue);
     assertEquals(maxBytes.length, numBytes - 1);
-    assertTrue(Arrays.equals(maxBytes, 0, numBytes - 2, bytes, 0, numBytes - 2));
+    assertEquals(Arrays.copyOfRange(maxBytes, 0, numBytes - 2), Arrays.copyOfRange(bytes, 0, numBytes - 2));
     assertEquals(maxBytes[numBytes - 2], (byte) 0xFF);
     assertTrue(ByteArray.compare(maxBytes, bytes) > 0);
 
@@ -187,7 +187,7 @@ public class SegmentColumnarIndexCreatorTest {
     minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.BYTES);
     minBytes = BytesUtils.toBytes(minValue);
     assertEquals(minBytes.length, numBytes - 1);
-    assertTrue(Arrays.equals(minBytes, 0, numBytes - 1, bytes, 0, numBytes - 1));
+    assertEquals(Arrays.copyOfRange(minBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
     assertTrue(ByteArray.compare(minBytes, bytes) < 0);
     maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.BYTES);
     assertEquals(maxValue, value);
@@ -198,12 +198,12 @@ public class SegmentColumnarIndexCreatorTest {
     minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.BYTES);
     minBytes = BytesUtils.toBytes(minValue);
     assertEquals(minBytes.length, numBytes - 1);
-    assertTrue(Arrays.equals(minBytes, 0, numBytes - 1, bytes, 0, numBytes - 1));
+    assertEquals(Arrays.copyOfRange(minBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
     assertTrue(ByteArray.compare(minBytes, bytes) < 0);
     maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.BYTES);
     maxBytes = BytesUtils.toBytes(maxValue);
     assertEquals(maxBytes.length, numBytes);
-    assertTrue(Arrays.equals(maxBytes, 0, numBytes - 1, bytes, 0, numBytes - 1));
+    assertEquals(Arrays.copyOfRange(maxBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
     assertEquals(maxBytes[numBytes - 1], (byte) 0xFF);
     assertTrue(ByteArray.compare(maxBytes, bytes) > 0);
   }
