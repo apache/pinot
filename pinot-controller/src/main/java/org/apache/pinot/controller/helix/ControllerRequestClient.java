@@ -291,6 +291,16 @@ public class ControllerRequestClient {
     }
   }
 
+  public void deleteBrokerTenant(String tenantName)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(
+              _controllerRequestURLBuilder.forBrokerTenantDelete(tenantName)).toURI()));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   public void createServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
       throws IOException {
     try {
