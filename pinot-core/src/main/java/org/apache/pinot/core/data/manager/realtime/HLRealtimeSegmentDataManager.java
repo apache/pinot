@@ -417,6 +417,11 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
+  public void startConsumption() {
+    // no-op
+  }
+
+  @Override
   public ConsumerState getConsumerState() {
     throw new UnsupportedOperationException();
   }
