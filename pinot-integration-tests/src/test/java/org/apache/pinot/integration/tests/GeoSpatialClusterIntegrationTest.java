@@ -362,4 +362,24 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
       Assert.assertEquals(actualResult, expectedResult);
     }
   }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStUnionQuery(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("Select STUnion(ST_GeogFromText(%s)) from %s",
+            AREA_GEOG_NAME, DEFAULT_TABLE_NAME);
+    JsonNode pinotResponse = postQuery(query);
+    JsonNode rows = pinotResponse.get("resultTable").get("rows");
+    String actualResult = rows.get(0).get(0).asText();
+    String expectedResult =
+        "850000000200000012000000000000000a0000000000000000000000000000000000000000000000003f826b0721dd331700000"
+            + "000000000003ff0000000000000000000000000000040568000000000003ff00000000000004056400000000000405640000000"
+            + "00003ff0000000000000405680000000000000000000000000003ff000000000000000000000000000003f826b0721dd3317000"
+            + "000000000000000000000000000000000000000000000c05e899ba1b196104042be385c67dfe3c05e898c8259e1f44042be491a"
+            + "fc04c9c05e89538ef34d6a4042be4840e1719fc05e8956cd6c2efd4042bdf26f1dc50dc05e898e864020814042bdc1e7967cafc"
+            + "05e89a7503b81b64042bddabe27179cc05e89a85caafbc24042be215336deb9c05e899ba1b196104042be385c67dfe3";
+    Assert.assertEquals(actualResult, expectedResult);
+  }
 }
