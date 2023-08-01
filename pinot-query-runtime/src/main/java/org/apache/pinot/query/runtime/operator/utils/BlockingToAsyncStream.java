@@ -23,9 +23,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class BlockingToAsyncStream<E> implements AsyncStream<E> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BlockingToAsyncStream.class);
   private final BlockingStream<E> _blockingStream;
   private final Executor _executor;
   /**
@@ -59,26 +62,30 @@ public class BlockingToAsyncStream<E> implements AsyncStream<E> {
         + "loss");
     CompletableFuture<E> blockToRead = _blockToRead;
     if (blockToRead == null) {
-      _blockToRead = CompletableFuture.supplyAsync(this::askForNewBlock, _executor);
+      _blockToRead = askForNewData();
       return null;
     } else if (blockToRead.isDone()) {
       E block = blockToRead.getNow(null);
       assert block != null;
 
-      _blockToRead = CompletableFuture.supplyAsync(this::askForNewBlock, _executor);
+      _blockToRead = askForNewData();
       return block;
     } else {
       return null;
     }
   }
 
-  private E askForNewBlock() {
-    E block = _blockingStream.get();
-    OnNewData onNewData = _onNewData.get();
-    if (onNewData != null) {
-      onNewData.newDataAvailable();
-    }
-    return block;
+  private CompletableFuture<E> askForNewData() {
+    CompletableFuture<E> askingAsync = CompletableFuture.supplyAsync(() -> {
+      LOGGER.trace("Asynchronously asking for more data");
+      E block = _blockingStream.get();
+      LOGGER.trace("New data found");
+      return block;
+    }, _executor);
+    // we need to notify in a new future, otherwise there would be a race condition
+    // between the notification reader and the future being completed
+    askingAsync.thenRun(() -> _onNewData.get().newDataAvailable());
+    return askingAsync;
   }
 
   @Override
