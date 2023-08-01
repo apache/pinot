@@ -84,6 +84,7 @@ public class ControllerRequestURLBuilder {
   public String forTablesFromTenant(String tenantName) {
     return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables");
   }
+
   public String forTablesFromTenant(String tenantName, String componentType) {
     return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables") + "?type=" + componentType;
   }

@@ -249,6 +249,7 @@ public class PinotTenantRestletResource {
    * This method expects a tenant name and will return a list of tables tagged on that tenant. It assumes that the
    * tagname is for server tenants only.
    * @param tenantName
+   * @param tenantType
    * @return
    */
   @GET
