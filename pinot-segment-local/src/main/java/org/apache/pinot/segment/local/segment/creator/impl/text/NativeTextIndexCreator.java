@@ -67,7 +67,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   private final File _tempDir;
   private final File _fstIndexFile;
   private final File _invertedIndexFile;
-  private Analyzer _analyzer;
+  private final Analyzer _analyzer;
   private final Map<String, RoaringBitmapWriter<RoaringBitmap>> _postingListMap = new TreeMap<>();
   private final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard = RoaringBitmapWriter.writer();
   private int _nextDocId = 0;
@@ -107,7 +107,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   private void addHelper(String document) {
     List<String> tokens;
     try {
-      tokens = analyze(document, _analyzer);
+      tokens = analyze(document);
     } catch (IOException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -144,10 +144,10 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  public List<String> analyze(String text, Analyzer analyzer)
+  public List<String> analyze(String text)
       throws IOException {
     List<String> result = new ArrayList<>();
-    try (TokenStream tokenStream = analyzer.tokenStream(_columnName, text)) {
+    try (TokenStream tokenStream = _analyzer.tokenStream(_columnName, text)) {
       CharTermAttribute attr = tokenStream.addAttribute(CharTermAttribute.class);
       tokenStream.reset();
       while (tokenStream.incrementToken()) {
