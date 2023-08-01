@@ -37,6 +37,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
@@ -85,6 +87,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     setH2Connection();
 
     // Scan through all the test cases.
+    Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap = new HashMap<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : getTestCases().entrySet()) {
       String testCaseName = testCaseEntry.getKey();
       QueryTestCase testCase = testCaseEntry.getValue();
@@ -98,51 +101,54 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         boolean allowEmptySegment = !BooleanUtils.toBoolean(extractExtraProps(testCase._extraProps, "noEmptySegment"));
         String tableName = testCaseName + "_" + tableEntry.getKey();
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
-        String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
-        org.apache.pinot.spi.data.Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
+        String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+        Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
         schemaMap.put(tableName, pinotSchema);
-        factory1.registerTable(pinotSchema, tableNameWithType);
-        factory2.registerTable(pinotSchema, tableNameWithType);
+        factory1.registerTable(pinotSchema, offlineTableName);
+        factory2.registerTable(pinotSchema, offlineTableName);
         List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
         List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
 
         // generate segments and dump into server1 and server2
         List<String> partitionColumns = tableEntry.getValue()._partitionColumns;
+        String partitionColumn = null;
+        List<List<String>> partitionIdToSegmentsMap = null;
+        if (partitionColumns != null && partitionColumns.size() == 1) {
+          partitionColumn = partitionColumns.get(0);
+          partitionIdToSegmentsMap = new ArrayList<>();
+          for (int i = 0; i < 4; i++) {
+            partitionIdToSegmentsMap.add(new ArrayList<>());
+          }
+        }
 
-        List<GenericRow> rows1 = new ArrayList<>();
-        List<GenericRow> rows2 = new ArrayList<>();
+        List<List<GenericRow>> partitionIdToRowsMap = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+          partitionIdToRowsMap.add(new ArrayList<>());
+        }
 
         for (GenericRow row : genericRows) {
           if (row == SEGMENT_BREAKER_ROW) {
-            if (allowEmptySegment || rows1.size() > 0) {
-              factory1.addSegment(tableNameWithType, rows1);
-              rows1 = new ArrayList<>();
-            }
-            if (allowEmptySegment || rows2.size() > 0) {
-              factory2.addSegment(tableNameWithType, rows2);
-              rows2 = new ArrayList<>();
-            }
+            addSegments(factory1, factory2, offlineTableName, allowEmptySegment, partitionIdToRowsMap,
+                partitionIdToSegmentsMap);
           } else {
-            long partition = 0;
+            int partitionId;
             if (partitionColumns == null) {
-              partition = RANDOM.nextInt(2);
+              partitionId = RANDOM.nextInt(4);
             } else {
+              int hashCode = 0;
               for (String field : partitionColumns) {
-                partition = (partition + row.getValue(field).hashCode()) % 42;
+                hashCode += row.getValue(field).hashCode();
               }
+              partitionId = (hashCode & Integer.MAX_VALUE) % 4;
             }
-            if (partition % 2 == 0) {
-              rows1.add(row);
-            } else {
-              rows2.add(row);
-            }
+            partitionIdToRowsMap.get(partitionId).add(row);
           }
         }
-        if (allowEmptySegment || rows1.size() > 0) {
-          factory1.addSegment(tableNameWithType, rows1);
-        }
-        if (allowEmptySegment || rows2.size() > 0) {
-          factory2.addSegment(tableNameWithType, rows2);
+        addSegments(factory1, factory2, offlineTableName, allowEmptySegment, partitionIdToRowsMap,
+            partitionIdToSegmentsMap);
+
+        if (partitionColumn != null) {
+          partitionedSegmentsMap.put(offlineTableName, Pair.of(partitionColumn, partitionIdToSegmentsMap));
         }
       }
 
@@ -197,7 +203,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
     _queryEnvironment =
         QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
-            factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap());
+            factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
+            partitionedSegmentsMap);
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
@@ -206,6 +213,22 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     int port2 = server2.getPort();
     _servers.put(new QueryServerInstance("localhost", port1, port1), server1);
     _servers.put(new QueryServerInstance("localhost", port2, port2), server2);
+  }
+
+  private void addSegments(MockInstanceDataManagerFactory factory1, MockInstanceDataManagerFactory factory2,
+      String offlineTableName, boolean allowEmptySegment, List<List<GenericRow>> partitionIdToRowsMap,
+      @Nullable List<List<String>> partitionIdToSegmentsMap) {
+    for (int i = 0; i < 4; i++) {
+      MockInstanceDataManagerFactory factory = i < 2 ? factory1 : factory2;
+      List<GenericRow> rows = partitionIdToRowsMap.get(i);
+      if (allowEmptySegment || !rows.isEmpty()) {
+        String segmentName = factory.addSegment(offlineTableName, rows);
+        if (partitionIdToSegmentsMap != null) {
+          partitionIdToSegmentsMap.get(i).add(segmentName);
+        }
+        rows.clear();
+      }
+    }
   }
 
   @AfterClass

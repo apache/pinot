@@ -65,7 +65,6 @@ public class PinotHintOptions {
 
   public static class JoinHintOptions {
     public static final String JOIN_STRATEGY = "join_strategy";
-    public static final String IS_COLOCATED_BY_JOIN_KEYS = "is_colocated_by_join_keys";
   }
 
   public static class TableHintOptions {

@@ -59,9 +59,38 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
             receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderFragmentId, mailboxMetadata);
           }
         });
+      } else if (senderMetadata.isPartitionedTableScan()) {
+        // For partitioned table scan, send the data to the worker with the same worker id (not necessary the same
+        // instance)
+        senderWorkerIdsMap.forEach((senderServerInstance, senderWorkerIds) -> {
+          for (int workerId : senderWorkerIds) {
+            receiverWorkerIdsMap.forEach((receiverServerInstance, receiverWorkerIds) -> {
+              for (int receiverWorkerId : receiverWorkerIds) {
+                if (receiverWorkerId == workerId) {
+                  String mailboxId =
+                      MailboxIdUtils.toPlanMailboxId(senderFragmentId, workerId, receiverFragmentId, workerId);
+                  MailboxMetadata serderMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
+                      Collections.singletonList(new VirtualServerAddress(receiverServerInstance, workerId)),
+                      Collections.emptyMap());
+                  MailboxMetadata receiverMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
+                      Collections.singletonList(new VirtualServerAddress(senderServerInstance, workerId)),
+                      Collections.emptyMap());
+                  senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
+                      .put(receiverFragmentId, serderMailboxMetadata);
+                  receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
+                      .put(senderFragmentId, receiverMailboxMetadata);
+                  break;
+                }
+              }
+            });
+          }
+        });
       } else {
         // For other exchange types, send the data to all the instances in the receiver fragment
-        // TODO: Add support for more exchange types
+        // TODO:
+        //   1. Add support for more exchange types
+        //   2. Keep the receiver worker id sequential in the senderMailboxMetadata so that the partitionId aligns with
+        //      the workerId. It is useful for JOIN query when only left table is partitioned.
         senderWorkerIdsMap.forEach((senderServerInstance, senderWorkerIds) -> {
           for (int senderWorkerId : senderWorkerIds) {
             Map<Integer, MailboxMetadata> senderMailboxMetadataMap =

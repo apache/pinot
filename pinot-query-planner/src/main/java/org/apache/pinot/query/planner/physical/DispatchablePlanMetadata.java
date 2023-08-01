@@ -64,6 +64,9 @@ public class DispatchablePlanMetadata implements Serializable {
   // whether a stage requires singleton instance to execute, e.g. stage contains global reduce (sort/agg) operator.
   private boolean _requiresSingletonInstance;
 
+  // whether a stage is partitioned table scan
+  private boolean _isPartitionedTableScan;
+
   // Total worker count of this stage.
   private int _totalWorkerCount;
 
@@ -72,8 +75,6 @@ public class DispatchablePlanMetadata implements Serializable {
     _serverInstanceToWorkerIdMap = new HashMap<>();
     _workerIdToSegmentsMap = new HashMap<>();
     _workerIdToMailboxesMap = new HashMap<>();
-    _timeBoundaryInfo = null;
-    _requiresSingletonInstance = false;
     _tableToUnavailableSegmentsMap = new HashMap<>();
   }
 
@@ -93,8 +94,7 @@ public class DispatchablePlanMetadata implements Serializable {
     return _workerIdToSegmentsMap;
   }
 
-  public void setWorkerIdToSegmentsMap(
-      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+  public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
   }
 
@@ -133,6 +133,14 @@ public class DispatchablePlanMetadata implements Serializable {
 
   public void setRequireSingleton(boolean newRequireInstance) {
     _requiresSingletonInstance = _requiresSingletonInstance || newRequireInstance;
+  }
+
+  public boolean isPartitionedTableScan() {
+    return _isPartitionedTableScan;
+  }
+
+  public void setPartitionedTableScan(boolean isPartitionedTableScan) {
+    _isPartitionedTableScan = isPartitionedTableScan;
   }
 
   public int getTotalWorkerCount() {
