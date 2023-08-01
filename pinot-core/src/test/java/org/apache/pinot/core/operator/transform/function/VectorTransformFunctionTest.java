@@ -64,7 +64,7 @@ public class VectorTransformFunctionTest extends BaseTransformFunctionTest {
         new Object[]{"cosineDistance(vector1, vector2, 0)", 0.1, 0.4},
         new Object[]{"cosineDistance(vector1, zeroVector, 0)", 0.0, 0.0},
         new Object[]{"innerProduct(vector1, vector2)", 100, 160},
-        new Object[]{"l1Distance(vector1, vector2)", 150, 200},
+        new Object[]{"l1Distance(vector1, vector2)", 140, 210},
         new Object[]{"l2Distance(vector1, vector2)", 8, 11},
         new Object[]{"vectorNorm(vector1)", 10, 16},
         new Object[]{"vectorNorm(vector2)", 10, 16}

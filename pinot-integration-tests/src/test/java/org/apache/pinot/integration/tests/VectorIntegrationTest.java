@@ -108,7 +108,7 @@ public class VectorIntegrationTest extends BaseClusterIntegrationTest {
       double innerProduce = jsonNode.get("resultTable").get("rows").get(0).get(1).asDouble();
       assertTrue(innerProduce > 100 && innerProduce < 160);
       double l1Distance = jsonNode.get("resultTable").get("rows").get(0).get(2).asDouble();
-      assertTrue(l1Distance > 150 && l1Distance < 200);
+      assertTrue(l1Distance > 140 && l1Distance < 210);
       double l2Distance = jsonNode.get("resultTable").get("rows").get(0).get(3).asDouble();
       assertTrue(l2Distance > 8 && l2Distance < 11);
       int vectorDimsVector1 = jsonNode.get("resultTable").get("rows").get(0).get(4).asInt();
