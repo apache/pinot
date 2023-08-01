@@ -236,11 +236,13 @@ public class PinotHelixTaskResourceManager {
    * @param pinotTaskConfigs List of child task configs to be submitted
    * @param taskTimeoutMs Timeout in milliseconds for each task
    * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
+   * @param maxAttemptsPerTask Maximum number of attempts per task
    * @return Name of the submitted parent task
    */
   public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, long taskTimeoutMs,
-      int numConcurrentTasksPerInstance) {
-    return submitTask(pinotTaskConfigs, Helix.UNTAGGED_MINION_INSTANCE, taskTimeoutMs, numConcurrentTasksPerInstance);
+      int numConcurrentTasksPerInstance, int maxAttemptsPerTask) {
+    return submitTask(pinotTaskConfigs, Helix.UNTAGGED_MINION_INSTANCE, taskTimeoutMs, numConcurrentTasksPerInstance,
+        maxAttemptsPerTask);
   }
 
   /**
@@ -250,10 +252,11 @@ public class PinotHelixTaskResourceManager {
    * @param minionInstanceTag Tag of the Minion instances to submit the task to
    * @param taskTimeoutMs Timeout in milliseconds for each task
    * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
+   * @param maxAttemptsPerTask Maximum number of attempts per task
    * @return Name of the submitted parent task
    */
   public synchronized String submitTask(List<PinotTaskConfig> pinotTaskConfigs, String minionInstanceTag,
-      long taskTimeoutMs, int numConcurrentTasksPerInstance) {
+      long taskTimeoutMs, int numConcurrentTasksPerInstance, int maxAttemptsPerTask) {
     int numChildTasks = pinotTaskConfigs.size();
     Preconditions.checkState(numChildTasks > 0);
     Preconditions.checkState(numConcurrentTasksPerInstance > 0);
@@ -261,7 +264,7 @@ public class PinotHelixTaskResourceManager {
     String taskType = pinotTaskConfigs.get(0).getTaskType();
     String parentTaskName = getParentTaskName(taskType, UUID.randomUUID() + "_" + System.currentTimeMillis());
     return submitTask(parentTaskName, pinotTaskConfigs, minionInstanceTag, taskTimeoutMs,
-        numConcurrentTasksPerInstance);
+        numConcurrentTasksPerInstance, maxAttemptsPerTask);
   }
 
   /**
@@ -272,10 +275,11 @@ public class PinotHelixTaskResourceManager {
    * @param minionInstanceTag Tag of the Minion instances to submit the task to
    * @param taskTimeoutMs Timeout in milliseconds for each task
    * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
+   * @param maxAttemptsPerTask Maximum number of attempts per task
    * @return Name of the submitted parent task
    */
   public synchronized String submitTask(String parentTaskName, List<PinotTaskConfig> pinotTaskConfigs,
-      String minionInstanceTag, long taskTimeoutMs, int numConcurrentTasksPerInstance) {
+      String minionInstanceTag, long taskTimeoutMs, int numConcurrentTasksPerInstance, int maxAttemptsPerTask) {
     int numChildTasks = pinotTaskConfigs.size();
     Preconditions.checkState(numChildTasks > 0);
     Preconditions.checkState(numConcurrentTasksPerInstance > 0);
@@ -297,8 +301,8 @@ public class PinotHelixTaskResourceManager {
     JobConfig.Builder jobBuilder =
         new JobConfig.Builder().addTaskConfigs(helixTaskConfigs).setInstanceGroupTag(minionInstanceTag)
             .setTimeoutPerTask(taskTimeoutMs).setNumConcurrentTasksPerInstance(numConcurrentTasksPerInstance)
-            .setIgnoreDependentJobFailure(true).setMaxAttemptsPerTask(1).setFailureThreshold(Integer.MAX_VALUE)
-            .setExpiry(_taskExpireTimeMs);
+            .setIgnoreDependentJobFailure(true).setMaxAttemptsPerTask(maxAttemptsPerTask)
+            .setFailureThreshold(Integer.MAX_VALUE).setExpiry(_taskExpireTimeMs);
     _taskDriver.enqueueJob(getHelixJobQueueName(taskType), parentTaskName, jobBuilder);
 
     // Wait until task state is available

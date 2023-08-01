@@ -31,8 +31,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Base implementation of the {@link PinotTaskGenerator} which reads the 'taskTimeoutMs' and
- * 'numConcurrentTasksPerInstance' from the cluster config.
+ * Base implementation of the {@link PinotTaskGenerator} which reads the 'taskTimeoutMs',
+ * 'numConcurrentTasksPerInstance' and 'maxAttemptsPerTask' from the cluster config.
  */
 public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTaskGenerator.class);
@@ -72,6 +72,21 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
       }
     }
     return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
+  }
+
+  @Override
+  public int getMaxAttemptsPerTask() {
+    String taskType = getTaskType();
+    String configKey = taskType + MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX;
+    String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
+    if (configValue != null) {
+      try {
+        return Integer.parseInt(configValue);
+      } catch (Exception e) {
+        LOGGER.error("Invalid config {}: '{}'", configKey, configValue, e);
+      }
+    }
+    return MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK;
   }
 
   @Override
