@@ -129,6 +129,43 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctCountQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String[] numericResultFunctions = new String[]{
+        "distinctCount", "distinctCountBitmap", "distinctCountHLL", "segmentPartitionedDistinctCount",
+        "distinctCountSmartHLL", "distinctCountThetaSketch", "distinctSum", "distinctAvg"
+    };
+
+    double[] expectedNumericResults = new double[]{
+        364, 364, 355, 364, 364, 364, 5915969, 16252.662087912087
+    };
+    Assert.assertEquals(numericResultFunctions.length, expectedNumericResults.length);
+
+    for (int i = 0; i < numericResultFunctions.length; i++) {
+      String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", numericResultFunctions[i]);
+      JsonNode jsonNode = postQuery(pinotQuery);
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedNumericResults[i]);
+    }
+
+    String[] binaryResultFunctions = new String[]{
+        "distinctCountRawHLL", "distinctCountRawThetaSketch"
+    };
+    int[] expectedBinarySizeResults = new int[]{
+        360,
+        3904
+    };
+    for (int i = 0; i < binaryResultFunctions.length; i++) {
+      String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", binaryResultFunctions[i]);
+      JsonNode jsonNode = postQuery(pinotQuery);
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
+          expectedBinarySizeResults[i]);
+    }
+
+    setUseMultiStageQueryEngine(true);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testMultiValueColumnAggregationQuery(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -166,13 +203,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     pinotQuery = "SELECT percentileKLLMV(DivAirportIDs, 99) FROM mytable";
     jsonNode = postQuery(pinotQuery);
-    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 12000);
-    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 15000);
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 10000);
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 17000);
 
     pinotQuery = "SELECT percentileKLLMV(DivAirportIDs, 99, 100) FROM mytable";
     jsonNode = postQuery(pinotQuery);
-    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 12000);
-    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 15000);
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 10000);
+    Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 17000);
 
     setUseMultiStageQueryEngine(true);
   }

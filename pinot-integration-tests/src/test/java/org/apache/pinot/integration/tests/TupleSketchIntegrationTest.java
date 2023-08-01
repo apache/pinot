@@ -22,20 +22,21 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.Random;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.datasketches.tuple.aninteger.IntegerSketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -43,14 +44,13 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
-public class SumPrecisionIntegrationTest extends BaseClusterIntegrationTest {
-  private static final String DIM_NAME = "dimName";
-  private static final String MET_BIG_DECIMAL_BYTES = "metBigDecimalBytes";
-  private static final String MET_BIG_DECIMAL_STRING = "metBigDecimalString";
-  private static final String MET_DOUBLE = "metDouble";
-  private static final String MET_LONG = "metLong";
+public class TupleSketchIntegrationTest extends BaseClusterIntegrationTest {
+  private static final String MET_TUPLE_SKETCH_BYTES = "metTupleSketchBytes";
+
+  private static final Random RANDOM = new Random();
 
   @BeforeClass
   public void setup()
@@ -65,11 +65,8 @@ public class SumPrecisionIntegrationTest extends BaseClusterIntegrationTest {
 
     // create & upload schema AND table config
     Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
-        .addSingleValueDimension(DIM_NAME, FieldSpec.DataType.STRING)
-        .addMetric(MET_BIG_DECIMAL_BYTES, FieldSpec.DataType.BIG_DECIMAL)
-        .addMetric(MET_BIG_DECIMAL_STRING, FieldSpec.DataType.BIG_DECIMAL)
-        .addMetric(MET_DOUBLE, FieldSpec.DataType.DOUBLE)
-        .addMetric(MET_LONG, FieldSpec.DataType.LONG).build();
+        .addMetric(MET_TUPLE_SKETCH_BYTES, FieldSpec.DataType.BYTES)
+        .build();
     addSchema(schema);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME).build();
     addTableConfig(tableConfig);
@@ -92,14 +89,16 @@ public class SumPrecisionIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query =
-        String.format("SELECT SUMPRECISION(%s), SUMPRECISION(%s), sum(%s), sum(%s) FROM %s",
-            MET_BIG_DECIMAL_BYTES, MET_BIG_DECIMAL_STRING, MET_DOUBLE, MET_LONG, DEFAULT_TABLE_NAME);
-    double sumResult = 2147484147500L;
+        String.format(
+            "SELECT DISTINCT_COUNT_TUPLE_SKETCH(%s), DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(%s), "
+                + "SUM_VALUES_INTEGER_SUM_TUPLE_SKETCH(%s), AVG_VALUE_INTEGER_SUM_TUPLE_SKETCH(%s) FROM %s",
+            MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES,
+            DEFAULT_TABLE_NAME);
     JsonNode jsonNode = postQuery(query);
-    System.out.println("jsonNode = " + jsonNode.toPrettyString());
-    for (int i = 0; i < 4; i++) {
-      assertEquals(Double.parseDouble(jsonNode.get("resultTable").get("rows").get(0).get(i).asText()), sumResult);
-    }
+    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong() > 0);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).asText().length(), 1756);
+    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(2).asLong() > 0);
+    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(3).asLong() > 0);
   }
 
   private File createAvroFile(long totalNumRecords)
@@ -108,34 +107,27 @@ public class SumPrecisionIntegrationTest extends BaseClusterIntegrationTest {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(ImmutableList.of(
-        new Field(DIM_NAME, org.apache.avro.Schema.create(Type.STRING), null, null),
-        new Field(MET_BIG_DECIMAL_BYTES, org.apache.avro.Schema.create(Type.BYTES), null, null),
-        new Field(MET_BIG_DECIMAL_STRING, org.apache.avro.Schema.create(Type.STRING), null, null),
-        new Field(MET_DOUBLE, org.apache.avro.Schema.create(Type.DOUBLE), null, null),
-        new Field(MET_LONG, org.apache.avro.Schema.create(Type.LONG), null, null)));
+        new Field(MET_TUPLE_SKETCH_BYTES, org.apache.avro.Schema.create(Type.BYTES), null, null)));
 
     // create avro file
     File avroFile = new File(_tempDir, "data.avro");
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, avroFile);
-      int dimCardinality = 50;
-      BigDecimal bigDecimalBase = BigDecimal.valueOf(Integer.MAX_VALUE + 1L);
       for (int i = 0; i < totalNumRecords; i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
-        record.put(DIM_NAME, "dim" + (RandomUtils.nextInt() % dimCardinality));
-        BigDecimal bigDecimalValue = bigDecimalBase.add(BigDecimal.valueOf(i));
-
-        record.put(MET_BIG_DECIMAL_BYTES, ByteBuffer.wrap(BigDecimalUtils.serialize(bigDecimalValue)));
-        record.put(MET_BIG_DECIMAL_STRING, bigDecimalValue.toPlainString());
-        record.put(MET_DOUBLE, bigDecimalValue.doubleValue());
-        record.put(MET_LONG, bigDecimalValue.longValue());
-
+        record.put(MET_TUPLE_SKETCH_BYTES, ByteBuffer.wrap(getRandomRawValue()));
         // add avro record to file
         fileWriter.append(record);
       }
     }
     return avroFile;
+  }
+
+  private byte[] getRandomRawValue() {
+    IntegerSketch is = new IntegerSketch(4, IntegerSummary.Mode.Sum);
+    is.update(RANDOM.nextInt(100), RANDOM.nextInt(100));
+    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());
   }
 
   @AfterClass
