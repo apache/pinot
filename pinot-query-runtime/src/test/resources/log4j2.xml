@@ -29,9 +29,9 @@
     <Logger name="org.apache.pinot" level="warn" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>
-    <Logger name="org.apache.pinot.query" level="trace" additivity="false">
-      <AppenderRef ref="console"/>
-    </Logger>
+<!--    <Logger name="org.apache.pinot.query" level="trace" additivity="false">-->
+<!--      <AppenderRef ref="console"/>-->
+<!--    </Logger>-->
     <Root level="error">
       <AppenderRef ref="console"/>
     </Root>
