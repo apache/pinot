@@ -135,7 +135,7 @@ public class ReceivingMailbox {
    */
   @Nullable
   public TransferableBlock poll() {
-    Preconditions.checkState(_reader != null, "A reader must be registere");
+    Preconditions.checkState(_reader != null, "A reader must be registered");
     TransferableBlock errorBlock = _errorBlock.get();
     return errorBlock != null ? errorBlock : _blocks.poll();
   }
