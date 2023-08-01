@@ -709,8 +709,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
     setUpSegments(tableConfig, schema);
     String query =
-        String.format("SELECT %s FROM testTable WHERE AND(NOT(add(%s, 0) > 0) AND %s IS NULL)", COLUMN1, COLUMN1,
-            COLUMN2);
+        String.format("SELECT %s FROM testTable WHERE NOT(add(%s, 0) > 0) AND %s IS NULL", COLUMN1, COLUMN1, COLUMN2);
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
 
