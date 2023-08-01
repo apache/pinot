@@ -142,10 +142,10 @@ public enum AggregationFunctionType {
   // DEPRECATED in v2
   IDSET("idSet"),
 
-  // TODO: support histogram
+  // TODO: support histogram requires solving ARRAY constructor and multi-function signature without optional ordinal
   HISTOGRAM("histogram"),
 
-  // TODO: support underscore separated version of the stats functions
+  // TODO: support underscore separated version of the stats functions, resolving conflict in SqlStdOptTable
   // currently Pinot is missing generated agg functions impl from Calcite's AggregateReduceFunctionsRule
   COVARPOP("covarPop", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.DOUBLE,
@@ -167,7 +167,7 @@ public enum AggregationFunctionType {
       OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
   FOURTHMOMENT("fourthMoment"),
 
-  // TODO: support Tuple sketches in V2
+  // TODO: revisit support for Tuple sketches in V2
   // DataSketches Tuple Sketch support
   DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch"),
 
@@ -177,11 +177,10 @@ public enum AggregationFunctionType {
   SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch"),
   AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch"),
 
-  // TODO: support Geo-spatial agg in V2
+  // TODO: revisit support for Geo-spatial agg in V2
   // Geo aggregation functions
   STUNION("STUnion"),
 
-  // TODO: support MV aggs properly in V2
   // Aggregation functions for multi-valued columns
   COUNTMV("countMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.explicit(SqlTypeName.BIGINT),
@@ -250,7 +249,7 @@ public enum AggregationFunctionType {
   CHILDARGMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + ARGMAX.getName()),
 
   // funnel aggregate functions
-  // TODO: support funnel count in V2
+  // TODO: revisit support for funnel count in V2
   FUNNELCOUNT("funnelCount");
 
   private static final Set<String> NAMES = Arrays.stream(values()).flatMap(func -> Stream.of(func.name(),
