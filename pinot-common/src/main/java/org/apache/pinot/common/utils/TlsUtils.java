@@ -240,10 +240,6 @@ public final class TlsUtils {
       // HttpsURLConnection
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
 
-      // Apache HTTP client 3.x
-      Protocol.registerProtocol("https",
-          new Protocol(CommonConstants.HTTPS_PROTOCOL, new PinotProtocolSocketFactory(sc.getSocketFactory()), 443));
-
       setSslContext(sc);
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
@@ -301,48 +297,6 @@ public final class TlsUtils {
         : SSL_CONTEXT_REF.get();
   }
 
-  /**
-   * Adapted from: https://svn.apache.org/viewvc/httpcomponents/oac
-   * .hc3x/trunk/src/contrib/org/apache/commons/httpclient/contrib/ssl/AuthSSLProtocolSocketFactory.java?view=markup
-   */
-  private static class PinotProtocolSocketFactory implements ProtocolSocketFactory {
-    final SSLSocketFactory _sslSocketFactory;
-
-    public PinotProtocolSocketFactory(SSLSocketFactory sslSocketFactory) {
-      _sslSocketFactory = sslSocketFactory;
-    }
-
-    @Override
-    public Socket createSocket(String host, int port, InetAddress localAddress, int localPort)
-        throws IOException {
-      return _sslSocketFactory.createSocket(host, port, localAddress, localPort);
-    }
-
-    @Override
-    public Socket createSocket(String host, int port, InetAddress localAddress, int localPort,
-        HttpConnectionParams params)
-        throws IOException {
-      Preconditions.checkNotNull(params);
-
-      int timeout = params.getConnectionTimeout();
-      if (timeout <= 0) {
-        return _sslSocketFactory.createSocket(host, port, localAddress, localPort);
-      }
-
-      Socket socket = _sslSocketFactory.createSocket();
-      SocketAddress localaddr = new InetSocketAddress(localAddress, localPort);
-      SocketAddress remoteaddr = new InetSocketAddress(host, port);
-      socket.bind(localaddr);
-      socket.connect(remoteaddr, timeout);
-      return socket;
-    }
-
-    @Override
-    public Socket createSocket(String host, int port)
-        throws IOException {
-      return _sslSocketFactory.createSocket(host, port);
-    }
-  }
 
   /**
    * Builds client side SslContext based on a given TlsConfig.
