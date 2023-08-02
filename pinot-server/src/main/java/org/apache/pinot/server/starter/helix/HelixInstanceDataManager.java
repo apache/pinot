@@ -220,8 +220,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", offlineTableName);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
+    SegmentZKMetadata zkMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, offlineTableName, segmentName);
+    Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for offline segment: %s, table: %s",
+        segmentName, offlineTableName);
+
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
+    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+
     _tableDataManagerMap.computeIfAbsent(offlineTableName, k -> createTableDataManager(k, tableConfig))
-        .addSegment(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema));
+        .addSegment(indexDir, indexLoadingConfig);
     LOGGER.info("Added segment: {} to table: {}", segmentName, offlineTableName);
   }
 
