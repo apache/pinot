@@ -159,8 +159,8 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
         }
         return;
       }
-      assert (_predicateEvaluator != null);
       boolean predicateEvaluationResult = _predicateEvaluationResult == PredicateEvaluationResult.TRUE;
+      assert (_predicateEvaluator != null);
       if (resultMetadata.hasDictionary()) {
         int[] dictIds = _transformFunction.transformToDictIdsSV(projectionBlock);
         if (_nullHandlingEnabled) {
