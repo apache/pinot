@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.dociditerators.ExpressionScanDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
@@ -43,12 +44,14 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public class ExpressionFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_EXPRESSION";
 
+  private final QueryContext _queryContext;
   private final Map<String, DataSource> _dataSourceMap;
   private final TransformFunction _transformFunction;
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
     super(numDocs, queryContext.isNullHandlingEnabled());
+    _queryContext = queryContext;
 
     Set<String> columns = new HashSet<>();
     ExpressionContext lhs = predicate.getLhs();
@@ -61,7 +64,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       _dataSourceMap.put(column, dataSource);
       columnContextMap.put(column, ColumnContext.fromDataSource(dataSource));
     });
-    _transformFunction = TransformFunctionFactory.get(lhs, columnContextMap, queryContext);
+    _transformFunction = TransformFunctionFactory.get(lhs, columnContextMap, _queryContext);
     _predicateEvaluator =
         PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
             _transformFunction.getResultMetadata().getDataType());
@@ -69,7 +72,14 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs);
+    return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
+        _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE);
+  }
+
+  @Override
+  protected BlockDocIdSet getFalses() {
+    return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
+        _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE);
   }
 
   @Override
