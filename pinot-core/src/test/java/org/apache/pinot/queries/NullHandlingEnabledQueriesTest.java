@@ -839,11 +839,11 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   public void testExpressionFilterOperatorResultIsInSecondProjectionBlock()
       throws Exception {
     initializeRows();
-    int counter = 0;
-    for (int i = 0; i < DocIdSetPlanNode.MAX_DOC_PER_CALL; i++) {
-      insertRowWithTwoColumns(null, counter++);
+    int i = 0;
+    for (; i < DocIdSetPlanNode.MAX_DOC_PER_CALL; i++) {
+      insertRowWithTwoColumns(null, i);
     }
-    insertRowWithTwoColumns(1, counter);
+    insertRowWithTwoColumns(1, i);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
         .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
