@@ -35,8 +35,6 @@
       { "sql": "SELECT * FROM {tbl} WHERE intCol BETWEEN 0 AND 100 AND strCol BETWEEN 'bar' AND 'foo'" },
       { "sql": "SELECT * FROM {tbl} WHERE intCol IN (SELECT a.intCol FROM {tbl} AS a JOIN {tbl} AS b ON a.strCol = b.strCol WHERE MOD(a.intCol, 2) = MOD(b.intCol, 2))" },
       {
-        "ignored": true,
-        "comments": "Relation Decorrelator not supported",
         "sql": "SELECT * FROM {tbl} AS a WHERE a.strCol IN (SELECT b.strCol FROM {tbl} AS b WHERE b.intCol = a.intCol + 1)"
       },
       {
@@ -45,18 +43,12 @@
         "sql": "SELECT * FROM {tbl} AS a WHERE a.intCol BETWEEN (SELECT b.intCol FROM {tbl} AS b WHERE b.intCol = a.intCol + 1) AND 100"
       },
       {
-        "ignored": true,
-        "comments": "Relation Decorrelator not supported",
         "sql": "SELECT * FROM {tbl} AS a WHERE a.intCol BETWEEN (SELECT MIN(b.intCol) FROM {tbl} AS b WHERE b.intCol = a.intCol + 1) AND 100"
       },
       {
-        "ignored": true,
-        "comments": "Relation Decorrelator not supported",
         "sql": "SELECT * FROM {tbl} AS a WHERE EXISTS (SELECT strCol FROM {tbl} AS b WHERE b.intCol = a.intCol + 1)"
       },
       {
-        "ignored": true,
-        "comments": "Relation Decorrelator not supported",
         "sql": "SELECT * FROM {tbl} AS a WHERE NOT EXISTS (SELECT strCol FROM {tbl} AS b WHERE b.intCol = a.intCol + 1)"
       },
       {
