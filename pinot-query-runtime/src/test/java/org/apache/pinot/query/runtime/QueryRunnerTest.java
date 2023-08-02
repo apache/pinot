@@ -93,25 +93,27 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @BeforeClass
   public void setUp()
       throws Exception {
-    MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
-        .addSegment("a_REALTIME", buildRows("a_REALTIME"))
-        .addSegment("a_REALTIME", buildRows("a_REALTIME"))
-        .addSegment("b_REALTIME", buildRows("b_REALTIME"))
-        .addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
-        .addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
-    MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
-        .addSegment("a_REALTIME", buildRows("a_REALTIME"))
-        .addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
-        .addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
-        .addSegment("d_OFFLINE", buildRows("d_OFFLINE"))
-        .addSegment("d_REALTIME", buildRows("d_REALTIME"));
+    MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
+    factory1.addSegment("a_REALTIME", buildRows("a_REALTIME"));
+    factory1.addSegment("a_REALTIME", buildRows("a_REALTIME"));
+    factory1.addSegment("b_REALTIME", buildRows("b_REALTIME"));
+    factory1.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
+    factory1.addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
+
+    MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2");
+    factory2.registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME");
+    factory2.registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE");
+    factory2.registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
+    factory2.addSegment("a_REALTIME", buildRows("a_REALTIME"));
+    factory2.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
+    factory2.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
+    factory2.addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
+    factory2.addSegment("d_REALTIME", buildRows("d_REALTIME"));
+
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
     QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
 
@@ -135,9 +137,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _reducerScheduler.startAsync();
     _mailboxService.start();
 
-    _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
-        server2.getPort(), factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(),
-        factory2.buildTableSegmentNameMap());
+    _queryEnvironment =
+        QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
+            factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
+            null);
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.

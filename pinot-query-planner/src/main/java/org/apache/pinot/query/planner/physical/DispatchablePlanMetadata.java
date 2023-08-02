@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
@@ -41,7 +42,9 @@ import org.apache.pinot.query.routing.QueryServerInstance;
  * </ul>
  */
 public class DispatchablePlanMetadata implements Serializable {
+  // These 2 fields are extracted from TableScanNode
   private final List<String> _scannedTables;
+  private Map<String, String> _tableOptions;
 
   // used for assigning server/worker nodes.
   private Map<QueryServerInstance, List<Integer>> _serverInstanceToWorkerIdMap;
@@ -64,6 +67,9 @@ public class DispatchablePlanMetadata implements Serializable {
   // whether a stage requires singleton instance to execute, e.g. stage contains global reduce (sort/agg) operator.
   private boolean _requiresSingletonInstance;
 
+  // whether a stage is partitioned table scan
+  private boolean _isPartitionedTableScan;
+
   // Total worker count of this stage.
   private int _totalWorkerCount;
 
@@ -72,8 +78,6 @@ public class DispatchablePlanMetadata implements Serializable {
     _serverInstanceToWorkerIdMap = new HashMap<>();
     _workerIdToSegmentsMap = new HashMap<>();
     _workerIdToMailboxesMap = new HashMap<>();
-    _timeBoundaryInfo = null;
-    _requiresSingletonInstance = false;
     _tableToUnavailableSegmentsMap = new HashMap<>();
   }
 
@@ -85,6 +89,15 @@ public class DispatchablePlanMetadata implements Serializable {
     _scannedTables.add(tableName);
   }
 
+  @Nullable
+  public Map<String, String> getTableOptions() {
+    return _tableOptions;
+  }
+
+  public void setTableOptions(Map<String, String> tableOptions) {
+    _tableOptions = tableOptions;
+  }
+
   // -----------------------------------------------
   // attached physical plan context.
   // -----------------------------------------------
@@ -93,8 +106,7 @@ public class DispatchablePlanMetadata implements Serializable {
     return _workerIdToSegmentsMap;
   }
 
-  public void setWorkerIdToSegmentsMap(
-      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
+  public void setWorkerIdToSegmentsMap(Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap) {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
   }
 
@@ -133,6 +145,14 @@ public class DispatchablePlanMetadata implements Serializable {
 
   public void setRequireSingleton(boolean newRequireInstance) {
     _requiresSingletonInstance = _requiresSingletonInstance || newRequireInstance;
+  }
+
+  public boolean isPartitionedTableScan() {
+    return _isPartitionedTableScan;
+  }
+
+  public void setPartitionedTableScan(boolean isPartitionedTableScan) {
+    _isPartitionedTableScan = isPartitionedTableScan;
   }
 
   public int getTotalWorkerCount() {

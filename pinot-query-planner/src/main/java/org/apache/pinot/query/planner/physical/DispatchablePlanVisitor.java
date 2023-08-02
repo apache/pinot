@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -127,6 +128,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitTableScan(TableScanNode node, DispatchablePlanContext context) {
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
     dispatchablePlanMetadata.addScannedTable(node.getTableName());
+    dispatchablePlanMetadata.setTableOptions(node.getNodeHint()._hintOptions.get(PinotHintOptions.TABLE_HINT_OPTIONS));
     return null;
   }
 
