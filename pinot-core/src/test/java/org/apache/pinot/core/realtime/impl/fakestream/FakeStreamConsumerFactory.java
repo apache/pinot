@@ -53,7 +53,7 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
   @Override
   public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
       String groupId) {
-    return new FakeStreamLevelConsumer();
+    throw new UnsupportedOperationException("Pinot no longer support stream level consumers!");
   }
 
   @Override

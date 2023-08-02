@@ -156,18 +156,6 @@ public class FakeStreamConfigUtils {
     return getDefaultLowLevelStreamConfigs(DEFAULT_NUM_PARTITIONS);
   }
 
-  /**
-   * Generate fake stream configs for high level stream
-   */
-  public static StreamConfig getDefaultHighLevelStreamConfigs() {
-    Map<String, String> streamConfigMap = getDefaultStreamConfigs();
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            StreamConfig.ConsumerType.HIGHLEVEL.toString());
-
-    return new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
-  }
-
   private static Map<String, String> getDefaultStreamConfigs() {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, STREAM_TYPE);

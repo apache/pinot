@@ -84,7 +84,6 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
@@ -101,6 +100,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -108,7 +108,10 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -163,7 +166,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
   protected PeriodicTaskScheduler _periodicTaskScheduler;
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
-  protected PinotRealtimeSegmentManager _realtimeSegmentsManager;
   protected PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   protected SegmentCompletionManager _segmentCompletionManager;
   protected LeadControllerManager _leadControllerManager;
@@ -430,15 +432,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
             _leadControllerManager, _config.getSegmentCommitTimeoutSeconds());
 
-    if (_config.getHLCTablesAllowed()) {
-      LOGGER.info("Realtime tables with High Level consumers will be supported");
-      _realtimeSegmentsManager =
-          new PinotRealtimeSegmentManager(_helixResourceManager, _leadControllerManager, _config);
-      _realtimeSegmentsManager.start(_controllerMetrics);
-    } else {
-      LOGGER.info("Realtime tables with High Level consumers will NOT be supported");
-      _realtimeSegmentsManager = null;
-    }
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
     _connectionManager = new MultiThreadedHttpConnectionManager();
@@ -502,6 +495,24 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApp.start(_listenerConfigs);
+    List<String> existingHlcTables = new ArrayList<>();
+    _helixResourceManager.getAllRealtimeTables().forEach(rt -> {
+      TableConfig tableConfig = _helixResourceManager.getTableConfig(rt);
+      if (tableConfig != null) {
+        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+        try {
+          StreamConfig.validateConsumerType(
+              streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"), streamConfigMap);
+        } catch (Exception e) {
+          existingHlcTables.add(rt);
+        }
+      }
+    });
+    if (existingHlcTables.size() > 0) {
+      LOGGER.error("High Level Consumer (HLC) based realtime tables are no longer supported. Please delete the "
+          + "following HLC tables before proceeding: {}\n", existingHlcTables);
+      throw new RuntimeException("Unable to start controller due to existing HLC tables!");
+    }
 
     _controllerMetrics.addCallbackGauge("dataDir.exists", () -> new File(_config.getDataDir()).exists() ? 1L : 0L);
     _controllerMetrics.addCallbackGauge("dataDir.fileOpLatencyMs", () -> {
@@ -757,11 +768,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
       LOGGER.info("Stopping Jersey admin API");
       _adminApp.stop();
-
-      if (_realtimeSegmentsManager != null) {
-        LOGGER.info("Stopping realtime segment manager");
-        _realtimeSegmentsManager.stop();
-      }
 
       LOGGER.info("Stopping resource manager");
       _helixResourceManager.stop();
