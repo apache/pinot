@@ -210,7 +210,6 @@ public class RealtimeTableDataManagerTest {
     assertEquals(llmd.getTotalDocs(), 5);
   }
 
-
   @Test
   public void testAllowDownload() {
     RealtimeTableDataManager mgr = new RealtimeTableDataManager(null);
