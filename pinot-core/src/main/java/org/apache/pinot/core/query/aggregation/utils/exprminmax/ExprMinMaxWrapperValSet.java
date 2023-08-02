@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.utils.argminmax;
+package org.apache.pinot.core.query.aggregation.utils.exprminmax;
 
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
@@ -26,7 +26,7 @@ import org.apache.pinot.core.common.BlockValSet;
  * Wrapper class for the value sets of the column to do argmin/max on.
  * This class is used for type-generic implementation of argmin/max.
  */
-public class ArgMinMaxWrapperValSet {
+public class ExprMinMaxWrapperValSet {
   protected final DataSchema.ColumnDataType _dataType;
   boolean _isSingleValue;
   int[] _intValues;
@@ -40,7 +40,7 @@ public class ArgMinMaxWrapperValSet {
   double[][] _doublesValuesMV;
   Object[][] _objectsValuesMV;
 
-  public ArgMinMaxWrapperValSet(
+  public ExprMinMaxWrapperValSet(
       DataSchema.ColumnDataType dataType, boolean isSingleValue) {
     _dataType = dataType;
     _isSingleValue = isSingleValue;

@@ -339,16 +339,16 @@ public class AggregationFunctionFactory {
             return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
             return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
-          case PARENTARGMAX:
-            return new ParentArgMinMaxAggregationFunction(arguments, true);
-          case PARENTARGMIN:
-            return new ParentArgMinMaxAggregationFunction(arguments, false);
-          case CHILDARGMAX:
-            return new ChildArgMinMaxAggregationFunction(arguments, true);
-          case CHILDARGMIN:
-            return new ChildArgMinMaxAggregationFunction(arguments, false);
-          case ARGMAX:
-          case ARGMIN:
+          case PARENTEXPRMAX:
+            return new ParentExprMinMaxAggregationFunction(arguments, true);
+          case PARENTEXPRMIN:
+            return new ParentExprMinMaxAggregationFunction(arguments, false);
+          case CHILDEXPRMAX:
+            return new ChildExprMinMaxAggregationFunction(arguments, true);
+          case CHILDEXPRMIN:
+            return new ChildExprMinMaxAggregationFunction(arguments, false);
+          case EXPRMAX:
+          case EXPRMIN:
             throw new IllegalArgumentException(
                 "Aggregation function: " + function + " is only supported in selection without alias.");
           case FUNNELCOUNT:

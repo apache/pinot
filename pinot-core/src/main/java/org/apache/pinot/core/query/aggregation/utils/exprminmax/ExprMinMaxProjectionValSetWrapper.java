@@ -16,25 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.utils.argminmax;
+package org.apache.pinot.core.query.aggregation.utils.exprminmax;
 
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 
 
 /**
- * Wrapper class for measuring columns in argmin/max aggregation function.
- * Meanly used to do comparison without boxing primitive types.
+ * Wrapper class for projection block value set for argmin/max aggregation function.
+ * Used to get the value from val set of different data types.
  */
-public class ArgMinMaxMeasuringValSetWrapper extends ArgMinMaxWrapperValSet {
+public class ExprMinMaxProjectionValSetWrapper extends ExprMinMaxWrapperValSet {
 
-  public ArgMinMaxMeasuringValSetWrapper(boolean isSingleValue, DataSchema.ColumnDataType dataType,
+  public ExprMinMaxProjectionValSetWrapper(boolean isSingleValue, DataSchema.ColumnDataType dataType,
       BlockValSet blockValSet) {
     super(dataType, isSingleValue);
     setNewBlock(blockValSet);
   }
 
-  public Comparable getComparable(int i) {
+  public Object getValue(int i) {
     switch (_dataType) {
       case INT:
       case BOOLEAN:
@@ -48,30 +48,23 @@ public class ArgMinMaxMeasuringValSetWrapper extends ArgMinMaxWrapperValSet {
         return _doublesValues[i];
       case STRING:
       case BIG_DECIMAL:
-        return (Comparable) _objectsValues[i];
+      case BYTES:
+      case JSON:
+          return _objectsValues[i];
+      case INT_ARRAY:
+        return _intValuesMV[i].length == 0 ? null : _intValuesMV[i];
+      case LONG_ARRAY:
+      case TIMESTAMP_ARRAY:
+        return _longValuesMV[i].length == 0 ? null : _longValuesMV[i];
+      case FLOAT_ARRAY:
+        return _floatValuesMV[i].length == 0 ? null : _floatValuesMV[i];
+      case DOUBLE_ARRAY:
+        return _doublesValuesMV[i].length == 0 ? null : _doublesValuesMV[i];
+      case STRING_ARRAY:
+      case BYTES_ARRAY:
+        return _objectsValuesMV[i].length == 0 ? null : _objectsValuesMV[i];
       default:
         throw new IllegalStateException("Unsupported data type: " + _dataType);
     }
-  }
-
-  public int compare(int i, Object o) {
-      switch (_dataType) {
-        case INT:
-        case BOOLEAN:
-          return Integer.compare((Integer) o, _intValues[i]);
-        case LONG:
-        case TIMESTAMP:
-          return Long.compare((Long) o, _longValues[i]);
-        case FLOAT:
-          return Float.compare((Float) o, _floatValues[i]);
-        case DOUBLE:
-          return Double.compare((Double) o, _doublesValues[i]);
-        case STRING:
-          return ((String) o).compareTo((String) _objectsValues[i]);
-        case BIG_DECIMAL:
-          return ((java.math.BigDecimal) o).compareTo((java.math.BigDecimal) _objectsValues[i]);
-        default:
-          throw new IllegalStateException("Unsupported data type in comparison" + _dataType);
-      }
   }
 }

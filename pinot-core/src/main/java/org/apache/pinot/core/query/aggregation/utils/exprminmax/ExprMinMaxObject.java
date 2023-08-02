@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.core.query.aggregation.utils.argminmax;
+package org.apache.pinot.core.query.aggregation.utils.exprminmax;
 
 import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
@@ -35,7 +35,7 @@ import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.query.aggregation.utils.ParentAggregationFunctionResultObject;
 
 
-public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
+public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
 
   // if the object is created but not yet populated, this happens e.g. when a server has no data for
   // the query and returns a default value
@@ -83,7 +83,7 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
   private DataBlock _immutableMeasuringKeys;
   private DataBlock _immutableProjectionVals;
 
-  public ArgMinMaxObject(DataSchema measuringSchema, DataSchema projectionSchema) {
+  public ExprMinMaxObject(DataSchema measuringSchema, DataSchema projectionSchema) {
     _isNull = true;
     _mutable = true;
 
@@ -94,7 +94,7 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
     _sizeOfExtremumProjectionVals = _projectionSchema.size();
   }
 
-  public ArgMinMaxObject(ByteBuffer byteBuffer)
+  public ExprMinMaxObject(ByteBuffer byteBuffer)
       throws IOException {
     _mutable = false;
     _isNull = byteBuffer.getInt() == ObjectNullState.NULL.getState();
@@ -110,14 +110,14 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
     _sizeOfExtremumProjectionVals = _projectionSchema.size();
   }
 
-  public static ArgMinMaxObject fromBytes(byte[] bytes)
+  public static ExprMinMaxObject fromBytes(byte[] bytes)
       throws IOException {
     return fromByteBuffer(ByteBuffer.wrap(bytes));
   }
 
-  public static ArgMinMaxObject fromByteBuffer(ByteBuffer byteBuffer)
+  public static ExprMinMaxObject fromByteBuffer(ByteBuffer byteBuffer)
       throws IOException {
-    return new ArgMinMaxObject(byteBuffer);
+    return new ExprMinMaxObject(byteBuffer);
   }
 
   // used for result serialization
@@ -149,12 +149,12 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
    * = 0: new key is the same as the current extremum
    * < 0: current key is still the extremum
    */
-  public int compareAndSetKey(List<ArgMinMaxMeasuringValSetWrapper> argMinMaxWrapperValSets, int offset,
+  public int compareAndSetKey(List<ExprMinMaxMeasuringValSetWrapper> argMinMaxWrapperValSets, int offset,
       boolean isMax) {
     Preconditions.checkState(_mutable, "Cannot compare and set key after the object is serialized");
     if (!_isNull) {
       for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
-        ArgMinMaxMeasuringValSetWrapper argMinMaxWrapperValSet = argMinMaxWrapperValSets.get(i);
+        ExprMinMaxMeasuringValSetWrapper argMinMaxWrapperValSet = argMinMaxWrapperValSets.get(i);
         int result = argMinMaxWrapperValSet.compare(offset, _extremumMeasuringKeys[i]);
         if (result != 0) {
           if (isMax ? result < 0 : result > 0) {
@@ -180,19 +180,19 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
    * Used during segment processing with compareAndSetKey
    * Set the vals to the new vals if the key is replaced.
    */
-  public void setToNewVal(List<ArgMinMaxProjectionValSetWrapper> argMinMaxProjectionValSetWrappers, int offset) {
+  public void setToNewVal(List<ExprMinMaxProjectionValSetWrapper> exprMinMaxProjectionValSetWrappers, int offset) {
     _extremumProjectionValues.clear();
-    addVal(argMinMaxProjectionValSetWrappers, offset);
+    addVal(exprMinMaxProjectionValSetWrappers, offset);
   }
 
   /**
    * Used during segment processing with compareAndSetKey
    * Add the vals to the list of vals if the key is the same.
    */
-  public void addVal(List<ArgMinMaxProjectionValSetWrapper> argMinMaxProjectionValSetWrappers, int offset) {
+  public void addVal(List<ExprMinMaxProjectionValSetWrapper> exprMinMaxProjectionValSetWrappers, int offset) {
     Object[] val = new Object[_projectionSchema.size()];
     for (int i = 0; i < _projectionSchema.size(); i++) {
-      val[i] = argMinMaxProjectionValSetWrappers.get(i).getValue(offset);
+      val[i] = exprMinMaxProjectionValSetWrappers.get(i).getValue(offset);
     }
     _extremumProjectionValues.add(val);
   }
@@ -280,7 +280,7 @@ public class ArgMinMaxObject implements ParentAggregationFunctionResultObject {
   /**
    * Merge two ArgMinMaxObjects
    */
-  public ArgMinMaxObject merge(ArgMinMaxObject other, boolean isMax) {
+  public ExprMinMaxObject merge(ExprMinMaxObject other, boolean isMax) {
     if (_isNull && other._isNull) {
       return this;
     } else if (_isNull) {
