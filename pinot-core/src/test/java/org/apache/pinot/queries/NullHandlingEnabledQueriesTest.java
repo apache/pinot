@@ -839,9 +839,9 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
       throws Exception {
     initializeRows();
     insertRowWithTwoColumns(null, null);
-    insertRowWithTwoColumns(Integer.MIN_VALUE, null);
     insertRowWithTwoColumns(1, null);
     insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(Integer.MIN_VALUE, null);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
         .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
