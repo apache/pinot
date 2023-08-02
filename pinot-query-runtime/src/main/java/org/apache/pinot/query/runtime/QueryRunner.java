@@ -30,7 +30,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
@@ -38,6 +37,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -74,7 +74,7 @@ public class QueryRunner {
   private String _hostname;
   private int _port;
 
-  private OpChainExecutor _opChainExecutor;
+  private ExecutorService _opChainExecutor;
 
   private OpChainSchedulerService _scheduler;
 
@@ -93,7 +93,8 @@ public class QueryRunner {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
           QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
       //TODO: make this configurable
-      _opChainExecutor = new OpChainExecutor(new NamedThreadFactory("op_chain_worker_on_" + _port + "_port"));
+      _opChainExecutor = ExecutorServiceUtils.create(config, "pinot.query.runner.opchain.executor",
+          "op_chain_worker_on_" + _port + "_port");
       _scheduler = new OpChainSchedulerService(getQueryWorkerIntermExecutorService());
       _mailboxService = new MailboxService(_hostname, _port, config);
       _serverExecutor = new ServerQueryExecutorV1Impl();
@@ -114,7 +115,7 @@ public class QueryRunner {
       throws TimeoutException {
     _serverExecutor.shutDown();
     _mailboxService.shutdown();
-    _opChainExecutor.close();
+    ExecutorServiceUtils.close(_opChainExecutor);
   }
 
   /**

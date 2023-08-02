@@ -38,6 +38,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
@@ -73,16 +75,15 @@ import org.testng.Assert;
 
 public abstract class QueryRunnerTestBase extends QueryTestSet {
   // TODO: Find a better way to create the global test executor
-  public static final OpChainExecutor EXECUTOR = new OpChainExecutor(
-      new NamedThreadFactory("worker_on_" + OperatorTestUtil.class.getSimpleName()) {
+  public static final ExecutorService EXECUTOR =
+      Executors.newCachedThreadPool(new NamedThreadFactory("worker_on_" + OperatorTestUtil.class.getSimpleName()) {
         @Override
         public Thread newThread(Runnable r) {
           Thread thread = super.newThread(r);
           thread.setDaemon(true);
           return thread;
         }
-      }
-  );
+      });
   protected static final double DOUBLE_CMP_EPSILON = 0.0001d;
   protected static final String SEGMENT_BREAKER_KEY = "__SEGMENT_BREAKER_KEY__";
   protected static final String SEGMENT_BREAKER_STR = "------";

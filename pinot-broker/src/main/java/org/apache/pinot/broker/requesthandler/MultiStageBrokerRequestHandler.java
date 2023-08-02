@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -49,7 +50,6 @@ import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
@@ -59,7 +59,7 @@ import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.runtime.OpChainExecutor;
+import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -86,7 +86,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
-  private final OpChainExecutor _opChainExecutor;
+  private final ExecutorService _opChainExecutor;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -113,10 +113,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         new WorkerManager(_reducerHostname, _reducerPort, routingManager), _tableCache);
     _queryDispatcher = new QueryDispatcher();
 
-    long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
-        QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
-    //TODO: make this configurable
-    _opChainExecutor = new OpChainExecutor(new NamedThreadFactory("op_chain_worker_on_" + _reducerPort + "_port"));
+    _opChainExecutor = ExecutorServiceUtils.create(config, "multiStage", "multiStage_on_" + _reducerPort + "port");
     _reducerScheduler = new OpChainSchedulerService(_opChainExecutor);
     _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config);
 
@@ -341,5 +338,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
+    ExecutorServiceUtils.close(_opChainExecutor);
   }
 }

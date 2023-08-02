@@ -22,6 +22,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.calcite.rel.RelDistribution;
@@ -37,9 +39,9 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.OpChainExecutor;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -72,8 +74,8 @@ public class PipelineBreakerExecutorTest {
   private ReceivingMailbox _mailbox2;
 
   private VirtualServerAddress _server = new VirtualServerAddress("localhost", 123, 0);
-  private OpChainExecutor _executor =
-      new OpChainExecutor(new NamedThreadFactory("worker_on_asd_" + getClass().getSimpleName()));
+  private ExecutorService _executor = Executors.newCachedThreadPool(
+      new NamedThreadFactory("worker_on_asd_" + getClass().getSimpleName()));
   private OpChainSchedulerService _scheduler = new OpChainSchedulerService(_executor);
   private StageMetadata _stageMetadata1 = new StageMetadata.Builder().setWorkerMetadataList(Stream.of(_server).map(
       s -> new WorkerMetadata.Builder().setVirtualServerAddress(s)
@@ -92,7 +94,7 @@ public class PipelineBreakerExecutorTest {
 
   @AfterClass
   public void tearDownClass() {
-    _executor.close();
+    ExecutorServiceUtils.close(_executor);
   }
 
   @BeforeMethod

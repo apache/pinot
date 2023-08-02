@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -32,8 +34,8 @@ import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PlannerUtils;
-import org.apache.pinot.query.runtime.OpChainExecutor;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
@@ -51,7 +53,7 @@ import org.testng.collections.Lists;
 public class QueryDispatcherTest extends QueryTestSet {
   private static final Random RANDOM_REQUEST_ID_GEN = new Random();
   private static final int QUERY_SERVER_COUNT = 2;
-  private static final OpChainExecutor EXECUTOR = new OpChainExecutor(
+  private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool(
       new NamedThreadFactory("worker_on_" + QueryDispatcherTest.class.getSimpleName()));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
@@ -89,7 +91,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (QueryServer worker : _queryServerMap.values()) {
       worker.shutdown();
     }
-    EXECUTOR.close();
+    ExecutorServiceUtils.close(EXECUTOR);
   }
 
   @Test(dataProvider = "testSql")
