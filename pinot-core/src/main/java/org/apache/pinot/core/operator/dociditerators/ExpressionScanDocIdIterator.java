@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
@@ -64,9 +65,9 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   //       the expression, but we only track the number of entries scanned for the resolved expression.
   private long _numEntriesScanned = 0L;
 
-  public ExpressionScanDocIdIterator(TransformFunction transformFunction, PredicateEvaluator predicateEvaluator,
-      Map<String, DataSource> dataSourceMap, int numDocs, boolean nullHandlingEnabled,
-      PredicateEvaluationResult predicateEvaluationResult) {
+  public ExpressionScanDocIdIterator(TransformFunction transformFunction,
+      @Nullable PredicateEvaluator predicateEvaluator, Map<String, DataSource> dataSourceMap, int numDocs,
+      boolean nullHandlingEnabled, PredicateEvaluationResult predicateEvaluationResult) {
     _transformFunction = transformFunction;
     _predicateEvaluator = predicateEvaluator;
     _dataSourceMap = dataSourceMap;
@@ -148,8 +149,18 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     TransformResultMetadata resultMetadata = _transformFunction.getResultMetadata();
     if (resultMetadata.isSingleValue()) {
       _numEntriesScanned += numDocs;
-      boolean predicateEvaluationResult = _predicateEvaluationResult == PredicateEvaluationResult.TRUE;
       RoaringBitmap nullBitmap = null;
+      if (_predicateEvaluationResult == PredicateEvaluationResult.NULL) {
+        nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
+        if (nullBitmap != null) {
+          for (int i : nullBitmap) {
+           matchingDocIds.add(_docIdBuffer[i]);
+          }
+        }
+        return;
+      }
+      assert (_predicateEvaluator != null);
+      boolean predicateEvaluationResult = _predicateEvaluationResult == PredicateEvaluationResult.TRUE;
       if (resultMetadata.hasDictionary()) {
         int[] dictIds = _transformFunction.transformToDictIdsSV(projectionBlock);
         if (_nullHandlingEnabled) {
@@ -315,6 +326,10 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
       }
     } else {
       // TODO(https://github.com/apache/pinot/issues/10882): support NULL for multi-value.
+      if (_nullHandlingEnabled || _predicateEvaluationResult == PredicateEvaluationResult.NULL) {
+        throw new UnsupportedOperationException("NULL handling is not supported for multi-value");
+      }
+      assert (_predicateEvaluator != null);
       if (resultMetadata.hasDictionary()) {
         int[][] dictIdsArray = _transformFunction.transformToDictIdsMV(projectionBlock);
         for (int i = 0; i < numDocs; i++) {
@@ -429,6 +444,6 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   }
 
   public enum PredicateEvaluationResult {
-    TRUE, FALSE
+    TRUE, NULL, FALSE
   }
 }

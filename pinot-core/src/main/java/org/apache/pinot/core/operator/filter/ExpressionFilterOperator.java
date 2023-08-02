@@ -32,6 +32,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.dociditerators.ExpressionScanDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
+import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
@@ -47,6 +48,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   private final QueryContext _queryContext;
   private final Map<String, DataSource> _dataSourceMap;
   private final TransformFunction _transformFunction;
+  private final Predicate.Type _predicateType;
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
@@ -65,21 +67,44 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       columnContextMap.put(column, ColumnContext.fromDataSource(dataSource));
     });
     _transformFunction = TransformFunctionFactory.get(lhs, columnContextMap, _queryContext);
-    _predicateEvaluator =
-        PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
-            _transformFunction.getResultMetadata().getDataType());
+    _predicateType = predicate.getType();
+    if (_predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL) {
+      _predicateEvaluator = null;
+    } else {
+      _predicateEvaluator =
+          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
+              _transformFunction.getResultMetadata().getDataType());
+    }
   }
 
   @Override
   protected BlockDocIdSet getTrues() {
-    return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-        _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE);
+    if (_predicateType == Predicate.Type.IS_NULL) {
+      return getNulls();
+    } else if (_predicateType == Predicate.Type.IS_NOT_NULL) {
+      return new NotDocIdSet(getNulls(), _numDocs);
+    } else {
+      return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
+          _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE);
+    }
+  }
+
+  @Override
+  protected BlockDocIdSet getNulls() {
+    return new ExpressionDocIdSet(_transformFunction, null, _dataSourceMap, _numDocs,
+        _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL);
   }
 
   @Override
   protected BlockDocIdSet getFalses() {
-    return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-        _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE);
+    if (_predicateType == Predicate.Type.IS_NULL) {
+      return new NotDocIdSet(getNulls(), _numDocs);
+    } else if (_predicateType == Predicate.Type.IS_NOT_NULL) {
+      return getNulls();
+    } else {
+      return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
+          _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE);
+    }
   }
 
   @Override
