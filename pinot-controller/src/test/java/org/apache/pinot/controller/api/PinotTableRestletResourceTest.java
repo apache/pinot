@@ -58,7 +58,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = "testOfflineTable";
   private static final String REALTIME_TABLE_NAME = "testRealtimeTable";
   private final TableConfigBuilder _offlineBuilder = new TableConfigBuilder(TableType.OFFLINE);
-  private final TableConfigBuilder _realtimeBuilder = new TableConfigBuilder(TableType.REALTIME);
+  private final TableConfigBuilder _realtimeBuilder = new TableConfigBuilder(TableType.REALTIME)
+      .setStreamConfigs(Map.of("stream.type", "foo", "consumer.type", "lowlevel"));
   private String _createTableUrl;
 
   @BeforeClass
@@ -72,7 +73,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // add schema for realtime table
     DEFAULT_INSTANCE.addDummySchema(REALTIME_TABLE_NAME);
-    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs();
+    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
     _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setSchemaName(REALTIME_TABLE_NAME)
         .setStreamConfigs(streamConfig.getStreamConfigsMap());

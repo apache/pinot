@@ -196,7 +196,7 @@ public class StreamConfigTest {
     Assert.assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(),
         StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES);
 
-    consumerType = "lowLevel,highLevel";
+    consumerType = "lowLevel";
     String offsetCriteria = "smallest";
     String decoderProp1Key = "prop1";
     String decoderProp1Value = "decoderValueString";
@@ -227,7 +227,6 @@ public class StreamConfigTest {
     Assert.assertEquals(streamConfig.getType(), streamType);
     Assert.assertEquals(streamConfig.getTopicName(), topic);
     Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.LOWLEVEL);
-    Assert.assertEquals(streamConfig.getConsumerTypes().get(1), StreamConfig.ConsumerType.HIGHLEVEL);
     Assert.assertEquals(streamConfig.getConsumerFactoryClassName(), consumerFactoryClass);
     Assert.assertEquals(streamConfig.getDecoderClass(), decoderClass);
     Assert.assertEquals(streamConfig.getDecoderProperties().size(), 1);
@@ -301,7 +300,7 @@ public class StreamConfigTest {
     exception = false;
     try {
       streamConfig = new StreamConfig(tableName, streamConfigMap);
-    } catch (IllegalArgumentException e) {
+    } catch (Exception e) {
       exception = true;
     }
     Assert.assertTrue(exception);
@@ -486,33 +485,37 @@ public class StreamConfigTest {
     Assert.assertTrue(streamConfig.hasLowLevelConsumerType());
     Assert.assertFalse(streamConfig.hasHighLevelConsumerType());
 
-    consumerType = "highLevel";
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
-    streamConfig = new StreamConfig(tableName, streamConfigMap);
-    Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.HIGHLEVEL);
-    Assert.assertFalse(streamConfig.hasLowLevelConsumerType());
-    Assert.assertTrue(streamConfig.hasHighLevelConsumerType());
 
-    consumerType = "highLevel,simple";
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
-    streamConfig = new StreamConfig(tableName, streamConfigMap);
-    Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.HIGHLEVEL);
-    Assert.assertEquals(streamConfig.getConsumerTypes().get(1), StreamConfig.ConsumerType.LOWLEVEL);
-    Assert.assertTrue(streamConfig.hasLowLevelConsumerType());
-    Assert.assertTrue(streamConfig.hasHighLevelConsumerType());
+    try {
+      consumerType = "highLevel";
+      streamConfigMap
+          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+              consumerType);
+      new StreamConfig(tableName, streamConfigMap);
+      Assert.fail("Invalid consumer type(s) " + consumerType + " in stream config");
+    } catch (Exception e) {
+      // expected
+    }
 
-    consumerType = "highLevel,lowlevel";
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
-    streamConfig = new StreamConfig(tableName, streamConfigMap);
-    Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.HIGHLEVEL);
-    Assert.assertEquals(streamConfig.getConsumerTypes().get(1), StreamConfig.ConsumerType.LOWLEVEL);
-    Assert.assertTrue(streamConfig.hasLowLevelConsumerType());
-    Assert.assertTrue(streamConfig.hasHighLevelConsumerType());
+    try {
+      consumerType = "highLevel,simple";
+      streamConfigMap
+          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+              consumerType);
+      new StreamConfig(tableName, streamConfigMap);
+      Assert.fail("Invalid consumer type(s) " + consumerType + " in stream config");
+    } catch (Exception e) {
+      // expected
+    }
+
+    try {
+      consumerType = "highLevel,lowlevel";
+      streamConfigMap
+          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+              consumerType);
+      new StreamConfig(tableName, streamConfigMap);
+    } catch (Exception e) {
+      // expected
+    }
   }
 }
