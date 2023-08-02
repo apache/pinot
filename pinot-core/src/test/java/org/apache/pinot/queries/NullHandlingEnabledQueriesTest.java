@@ -27,6 +27,7 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -835,13 +836,36 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testExpressionFilterOperatorResultIsInSecondProjectionBlock()
+      throws Exception {
+    initializeRows();
+    for (int i = 0; i < DocIdSetPlanNode.MAX_DOC_PER_CALL; i++) {
+      insertRowWithTwoColumns(null, i);
+    }
+    insertRowWithTwoColumns(1, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE add(%s, 0) > 0 LIMIT 10", COLUMN1, COLUMN2, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{1, DocIdSetPlanNode.MAX_DOC_PER_CALL});
+  }
+
+  @Test
   public void testExpressionFilterOperatorApplyAndForGetFalses()
       throws Exception {
     initializeRows();
     insertRowWithTwoColumns(null, null);
-    insertRowWithTwoColumns(Integer.MIN_VALUE, null);
     insertRowWithTwoColumns(1, null);
     insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(Integer.MIN_VALUE, null);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
         .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
