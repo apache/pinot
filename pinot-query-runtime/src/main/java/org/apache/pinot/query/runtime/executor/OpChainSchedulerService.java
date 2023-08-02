@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.executor;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -88,13 +89,16 @@ public class OpChainSchedulerService implements SchedulerService {
   public void cancel(long requestId) {
     // simple cancellation. for leaf stage this cannot be a dangling opchain b/c they will eventually be cleared up
     // via query timeout.
-    List<OpChainId> opChainIdsToCancel = _submittedOpChainMap.keySet()
-        .stream().filter(opChainId -> opChainId.getRequestId() == requestId).collect(Collectors.toList());
-    for (OpChainId opChainId : opChainIdsToCancel) {
-      Future<?> future = _submittedOpChainMap.get(opChainId);
+    List<Map.Entry<OpChainId, Future<?>>> entries = _submittedOpChainMap.entrySet().stream()
+        .filter(entry -> entry.getKey().getRequestId() == requestId)
+        .collect(Collectors.toList());
+    for (Map.Entry<OpChainId, Future<?>> entry : entries) {
+      OpChainId key = entry.getKey();
+      Future<?> future = entry.getValue();
       if (future != null) {
         future.cancel(true);
       }
+      _submittedOpChainMap.remove(key);
     }
   }
 
