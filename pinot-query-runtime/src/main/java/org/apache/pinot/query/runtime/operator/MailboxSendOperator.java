@@ -183,7 +183,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  public void cancel(@Nullable Throwable t) {
+  public void cancel(Throwable t) {
     super.cancel(t);
     _exchange.cancel(t);
   }

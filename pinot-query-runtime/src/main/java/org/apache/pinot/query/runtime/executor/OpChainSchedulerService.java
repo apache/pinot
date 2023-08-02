@@ -24,7 +24,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -106,7 +105,7 @@ public class OpChainSchedulerService implements SchedulerService {
       opChain.close();
   }
 
-  private void cancelOpChain(OpChain opChain, @Nullable Throwable t) {
+  private void cancelOpChain(OpChain opChain, Throwable t) {
     opChain.cancel(t);
   }
 }

@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -99,7 +98,7 @@ public class OpChain implements AutoCloseable {
    * executing it.
    * @param e
    */
-  public void cancel(@Nullable Throwable e) {
+  public void cancel(Throwable e) {
     try {
       _root.cancel(e);
     } finally {
