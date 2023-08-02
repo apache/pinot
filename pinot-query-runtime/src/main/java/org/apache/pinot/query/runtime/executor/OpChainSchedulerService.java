@@ -46,41 +46,41 @@ public class OpChainSchedulerService implements SchedulerService {
   @Override
   public void register(OpChain operatorChain) {
     Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
-        @Override
-        public void runJob() {
-          boolean isFinished = false;
-          TransferableBlock returnedErrorBlock = null;
-          Throwable thrown = null;
-          try {
-            LOGGER.trace("({}): Executing", operatorChain);
-            operatorChain.getStats().executing();
-            TransferableBlock result = operatorChain.getRoot().nextBlock();
-            while (!result.isEndOfStreamBlock()) {
-              result = operatorChain.getRoot().nextBlock();
+      @Override
+      public void runJob() {
+        boolean isFinished = false;
+        TransferableBlock returnedErrorBlock = null;
+        Throwable thrown = null;
+        try {
+          LOGGER.trace("({}): Executing", operatorChain);
+          operatorChain.getStats().executing();
+          TransferableBlock result = operatorChain.getRoot().nextBlock();
+          while (!result.isEndOfStreamBlock()) {
+            result = operatorChain.getRoot().nextBlock();
+          }
+          isFinished = true;
+          if (result.isErrorBlock()) {
+            returnedErrorBlock = result;
+            LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
+                result.getDataBlock().getExceptions());
+          } else {
+            LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
+          }
+        } catch (Exception e) {
+          LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
+          thrown = e;
+        } finally {
+          if (returnedErrorBlock != null || thrown != null) {
+            if (thrown == null) {
+              thrown = new RuntimeException("Error block " + returnedErrorBlock.getDataBlock().getExceptions());
             }
-            isFinished = true;
-            if (result.isErrorBlock()) {
-              returnedErrorBlock = result;
-              LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
-                  result.getDataBlock().getExceptions());
-            } else {
-              LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
-            }
-          } catch (Exception e) {
-            LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
-            thrown = e;
-          } finally {
-            if (returnedErrorBlock != null || thrown != null) {
-              if (thrown == null) {
-                thrown = new RuntimeException("Error block " + returnedErrorBlock.getDataBlock().getExceptions());
-              }
-              cancelOpChain(operatorChain, thrown);
-            } else if (isFinished) {
-              closeOpChain(operatorChain);
-            }
+            cancelOpChain(operatorChain, thrown);
+          } else if (isFinished) {
+            closeOpChain(operatorChain);
           }
         }
-      });
+      }
+    });
     _submittedOpChainMap.put(operatorChain.getId(), scheduledFuture);
   }
 
@@ -88,9 +88,9 @@ public class OpChainSchedulerService implements SchedulerService {
   public void cancel(long requestId) {
     // simple cancellation. for leaf stage this cannot be a dangling opchain b/c they will eventually be cleared up
     // via query timeout.
-    List<Map.Entry<OpChainId, Future<?>>> entries = _submittedOpChainMap.entrySet().stream()
-        .filter(entry -> entry.getKey().getRequestId() == requestId)
-        .collect(Collectors.toList());
+    List<Map.Entry<OpChainId, Future<?>>> entries =
+        _submittedOpChainMap.entrySet().stream().filter(entry -> entry.getKey().getRequestId() == requestId)
+            .collect(Collectors.toList());
     for (Map.Entry<OpChainId, Future<?>> entry : entries) {
       OpChainId key = entry.getKey();
       Future<?> future = entry.getValue();
@@ -102,7 +102,7 @@ public class OpChainSchedulerService implements SchedulerService {
   }
 
   private void closeOpChain(OpChain opChain) {
-      opChain.close();
+    opChain.close();
   }
 
   private void cancelOpChain(OpChain opChain, Throwable t) {
