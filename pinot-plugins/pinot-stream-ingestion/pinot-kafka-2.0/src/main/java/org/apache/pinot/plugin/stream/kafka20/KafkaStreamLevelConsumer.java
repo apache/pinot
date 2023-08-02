@@ -41,7 +41,8 @@ import org.slf4j.LoggerFactory;
 /**
  * An implementation of a {@link StreamLevelConsumer} which consumes from the kafka stream
  */
-@Deprecated(since = "Pinot no longer support high level consumer model since v0.12.*")
+// Pinot no longer support high level consumer model since v0.12.*
+@Deprecated
 public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
   private final StreamMessageDecoder _messageDecoder;

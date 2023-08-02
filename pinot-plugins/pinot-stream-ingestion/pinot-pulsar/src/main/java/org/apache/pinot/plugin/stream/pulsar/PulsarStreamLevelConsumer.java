@@ -33,7 +33,8 @@ import org.slf4j.LoggerFactory;
 /**
  * A {@link StreamLevelConsumer} implementation for the Pulsar stream
  */
-@Deprecated(since = "Pinot no longer support high level consumer model since v0.12.*")
+// Pinot no longer support high level consumer model since v0.12.*
+@Deprecated
 public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
   private Logger _logger;
 
