@@ -70,13 +70,14 @@ public class OpChainSchedulerService implements SchedulerService {
           LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
           thrown = e;
         } finally {
+          _submittedOpChainMap.remove(operatorChain.getId());
           if (returnedErrorBlock != null || thrown != null) {
             if (thrown == null) {
               thrown = new RuntimeException("Error block " + returnedErrorBlock.getDataBlock().getExceptions());
             }
-            cancelOpChain(operatorChain, thrown);
+            operatorChain.cancel(thrown);
           } else if (isFinished) {
-            closeOpChain(operatorChain);
+            operatorChain.close();
           }
         }
       }
@@ -99,13 +100,5 @@ public class OpChainSchedulerService implements SchedulerService {
       }
       _submittedOpChainMap.remove(key);
     }
-  }
-
-  private void closeOpChain(OpChain opChain) {
-    opChain.close();
-  }
-
-  private void cancelOpChain(OpChain opChain, Throwable t) {
-    opChain.cancel(t);
   }
 }
