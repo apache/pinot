@@ -24,7 +24,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -73,14 +72,7 @@ public class OpChainSchedulerService implements SchedulerService {
           } finally {
             if (returnedErrorBlock != null || thrown != null) {
               if (thrown == null) {
-                String blockMsg;
-                if (returnedErrorBlock.getDataBlock() instanceof MetadataBlock) {
-                  MetadataBlock metadataBlock = (MetadataBlock) returnedErrorBlock.getDataBlock();
-                  blockMsg = String.join(", ", metadataBlock.getExceptions().values());
-                } else {
-                  blockMsg = "Unknown";
-                }
-                thrown = new RuntimeException("Error block " + blockMsg);
+                thrown = new RuntimeException("Error block " + returnedErrorBlock.getDataBlock().getExceptions());
               }
               cancelOpChain(operatorChain, thrown);
             } else if (isFinished) {
