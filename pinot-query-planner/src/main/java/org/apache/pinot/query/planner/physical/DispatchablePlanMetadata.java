@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
@@ -41,7 +42,9 @@ import org.apache.pinot.query.routing.QueryServerInstance;
  * </ul>
  */
 public class DispatchablePlanMetadata implements Serializable {
+  // These 2 fields are extracted from TableScanNode
   private final List<String> _scannedTables;
+  private Map<String, String> _tableOptions;
 
   // used for assigning server/worker nodes.
   private Map<QueryServerInstance, List<Integer>> _serverInstanceToWorkerIdMap;
@@ -84,6 +87,15 @@ public class DispatchablePlanMetadata implements Serializable {
 
   public void addScannedTable(String tableName) {
     _scannedTables.add(tableName);
+  }
+
+  @Nullable
+  public Map<String, String> getTableOptions() {
+    return _tableOptions;
+  }
+
+  public void setTableOptions(Map<String, String> tableOptions) {
+    _tableOptions = tableOptions;
   }
 
   // -----------------------------------------------

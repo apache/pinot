@@ -62,6 +62,7 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       } else if (senderMetadata.isPartitionedTableScan()) {
         // For partitioned table scan, send the data to the worker with the same worker id (not necessary the same
         // instance)
+        // TODO: Support further split the single partition into multiple workers
         senderWorkerIdsMap.forEach((senderServerInstance, senderWorkerIds) -> {
           for (int workerId : senderWorkerIds) {
             receiverWorkerIdsMap.forEach((receiverServerInstance, receiverWorkerIds) -> {

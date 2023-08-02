@@ -40,7 +40,6 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
-import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -102,53 +101,29 @@ public class WorkerManager {
       assignWorkersToNonRootFragment(child, context);
     }
 
-    TableScanNode tableScanNode = findTableScanNode(fragment.getFragmentRoot());
-    Preconditions.checkState(tableScanNode != null, "Failed to find table scan node under leaf fragment");
-    String tableName = tableScanNode.getTableName();
-
-    // Extract partitionKey and numPartitions from hint if provided
-    Map<String, String> tableHintOptions =
-        tableScanNode.getNodeHint()._hintOptions.get(PinotHintOptions.TABLE_HINT_OPTIONS);
+    DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId());
+    Map<String, String> tableOptions = metadata.getTableOptions();
     String partitionKey = null;
     int numPartitions = 0;
-    if (tableHintOptions != null) {
-      partitionKey = tableHintOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY);
-      String partitionSize = tableHintOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
+    if (tableOptions != null) {
+      partitionKey = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY);
+      String partitionSize = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
       if (partitionSize != null) {
         numPartitions = Integer.parseInt(partitionSize);
       }
     }
-
     if (partitionKey == null) {
-      assignWorkersToNonPartitionedLeafFragment(fragment, context, tableName);
+      assignWorkersToNonPartitionedLeafFragment(metadata, context);
     } else {
       Preconditions.checkState(numPartitions > 0, "'%s' must be provided for partition key: %s",
           PinotHintOptions.TableHintOptions.PARTITION_SIZE, partitionKey);
-      assignWorkersToPartitionedLeafFragment(fragment, context, tableName, partitionKey, numPartitions);
+      assignWorkersToPartitionedLeafFragment(metadata, context, partitionKey, numPartitions);
     }
   }
 
-  @Nullable
-  private TableScanNode findTableScanNode(PlanNode planNode) {
-    if (planNode instanceof TableScanNode) {
-      return (TableScanNode) planNode;
-    }
-    List<PlanNode> children = planNode.getInputs();
-    if (children.isEmpty()) {
-      return null;
-    }
-    for (PlanNode child : children) {
-      TableScanNode tableScanNode = findTableScanNode(child);
-      if (tableScanNode != null) {
-        return tableScanNode;
-      }
-    }
-    return null;
-  }
-
-  private void assignWorkersToNonPartitionedLeafFragment(PlanFragment fragment, DispatchablePlanContext context,
-      String tableName) {
-    DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId());
+  private void assignWorkersToNonPartitionedLeafFragment(DispatchablePlanMetadata metadata,
+      DispatchablePlanContext context) {
+    String tableName = metadata.getScannedTables().get(0);
     Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, context.getRequestId());
     Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
 
@@ -234,9 +209,9 @@ public class WorkerManager {
         CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + tableNameWithType), requestId);
   }
 
-  private void assignWorkersToPartitionedLeafFragment(PlanFragment fragment, DispatchablePlanContext context,
-      String tableName, String partitionKey, int numPartitions) {
-    DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId());
+  private void assignWorkersToPartitionedLeafFragment(DispatchablePlanMetadata metadata,
+      DispatchablePlanContext context, String partitionKey, int numPartitions) {
+    String tableName = metadata.getScannedTables().get(0);
     ColocatedTableInfo colocatedTableInfo = getColocatedTableInfo(tableName, partitionKey, numPartitions);
 
     // Pick one server per partition

@@ -192,15 +192,16 @@ public class QueryEnvironmentTestBase {
         String tableNameWithType = entry.getKey();
         String partitionColumn = entry.getValue().getLeft();
         List<List<String>> partitionIdToSegmentsMap = entry.getValue().getRight();
+        int numPartitions = partitionIdToSegmentsMap.size();
         String hostname1 = MockRoutingManagerFactory.toHostname(port1);
         String hostname2 = MockRoutingManagerFactory.toHostname(port2);
-        PartitionInfo[] partitionIdToInfoMap = new PartitionInfo[4];
-        for (int i = 0; i < 4; i++) {
-          String hostname = i < 2 ? hostname1 : hostname2;
+        PartitionInfo[] partitionIdToInfoMap = new PartitionInfo[numPartitions];
+        for (int i = 0; i < numPartitions; i++) {
+          String hostname = i < (numPartitions / 2) ? hostname1 : hostname2;
           partitionIdToInfoMap[i] = new PartitionInfo(Collections.singleton(hostname), partitionIdToSegmentsMap.get(i));
         }
         TablePartitionInfo tablePartitionInfo =
-            new TablePartitionInfo(tableNameWithType, partitionColumn, "hashCode", 4, partitionIdToInfoMap,
+            new TablePartitionInfo(tableNameWithType, partitionColumn, "hashCode", numPartitions, partitionIdToInfoMap,
                 Collections.emptySet());
         partitionInfoMap.put(tableNameWithType, tablePartitionInfo);
       }
