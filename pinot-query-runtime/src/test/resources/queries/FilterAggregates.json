@@ -115,8 +115,6 @@
         "sql": "SELECT min(double_col) FILTER (WHERE string_col IN ('a', 'b')), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2"
       },
       {
-        "ignored": true,
-        "comments": "IS NULL and IS NOT NULL is not yet supported in filter conversion.",
         "sql": "SELECT min(double_col) FILTER (WHERE string_col IS NOT NULL), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2"
       },
       {

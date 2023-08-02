@@ -154,7 +154,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
         nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
         if (nullBitmap != null) {
           for (int i : nullBitmap) {
-           matchingDocIds.add(_docIdBuffer[i]);
+            matchingDocIds.add(_docIdBuffer[i]);
           }
         }
         return;
@@ -326,9 +326,10 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
       }
     } else {
       // TODO(https://github.com/apache/pinot/issues/10882): support NULL for multi-value.
-      if (_nullHandlingEnabled || _predicateEvaluationResult == PredicateEvaluationResult.NULL) {
-        throw new UnsupportedOperationException("NULL handling is not supported for multi-value");
+      if (_predicateEvaluationResult == PredicateEvaluationResult.NULL) {
+        return;
       }
+      boolean predicateEvaluationResult = _predicateEvaluationResult == PredicateEvaluationResult.TRUE;
       assert (_predicateEvaluator != null);
       if (resultMetadata.hasDictionary()) {
         int[][] dictIdsArray = _transformFunction.transformToDictIdsMV(projectionBlock);
@@ -336,7 +337,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
           int[] dictIds = dictIdsArray[i];
           int numDictIds = dictIds.length;
           _numEntriesScanned += numDictIds;
-          if (_predicateEvaluator.applyMV(dictIds, numDictIds)) {
+          if (_predicateEvaluator.applyMV(dictIds, numDictIds) == predicateEvaluationResult) {
             matchingDocIds.add(_docIdBuffer[i]);
           }
         }
@@ -348,7 +349,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               int[] values = intValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues)) {
+              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }
@@ -359,7 +360,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               long[] values = longValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues)) {
+              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }
@@ -370,7 +371,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               float[] values = floatValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues)) {
+              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }
@@ -381,7 +382,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               double[] values = doubleValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues)) {
+              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }
@@ -392,7 +393,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               String[] values = valuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues)) {
+              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }

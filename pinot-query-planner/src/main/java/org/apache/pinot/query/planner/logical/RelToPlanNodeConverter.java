@@ -31,8 +31,6 @@ import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.SortExchange;
-import org.apache.calcite.rel.hint.PinotHintOptions;
-import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -134,8 +132,8 @@ public final class RelToPlanNodeConverter {
     // Compute all the tables involved under this exchange node
     Set<String> tableNames = getTableNamesFromRelRoot(node);
 
-    return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), exchangeType,
-        tableNames, node.getDistribution(), fieldCollations, isSortOnSender, isSortOnReceiver);
+    return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), exchangeType, tableNames,
+        node.getDistribution(), fieldCollations, isSortOnSender, isSortOnReceiver);
   }
 
   private static PlanNode convertLogicalSetOp(SetOp node, int currentStageId) {
@@ -187,11 +185,8 @@ public final class RelToPlanNodeConverter {
         new FieldSelectionKeySelector(joinInfo.rightKeys));
     List<RexExpression> joinClause =
         joinInfo.nonEquiConditions.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
-    boolean isColocatedJoin =
-        PinotHintStrategyTable.isHintOptionTrue(node.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
-            PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
     return new JoinNode(currentStageId, toDataSchema(node.getRowType()), toDataSchema(node.getLeft().getRowType()),
-        toDataSchema(node.getRight().getRowType()), joinType, joinKeys, joinClause, isColocatedJoin);
+        toDataSchema(node.getRight().getRowType()), joinType, joinKeys, joinClause);
   }
 
   private static DataSchema toDataSchema(RelDataType rowType) {

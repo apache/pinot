@@ -117,14 +117,14 @@
         "outputs": [["b", 6], ["a", 6]]
       },
       {
-        "comments": "table aren't actually partitioned by val thus all segments can produce duplicate results, thus [[6]]",
+        "comments": "table aren't actually partitioned by val thus all segments can produce duplicate results, thus [[8]]",
         "sql": "SELECT SEGMENT_PARTITIONED_DISTINCT_COUNT(val) FROM {tbl1}",
-        "outputs": [[6]]
+        "outputs": [[8]]
       },
       {
-        "comments": "table aren't actually partitioned by val thus all segments can produce duplicate results, thus [[b, 4], [a, 4]]",
+        "comments": "table aren't actually partitioned by val thus all segments can produce duplicate results, thus [[b, 5], [a, 4]]",
         "sql": "SELECT groupingCol, SEGMENT_PARTITIONED_DISTINCT_COUNT(val) FROM {tbl1} GROUP BY groupingCol",
-        "outputs": [["b", 4], ["a", 4]]
+        "outputs": [["b", 5], ["a", 4]]
       },
       {
         "sql": "SELECT l.groupingCol, SEGMENT_PARTITIONED_DISTINCT_COUNT(l.val), SEGMENT_PARTITIONED_DISTINCT_COUNT(r.val) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",
@@ -135,9 +135,9 @@
         "outputs": [["b", 6], ["a", 6]]
       },
       {
-        "comments": "table aren't actually partitioned by val thus all segments can produce duplicate results, thus [[b, 4], [a, 4]]",
+        "comments": "table aren't actually partitioned by val thus all segments can produce duplicate results, thus [[b, 5], [a, 4]]",
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, SEGMENT_PARTITIONED_DISTINCT_COUNT(val) FROM {tbl1} GROUP BY groupingCol",
-        "outputs": [["b", 4], ["a", 4]]
+        "outputs": [["b", 5], ["a", 4]]
       },
       {
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ l.groupingCol, SEGMENT_PARTITIONED_DISTINCT_COUNT(l.val), SEGMENT_PARTITIONED_DISTINCT_COUNT(r.val) FROM {tbl1} l JOIN {tbl2} r ON l.groupingCol = r.groupingCol GROUP BY l.groupingCol",

@@ -23,8 +23,6 @@
       { "sql": "SELECT concat(strCol, strCol) FROM {stringTbl}" },
       { "sql": "SELECT concat_ws(',', strCol, strCol) FROM {stringTbl} WHERE strCol <> ''" },
       {
-        "ignored": true,
-        "comment": "standard SQL treats '' as null and ignores it, but pinot does not",
         "sql": "SELECT concat_ws(',', strCol, strCol) FROM {stringTbl}"
       },
       {

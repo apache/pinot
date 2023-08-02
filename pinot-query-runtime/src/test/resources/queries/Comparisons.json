@@ -171,8 +171,6 @@
     ]
   },
   "timestamps_comp": {
-    "ignored": true,
-    "comment": "we don't support timestamp comparisons",
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -410,13 +408,9 @@
       { "sql": "SELECT val NOT BETWEEN 3 AND 2 FROM {tbl}" },
       { "sql": "SELECT 3 NOT BETWEEN small AND big FROM {tbl}" },
       {
-        "ignored": true,
-        "comment": "SYMMETRIC not supported",
         "sql": "SELECT val BETWEEN SYMMETRIC small AND big FROM {tbl}"
       },
       {
-        "ignored": true,
-        "comment": "SYMMETRIC not supported",
         "sql": "SELECT val BETWEEN SYMMETRIC big AND small FROM {tbl}"
       }
     ]

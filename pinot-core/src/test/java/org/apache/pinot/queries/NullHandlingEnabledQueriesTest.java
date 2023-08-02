@@ -27,6 +27,7 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -835,13 +836,36 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testExpressionFilterOperatorResultIsInSecondProjectionBlock()
+      throws Exception {
+    initializeRows();
+    for (int i = 0; i < DocIdSetPlanNode.MAX_DOC_PER_CALL; i++) {
+      insertRowWithTwoColumns(null, i);
+    }
+    insertRowWithTwoColumns(1, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE add(%s, 0) > 0 LIMIT 10", COLUMN1, COLUMN2, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{1, DocIdSetPlanNode.MAX_DOC_PER_CALL});
+  }
+
+  @Test
   public void testExpressionFilterOperatorApplyAndForGetFalses()
       throws Exception {
     initializeRows();
     insertRowWithTwoColumns(null, null);
-    insertRowWithTwoColumns(Integer.MIN_VALUE, null);
     insertRowWithTwoColumns(1, null);
     insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(Integer.MIN_VALUE, null);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
         .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
@@ -855,6 +879,23 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
     assertArrayEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorNotFilterOnMultiValue()
+      throws Exception {
+    initializeRows();
+    insertRow(new Integer[]{1, 2, 3});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE NOT(VALUEIN(%s, 2, 3) > 2) LIMIT 100", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 0);
   }
 
   @Test
@@ -993,36 +1034,60 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testExpressionFilterOperatorMultiValueThrowsUnsupportedException()
+  public void testExpressionFilterOperatorOnMultiValue()
       throws Exception {
     initializeRows();
-    insertRow(new Integer[]{1, 2, 3});
-    insertRow(new Integer[]{2, 3, 4});
+    insertRowWithTwoColumns(new Integer[]{1, 2, 3}, 1);
+    insertRowWithTwoColumns(new Integer[]{2, 3, 4}, null);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
-    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
     setUpSegments(tableConfig, schema);
-    String query = String.format("SELECT * FROM testTable WHERE VALUEIN(%s, 2, 3) IN (2, 3)", COLUMN1);
+    String query =
+        String.format("SELECT * FROM testTable WHERE (VALUEIN(%s, 2, 3) IN (2, 3)) AND (%s = 1)", COLUMN1, COLUMN2);
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
 
-    assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage()
-        .contains("NULL handling is not supported for multi-value"));
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}, 1});
   }
 
   @Test
-  public void testExpressionFilterOperatorIsNullOnMultiValueWhenNullHandlingDisabledThrowsUnsupportedException()
+  public void testExpressionFilterOperatorMultiValueIsNull()
       throws Exception {
     initializeRows();
     insertRow(new Integer[]{1, 2, 3});
-    insertRow(new Integer[]{2, 3, 4});
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
     setUpSegments(tableConfig, schema);
-    String query = String.format("SELECT * FROM testTable WHERE VALUEIN(%s, 2, 3) IS NULL", COLUMN1);
+    String query =
+        String.format("SELECT * FROM testTable WHERE (VALUEIN(%s, 2, 3) IS NULL)", COLUMN1);
 
-    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
 
-    assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage()
-        .contains("NULL handling is not supported for multi-value"));
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 0);
+  }
+
+  @Test
+  public void testExpressionFilterOperatorMultiValueIsNotNull()
+      throws Exception {
+    initializeRows();
+    insertRow(new Integer[]{1, 2, 3});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT * FROM testTable WHERE (VALUEIN(%s, 2, 3) IS NOT NULL)", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}});
   }
 }
