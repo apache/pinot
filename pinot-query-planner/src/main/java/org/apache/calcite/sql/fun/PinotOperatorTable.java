@@ -50,6 +50,8 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
   private static @MonotonicNonNull PinotOperatorTable _instance;
 
   public static final SqlFunction COALESCE = new PinotSqlCoalesceFunction();
+  public static final SqlArrayValueConstructor ARRAY_VALUE_CONSTRUCTOR = new SqlArrayValueConstructor();
+  public static final SqlMapValueConstructor MAP_VALUE_CONSTRUCTOR = new SqlMapValueConstructor();
 
   // TODO: clean up lazy init by using Suppliers.memorized(this::computeInstance) and make getter wrapped around
   // supplier instance. this should replace all lazy init static objects in the codebase

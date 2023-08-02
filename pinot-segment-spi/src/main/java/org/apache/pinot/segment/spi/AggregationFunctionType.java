@@ -142,8 +142,14 @@ public enum AggregationFunctionType {
   // DEPRECATED in v2
   IDSET("idSet"),
 
-  // TODO: support histogram requires solving ARRAY constructor and multi-function signature without optional ordinal
-  HISTOGRAM("histogram"),
+  // histogram has 2 signatures, either by array or by lower/upper/binCount
+  HISTOGRAM("histogram", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.or(
+          OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.ARRAY), ordinal -> ordinal > 1),
+          OperandTypes.family(ImmutableList.of(
+              SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC),
+              ordinal -> ordinal > 1)
+      ), ReturnTypes.TO_ARRAY, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   // TODO: support underscore separated version of the stats functions, resolving conflict in SqlStdOptTable
   // currently Pinot is missing generated agg functions impl from Calcite's AggregateReduceFunctionsRule
