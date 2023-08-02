@@ -856,4 +856,21 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
     assertArrayEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
   }
+
+  @Test
+  public void testExpressionFilterOperatorNotFilterOnMultiValue()
+      throws Exception {
+    initializeRows();
+    insertRow(new Integer[]{1, 2, 3});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE NOT(VALUEIN(%s, 2, 3) > 2) LIMIT 100", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 0);
+  }
 }

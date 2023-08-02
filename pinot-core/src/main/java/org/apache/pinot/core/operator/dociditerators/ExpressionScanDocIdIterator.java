@@ -146,9 +146,9 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   private void processProjectionBlock(ProjectionBlock projectionBlock, BitmapDataProvider matchingDocIds) {
     int numDocs = projectionBlock.getNumDocs();
     TransformResultMetadata resultMetadata = _transformFunction.getResultMetadata();
+    boolean predicateEvaluationResult = _predicateEvaluationResult == PredicateEvaluationResult.TRUE;
     if (resultMetadata.isSingleValue()) {
       _numEntriesScanned += numDocs;
-      boolean predicateEvaluationResult = _predicateEvaluationResult == PredicateEvaluationResult.TRUE;
       RoaringBitmap nullBitmap = null;
       if (resultMetadata.hasDictionary()) {
         int[] dictIds = _transformFunction.transformToDictIdsSV(projectionBlock);
@@ -321,7 +321,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
           int[] dictIds = dictIdsArray[i];
           int numDictIds = dictIds.length;
           _numEntriesScanned += numDictIds;
-          if (_predicateEvaluator.applyMV(dictIds, numDictIds)) {
+          if (_predicateEvaluator.applyMV(dictIds, numDictIds) == predicateEvaluationResult) {
             matchingDocIds.add(_docIdBuffer[i]);
           }
         }
@@ -333,7 +333,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               int[] values = intValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues)) {
+              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }
@@ -344,7 +344,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               long[] values = longValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues)) {
+              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }
@@ -355,7 +355,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               float[] values = floatValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues)) {
+              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }
@@ -366,7 +366,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               double[] values = doubleValuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues)) {
+              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }
@@ -377,7 +377,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
               String[] values = valuesArray[i];
               int numValues = values.length;
               _numEntriesScanned += numValues;
-              if (_predicateEvaluator.applyMV(values, numValues)) {
+              if (_predicateEvaluator.applyMV(values, numValues) == predicateEvaluationResult) {
                 matchingDocIds.add(_docIdBuffer[i]);
               }
             }
