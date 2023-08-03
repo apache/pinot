@@ -46,6 +46,7 @@
   },
   "upsertConfig": {
     "mode": "PARTIAL",
+    "rowMergerCustomImplementation": "RsvpUsecaseRowMerger",
     "partialUpsertStrategies": {
       "rsvp_count": "INCREMENT",
       "group_name": "UNION",

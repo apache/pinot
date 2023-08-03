@@ -43,8 +43,10 @@ public class PartialUpsertHandlerTest {
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
+    UpsertConfig upsertConfig = new UpsertConfig();
+    upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     PartialUpsertHandler handler =
-        new PartialUpsertHandler(schema, partialUpsertStrategies, UpsertConfig.Strategy.OVERWRITE,
+        new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig,
             Collections.singletonList("hoursSinceEpoch"));
 
     // both records are null.
@@ -99,8 +101,10 @@ public class PartialUpsertHandlerTest {
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
+    UpsertConfig upsertConfig = new UpsertConfig();
+    upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     PartialUpsertHandler handler =
-        new PartialUpsertHandler(schema, partialUpsertStrategies, UpsertConfig.Strategy.OVERWRITE,
+        new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig,
             Collections.singletonList("hoursSinceEpoch"));
 
     // previousRecord is null default value, while newRecord is not.

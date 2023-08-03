@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.upsert;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.segment.local.function.BaseRowMerger;
+import org.apache.pinot.segment.local.function.BiFunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -37,16 +39,31 @@ public class PartialUpsertHandler {
   private final PartialUpsertMerger _defaultPartialUpsertMerger;
   private final List<String> _comparisonColumns;
   private final List<String> _primaryKeyColumns;
+  private final BaseRowMerger _rowMerger;
+
+  private Map<String, Object> _reuseRowMergerResult = new HashMap<>();
 
   public PartialUpsertHandler(Schema schema, Map<String, UpsertConfig.Strategy> partialUpsertStrategies,
-      UpsertConfig.Strategy defaultPartialUpsertStrategy, List<String> comparisonColumns) {
-    _defaultPartialUpsertMerger = PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy);
+      UpsertConfig upsertConfig, List<String> comparisonColumns) {
+    _defaultPartialUpsertMerger = PartialUpsertMergerFactory.getMerger(upsertConfig.getDefaultPartialUpsertStrategy());
     _comparisonColumns = comparisonColumns;
     _primaryKeyColumns = schema.getPrimaryKeyColumns();
 
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
     }
+
+    String rowMergerCustomImplementation = upsertConfig.getRowMergerCustomImplementation();
+    if(rowMergerCustomImplementation != null && !rowMergerCustomImplementation.equals("")) {
+      try {
+        _rowMerger = (BaseRowMerger) BiFunctionEvaluatorFactory.getInstance(rowMergerCustomImplementation);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+      }
+      else {
+        _rowMerger = null;
+      }
   }
 
   /**
@@ -65,7 +82,27 @@ public class PartialUpsertHandler {
    * @return a new row after merge
    */
   public GenericRow merge(GenericRow previousRecord, GenericRow newRecord) {
+
+    if (_rowMerger != null) {
+        _rowMerger.evaluate(previousRecord, newRecord, _reuseRowMergerResult);
+    }
+
     for (String column : previousRecord.getFieldToValueMap().keySet()) {
+
+        // if the column is result of row merger function, then use the value
+        if (_reuseRowMergerResult.containsKey(column)) {
+            if (!_primaryKeyColumns.contains(column) && !_comparisonColumns.contains(column)) {
+                Object mergedValue = _reuseRowMergerResult.get(column);
+                if (mergedValue == null) {
+                    newRecord.addNullValueField(column);
+                } else {
+                    newRecord.removeNullValueField(column);
+                    newRecord.putValue(column, mergedValue);
+                }
+            }
+            continue;
+        }
+
       if (!_primaryKeyColumns.contains(column)) {
         if (!previousRecord.isNullValue(column)) {
           if (newRecord.isNullValue(column)) {

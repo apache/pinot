@@ -31,13 +31,16 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 public class UpsertConfig extends BaseJsonConfig {
 
   public enum Mode {
-    FULL, PARTIAL, NONE
+    FULL, PARTIAL, ROW_MERGER, NONE
   }
 
   public enum Strategy {
     // Todo: add CUSTOM strategies
     APPEND, IGNORE, INCREMENT, MAX, MIN, OVERWRITE, UNION
   }
+
+  @JsonPropertyDescription("Class name for custom row merger implementation")
+  private String rowMergerCustomImplementation;
 
   @JsonPropertyDescription("Upsert mode.")
   private Mode _mode;
@@ -200,5 +203,13 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setMetadataManagerConfigs(Map<String, String> metadataManagerConfigs) {
     _metadataManagerConfigs = metadataManagerConfigs;
+  }
+
+  public String getRowMergerCustomImplementation() {
+    return rowMergerCustomImplementation;
+  }
+
+  public void setRowMergerCustomImplementation(String rowMergerCustomImplementation) {
+    this.rowMergerCustomImplementation = rowMergerCustomImplementation;
   }
 }

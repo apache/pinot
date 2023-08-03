@@ -101,7 +101,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       Preconditions.checkArgument(partialUpsertStrategies != null,
           "Partial-upsert strategies must be configured for partial-upsert enabled table: %s", _tableNameWithType);
       _partialUpsertHandler =
-          new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig.getDefaultPartialUpsertStrategy(),
+          new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig,
               _comparisonColumns);
     }
 
