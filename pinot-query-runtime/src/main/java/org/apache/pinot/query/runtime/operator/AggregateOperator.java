@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -249,7 +250,7 @@ public class AggregateOperator extends MultiStageOperator {
 
     // add additional arguments for aggFunctionCall
     if (_aggType.isInputIntermediateFormat()) {
-      rewriteAggArgumentForIntermediateInput(aggArguments, aggIdx);
+      rewriteAggArgumentForIntermediateInput(aggFunctionCall, aggArguments, aggIdx);
     }
     // This can only be true for COUNT aggregation functions on intermediate stage.
     // The literal value here does not matter. We create a dummy literal here just so that the count aggregation
@@ -261,7 +262,8 @@ public class AggregateOperator extends MultiStageOperator {
     return new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, aggArguments);
   }
 
-  private void rewriteAggArgumentForIntermediateInput(List<ExpressionContext> aggArguments, int aggIdx) {
+  private void rewriteAggArgumentForIntermediateInput(RexExpression.FunctionCall aggFunctionCall,
+      List<ExpressionContext> aggArguments, int aggIdx) {
     Map<Integer, Literal> aggCallSignature = _aggCallSignatureMap.get(aggIdx);
     if (aggCallSignature != null && !aggCallSignature.isEmpty()) {
       int argListSize = aggCallSignature.get(-1).getIntValue();
@@ -269,6 +271,14 @@ public class AggregateOperator extends MultiStageOperator {
         Literal aggIdxLiteral = aggCallSignature.get(argIdx);
         if (aggIdxLiteral != null) {
           aggArguments.add(ExpressionContext.forLiteralContext(aggIdxLiteral));
+        } else if (aggFunctionCall.getFunctionName().equalsIgnoreCase("HISTOGRAM")) {
+          // special handling for histogram
+          aggArguments.add(ExpressionContext.forFunction(
+              new FunctionContext(FunctionContext.Type.TRANSFORM, "arrayValueConstructor", ImmutableList.of(
+                  ExpressionContext.forLiteralContext(Literal.longValue(0)),
+                  ExpressionContext.forLiteralContext(Literal.longValue(1)))
+              )
+          ));
         } else {
           aggArguments.add(ExpressionContext.forIdentifier("__PLACEHOLDER__"));
         }
