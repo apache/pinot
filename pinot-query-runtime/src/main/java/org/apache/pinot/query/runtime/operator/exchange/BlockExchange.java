@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.SendingMailbox;
@@ -169,7 +168,7 @@ public abstract class BlockExchange {
   public void close() {
   }
 
-  public void cancel(@Nullable Throwable t) {
+  public void cancel(Throwable t) {
     for (SendingMailbox sendingMailbox : _sendingMailboxes) {
       sendingMailbox.cancel(t);
     }

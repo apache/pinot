@@ -24,7 +24,6 @@ import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
@@ -78,7 +77,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void cancel(@Nullable Throwable t) {
+  public void cancel(Throwable t) {
     if (!_statusObserver.isFinished()) {
       LOGGER.debug("Cancelling mailbox: {}", _id);
       if (_contentObserver == null) {

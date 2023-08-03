@@ -19,7 +19,6 @@
 package org.apache.pinot.query.mailbox;
 
 import java.io.IOException;
-import javax.annotation.Nullable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 
@@ -55,5 +54,5 @@ public interface SendingMailbox {
    * Cancels the mailbox and notifies the receiver of the cancellation so that it can release the underlying resources.
    * No more blocks can be sent after calling this method.
    */
-  void cancel(@Nullable Throwable t);
+  void cancel(Throwable t);
 }
