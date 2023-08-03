@@ -203,7 +203,7 @@ public class PinotQueryResource {
     QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
     List<String> tableNames = queryEnvironment.getTableNamesForQuery(query);
-    Set<String> brokerTenantsUnion;
+    List<String> instanceIds;
     if (tableNames.size() != 0) {
       List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
       if (tableConfigList == null || tableConfigList.size() == 0) {
@@ -212,17 +212,18 @@ public class PinotQueryResource {
       }
 
       // find the unions of all the broker tenant tags of the queried tables.
-      brokerTenantsUnion = getBrokerTenantTagsUnion(tableConfigList);
+      Set<String> brokerTenantsUnion = getBrokerTenantTagsUnion(tableConfigList);
       if (brokerTenantsUnion.isEmpty()) {
         return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR, new Exception(
             String.format("Unable to dispatch multistage query for tables: [%s]", tableNames))).toString();
       }
+      instanceIds = findCommonBrokerInstance(brokerTenantsUnion);
     } else {
       // TODO fail these queries going forward. Added this logic to take care of tautologies like BETWEEN 0 and -1.
-      brokerTenantsUnion = _pinotHelixResourceManager.getAllBrokerTenantNames();
+      instanceIds = _pinotHelixResourceManager.getAllBrokerInstanceConfigs().stream()
+          .map(InstanceConfig::getInstanceName).collect(Collectors.toList());
       LOGGER.error("Unable to find table name from SQL {} thus dispatching to random broker.", query);
     }
-    List<String> instanceIds = findCommonBrokerInstance(brokerTenantsUnion);
     String instanceId = selectRandomInstanceId(instanceIds);
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
