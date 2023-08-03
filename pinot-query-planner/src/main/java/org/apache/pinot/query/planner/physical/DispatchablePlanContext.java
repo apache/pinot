@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.physical;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -29,6 +30,7 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerManager;
@@ -90,44 +92,49 @@ public class DispatchablePlanContext {
     DispatchablePlanFragment[] dispatchablePlanFragmentArray =
         new DispatchablePlanFragment[_dispatchablePlanStageRootMap.size()];
     createDispatchablePlanFragmentList(dispatchablePlanFragmentArray, subPlanRoot);
-    List<DispatchablePlanFragment> dispatchablePlanFragmentList = Arrays.asList(dispatchablePlanFragmentArray);
-    for (Map.Entry<Integer, DispatchablePlanMetadata> dispatchableEntry : _dispatchablePlanMetadataMap.entrySet()) {
-      DispatchablePlanMetadata dispatchablePlanMetadata = dispatchableEntry.getValue();
+    for (Map.Entry<Integer, DispatchablePlanMetadata> planMetadataEntry : _dispatchablePlanMetadataMap.entrySet()) {
+      int stageId = planMetadataEntry.getKey();
+      DispatchablePlanMetadata dispatchablePlanMetadata = planMetadataEntry.getValue();
 
       // construct each worker metadata
-      WorkerMetadata[] workerMetadataList = new WorkerMetadata[dispatchablePlanMetadata.getTotalWorkerCount()];
-      for (Map.Entry<QueryServerInstance, List<Integer>> queryServerEntry
-          : dispatchablePlanMetadata.getServerInstanceToWorkerIdMap().entrySet()) {
-        for (int workerId : queryServerEntry.getValue()) {
-          VirtualServerAddress virtualServerAddress = new VirtualServerAddress(queryServerEntry.getKey(), workerId);
-          WorkerMetadata.Builder builder = new WorkerMetadata.Builder();
-          builder.setVirtualServerAddress(virtualServerAddress);
-          if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
-            builder.addTableSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap().get(workerId));
-          }
-          builder.putAllMailBoxInfosMap(dispatchablePlanMetadata.getWorkerIdToMailBoxIdsMap().get(workerId));
-          workerMetadataList[workerId] = builder.build();
+      Map<Integer, QueryServerInstance> workerIdToServerInstanceMap =
+          dispatchablePlanMetadata.getWorkerIdToServerInstanceMap();
+      Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
+          dispatchablePlanMetadata.getWorkerIdToSegmentsMap();
+      Map<Integer, Map<Integer, MailboxMetadata>> workerIdToMailboxesMap =
+          dispatchablePlanMetadata.getWorkerIdToMailboxesMap();
+      Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdsMap = new HashMap<>();
+      WorkerMetadata[] workerMetadataArray = new WorkerMetadata[workerIdToServerInstanceMap.size()];
+      for (Map.Entry<Integer, QueryServerInstance> serverEntry : workerIdToServerInstanceMap.entrySet()) {
+        int workerId = serverEntry.getKey();
+        QueryServerInstance queryServerInstance = serverEntry.getValue();
+        serverInstanceToWorkerIdsMap.computeIfAbsent(queryServerInstance, k -> new ArrayList<>()).add(workerId);
+        WorkerMetadata.Builder workerMetadataBuilder = new WorkerMetadata.Builder().setVirtualServerAddress(
+            new VirtualServerAddress(queryServerInstance, workerId));
+        if (workerIdToSegmentsMap != null) {
+          workerMetadataBuilder.addTableSegmentsMap(workerIdToSegmentsMap.get(workerId));
         }
+        workerMetadataBuilder.putAllMailBoxInfosMap(workerIdToMailboxesMap.get(workerId));
+        workerMetadataArray[workerId] = workerMetadataBuilder.build();
       }
 
       // set the stageMetadata
-      int stageId = dispatchableEntry.getKey();
-      dispatchablePlanFragmentList.get(stageId).setWorkerMetadataList(Arrays.asList(workerMetadataList));
-      dispatchablePlanFragmentList.get(stageId)
-          .setWorkerIdToSegmentsMap(dispatchablePlanMetadata.getWorkerIdToSegmentsMap());
-      dispatchablePlanFragmentList.get(stageId)
-          .setServerInstanceToWorkerIdMap(dispatchablePlanMetadata.getServerInstanceToWorkerIdMap());
+      DispatchablePlanFragment dispatchablePlanFragment = dispatchablePlanFragmentArray[stageId];
+      dispatchablePlanFragment.setWorkerMetadataList(Arrays.asList(workerMetadataArray));
+      if (workerIdToSegmentsMap != null) {
+        dispatchablePlanFragment.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+      }
+      dispatchablePlanFragment.setServerInstanceToWorkerIdMap(serverInstanceToWorkerIdsMap);
       Preconditions.checkState(dispatchablePlanMetadata.getScannedTables().size() <= 1,
           "More than one table is not supported yet");
       if (dispatchablePlanMetadata.getScannedTables().size() == 1) {
-        dispatchablePlanFragmentList.get(stageId).setTableName(dispatchablePlanMetadata.getScannedTables().get(0));
+        dispatchablePlanFragment.setTableName(dispatchablePlanMetadata.getScannedTables().get(0));
       }
       if (dispatchablePlanMetadata.getTimeBoundaryInfo() != null) {
-        dispatchablePlanFragmentList.get(stageId)
-            .setTimeBoundaryInfo(dispatchablePlanMetadata.getTimeBoundaryInfo());
+        dispatchablePlanFragment.setTimeBoundaryInfo(dispatchablePlanMetadata.getTimeBoundaryInfo());
       }
     }
-    return dispatchablePlanFragmentList;
+    return Arrays.asList(dispatchablePlanFragmentArray);
   }
 
   private void createDispatchablePlanFragmentList(DispatchablePlanFragment[] dispatchablePlanFragmentArray,
