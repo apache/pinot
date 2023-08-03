@@ -87,8 +87,10 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
   public void onData() {
     if (_newDataReady.offer(Boolean.TRUE)) {
-      LOGGER.trace("New data notification delivered on " + _id + ". " + System.identityHashCode(_newDataReady));
-    } else {
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace("New data notification delivered on " + _id + ". " + System.identityHashCode(_newDataReady));
+      }
+    } else if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("New data notification ignored on " + _id + ". " + System.identityHashCode(_newDataReady));
     }
   }
