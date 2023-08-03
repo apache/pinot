@@ -650,6 +650,46 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testRangeFiltering()
+      throws Exception {
+    initializeRows();
+    insertRow(-1);
+    insertRow(null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSortedColumn(COLUMN1).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE %s < 0", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{-1});
+  }
+
+  @Test
+  public void testEqualFiltering()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(Integer.MIN_VALUE);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSortedColumn(COLUMN1).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE %s = %d", COLUMN1, Integer.MIN_VALUE);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
+  }
+
+  @Test
   public void testOrFiltering()
       throws Exception {
     initializeRows();

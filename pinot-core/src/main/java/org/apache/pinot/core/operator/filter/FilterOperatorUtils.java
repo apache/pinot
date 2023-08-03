@@ -19,13 +19,18 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.OptionalInt;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class FilterOperatorUtils {
@@ -73,7 +78,7 @@ public class FilterOperatorUtils {
       if (predicateEvaluator.isAlwaysFalse()) {
         return EmptyFilterOperator.getInstance();
       } else if (predicateEvaluator.isAlwaysTrue()) {
-        return new MatchAllFilterOperator(numDocs);
+        return new MatchAllFilterOperator(queryContext, dataSource, numDocs);
       }
 
       // Currently sorted index based filtering is supported only for
@@ -276,5 +281,15 @@ public class FilterOperatorUtils {
   public static BaseFilterOperator getNotFilterOperator(QueryContext queryContext, BaseFilterOperator filterOperator,
       int numDocs) {
     return _instance.getNotFilterOperator(queryContext, filterOperator, numDocs);
+  }
+
+  /**
+   * Returns the document IDs in the {@code blockDocIdSet} minus the document IDs in the {@code nullBitmap}.
+   */
+  public static BlockDocIdSet excludeNulls(QueryContext queryContext, int numDocs, BlockDocIdSet blockDocIdSet,
+      ImmutableRoaringBitmap nullBitmap) {
+    return new AndDocIdSet(Arrays.asList(blockDocIdSet,
+        new BitmapDocIdSet(ImmutableRoaringBitmap.flip(nullBitmap, 0, (long) numDocs), numDocs)),
+        queryContext.getQueryOptions());
   }
 }
