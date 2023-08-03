@@ -84,6 +84,7 @@ public class FunctionUtils {
     put(String[].class, PinotDataType.STRING_ARRAY);
     put(Object.class, PinotDataType.OBJECT);
     put(Object[].class, PinotDataType.OBJECT_ARRAY);
+    put(Vector.class, PinotDataType.VECTOR);
   }};
 
   private static final Map<Class<?>, DataType> DATA_TYPE_MAP = new HashMap<Class<?>, DataType>() {{
@@ -100,6 +101,7 @@ public class FunctionUtils {
     put(Boolean.class, DataType.BOOLEAN);
     put(Timestamp.class, DataType.TIMESTAMP);
     put(String.class, DataType.STRING);
+    put(Vector.class, DataType.VECTOR);
     put(byte[].class, DataType.BYTES);
     put(int[].class, DataType.INT);
     put(long[].class, DataType.LONG);

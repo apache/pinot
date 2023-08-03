@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.spi.data.readers;
 
 import java.util.Arrays;
@@ -8,104 +26,126 @@ public class Vector implements Comparable<Vector> {
     FLOAT, INT
   }
 
-  private int dimension;
-  private float[] floatValues;
-  private int[] intValues;
-  private VectorType type;
+  private int _dimension;
+  private float[] _floatValues;
+  private int[] _intValues;
+  private VectorType _type;
 
   public Vector(int dimension, float[] values) {
-    this.dimension = dimension;
-    this.floatValues = values;
-    this.type = VectorType.FLOAT;
+    _dimension = dimension;
+    _floatValues = values;
+    _type = VectorType.FLOAT;
   }
 
   public Vector(int dimension, int[] values) {
-    this.dimension = dimension;
-    this.intValues = values;
-    this.type = VectorType.INT;
+    _dimension = dimension;
+    _intValues = values;
+    _type = VectorType.INT;
   }
 
   public int getDimension() {
-    return dimension;
+    return _dimension;
   }
 
   public void setDimension(int dimension) {
-    this.dimension = dimension;
+    _dimension = dimension;
   }
 
   public float[] getFloatValues() {
-    if (type != VectorType.FLOAT) {
+    if (_type != VectorType.FLOAT) {
       throw new IllegalStateException("Vector type is not FLOAT");
     }
-    return floatValues;
+    return _floatValues;
   }
 
   public int[] getIntValues() {
-    if (type != VectorType.INT) {
+    if (_type != VectorType.INT) {
       throw new IllegalStateException("Vector type is not INT");
     }
-    return intValues;
+    return _intValues;
   }
 
   public void setValues(float[] values) {
-    this.floatValues = values;
-    this.type = VectorType.FLOAT;
+    _floatValues = values;
+    _type = VectorType.FLOAT;
   }
 
   public void setValues(int[] values) {
-    this.intValues = values;
-    this.type = VectorType.INT;
+    _intValues = values;
+    _type = VectorType.INT;
+  }
+
+  public VectorType getType() {
+    return _type;
   }
 
   public static Vector fromString(String value) {
     String[] tokens = value.split(",");
-    int dimension = Integer.parseInt(tokens[0]);
-    float[] result = new float[tokens.length - 1];
-    for (int i = 1; i < tokens.length; i++) {
-      result[i - 1] = Float.parseFloat(tokens[i]);
+    VectorType vectorType = VectorType.valueOf(tokens[0].toUpperCase());
+    int dimension = Integer.parseInt(tokens[1]);
+    switch (vectorType) {
+      case FLOAT: {
+        float[] result = new float[tokens.length - 2];
+        for (int i = 2; i < tokens.length; i++) {
+          result[i - 2] = Float.parseFloat(tokens[i]);
+        }
+        return new Vector(dimension, result);
+      }
+      case INT: {
+        int[] result = new int[tokens.length - 2];
+        for (int i = 2; i < tokens.length; i++) {
+          result[i - 2] = Integer.parseInt(tokens[i]);
+        }
+        return new Vector(dimension, result);
+      }
+      default:
+        throw new IllegalArgumentException("Unsupported vector type: " + vectorType);
     }
-    return new Vector(dimension, result);
   }
 
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append(dimension);
+    sb.append(_type);
     sb.append(",");
-    switch (type) {
+    sb.append(_dimension);
+    sb.append(",");
+    switch (_type) {
       case FLOAT:
-        for (int i = 0; i < floatValues.length; i++) {
-          sb.append(floatValues[i]);
-          if (i < floatValues.length - 1) {
+        for (int i = 0; i < _floatValues.length; i++) {
+          sb.append(_floatValues[i]);
+          if (i < _floatValues.length - 1) {
             sb.append(",");
           }
         }
         break;
       case INT:
-        for (int i = 0; i < intValues.length; i++) {
-          sb.append(intValues[i]);
-          if (i < intValues.length - 1) {
+        for (int i = 0; i < _intValues.length; i++) {
+          sb.append(_intValues[i]);
+          if (i < _intValues.length - 1) {
             sb.append(",");
           }
         }
         break;
+      default:
+        throw new IllegalArgumentException("Unsupported vector type: " + _type);
     }
     return sb.toString();
   }
 
   public byte[] toBytes() {
-    int size = type == VectorType.FLOAT ? floatValues.length : intValues.length;
+    int size = _type == VectorType.FLOAT ? _floatValues.length : _intValues.length;
     byte[] result = new byte[5 + 4 * size]; // 1 byte for type, 4 for dimension
     int offset = 0;
-    result[offset++] = (byte) (type == VectorType.FLOAT ? 0 : 1);
-    int intBits = dimension;
+    result[offset++] = (byte) (_type == VectorType.FLOAT ? 0 : 1);
+    int intBits = _dimension;
     result[offset++] = (byte) (intBits >> 24);
     result[offset++] = (byte) (intBits >> 16);
     result[offset++] = (byte) (intBits >> 8);
     result[offset++] = (byte) (intBits);
-    switch (type) {
+    switch (_type) {
       case FLOAT:
-        for (int i = 0; i < floatValues.length; i++) {
-          intBits = Float.floatToIntBits(floatValues[i]);
+        for (int i = 0; i < _floatValues.length; i++) {
+          intBits = Float.floatToIntBits(_floatValues[i]);
           result[offset++] = (byte) (intBits >> 24);
           result[offset++] = (byte) (intBits >> 16);
           result[offset++] = (byte) (intBits >> 8);
@@ -113,14 +153,16 @@ public class Vector implements Comparable<Vector> {
         }
         break;
       case INT:
-        for (int i = 0; i < intValues.length; i++) {
-          intBits = intValues[i];
+        for (int i = 0; i < _intValues.length; i++) {
+          intBits = _intValues[i];
           result[offset++] = (byte) (intBits >> 24);
           result[offset++] = (byte) (intBits >> 16);
           result[offset++] = (byte) (intBits >> 8);
           result[offset++] = (byte) (intBits);
         }
         break;
+      default:
+        throw new IllegalArgumentException("Unsupported vector type: " + _type);
     }
     return result;
   }
@@ -160,42 +202,57 @@ public class Vector implements Comparable<Vector> {
           intResult[i] = intBits;
         }
         return new Vector(dimension, intResult);
+      default:
+        throw new IllegalArgumentException("Unsupported vector type: " + type);
     }
-    return null; // Should never reach here
   }
 
   @Override
   public int compareTo(Vector other) {
-    if (this.dimension != other.dimension) {
-      return this.dimension - other.dimension;
+    if (_dimension != other._dimension) {
+      return _dimension - other._dimension;
     }
-    if (this.type != other.type) {
+    if (_type != other._type) {
       throw new IllegalArgumentException("Cannot compare vectors of different types");
     }
-    if (this.type == VectorType.FLOAT) {
-      for (int i = 0; i < this.floatValues.length; i++) {
-        if (this.floatValues[i] != other.floatValues[i]) {
-          return Float.compare(this.floatValues[i], other.floatValues[i]);
+    if (_type == VectorType.FLOAT) {
+      for (int i = 0; i < _floatValues.length; i++) {
+        if (_floatValues[i] != other._floatValues[i]) {
+          return Float.compare(_floatValues[i], other._floatValues[i]);
         }
       }
     } else {
-      for (int i = 0; i < this.intValues.length; i++) {
-        if (this.intValues[i] != other.intValues[i]) {
-          return Integer.compare(this.intValues[i], other.intValues[i]);
+      for (int i = 0; i < _intValues.length; i++) {
+        if (_intValues[i] != other._intValues[i]) {
+          return Integer.compare(_intValues[i], other._intValues[i]);
         }
       }
     }
     return 0;
   }
 
-  public boolean equals(Vector other) {
-    if (this.dimension != other.dimension || this.type != other.type) {
+  @Override
+  public boolean equals(Object other) {
+    Vector otherVector = (Vector) other;
+    if (_dimension != otherVector._dimension || _type != otherVector._type) {
       return false;
     }
-    if (this.type == VectorType.FLOAT) {
-      return Arrays.equals(this.floatValues, other.floatValues);
+    if (_type == VectorType.FLOAT) {
+      return Arrays.equals(_floatValues, otherVector._floatValues);
     } else {
-      return Arrays.equals(this.intValues, other.intValues);
+      return Arrays.equals(_intValues, otherVector._intValues);
     }
+  }
+
+  @Override
+  public int hashCode() {
+    int result = _type.hashCode();
+    result = 31 * result + _dimension;
+    if (_type == VectorType.FLOAT) {
+      result = 31 * result + Arrays.hashCode(_floatValues);
+    } else {
+      result = 31 * result + Arrays.hashCode(_intValues);
+    }
+    return result;
   }
 }

@@ -117,8 +117,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   protected String _virtualColumnProvider;
 
-  private int _vectorLength;
-
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
   }
@@ -144,16 +142,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     _name = name;
     _dataType = DataType.VECTOR;
     _isSingleValueField = false;
-    _vectorLength = vectorLength;
     setDefaultNullValue(defaultNullValue);
-  }
-
-  public boolean isVector() {
-    return _vectorLength > 0;
-  }
-
-  public int getVectorLength() {
-    return _vectorLength;
   }
 
   public abstract FieldType getFieldType();
@@ -460,7 +449,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     MAP(false, false),
     LIST(false, false),
     UNKNOWN(false, true),
-    VECTOR(Float.BYTES, true, true);
+    VECTOR(false, true);
 
     private final DataType _storedType;
     private final int _size;

@@ -134,6 +134,7 @@ public final class Schema implements Serializable {
           case DOUBLE:
           case BIG_DECIMAL:
           case BYTES:
+          case VECTOR:
             break;
           default:
             throw new IllegalStateException("Unsupported data type: " + dataType + " in METRIC field");
