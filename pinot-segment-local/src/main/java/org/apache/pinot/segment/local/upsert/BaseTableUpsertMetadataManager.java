@@ -175,6 +175,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         }
       }
     }
+    onPreloadFinish();
     LOGGER.info("Preloaded segments from table: {} for fast upsert metadata recovery", _tableNameWithType);
   }
 
@@ -223,6 +224,12 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   private File getValidDocIdsSnapshotFile(String segmentName, String segmentTier) {
     File indexDir = _tableDataManager.getSegmentDataDir(segmentName, segmentTier, _tableConfig);
     return new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+  }
+
+  /**
+   * Can be overridden to perform operations after preload is done.
+   */
+  protected void onPreloadFinish() {
   }
 
   @Override
