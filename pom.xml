@@ -160,6 +160,7 @@
     <audienceannotations.version>0.13.0</audienceannotations.version>
     <clp-ffi.version>0.4.3</clp-ffi.version>
     <aws.sdk.version>2.20.94</aws.sdk.version>
+    <joda-time.version>2.12.5</joda-time.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
 
@@ -557,7 +558,7 @@
       <dependency>
         <groupId>joda-time</groupId>
         <artifactId>joda-time</artifactId>
-        <version>2.11.2</version>
+        <version>${joda-time.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
