@@ -20,11 +20,11 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -40,6 +40,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * The longer the time period between write requests, the larger the sequence numbers become.
  */
 public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
+  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
   private final Map<String, String> _shardToStartSequenceMap;
 
   public KinesisPartitionGroupOffset(Map<String, String> shardToStartSequenceMap) {
@@ -48,7 +49,7 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
 
   public KinesisPartitionGroupOffset(String offsetStr)
       throws IOException {
-    _shardToStartSequenceMap = JsonUtils.stringToObject(offsetStr, new TypeReference<Map<String, String>>() {
+    _shardToStartSequenceMap = DEFAULT_MAPPER.readValue(offsetStr, new TypeReference<Map<String, String>>() {
     });
   }
 
@@ -59,7 +60,7 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   @Override
   public String toString() {
     try {
-      return JsonUtils.objectToString(_shardToStartSequenceMap);
+      return DEFAULT_MAPPER.writeValueAsString(_shardToStartSequenceMap);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException(
           "Caught exception when converting KinesisCheckpoint to string: " + _shardToStartSequenceMap);
