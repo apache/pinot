@@ -203,7 +203,7 @@ public class PinotQueryResource {
     QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
     List<String> tableNames = queryEnvironment.getTableNamesForQuery(query);
-    Set<String> brokerTenants;
+    Set<String> brokerTenantsUnion;
     if (tableNames.size() != 0) {
       List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
       if (tableConfigList == null || tableConfigList.size() == 0) {
@@ -211,23 +211,19 @@ public class PinotQueryResource {
             new Exception("Unable to find table in cluster, table does not exist")).toString();
       }
 
-      // When routing a query, there should be at least one common broker tenant for the table. However, the server
-      // tenants can be completely disjoint. The leaf stages which access segments will be processed on the respective
-      // server tenants for each table. The intermediate stages can be processed in either or all of the server tenants
-      // belonging to the tables.
-      brokerTenants = getCommonBrokerTenants(tableConfigList);
-      if (brokerTenants.isEmpty()) {
+      // find the unions of all the broker tenant tags of the queried tables.
+      brokerTenantsUnion = getBrokerTenantTagsUnion(tableConfigList);
+      if (brokerTenantsUnion.isEmpty()) {
         return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR, new Exception(
-            String.format("Unable to dispatch multistage query with multiple tables : %s " + "on different tenant",
-                tableNames))).toString();
+            String.format("Unable to dispatch multistage query for tables: [%s]", tableNames))).toString();
       }
     } else {
       // TODO fail these queries going forward. Added this logic to take care of tautologies like BETWEEN 0 and -1.
-      brokerTenants = _pinotHelixResourceManager.getAllBrokerTenantNames();
+      brokerTenantsUnion = _pinotHelixResourceManager.getAllBrokerTenantNames();
       LOGGER.error("Unable to find table name from SQL {} thus dispatching to random broker.", query);
     }
-    List<String> instanceIds = findCommonBrokerInstance(brokerTenants);
-    String instanceId = selectInstanceId(instanceIds);
+    List<String> instanceIds = findCommonBrokerInstance(brokerTenantsUnion);
+    String instanceId = selectRandomInstanceId(instanceIds);
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
 
@@ -254,7 +250,7 @@ public class PinotQueryResource {
 
     // Get brokers for the resource table.
     List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
-    String instanceId = selectInstanceId(instanceIds);
+    String instanceId = selectRandomInstanceId(instanceIds);
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
 
@@ -277,7 +273,7 @@ public class PinotQueryResource {
     return allTableConfigList;
   }
 
-  private String selectInstanceId(List<String> instanceIds) {
+  private String selectRandomInstanceId(List<String> instanceIds) {
     if (instanceIds.isEmpty()) {
       return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
     }
@@ -304,8 +300,8 @@ public class PinotQueryResource {
     return commonInstances == null ? Collections.emptyList() : new ArrayList<>(commonInstances);
   }
 
-  // return the brokerTenant if all table configs point to the same broker, else returns null
-  private Set<String> getCommonBrokerTenants(List<TableConfig> tableConfigList) {
+  // return the union of brokerTenants from the tables list.
+  private Set<String> getBrokerTenantTagsUnion(List<TableConfig> tableConfigList) {
     Set<String> tableBrokerTenants = new HashSet<>();
     for (TableConfig tableConfig : tableConfigList) {
       tableBrokerTenants.add(tableConfig.getTenantConfig().getBroker());
