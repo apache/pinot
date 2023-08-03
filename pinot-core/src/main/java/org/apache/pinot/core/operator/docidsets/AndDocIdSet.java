@@ -85,13 +85,15 @@ public final class AndDocIdSet implements BlockDocIdSet {
       allDocIdIterators[i] = docIdIterator;
       if (docIdIterator instanceof SortedDocIdIterator) {
         sortedDocIdIterators.add((SortedDocIdIterator) docIdIterator);
-        // do not keep holding on to the _docIdRanges since they will occupy heap space during the query execution
+        // aggregate the number of entries scanned in filter before removing the iterator
         _numEntriesScannedInFilter += blockDocIdSet.getNumEntriesScannedInFilter();
+        // do not keep holding on to the _docIdRanges since they will occupy heap space during the query execution
         iterator.remove();
       } else if (docIdIterator instanceof BitmapBasedDocIdIterator) {
         bitmapBasedDocIdIterators.add((BitmapBasedDocIdIterator) docIdIterator);
-        // do not keep holding on to the bitmaps since they will occupy heap space during the query execution
+        // aggregate the number of entries scanned in filter before removing the iterator
         _numEntriesScannedInFilter += blockDocIdSet.getNumEntriesScannedInFilter();
+        // do not keep holding on to the _docIdRanges since they will occupy heap space during the query execution
         iterator.remove();
       } else if (docIdIterator instanceof ScanBasedDocIdIterator) {
         scanBasedDocIdIterators.add((ScanBasedDocIdIterator) docIdIterator);
