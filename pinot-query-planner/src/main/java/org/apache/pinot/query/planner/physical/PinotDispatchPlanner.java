@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.query.planner.physical;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
@@ -92,18 +92,12 @@ public class PinotDispatchPlanner {
         populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()));
   }
 
-  private static Map<String, Collection<String>> populateTableUnavailableSegments(
+  private static Map<String, Set<String>> populateTableUnavailableSegments(
       Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap) {
-    Map<String, Collection<String>> tableToUnavailableSegments = new HashMap<>();
-    dispatchablePlanMetadataMap.values()
-        .forEach(dispatchablePlanMetadata -> dispatchablePlanMetadata.getTableToUnavailableSegmentsMap().forEach(
-            (table, segments) -> {
-              if (!tableToUnavailableSegments.containsKey(table)) {
-                tableToUnavailableSegments.put(table, new HashSet<>());
-              }
-              tableToUnavailableSegments.get(table).addAll(segments);
-            }
-        ));
+    Map<String, Set<String>> tableToUnavailableSegments = new HashMap<>();
+    dispatchablePlanMetadataMap.values().forEach(metadata -> metadata.getTableToUnavailableSegmentsMap().forEach(
+        (tableName, unavailableSegments) -> tableToUnavailableSegments.computeIfAbsent(tableName, k -> new HashSet<>())
+            .addAll(unavailableSegments)));
     return tableToUnavailableSegments;
   }
 }

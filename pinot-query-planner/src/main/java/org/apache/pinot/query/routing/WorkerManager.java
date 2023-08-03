@@ -73,9 +73,8 @@ public class WorkerManager {
     // ROOT stage doesn't have a QueryServer as it is strictly only reducing results, so here we simply assign the
     // worker instance with identical server/mailbox port number.
     DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(0);
-    metadata.setServerInstanceToWorkerIdMap(
-        Collections.singletonMap(new QueryServerInstance(_hostName, _port, _port), Collections.singletonList(0)));
-    metadata.setTotalWorkerCount(1);
+    metadata.setWorkerIdToServerInstanceMap(
+        Collections.singletonMap(0, new QueryServerInstance(_hostName, _port, _port)));
     for (PlanFragment child : rootFragment.getChildren()) {
       assignWorkersToNonRootFragment(child, context);
     }
@@ -156,21 +155,19 @@ public class WorkerManager {
 
       // attach unavailable segments to metadata
       if (!routingTable.getUnavailableSegments().isEmpty()) {
-        metadata.addTableToUnavailableSegmentsMap(tableName, routingTable.getUnavailableSegments());
+        metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
       }
     }
-    int globalIdx = 0;
-    Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap = new HashMap<>();
+    int workerId = 0;
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
     for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : serverInstanceToSegmentsMap.entrySet()) {
-      QueryServerInstance queryServerInstance = new QueryServerInstance(entry.getKey());
-      serverInstanceToWorkerIdMap.put(queryServerInstance, Collections.singletonList(globalIdx));
-      workerIdToSegmentsMap.put(globalIdx, entry.getValue());
-      globalIdx++;
+      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
+      workerIdToSegmentsMap.put(workerId, entry.getValue());
+      workerId++;
     }
-    metadata.setServerInstanceToWorkerIdMap(serverInstanceToWorkerIdMap);
+    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
-    metadata.setTotalWorkerCount(globalIdx);
   }
 
   /**
@@ -219,8 +216,8 @@ public class WorkerManager {
     //       segments for the same partition is colocated
     long indexToPick = context.getRequestId();
     ColocatedPartitionInfo[] partitionInfoMap = colocatedTableInfo._partitionInfoMap;
-    int nextWorkerId = 0;
-    Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap = new HashMap<>();
+    int workerId = 0;
+    Map<Integer, QueryServerInstance> workedIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
     Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
     for (int i = 0; i < numPartitions; i++) {
@@ -233,15 +230,12 @@ public class WorkerManager {
           pickEnabledServer(partitionInfo._fullyReplicatedServers, enabledServerInstanceMap, indexToPick++);
       Preconditions.checkState(serverInstance != null,
           "Failed to find enabled fully replicated server for table: %s, partition: %s in table: %s", tableName, i);
-      QueryServerInstance queryServerInstance = new QueryServerInstance(serverInstance);
-      int workerId = nextWorkerId++;
-      serverInstanceToWorkerIdMap.computeIfAbsent(queryServerInstance, k -> new ArrayList<>()).add(workerId);
+      workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
       workerIdToSegmentsMap.put(workerId, getSegmentsMap(partitionInfo));
+      workerId++;
     }
-
-    metadata.setServerInstanceToWorkerIdMap(serverInstanceToWorkerIdMap);
+    metadata.setWorkerIdToServerInstanceMap(workedIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
-    metadata.setTotalWorkerCount(nextWorkerId);
     metadata.setTimeBoundaryInfo(colocatedTableInfo._timeBoundaryInfo);
     metadata.setPartitionedTableScan(true);
   }
@@ -260,8 +254,7 @@ public class WorkerManager {
     if (children.size() > 0) {
       DispatchablePlanMetadata firstChildMetadata = metadataMap.get(children.get(0).getFragmentId());
       if (firstChildMetadata.isPartitionedTableScan()) {
-        metadata.setServerInstanceToWorkerIdMap(firstChildMetadata.getServerInstanceToWorkerIdMap());
-        metadata.setTotalWorkerCount(firstChildMetadata.getTotalWorkerCount());
+        metadata.setWorkerIdToServerInstanceMap(firstChildMetadata.getWorkerIdToServerInstanceMap());
         return;
       }
     }
@@ -291,22 +284,18 @@ public class WorkerManager {
     int stageParallelism = Integer.parseInt(options.getOrDefault(QueryOptionKey.STAGE_PARALLELISM, "1"));
     if (metadata.isRequiresSingletonInstance()) {
       // require singleton should return a single global worker ID with 0;
-      ServerInstance serverInstance = serverInstances.get(RANDOM.nextInt(serverInstances.size()));
-      metadata.setServerInstanceToWorkerIdMap(
-          Collections.singletonMap(new QueryServerInstance(serverInstance), Collections.singletonList(0)));
-      metadata.setTotalWorkerCount(1);
+      metadata.setWorkerIdToServerInstanceMap(Collections.singletonMap(0,
+          new QueryServerInstance(serverInstances.get(RANDOM.nextInt(serverInstances.size())))));
     } else {
-      Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap = new HashMap<>();
-      int nextWorkerId = 0;
+      Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
+      int workerId = 0;
       for (ServerInstance serverInstance : serverInstances) {
-        List<Integer> workerIds = new ArrayList<>();
+        QueryServerInstance queryServerInstance = new QueryServerInstance(serverInstance);
         for (int i = 0; i < stageParallelism; i++) {
-          workerIds.add(nextWorkerId++);
+          workerIdToServerInstanceMap.put(workerId++, queryServerInstance);
         }
-        serverInstanceToWorkerIdMap.put(new QueryServerInstance(serverInstance), workerIds);
       }
-      metadata.setServerInstanceToWorkerIdMap(serverInstanceToWorkerIdMap);
-      metadata.setTotalWorkerCount(nextWorkerId);
+      metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     }
   }
 
