@@ -160,7 +160,7 @@ public class MailboxSendOperator extends MultiStageOperator {
           LOGGER.debug("==[SEND]== Block " + block + " correctly sent from: " + _context.getId());
         }
       } else {
-        if (LOGGER.isWarnEnabled()) {
+        if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("==[SEND]== Block " + block + " cannot be sent from: " + _context.getId());
         }
       }
