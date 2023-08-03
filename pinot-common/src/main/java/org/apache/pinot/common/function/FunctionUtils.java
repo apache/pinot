@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 public class FunctionUtils {
@@ -55,6 +56,7 @@ public class FunctionUtils {
     put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
     put(Object.class, PinotDataType.OBJECT);
+    put(Vector.class, PinotDataType.VECTOR);
   }};
 
   // Types allowed as the function argument (actual value passed into the function) for type conversion

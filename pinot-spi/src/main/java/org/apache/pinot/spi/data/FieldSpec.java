@@ -27,12 +27,12 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
-import org.apache.pinot.spi.utils.VectorUtils;
 
 
 /**
@@ -60,7 +60,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
   public static final BigDecimal DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
-  public static final double[] DEFAULT_DIMENSION_NULL_VALUE_OF_VECTOR = new double[0];
+  public static final Vector DEFAULT_DIMENSION_NULL_VALUE_OF_VECTOR = new Vector(0, new float[0]);
 
 
   public static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
@@ -70,7 +70,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final BigDecimal DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
-  public static final double[] DEFAULT_METRIC_NULL_VALUE_OF_VECTOR = new double[0];
+  public static final Vector DEFAULT_METRIC_NULL_VALUE_OF_VECTOR = new Vector(0, new float[0]);
 
   public static final FieldSpecMetadata FIELD_SPEC_METADATA;
 
@@ -380,6 +380,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case BYTES:
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
+        case VECTOR:
+          jsonNode.put(key, ((Vector) _defaultNullValue).toString());
+          break;
         default:
           throw new IllegalStateException("Unsupported data type: " + this);
       }
@@ -554,7 +557,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case BYTES:
             return BytesUtils.toBytes(value);
           case VECTOR:
-            return VectorUtils.fromString(value);
+            return Vector.fromString(value);
           default:
             throw new IllegalStateException();
         }
@@ -588,6 +591,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toByteArray(value);
+          case VECTOR:
+            return Vector.fromString(value);
           default:
             throw new IllegalStateException();
         }
