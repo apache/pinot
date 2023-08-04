@@ -92,6 +92,8 @@ public final class AndDocIdSet implements BlockDocIdSet {
       } else if (docIdIterator instanceof BitmapBasedDocIdIterator) {
         bitmapBasedDocIdIterators.add((BitmapBasedDocIdIterator) docIdIterator);
         // aggregate the number of entries scanned in filter before removing the iterator
+        // some BitmapBasedDocIdIterator may be generated from underlying index types (e.g. H3Index) that actually
+        // scans documents, so we need to aggregate them here
         _numEntriesScannedInFilter += blockDocIdSet.getNumEntriesScannedInFilter();
         // do not keep holding on to the _docIdRanges since they will occupy heap space during the query execution
         iterator.remove();
