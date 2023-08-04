@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -68,7 +67,7 @@ public class PipelineBreakerExecutor {
   public static PipelineBreakerResult executePipelineBreakers(
       OpChainSchedulerService scheduler,
       MailboxService mailboxService, DistributedStagePlan distributedStagePlan, long deadlineMs,
-      long requestId, boolean isTraceEnabled, Executor executor) {
+      long requestId, boolean isTraceEnabled) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(distributedStagePlan.getStageRoot(), pipelineBreakerContext);
     if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
@@ -79,7 +78,7 @@ public class PipelineBreakerExecutor {
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainContext = new OpChainExecutionContext(mailboxService, requestId,
             stageRoot.getPlanFragmentId(), distributedStagePlan.getServer(), deadlineMs,
-            distributedStagePlan.getStageMetadata(), null, isTraceEnabled, executor);
+            distributedStagePlan.getStageMetadata(), null, isTraceEnabled);
         PhysicalPlanContext physicalPlanContext = new PhysicalPlanContext(opChainContext, null);
         return PipelineBreakerExecutor.execute(scheduler, pipelineBreakerContext, physicalPlanContext);
       } catch (Exception e) {

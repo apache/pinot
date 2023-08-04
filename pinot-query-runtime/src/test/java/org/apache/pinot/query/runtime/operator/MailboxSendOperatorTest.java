@@ -21,16 +21,12 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
@@ -65,7 +61,6 @@ public class MailboxSendOperatorTest {
   private MailboxService _mailboxService;
   @Mock
   private BlockExchange _exchange;
-  private ExecutorService _executor;
 
   @BeforeMethod
   public void setUp()
@@ -75,14 +70,12 @@ public class MailboxSendOperatorTest {
     when(_server.port()).thenReturn(0);
     when(_server.workerId()).thenReturn(0);
     when(_exchange.offerBlock(any(), anyLong())).thenReturn(true);
-    _executor = Executors.newCachedThreadPool(new NamedThreadFactory("worker_on_" + getClass().getSimpleName()));
   }
 
   @AfterMethod
   public void tearDown()
       throws Exception {
     _mocks.close();
-    ExecutorServiceUtils.close(_executor);
   }
 
   @Test
@@ -185,7 +178,7 @@ public class MailboxSendOperatorTest {
             new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE,
-            stageMetadata, null, false, _executor);
+            stageMetadata, null, false);
     return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }

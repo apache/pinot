@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -91,7 +90,7 @@ public class QueryDispatcher {
   public ResultTable submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan,
       MailboxService mailboxService, OpChainSchedulerService scheduler, long timeoutMs,
       Map<String, String> queryOptions, Map<Integer, ExecutionStatsAggregator> executionStatsAggregator,
-      boolean traceEnabled, Executor executor)
+      boolean traceEnabled)
       throws Exception {
     final long requestId = context.getRequestId();
     try {
@@ -100,7 +99,7 @@ public class QueryDispatcher {
       // run reduce stage and return result.
       long reduceStartTimeInNanos = System.nanoTime();
       ResultTable resultTable = runReducer(requestId, dispatchableSubPlan, reduceStageId, timeoutMs, mailboxService,
-          scheduler, executionStatsAggregator, traceEnabled, executor);
+          scheduler, executionStatsAggregator, traceEnabled);
       context.setReduceTimeNanos(System.nanoTime() - reduceStartTimeInNanos);
       return resultTable;
     } catch (Exception e) {
@@ -198,7 +197,7 @@ public class QueryDispatcher {
   @VisibleForTesting
   public static ResultTable runReducer(long requestId, DispatchableSubPlan dispatchableSubPlan, int reduceStageId,
       long timeoutMs, MailboxService mailboxService, OpChainSchedulerService scheduler,
-      Map<Integer, ExecutionStatsAggregator> statsAggregatorMap, boolean traceEnabled, Executor executor) {
+      Map<Integer, ExecutionStatsAggregator> statsAggregatorMap, boolean traceEnabled) {
     DispatchablePlanFragment reduceStagePlanFragment = dispatchableSubPlan.getQueryStageList().get(reduceStageId);
     MailboxReceiveNode reduceNode = (MailboxReceiveNode) reduceStagePlanFragment.getPlanFragment().getFragmentRoot();
     reduceNode.setExchangeType(PinotRelExchangeType.PIPELINE_BREAKER);
@@ -210,7 +209,7 @@ public class QueryDispatcher {
     DistributedStagePlan reducerStagePlan = new DistributedStagePlan(0, server, reduceNode, brokerStageMetadata);
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, reducerStagePlan,
-            System.currentTimeMillis() + timeoutMs, requestId, traceEnabled, executor);
+            System.currentTimeMillis() + timeoutMs, requestId, traceEnabled);
     if (pipelineBreakerResult == null) {
       throw new RuntimeException("Broker reducer error during query execution!");
     }

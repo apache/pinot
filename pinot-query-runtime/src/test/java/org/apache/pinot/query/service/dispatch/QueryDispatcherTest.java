@@ -142,8 +142,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     RequestContext context = new DefaultRequestContext();
     context.setRequestId(requestId);
     try {
-      dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false,
-          EXECUTOR);
+      dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error executing query"));
@@ -168,8 +167,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     context.setRequestId(requestId);
     try {
       // will throw b/c mailboxService is null
-      dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false,
-          EXECUTOR);
+      dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       System.out.println("e = " + e);

@@ -207,7 +207,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     try {
       QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
           Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
-          _reducerScheduler, null, false, EXECUTOR);
+          _reducerScheduler, null, false);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
       // TODO: The actual message is (usually) something like:

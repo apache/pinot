@@ -131,7 +131,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false, _executor);
+            System.currentTimeMillis() + 10_000L, 0, false);
 
     // then
     // should have single PB result, receive 2 data blocks, EOS block shouldn't be included
@@ -170,7 +170,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false, _executor);
+            System.currentTimeMillis() + 10_000L, 0, false);
 
     // then
     // should have two PB result, receive 2 data blocks, one each, EOS block shouldn't be included
@@ -197,7 +197,7 @@ public class PipelineBreakerExecutorTest {
     // when
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false, _executor);
+            System.currentTimeMillis() + 10_000L, 0, false);
 
     // then
     // should contain only failure error blocks
@@ -227,7 +227,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() - 10_000L, 0, false, _executor);
+            System.currentTimeMillis() - 10_000L, 0, false);
 
     // then
     // should contain only failure error blocks
@@ -265,7 +265,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false, _executor);
+            System.currentTimeMillis() + 10_000L, 0, false);
 
     // then
     // should pass when one PB returns result, the other returns empty.
@@ -303,7 +303,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false, _executor);
+            System.currentTimeMillis() + 10_000L, 0, false);
 
     // then
     // should fail even if one of the 2 PB doesn't contain error block from sender.
