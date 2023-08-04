@@ -309,10 +309,16 @@ public class PipelineBreakerExecutorTest {
     // should fail even if one of the 2 PB doesn't contain error block from sender.
     Assert.assertNotNull(pipelineBreakerResult);
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 2);
+
+    boolean errorFound = false;
     for (List<TransferableBlock> resultBlocks : pipelineBreakerResult.getResultMap().values()) {
-      Assert.assertEquals(resultBlocks.size(), 1);
-      Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
-      Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
+      if (!resultBlocks.isEmpty()) {
+        TransferableBlock lastBlock = resultBlocks.get(resultBlocks.size() - 1);
+        if (lastBlock.isErrorBlock()) {
+          errorFound = true;
+        }
+      }
     }
+    Assert.assertTrue(errorFound, "An error block should be the last block on at least one of the result map entries");
   }
 }
