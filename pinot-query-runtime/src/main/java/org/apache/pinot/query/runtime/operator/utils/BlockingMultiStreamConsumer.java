@@ -20,9 +20,7 @@ package org.apache.pinot.query.runtime.operator.utils;
 
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -52,12 +50,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     _mailboxes = asyncProducers;
     _mailboxes.forEach(blockProducer -> blockProducer.addOnNewDataListener(onNewData));
     _lastRead = _mailboxes.size() - 1;
-  }
-
-  public BlockingMultiStreamConsumer(Object id, long deadlineMs, Executor executor,
-      List<? extends BlockingStream<E>> blockingProducers) {
-    this(id, deadlineMs,
-        blockingProducers.stream().map(p -> new BlockingToAsyncStream<>(executor, p)).collect(Collectors.toList()));
   }
 
   protected abstract boolean isError(E element);
@@ -224,11 +216,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     public OfTransferableBlock(Object id, long deadlineMs,
         List<? extends AsyncStream<TransferableBlock>> asyncProducers) {
       super(id, deadlineMs, asyncProducers);
-    }
-
-    public OfTransferableBlock(Object id, long deadlineMs, Executor executor,
-        List<? extends BlockingStream<TransferableBlock>> blockingProducers) {
-      super(id, deadlineMs, executor, blockingProducers);
     }
 
     @Override
