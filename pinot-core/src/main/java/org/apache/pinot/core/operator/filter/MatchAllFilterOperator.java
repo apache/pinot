@@ -24,28 +24,13 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
-import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class MatchAllFilterOperator extends BaseFilterOperator {
   public static final String EXPLAIN_NAME = "FILTER_MATCH_ENTIRE_SEGMENT";
 
-  private final QueryContext _queryContext;
-  private final DataSource _dataSource;
-
   public MatchAllFilterOperator(int numDocs) {
     super(numDocs, false);
-    _queryContext = null;
-    _dataSource = null;
-  }
-
-  public MatchAllFilterOperator(QueryContext queryContext, DataSource dataSource, int numDocs) {
-    super(numDocs, false);
-    _queryContext = queryContext;
-    _dataSource = dataSource;
   }
 
   @Override
@@ -55,15 +40,6 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    if (_queryContext != null && _queryContext.isNullHandlingEnabled() && _dataSource != null) {
-      NullValueVectorReader nullValueVectorReader = _dataSource.getNullValueVector();
-      if (nullValueVectorReader != null) {
-        ImmutableRoaringBitmap nullBitmap = nullValueVectorReader.getNullBitmap();
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          return FilterOperatorUtils.excludeNulls(_queryContext, _numDocs, new MatchAllDocIdSet(_numDocs), nullBitmap);
-        }
-      }
-    }
     return new MatchAllDocIdSet(_numDocs);
   }
 

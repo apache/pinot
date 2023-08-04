@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import java.util.Arrays;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -45,7 +47,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
     if (_nullHandlingEnabled) {
       ImmutableRoaringBitmap nullBitmap = getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        return FilterOperatorUtils.excludeNulls(_queryContext, _numDocs, getNextBlockWithoutNullHandling(), nullBitmap);
+        return excludeNulls(getNextBlockWithoutNullHandling(), nullBitmap);
       }
     }
     return getNextBlockWithoutNullHandling();
@@ -59,6 +61,12 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
     } else {
       return EmptyDocIdSet.getInstance();
     }
+  }
+
+  private BlockDocIdSet excludeNulls(BlockDocIdSet blockDocIdSet, ImmutableRoaringBitmap nullBitmap) {
+    return new AndDocIdSet(Arrays.asList(blockDocIdSet,
+        new BitmapDocIdSet(ImmutableRoaringBitmap.flip(nullBitmap, 0, (long) _numDocs), _numDocs)),
+        _queryContext.getQueryOptions());
   }
 
   @Nullable
