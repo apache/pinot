@@ -82,11 +82,12 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
 
     // Extract column names and data types for group-by columns
+    BaseProjectOperator<?> projectOperator = projectOperators.get(0).getRight();
     for (int i = 0; i < numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = _groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
       columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(
-          projectOperators.get(i).getRight().getResultColumnContext(groupByExpression).getDataType());
+          projectOperator.getResultColumnContext(groupByExpression).getDataType());
     }
 
     // Extract column names and data types for aggregation functions

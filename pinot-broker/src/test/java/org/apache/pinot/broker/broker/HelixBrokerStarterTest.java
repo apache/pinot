@@ -95,7 +95,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
     _helixResourceManager.addTable(offlineTableConfig);
     TableConfig realtimeTimeConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-            .setTimeType(TimeUnit.DAYS.name()).setStreamConfigs(getStreamConfigs()).build();
+            .setTimeType(TimeUnit.DAYS.name()).setStreamConfigs(getStreamConfigs()).setNumReplicas(1)
+            .build();
     _helixResourceManager.addTable(realtimeTimeConfig);
 
     for (int i = 0; i < NUM_OFFLINE_SEGMENTS; i++) {
@@ -118,10 +119,12 @@ public class HelixBrokerStarterTest extends ControllerTest {
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "highLevel");
+    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder");
+    streamConfigs.put("stream.kafka.consumer.factory.class.name",
+        "org.apache.pinot.broker.broker.FakeStreamConsumerFactory");
     return streamConfigs;
   }
 

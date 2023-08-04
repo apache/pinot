@@ -94,7 +94,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, false);
+        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
     HashJoinOperator joinOnString =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -129,7 +129,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, false);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
     HashJoinOperator joinOnInt =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnInt.nextBlock();
@@ -161,7 +161,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, false);
+        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses);
     HashJoinOperator joinOnInt =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnInt.nextBlock();
@@ -200,7 +200,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.LEFT,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, false);
+        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -232,7 +232,7 @@ public class HashJoinOperatorTest {
         });
     List<RexExpression> joinClauses = new ArrayList<>();
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, false);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -261,7 +261,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.LEFT,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, false);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -294,7 +294,7 @@ public class HashJoinOperatorTest {
         });
 
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, false);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -330,7 +330,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, false);
+        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
@@ -366,7 +366,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, false);
+        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
@@ -398,7 +398,7 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.RIGHT,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, false);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
     HashJoinOperator joinOnNum =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnNum.nextBlock();
@@ -439,7 +439,7 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.SEMI,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, false);
+        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
@@ -473,7 +473,7 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.FULL,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, false);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
@@ -517,7 +517,7 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.ANTI,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, false);
+        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
@@ -550,7 +550,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, false);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -581,7 +581,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, false);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 

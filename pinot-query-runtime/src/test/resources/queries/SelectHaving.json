@@ -44,12 +44,12 @@
       {
         "comment": "Plan failed. Expression 'a' is not being grouped.",
         "sql":"SELECT a FROM {test_having} HAVING min(a) < max(a);",
-        "expectedException": ".*Error composing query plan.*"
+        "expectedException": "Error composing query plan for.*"
       },
       {
         "comment": "Plan failed. Expression 'a' is not being grouped.",
         "sql":"SELECT 1 AS one FROM {test_having} HAVING a > 1;",
-        "expectedException": ".*Error composing query plan.*"
+        "expectedException": "Error composing query plan for.*"
       },
       {
         "sql":"SELECT 1 AS one FROM {test_having} HAVING 1 > 2;"

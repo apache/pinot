@@ -155,23 +155,16 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     PinotLogicalExchange right = (PinotLogicalExchange) (join.getRight() instanceof HepRelVertex
         ? ((HepRelVertex) join.getRight()).getCurrentRel() : join.getRight());
 
-    boolean isColocatedJoin = PinotHintStrategyTable.isHintOptionTrue(join.getHints(),
-        PinotHintOptions.JOIN_HINT_OPTIONS, PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
-    PinotLogicalExchange dynamicBroadcastExchange = isColocatedJoin
-        ? PinotLogicalExchange.create(right.getInput(), RelDistributions.SINGLETON,
-            PinotRelExchangeType.PIPELINE_BREAKER)
-        : PinotLogicalExchange.create(right.getInput(), RelDistributions.BROADCAST_DISTRIBUTED,
+    PinotLogicalExchange dynamicBroadcastExchange =
+        PinotLogicalExchange.create(right.getInput(), RelDistributions.BROADCAST_DISTRIBUTED,
             PinotRelExchangeType.PIPELINE_BREAKER);
     Join dynamicFilterJoin =
         new LogicalJoin(join.getCluster(), join.getTraitSet(), left.getInput(), dynamicBroadcastExchange,
             join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
             ImmutableList.copyOf(join.getSystemFieldList()));
     // adding pass-through exchange after join b/c currently leaf-stage doesn't support chaining operator(s) after JOIN
-    // TODO: support pass-through for singleton again when non-colocated.
-    // TODO: this is b/c #10886 alters the singleton exchange and it no longer works if join is not colocated.
-    PinotLogicalExchange passThroughAfterJoinExchange = isColocatedJoin
-        ? PinotLogicalExchange.create(dynamicFilterJoin, RelDistributions.SINGLETON)
-        : PinotLogicalExchange.create(dynamicFilterJoin, RelDistributions.hash(join.analyzeCondition().leftKeys));
+    PinotLogicalExchange passThroughAfterJoinExchange =
+        PinotLogicalExchange.create(dynamicFilterJoin, RelDistributions.hash(join.analyzeCondition().leftKeys));
     call.transformTo(passThroughAfterJoinExchange);
   }
 }

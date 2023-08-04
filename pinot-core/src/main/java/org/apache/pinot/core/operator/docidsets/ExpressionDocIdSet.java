@@ -30,8 +30,10 @@ public final class ExpressionDocIdSet implements BlockDocIdSet {
   private final ExpressionScanDocIdIterator _docIdIterator;
 
   public ExpressionDocIdSet(TransformFunction transformFunction, PredicateEvaluator predicateEvaluator,
-      Map<String, DataSource> dataSourceMap, int numDocs) {
-    _docIdIterator = new ExpressionScanDocIdIterator(transformFunction, predicateEvaluator, dataSourceMap, numDocs);
+      Map<String, DataSource> dataSourceMap, int numDocs, boolean nullHandlingEnabled,
+      ExpressionScanDocIdIterator.PredicateEvaluationResult predicateEvaluationResult) {
+    _docIdIterator = new ExpressionScanDocIdIterator(transformFunction, predicateEvaluator, dataSourceMap, numDocs,
+        nullHandlingEnabled, predicateEvaluationResult);
   }
 
   @Override

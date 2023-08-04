@@ -390,6 +390,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       return;
     }
 
+    // Assign table directory and tier info to not let the segment be moved during loading/preprocessing
+    indexLoadingConfig.setTableDataDir(_tableDataDir);
+    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
+    indexLoadingConfig.setSegmentTier(segmentZKMetadata.getTier());
+
     File segmentDir = new File(_indexDir, segmentName);
     // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
     // segment backup directory existed), need to first try to recover from reload failure before checking the existence
@@ -445,14 +450,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       PartitionDedupMetadataManager partitionDedupMetadataManager =
           _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
               : null;
-      segmentDataManager =
+      LLRealtimeSegmentDataManager llRealtimeSegmentDataManager =
           new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
               indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
               partitionDedupMetadataManager, _isTableReadyToConsumeData);
+      llRealtimeSegmentDataManager.startConsumption();
+      segmentDataManager = llRealtimeSegmentDataManager;
     } else {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
-      segmentDataManager = new HLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, this,
-          _indexDir.getAbsolutePath(), indexLoadingConfig, schema, _serverMetrics);
+      HLRealtimeSegmentDataManager hlRealtimeSegmentDataManager = new HLRealtimeSegmentDataManager(segmentZKMetadata,
+              tableConfig, instanceZKMetadata, this, _indexDir.getAbsolutePath(),
+              indexLoadingConfig, schema, _serverMetrics);
+      hlRealtimeSegmentDataManager.startConsumption();
+      segmentDataManager = hlRealtimeSegmentDataManager;
     }
 
     _logger.info("Initialized RealtimeSegmentDataManager - " + segmentName);

@@ -27,21 +27,21 @@ netstat -i
 
 if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
-  mvn clean install -DskipTests -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true -am -B \
+  mvn clean install -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -am -B \
     -pl 'pinot-integration-tests' -T 16 || exit 1
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn test -am -B \
         -pl 'pinot-integration-tests' \
-        -Dtest='C*Test,L*Test,M*Test,R*Test,S*Test' \
+        -Dtest='A*Test,B*Test,C*Test,D*Test,E*Test,F*Test,G*Test,H*Test,I*Test,J*Test,K*Test,L*Test,P*Test,Q*Test,R*Test' \
         -P github-actions,integration-tests-only \
-        -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true && exit 0 || exit 1
+        -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
     mvn test -am -B \
         -pl 'pinot-integration-tests' \
-        -Dtest='!C*Test,!L*Test,!M*Test,!R*Test,!S*Test' \
+        -Dtest='M*Test,N*Test,O*Test,S*Test,T*Test,U*Test,V*Test,W*Test,X*Test,Y*Test,Z*Test' \
         -P github-actions,integration-tests-only \
-        -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true && exit 0 || exit 1
+        -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip && exit 0 || exit 1
   fi
 else
   # Unit Tests
@@ -56,18 +56,11 @@ else
         -pl 'pinot-core' \
         -pl 'pinot-query-planner' \
         -pl 'pinot-query-runtime' \
-        -pl 'pinot-server' \
-        -pl ':pinot-yammer' \
-        -pl ':pinot-avro-base' \
-        -pl ':pinot-avro' \
-        -pl ':pinot-csv' \
-        -pl ':pinot-json' \
-        -pl ':pinot-segment-uploader-default' \
         -P github-actions,no-integration-tests \
-        -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true && exit 0 || exit 1
+        -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn clean install -DskipTests -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true -T 16 || exit 1
+    mvn clean install -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -T 16 || exit 1
     mvn test -am -B \
         -pl '!pinot-spi' \
         -pl '!pinot-segment-spi' \
@@ -76,15 +69,8 @@ else
         -pl '!pinot-core' \
         -pl '!pinot-query-planner' \
         -pl '!pinot-query-runtime' \
-        -pl '!pinot-server' \
-        -pl '!:pinot-yammer' \
-        -pl '!:pinot-avro-base' \
-        -pl '!:pinot-avro' \
-        -pl '!:pinot-csv' \
-        -pl '!:pinot-json' \
-        -pl '!:pinot-segment-uploader-default' \
         -P github-actions,no-integration-tests \
-        -Dspotless.apply.skip -Dcheckstyle.skip -Dspotless.apply.skip -Dlicense.skip=true \
+        -Dspotless.skip -Dcheckstyle.skip -Denforcer.skip -Dlicense.skip \
          && exit 0 || exit 1
   fi
 fi
