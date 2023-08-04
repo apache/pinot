@@ -100,30 +100,94 @@ public class VectorIntegrationTest extends BaseClusterIntegrationTest {
             + "vectorNorm(vector1), vectorNorm(vector2), "
             + "cosineDistance(vector1, zeroVector), "
             + "cosineDistance(vector1, zeroVector, 0) "
-            + "FROM %s", DEFAULT_TABLE_NAME);
+            + "FROM %s LIMIT %d", DEFAULT_TABLE_NAME, getCountStarResult());
     JsonNode jsonNode = postQuery(query);
     for (int i = 0; i < getCountStarResult(); i++) {
-      double cosineDistance = jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble();
+      double cosineDistance = jsonNode.get("resultTable").get("rows").get(i).get(0).asDouble();
       assertTrue(cosineDistance > 0.1 && cosineDistance < 0.4);
-      double innerProduce = jsonNode.get("resultTable").get("rows").get(0).get(1).asDouble();
+      double innerProduce = jsonNode.get("resultTable").get("rows").get(i).get(1).asDouble();
       assertTrue(innerProduce > 100 && innerProduce < 160);
-      double l1Distance = jsonNode.get("resultTable").get("rows").get(0).get(2).asDouble();
+      double l1Distance = jsonNode.get("resultTable").get("rows").get(i).get(2).asDouble();
       assertTrue(l1Distance > 140 && l1Distance < 210);
-      double l2Distance = jsonNode.get("resultTable").get("rows").get(0).get(3).asDouble();
+      double l2Distance = jsonNode.get("resultTable").get("rows").get(i).get(3).asDouble();
       assertTrue(l2Distance > 8 && l2Distance < 11);
-      int vectorDimsVector1 = jsonNode.get("resultTable").get("rows").get(0).get(4).asInt();
+      int vectorDimsVector1 = jsonNode.get("resultTable").get("rows").get(i).get(4).asInt();
       assertEquals(vectorDimsVector1, VECTOR_DIM_SIZE);
-      int vectorDimsVector2 = jsonNode.get("resultTable").get("rows").get(0).get(5).asInt();
+      int vectorDimsVector2 = jsonNode.get("resultTable").get("rows").get(i).get(5).asInt();
       assertEquals(vectorDimsVector2, VECTOR_DIM_SIZE);
-      double vectorNormVector1 = jsonNode.get("resultTable").get("rows").get(0).get(6).asInt();
+      double vectorNormVector1 = jsonNode.get("resultTable").get("rows").get(i).get(6).asInt();
       assertTrue(vectorNormVector1 > 10 && vectorNormVector1 < 16);
-      double vectorNormVector2 = jsonNode.get("resultTable").get("rows").get(0).get(7).asInt();
+      double vectorNormVector2 = jsonNode.get("resultTable").get("rows").get(i).get(7).asInt();
       assertTrue(vectorNormVector2 > 10 && vectorNormVector2 < 16);
-      cosineDistance = jsonNode.get("resultTable").get("rows").get(0).get(8).asDouble();
+      cosineDistance = jsonNode.get("resultTable").get("rows").get(i).get(8).asDouble();
       assertEquals(cosineDistance, Double.NaN);
-      cosineDistance = jsonNode.get("resultTable").get("rows").get(0).get(9).asDouble();
+      cosineDistance = jsonNode.get("resultTable").get("rows").get(i).get(9).asDouble();
       assertEquals(cosineDistance, 0.0);
     }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueriesWithLiterals(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String zeroVectorStringLiteral = "ARRAY[0.0"
+        + ", 0.0".repeat(VECTOR_DIM_SIZE - 1)
+        + "]";
+    String oneVectorStringLiteral = "ARRAY[1.0"
+        + ", 1.0".repeat(VECTOR_DIM_SIZE - 1)
+        + "]";
+    String query =
+        String.format("SELECT "
+                + "cosineDistance(vector1, %s), "
+                + "innerProduct(vector1, %s), "
+                + "l1Distance(vector1, %s), "
+                + "l2Distance(vector1, %s), "
+                + "vectorDims(%s), "
+                + "vectorNorm(%s) "
+                + "FROM %s LIMIT %d",
+            zeroVectorStringLiteral, zeroVectorStringLiteral, zeroVectorStringLiteral, zeroVectorStringLiteral,
+            zeroVectorStringLiteral, zeroVectorStringLiteral, DEFAULT_TABLE_NAME, getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    for (int i = 0; i < getCountStarResult(); i++) {
+      double cosineDistance = jsonNode.get("resultTable").get("rows").get(i).get(0).asDouble();
+      assertEquals(cosineDistance, Double.NaN);
+      double innerProduce = jsonNode.get("resultTable").get("rows").get(i).get(1).asDouble();
+      assertEquals(innerProduce, 0.0);
+      double l1Distance = jsonNode.get("resultTable").get("rows").get(i).get(2).asDouble();
+      assertTrue(l1Distance > 100 && l1Distance < 300);
+      double l2Distance = jsonNode.get("resultTable").get("rows").get(i).get(3).asDouble();
+      assertTrue(l2Distance > 10 && l2Distance < 16);
+      int vectorDimsVector = jsonNode.get("resultTable").get("rows").get(i).get(4).asInt();
+      assertEquals(vectorDimsVector, VECTOR_DIM_SIZE);
+      double vectorNormVector = jsonNode.get("resultTable").get("rows").get(i).get(5).asInt();
+      assertEquals(vectorNormVector, 0.0);
+    }
+
+    query =
+        String.format("SELECT "
+                + "cosineDistance(%s, %s), "
+                + "cosineDistance(%s, %s, 0.0), "
+                + "innerProduct(%s, %s), "
+                + "l1Distance(%s, %s), "
+                + "l2Distance(%s, %s)"
+                + "FROM %s LIMIT 1",
+            zeroVectorStringLiteral, oneVectorStringLiteral,
+            zeroVectorStringLiteral, oneVectorStringLiteral,
+            zeroVectorStringLiteral, oneVectorStringLiteral,
+            zeroVectorStringLiteral, oneVectorStringLiteral,
+            zeroVectorStringLiteral, oneVectorStringLiteral,
+            DEFAULT_TABLE_NAME);
+    jsonNode = postQuery(query);
+    double cosineDistance = jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble();
+    assertEquals(cosineDistance, Double.NaN);
+    cosineDistance = jsonNode.get("resultTable").get("rows").get(0).get(1).asDouble();
+    assertEquals(cosineDistance, 0.0);
+    double innerProduce = jsonNode.get("resultTable").get("rows").get(0).get(2).asDouble();
+    assertEquals(innerProduce, 0.0);
+    double l1Distance = jsonNode.get("resultTable").get("rows").get(0).get(3).asDouble();
+    assertEquals(l1Distance, 512.0);
+    double l2Distance = jsonNode.get("resultTable").get("rows").get(0).get(4).asDouble();
+    assertEquals(l2Distance, 22.627416997969522);
   }
 
   private File createAvroFile(long totalNumRecords)

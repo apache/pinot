@@ -221,6 +221,8 @@ public enum TransformFunctionType {
   VECTOR_NORM("vectorNorm", ReturnTypes.explicit(SqlTypeName.DOUBLE),
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY)), "vector_norm"),
 
+  ARRAY_VALUE_CONSTRUCTOR("arrayValueConstructor"),
+
   // Trigonometry
   SIN("sin"),
   COS("cos"),
