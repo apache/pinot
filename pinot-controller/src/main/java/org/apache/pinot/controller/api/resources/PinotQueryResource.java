@@ -30,7 +30,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +38,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -57,6 +57,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -212,16 +213,15 @@ public class PinotQueryResource {
       }
 
       // find the unions of all the broker tenant tags of the queried tables.
-      Set<String> brokerTenantsUnion = getBrokerTenantTagsUnion(tableConfigList);
+      Set<String> brokerTenantsUnion = getBrokerTenantsUnion(tableConfigList);
       if (brokerTenantsUnion.isEmpty()) {
         return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR, new Exception(
             String.format("Unable to dispatch multistage query for tables: [%s]", tableNames))).toString();
       }
-      instanceIds = findCommonBrokerInstance(brokerTenantsUnion);
+      instanceIds = findCommonBrokerInstances(brokerTenantsUnion);
     } else {
       // TODO fail these queries going forward. Added this logic to take care of tautologies like BETWEEN 0 and -1.
-      instanceIds = _pinotHelixResourceManager.getAllBrokerInstanceConfigs().stream()
-          .map(InstanceConfig::getInstanceName).collect(Collectors.toList());
+      instanceIds = _pinotHelixResourceManager.getAllBrokerInstances();
       LOGGER.error("Unable to find table name from SQL {} thus dispatching to random broker.", query);
     }
     String instanceId = selectRandomInstanceId(instanceIds);
@@ -288,21 +288,17 @@ public class PinotQueryResource {
     return instanceIds.get(RANDOM.nextInt(instanceIds.size()));
   }
 
-  private List<String> findCommonBrokerInstance(Set<String> brokerTenants) {
-    Set<String> commonInstances = null;
+  private List<String> findCommonBrokerInstances(Set<String> brokerTenants) {
+    Stream<InstanceConfig> brokerInstanceConfigs = _pinotHelixResourceManager.getAllBrokerInstanceConfigs().stream();
     for (String brokerTenant : brokerTenants) {
-      Set<String> instances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(brokerTenant);
-      if (commonInstances == null) {
-        commonInstances = instances;
-      } else {
-        commonInstances.retainAll(instances);
-      }
+      brokerInstanceConfigs = brokerInstanceConfigs.filter(
+          instanceConfig -> instanceConfig.containsTag(TagNameUtils.getBrokerTagForTenant(brokerTenant)));
     }
-    return commonInstances == null ? Collections.emptyList() : new ArrayList<>(commonInstances);
+    return brokerInstanceConfigs.map(InstanceConfig::getInstanceName).collect(Collectors.toList());
   }
 
   // return the union of brokerTenants from the tables list.
-  private Set<String> getBrokerTenantTagsUnion(List<TableConfig> tableConfigList) {
+  private Set<String> getBrokerTenantsUnion(List<TableConfig> tableConfigList) {
     Set<String> tableBrokerTenants = new HashSet<>();
     for (TableConfig tableConfig : tableConfigList) {
       tableBrokerTenants.add(tableConfig.getTenantConfig().getBroker());

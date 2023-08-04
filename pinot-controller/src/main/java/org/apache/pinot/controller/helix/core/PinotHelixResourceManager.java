@@ -469,6 +469,11 @@ public class PinotHelixResourceManager {
         TagNameUtils.getBrokerTagForTenant(brokerTenantName));
   }
 
+  public List<String> getAllBrokerInstances() {
+    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream()
+        .filter(InstanceTypeUtils::isBroker).collect(Collectors.toList());
+  }
+
   public List<InstanceConfig> getAllBrokerInstanceConfigs() {
     return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
         .filter(instance -> InstanceTypeUtils.isBroker(instance.getId())).collect(Collectors.toList());
