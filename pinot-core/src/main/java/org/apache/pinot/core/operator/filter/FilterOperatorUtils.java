@@ -26,6 +26,8 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class FilterOperatorUtils {
@@ -73,6 +75,15 @@ public class FilterOperatorUtils {
       if (predicateEvaluator.isAlwaysFalse()) {
         return EmptyFilterOperator.getInstance();
       } else if (predicateEvaluator.isAlwaysTrue()) {
+        if (queryContext.isNullHandlingEnabled()) {
+          NullValueVectorReader nullValueVectorReader = dataSource.getNullValueVector();
+          if (nullValueVectorReader != null) {
+            ImmutableRoaringBitmap nullBitmap = nullValueVectorReader.getNullBitmap();
+            if (nullBitmap != null && !nullBitmap.isEmpty()) {
+              return new BitmapBasedFilterOperator(nullBitmap, true, numDocs);
+            }
+          }
+        }
         return new MatchAllFilterOperator(numDocs);
       }
 
