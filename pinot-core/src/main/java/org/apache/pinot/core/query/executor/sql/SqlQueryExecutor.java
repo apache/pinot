@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.executor.sql;
 
 import com.google.common.collect.ImmutableList;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
