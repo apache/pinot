@@ -547,8 +547,6 @@ org.slf4j:slf4j-api:1.7.25
 BSD
 ---
 com.thoughtworks.paranamer:paranamer:2.8
-com.jcabi:jcabi-log:0.18.1
-
 
 BSD 2-Clause
 ------------
@@ -569,6 +567,7 @@ com.google.auth:google-auth-library-oauth2-http:0.21.1
 com.google.protobuf:protobuf-java-util:3.13.0
 com.google.protobuf:protobuf-java:3.22.0
 com.google.protobuf:protobuf-lite:3.0.1
+com.jcabi:jcabi-log:0.18.1
 org.antlr:antlr4-runtime:4.6
 org.codehaus.janino:commons-compiler:3.1.6
 org.codehaus.janino:janino:3.1.6
