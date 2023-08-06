@@ -97,7 +97,7 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
       makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
           .forEach(header -> httpGet.addHeader(header.getName(), header.getValue()));
 
-      HttpResponse response  = httpClient.execute(httpGet);
+      HttpResponse response = httpClient.execute(httpGet);
       int status = response.getStatusLine().getStatusCode();
       if (status != 200) {
         String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());

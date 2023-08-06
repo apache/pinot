@@ -59,7 +59,8 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
       LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics,
       ExecutorService executorService) {
     this(controllerConf, pinotHelixResourceManager, leadControllerManager, controllerMetrics,
-        new ConsumingSegmentInfoReader(executorService, new BasicHttpClientConnectionManager(), pinotHelixResourceManager));
+        new ConsumingSegmentInfoReader(executorService, new BasicHttpClientConnectionManager(),
+            pinotHelixResourceManager));
   }
 
   @Override

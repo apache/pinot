@@ -32,8 +32,9 @@ import java.util.List;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -105,7 +106,8 @@ public class MultiHttpRequestTest {
   }
 
   @Test
-  public void testMultiGet() {
+  public void testMultiGet()
+      throws IOException {
     MultiHttpRequest mget =
         new MultiHttpRequest(Executors.newCachedThreadPool(), new PoolingHttpClientConnectionManager());
     List<String> urls = Arrays.asList("http://localhost:" + String.valueOf(_portStart) + URI_PATH,
@@ -116,20 +118,21 @@ public class MultiHttpRequestTest {
     // timeout value needs to be less than 5000ms set above for
     // third server
     final int requestTimeoutMs = 1000;
-    CompletionService<HttpGet> completionService = mget.execute(urls, null, requestTimeoutMs);
+    CompletionService<MultiHttpRequestResponse> completionService = mget.execute(urls, null, requestTimeoutMs);
     int success = 0;
     int errors = 0;
     int timeouts = 0;
     for (int i = 0; i < urls.size(); i++) {
-      HttpGet getMethod = null;
+      MultiHttpRequestResponse httpRequestResponse = null;
       try {
-        getMethod = completionService.take().get();
-        if (getMethod.get >= 300) {
+        httpRequestResponse = completionService.take().get();
+        CloseableHttpResponse response = httpRequestResponse.getResponse();
+        if (response.getStatusLine().getStatusCode() >= 300) {
           errors++;
-          Assert.assertEquals(getMethod.getResponseBodyAsString(), ERROR_MSG);
+          Assert.assertEquals(EntityUtils.toString(response.getEntity()), ERROR_MSG);
         } else {
           success++;
-          Assert.assertEquals(getMethod.getResponseBodyAsString(), SUCCESS_MSG);
+          Assert.assertEquals(EntityUtils.toString(response.getEntity()), SUCCESS_MSG);
         }
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted", e);
@@ -145,8 +148,8 @@ public class MultiHttpRequestTest {
       } catch (IOException e) {
         errors++;
       } finally {
-        if (getMethod != null) {
-          getMethod.releaseConnection();
+        if (httpRequestResponse != null) {
+          httpRequestResponse.getResponse().close();
         }
       }
     }

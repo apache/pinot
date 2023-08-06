@@ -65,7 +65,7 @@ public class TableSize {
   @Inject
   Executor _executor;
   @Inject
-  HttpConnectionManager _connectionManager;
+  HttpClientConnectionManager _connectionManager;
 
   @Inject
   ControllerMetrics _controllerMetrics;

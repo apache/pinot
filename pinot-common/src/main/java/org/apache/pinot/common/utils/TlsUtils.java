@@ -23,13 +23,8 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
-import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
-import java.net.Socket;
-import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -40,17 +35,12 @@ import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-import org.apache.commons.httpclient.params.HttpConnectionParams;
-import org.apache.commons.httpclient.protocol.Protocol;
-import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -240,10 +230,6 @@ public final class TlsUtils {
       // HttpsURLConnection
       HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
 
-      // Apache HTTP client 3.x
-      Protocol.registerProtocol("https",
-          new Protocol(CommonConstants.HTTPS_PROTOCOL, new PinotProtocolSocketFactory(sc.getSocketFactory()), 443));
-
       setSslContext(sc);
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
@@ -299,49 +285,6 @@ public final class TlsUtils {
   private static final class SSLContextHolder {
     static final SSLContext SSL_CONTEXT = SSL_CONTEXT_REF.get() == null ? SSLContexts.createDefault()
         : SSL_CONTEXT_REF.get();
-  }
-
-  /**
-   * Adapted from: https://svn.apache.org/viewvc/httpcomponents/oac
-   * .hc3x/trunk/src/contrib/org/apache/commons/httpclient/contrib/ssl/AuthSSLProtocolSocketFactory.java?view=markup
-   */
-  private static class PinotProtocolSocketFactory implements ProtocolSocketFactory {
-    final SSLSocketFactory _sslSocketFactory;
-
-    public PinotProtocolSocketFactory(SSLSocketFactory sslSocketFactory) {
-      _sslSocketFactory = sslSocketFactory;
-    }
-
-    @Override
-    public Socket createSocket(String host, int port, InetAddress localAddress, int localPort)
-        throws IOException {
-      return _sslSocketFactory.createSocket(host, port, localAddress, localPort);
-    }
-
-    @Override
-    public Socket createSocket(String host, int port, InetAddress localAddress, int localPort,
-        HttpConnectionParams params)
-        throws IOException {
-      Preconditions.checkNotNull(params);
-
-      int timeout = params.getConnectionTimeout();
-      if (timeout <= 0) {
-        return _sslSocketFactory.createSocket(host, port, localAddress, localPort);
-      }
-
-      Socket socket = _sslSocketFactory.createSocket();
-      SocketAddress localaddr = new InetSocketAddress(localAddress, localPort);
-      SocketAddress remoteaddr = new InetSocketAddress(host, port);
-      socket.bind(localaddr);
-      socket.connect(remoteaddr, timeout);
-      return socket;
-    }
-
-    @Override
-    public Socket createSocket(String host, int port)
-        throws IOException {
-      return _sslSocketFactory.createSocket(host, port);
-    }
   }
 
   /**

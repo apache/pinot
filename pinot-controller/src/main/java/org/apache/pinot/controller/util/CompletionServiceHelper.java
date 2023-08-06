@@ -20,6 +20,7 @@
 package org.apache.pinot.controller.util;
 
 import com.google.common.collect.BiMap;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.HashMap;
@@ -59,8 +60,7 @@ public class CompletionServiceHelper {
   }
 
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, int timeoutMs)
-      throws Exception {
+      boolean multiRequestPerServer, int timeoutMs) {
     return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs, null);
   }
 
@@ -81,8 +81,7 @@ public class CompletionServiceHelper {
    */
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
       boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs,
-      @Nullable String useCase)
-      throws Exception {
+      @Nullable String useCase) {
     CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
 
     // TODO: use some service other than completion service so that we know which server encounters the error
@@ -93,7 +92,7 @@ public class CompletionServiceHelper {
       try {
         multiHttpRequestResponse = completionService.take().get();
         URI uri = multiHttpRequestResponse.getURI();
-        CloseableHttpResponse response =  multiHttpRequestResponse.getResponse();
+        CloseableHttpResponse response = multiHttpRequestResponse.getResponse();
         String instance =
             _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
         if (response.getStatusLine().getStatusCode() >= 300) {
@@ -110,7 +109,11 @@ public class CompletionServiceHelper {
         completionServiceResponse._failedResponseCount++;
       } finally {
         if (multiHttpRequestResponse != null) {
-          multiHttpRequestResponse.getResponse().close();
+          try {
+            multiHttpRequestResponse.getResponse().close();
+          } catch (IOException e) {
+            LOGGER.error("Connection close error. Details: {}", e.getMessage());
+          }
         }
       }
     }
@@ -126,14 +129,12 @@ public class CompletionServiceHelper {
   }
 
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, int timeoutMs, @Nullable String useCase)
-      throws Exception {
+      boolean multiRequestPerServer, int timeoutMs, @Nullable String useCase) {
     return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, null, timeoutMs, useCase);
   }
 
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
-      boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs)
-      throws Exception {
+      boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs) {
     return doMultiGetRequest(serverURLs, tableNameWithType, multiRequestPerServer, requestHeaders, timeoutMs, null);
   }
 

@@ -21,8 +21,6 @@ package org.apache.pinot.controller.api.upload;
 import java.util.concurrent.Executor;
 import javax.ws.rs.core.Response;
 import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;

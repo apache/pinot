@@ -31,9 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -306,7 +306,8 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testGetTableSubTypeSizeAllSuccess() throws InvalidConfigException {
+  public void testGetTableSubTypeSizeAllSuccess()
+      throws Exception {
     final String[] servers = {"server0", "server1"};
     String table = "offline";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
@@ -390,7 +391,8 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void getTableSizeDetailsRealtimeOnly() throws InvalidConfigException {
+  public void getTableSizeDetailsRealtimeOnly()
+      throws Exception {
     final String[] servers = {"server3", "server4"};
     String table = "realtime";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
