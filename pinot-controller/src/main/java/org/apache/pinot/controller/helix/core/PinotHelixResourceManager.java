@@ -106,6 +106,7 @@ import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
+import org.apache.pinot.common.messages.TableDeletionControllerMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
@@ -2008,6 +2009,51 @@ public class PinotHelixResourceManager {
       LOGGER.info("Deleting table {}: Removed helix table resource", offlineTableName);
     }
 
+    deleteSegmentPartitionsForOfflineTable(retentionPeriod, offlineTableName);
+  }
+
+  public void deleteOfflineTableBlocking(String tableName, @Nullable String retentionPeriod) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    LOGGER.info("Deleting table {}: Start", offlineTableName);
+
+    // Remove the table from brokerResource
+    HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed from broker resource", offlineTableName);
+
+    // Delete the table on servers
+    deleteTableOnServer(offlineTableName);
+
+    // Drop the table
+    if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(offlineTableName)) {
+      _helixAdmin.dropResource(_helixClusterName, offlineTableName);
+      LOGGER.info("Deleting table {}: Removed helix table resource", offlineTableName);
+    }
+
+    // Wait for external view to converge
+    long externalViewDroppedMaxWaitMs = 20 * 60 * 1000L; //TODO: make this configurable
+    long externalViewDroppedCheckInternalMs = 1000L; //TODO: make this configurable
+    long endTimeMs = System.currentTimeMillis() + externalViewDroppedMaxWaitMs;
+    do {
+      try {
+        ExternalView externalView = _helixZkManager.getHelixDataAccessor()
+            .getProperty(_helixZkManager.getHelixDataAccessor().keyBuilder().externalView(offlineTableName));
+
+        if (externalView == null) {
+          LOGGER.info("ExternalView converged for the table to delete: {}", offlineTableName);
+          break;
+        }
+        Thread.sleep(externalViewDroppedCheckInternalMs);
+      } catch (InterruptedException e) {
+        LOGGER.warn("Interrupted while waiting for external view to converge for table: {}. Deletion failed.",
+            offlineTableName, e);
+        return;
+      }
+    } while (System.currentTimeMillis() < endTimeMs);
+
+    deleteSegmentPartitionsForOfflineTable(retentionPeriod, offlineTableName);
+  }
+
+  private void deleteSegmentPartitionsForOfflineTable(String retentionPeriod, String offlineTableName) {
     // Remove all stored segments for the table
     Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
     _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFromPropertyStore(offlineTableName),
@@ -2042,11 +2088,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Finish", offlineTableName);
   }
 
-  public void deleteRealtimeTable(String tableName) {
-    deleteRealtimeTable(tableName, null);
-  }
-
-  public void deleteRealtimeTable(String tableName, @Nullable String retentionPeriod) {
+  public void deleteRealtimeTableTableBlocking(String tableName, @Nullable String retentionPeriod) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     LOGGER.info("Deleting table {}: Start", realtimeTableName);
 
@@ -2054,9 +2096,8 @@ public class PinotHelixResourceManager {
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, realtimeTableName);
     LOGGER.info("Deleting table {}: Removed from broker resource", realtimeTableName);
 
-    // Drop the table on servers
-    // TODO: Make this api idempotent and blocking by waiting for externalview to converge on controllers
-    //      instead of servers. Follow the same steps for offline tables.
+    // Delete the table on servers, sending this after EV convergence doesn't work
+    // as Helix sender throws exception EV not found
     deleteTableOnServer(realtimeTableName);
 
     // Cache the state and drop the table
@@ -2065,8 +2106,36 @@ public class PinotHelixResourceManager {
       instancesForTable = getAllInstancesForTable(realtimeTableName);
       _helixAdmin.dropResource(_helixClusterName, realtimeTableName);
       LOGGER.info("Deleting table {}: Removed helix table resource", realtimeTableName);
+    } else {
+      LOGGER.info("Deleting table {}: Table resource not found in helix", realtimeTableName);
     }
 
+    // Wait for external view to converge
+    long externalViewDroppedMaxWaitMs = 20 * 60 * 1000L; //TODO: make this configurable
+    long externalViewDroppedCheckInternalMs = 1000L; //TODO: make this configurable
+    long endTimeMs = System.currentTimeMillis() + externalViewDroppedMaxWaitMs;
+    do {
+      try {
+      ExternalView externalView = _helixZkManager.getHelixDataAccessor()
+          .getProperty(_helixZkManager.getHelixDataAccessor().keyBuilder().externalView(realtimeTableName));
+
+      if (externalView == null) {
+        LOGGER.info("ExternalView converged for the table to delete: {}", realtimeTableName);
+        break;
+      }
+      Thread.sleep(externalViewDroppedCheckInternalMs);
+      } catch (InterruptedException e) {
+        LOGGER.warn("Interrupted while waiting for external view to converge for table: {}. Deletion failed.",
+            realtimeTableName, e);
+        return;
+      }
+    } while (System.currentTimeMillis() < endTimeMs);
+
+    deleteSegmentPartitionsForRealtimeTable(tableName, retentionPeriod, realtimeTableName, instancesForTable);
+  }
+
+  private void deleteSegmentPartitionsForRealtimeTable(String tableName, String retentionPeriod,
+      String realtimeTableName, Set<String> instancesForTable) {
     // Remove all stored segments for the table
     Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
     _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFromPropertyStore(realtimeTableName),
@@ -2114,6 +2183,34 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Removed table config", realtimeTableName);
 
     LOGGER.info("Deleting table {}: Finish", realtimeTableName);
+  }
+
+  public void deleteRealtimeTable(String tableName) {
+    deleteRealtimeTable(tableName, null);
+  }
+
+  public void deleteRealtimeTable(String tableName, @Nullable String retentionPeriod) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    LOGGER.info("Deleting table {}: Start", realtimeTableName);
+
+    // Remove the table from brokerResource
+    HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed from broker resource", realtimeTableName);
+
+    // Drop the table on servers
+    // TODO: Make this api idempotent and blocking by waiting for externalview to converge on controllers
+    //      instead of servers. Follow the same steps for offline tables.
+    deleteTableOnServer(realtimeTableName);
+
+    // Cache the state and drop the table
+    Set<String> instancesForTable = null;
+    if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(realtimeTableName)) {
+      instancesForTable = getAllInstancesForTable(realtimeTableName);
+      _helixAdmin.dropResource(_helixClusterName, realtimeTableName);
+      LOGGER.info("Deleting table {}: Removed helix table resource", realtimeTableName);
+    }
+
+    deleteSegmentPartitionsForRealtimeTable(tableName, retentionPeriod, realtimeTableName, instancesForTable);
   }
 
   /**
@@ -2257,6 +2354,17 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
     return addControllerJobToZK(jobId, jobMetadata,
         ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.RELOAD_SEGMENT));
+  }
+
+  public boolean addTableDeleteJob(String tableNameWithType, String jobId, int numberOfMessagesSent) {
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_DELETE.toString());
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
+    jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
+    return addControllerJobToZK(jobId, jobMetadata,
+        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_DELETE));
   }
 
   public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobResourcePath) {
@@ -2445,6 +2553,34 @@ public class PinotHelixResourceManager {
   /**
    * Delete the table on servers by sending table deletion message
    */
+  public Pair<Integer, String> deleteTableAsync(String tableNameWithType, TableType tableType, String retentionPeriod) {
+    LOGGER.info("Sending delete table message for table: {}", tableNameWithType);
+
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setSelfExcluded(false);
+    TableDeletionControllerMessage tableDeletionMessage =
+        new TableDeletionControllerMessage(tableNameWithType, tableType, retentionPeriod);
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+
+    // Infinite timeout on the recipient
+    int timeoutMs = -1;
+    int numMessagesSent = messagingService.send(recipientCriteria, tableDeletionMessage, null, timeoutMs);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} delete table messages for table: {}", numMessagesSent, tableNameWithType);
+    } else {
+      LOGGER.warn("No delete table message sent for table: {}", tableNameWithType);
+    }
+
+    return Pair.of(numMessagesSent, tableDeletionMessage.getId());
+  }
+
+  /**
+   * Delete the table on servers by sending table deletion message
+   */
   private void deleteTableOnServer(String tableNameWithType) {
     LOGGER.info("Sending delete table message for table: {}", tableNameWithType);
     Criteria recipientCriteria = new Criteria();
@@ -2455,13 +2591,14 @@ public class PinotHelixResourceManager {
     TableDeletionMessage tableDeletionMessage = new TableDeletionMessage(tableNameWithType);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
-    // Externalview can be null for newly created table, skip sending the message
-    if (_helixZkManager.getHelixDataAccessor()
-        .getProperty(_helixZkManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType)) == null) {
-      LOGGER.warn("No delete table message sent for newly created table: {} as the externalview is null.",
-          tableNameWithType);
+    ExternalView externalView = _helixZkManager.getHelixDataAccessor()
+        .getProperty(_helixZkManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType));
+
+    if (externalView == null) {
+      LOGGER.warn("External view for table {} is null. Skip sending delete message to servers", tableNameWithType);
       return;
     }
+
     // Infinite timeout on the recipient
     int timeoutMs = -1;
     int numMessagesSent = messagingService.send(recipientCriteria, tableDeletionMessage, null, timeoutMs);

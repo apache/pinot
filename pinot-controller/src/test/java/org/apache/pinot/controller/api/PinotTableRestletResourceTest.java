@@ -48,6 +48,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.JsonUtils.stringToJsonNode;
 import static org.testng.Assert.*;
 
 
@@ -293,7 +294,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   private TableConfig getTableConfig(String tableName, String tableType)
       throws Exception {
     String tableConfigString = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName));
-    return JsonUtils.jsonNodeToObject(JsonUtils.stringToJsonNode(tableConfigString).get(tableType), TableConfig.class);
+    return JsonUtils.jsonNodeToObject(stringToJsonNode(tableConfigString).get(tableType), TableConfig.class);
   }
 
   @Test
@@ -310,7 +311,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     tableConfig.getValidationConfig().setRetentionTimeUnit("HOURS");
     tableConfig.getValidationConfig().setRetentionTimeValue("10");
 
-    JsonNode jsonResponse = JsonUtils.stringToJsonNode(
+    JsonNode jsonResponse = stringToJsonNode(
         sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(tableName),
             tableConfig.toJsonString()));
     assertTrue(jsonResponse.has("status"));
@@ -409,14 +410,14 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     Map<String, Map<String, String>> taskTypeMap = new HashMap<>();
     taskTypeMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, new HashMap<>());
     offlineTableConfig2.setTaskConfig(new TableTaskConfig(taskTypeMap));
-    JsonUtils.stringToJsonNode(
+    stringToJsonNode(
         sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName2),
             offlineTableConfig2.toJsonString()));
     // update for pqr_REALTIME
     taskTypeMap = new HashMap<>();
     taskTypeMap.put(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>());
     realtimeTableConfig1.setTaskConfig(new TableTaskConfig(taskTypeMap));
-    JsonUtils.stringToJsonNode(
+    stringToJsonNode(
         sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName1),
             realtimeTableConfig1.toJsonString()));
 
@@ -436,7 +437,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     taskTypeMap = new HashMap<>();
     taskTypeMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, new HashMap<>());
     offlineTableConfig1.setTaskConfig(new TableTaskConfig(taskTypeMap));
-    JsonUtils.stringToJsonNode(
+    stringToJsonNode(
         sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName1),
             offlineTableConfig1.toJsonString()));
 
@@ -451,7 +452,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   private List<String> getTableNames(String url)
       throws IOException {
-    JsonNode tablesJson = JsonUtils.stringToJsonNode(sendGetRequest(url)).get("tables");
+    JsonNode tablesJson = stringToJsonNode(sendGetRequest(url)).get("tables");
     return JsonUtils.jsonNodeToObject(tablesJson, new TypeReference<List<String>>() {
     });
   }
@@ -571,6 +572,136 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     deleteResponse = sendDeleteRequest(
         StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "table3_OFFLINE?type=offline"));
     assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_OFFLINE] deleted\"}");
+  }
+
+  @Test
+  public void testDeleteTableAsync()
+      throws IOException {
+    // Case 1: Create a REALTIME table and delete it directly w/o using query param.
+    TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("table0").build();
+    String creationResponse = sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
+    assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table0_REALTIME successfully added\"}");
+
+    // Delete realtime table using REALTIME suffix.
+    String deleteResponse = sendDeleteRequest(
+        StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "table0_REALTIME?async=true"));
+//    assertEquals(deleteResponse, "{\"status\":\"Tables: [table0_REALTIME] deleted\"}");
+    waitForTableDeletion("table0_REALTIME", deleteResponse);
+
+    // Case 2: Create a OFFLINE table and delete it directly w/o using query param.
+    TableConfig offlineTableConfig = _offlineBuilder.setTableName("table0").build();
+    creationResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table0_OFFLINE successfully added\"}");
+
+    // Delete offline table using OFFLINE suffix.
+    deleteResponse = sendDeleteRequest(
+        StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "table0_OFFLINE?async=true"));
+    waitForTableDeletion("table0_OFFLINE", deleteResponse);
+
+    // Case 3: Create REALTIME and OFFLINE tables and delete both of them.
+    TableConfig rtConfig1 = _realtimeBuilder.setTableName("table1").build();
+    creationResponse = sendPostRequest(_createTableUrl, rtConfig1.toJsonString());
+    assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table1_REALTIME successfully added\"}");
+
+    TableConfig offlineConfig1 = _offlineBuilder.setTableName("table1").build();
+    creationResponse = sendPostRequest(_createTableUrl, offlineConfig1.toJsonString());
+    assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table1_OFFLINE successfully added\"}");
+
+    deleteResponse = sendDeleteRequest(
+        StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "table1?async=true"));
+    waitForTableDeletion("table1_OFFLINE", deleteResponse);
+    waitForTableDeletion("table1_REALTIME", deleteResponse);
+
+    // Case 4: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params.
+    TableConfig rtConfig2 = _realtimeBuilder.setTableName("table2").build();
+    creationResponse = sendPostRequest(_createTableUrl, rtConfig2.toJsonString());
+    assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table2_REALTIME successfully added\"}");
+
+    TableConfig offlineConfig2 = _offlineBuilder.setTableName("table2").build();
+    creationResponse = sendPostRequest(_createTableUrl, offlineConfig2.toJsonString());
+    assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table2_OFFLINE successfully added\"}");
+
+    // The conflict between param type and table name suffix causes no table being deleted.
+    try {
+      sendDeleteRequest(StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables",
+          "table2_OFFLINE?type=realtime&async=true"));
+      fail("Deleting a realtime table with OFFLINE suffix.");
+    } catch (Exception e) {
+      assertTrue(e instanceof IOException);
+    }
+
+    deleteResponse = sendDeleteRequest(
+        StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "table2?type=realtime&async=true"));
+    waitForTableDeletion("table2_REALTIME", deleteResponse);
+
+    deleteResponse = sendDeleteRequest(
+        StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "table2?type=offline&async=true"));
+    waitForTableDeletion("table2_OFFLINE", deleteResponse);
+
+    // Case 5: Delete a non-existent table and expect a bad request expection.
+    try {
+      deleteResponse = sendDeleteRequest(StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables",
+          "no_such_table_OFFLINE?async=true"));
+      fail("Deleting a non-existing table should fail.");
+    } catch (Exception e) {
+      assertTrue(e instanceof IOException);
+    }
+
+    // Case 6: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params and suffixes.
+    TableConfig rtConfig3 = _realtimeBuilder.setTableName("table3").build();
+    creationResponse = sendPostRequest(_createTableUrl, rtConfig3.toJsonString());
+    assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table3_REALTIME successfully added\"}");
+
+    TableConfig offlineConfig3 = _offlineBuilder.setTableName("table3").build();
+    creationResponse = sendPostRequest(_createTableUrl, offlineConfig3.toJsonString());
+    assertEquals(creationResponse,
+        "{\"unrecognizedProperties\":{},\"status\":\"Table table3_OFFLINE successfully added\"}");
+
+    deleteResponse = sendDeleteRequest(StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables",
+        "table3_REALTIME?type=realtime&async=true"));
+    waitForTableDeletion("table3_REALTIME", deleteResponse);
+
+    deleteResponse = sendDeleteRequest(StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables",
+        "table3_OFFLINE?type=offline&async=true"));
+    waitForTableDeletion("table3_OFFLINE", deleteResponse);
+  }
+
+  private boolean isTableDeleted(String tableName, String jobId)
+      throws Exception {
+    String response = sendGetRequest(
+        StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables/deleteTableStatus", jobId));
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode(response);
+    int segmentsPendingDeletion = jsonResponse.get("segmentsPendingDeletionCount").intValue();
+    boolean tableConfigDeleted = jsonResponse.get("tableConfigDeleted").booleanValue();
+    return segmentsPendingDeletion == 0 && tableConfigDeleted;
+  }
+
+  private void waitForTableDeletion(String tableName, String deleteResponse) {
+    int numAttempts = 0;
+    while (numAttempts < 10) {
+      try {
+        JsonNode jsonResponse = JsonUtils.stringToJsonNode(deleteResponse);
+        String status = jsonResponse.get("status").textValue();
+        JsonNode statusJson = JsonUtils.stringToJsonNode(status);
+        String jobId = statusJson.get("deleteTableJobId").textValue();
+
+        if (isTableDeleted(tableName, jobId)) {
+          return;
+        }
+        Thread.sleep(1000);
+        numAttempts++;
+      } catch (Exception e) {
+        fail("Caught exception while waiting for table deletion: " + e.getMessage());
+      }
+    }
+    fail("Table " + tableName + " was not deleted within 10 seconds");
   }
 
   @Test

@@ -71,6 +71,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -472,38 +473,125 @@ public class PinotTableRestletResource {
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
           + "will default to the first config that's not null: the cluster setting, then '7d'. Using 0d or -1d will "
-          + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod) {
+          + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod,
+      @ApiParam(value = "Delete table in background. Should be used for large tables.")
+      @QueryParam("async") @DefaultValue("false") boolean async) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
-    List<String> tablesDeleted = new LinkedList<>();
-    try {
-      boolean tableExist = false;
-      if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
-        tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
-        // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
-        // did not complete.
-        _pinotHelixResourceManager.deleteOfflineTable(tableName, retentionPeriod);
-        if (tableExist) {
-          tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
-        }
-      }
-      if (verifyTableType(tableName, tableType, TableType.REALTIME)) {
-        tableExist = _pinotHelixResourceManager.hasRealtimeTable(tableName);
-        // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
-        // did not complete.
-        _pinotHelixResourceManager.deleteRealtimeTable(tableName, retentionPeriod);
-        if (tableExist) {
-          tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
-        }
-      }
-      if (!tablesDeleted.isEmpty()) {
-        return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
-      }
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    boolean isOfflineTable = verifyTableType(tableName, tableType, TableType.OFFLINE);
+    boolean isRealtimeTable = verifyTableType(tableName, tableType, TableType.REALTIME);
+
+    boolean offlineTableExists =
+        isOfflineTable && _pinotHelixResourceManager.hasOfflineTable(
+            tableName);
+
+    boolean realtimeTableExists =
+        isRealtimeTable && _pinotHelixResourceManager.hasRealtimeTable(
+            tableName);
+
+    if (!offlineTableExists && !realtimeTableExists) {
+      throw new ControllerApplicationException(LOGGER,
+          "Table '" + tableName + "' with type " + tableType + " does not exist", Response.Status.NOT_FOUND);
     }
-    throw new ControllerApplicationException(LOGGER,
-        "Table '" + tableName + "' with type " + tableType + " does not exist", Response.Status.NOT_FOUND);
+
+    if (async) {
+      Pair<Integer, String> msgInfo =
+          _pinotHelixResourceManager.deleteTableAsync(tableName, tableType, retentionPeriod);
+
+      //TODO: change this error message for correct exception handling
+      if (msgInfo.getLeft() == 0) {
+        throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist",
+            Response.Status.BAD_REQUEST);
+      }
+
+      Map<String, String> tableDeleteMeta = new HashMap<>();
+      tableDeleteMeta.put("numMessagesSent", String.valueOf(msgInfo.getLeft()));
+      tableDeleteMeta.put("deleteTableJobId", msgInfo.getRight());
+      // Store in ZK
+      try {
+        if (_pinotHelixResourceManager.addTableDeleteJob(tableName, msgInfo.getRight(), msgInfo.getLeft())) {
+          tableDeleteMeta.put("tableDeleteJobMetaZKStorageStatus", "SUCCESS");
+        } else {
+          tableDeleteMeta.put("tableDeleteMetaZKStorageStatus", "FAILED");
+          LOGGER.error("Failed to add delete table job metadata into zookeeper for table: {}", tableName);
+        }
+      } catch (Exception e) {
+        tableDeleteMeta.put("tableDeleteMetaZKStorageStatus", "FAILED");
+        LOGGER.error("Failed to add delete table job metadata  into zookeeper for table: {}", tableName, e);
+      }
+      try {
+        tableDeleteMeta.put("message", "Table deletion triggered");
+        tableDeleteMeta.put("table", tableName);
+        return new SuccessResponse(JsonUtils.objectToString(tableDeleteMeta));
+      } catch (JsonProcessingException e) {
+        throw new ControllerApplicationException(LOGGER, "Failed to serialize response",
+            Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
+    } else {
+      List<String> tablesDeleted = new LinkedList<>();
+      try {
+        if (isOfflineTable) {
+          // Even the table name does not exist, still go on to delete remaining table metadata
+          // in case a previous delete did not complete.
+          _pinotHelixResourceManager.deleteOfflineTable(tableName, retentionPeriod);
+
+          if (offlineTableExists) {
+            tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+          }
+        }
+        if (isRealtimeTable) {
+          // Even the table name does not exist, still go on to delete remaining table metadata
+          // in case a previous delete did not complete.
+          _pinotHelixResourceManager.deleteRealtimeTable(tableName, retentionPeriod);
+
+          if (realtimeTableExists) {
+            tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+          }
+        }
+
+        return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
+      } catch (Exception e) {
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
+    }
+  }
+
+  @GET
+  @Path("/tables/deleteTableStatus/{jobId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get status for a submitted force commit operation",
+      notes = "Get status for a submitted force commit operation")
+  public JsonNode getDeleteTableJobStatus(
+      @ApiParam(value = "Delete table job id", required = true) @PathParam("jobId") String deleteTableJobId)
+      throws Exception {
+    Map<String, String> controllerJobZKMetadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(deleteTableJobId,
+            ControllerJobType.TABLE_DELETE);
+    if (controllerJobZKMetadata == null) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + deleteTableJobId,
+          Response.Status.NOT_FOUND);
+    }
+    String tableNameWithType = controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
+
+    ExternalView externalView =
+        _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
+    Map<String, Object> result = new HashMap<>(controllerJobZKMetadata);
+
+    if (externalView != null) {
+      result.put("segmentsPendingDeletion", externalView.getPartitionSet());
+      result.put("segmentsPendingDeletionCount", externalView.getPartitionSet().size());
+    } else {
+      result.put("segmentsPendingDeletion", Collections.emptyList());
+      result.put("segmentsPendingDeletionCount", 0);
+    }
+
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig != null) {
+      result.put("tableConfigDeleted", false);
+    } else {
+      result.put("tableConfigDeleted", true);
+    }
+    return JsonUtils.objectToJsonNode(result);
   }
 
   //   Return true iff the table is of the expectedType based on the given tableName and tableType. The truth table:

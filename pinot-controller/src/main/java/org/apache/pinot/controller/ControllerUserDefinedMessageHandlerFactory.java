@@ -18,16 +18,24 @@
  */
 package org.apache.pinot.controller;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import javax.ws.rs.core.Response;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
+import org.apache.pinot.common.messages.TableDeletionControllerMessage;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,9 +46,12 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
   private static final String USER_DEFINED_MSG_STRING = Message.MessageType.USER_DEFINE_MSG.toString();
 
   private final PeriodicTaskScheduler _periodicTaskScheduler;
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
 
-  public ControllerUserDefinedMessageHandlerFactory(PeriodicTaskScheduler periodicTaskScheduler) {
+  public ControllerUserDefinedMessageHandlerFactory(PeriodicTaskScheduler periodicTaskScheduler,
+      PinotHelixResourceManager pinotHelixResourceManager) {
     _periodicTaskScheduler = periodicTaskScheduler;
+    _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 
   @Override
@@ -49,6 +60,11 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
     if (messageType.equals(RunPeriodicTaskMessage.RUN_PERIODIC_TASK_MSG_SUB_TYPE)) {
       return new RunPeriodicTaskMessageHandler(new RunPeriodicTaskMessage(message), notificationContext,
           _periodicTaskScheduler);
+    }
+
+    if (messageType.equals(TableDeletionControllerMessage.DELETE_TABLE_MSG_SUB_TYPE)) {
+      return new TableDeletionControllerMessageHandler(new TableDeletionControllerMessage(message), notificationContext,
+          _pinotHelixResourceManager);
     }
 
     // Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
@@ -138,6 +154,77 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
     @Override
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error for no-op message handling (error code: {}, error type: {})", code, type, e);
+    }
+  }
+
+  private static class TableDeletionControllerMessageHandler extends MessageHandler {
+    private final String _tableNameWithType;
+    private final TableType _tableType;
+    private final String _retentionPeriod;
+    private final PinotHelixResourceManager _helixResourceManager;
+
+    TableDeletionControllerMessageHandler(TableDeletionControllerMessage message, NotificationContext context,
+        PinotHelixResourceManager helixResourceManager) {
+      super(message, context);
+      _tableNameWithType = message.getTableNameWithType();
+      _tableType = message.getTableType();
+      _retentionPeriod = message.getRetentionPeriod();
+      _helixResourceManager = helixResourceManager;
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      LOGGER.info("Handling deletion for table {}: Start", _tableNameWithType);
+
+      //TODO: some of this validation logic is duplicate and can be removed
+      List<String> tablesDeleted = new LinkedList<>();
+      HelixTaskResult result = new HelixTaskResult();
+      try {
+        boolean tableExist = false;
+        if (verifyTableType(_tableNameWithType, _tableType, TableType.OFFLINE)) {
+          tableExist = _helixResourceManager.hasOfflineTable(_tableNameWithType);
+          // Even the table name does not exist, still go on to delete remaining table metadata
+          // in case a previous delete did not complete.
+          _helixResourceManager.deleteOfflineTableBlocking(_tableNameWithType, _retentionPeriod);
+          if (tableExist) {
+            tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(_tableNameWithType));
+          }
+        }
+        if (verifyTableType(_tableNameWithType, _tableType, TableType.REALTIME)) {
+          tableExist = _helixResourceManager.hasRealtimeTable(_tableNameWithType);
+          // Even the table name does not exist, still go on to delete remaining table metadata
+          // in case a previous delete did not complete.
+          _helixResourceManager.deleteRealtimeTableTableBlocking(_tableNameWithType, _retentionPeriod);
+          if (tableExist) {
+            tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(_tableNameWithType));
+          }
+        }
+        if (!tablesDeleted.isEmpty()) {
+          result.setSuccess(true);
+          result.setMessage("Following tables deleted: " + tablesDeleted);
+          return result;
+        }
+      } catch (Exception e) {
+        result.setException(e);
+        return result;
+      }
+
+      result.setException(new ControllerApplicationException(LOGGER, "Table " + _tableNameWithType + " does not exist",
+          Response.Status.NOT_FOUND));
+      return result;
+    }
+
+    private boolean verifyTableType(String tableName, TableType tableType, TableType expectedType) {
+      if (tableType != null && tableType != expectedType) {
+        return false;
+      }
+      TableType typeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
+      return typeFromTableName == null || typeFromTableName == expectedType;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error for table deletion message handling (error code: {}, error type: {})", code, type, e);
     }
   }
 }
