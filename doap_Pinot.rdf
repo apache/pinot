@@ -49,7 +49,7 @@ It's perfect for user-facing real-time analytics and other analytical use cases,
     </release>
     <repository>
       <GitRepository>
-        <location rdf:resource="https://git@github.com:apache/pinot.git"/>
+        <location rdf:resource="https://gitbox.apache.org/repos/asf/pinot.git"/>
         <browse rdf:resource="https://github.com/apache/pinot"/>
       </GitRepository>
     </repository>
