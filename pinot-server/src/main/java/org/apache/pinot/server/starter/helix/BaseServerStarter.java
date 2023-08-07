@@ -594,6 +594,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       startupServiceStatusCheck(endTimeMs);
     }
 
+    preServeQueries();
+
     // Start the query server after finishing the service status check. If the query server is started before all the
     // segments are loaded, broker might not have finished processing the callback of routing table update, and start
     // querying the server pre-maturely.
@@ -620,6 +622,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
     _realtimeLuceneIndexRefreshState.start();
+  }
+
+  /**
+   * Can be overridden to perform operations before server starts serving queries.
+   */
+  protected void preServeQueries() {
   }
 
   @Override
