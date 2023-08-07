@@ -1791,6 +1791,7 @@
             <exclude>**/*.v1</exclude>
             <exclude>**/*.v2</exclude>
             <exclude>**/appAssemblerScriptTemplate</exclude>
+            <exclude>doap_Pinot.rdf</exclude>
 
             <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
             be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
