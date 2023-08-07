@@ -108,6 +108,25 @@ public class VectorFunctionsTest {
     inputs.add(new Object[]{"vectorDims(vector2)", Lists.newArrayList("vector2"), row, 5});
     inputs.add(new Object[]{"vectorNorm(vector1)", Lists.newArrayList("vector1"), row, 0.741619857751291});
     inputs.add(new Object[]{"vectorNorm(vector2)", Lists.newArrayList("vector2"), row, 0.0});
+
+    inputs.add(new Object[]{
+        "cosineDistance(vector1, ARRAY[0.0,0.0,0.0,0.0,0.0])", Lists.newArrayList("vector1"), row, Double.NaN
+    });
+    inputs.add(new Object[]{
+        "cosineDistance(vector1, ARRAY[0.0,0.0,0.0,0.0,0.0], 0.0)", Lists.newArrayList("vector1"), row, 0.0
+    });
+    inputs.add(new Object[]{
+        "cosineDistance(vector1, ARRAY[0.0,0.0,0.0,0.0,0.0], 1.0)", Lists.newArrayList("vector1"), row, 1.0
+    });
+    inputs.add(new Object[]{
+        "innerProduct(vector1, ARRAY[0.0,0.0,0.0,0.0,0.0])", Lists.newArrayList("vector1"), row, 0.0
+    });
+    inputs.add(new Object[]{
+        "l2Distance(vector1, ARRAY[0.0,0.0,0.0,0.0,0.0])", Lists.newArrayList("vector1"), row, 0.741619857751291
+    });
+    inputs.add(new Object[]{
+        "l1Distance(vector1, ARRAY[0.0,0.0,0.0,0.0,0.0])", Lists.newArrayList("vector1"), row, 1.5000000223517418
+    });
     return inputs.toArray(new Object[0][]);
   }
 }
