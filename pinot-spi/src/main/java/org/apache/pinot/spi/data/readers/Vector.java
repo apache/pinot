@@ -26,8 +26,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
-import java.util.Arrays;
-
 public class Vector implements Comparable<Vector> {
 
   public enum VectorType {
