@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<MessageCollection xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation="messagecollection.xsd">
+
+  <Plugin>
+    <ShortDescription>Apache Pinot Spotbugs Plugin</ShortDescription>
+    <Details>This plugin provides original detectors defined to contribute to Apache Pinot</Details>
+  </Plugin>
+
+  <Detector class="org.apache.pinot.spotbugs.plugin.ShadedTypesUsedOnSpiDetector">
+    <Details>
+      Detector used to detect usages of shaded libraries when calling SPI code.
+    </Details>
+  </Detector>
+
+  <BugPattern type="SHADED_TYPES_IN_SPI">
+    <ShortDescription>Using shaded APIs when calling SPI methods.</ShortDescription>
+    <LongDescription>
+      At least one call to an SPI method using shaded libraries has been detected.
+      This can produce problems in runtime when the shaded classes are repackaged.
+      For example, you may be trying to call a method that receives an argument whose static type is a Jackson package.
+      Given that Jackson should be shaded, your plugin will actually try to call that method using its shaded version
+      of Jackson, which would produce a MethodNotFound at runtime.
+    </LongDescription>
+    <Details>
+<![CDATA[
+<p>At least one call to an SPI method using shaded libraries has been detected.
+This can produce problems in runtime when the shaded classes are repackaged.
+For example, you may be trying to call a method that receives an argument whose static type is a Jackson package.
+Given that Jackson should be shaded, your plugin will actually try to call that method using its shaded version
+of Jackson, which would produce a MethodNotFound at runtime.</p>
+]]>
+    </Details>
+  </BugPattern>
+
+  <BugCode abbrev="PL">Shaded types in SPI</BugCode>
+</MessageCollection>

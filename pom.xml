@@ -57,6 +57,7 @@
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
     <module>contrib/pinot-fmpp-maven-plugin</module>
+    <module>contrib/pinot-spotbugs-plugin</module>
 
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
@@ -179,6 +180,8 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
+
+    <spotBugsVersion>4.0.0</spotBugsVersion>
   </properties>
 
   <profiles>
