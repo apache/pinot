@@ -24,6 +24,7 @@ import io.swagger.annotations.ApiModelProperty;
 
 @ApiModel
 public class RebalanceContext {
+  // TODO : simplify the rebalance configs wherever possible
   @JsonProperty("dryRun")
   @ApiModelProperty(example = "false")
   private Boolean _dryRun = false;
