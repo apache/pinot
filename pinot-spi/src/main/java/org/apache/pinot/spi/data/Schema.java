@@ -120,6 +120,7 @@ public final class Schema implements Serializable {
           case STRING:
           case JSON:
           case BYTES:
+          case VECTOR:
             break;
           default:
             throw new IllegalStateException(
@@ -590,6 +591,13 @@ public final class Schema implements Serializable {
       _schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
       return this;
     }
+
+    public SchemaBuilder addDimension(String metricName, DataType dataType, DataType vectorDataType, int vectorLength,
+        Object defaultNullValue) {
+      _schema.addField(new DimensionFieldSpec(metricName, dataType, vectorDataType, vectorLength, defaultNullValue));
+      return this;
+    }
+
 
     /**
      * @deprecated in favor of {@link SchemaBuilder#addDateTime(String, DataType, String, String)}

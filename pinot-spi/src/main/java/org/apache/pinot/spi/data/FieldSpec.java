@@ -105,6 +105,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
 
+  protected int _vectorLength = 0;
+  protected DataType _vectorDataType;
+
   // NOTE: This only applies to STRING column, which is the max number of characters
   private int _maxLength = DEFAULT_MAX_LENGTH;
 
@@ -138,10 +141,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     setDefaultNullValue(defaultNullValue);
   }
 
-  public FieldSpec(String name, int vectorLength, @Nullable Object defaultNullValue) {
+  public FieldSpec(String name, DataType dataType, DataType vectorDataType, int vectorLength,
+      @Nullable Object defaultNullValue) {
     _name = name;
     _dataType = DataType.VECTOR;
     _isSingleValueField = false;
+    _vectorLength = vectorLength;
+    _vectorDataType = vectorDataType;
     setDefaultNullValue(defaultNullValue);
   }
 
@@ -330,6 +336,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
     if (_maxLength != DEFAULT_MAX_LENGTH) {
       jsonObject.put("maxLength", _maxLength);
+    }
+    if (_vectorLength > 0) {
+      jsonObject.put("vectorLength", _vectorLength);
+    }
+    if (_vectorDataType != null) {
+      jsonObject.put("vectorDataType", _vectorDataType.name());
     }
     appendDefaultNullValue(jsonObject);
     appendTransformFunction(jsonObject);

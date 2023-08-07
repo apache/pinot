@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.Arrays;
 
 
@@ -51,6 +52,7 @@ public class Vector implements Comparable<Vector> {
     _dimension = dimension;
   }
 
+  @JsonIgnore
   public float[] getFloatValues() {
     if (_type != VectorType.FLOAT) {
       throw new IllegalStateException("Vector type is not FLOAT");
@@ -58,6 +60,7 @@ public class Vector implements Comparable<Vector> {
     return _floatValues;
   }
 
+  @JsonIgnore
   public int[] getIntValues() {
     if (_type != VectorType.INT) {
       throw new IllegalStateException("Vector type is not INT");
