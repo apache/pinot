@@ -219,7 +219,7 @@ public final class RelToPlanNodeConverter {
       case BIGINT:
         return isArray ? DataSchema.ColumnDataType.LONG_ARRAY : DataSchema.ColumnDataType.LONG;
       case DECIMAL:
-        return resolveDecimal(relDataType);
+        return resolveDecimal(relDataType, isArray);
       case FLOAT:
       case REAL:
         return isArray ? DataSchema.ColumnDataType.FLOAT_ARRAY : DataSchema.ColumnDataType.FLOAT;
@@ -259,31 +259,32 @@ public final class RelToPlanNodeConverter {
   }
 
   /**
-   * Calcite uses DEMICAL type to infer data type hoisting and infer arithmetic result types. down casting this
-   * back to the proper primitive type for Pinot.
+   * Calcite uses DEMICAL type to infer data type hoisting and infer arithmetic result types. down casting this back to
+   * the proper primitive type for Pinot.
    *
    * @param relDataType the DECIMAL rel data type.
+   * @param isArray
    * @return proper {@link DataSchema.ColumnDataType}.
    * @see {@link org.apache.calcite.rel.type.RelDataTypeFactoryImpl#decimalOf}.
    */
-  private static DataSchema.ColumnDataType resolveDecimal(RelDataType relDataType) {
+  private static DataSchema.ColumnDataType resolveDecimal(RelDataType relDataType, boolean isArray) {
     int precision = relDataType.getPrecision();
     int scale = relDataType.getScale();
     if (scale == 0) {
       if (precision <= 10) {
-        return DataSchema.ColumnDataType.INT;
+        return isArray ? DataSchema.ColumnDataType.INT_ARRAY : DataSchema.ColumnDataType.INT;
       } else if (precision <= 38) {
-        return DataSchema.ColumnDataType.LONG;
+        return isArray ? DataSchema.ColumnDataType.LONG_ARRAY : DataSchema.ColumnDataType.LONG;
       } else {
-        return DataSchema.ColumnDataType.BIG_DECIMAL;
+        return isArray ? DataSchema.ColumnDataType.DOUBLE_ARRAY : DataSchema.ColumnDataType.BIG_DECIMAL;
       }
     } else {
       if (precision <= 14) {
-        return DataSchema.ColumnDataType.FLOAT;
+        return isArray ? DataSchema.ColumnDataType.FLOAT_ARRAY : DataSchema.ColumnDataType.FLOAT;
       } else if (precision <= 30) {
-        return DataSchema.ColumnDataType.DOUBLE;
+        return isArray ? DataSchema.ColumnDataType.DOUBLE_ARRAY : DataSchema.ColumnDataType.DOUBLE;
       } else {
-        return DataSchema.ColumnDataType.BIG_DECIMAL;
+        return isArray ? DataSchema.ColumnDataType.DOUBLE_ARRAY : DataSchema.ColumnDataType.BIG_DECIMAL;
       }
     }
   }
