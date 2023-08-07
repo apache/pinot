@@ -58,8 +58,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = "testOfflineTable";
   private static final String REALTIME_TABLE_NAME = "testRealtimeTable";
   private final TableConfigBuilder _offlineBuilder = new TableConfigBuilder(TableType.OFFLINE);
-  private final TableConfigBuilder _realtimeBuilder = new TableConfigBuilder(TableType.REALTIME)
-      .setStreamConfigs(Map.of("stream.type", "foo", "consumer.type", "lowlevel"));
+  private final TableConfigBuilder _realtimeBuilder = new TableConfigBuilder(TableType.REALTIME);
   private String _createTableUrl;
 
   @BeforeClass
