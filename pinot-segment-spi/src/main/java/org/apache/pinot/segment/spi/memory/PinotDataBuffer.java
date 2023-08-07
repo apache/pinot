@@ -33,7 +33,6 @@ import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.memory.unsafe.UnsafePinotBufferFactory;
 import org.apache.pinot.segment.spi.utils.JavaVersion;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -371,13 +370,6 @@ public abstract class PinotDataBuffer implements Closeable {
       }
       _closeable = false;
     }
-  }
-
-  public boolean isPrefetchable() {
-    return false;
-  }
-
-  public void prefetch(long baseOffset, List<ForwardIndexByteRange> byteRanges) {
   }
 
   public byte getByte(int offset) {
