@@ -271,18 +271,18 @@ const QueryPage = () => {
     setQueryLoader(true);
     queryExecuted.current = true;
     let params;
-    let queryOptions = '';
+    let queryOptions = [];
     if(queryTimeout){
-      queryOptions += `timeoutMs=${queryTimeout}`;
+      queryOptions.push(`timeoutMs=${queryTimeout}`);
     }
     if(checked.useMSE){
-      queryOptions += `useMultistageEngine=true`;
+      queryOptions.push(`useMultistageEngine=true`);
     }
     const finalQuery = `${query || inputQuery.trim()}`;
     params = JSON.stringify({
       sql: `${finalQuery}`,
       trace: checked.tracing,
-      queryOptions: `${queryOptions}`,
+      queryOptions: `${queryOptions.join(";")}`,
     });
 
     if(finalQuery !== ''){
