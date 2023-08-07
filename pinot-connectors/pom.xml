@@ -43,16 +43,4 @@
     <module>pinot-spark-3-connector</module>
     <module>pinot-flink-connector</module>
   </modules>
-
-  <profiles>
-    <profile>
-      <id>presto-driver</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <modules>
-        <module>prestodb-pinot-dependencies</module>
-      </modules>
-    </profile>
-  </profiles>
 </project>
