@@ -37,10 +37,10 @@ import org.apache.pinot.spi.utils.CommonConstants;
 /**
  * This rewriter rewrites EXPR_MIN/EXPR_MAX function, so that the functions with the same measuring expressions
  * are consolidated and added as a single function with a list of projection expressions. For example, the query
- * "SELECT EXPR_MIN(col1, col2, col3), EXPR_MIN(col1, col2, col4) FROM myTable" will be consolidated to a single
+ * "SELECT EXPR_MIN(col3, col1, col2), EXPR_MIN(col4, col1, col2) FROM myTable" will be consolidated to a single
  * function "PARENT_EXPR_MIN(0, 2, col1, col2, col3, col4)". and added to the end of the selection list.
- * While the original EXPR_MIN(col1, col2, col3) and EXPR_MIN(col1, col2, col4) will be rewritten to
- * CHILD_EXPR_MIN(0, col3, col1, col2, col3) and CHILD_EXPR_MIN(0, col4, col1, col2, col4) respectively.
+ * While the original EXPR_MIN(col3, col1, col2) and EXPR_MIN(col4, col1, col2) will be rewritten to
+ * CHILD_EXPR_MIN(0, col3, col3, col1, col2) and CHILD_EXPR_MIN(0, col4, col4, col1, col2) respectively.
  * The 2 new parameters for CHILD_EXPR_MIN are the function ID (0) and the projection column (col1/col4),
  * used as column key in the parent aggregation result, during result rewriting.
  * PARENT_EXPR_MIN(0, 2, col1, col2, col3, col4) means a parent aggregation function with function ID 0,
