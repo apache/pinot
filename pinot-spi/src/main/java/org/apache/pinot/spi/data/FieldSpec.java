@@ -166,6 +166,22 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return _dataType;
   }
 
+  public DataType getVectorDataType() {
+    return _vectorDataType;
+  }
+
+  public int getVectorLength() {
+    return _vectorLength;
+  }
+
+  public void setVectorLength(int vectorLength) {
+    _vectorLength = vectorLength;
+  }
+
+  public void setVectorDataType(DataType vectorDataType) {
+    _vectorDataType = vectorDataType;
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDataType(DataType dataType) {
     _dataType = dataType;
@@ -412,7 +428,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
         .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
-        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
+        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider)
+        && EqualityUtils.isEqual(_vectorLength, that._vectorLength)
+        && EqualityUtils.isEqual(_vectorDataType, that._vectorDataType);
   }
 
   @Override
@@ -424,6 +442,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     result = EqualityUtils.hashCodeOf(result, _maxLength);
     result = EqualityUtils.hashCodeOf(result, _transformFunction);
     result = EqualityUtils.hashCodeOf(result, _virtualColumnProvider);
+    result = EqualityUtils.hashCodeOf(result, _vectorLength);
+    result = EqualityUtils.hashCodeOf(result, _vectorDataType);
     return result;
   }
 
