@@ -952,7 +952,6 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       if (_statisticsList == null || _statisticsList.size() == 0) {
         return 0.0;
       }
-    }
 
       // the last run's statistics is used;
       return _statisticsList.get(_statisticsList.size() - 1).getPercentile(p);
