@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Base64;
 import java.util.Random;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
@@ -30,6 +31,7 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -95,8 +97,13 @@ public class TupleSketchIntegrationTest extends BaseClusterIntegrationTest {
             MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES,
             DEFAULT_TABLE_NAME);
     JsonNode jsonNode = postQuery(query);
-    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong() > 0);
-    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).asText().length(), 1756);
+    long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+    byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
+    Sketch<IntegerSummary> deserializedSketch =
+        ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(rawSketchBytes);
+
+    assertTrue(distinctCount > 0);
+    assertEquals(Double.valueOf(deserializedSketch.getEstimate()).longValue(), distinctCount);
     assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(2).asLong() > 0);
     assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(3).asLong() > 0);
   }
