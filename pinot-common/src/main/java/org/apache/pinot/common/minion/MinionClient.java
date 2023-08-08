@@ -31,6 +31,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -70,7 +71,7 @@ public class MinionClient {
         MinionRequestURLBuilder.baseUrl(_controllerUrl).forTaskSchedule(taskType, tableNameWithType));
     HttpResponse response = HTTP_CLIENT.execute(httpPost);
     int statusCode = response.getStatusLine().getStatusCode();
-    final String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+    final String responseString = EntityUtils.toString(response.getEntity());
     if (statusCode >= 400) {
       throw new HttpException(String
           .format("Unable to schedule minion tasks. Error code %d, Error message: %s", statusCode, responseString));
@@ -99,7 +100,7 @@ public class MinionClient {
     HttpGet httpGet = createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTaskState(taskName));
     HttpResponse response = HTTP_CLIENT.execute(httpGet);
     int statusCode = response.getStatusLine().getStatusCode();
-    String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+    String responseString = EntityUtils.toString(response.getEntity());
     if (statusCode >= 400) {
       throw new HttpException(String
           .format("Unable to get state for task: %s. Error code %d, Error message: %s", taskName, statusCode,

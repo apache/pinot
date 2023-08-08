@@ -19,13 +19,12 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.net.URI;
-import java.nio.charset.Charset;
-import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -100,7 +99,7 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
       HttpResponse response = httpClient.execute(httpGet);
       int status = response.getStatusLine().getStatusCode();
       if (status != 200) {
-        String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+        String responseString = EntityUtils.toString(response.getEntity());
         throw new HttpException("Failed to change table state, error: " + responseString);
       }
     }

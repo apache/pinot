@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,11 +42,11 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -215,7 +214,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         int status = response.getStatusLine().getStatusCode();
         // Unexpected server responses are collected and returned as exception.
         if (status != 200 && status != 404) {
-          String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+          String responseString = EntityUtils.toString(response.getEntity());
           throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,
               responseString, uri));
         }

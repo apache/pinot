@@ -35,6 +35,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -89,7 +90,7 @@ public class SchemaUtils {
       try {
         CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet);
         int responseCode = response.getStatusLine().getStatusCode();
-        String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+        String responseString = EntityUtils.toString(response.getEntity());
         if (responseCode >= 400) {
           // File not find error code.
           if (responseCode == 404) {
@@ -161,7 +162,7 @@ public class SchemaUtils {
         CloseableHttpResponse response = HTTP_CLIENT.execute(httpDelete);
         int responseCode = response.getStatusLine().getStatusCode();
         if (responseCode >= 400) {
-          String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+          String responseString = EntityUtils.toString(response.getEntity());
           LOGGER.warn("Got error response code: {}, response: {}", responseCode, responseString);
           return false;
         }

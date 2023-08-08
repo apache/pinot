@@ -57,6 +57,7 @@ import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.apache.pinot.controller.ControllerConf;
@@ -131,7 +132,7 @@ public class PinotRunningQueryResource {
         requestHeaders.forEach(deleteMethod::setHeader);
         CloseableHttpResponse response = client.execute(deleteMethod);
         int status = response.getStatusLine().getStatusCode();
-        String responseContent = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+        String responseContent = EntityUtils.toString(response.getEntity());
         if (status == 200) {
           return responseContent;
         }

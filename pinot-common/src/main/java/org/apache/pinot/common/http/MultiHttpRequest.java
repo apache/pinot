@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.http;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
@@ -31,6 +32,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,8 +80,6 @@ public class MultiHttpRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiHttpRequest.class);
 
   private final Executor _executor;
-  // TODO: Verify that _connectionManager is an instaceOf MultithreadedHttpConnectionManager.
-  //       SimpleHttpConnectionManager is not thread-safe.
   private final HttpClientConnectionManager _connectionManager;
 
   /**
@@ -122,24 +122,28 @@ public class MultiHttpRequest {
         .setConnectionRequestTimeout(timeoutMs)
         .setSocketTimeout(timeoutMs).build(); // setting the socket
 
-    CloseableHttpClient client = HttpClients.custom().setConnectionManager(_connectionManager)
-        .setDefaultRequestConfig(defaultRequestConfig).build(); // try-catch
+    HttpClientBuilder httpClientBuilder = HttpClients.custom()
+        .setConnectionManager(_connectionManager).setDefaultRequestConfig(defaultRequestConfig);
 
     CompletionService<MultiHttpRequestResponse> completionService = new ExecutorCompletionService<>(_executor);
+    CloseableHttpClient client = httpClientBuilder.build();
     for (String url : urls) {
       completionService.submit(() -> {
+        T httpMethod = httpRequestBaseSupplier.apply(url);
+        if (requestHeaders != null) {
+          requestHeaders.forEach(((HttpRequestBase) httpMethod)::setHeader);
+        }
+        CloseableHttpResponse response = null;
         try {
-          T httpMethod = httpRequestBaseSupplier.apply(url);
-          if (requestHeaders != null) {
-            requestHeaders.forEach(((HttpRequestBase) httpMethod)::setHeader);
-          }
-          CloseableHttpResponse response = client.execute(httpMethod);
+          response = client.execute(httpMethod);
           return new MultiHttpRequestResponse(httpMethod.getURI(), response);
-        } catch (Exception e) {
+        } catch (IOException ex) {
           // Log only exception type and message instead of the whole stack trace
-          LOGGER.warn("Caught '{}' while executing: {} on URL: {}", e, httpMethodName, url);
-          client.close();
-          throw e;
+          LOGGER.warn("Caught '{}' while executing: {} on URL: {}", ex, httpMethodName, url);
+          if (response != null) {
+            response.close();
+          }
+          throw ex;
         }
       });
     }
