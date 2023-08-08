@@ -877,7 +877,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       }
     }
 
-    public double getPercentile(double p){
+    public double getPercentile(double p) {
       return _statistics.getPercentile(p);
     }
 
@@ -948,9 +948,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       return _avgClientTime;
     }
 
-    public double getPercentile(double p){
-      if(_statisticsList == null || _statisticsList.size() == 0)
+    public double getPercentile(double p) {
+      if (_statisticsList == null || _statisticsList.size() == 0) {
         return 0.0;
+      }
+    }
 
       // the last run's statistics is used;
       return _statisticsList.get(_statisticsList.size() - 1).getPercentile(p);
