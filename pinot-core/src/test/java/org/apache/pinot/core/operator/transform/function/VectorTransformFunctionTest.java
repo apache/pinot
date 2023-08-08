@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.testng.annotations.DataProvider;
@@ -60,7 +61,7 @@ public class VectorTransformFunctionTest extends BaseTransformFunctionTest {
   @DataProvider(name = "testVectorTransformFunctionDataProvider")
   public Object[][] testVectorTransformFunctionDataProvider() {
     String zeroVectorLiteral = "ARRAY[0.0"
-        + ",0.0".repeat(VECTOR_DIM_SIZE - 1)
+        + StringUtils.repeat(",0.0", VECTOR_DIM_SIZE - 1)
         + "]";
     return new Object[][]{
         new Object[]{"cosineDistance(vector1, vector2)", 0.1, 0.4},
