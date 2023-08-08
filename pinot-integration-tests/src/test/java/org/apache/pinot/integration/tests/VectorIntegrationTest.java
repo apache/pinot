@@ -32,6 +32,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -131,10 +132,10 @@ public class VectorIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String zeroVectorStringLiteral = "ARRAY[0.0"
-        + ", 0.0".repeat(VECTOR_DIM_SIZE - 1)
+        + StringUtils.repeat(", 0.0", VECTOR_DIM_SIZE - 1)
         + "]";
     String oneVectorStringLiteral = "ARRAY[1.0"
-        + ", 1.0".repeat(VECTOR_DIM_SIZE - 1)
+        + StringUtils.repeat(", 1.0", VECTOR_DIM_SIZE - 1)
         + "]";
     String query =
         String.format("SELECT "
