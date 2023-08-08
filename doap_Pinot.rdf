@@ -26,7 +26,7 @@
     <license rdf:resource="https://spdx.org/licenses/Apache-2.0" />
     <name>Apache Pinot</name>
     <homepage rdf:resource="https://pinot.apache.org" />
-    <asfext:pmc rdf:resource="https://projects.apache.org/committee.html?pinot" />
+    <asfext:pmc rdf:resource="https://pinot.apache.org" />
     <shortdesc>Apache Pinot is a real-time distributed OLAP datastore purpose-built for low-latency, high-throughput analytics.</shortdesc>
     <description>Apache Pinot is a real-time distributed online analytical processing (OLAP) datastore. Use Pinot to ingest and immediately query data from streaming or batch data sources (including, Apache Kafka, Amazon Kinesis, Hadoop HDFS, Amazon S3, Azure ADLS, and Google Cloud Storage).
 Apache Pinot includes the following:
@@ -36,7 +36,7 @@ Scaling up and out with no upper bound.
 Consistent performance based on the size of your cluster and an expected query per second (QPS) threshold.
 It's perfect for user-facing real-time analytics and other analytical use cases, including internal dashboards, anomaly detection, and ad hoc data exploration.</description>
     <bug-database rdf:resource="https://github.com/apache/pinot/issues" />
-		<mailing-list rdf:resource="https://docs.pinot.apache.org/community-1/community" />
+    <mailing-list rdf:resource="https://docs.pinot.apache.org/community-1/community" />
     <download-page rdf:resource="https://pinot.apache.org/download" />
     <programming-language>Java</programming-language>
     <category rdf:resource="https://projects.apache.org/category/big-data" />
