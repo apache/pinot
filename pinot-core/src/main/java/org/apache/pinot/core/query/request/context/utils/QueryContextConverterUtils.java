@@ -24,10 +24,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -64,40 +64,29 @@ public class QueryContextConverterUtils {
 
     // SELECT
     List<ExpressionContext> selectExpressions;
+    boolean distinct = false;
     List<Expression> selectList = pinotQuery.getSelectList();
+    // Handle DISTINCT
+    if (selectList.size() == 1) {
+      Function function = selectList.get(0).getFunctionCall();
+      if (function != null && function.getOperator().equals("distinct")) {
+        distinct = true;
+        selectList = function.getOperands();
+      }
+    }
     List<String> aliasList = new ArrayList<>(selectList.size());
     selectExpressions = new ArrayList<>(selectList.size());
     for (Expression thriftExpression : selectList) {
       // Handle alias
-      Expression expressionWithoutAlias = thriftExpression;
-      if (thriftExpression.getType() == ExpressionType.FUNCTION) {
-        Function function = thriftExpression.getFunctionCall();
+      Function function = thriftExpression.getFunctionCall();
+      Expression expressionWithoutAlias;
+      if (function != null && function.getOperator().equals("as")) {
         List<Expression> operands = function.getOperands();
-        switch (function.getOperator().toUpperCase()) {
-          case "AS":
-            expressionWithoutAlias = operands.get(0);
-            aliasList.add(operands.get(1).getIdentifier().getName());
-            break;
-          case "DISTINCT":
-            int numOperands = operands.size();
-            for (int i = 0; i < numOperands; i++) {
-              Expression operand = operands.get(i);
-              Function operandFunction = operand.getFunctionCall();
-              if (operandFunction != null && operandFunction.getOperator().equalsIgnoreCase("AS")) {
-                operands.set(i, operandFunction.getOperands().get(0));
-                aliasList.add(operandFunction.getOperands().get(1).getIdentifier().getName());
-              } else {
-                aliasList.add(null);
-              }
-            }
-            break;
-          default:
-            // Add null as a placeholder for alias.
-            aliasList.add(null);
-            break;
-        }
+        expressionWithoutAlias = operands.get(0);
+        aliasList.add(operands.get(1).getIdentifier().getName());
       } else {
-        // Add null as a placeholder for alias.
+        expressionWithoutAlias = thriftExpression;
+        // Add null as a placeholder for alias
         aliasList.add(null);
       }
       selectExpressions.add(RequestContextUtils.getExpression(expressionWithoutAlias));
@@ -124,16 +113,20 @@ public class QueryContextConverterUtils {
     List<OrderByExpressionContext> orderByExpressions = null;
     List<Expression> orderByList = pinotQuery.getOrderByList();
     if (CollectionUtils.isNotEmpty(orderByList)) {
-      // Deduplicate the order-by expressions
       orderByExpressions = new ArrayList<>(orderByList.size());
-      Set<ExpressionContext> expressionSet = new HashSet<>();
+      Set<Expression> seen = new HashSet<>();
       for (Expression orderBy : orderByList) {
-        // NOTE: Order-by is always a Function with the ordering of the Expression
-        Function thriftFunction = orderBy.getFunctionCall();
-        ExpressionContext expression = RequestContextUtils.getExpression(thriftFunction.getOperands().get(0));
-        if (expressionSet.add(expression)) {
-          boolean isAsc = thriftFunction.getOperator().equalsIgnoreCase("ASC");
-          orderByExpressions.add(new OrderByExpressionContext(expression, isAsc));
+        Boolean isNullsLast = isNullsLast(orderBy);
+        boolean isAsc = isAsc(orderBy, isNullsLast);
+        Expression orderByFunctionsRemoved = CalciteSqlParser.removeOrderByFunctions(orderBy);
+        // Deduplicate the order-by expressions
+        if (seen.add(orderByFunctionsRemoved)) {
+          ExpressionContext expressionContext = RequestContextUtils.getExpression(orderByFunctionsRemoved);
+          if (isNullsLast != null) {
+            orderByExpressions.add(new OrderByExpressionContext(expressionContext, isAsc, isNullsLast));
+          } else {
+            orderByExpressions.add(new OrderByExpressionContext(expressionContext, isAsc));
+          }
         }
       }
     }
@@ -156,10 +149,29 @@ public class QueryContextConverterUtils {
     }
 
     return new QueryContext.Builder().setTableName(tableName).setSubquery(subquery)
-        .setSelectExpressions(selectExpressions).setAliasList(aliasList).setFilter(filter)
+        .setSelectExpressions(selectExpressions).setDistinct(distinct).setAliasList(aliasList).setFilter(filter)
         .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setExpressionOverrideHints(expressionContextOverrideHints)
         .setExplain(pinotQuery.isExplain()).build();
+  }
+
+  @Nullable
+  private static Boolean isNullsLast(Expression expression) {
+    String operator = expression.getFunctionCall().getOperator();
+    if (operator.equals(CalciteSqlParser.NULLS_LAST)) {
+      return true;
+    } else if (operator.equals(CalciteSqlParser.NULLS_FIRST)) {
+      return false;
+    } else {
+      return null;
+    }
+  }
+
+  private static boolean isAsc(Expression expression, Boolean isNullsLast) {
+    if (isNullsLast != null) {
+      expression = expression.getFunctionCall().getOperands().get(0);
+    }
+    return expression.getFunctionCall().getOperator().equals(CalciteSqlParser.ASC);
   }
 }

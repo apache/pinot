@@ -26,11 +26,13 @@ public class RecordInfo {
   private final PrimaryKey _primaryKey;
   private final int _docId;
   private final Comparable _comparisonValue;
+  private final boolean _deleteRecord;
 
-  public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
+  public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue, boolean deleteRecord) {
     _primaryKey = primaryKey;
     _docId = docId;
     _comparisonValue = comparisonValue;
+    _deleteRecord = deleteRecord;
   }
 
   public PrimaryKey getPrimaryKey() {
@@ -43,5 +45,9 @@ public class RecordInfo {
 
   public Comparable getComparisonValue() {
     return _comparisonValue;
+  }
+
+  public boolean isDeleteRecord() {
+    return _deleteRecord;
   }
 }

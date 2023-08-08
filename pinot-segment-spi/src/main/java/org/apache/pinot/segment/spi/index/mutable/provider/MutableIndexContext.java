@@ -18,36 +18,104 @@
  */
 package org.apache.pinot.segment.spi.index.mutable.provider;
 
+import java.io.File;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
-import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-public interface MutableIndexContext {
-  PinotDataBufferMemoryManager getMemoryManager();
+public class MutableIndexContext {
+  private final int _capacity;
+  private final FieldSpec _fieldSpec;
+  private final int _fixedLengthBytes;
+  private final boolean _hasDictionary;
+  private final boolean _offHeap;
+  private final int _estimatedColSize;
+  private final int _estimatedCardinality;
+  private final int _avgNumMultiValues;
+  private final String _segmentName;
+  private final PinotDataBufferMemoryManager _memoryManager;
+  private final File _consumerDir;
 
-  FieldSpec getFieldSpec();
+  public MutableIndexContext(FieldSpec fieldSpec, int fixedLengthBytes, boolean hasDictionary, String segmentName,
+      PinotDataBufferMemoryManager memoryManager, int capacity, boolean offHeap, int estimatedColSize,
+      int estimatedCardinality, int avgNumMultiValues, File consumerDir) {
+    _fieldSpec = fieldSpec;
+    _fixedLengthBytes = fixedLengthBytes;
+    _hasDictionary = hasDictionary;
+    _segmentName = segmentName;
+    _memoryManager = memoryManager;
+    _capacity = capacity;
+    _offHeap = offHeap;
+    _estimatedColSize = estimatedColSize;
+    _estimatedCardinality = estimatedCardinality;
+    _avgNumMultiValues = avgNumMultiValues;
+    _consumerDir = consumerDir;
+  }
 
-  String getSegmentName();
+  public PinotDataBufferMemoryManager getMemoryManager() {
+    return _memoryManager;
+  }
 
-  boolean hasDictionary();
+  public String getSegmentName() {
+    return _segmentName;
+  }
 
-  int getCapacity();
+  public FieldSpec getFieldSpec() {
+    return _fieldSpec;
+  }
 
-  boolean isOffHeap();
+  public int getFixedLengthBytes() {
+    return _fixedLengthBytes;
+  }
 
-  static Builder builder() {
+  public boolean hasDictionary() {
+    return _hasDictionary;
+  }
+
+  public int getCapacity() {
+    return _capacity;
+  }
+
+  public boolean isOffHeap() {
+    return _offHeap;
+  }
+
+  public int getEstimatedColSize() {
+    return _estimatedColSize;
+  }
+
+  public int getEstimatedCardinality() {
+    return _estimatedCardinality;
+  }
+
+  public int getAvgNumMultiValues() {
+    return _avgNumMultiValues;
+  }
+
+  @Nullable
+  public File getConsumerDir() {
+    return _consumerDir;
+  }
+
+  public static Builder builder() {
     return new Builder();
   }
 
-  class Builder {
+  public static class Builder {
     private FieldSpec _fieldSpec;
+    private int _fixedLengthBytes;
     private String _segmentName;
     private boolean _hasDictionary = true;
     private boolean _offHeap = true;
     private int _capacity;
     private PinotDataBufferMemoryManager _memoryManager;
+    private int _estimatedColSize;
+    private int _estimatedCardinality;
+    private int _avgNumMultiValues;
+    @Nullable
+    private File _consumerDir;
 
     public Builder withMemoryManager(PinotDataBufferMemoryManager memoryManager) {
       _memoryManager = memoryManager;
@@ -79,178 +147,35 @@ public interface MutableIndexContext {
       return this;
     }
 
-    public Common build() {
-      return new Common(Objects.requireNonNull(_fieldSpec), _hasDictionary, Objects.requireNonNull(_segmentName),
-          Objects.requireNonNull(_memoryManager), _capacity, _offHeap);
-    }
-  }
-
-  final class Common implements MutableIndexContext {
-    private final int _capacity;
-    private final FieldSpec _fieldSpec;
-    private final boolean _hasDictionary;
-    private final boolean _offHeap;
-    private final String _segmentName;
-    private final PinotDataBufferMemoryManager _memoryManager;
-
-    public Common(FieldSpec fieldSpec, boolean hasDictionary, String segmentName,
-        PinotDataBufferMemoryManager memoryManager, int capacity, boolean offHeap) {
-      _fieldSpec = fieldSpec;
-      _hasDictionary = hasDictionary;
-      _segmentName = segmentName;
-      _memoryManager = memoryManager;
-      _capacity = capacity;
-      _offHeap = offHeap;
-    }
-
-    @Override
-    public PinotDataBufferMemoryManager getMemoryManager() {
-      return _memoryManager;
-    }
-
-    @Override
-    public String getSegmentName() {
-      return _segmentName;
-    }
-
-    @Override
-    public FieldSpec getFieldSpec() {
-      return _fieldSpec;
-    }
-
-    @Override
-    public boolean hasDictionary() {
-      return _hasDictionary;
-    }
-
-    @Override
-    public int getCapacity() {
-      return _capacity;
-    }
-
-    @Override
-    public boolean isOffHeap() {
-      return _offHeap;
-    }
-
-    public Dictionary forDictionary(int estimatedColSize, int estimatedCardinality) {
-      return new Dictionary(this, estimatedColSize, estimatedCardinality);
-    }
-
-    public Forward forForwardIndex(int avgNumMultiValues) {
-      return new Forward(this, avgNumMultiValues);
-    }
-
-    public Inverted forInvertedIndex() {
-      return new Inverted(this);
-    }
-
-    public Json forJsonIndex(JsonIndexConfig jsonIndexConfig) {
-      return new Json(this, jsonIndexConfig);
-    }
-
-    public Text forTextIndex() {
-      return new Text(this);
-    }
-  }
-
-  class Wrapper implements MutableIndexContext {
-
-    private final MutableIndexContext _wrapped;
-
-    public Wrapper(MutableIndexContext wrapped) {
-      _wrapped = wrapped;
-    }
-
-    @Override
-    public PinotDataBufferMemoryManager getMemoryManager() {
-      return _wrapped.getMemoryManager();
-    }
-
-    @Override
-    public FieldSpec getFieldSpec() {
-      return _wrapped.getFieldSpec();
-    }
-
-    @Override
-    public String getSegmentName() {
-      return _wrapped.getSegmentName();
-    }
-
-    @Override
-    public boolean hasDictionary() {
-      return _wrapped.hasDictionary();
-    }
-
-    @Override
-    public int getCapacity() {
-      return _wrapped.getCapacity();
-    }
-
-    @Override
-    public boolean isOffHeap() {
-      return _wrapped.isOffHeap();
-    }
-  }
-
-  class Dictionary extends Wrapper {
-
-    private final int _estimatedColSize;
-    private final int _estimatedCardinality;
-
-    public Dictionary(MutableIndexContext wrapped, int estimatedColSize, int estimatedCardinality) {
-      super(wrapped);
+    public Builder withEstimatedColSize(int estimatedColSize) {
       _estimatedColSize = estimatedColSize;
+      return this;
+    }
+
+    public Builder withEstimatedCardinality(int estimatedCardinality) {
       _estimatedCardinality = estimatedCardinality;
+      return this;
     }
 
-    public int getEstimatedColSize() {
-      return _estimatedColSize;
-    }
-
-    public int getEstimatedCardinality() {
-      return _estimatedCardinality;
-    }
-  }
-
-  class Forward extends Wrapper {
-
-    private final int _avgNumMultiValues;
-
-    public Forward(MutableIndexContext wrapped, int avgNumMultiValues) {
-      super(wrapped);
+    public Builder withAvgNumMultiValues(int avgNumMultiValues) {
       _avgNumMultiValues = avgNumMultiValues;
+      return this;
     }
 
-    public int getAvgNumMultiValues() {
-      return _avgNumMultiValues;
-    }
-  }
-
-  class Inverted extends Wrapper {
-
-    public Inverted(MutableIndexContext wrapped) {
-      super(wrapped);
-    }
-  }
-
-  class Json extends Wrapper {
-    private final JsonIndexConfig _jsonIndexConfig;
-
-    public Json(MutableIndexContext wrapped, JsonIndexConfig jsonIndexConfig) {
-      super(wrapped);
-      _jsonIndexConfig = jsonIndexConfig;
+    public Builder withConsumerDir(File consumerDir) {
+      _consumerDir = consumerDir;
+      return this;
     }
 
-    public JsonIndexConfig getJsonIndexConfig() {
-      return _jsonIndexConfig;
+    public Builder withFixedLengthBytes(int fixedLengthBytes) {
+      _fixedLengthBytes = fixedLengthBytes;
+      return this;
     }
-  }
 
-  class Text extends Wrapper {
-
-    public Text(MutableIndexContext wrapped) {
-      super(wrapped);
+    public MutableIndexContext build() {
+      return new MutableIndexContext(Objects.requireNonNull(_fieldSpec), _fixedLengthBytes, _hasDictionary,
+          Objects.requireNonNull(_segmentName), Objects.requireNonNull(_memoryManager), _capacity, _offHeap,
+          _estimatedColSize, _estimatedCardinality, _avgNumMultiValues, _consumerDir);
     }
   }
 }

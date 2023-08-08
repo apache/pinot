@@ -25,8 +25,8 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
-import org.apache.calcite.rel.logical.LogicalExchange;
 import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.calcite.tools.RelBuilderFactory;
 
 
@@ -65,19 +65,18 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
 
     if (joinInfo.leftKeys.isEmpty()) {
       // when there's no JOIN key, use broadcast.
-      leftExchange = LogicalExchange.create(leftInput, RelDistributions.SINGLETON);
-      rightExchange = LogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
+      leftExchange = PinotLogicalExchange.create(leftInput, RelDistributions.RANDOM_DISTRIBUTED);
+      rightExchange = PinotLogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
     } else {
       // when join key exists, use hash distribution.
-      leftExchange = LogicalExchange.create(leftInput, RelDistributions.hash(joinInfo.leftKeys));
-      rightExchange = LogicalExchange.create(rightInput, RelDistributions.hash(joinInfo.rightKeys));
+      leftExchange = PinotLogicalExchange.create(leftInput, RelDistributions.hash(joinInfo.leftKeys));
+      rightExchange = PinotLogicalExchange.create(rightInput, RelDistributions.hash(joinInfo.rightKeys));
     }
 
     RelNode newJoinNode =
-        new LogicalJoin(join.getCluster(), join.getTraitSet(), leftExchange, rightExchange, join.getCondition(),
-            join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
+        new LogicalJoin(join.getCluster(), join.getTraitSet(), join.getHints(), leftExchange, rightExchange,
+            join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
             ImmutableList.copyOf(join.getSystemFieldList()));
-
     call.transformTo(newJoinNode);
   }
 }

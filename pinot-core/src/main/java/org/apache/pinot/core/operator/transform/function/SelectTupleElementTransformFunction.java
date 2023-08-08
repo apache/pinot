@@ -18,20 +18,24 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
-public abstract class SelectTupleElementTransformFunction extends BaseTransformFunction {
+public abstract class SelectTupleElementTransformFunction
+    extends ComputeDifferentlyWhenNullHandlingEnabledTransformFunction {
 
   private static final EnumSet<FieldSpec.DataType> SUPPORTED_DATATYPES = EnumSet.of(FieldSpec.DataType.INT,
       FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.BIG_DECIMAL,
-      FieldSpec.DataType.TIMESTAMP, FieldSpec.DataType.STRING);
+      FieldSpec.DataType.TIMESTAMP, FieldSpec.DataType.STRING, FieldSpec.DataType.UNKNOWN);
 
   private static final EnumMap<FieldSpec.DataType, EnumSet<FieldSpec.DataType>> ACCEPTABLE_COMBINATIONS =
       createAcceptableCombinations();
@@ -46,7 +50,9 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      boolean nullHandlingEnabled) {
+    super.init(arguments, columnContextMap, nullHandlingEnabled);
     if (arguments.isEmpty()) {
       throw new IllegalArgumentException(_name + " takes at least one argument");
     }
@@ -63,7 +69,8 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
       }
       if (dataType == null) {
         dataType = argumentType;
-      } else if (ACCEPTABLE_COMBINATIONS.get(dataType).contains(argumentType)) {
+      } else if (dataType.isUnknown() || argumentType.isUnknown() || ACCEPTABLE_COMBINATIONS.get(dataType)
+          .contains(argumentType)) {
         dataType = getLowestCommonDenominatorType(dataType, argumentType);
       } else {
         throw new IllegalArgumentException(
@@ -82,6 +89,25 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
   @Override
   public String getName() {
     return _name;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    RoaringBitmap bitmap = _arguments.get(0).getNullBitmap(valueBlock);
+    if (bitmap == null || bitmap.isEmpty()) {
+      return bitmap;
+    }
+    for (int i = 1; i < _arguments.size(); i++) {
+      RoaringBitmap curBitmap = _arguments.get(i).getNullBitmap(valueBlock);
+      if (curBitmap == null || curBitmap.isEmpty()) {
+        return curBitmap;
+      }
+      bitmap.and(curBitmap);
+      if (bitmap.isEmpty()) {
+        return null;
+      }
+    }
+    return bitmap;
   }
 
   private static FieldSpec.DataType getLowestCommonDenominatorType(FieldSpec.DataType left, FieldSpec.DataType right) {
@@ -109,4 +135,286 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
     combinations.put(FieldSpec.DataType.STRING, EnumSet.of(FieldSpec.DataType.STRING));
     return combinations;
   }
+
+  @Override
+  protected int[] transformToIntValuesSVUsingValue(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initIntValuesSV(numDocs);
+    int[] values = _arguments.get(0).transformToIntValuesSV(valueBlock);
+    System.arraycopy(values, 0, _intValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToIntValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _intValuesSV[j] = binaryFunction(_intValuesSV[j], values[j]);
+      }
+    }
+    return _intValuesSV;
+  }
+
+  @Override
+  protected int[] transformToIntValuesSVUsingValueAndNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initIntValuesSV(numDocs);
+    int[] curValues = _arguments.get(0).transformToIntValuesSV(valueBlock);
+    System.arraycopy(curValues, 0, _intValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = _arguments.get(0).getNullBitmap(valueBlock);
+    for (int i = 1; i < _arguments.size(); i++) {
+      curValues = _arguments.get(i).transformToIntValuesSV(valueBlock);
+      RoaringBitmap curNull = _arguments.get(i).getNullBitmap(valueBlock);
+      for (int j = 0; j < numDocs & j < curValues.length; j++) {
+        // If current value is not null, we process the data.
+        if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _intValuesSV[j] = curValues[j];
+          } else {
+            _intValuesSV[j] = binaryFunction(_intValuesSV[j], curValues[j]);
+          }
+        }
+      }
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
+    }
+    return _intValuesSV;
+  }
+
+  abstract protected int binaryFunction(int a, int b);
+
+  @Override
+  protected long[] transformToLongValuesSVUsingValue(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initLongValuesSV(numDocs);
+    long[] values = _arguments.get(0).transformToLongValuesSV(valueBlock);
+    System.arraycopy(values, 0, _longValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToLongValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _longValuesSV[j] = binaryFunction(_longValuesSV[j], values[j]);
+      }
+    }
+    return _longValuesSV;
+  }
+
+  @Override
+  protected long[] transformToLongValuesSVUsingValueAndNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initLongValuesSV(numDocs);
+    long[] curValues = _arguments.get(0).transformToLongValuesSV(valueBlock);
+    System.arraycopy(curValues, 0, _longValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = _arguments.get(0).getNullBitmap(valueBlock);
+    for (int i = 1; i < _arguments.size(); i++) {
+      curValues = _arguments.get(i).transformToLongValuesSV(valueBlock);
+      RoaringBitmap curNull = _arguments.get(i).getNullBitmap(valueBlock);
+      for (int j = 0; j < numDocs & j < curValues.length; j++) {
+        // If current value is not null, we process the data.
+        if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _longValuesSV[j] = curValues[j];
+          } else {
+            _longValuesSV[j] = binaryFunction(_longValuesSV[j], curValues[j]);
+          }
+        }
+      }
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
+    }
+    return _longValuesSV;
+  }
+
+  abstract protected long binaryFunction(long a, long b);
+
+  @Override
+  protected float[] transformToFloatValuesSVUsingValue(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initFloatValuesSV(numDocs);
+    float[] values = _arguments.get(0).transformToFloatValuesSV(valueBlock);
+    System.arraycopy(values, 0, _floatValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToFloatValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _floatValuesSV[j] = binaryFunction(_floatValuesSV[j], values[j]);
+      }
+    }
+    return _floatValuesSV;
+  }
+
+  @Override
+  protected float[] transformToFloatValuesSVUsingValueAndNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initFloatValuesSV(numDocs);
+    float[] curValues = _arguments.get(0).transformToFloatValuesSV(valueBlock);
+    System.arraycopy(curValues, 0, _floatValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = _arguments.get(0).getNullBitmap(valueBlock);
+    for (int i = 1; i < _arguments.size(); i++) {
+      curValues = _arguments.get(i).transformToFloatValuesSV(valueBlock);
+      RoaringBitmap curNull = _arguments.get(i).getNullBitmap(valueBlock);
+      for (int j = 0; j < numDocs & j < curValues.length; j++) {
+        // If current value is not null, we process the data.
+        if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _floatValuesSV[j] = curValues[j];
+          } else {
+            _floatValuesSV[j] = binaryFunction(_floatValuesSV[j], curValues[j]);
+          }
+        }
+      }
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
+    }
+    return _floatValuesSV;
+  }
+
+  abstract protected float binaryFunction(float a, float b);
+
+  @Override
+  protected double[] transformToDoubleValuesSVUsingValue(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initDoubleValuesSV(numDocs);
+    double[] values = _arguments.get(0).transformToDoubleValuesSV(valueBlock);
+    System.arraycopy(values, 0, _doubleValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToDoubleValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _doubleValuesSV[j] = binaryFunction(_doubleValuesSV[j], values[j]);
+      }
+    }
+    return _doubleValuesSV;
+  }
+
+  @Override
+  protected double[] transformToDoubleValuesSVUsingValueAndNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initDoubleValuesSV(numDocs);
+    double[] curValues = _arguments.get(0).transformToDoubleValuesSV(valueBlock);
+    System.arraycopy(curValues, 0, _doubleValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = _arguments.get(0).getNullBitmap(valueBlock);
+    for (int i = 1; i < _arguments.size(); i++) {
+      curValues = _arguments.get(i).transformToDoubleValuesSV(valueBlock);
+      RoaringBitmap curNull = _arguments.get(i).getNullBitmap(valueBlock);
+      for (int j = 0; j < numDocs & j < curValues.length; j++) {
+        // If current value is not null, we process the data.
+        if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _doubleValuesSV[j] = curValues[j];
+          } else {
+            _doubleValuesSV[j] = binaryFunction(_doubleValuesSV[j], curValues[j]);
+          }
+        }
+      }
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
+    }
+    return _doubleValuesSV;
+  }
+
+  abstract protected double binaryFunction(double a, double b);
+
+  @Override
+  protected BigDecimal[] transformToBigDecimalValuesSVUsingValue(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initBigDecimalValuesSV(numDocs);
+    BigDecimal[] values = _arguments.get(0).transformToBigDecimalValuesSV(valueBlock);
+    System.arraycopy(values, 0, _bigDecimalValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToBigDecimalValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _bigDecimalValuesSV[j] = binaryFunction(_bigDecimalValuesSV[j], values[j]);
+      }
+    }
+    return _bigDecimalValuesSV;
+  }
+
+  @Override
+  protected BigDecimal[] transformToBigDecimalValuesSVUsingValueAndNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initBigDecimalValuesSV(numDocs);
+    BigDecimal[] curValues = _arguments.get(0).transformToBigDecimalValuesSV(valueBlock);
+    System.arraycopy(curValues, 0, _bigDecimalValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = _arguments.get(0).getNullBitmap(valueBlock);
+    for (int i = 1; i < _arguments.size(); i++) {
+      curValues = _arguments.get(i).transformToBigDecimalValuesSV(valueBlock);
+      RoaringBitmap curNull = _arguments.get(i).getNullBitmap(valueBlock);
+      for (int j = 0; j < numDocs & j < curValues.length; j++) {
+        // If current value is not null, we process the data.
+        if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _bigDecimalValuesSV[j] = curValues[j];
+          } else {
+            _bigDecimalValuesSV[j] = binaryFunction(_bigDecimalValuesSV[j], (curValues[j]));
+          }
+        }
+      }
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
+    }
+    return _bigDecimalValuesSV;
+  }
+
+  abstract protected BigDecimal binaryFunction(BigDecimal a, BigDecimal b);
+
+  @Override
+  protected String[] transformToStringValuesSVUsingValue(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesSV(numDocs);
+    String[] values = _arguments.get(0).transformToStringValuesSV(valueBlock);
+    System.arraycopy(values, 0, _stringValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToStringValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _stringValuesSV[j] = binaryFunction(_stringValuesSV[j], (values[j]));
+      }
+    }
+    return _stringValuesSV;
+  }
+
+  @Override
+  protected String[] transformToStringValuesSVUsingValueAndNull(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesSV(numDocs);
+    String[] curValues = _arguments.get(0).transformToStringValuesSV(valueBlock);
+    System.arraycopy(curValues, 0, _stringValuesSV, 0, numDocs);
+    RoaringBitmap nullBitmap = _arguments.get(0).getNullBitmap(valueBlock);
+    for (int i = 1; i < _arguments.size(); i++) {
+      curValues = _arguments.get(i).transformToStringValuesSV(valueBlock);
+      RoaringBitmap curNull = _arguments.get(i).getNullBitmap(valueBlock);
+      for (int j = 0; j < numDocs & j < curValues.length; j++) {
+        // If current value is not null, we process the data.
+        if (curNull == null || !curNull.contains(j)) {
+          // If existing maximum value is null, we set the value directly.
+          if (nullBitmap != null && nullBitmap.contains(j)) {
+            _stringValuesSV[j] = curValues[j];
+          } else {
+            _stringValuesSV[j] = binaryFunction(_stringValuesSV[j], (curValues[j]));
+          }
+        }
+      }
+      if (nullBitmap != null && curNull != null) {
+        nullBitmap.and(curNull);
+      } else {
+        nullBitmap = null;
+      }
+    }
+    return _stringValuesSV;
+  }
+
+  abstract protected String binaryFunction(String a, String b);
 }

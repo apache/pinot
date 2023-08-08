@@ -20,8 +20,10 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -64,5 +66,36 @@ public class TruncateDecimalTransformFunctionTest extends BaseTransformFunctionT
 
   public Double truncate(double a, int b) {
     return BigDecimal.valueOf(a).setScale(b, RoundingMode.DOWN).doubleValue();
+  }
+
+  @Test
+  public void testTruncateNullLiteral() {
+    ExpressionContext expression = RequestContextUtils.getExpression("truncate(null, 1)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.TRUNCATE.getName());
+    double[] expectedValues = new double[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testTruncateNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("truncate(%s, 0)", INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof TruncateDecimalTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.TRUNCATE.getName());
+    double[] expectedValues = new double[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = _intSVValues[i];
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

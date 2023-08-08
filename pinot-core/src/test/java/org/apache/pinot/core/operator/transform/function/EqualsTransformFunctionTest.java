@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 public class EqualsTransformFunctionTest extends BinaryOperatorTransformFunctionTest {
 
   @Override
@@ -28,5 +34,37 @@ public class EqualsTransformFunctionTest extends BinaryOperatorTransformFunction
   @Override
   String getFunctionName() {
     return new EqualsTransformFunction().getName();
+  }
+
+  @Test
+  public void testEqualsNullLiteral() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("equals(null, %s)", INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof EqualsTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "equals");
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testEqualsNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("equals(%s, %s)", INT_SV_NULL_COLUMN, INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof EqualsTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "equals");
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = 1;
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

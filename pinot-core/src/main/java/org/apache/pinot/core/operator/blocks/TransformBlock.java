@@ -19,67 +19,47 @@
 package org.apache.pinot.core.operator.blocks;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.common.BlockDocIdValueSet;
-import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.docvalsets.TransformBlockValSet;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 
 
 /**
- * Transform Block holds blocks of transformed columns.
- * <p>In absence of transforms, it servers as a pass-through to projection block.
+ * The {@code TransformBlock} contains values of the transformed columns.
  */
-public class TransformBlock implements Block {
-  protected final ProjectionBlock _projectionBlock;
+public class TransformBlock implements ValueBlock {
+  protected final ValueBlock _sourceBlock;
   protected final Map<ExpressionContext, TransformFunction> _transformFunctionMap;
 
-  public TransformBlock(ProjectionBlock projectionBlock,
-      Map<ExpressionContext, TransformFunction> transformFunctionMap) {
-    _projectionBlock = projectionBlock;
+  public TransformBlock(ValueBlock sourceBlock, Map<ExpressionContext, TransformFunction> transformFunctionMap) {
+    _sourceBlock = sourceBlock;
     _transformFunctionMap = transformFunctionMap;
   }
 
+  @Override
   public int getNumDocs() {
-    return _projectionBlock.getNumDocs();
+    return _sourceBlock.getNumDocs();
   }
 
+  @Nullable
+  @Override
   public int[] getDocIds() {
-    return _projectionBlock.getDocIds();
+    return _sourceBlock.getDocIds();
   }
 
+  @Override
   public BlockValSet getBlockValueSet(ExpressionContext expression) {
     if (expression.getType() == ExpressionContext.Type.IDENTIFIER) {
-      return _projectionBlock.getBlockValueSet(expression.getIdentifier());
+      return _sourceBlock.getBlockValueSet(expression);
     } else {
-      return new TransformBlockValSet(_projectionBlock, _transformFunctionMap.get(expression), expression);
+      return new TransformBlockValSet(_sourceBlock, _transformFunctionMap.get(expression));
     }
   }
 
+  @Override
   public BlockValSet getBlockValueSet(String column) {
-    return _projectionBlock.getBlockValueSet(column);
-  }
-
-  @Override
-  public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockDocIdValueSet getBlockDocIdValueSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockMetadata getMetadata() {
-    throw new UnsupportedOperationException();
+    return _sourceBlock.getBlockValueSet(column);
   }
 }

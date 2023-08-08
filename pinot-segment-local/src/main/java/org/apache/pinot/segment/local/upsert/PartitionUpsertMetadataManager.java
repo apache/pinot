@@ -65,6 +65,13 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   void addSegment(ImmutableSegment segment);
 
   /**
+   * Different from adding a segment, when preloading a segment, the upsert metadata may be updated more efficiently.
+   * Basically the upsert metadata can be directly updated for each primary key, without doing the more costly
+   * read-compare-update.
+   */
+  void preloadSegment(ImmutableSegment segment);
+
+  /**
    * Updates the upsert metadata for a new consumed record in the given consuming segment.
    */
   void addRecord(MutableSegment segment, RecordInfo recordInfo);
@@ -83,4 +90,20 @@ public interface PartitionUpsertMetadataManager extends Closeable {
    * Returns the merged record when partial-upsert is enabled.
    */
   GenericRow updateRecord(GenericRow record, RecordInfo recordInfo);
+
+  /**
+   * Takes snapshot for all the tracked immutable segments when snapshot is enabled. This method should be invoked
+   * before a new consuming segment starts consuming.
+   */
+  void takeSnapshot();
+
+  /**
+   * Remove the expired primary keys from the metadata when TTL is enabled.
+   */
+  void removeExpiredPrimaryKeys();
+
+  /**
+   * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
+   */
+  void stop();
 }

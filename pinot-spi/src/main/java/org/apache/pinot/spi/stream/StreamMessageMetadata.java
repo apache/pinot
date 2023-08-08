@@ -30,23 +30,35 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class StreamMessageMetadata implements RowMetadata {
   private final long _recordIngestionTimeMs;
+  private final long _firstStreamRecordIngestionTimeMs;
   private final GenericRow _headers;
   private final Map<String, String> _metadata;
 
-  public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers) {
-    this(recordIngestionTimeMs, headers, Collections.emptyMap());
+  public StreamMessageMetadata(long recordIngestionTimeMs) {
+    this(recordIngestionTimeMs, Long.MIN_VALUE, null, Collections.emptyMap());
   }
 
+  public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers) {
+    this(recordIngestionTimeMs, Long.MIN_VALUE, headers, Collections.emptyMap());
+  }
+
+  public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
+      Map<String, String> metadata) {
+    this(recordIngestionTimeMs, Long.MIN_VALUE, headers, metadata);
+  }
   /**
    * Construct the stream based message/row message metadata
    *
-   * @param recordIngestionTimeMs  the time that the message was ingested by the stream provider
+   * @param recordIngestionTimeMs  the time that the message was ingested by the stream provider.
    *                         use Long.MIN_VALUE if not applicable
+   * @param firstStreamRecordIngestionTimeMs the time that the message was ingested by the first stream provider
+   *                         in the ingestion pipeline. use Long.MIN_VALUE if not applicable
    * @param metadata
    */
-  public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
-      Map<String, String> metadata) {
+  public StreamMessageMetadata(long recordIngestionTimeMs, long firstStreamRecordIngestionTimeMs,
+      @Nullable GenericRow headers, Map<String, String> metadata) {
     _recordIngestionTimeMs = recordIngestionTimeMs;
+    _firstStreamRecordIngestionTimeMs = firstStreamRecordIngestionTimeMs;
     _headers = headers;
     _metadata = metadata;
   }
@@ -54,6 +66,11 @@ public class StreamMessageMetadata implements RowMetadata {
   @Override
   public long getRecordIngestionTimeMs() {
     return _recordIngestionTimeMs;
+  }
+
+  @Override
+  public long getFirstStreamRecordIngestionTimeMs() {
+    return _firstStreamRecordIngestionTimeMs;
   }
 
   @Override

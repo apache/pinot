@@ -23,6 +23,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -118,6 +119,34 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
       expectedValues[i] = getExpectedValue(Double.compare(_doubleSVValues[i], _longSVValues[0]));
     }
     testTransformFunction(transformFunction, expectedValues);
+
+    // Test with null literal
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, null)", functionName, DOUBLE_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    bitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+
+    // Test with null column.
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(%s, %d)", functionName, INT_SV_NULL_COLUMN, _intSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertEquals(transformFunction.getName(), functionName);
+    resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
+    expectedValues = new boolean[NUM_ROWS];
+    bitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        bitmap.add(i);
+      } else {
+        expectedValues[i] = getExpectedValue(Integer.compare(_intSVValues[i], _intSVValues[0]));
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
   }
 
   @Test(dataProvider = "testIllegalArguments", expectedExceptions = {BadQueryRequestException.class})

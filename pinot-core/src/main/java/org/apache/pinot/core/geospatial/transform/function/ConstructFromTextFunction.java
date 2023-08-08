@@ -22,13 +22,13 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.Utils;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.ParseException;
@@ -44,7 +44,7 @@ abstract class ConstructFromTextFunction extends BaseTransformFunction {
   protected WKTReader _reader;
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
         getName());
     TransformFunction transformFunction = arguments.get(0);
@@ -64,12 +64,12 @@ abstract class ConstructFromTextFunction extends BaseTransformFunction {
   }
 
   @Override
-  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
     if (_results == null) {
       _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
     }
-    String[] argumentValues = _transformFunction.transformToStringValuesSV(projectionBlock);
-    int length = projectionBlock.getNumDocs();
+    String[] argumentValues = _transformFunction.transformToStringValuesSV(valueBlock);
+    int length = valueBlock.getNumDocs();
     for (int i = 0; i < length; i++) {
       try {
         Geometry geometry = _reader.read(argumentValues[i]);

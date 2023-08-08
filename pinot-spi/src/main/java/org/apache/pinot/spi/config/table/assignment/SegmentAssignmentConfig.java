@@ -27,6 +27,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 public class SegmentAssignmentConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Configuration for Segment Assignment Strategy")
+  @JsonProperty("segmentAssignmentStrategy")
   private final String _assignmentStrategy;
 
   @JsonCreator

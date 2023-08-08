@@ -38,37 +38,55 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
   @CommandLine.Option(names = {"-personalAccessToken"}, required = true, description = "GitHub personal access token.")
   private String _personalAccessToken;
 
-  @CommandLine.Option(names = {"-sourceType"}, defaultValue = "Kafka",
-      description = "Stream DataSource to use for ingesting data. Supported values - Kafka,Kinesis")
+  @CommandLine.Option(names = {"-sourceType"}, defaultValue = "Kafka", description = "Stream DataSource to use for "
+      + "ingesting data. Supported values - Kafka,Kinesis")
   private String _sourceType;
 
-  @CommandLine.Option(names = {"-kafkaBrokerList"},
-      description = "Kafka broker list of the kafka cluster to produce events.")
+  @CommandLine.Option(names = {"-kafkaBrokerList"}, description = "Kafka broker list of the kafka cluster to produce "
+      + "events.")
   private String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
 
-  @CommandLine.Option(names = {"-kinesisEndpoint"},
-      description = "Endpoint of localstack or any other Kinesis cluster when not using AWS.")
+  @CommandLine.Option(names = {"-kafkaSecurityProtocol"}, description = "Kafka security protocol "
+      + "(PLAINTEXT/SASL_SSL/etc")
+  private String _kafkaSecurityProtocol;
+
+  // Only needed when configured as SASL_SSL
+  @CommandLine.Option(names = {"-kafkaUserName"}, description = "Kafka Username")
+  private String _kafkaSaslUserName;
+
+  @CommandLine.Option(names = {"-kafkaPassword"}, description = "Kafka Password")
+  private String _kafkaSaslPassword;
+
+  @CommandLine.Option(names = {"-kinesisEndpoint"}, description = "Endpoint of localstack or any other Kinesis "
+      + "cluster when not using AWS.")
   private String _kinesisEndpoint = null;
 
   @CommandLine.Option(names = {"-awsRegion"}, description = "AWS Region in which Kinesis is located")
   private String _awsRegion = "us-east-1";
 
-  @CommandLine.Option(names = {"-awsAccessKey"}, description = "AccessKey for AWS Account.")
+  @CommandLine.Option(names = {"-awsAccessKey"}, description = "AccessKey for AWS Account")
   private String _accessKey;
 
   @CommandLine.Option(names = {"-awsSecretKey"}, description = "SecretKey for AWS Account")
   private String _secretKey;
 
-  @CommandLine.Option(names = {"-topic"}, required = true,
-      description = "Name of kafka-topic/kinesis-stream to publish events.")
+  // Pulsar related Configs
+  @CommandLine.Option(names = {"-pulsarBrokerServiceUrl"}, description = "Pulsar broker service url.")
+  private String _pulsarBrokerServiceUrl;
+
+  @CommandLine.Option(names = {"-token"}, description = "Pulsar token.")
+  private String _pulsarToken;
+
+  @CommandLine.Option(names = {"-topic"}, required = true, description = "Name of kafka-topic/kinesis-stream to "
+      + "publish events.")
   private String _topic;
 
-  @CommandLine.Option(names = {"-eventType"},
-      description = "Type of GitHub event. Supported types - pullRequestMergedEvent")
+  @CommandLine.Option(names = {"-eventType"}, description = "Type of GitHub event. Supported types - "
+      + "pullRequestMergedEvent")
   private String _eventType = PULL_REQUEST_MERGED_EVENT_TYPE;
 
   @CommandLine.Option(names = {"-schemaFile"}, description = "Path to schema file. "
-      + "By default uses examples/stream/githubEvents/pullRequestMergedEvents_schema.json")
+      + "By default uses examples/stream/pullRequestMergedEvents/pullRequestMergedEvents_schema.json")
   private String _schemaFile;
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
@@ -131,9 +149,15 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
               PullRequestMergedEventsStream.getKinesisStreamDataProducer(_kinesisEndpoint, _awsRegion, _accessKey,
                   _secretKey);
           break;
+        case PULSAR:
+          streamDataProducer =
+              PullRequestMergedEventsStream.getPulsarStreamDataProducer(_pulsarBrokerServiceUrl, _pulsarToken);
+          break;
         case KAFKA:
         default:
-          streamDataProducer = PullRequestMergedEventsStream.getKafkaStreamDataProducer(_kafkaBrokerList);
+          streamDataProducer =
+              PullRequestMergedEventsStream.getKafkaStreamDataProducer(_kafkaBrokerList, _kafkaSecurityProtocol,
+                  _kafkaSaslUserName, _kafkaSaslPassword);
           break;
       }
       PullRequestMergedEventsStream pullRequestMergedEventsStream =

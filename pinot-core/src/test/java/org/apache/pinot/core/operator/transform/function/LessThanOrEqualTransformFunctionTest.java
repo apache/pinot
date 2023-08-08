@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-public class LessThanOrEqualTransformFunctionTest extends BinaryOperatorTransformFunctionTest {
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
+
+public class LessThanOrEqualTransformFunctionTest extends BinaryOperatorTransformFunctionTest {
   @Override
   boolean getExpectedValue(int compareResult) {
     return compareResult <= 0;
@@ -28,5 +34,37 @@ public class LessThanOrEqualTransformFunctionTest extends BinaryOperatorTransfor
   @Override
   String getFunctionName() {
     return new LessThanOrEqualTransformFunction().getName();
+  }
+
+  @Test
+  public void testLessThanOrEqualNullLiteral() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("less_than_or_equal(null, %s)", INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof LessThanOrEqualTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "less_than_or_equal");
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testLessThanOrEqualsNullColumn() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("less_than_or_equal(%s, %s)", INT_SV_NULL_COLUMN, INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof LessThanOrEqualTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "less_than_or_equal");
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = 1;
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

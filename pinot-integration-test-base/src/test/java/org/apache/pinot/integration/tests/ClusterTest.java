@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -61,14 +62,12 @@ import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
-import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Minion;
@@ -77,6 +76,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.DataProvider;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -90,12 +90,34 @@ public abstract class ClusterTest extends ControllerTest {
   protected static final int DEFAULT_BROKER_PORT = 18099;
   protected static final Random RANDOM = new Random(System.currentTimeMillis());
 
-  protected String _brokerBaseApiUrl;
-
   protected List<BaseBrokerStarter> _brokerStarters;
   protected List<BaseServerStarter> _serverStarters;
   protected List<Integer> _brokerPorts;
   protected BaseMinionStarter _minionStarter;
+
+  private String _brokerBaseApiUrl;
+
+  private boolean _useMultiStageQueryEngine = false;
+
+  protected String getBrokerBaseApiUrl() {
+    return _brokerBaseApiUrl;
+  }
+
+  protected boolean useMultiStageQueryEngine() {
+    return _useMultiStageQueryEngine;
+  }
+
+  protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
+    _useMultiStageQueryEngine = useMultiStageQueryEngine;
+  }
+
+  protected void disableMultiStageQueryEngine() {
+    setUseMultiStageQueryEngine(false);
+  }
+
+  protected void enableMultiStageQueryEngine() {
+    setUseMultiStageQueryEngine(true);
+  }
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
     return new PinotConfiguration();
@@ -168,22 +190,12 @@ public abstract class ClusterTest extends ControllerTest {
     return _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
   }
 
-  protected int getBrokerPort(int index) {
-    return _brokerPorts.get(index);
-  }
-
-  protected List<Integer> getBrokerPorts() {
-    return ImmutableList.copyOf(_brokerPorts);
-  }
-
   protected PinotConfiguration getDefaultServerConfiguration() {
-    PinotConfiguration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
-
-    configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
-    configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
-    configuration.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
-
-    return configuration;
+    PinotConfiguration serverConf = new PinotConfiguration();
+    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
+    serverConf.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
+    serverConf.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
+    return serverConf;
   }
 
   protected void overrideServerConf(PinotConfiguration serverConf) {
@@ -198,7 +210,7 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
         Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + serverId);
     serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, Server.DEFAULT_ADMIN_API_PORT - serverId);
-    serverConf.setProperty(Server.CONFIG_OF_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + serverId);
+    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + serverId);
     serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT + serverId);
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
@@ -329,8 +341,7 @@ public abstract class ClusterTest extends ControllerTest {
     int numSegments = segmentTarFiles.size();
     assertTrue(numSegments > 0);
 
-    URI uploadSegmentHttpURI =
-        FileUploadDownloadClient.getUploadSegmentURI(CommonConstants.HTTP_PROTOCOL, LOCAL_HOST, _controllerPort);
+    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles.get(0);
@@ -386,23 +397,26 @@ public abstract class ClusterTest extends ControllerTest {
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvroFileSchemaKafkaAvroMessageDecoder.class);
     public static File _avroFile;
-    private org.apache.avro.Schema _avroSchema;
-    private RecordExtractor _recordExtractor;
-    private DecoderFactory _decoderFactory = new DecoderFactory();
+    private RecordExtractor<GenericRecord> _recordExtractor;
+    private final DecoderFactory _decoderFactory = new DecoderFactory();
     private DatumReader<GenericData.Record> _reader;
 
     @Override
     public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
         throws Exception {
       // Load Avro schema
+      org.apache.avro.Schema avroSchema;
       try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(_avroFile)) {
-        _avroSchema = reader.getSchema();
+        avroSchema = reader.getSchema();
+      } catch (Exception ex) {
+        LOGGER.error("Caught exception", ex);
+        throw new RuntimeException(ex);
       }
       AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
       config.init(props);
       _recordExtractor = new AvroRecordExtractor();
       _recordExtractor.init(fieldsToRead, config);
-      _reader = new GenericDatumReader<>(_avroSchema);
+      _reader = new GenericDatumReader<>(avroSchema);
     }
 
     @Override
@@ -425,7 +439,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected JsonNode getDebugInfo(final String uri)
       throws Exception {
-    return JsonUtils.stringToJsonNode(sendGetRequest(_brokerBaseApiUrl + "/" + uri));
+    return JsonUtils.stringToJsonNode(sendGetRequest(getBrokerBaseApiUrl() + "/" + uri));
   }
 
   /**
@@ -433,23 +447,14 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(query, _brokerBaseApiUrl);
+    return postQuery(query, getBrokerBaseApiUrl(), null, getExtraQueryProperties());
   }
 
-  /**
-   * Queries the broker's sql query endpoint (/sql)
-   */
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl)
-      throws Exception {
-    return postQuery(query, brokerBaseApiUrl, null);
-  }
-
-  /**
-   * Queries the broker's sql query endpoint (/sql)
-   */
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers)
-      throws Exception {
-    return postQuery(query, brokerBaseApiUrl, headers, null);
+  protected Map<String, String> getExtraQueryProperties() {
+    if (!useMultiStageQueryEngine()) {
+      return Collections.emptyMap();
+    }
+    return ImmutableMap.of("queryOptions", "useMultistageEngine=true");
   }
 
   /**
@@ -461,7 +466,7 @@ public abstract class ClusterTest extends ControllerTest {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
     if (MapUtils.isNotEmpty(extraJsonProperties)) {
-      for (Map.Entry<String, String> extraProperty :extraJsonProperties.entrySet()) {
+      for (Map.Entry<String, String> extraProperty : extraJsonProperties.entrySet()) {
         payload.put(extraProperty.getKey(), extraProperty.getValue());
       }
     }
@@ -469,29 +474,57 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
-   * Queries the controller's sql query endpoint (/query/sql)
+   * Queries the broker's sql query endpoint (/query/sql) using query and queryOptions strings
    */
-  protected JsonNode postQueryToController(String query)
+  protected JsonNode postQueryWithOptions(String query, String queryOptions)
       throws Exception {
-    return postQueryToController(query, _controllerBaseApiUrl);
+    return postQuery(query, getBrokerBaseApiUrl(), null, ImmutableMap.of("queryOptions", queryOptions));
   }
 
   /**
    * Queries the controller's sql query endpoint (/sql)
    */
-  public static JsonNode postQueryToController(String query, String controllerBaseApiUrl)
+  public JsonNode postQueryToController(String query)
       throws Exception {
-    return postQueryToController(query, controllerBaseApiUrl, null);
+    return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryProperties());
   }
 
   /**
    * Queries the controller's sql query endpoint (/sql)
    */
-  public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers)
+  public static JsonNode postQueryToController(String query, String controllerBaseApiUrl, Map<String, String> headers,
+      Map<String, String> extraJsonProperties)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
+    if (MapUtils.isNotEmpty(extraJsonProperties)) {
+      for (Map.Entry<String, String> extraProperty : extraJsonProperties.entrySet()) {
+        payload.put(extraProperty.getKey(), extraProperty.getValue());
+      }
+    }
     return JsonUtils.stringToJsonNode(
         sendPostRequest(controllerBaseApiUrl + "/sql", JsonUtils.objectToString(payload), headers));
+  }
+
+  @DataProvider(name = "useBothQueryEngines")
+  public Object[][] useBothQueryEngines() {
+    return new Object[][]{
+        {false},
+        {true}
+    };
+  }
+
+  @DataProvider(name = "useV1QueryEngine")
+  public Object[][] useV1QueryEngine() {
+    return new Object[][]{
+        {false}
+    };
+  }
+
+  @DataProvider(name = "useV2QueryEngine")
+  public Object[][] useV2QueryEngine() {
+    return new Object[][]{
+        {true}
+    };
   }
 }

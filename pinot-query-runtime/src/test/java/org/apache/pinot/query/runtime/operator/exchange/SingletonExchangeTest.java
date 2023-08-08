@@ -19,13 +19,16 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Iterator;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.query.mailbox.GrpcSendingMailbox;
+import org.apache.pinot.query.mailbox.InMemorySendingMailbox;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -34,18 +37,21 @@ import org.testng.annotations.Test;
 
 
 public class SingletonExchangeTest {
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1", "host:1", "host:1");
-
   private AutoCloseable _mocks;
 
   @Mock
-  TransferableBlock _block;
+  private InMemorySendingMailbox _mailbox1;
   @Mock
-  MailboxService<TransferableBlock> _mailboxService;
+  private GrpcSendingMailbox _mailbox2;
+  @Mock
+  private InMemorySendingMailbox _mailbox3;
+  @Mock
+  TransferableBlock _block;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    Mockito.when(_block.getType()).thenReturn(DataBlock.Type.METADATA);
   }
 
   @AfterMethod
@@ -55,19 +61,41 @@ public class SingletonExchangeTest {
   }
 
   @Test
-  public void shouldRouteSingleton() {
+  public void shouldRouteSingleton()
+      throws Exception {
     // Given:
-    ImmutableList<MailboxIdentifier> destinations = ImmutableList.of(MAILBOX_1);
+    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
 
     // When:
-    Iterator<BlockExchange.RoutedBlock> route =
-        new SingletonExchange(_mailboxService, destinations, TransferableBlockUtils::splitBlock)
-            .route(destinations, _block);
+    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock, (opChainId) -> {
+    }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
 
     // Then:
-    BlockExchange.RoutedBlock routedBlock = route.next();
-    Assert.assertEquals(routedBlock._destination, MAILBOX_1);
-    Assert.assertEquals(routedBlock._block, _block);
-    Assert.assertFalse(route.hasNext(), "should be done with routing");
+    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    // Then:
+    Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
+    Assert.assertEquals(captor.getValue(), _block);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void shouldThrowWhenSingletonWithNonLocalMailbox()
+      throws Exception {
+    // Given:
+    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox2);
+
+    // When:
+    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock, (opChainId) -> {
+    }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void shouldThrowWhenSingletonWithMultipleMailboxes()
+      throws Exception {
+    // Given:
+    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox3);
+
+    // When:
+    new SingletonExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock, (opChainId) -> {
+    }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
   }
 }

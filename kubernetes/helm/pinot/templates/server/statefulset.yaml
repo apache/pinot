@@ -60,7 +60,7 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [
-          "StartServer",
+          "{{ .Values.server.startCommand }}",
           "-clusterName", "{{ .Values.cluster.name }}",
           "-zkAddress", {{ include "zookeeper.url" . | quote }},
           "-configFileName", "/var/pinot/server/config/pinot-server.conf"
@@ -80,6 +80,9 @@ spec:
           - containerPort: {{ .Values.server.service.adminPort }}
             protocol: {{ .Values.server.service.protocol }}
             name: {{ .Values.server.service.adminPortName }}
+{{- if .Values.server.service.extraPorts }}
+{{ toYaml .Values.server.service.extraPorts | indent 10 }}
+{{- end }}   
         {{- if .Values.server.probes.livenessEnabled }}
         livenessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}

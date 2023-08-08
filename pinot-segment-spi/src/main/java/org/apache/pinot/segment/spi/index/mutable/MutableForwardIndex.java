@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.spi.index.mutable;
 
 import java.math.BigDecimal;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 
@@ -27,7 +29,123 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
  * Interface for mutable forward index (for CONSUMING segment).
  * NOTE: Mutable forward index does not use reader context to accelerate the reads.
  */
-public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexReaderContext> {
+public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexReaderContext>, MutableIndex {
+
+  @Override
+  default void add(@Nonnull Object value, int dictId, int docId) {
+    if (dictId >= 0) {
+      setDictId(docId, dictId);
+    } else {
+      switch (getStoredType()) {
+        case INT:
+          setInt(docId, (int) value);
+          break;
+        case LONG:
+          setLong(docId, (long) value);
+          break;
+        case FLOAT:
+          setFloat(docId, (float) value);
+          break;
+        case DOUBLE:
+          setDouble(docId, (double) value);
+          break;
+        case BIG_DECIMAL:
+          // If the Big Decimal is already serialized as byte[], use it directly.
+          // This is only possible when the Big Decimal is generated from a realtime pre-aggregation
+          // where SumPrecisionValueAggregator uses BigDecimalUtils.serializeWithSize() to serialize the value
+          // instead of the normal BigDecimalUtils.serialize().
+          // setBigDecimal() underlying calls BigDecimalUtils.serialize() which is not the intention
+          // when the Big Decimal is already serialized.
+          if (value instanceof byte[]) {
+            setBytes(docId, (byte[]) value);
+          } else {
+            setBigDecimal(docId, (BigDecimal) value);
+          }
+          break;
+        case STRING:
+          setString(docId, (String) value);
+          break;
+        case BYTES:
+          setBytes(docId, (byte[]) value);
+          break;
+        case JSON:
+          if (value instanceof String) {
+            setString(docId, (String) value);
+          } else if (value instanceof byte[]) {
+            setBytes(docId, (byte[]) value);
+          }
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+  @Override
+  default void add(@Nonnull Object[] value, @Nullable int[] dictIds, int docId) {
+    if (dictIds != null) {
+      setDictIdMV(docId, dictIds);
+    } else {
+      int length = value.length;
+      // TODO: The new int[], long[], etc objects are not actually used as arrays iterated again, so we could skip the
+      //  array copy by calling an add(Object[]) method and having overloaded indexes for each type.
+      // TODO: Longer methods are not optimized by C2 JIT. We should try to move each loop to a specific method.
+      switch (getStoredType()) {
+        case INT:
+          int[] ints = new int[length];
+          for (int i = 0; i < length; i++) {
+            ints[i] = (Integer) value[i];
+          }
+          setIntMV(docId, ints);
+          break;
+        case LONG:
+          long[] longs = new long[length];
+          for (int i = 0; i < length; i++) {
+            longs[i] = (Long) value[i];
+          }
+          setLongMV(docId, longs);
+          break;
+        case FLOAT:
+          float[] floats = new float[length];
+          for (int i = 0; i < length; i++) {
+            floats[i] = (Float) value[i];
+          }
+          setFloatMV(docId, floats);
+          break;
+        case DOUBLE:
+          double[] doubles = new double[length];
+          for (int i = 0; i < length; i++) {
+            doubles[i] = (Double) value[i];
+          }
+          setDoubleMV(docId, doubles);
+          break;
+        case STRING:
+          if (value instanceof String[]) {
+            setStringMV(docId, (String[]) value);
+          } else {
+            String[] strings = new String[length];
+            for (int i = 0; i < length; i++) {
+              strings[i] = (String) value[i];
+            }
+            setStringMV(docId, strings);
+          }
+          break;
+        case BYTES:
+          if (value instanceof byte[][]) {
+            setBytesMV(docId, (byte[][]) value);
+          } else {
+            byte[][] bytesArray = new byte[length][];
+            for (int i = 0; i < length; i++) {
+              bytesArray[i] = (byte[]) value[i];
+            }
+            setBytesMV(docId, bytesArray);
+          }
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
 
   /**
    * Returns the length (size in bytes) of the shortest elements inside the forward index.

@@ -19,33 +19,35 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Iterator;
-import org.apache.pinot.query.mailbox.JsonMailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-public class RandomExchangeTest {
-  private static final MailboxIdentifier MAILBOX_1 = new JsonMailboxIdentifier("1", "host:1", "host:1");
-  private static final MailboxIdentifier MAILBOX_2 = new JsonMailboxIdentifier("1", "host:1", "host:2");
 
+public class RandomExchangeTest {
   private AutoCloseable _mocks;
 
   @Mock
-  TransferableBlock _block;
+  private SendingMailbox _mailbox1;
   @Mock
-  MailboxService<TransferableBlock> _mailboxService;
+  private SendingMailbox _mailbox2;
+  @Mock
+  TransferableBlock _block;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
+    Mockito.when(_block.getType()).thenReturn(DataBlock.Type.METADATA);
   }
 
   @AfterMethod
@@ -55,19 +57,18 @@ public class RandomExchangeTest {
   }
 
   @Test
-  public void shouldRouteRandomly() {
+  public void shouldRouteRandomly()
+      throws Exception {
     // Given:
-    ImmutableList<MailboxIdentifier> destinations = ImmutableList.of(MAILBOX_1, MAILBOX_2);
+    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 
     // When:
-    Iterator<BlockExchange.RoutedBlock> route =
-        new RandomExchange(_mailboxService, destinations, size -> 1, TransferableBlockUtils::splitBlock)
-            .route(destinations, _block);
+    new RandomExchange(new OpChainId(1, 2, 3), destinations, size -> 1, TransferableBlockUtils::splitBlock,
+        (opChainId) -> { }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
 
+    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
     // Then:
-    BlockExchange.RoutedBlock routedBlock = route.next();
-    Assert.assertEquals(routedBlock._destination, MAILBOX_2);
-    Assert.assertEquals(routedBlock._block, _block);
-    Assert.assertFalse(route.hasNext(), "should be done with routing");
+    Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture());
+    Assert.assertEquals(captor.getValue(), _block);
   }
 }

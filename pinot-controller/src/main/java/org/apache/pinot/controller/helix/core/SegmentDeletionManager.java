@@ -44,6 +44,9 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
+import org.apache.pinot.core.segment.processing.lifecycle.impl.SegmentDeletionEventDetails;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -165,6 +168,10 @@ public class SegmentDeletionManager {
         propStorePathList.add(segmentPropertyStorePath);
       }
 
+      // Notify all active listeners here
+      PinotSegmentLifecycleEventListenerManager.getInstance()
+          .notifyListeners(new SegmentDeletionEventDetails(tableName, segmentsToDelete));
+
       boolean[] deleteSuccessful = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
       List<String> propStoreFailedSegs = new ArrayList<>(segmentsToDelete.size());
       for (int i = 0; i < deleteSuccessful.length; i++) {
@@ -264,7 +271,7 @@ public class SegmentDeletionManager {
   /**
    * Removes aged deleted segments from the deleted directory
    */
-  public void removeAgedDeletedSegments() {
+  public void removeAgedDeletedSegments(LeadControllerManager leadControllerManager) {
     if (_dataDir != null) {
       URI deletedDirURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS);
       PinotFS pinotFS = PinotFSFactory.create(deletedDirURI.getScheme());
@@ -287,26 +294,29 @@ public class SegmentDeletionManager {
         }
 
         for (String tableNameDir : tableNameDirs) {
-          URI tableNameURI = URIUtils.getUri(tableNameDir);
-          // Get files that are aged
-          final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
-          int numFilesDeleted = 0;
-          for (String targetFile : targetFiles) {
-            URI targetURI = URIUtils.getUri(targetFile);
-            long deletionTimeMs = getDeletionTimeMsFromFile(targetFile, pinotFS.lastModified(targetURI));
-            if (System.currentTimeMillis() >= deletionTimeMs) {
-              if (!pinotFS.delete(targetURI, true)) {
-                LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
-              } else {
-                numFilesDeleted++;
+          String tableName = URIUtils.getLastPart(tableNameDir);
+          if (leadControllerManager.isLeaderForTable(tableName)) {
+            URI tableNameURI = URIUtils.getUri(tableNameDir);
+            // Get files that are aged
+            final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
+            int numFilesDeleted = 0;
+            for (String targetFile : targetFiles) {
+              URI targetURI = URIUtils.getUri(targetFile);
+              long deletionTimeMs = getDeletionTimeMsFromFile(targetFile, pinotFS.lastModified(targetURI));
+              if (System.currentTimeMillis() >= deletionTimeMs) {
+                if (!pinotFS.delete(targetURI, true)) {
+                  LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI);
+                } else {
+                  numFilesDeleted++;
+                }
               }
             }
-          }
 
-          if (numFilesDeleted == targetFiles.length) {
-            // Delete directory if it's empty
-            if (!pinotFS.delete(tableNameURI, false)) {
-              LOGGER.warn("The directory {} cannot be removed.", tableNameDir);
+            if (numFilesDeleted == targetFiles.length) {
+              // Delete directory if it's empty
+              if (!pinotFS.delete(tableNameURI, false)) {
+                LOGGER.warn("The directory {} cannot be removed.", tableNameDir);
+              }
             }
           }
         }

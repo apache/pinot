@@ -19,188 +19,245 @@
 package org.apache.pinot.query.runtime.executor;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
-import javax.annotation.concurrent.NotThreadSafe;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.query.runtime.operator.OpChain;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * This is a scheduler that schedules operator chains in round robin fashion,
- * but will only schedule them when there is work to be done. The availability
- * of work is signaled using the {@link #onDataAvailable(MailboxIdentifier)}
- * callback.
+ * This is a scheduler that schedules operator chains in round-robin fashion, but will only schedule them when there is
+ * work to be done. The availability of work is signaled using the {@link #onDataAvailable} callback.
+ * <p>
+ *   Design: There are 3 states for a OpChain:
+ *
+ *   1. Ready: This state means that an OpChain is ready to be run. If an OpChain is in this state, then it would be in
+ *             the _ready queue. The _ready queue is polled on every call to {@link #next}.
+ *   2. Available/Yielded: This is when the OpChain was run and it returned a no-op block, indicating that it has no
+ *                         new data to process. The {@link OpChainId} for these OpChains are stored in the _available
+ *                         map, where the value of the map is the release-timeout.
+ *   3. Running: When the OpChain is returned by the {@link #next} method, it is considered to be in the Running state.
+ *
+ *   The following state transitions are possible:
+ *   1. Ready ==> Running: This happens when the OpChain is returned by the {@link #next} method.
+ *   2. Running ==> Available/Yielded: This happens when a running OpChain returns a No-op block, following which a
+ *                                     yield is called and there's no entry for the OpChain in _seenMail.
+ *   3. Available/Yielded ==> Ready: This can happen in two cases: (1) When yield is called but _seenMail has an
+ *                                   entry for the corresponding OpChainId, which means there was some data received
+ *                                   by MailboxReceiveOperator after the last poll. (2) When a sender has died or hasn't
+ *                                   sent any data in the last _releaseTimeoutMs milliseconds.
+ *
+ *                      |--------------( #yield() )---------|
+ *                      |                                   |
+ *                     \/                                   |
+ *   [ START ] --> [ READY ] -----------( #next() )--> [ RUNNING ]
+ *                     /\                                   |
+ *                     |                                    |
+ *         ( #seenMail() or #periodic())                    |
+ *                     |                                    |
+ *                [ AVAILABLE ] <------( #yield() )---------|
+ *                                                          |
+ *                                                          |
+ *   [ EXIT ] <-----------------( #deregistered() )---------|
+ *
+ *   The OpChain is considered "alive" from the time it is registered until it is de-registered. Any reference to the
+ *   OpChain or its related metadata is kept only while the OpChain is alive. The {@link #onDataAvailable} callback
+ *   can be called before an OpChain was ever registered. In that case, this scheduler will simply ignore the callback,
+ *   since once the OpChain gets registered it will anyways be put into the _ready queue immediately. In case the
+ *   OpChain never gets registered (e.g. if the broker couldn't dispatch it), as long as the sender cleans up all
+ *   resources that it has acquired, there will be no leak, since the scheduler doesn't hold any references for
+ *   non-alive OpChains.
+ * </p>
  */
-@NotThreadSafe
+@ThreadSafe
 public class RoundRobinScheduler implements OpChainScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoundRobinScheduler.class);
-  private static final long DEFAULT_RELEASE_TIMEOUT = TimeUnit.MINUTES.toMillis(1);
+  private static final String AVAILABLE_RELEASE_THREAD_NAME = "round-robin-scheduler-release-thread";
 
-  private final long _releaseTimeout;
+  private final long _releaseTimeoutMs;
   private final Supplier<Long> _ticker;
 
-  // the _available queue contains operator chains that are available
-  // to this scheduler but do not have any data available to schedule
-  // while the _ready queue contains the operator chains that are ready
-  // to be scheduled (have data, or are first-time scheduled)
-  private final Queue<AvailableEntry> _available = new LinkedList<>();
-  private final Queue<OpChain> _ready = new LinkedList<>();
+  private final Map<OpChainId, OpChain> _aliveChains = new ConcurrentHashMap<>();
+  private final Set<OpChainId> _seenMail = Sets.newConcurrentHashSet();
+  private final Map<OpChainId, Long> _available = new ConcurrentHashMap<>();
 
-  private boolean _isShutDown = false;
+  private final BlockingQueue<OpChain> _ready = new LinkedBlockingQueue<>();
 
-  // using a Set here is acceptable because calling hasNext() and
-  // onDataAvailable() cannot occur concurrently - that means that
-  // anytime we schedule a new operator based on the presence of
-  // mail we can be certain that it will consume all of the mail
-  // form that mailbox, even if there are multiple items in it. If,
-  // during execution of that operator, more mail appears, then the
-  // operator will be rescheduled immediately potentially resulting
-  // in a false-positive schedule
-  @VisibleForTesting
-  final Set<MailboxIdentifier> _seenMail = new HashSet<>();
+  private final Lock _lock = new ReentrantLock();
+  private final ScheduledExecutorService _availableOpChainReleaseService;
 
-  public RoundRobinScheduler() {
-    this(DEFAULT_RELEASE_TIMEOUT);
+  public RoundRobinScheduler(long releaseTimeoutMs) {
+    this(releaseTimeoutMs, System::currentTimeMillis);
   }
 
-  public RoundRobinScheduler(long releaseTimeout) {
-    this(releaseTimeout, System::currentTimeMillis);
-  }
-
-  public RoundRobinScheduler(long releaseTimeoutMs, Supplier<Long> ticker) {
-    _releaseTimeout = releaseTimeoutMs;
+  RoundRobinScheduler(long releaseTimeoutMs, Supplier<Long> ticker) {
+    Preconditions.checkArgument(releaseTimeoutMs > 0, "Release timeout for round-robin scheduler should be > 0ms");
+    _releaseTimeoutMs = releaseTimeoutMs;
     _ticker = ticker;
+    _availableOpChainReleaseService = Executors.newSingleThreadScheduledExecutor(r -> {
+      Thread t = new Thread(r);
+      t.setName(AVAILABLE_RELEASE_THREAD_NAME);
+      t.setDaemon(true);
+      return t;
+    });
+    _availableOpChainReleaseService.scheduleAtFixedRate(() -> {
+      List<OpChainId> timedOutWaiting = new ArrayList<>();
+      for (Map.Entry<OpChainId, Long> entry : _available.entrySet()) {
+        if (Thread.interrupted()) {
+          LOGGER.warn("Thread={} interrupted. Scheduler may be shutting down.", AVAILABLE_RELEASE_THREAD_NAME);
+          break;
+        }
+        if (_ticker.get() > entry.getValue()) {
+          timedOutWaiting.add(entry.getKey());
+        }
+      }
+      for (OpChainId opChainId : timedOutWaiting) {
+        _lock.lock();
+        try {
+          if (_available.containsKey(opChainId)) {
+            _available.remove(opChainId);
+            _ready.offer(_aliveChains.get(opChainId));
+          }
+        } finally {
+          _lock.unlock();
+        }
+      }
+    }, _releaseTimeoutMs, _releaseTimeoutMs, TimeUnit.MILLISECONDS);
   }
 
   @Override
-  public void register(OpChain operatorChain, boolean isNew) {
-    if (_isShutDown) {
-      return;
-    }
-    // the first time an operator chain is scheduled, it should
-    // immediately be considered ready in case it does not need
-    // read from any mailbox (e.g. with a LiteralValueOperator)
-    if (isNew) {
-      _ready.add(operatorChain);
-    } else {
-      long releaseTs = _releaseTimeout < 0 ? Long.MAX_VALUE : _ticker.get() + _releaseTimeout;
-      _available.add(new AvailableEntry(operatorChain, releaseTs));
+  public void register(OpChain operatorChain) {
+    Preconditions.checkState(!_aliveChains.containsKey(operatorChain.getId()),
+        String.format("Tried to re-register op-chain: %s", operatorChain.getId()));
+    _lock.lock();
+    try {
+      _aliveChains.put(operatorChain.getId(), operatorChain);
+      _ready.offer(operatorChain);
+    } finally {
+      _lock.unlock();
     }
     trace("registered " + operatorChain);
   }
 
   @Override
-  public void onDataAvailable(MailboxIdentifier mailbox) {
-    // it may be possible to receive this callback when there's no corresponding
-    // operator chain registered to the mailbox - this can happen when either
-    // (1) we get the callback before the first register is called or (2) we get
-    // the callback while the operator chain is executing. to account for this,
-    // we just store it in a set of seen mail and only check for it when hasNext
-    // is called.
-    //
-    // note that scenario (2) may cause a false-positive schedule where an operator
-    // chain gets scheduled for mail that it had already processed, in which case
-    // the operator chain will simply do nothing and get put back onto the queue.
-    // scenario (2) may additionally cause a memory leak - if onDataAvailable is
-    // called with an EOS block _while_ the operator chain is executing, the chain
-    // will consume the EOS block and computeReady() will never remove the mailbox
-    // from the _seenMail set.
-    //
-    // TODO: fix the memory leak by adding a close(opChain) callback
-    _seenMail.add(mailbox);
-    trace("got mail for " + mailbox);
-  }
-
-  @Override
-  public boolean hasNext() {
-    if (!_ready.isEmpty()) {
-      return true;
+  public void deregister(OpChain operatorChain) {
+    Preconditions.checkState(_aliveChains.containsKey(operatorChain.getId()),
+        "Tried to de-register an un-registered op-chain");
+    _lock.lock();
+    try {
+      OpChainId chainId = operatorChain.getId();
+      _aliveChains.remove(chainId);
+      // it could be that the onDataAvailable callback was called when the OpChain was executing, in which case there
+      // could be a dangling entry in _seenMail.
+      _seenMail.remove(chainId);
+    } finally {
+      _lock.unlock();
     }
-    computeReady();
-    return !_ready.isEmpty();
+    // invoke opChain deregister callback
+    operatorChain.getOpChainFinishCallback().accept(operatorChain.getId());
   }
 
   @Override
-  public OpChain next() {
-    OpChain op = _ready.poll();
-    trace("Polled " + op);
-    return op;
+  public void yield(OpChain operatorChain) {
+    long releaseTs = _ticker.get() + _releaseTimeoutMs;
+    _lock.lock();
+    try {
+      // It could be that this OpChain received data before it could be yielded completely. In that case, mark it ready
+      // to get it scheduled asap.
+      if (_seenMail.contains(operatorChain.getId())) {
+        _seenMail.remove(operatorChain.getId());
+        _ready.add(operatorChain);
+        return;
+      }
+      _available.put(operatorChain.getId(), releaseTs);
+    } finally {
+      _lock.unlock();
+    }
+  }
+
+  @Override
+  public void onDataAvailable(OpChainId opChainId) {
+    // If this chain isn't alive as per the scheduler, don't do anything. If the OpChain is registered after this, it
+    // will anyways be scheduled to run since new OpChains are run immediately.
+    if (!_aliveChains.containsKey(opChainId)) {
+      trace("woken up but the OpChain is not registered so ignoring the event: " + opChainId);
+      return;
+    }
+    _lock.lock();
+    try {
+      if (!_aliveChains.containsKey(opChainId)) {
+        return;
+      }
+      if (_available.containsKey(opChainId)) {
+        _available.remove(opChainId);
+        _ready.offer(_aliveChains.get(opChainId));
+      } else {
+        // There are two cases here:
+        // 1. OpChain is in the _ready queue: the next time it gets polled, we'll remove the _seenMail entry.
+        // 2. OpChain is running: the next time yield is called for it, we'll check against _seenMail and put it back
+        //    in the _ready queue again.
+        _seenMail.add(opChainId);
+      }
+    } finally {
+      _lock.unlock();
+    }
+    trace("got data for " + opChainId);
+  }
+
+  @Override
+  public OpChain next(long time, TimeUnit timeUnit)
+      throws InterruptedException {
+    return _ready.poll(time, timeUnit);
   }
 
   @Override
   public int size() {
-    return _ready.size() + _available.size();
+    return _aliveChains.size();
   }
 
   @Override
-  public void shutDown() {
-    if (_isShutDown) {
-      return;
-    }
-    while (!_ready.isEmpty()) {
-      _ready.poll().close();
-    }
-    while (!_available.isEmpty()) {
-      _available.poll()._opChain.close();
-    }
-    _isShutDown = true;
+  public void shutdownNow() {
+    // TODO: Figure out shutdown flow in context of graceful shutdown.
+    _availableOpChainReleaseService.shutdownNow();
   }
 
-  private void computeReady() {
-    Iterator<AvailableEntry> availableChains = _available.iterator();
+  @VisibleForTesting
+  int readySize() {
+    return _ready.size();
+  }
 
-    // the algorithm here iterates through all available chains and checks
-    // to see whether or not any of the available chains have seen mail for
-    // at least one of the mailboxes they receive from - if they do, then
-    // we should make that chain available and remove any mail from the
-    // mailboxes that it would consume from (after it is scheduled, all
-    // mail available to it will have been consumed).
-    while (availableChains.hasNext()) {
-      AvailableEntry chain = availableChains.next();
-      Sets.SetView<MailboxIdentifier> intersect = Sets.intersection(chain._opChain.getReceivingMailbox(), _seenMail);
+  @VisibleForTesting
+  int availableSize() {
+    return _available.size();
+  }
 
-      if (!intersect.isEmpty()) {
-        // use an immutable copy because set views use the underlying sets
-        // directly, which would cause a concurrent modification exception
-        // when removing data from _seenMail
-        _seenMail.removeAll(intersect.immutableCopy());
-        _ready.add(chain._opChain);
-        availableChains.remove();
-      } else if (_ticker.get() > chain._releaseTs) {
-        LOGGER.warn("({}) Scheduling operator chain reading from {} after timeout. Ready: {}, Available: {}, Mail: {}.",
-            chain._opChain, chain._opChain.getReceivingMailbox(), _ready, _available, _seenMail);
-        _ready.add(chain._opChain);
-        availableChains.remove();
-      }
-    }
+  @VisibleForTesting
+  int seenMailSize() {
+    return _seenMail.size();
+  }
+
+  @VisibleForTesting
+  int aliveChainsSize() {
+    return _aliveChains.size();
   }
 
   private void trace(String operation) {
     LOGGER.trace("({}) Ready: {}, Available: {}, Mail: {}", operation, _ready, _available, _seenMail);
-  }
-
-  private static class AvailableEntry {
-
-    final OpChain _opChain;
-    final long _releaseTs;
-
-    private AvailableEntry(OpChain opChain, long releaseTs) {
-      _opChain = opChain;
-      _releaseTs = releaseTs;
-    }
-
-    @Override
-    public String toString() {
-      return _opChain.toString();
-    }
   }
 }

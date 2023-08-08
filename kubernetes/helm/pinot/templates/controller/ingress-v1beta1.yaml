@@ -1,0 +1,30 @@
+{{- if .Values.controller.ingress.v1beta1.enabled -}}
+{{- $ingressPath := .Values.controller.ingress.v1beta1.path -}}
+{{- $serviceName := include "pinot.controller.fullname" . -}}
+{{- $servicePort := .Values.controller.service.port -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ $serviceName }}
+{{- if .Values.controller.ingress.v1beta1.annotations }}
+  annotations:
+{{ toYaml .Values.controller.ingress.v1beta1.annotations | indent 4 }}
+{{- end }}
+  labels:
+{{- include "pinot.controllerLabels" . | nindent 4 }}
+spec:
+{{- if .Values.controller.ingress.v1beta1.tls }}
+  tls:
+{{ toYaml .Values.controller.ingress.v1beta1.tls | indent 4 }}
+{{- end }}
+  rules:
+    {{- range .Values.controller.ingress.v1beta1.hosts }}
+    - host: {{ . }}
+      http:
+        paths:
+          - path: {{ $ingressPath }}
+            backend:
+              serviceName: {{ $serviceName }}
+              servicePort: {{ $servicePort }}
+    {{- end }}
+{{- end }}

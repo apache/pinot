@@ -23,12 +23,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class NativeFSTIndexCreator implements TextIndexCreator {
+public class NativeFSTIndexCreator implements FSTIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(NativeFSTIndexCreator.class);
 
   private final File _fstIndexFile;
@@ -44,7 +45,6 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
    * @param indexDir  Index directory
    * @param columnName Column name for which index is being created
    * @param sortedEntries Sorted entries of the unique values of the column.
-   * @throws IOException
    */
   public NativeFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries) {
     _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
@@ -56,6 +56,10 @@ public class NativeFSTIndexCreator implements TextIndexCreator {
         _fstBuilder.add(sortedEntries[_dictId].getBytes(), 0, sortedEntries[_dictId].length(), _dictId);
       }
     }
+  }
+
+  public NativeFSTIndexCreator(IndexCreationContext context) {
+    this(context.getIndexDir(), context.getFieldSpec().getName(), (String[]) context.getSortedUniqueElementsArray());
   }
 
   // Expects dictionary entries in sorted order.

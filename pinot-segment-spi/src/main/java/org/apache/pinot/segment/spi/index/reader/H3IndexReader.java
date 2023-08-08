@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import java.io.Closeable;
+import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
  * Reader of the H3 index.
  */
-public interface H3IndexReader extends Closeable {
+public interface H3IndexReader extends IndexReader {
 
   /**
    * Gets the matching Doc IDs of the given H3 index ID as bitmaps.

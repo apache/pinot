@@ -20,41 +20,60 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * This class contains the shared logic across all different exchange types for
  * exchanging data across different servers.
+ *
+ * {@link BlockExchange} is used by {@link org.apache.pinot.query.runtime.operator.MailboxSendOperator} to
+ * exchange data between underlying {@link org.apache.pinot.query.mailbox.MailboxService} and the query stage execution
+ * engine running the actual {@link org.apache.pinot.query.runtime.operator.OpChain}.
  */
 public abstract class BlockExchange {
+  public static final int DEFAULT_MAX_PENDING_BLOCKS = 5;
+  private static final Logger LOGGER = LoggerFactory.getLogger(BlockExchange.class);
   // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
 
-  private final MailboxService<TransferableBlock> _mailbox;
-  private final List<MailboxIdentifier> _destinations;
+  private final OpChainId _opChainId;
+  private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
+  private final Consumer<OpChainId> _callback;
+  private final long _deadlineMs;
 
-  public static BlockExchange getExchange(MailboxService<TransferableBlock> mailboxService,
-      List<MailboxIdentifier> destinations, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
+  private final BlockingQueue<TransferableBlock> _queue = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
+  private final AtomicReference<TransferableBlock> _errorBlock = new AtomicReference<>();
+
+  public static BlockExchange getExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes,
+      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> selector, BlockSplitter splitter,
+      Consumer<OpChainId> callback, long deadlineMs) {
     switch (exchangeType) {
       case SINGLETON:
-        return new SingletonExchange(mailboxService, destinations, splitter);
+        return new SingletonExchange(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
       case HASH_DISTRIBUTED:
-        return new HashExchange(mailboxService, destinations, selector, splitter);
+        return new HashExchange(opChainId, sendingMailboxes, selector, splitter, callback, deadlineMs);
       case RANDOM_DISTRIBUTED:
-        return new RandomExchange(mailboxService, destinations, splitter);
+        return new RandomExchange(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
       case BROADCAST_DISTRIBUTED:
-        return new BroadcastExchange(mailboxService, destinations, splitter);
+        return new BroadcastExchange(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
       case ROUND_ROBIN_DISTRIBUTED:
       case RANGE_DISTRIBUTED:
       case ANY:
@@ -63,29 +82,58 @@ public abstract class BlockExchange {
     }
   }
 
-  protected BlockExchange(MailboxService<TransferableBlock> mailbox, List<MailboxIdentifier> destinations,
-      BlockSplitter splitter) {
-    _mailbox = mailbox;
-    _destinations = destinations;
+  protected BlockExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Consumer<OpChainId> callback, long deadlineMs) {
+    _opChainId = opChainId;
+    _sendingMailboxes = sendingMailboxes;
     _splitter = splitter;
+    _callback = callback;
+    _deadlineMs = deadlineMs;
   }
 
-  public void send(TransferableBlock block) {
-    if (block.isEndOfStreamBlock()) {
-      _destinations.forEach(destination -> sendBlock(destination, block));
-      return;
-    }
+  public boolean offerBlock(TransferableBlock block, long timeoutMs)
+      throws Exception {
+    return _queue.offer(block, timeoutMs, TimeUnit.MILLISECONDS);
+  }
 
-    Iterator<RoutedBlock> routedBlocks = route(_destinations, block);
-    while (routedBlocks.hasNext()) {
-      RoutedBlock next = routedBlocks.next();
-      sendBlock(next._destination, next._block);
+  public int getRemainingCapacity() {
+    return _queue.remainingCapacity();
+  }
+
+  public TransferableBlock send() {
+    try {
+      TransferableBlock block;
+      long timeoutMs = _deadlineMs - System.currentTimeMillis();
+      if (_errorBlock.get() != null) {
+        LOGGER.debug("Exchange: {} is already cancelled or errored out internally, ignore the late block", _opChainId);
+        return _errorBlock.get();
+      }
+      block = _queue.poll(timeoutMs, TimeUnit.MILLISECONDS);
+      if (block == null) {
+        block = TransferableBlockUtils.getErrorTransferableBlock(
+            new TimeoutException("Timed out on exchange for opChain: " + _opChainId));
+      } else {
+        // Notify that the block exchange can now accept more blocks.
+        _callback.accept(_opChainId);
+        if (block.isEndOfStreamBlock()) {
+          for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+            sendBlock(sendingMailbox, block);
+          }
+        } else {
+          route(_sendingMailboxes, block);
+        }
+      }
+      return block;
+    } catch (Exception e) {
+      TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(
+          new RuntimeException("Exception while sending data via exchange for opChain: " + _opChainId));
+      setErrorBlock(errorBlock);
+      return errorBlock;
     }
   }
 
-  private void sendBlock(MailboxIdentifier mailboxId, TransferableBlock block) {
-    SendingMailbox<TransferableBlock> sendingMailbox = _mailbox.getSendingMailbox(mailboxId);
-
+  protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block)
+      throws Exception {
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);
       sendingMailbox.complete();
@@ -94,21 +142,35 @@ public abstract class BlockExchange {
 
     DataBlock.Type type = block.getType();
     Iterator<TransferableBlock> splits = _splitter.split(block, type, MAX_MAILBOX_CONTENT_SIZE_BYTES);
-
     while (splits.hasNext()) {
       sendingMailbox.send(splits.next());
     }
   }
 
-  protected abstract Iterator<RoutedBlock> route(List<MailboxIdentifier> destinations, TransferableBlock block);
+  private void setErrorBlock(TransferableBlock errorBlock) {
+    if (_errorBlock.compareAndSet(null, errorBlock)) {
+      try {
+        for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+          sendBlock(sendingMailbox, errorBlock);
+        }
+      } catch (Exception e) {
+        LOGGER.error("error while sending exception block via exchange for opChain: " + _opChainId, e);
+      }
+      _queue.clear();
+    }
+  }
 
-  protected static class RoutedBlock {
-    final MailboxIdentifier _destination;
-    final TransferableBlock _block;
+  protected abstract void route(List<SendingMailbox> destinations, TransferableBlock block)
+      throws Exception;
 
-    protected RoutedBlock(MailboxIdentifier destination, TransferableBlock block) {
-      _destination = destination;
-      _block = block;
+  // Called when the OpChain gracefully returns.
+  // TODO: This is a no-op right now.
+  public void close() {
+  }
+
+  public void cancel(Throwable t) {
+    for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+      sendingMailbox.cancel(t);
     }
   }
 }

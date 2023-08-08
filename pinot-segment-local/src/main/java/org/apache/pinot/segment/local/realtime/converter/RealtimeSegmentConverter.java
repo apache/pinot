@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.converter;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Collection;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -27,13 +28,19 @@ import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.FstIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -75,9 +82,8 @@ public class RealtimeSegmentConverter {
     // realtime segment generation
     genConfig.setSegmentTimeValueCheck(false);
     if (_columnIndicesForRealtimeTable.getInvertedIndexColumns() != null) {
-      for (String column : _columnIndicesForRealtimeTable.getInvertedIndexColumns()) {
-        genConfig.createInvertedIndexForColumn(column);
-      }
+      genConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED,
+          _columnIndicesForRealtimeTable.getInvertedIndexColumns());
     }
 
     if (_columnIndicesForRealtimeTable.getVarLengthDictionaryColumns() != null) {
@@ -90,8 +96,13 @@ public class RealtimeSegmentConverter {
     genConfig.setTableName(_tableName);
     genConfig.setOutDir(_outputPath);
     genConfig.setSegmentName(_segmentName);
-    genConfig.setTextIndexCreationColumns(_columnIndicesForRealtimeTable.getTextIndexColumns());
-    genConfig.setFSTIndexCreationColumns(_columnIndicesForRealtimeTable.getFstIndexColumns());
+
+    addIndexOrDefault(genConfig, StandardIndexes.text(), _columnIndicesForRealtimeTable.getTextIndexColumns(),
+        new TextIndexConfigBuilder(genConfig.getFSTIndexType()).build());
+
+    addIndexOrDefault(genConfig, StandardIndexes.fst(), _columnIndicesForRealtimeTable.getFstIndexColumns(),
+        new FstIndexConfig(genConfig.getFSTIndexType()));
+
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
@@ -119,14 +130,27 @@ public class RealtimeSegmentConverter {
     }
   }
 
+  private <C extends IndexConfig> void addIndexOrDefault(SegmentGeneratorConfig genConfig,
+      IndexType<C, ?, ?> indexType, @Nullable Collection<String> columns, C defaultConfig) {
+    Map<String, C> config = indexType.getConfig(genConfig.getTableConfig(), genConfig.getSchema());
+    if (columns != null) {
+      for (String column : columns) {
+        C colConf = config.get(column);
+        genConfig.setIndexOn(indexType, colConf == null ? defaultConfig : colConf, column);
+      }
+    }
+  }
+
   /**
    * Returns a new schema containing only physical columns
    */
   @VisibleForTesting
   public static Schema getUpdatedSchema(Schema original) {
     Schema newSchema = new Schema();
-    for (String col : original.getPhysicalColumnNames()) {
-      newSchema.addField(original.getFieldSpecFor(col));
+    for (FieldSpec fieldSpec : original.getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        newSchema.addField(fieldSpec);
+      }
     }
     return newSchema;
   }

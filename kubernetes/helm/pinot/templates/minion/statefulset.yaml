@@ -61,7 +61,7 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [
-          "StartMinion",
+          "{{ .Values.minion.startCommand }}",
           "-clusterName", "{{ .Values.cluster.name }}",
           "-zkAddress", {{ include "zookeeper.url" . | quote }},
           "-configFileName", "/var/pinot/minion/config/pinot-minion.conf"
@@ -78,6 +78,9 @@ spec:
           - containerPort: {{ .Values.minion.service.port }}
             protocol: {{ .Values.minion.service.protocol }}
             name: {{ .Values.minion.service.name }}
+{{- if .Values.minion.service.extraPorts }}
+{{ toYaml .Values.minion.service.extraPorts | indent 10 }}
+{{- end }}     
         {{- if .Values.minion.probes.livenessEnabled }}
         livenessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}

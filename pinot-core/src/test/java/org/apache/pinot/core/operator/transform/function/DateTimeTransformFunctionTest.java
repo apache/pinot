@@ -22,11 +22,13 @@ import java.util.function.LongToIntFunction;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class DateTimeTransformFunctionTest extends BaseTransformFunctionTest {
@@ -86,6 +88,25 @@ public class DateTimeTransformFunctionTest extends BaseTransformFunctionTest {
     int[] values = transformFunction.transformToIntValuesSV(_projectionBlock);
     for (int i = 0; i < _projectionBlock.getNumDocs(); i++) {
       assertEquals(values[i], expected.applyAsInt(_timeValues[i]));
+    }
+  }
+
+  @Test(dataProvider = "testCasesUTC")
+  public void testUTCNullColumn(String function, LongToIntFunction expected,
+      Class<? extends TransformFunction> expectedClass) {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("%s(%s)", function, TIMESTAMP_COLUMN_NULL));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(expectedClass.isInstance(transformFunction));
+    int[] values = transformFunction.transformToIntValuesSV(_projectionBlock);
+    RoaringBitmap nullBitmap = transformFunction.getNullBitmap(_projectionBlock);
+
+    for (int i = 0; i < _projectionBlock.getNumDocs(); i++) {
+      if (isNullRow(i)) {
+        assertTrue(nullBitmap.contains(i));
+      } else {
+        assertEquals(values[i], expected.applyAsInt(_timeValues[i]));
+      }
     }
   }
 

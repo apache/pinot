@@ -30,6 +30,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
@@ -53,10 +54,15 @@ import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.utils.rewriter.ResultRewriteUtils;
+import org.apache.pinot.core.query.utils.rewriter.RewriterResult;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.spi.utils.LoopUtils;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -99,7 +105,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
       PostAggregationHandler postAggregationHandler =
           new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema));
       DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
-      brokerResponse.setResultTable(new ResultTable(resultDataSchema, Collections.emptyList()));
+      RewriterResult rewriterResult = ResultRewriteUtils.rewriteResult(resultDataSchema, Collections.emptyList());
+      brokerResponse.setResultTable(new ResultTable(rewriterResult.getDataSchema(), rewriterResult.getRows()));
       return;
     }
 
@@ -166,6 +173,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       rows = new ArrayList<>();
       HavingFilterHandler havingFilterHandler =
           new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.isNullHandlingEnabled());
+      int processedRows = 0;
       while (rows.size() < limit && sortedIterator.hasNext()) {
         Object[] row = sortedIterator.next().getValues();
         extractFinalAggregationResults(row);
@@ -178,6 +186,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
         if (havingFilterHandler.isMatch(row)) {
           rows.add(row);
         }
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(processedRows);
+        processedRows++;
       }
     } else {
       int numRows = Math.min(numRecords, limit);
@@ -192,11 +202,17 @@ public class GroupByDataTableReducer implements DataTableReducer {
           }
         }
         rows.add(row);
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
       }
     }
 
     // Calculate final result rows after post aggregation
     List<Object[]> resultRows = calculateFinalResultRows(postAggregationHandler, rows);
+
+    RewriterResult resultRewriterResult =
+        ResultRewriteUtils.rewriteResult(resultDataSchema, resultRows);
+    resultRows = resultRewriterResult.getRows();
+    resultDataSchema = resultRewriterResult.getDataSchema();
 
     brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
   }
@@ -272,75 +288,81 @@ public class GroupByDataTableReducer implements DataTableReducer {
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     for (int i = 0; i < numReduceThreadsToUse; i++) {
       List<DataTable> reduceGroup = reduceGroups.get(i);
+      int taskId = i;
+      ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
       futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          for (DataTable dataTable : reduceGroup) {
-            // Terminate when thread is interrupted. This is expected when the query already fails in the main thread.
-            if (Thread.interrupted()) {
-              return;
-            }
-            try {
-              boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
-              RoaringBitmap[] nullBitmaps = null;
-              if (nullHandlingEnabled) {
-                nullBitmaps = new RoaringBitmap[_numColumns];
-                for (int i = 0; i < _numColumns; i++) {
-                  nullBitmaps[i] = dataTable.getNullRowIds(i);
-                }
-              }
-
-              int numRows = dataTable.getNumberOfRows();
-              for (int rowId = 0; rowId < numRows; rowId++) {
-                LoopUtils.checkMergePhaseInterruption(rowId);
-                Object[] values = new Object[_numColumns];
-                for (int colId = 0; colId < _numColumns; colId++) {
-                  switch (storedColumnDataTypes[colId]) {
-                    case INT:
-                      values[colId] = dataTable.getInt(rowId, colId);
-                      break;
-                    case LONG:
-                      values[colId] = dataTable.getLong(rowId, colId);
-                      break;
-                    case FLOAT:
-                      values[colId] = dataTable.getFloat(rowId, colId);
-                      break;
-                    case DOUBLE:
-                      values[colId] = dataTable.getDouble(rowId, colId);
-                      break;
-                    case BIG_DECIMAL:
-                      values[colId] = dataTable.getBigDecimal(rowId, colId);
-                      break;
-                    case STRING:
-                      values[colId] = dataTable.getString(rowId, colId);
-                      break;
-                    case BYTES:
-                      values[colId] = dataTable.getBytes(rowId, colId);
-                      break;
-                    case OBJECT:
-                      // TODO: Move ser/de into AggregationFunction interface
-                      CustomObject customObject = dataTable.getCustomObject(rowId, colId);
-                      if (customObject != null) {
-                        values[colId] = ObjectSerDeUtils.deserialize(customObject);
-                      }
-                      break;
-                    // Add other aggregation intermediate result / group-by column type supports here
-                    default:
-                      throw new IllegalStateException();
+          Tracing.ThreadAccountantOps.setupWorker(taskId, new ThreadResourceUsageProvider(), parentContext);
+          try {
+            for (DataTable dataTable : reduceGroup) {
+              try {
+                boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+                RoaringBitmap[] nullBitmaps = null;
+                if (nullHandlingEnabled) {
+                  nullBitmaps = new RoaringBitmap[_numColumns];
+                  for (int i = 0; i < _numColumns; i++) {
+                    nullBitmaps[i] = dataTable.getNullRowIds(i);
                   }
                 }
-                if (nullHandlingEnabled) {
+
+                int numRows = dataTable.getNumberOfRows();
+                for (int rowId = 0; rowId < numRows; rowId++) {
+                  // Terminate when thread is interrupted.
+                  // This is expected when the query already fails in the main thread.
+                  // The first check will always be performed when rowId = 0
+                  Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
+                  Object[] values = new Object[_numColumns];
                   for (int colId = 0; colId < _numColumns; colId++) {
-                    if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-                      values[colId] = null;
+                    switch (storedColumnDataTypes[colId]) {
+                      case INT:
+                        values[colId] = dataTable.getInt(rowId, colId);
+                        break;
+                      case LONG:
+                        values[colId] = dataTable.getLong(rowId, colId);
+                        break;
+                      case FLOAT:
+                        values[colId] = dataTable.getFloat(rowId, colId);
+                        break;
+                      case DOUBLE:
+                        values[colId] = dataTable.getDouble(rowId, colId);
+                        break;
+                      case BIG_DECIMAL:
+                        values[colId] = dataTable.getBigDecimal(rowId, colId);
+                        break;
+                      case STRING:
+                        values[colId] = dataTable.getString(rowId, colId);
+                        break;
+                      case BYTES:
+                        values[colId] = dataTable.getBytes(rowId, colId);
+                        break;
+                      case OBJECT:
+                        // TODO: Move ser/de into AggregationFunction interface
+                        CustomObject customObject = dataTable.getCustomObject(rowId, colId);
+                        if (customObject != null) {
+                          values[colId] = ObjectSerDeUtils.deserialize(customObject);
+                        }
+                        break;
+                      // Add other aggregation intermediate result / group-by column type supports here
+                      default:
+                        throw new IllegalStateException();
                     }
                   }
+                  if (nullHandlingEnabled) {
+                    for (int colId = 0; colId < _numColumns; colId++) {
+                      if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+                        values[colId] = null;
+                      }
+                    }
+                  }
+                  indexedTable.upsert(new Record(values));
                 }
-                indexedTable.upsert(new Record(values));
+              } finally {
+                countDownLatch.countDown();
               }
-            } finally {
-              countDownLatch.countDown();
             }
+          } finally {
+            Tracing.ThreadAccountantOps.clear();
           }
         }
       });
@@ -352,7 +374,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
         throw new TimeoutException("Timed out in broker reduce phase");
       }
     } catch (InterruptedException e) {
-      throw new RuntimeException("Interrupted in broker reduce phase", e);
+      Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
+      throw new EarlyTerminationException("Interrupted in broker reduce phase"
+          + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg), e);
     } finally {
       for (Future future : futures) {
         if (!future.isDone()) {
@@ -425,6 +449,11 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     // Calculate final result rows after post aggregation
     List<Object[]> resultRows = calculateFinalResultRows(postAggregationHandler, rows);
+
+    RewriterResult resultRewriterResult =
+        ResultRewriteUtils.rewriteResult(resultDataSchema, resultRows);
+    resultRows = resultRewriterResult.getRows();
+    resultDataSchema = resultRewriterResult.getDataSchema();
 
     brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, resultRows));
   }

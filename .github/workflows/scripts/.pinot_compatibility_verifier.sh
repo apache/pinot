@@ -41,17 +41,49 @@ echo "      <url>https://packages.confluent.io/maven/</url>">> ${SETTINGS_FILE}
 echo "      <blocked>false</blocked>">> ${SETTINGS_FILE}
 echo "    </mirror>">> ${SETTINGS_FILE}
 echo "  </mirrors>">> ${SETTINGS_FILE}
+
+echo "  <servers>">> ${SETTINGS_FILE}
+echo "    <server>">> ${SETTINGS_FILE}
+echo "      <id>central</id>">> ${SETTINGS_FILE}
+echo "      <configuration>">> ${SETTINGS_FILE}
+echo "        <httpConfiguration>">> ${SETTINGS_FILE}
+echo "          <all>">> ${SETTINGS_FILE}
+echo "            <connectionTimeout>120000</connectionTimeout>">> ${SETTINGS_FILE}
+echo "            <readTimeout>120000</readTimeout>">> ${SETTINGS_FILE}
+echo "            <retries>3</retries>">> ${SETTINGS_FILE}
+echo "          </all>">> ${SETTINGS_FILE}
+echo "        </httpConfiguration>">> ${SETTINGS_FILE}
+echo "      </configuration>">> ${SETTINGS_FILE}
+echo "    </server>">> ${SETTINGS_FILE}
+echo "  </servers>">> ${SETTINGS_FILE}
+
 echo "</settings>">> ${SETTINGS_FILE}
 
 # PINOT_MAVEN_OPTS is used to provide additional maven options to the checkoutAndBuild.sh command
 export PINOT_MAVEN_OPTS="-s $(pwd)/${SETTINGS_FILE}"
 
-if [ -z "$newerCommit" ]; then
-  echo "Running compatibility regression test against \"${olderCommit}\""
+# Compare commit hash for compatibility verification
+git fetch --all
+NEW_COMMIT_HASH=`git log -1 --pretty=format:'%h' HEAD`
+if [ ! -z "${NEW_COMMIT}" ]; then
+  NEW_COMMIT_HASH=`git log -1 --pretty=format:'%h' ${NEW_COMMIT}`
+fi
+OLD_COMMIT_HASH=`git log -1 --pretty=format:'%h' ${OLD_COMMIT}`
+if [ $? -ne 0 ]; then
+  echo "Failed to get commit hash for commit: \"${OLD_COMMIT}\""
+  OLD_COMMIT_HASH=`git log -1 --pretty=format:'%h' origin/${OLD_COMMIT}`
+fi
+if [ "${NEW_COMMIT_HASH}" == "${OLD_COMMIT_HASH}" ]; then
+  echo "No changes between old commit: \"${OLD_COMMIT}\" and new commit: \"${NEW_COMMIT}\""
+  exit 0
+fi
+
+if [ -z "${NEW_COMMIT}" ]; then
+  echo "Running compatibility regression test against \"${OLD_COMMIT}\""
   compatibility-verifier/checkoutAndBuild.sh -w $WORKING_DIR -o $OLD_COMMIT
 else
-  echo "Running compatibility regression test against \"${olderCommit}\" and \"${newerCommit}\""
-  compatibility-verifier/checkoutAndBuild.sh -w $WORKING_DIR -o $OLD_COMMIT -n $NEW_OLD_COMMIT
+  echo "Running compatibility regression test against \"${OLD_COMMIT}\" and \"${NEW_COMMIT}\""
+  compatibility-verifier/checkoutAndBuild.sh -w $WORKING_DIR -o $OLD_COMMIT -n $NEW_COMMIT
 fi
 
 compatibility-verifier/compCheck.sh -w $WORKING_DIR -t $TEST_SUITE

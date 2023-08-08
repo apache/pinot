@@ -43,6 +43,9 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -61,6 +64,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOGGER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all the loggers", notes = "Return all the logger names")
   public List<String> getLoggers() {
@@ -69,6 +73,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers/{loggerName}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOGGER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get logger configs", notes = "Return logger info")
   public Map<String, String> getLogger(
@@ -82,6 +87,7 @@ public class PinotBrokerLogger {
 
   @PUT
   @Path("/loggers/{loggerName}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_LOGGER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Set logger level", notes = "Set logger level for a given logger")
   public Map<String, String> setLoggerLevel(@ApiParam(value = "Logger name") @PathParam("loggerName") String loggerName,
@@ -91,6 +97,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers/files")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all local log files")
   public Set<String> getLocalLogFiles() {
@@ -106,6 +113,7 @@ public class PinotBrokerLogger {
 
   @GET
   @Path("/loggers/download")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @ApiOperation(value = "Download a log file")
   public Response downloadLogFile(

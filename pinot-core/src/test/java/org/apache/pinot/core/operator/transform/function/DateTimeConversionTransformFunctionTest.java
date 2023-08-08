@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -65,10 +66,33 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
         }, new Object[]{"dateTimeConvert(5,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')"}, new Object[]{
         String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')", INT_MV_COLUMN)
     }, new Object[]{
-        String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','MINUTES')", TIME_COLUMN)
+        String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','MINUTES:1')", TIME_COLUMN)
     }, new Object[]{
         String.format("dateTimeConvert(%s,%s,'1:MINUTES:EPOCH','1:MINUTES')", TIME_COLUMN, INT_SV_COLUMN)
     }
     };
+  }
+
+  @Test
+  public void testDateTimeConversionTransformFunctionNullColumn() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("dateTimeConvert(%s,'1:MILLISECONDS:EPOCH','1:MINUTES:EPOCH','1:MINUTES')",
+            TIMESTAMP_COLUMN_NULL));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof DateTimeConversionTransformFunction);
+    assertEquals(transformFunction.getName(), DateTimeConversionTransformFunction.FUNCTION_NAME);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertTrue(resultMetadata.isSingleValue());
+    assertEquals(resultMetadata.getDataType(), DataType.LONG);
+    long[] expectedValues = new long[NUM_ROWS];
+    RoaringBitmap expectedNulls = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        expectedNulls.add(i);
+      } else {
+        expectedValues[i] = TimeUnit.MILLISECONDS.toMinutes(_timeValues[i]);
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, expectedNulls);
   }
 }

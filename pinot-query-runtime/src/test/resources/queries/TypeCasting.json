@@ -36,14 +36,14 @@
       { "sql": "SELECT CAST(floatCol AS DOUBLE) * 1e100, CAST(intCol AS BIGINT) * 2000000000, CAST(longCol AS DOUBLE) * 1e100, CAST(boolCol AS INT) FROM {tbl}" },
       { "sql": "SELECT CAST(a.floatCol AS DOUBLE) * 1e100, CAST(a.intCol AS BIGINT) * 2000000000, CAST(b.longCol AS FLOAT) * 1e20, CAST(a.boolCol AS INT) FROM {tbl} AS a JOIN {tbl} AS b ON a.intCol = b.intCol WHERE a.boolCol = true" },
       {
-        "ignored": true,
-        "comments": "primitive cast not work: cast as DECIMAL doesn't work",
-        "sql": "SELECT CAST(doubleCol AS DECIMAL) FROM {tbl} WHERE bigDecimalCol > 0 AND CAST(bytesCol AS VARCHAR) != '1000'"
+        "comments": "special cast not work: bytes cast to hex is not supported in h2, need to use RAWTOHEX(bytesCol) instead",
+        "sql": "SELECT CAST(doubleCol AS DECIMAL), CAST(bytesCol AS VARCHAR) FROM {tbl} WHERE bigDecimalCol > 0 AND CAST(bytesCol AS VARCHAR) != '1000'",
+        "h2Sql": "SELECT CAST(doubleCol AS DECIMAL), RAWTOHEX(bytesCol) FROM {tbl} WHERE bigDecimalCol > 0 AND RAWTOHEX(bytesCol) != '1000'"
       },
       {
         "ignored": true,
         "comments": "special cast not work: timestamp cast not supported, varchar cast not supported",
-        "sql": "SELECT CAST(b.timestampCol AS BIGINT), CAST(stringCol AS VARBINARY) FROM {tbl}"
+        "sql": "SELECT CAST(timestampCol AS BIGINT), CAST(stringCol AS VARBINARY) FROM {tbl}"
       }
     ]
   },
@@ -135,27 +135,36 @@
         ]
       },
       {
-        "ignored": true,
-        "comment": "problematic dateTimeConvert with weird exception on leaf stage",
-        "sql": "SELECT dateTimeConvert(timestampStringCol, '1:MILLISECONDS:EPOCH', '1:MINUTES:EPOCH', '30:MINUTES') FROM {tbl}",
+        "sql": "SELECT dateTimeConvert(timestampCol, '1:MILLISECONDS:EPOCH', '1:MINUTES:EPOCH', '30:MINUTES') FROM {tbl}",
         "outputs": [
-          []
+          [450],
+          [540],
+          [15263280],
+          [15264360],
+          [27352050],
+          [1993348080]
         ]
       },
       {
-        "ignored": true,
-        "comment": "problematic round function not producing proper decimal results type",
         "sql": "SELECT ROUND(longCol, 2) FROM {tbl}",
         "outputs": [
-          []
+          [14],
+          [14],
+          [20],
+          [20],
+          [40],
+          [46]
         ]
       },
       {
-        "ignored": true,
-        "comment": "dateTrunc returns round up instead of round down results",
-        "sql": "SELECT dateTrunc('DAY', b.timestampCol) FROM {tbl}",
+        "sql": "SELECT dateTrunc('DAY', timestampCol) FROM {tbl}",
         "outputs": [
-          []
+          [0],
+          [0],
+          [915753600000],
+          [915840000000],
+          [1641081600000],
+          [119600841600000]
         ]
       }
     ]

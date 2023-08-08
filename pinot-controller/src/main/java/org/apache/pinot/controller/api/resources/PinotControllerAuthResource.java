@@ -28,6 +28,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -38,6 +39,9 @@ import javax.ws.rs.core.MediaType;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -65,6 +69,7 @@ public class PinotControllerAuthResource {
    */
   @GET
   @Path("auth/verify")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_AUTH)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check whether authentication is enabled")
   @ApiResponses(value = {
@@ -72,7 +77,7 @@ public class PinotControllerAuthResource {
       @ApiResponse(code = 500, message = "Verification error")
   })
   public boolean verify(@ApiParam(value = "Table name without type") @QueryParam("tableName") String tableName,
-      @ApiParam(value = "API access type") @QueryParam("accessType") AccessType accessType,
+      @ApiParam(value = "API access type") @DefaultValue("READ") @QueryParam("accessType") AccessType accessType,
       @ApiParam(value = "Endpoint URL") @QueryParam("endpointUrl") String endpointUrl) {
     AccessControl accessControl = _accessControlFactory.create();
     return accessControl.hasAccess(tableName, accessType, _httpHeaders, endpointUrl);
@@ -86,6 +91,7 @@ public class PinotControllerAuthResource {
    */
   @GET
   @Path("auth/info")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_AUTH)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Retrieve auth workflow info")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Auth workflow info provided")})

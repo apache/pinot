@@ -19,11 +19,18 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -70,9 +77,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.STRING, false, false);
   protected static final TransformResultMetadata JSON_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.JSON, false, false);
-  // TODO: Support MV BYTES
   protected static final TransformResultMetadata BYTES_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, false, false);
+  protected static final TransformResultMetadata UNKNOWN_METADATA =
+      new TransformResultMetadata(DataType.UNKNOWN, true, false);
 
   // These buffers are used to hold the result for different result types. When the subclass overrides a method, it can
   // reuse the buffer for that method. E.g. if transformToIntValuesSV is overridden, the result can be written into
@@ -91,53 +99,93 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected String[][] _stringValuesMV;
   protected byte[][][] _bytesValuesMV;
 
+  protected List<TransformFunction> _arguments;
+  protected boolean _nullHandlingEnabled;
+
+  protected void fillResultUnknown(int length) {
+    for (int i = 0; i < length; i++) {
+      _intValuesSV[i] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+    }
+  }
+
+  // NOTE: this init has to be called for default getNullBitmap() implementation to be effective.
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    _arguments = arguments;
+  }
+
+  @Override
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      boolean nullHandlingEnabled) {
+    init(arguments, columnContextMap);
+    _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
   @Override
   public Dictionary getDictionary() {
     return null;
   }
 
   @Override
-  public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
+  public int[] transformToDictIdsSV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
+  public int[][] transformToDictIdsMV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }
 
-  @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_intValuesSV == null) {
+  protected void initIntValuesSV(int length) {
+    if (_intValuesSV == null || _intValuesSV.length < length) {
       _intValuesSV = new int[length];
     }
+  }
+
+  protected void initZeroFillingIntValuesSV(int length) {
+    if (_intValuesSV == null || _intValuesSV.length < length) {
+      _intValuesSV = new int[length];
+    } else {
+      Arrays.fill(_intValuesSV, 0, length, 0);
+    }
+  }
+
+  @Override
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initIntValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[] dictIds = transformToDictIdsSV(projectionBlock);
+      int[] dictIds = transformToDictIdsSV(valueBlock);
       dictionary.readIntValues(dictIds, length, _intValuesSV);
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case LONG:
-          long[] longValues = transformToLongValuesSV(projectionBlock);
+          long[] longValues = transformToLongValuesSV(valueBlock);
           ArrayCopyUtils.copy(longValues, _intValuesSV, length);
           break;
         case FLOAT:
-          float[] floatValues = transformToFloatValuesSV(projectionBlock);
+          float[] floatValues = transformToFloatValuesSV(valueBlock);
           ArrayCopyUtils.copy(floatValues, _intValuesSV, length);
           break;
         case DOUBLE:
-          double[] doubleValues = transformToDoubleValuesSV(projectionBlock);
+          double[] doubleValues = transformToDoubleValuesSV(valueBlock);
           ArrayCopyUtils.copy(doubleValues, _intValuesSV, length);
           break;
         case BIG_DECIMAL:
-          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(valueBlock);
           ArrayCopyUtils.copy(bigDecimalValues, _intValuesSV, length);
           break;
         case STRING:
-          String[] stringValues = transformToStringValuesSV(projectionBlock);
+          String[] stringValues = transformToStringValuesSV(valueBlock);
           ArrayCopyUtils.copy(stringValues, _intValuesSV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _intValuesSV[i] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read SV %s as INT", resultDataType));
@@ -146,38 +194,48 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _intValuesSV;
   }
 
-  @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_longValuesSV == null) {
+  protected void initLongValuesSV(int length) {
+    if (_longValuesSV == null || _longValuesSV.length < length) {
       _longValuesSV = new long[length];
     }
+  }
+
+  @Override
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initLongValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[] dictIds = transformToDictIdsSV(projectionBlock);
+      int[] dictIds = transformToDictIdsSV(valueBlock);
       dictionary.readLongValues(dictIds, length, _longValuesSV);
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case INT:
-          int[] intValues = transformToIntValuesSV(projectionBlock);
+          int[] intValues = transformToIntValuesSV(valueBlock);
           ArrayCopyUtils.copy(intValues, _longValuesSV, length);
           break;
         case FLOAT:
-          float[] floatValues = transformToFloatValuesSV(projectionBlock);
+          float[] floatValues = transformToFloatValuesSV(valueBlock);
           ArrayCopyUtils.copy(floatValues, _longValuesSV, length);
           break;
         case DOUBLE:
-          double[] doubleValues = transformToDoubleValuesSV(projectionBlock);
+          double[] doubleValues = transformToDoubleValuesSV(valueBlock);
           ArrayCopyUtils.copy(doubleValues, _longValuesSV, length);
           break;
         case BIG_DECIMAL:
-          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(valueBlock);
           ArrayCopyUtils.copy(bigDecimalValues, _longValuesSV, length);
           break;
         case STRING:
-          String[] stringValues = transformToStringValuesSV(projectionBlock);
+          String[] stringValues = transformToStringValuesSV(valueBlock);
           ArrayCopyUtils.copy(stringValues, _longValuesSV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _longValuesSV[i] = (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read SV %s as LONG", resultDataType));
@@ -186,38 +244,48 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _longValuesSV;
   }
 
-  @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_floatValuesSV == null) {
+  protected void initFloatValuesSV(int length) {
+    if (_floatValuesSV == null || _floatValuesSV.length < length) {
       _floatValuesSV = new float[length];
     }
+  }
+
+  @Override
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initFloatValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[] dictIds = transformToDictIdsSV(projectionBlock);
+      int[] dictIds = transformToDictIdsSV(valueBlock);
       dictionary.readFloatValues(dictIds, length, _floatValuesSV);
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case INT:
-          int[] intValues = transformToIntValuesSV(projectionBlock);
+          int[] intValues = transformToIntValuesSV(valueBlock);
           ArrayCopyUtils.copy(intValues, _floatValuesSV, length);
           break;
         case LONG:
-          long[] longValues = transformToLongValuesSV(projectionBlock);
+          long[] longValues = transformToLongValuesSV(valueBlock);
           ArrayCopyUtils.copy(longValues, _floatValuesSV, length);
           break;
         case DOUBLE:
-          double[] doubleValues = transformToDoubleValuesSV(projectionBlock);
+          double[] doubleValues = transformToDoubleValuesSV(valueBlock);
           ArrayCopyUtils.copy(doubleValues, _floatValuesSV, length);
           break;
         case BIG_DECIMAL:
-          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(valueBlock);
           ArrayCopyUtils.copy(bigDecimalValues, _floatValuesSV, length);
           break;
         case STRING:
-          String[] stringValues = transformToStringValuesSV(projectionBlock);
+          String[] stringValues = transformToStringValuesSV(valueBlock);
           ArrayCopyUtils.copy(stringValues, _floatValuesSV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _floatValuesSV[i] = (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read SV %s as FLOAT", resultDataType));
@@ -226,38 +294,48 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _floatValuesSV;
   }
 
-  @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
+  protected void initDoubleValuesSV(int length) {
+    if (_doubleValuesSV == null || _doubleValuesSV.length < length) {
       _doubleValuesSV = new double[length];
     }
+  }
+
+  @Override
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initDoubleValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[] dictIds = transformToDictIdsSV(projectionBlock);
+      int[] dictIds = transformToDictIdsSV(valueBlock);
       dictionary.readDoubleValues(dictIds, length, _doubleValuesSV);
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case INT:
-          int[] intValues = transformToIntValuesSV(projectionBlock);
+          int[] intValues = transformToIntValuesSV(valueBlock);
           ArrayCopyUtils.copy(intValues, _doubleValuesSV, length);
           break;
         case LONG:
-          long[] longValues = transformToLongValuesSV(projectionBlock);
+          long[] longValues = transformToLongValuesSV(valueBlock);
           ArrayCopyUtils.copy(longValues, _doubleValuesSV, length);
           break;
         case FLOAT:
-          float[] floatValues = transformToFloatValuesSV(projectionBlock);
+          float[] floatValues = transformToFloatValuesSV(valueBlock);
           ArrayCopyUtils.copy(floatValues, _doubleValuesSV, length);
           break;
         case BIG_DECIMAL:
-          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(valueBlock);
           ArrayCopyUtils.copy(bigDecimalValues, _doubleValuesSV, length);
           break;
         case STRING:
-          String[] stringValues = transformToStringValuesSV(projectionBlock);
+          String[] stringValues = transformToStringValuesSV(valueBlock);
           ArrayCopyUtils.copy(stringValues, _doubleValuesSV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _doubleValuesSV[i] = (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read SV %s as DOUBLE", resultDataType));
@@ -266,42 +344,52 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _doubleValuesSV;
   }
 
-  @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
+  protected void initBigDecimalValuesSV(int length) {
+    if (_bigDecimalValuesSV == null || _bigDecimalValuesSV.length < length) {
       _bigDecimalValuesSV = new BigDecimal[length];
     }
+  }
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initBigDecimalValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[] dictIds = transformToDictIdsSV(projectionBlock);
+      int[] dictIds = transformToDictIdsSV(valueBlock);
       dictionary.readBigDecimalValues(dictIds, length, _bigDecimalValuesSV);
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case INT:
-          int[] intValues = transformToIntValuesSV(projectionBlock);
+          int[] intValues = transformToIntValuesSV(valueBlock);
           ArrayCopyUtils.copy(intValues, _bigDecimalValuesSV, length);
           break;
         case LONG:
-          long[] longValues = transformToLongValuesSV(projectionBlock);
+          long[] longValues = transformToLongValuesSV(valueBlock);
           ArrayCopyUtils.copy(longValues, _bigDecimalValuesSV, length);
           break;
         case FLOAT:
-          float[] floatValues = transformToFloatValuesSV(projectionBlock);
+          float[] floatValues = transformToFloatValuesSV(valueBlock);
           ArrayCopyUtils.copy(floatValues, _bigDecimalValuesSV, length);
           break;
         case DOUBLE:
-          double[] doubleValues = transformToDoubleValuesSV(projectionBlock);
+          double[] doubleValues = transformToDoubleValuesSV(valueBlock);
           ArrayCopyUtils.copy(doubleValues, _bigDecimalValuesSV, length);
           break;
         case STRING:
-          String[] stringValues = transformToStringValuesSV(projectionBlock);
+          String[] stringValues = transformToStringValuesSV(valueBlock);
           ArrayCopyUtils.copy(stringValues, _bigDecimalValuesSV, length);
           break;
         case BYTES:
-          byte[][] bytesValues = transformToBytesValuesSV(projectionBlock);
+          byte[][] bytesValues = transformToBytesValuesSV(valueBlock);
           ArrayCopyUtils.copy(bytesValues, _bigDecimalValuesSV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _bigDecimalValuesSV[i] = (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read SV %s as BIG_DECIMAL", resultDataType));
@@ -310,42 +398,52 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _bigDecimalValuesSV;
   }
 
-  @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_stringValuesSV == null) {
+  protected void initStringValuesSV(int length) {
+    if (_stringValuesSV == null || _stringValuesSV.length < length) {
       _stringValuesSV = new String[length];
     }
+  }
+
+  @Override
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initStringValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[] dictIds = transformToDictIdsSV(projectionBlock);
+      int[] dictIds = transformToDictIdsSV(valueBlock);
       dictionary.readStringValues(dictIds, length, _stringValuesSV);
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case INT:
-          int[] intValues = transformToIntValuesSV(projectionBlock);
+          int[] intValues = transformToIntValuesSV(valueBlock);
           ArrayCopyUtils.copy(intValues, _stringValuesSV, length);
           break;
         case LONG:
-          long[] longValues = transformToLongValuesSV(projectionBlock);
+          long[] longValues = transformToLongValuesSV(valueBlock);
           ArrayCopyUtils.copy(longValues, _stringValuesSV, length);
           break;
         case FLOAT:
-          float[] floatValues = transformToFloatValuesSV(projectionBlock);
+          float[] floatValues = transformToFloatValuesSV(valueBlock);
           ArrayCopyUtils.copy(floatValues, _stringValuesSV, length);
           break;
         case DOUBLE:
-          double[] doubleValues = transformToDoubleValuesSV(projectionBlock);
+          double[] doubleValues = transformToDoubleValuesSV(valueBlock);
           ArrayCopyUtils.copy(doubleValues, _stringValuesSV, length);
           break;
         case BIG_DECIMAL:
-          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(valueBlock);
           ArrayCopyUtils.copy(bigDecimalValues, _stringValuesSV, length);
           break;
         case BYTES:
-          byte[][] bytesValues = transformToBytesValuesSV(projectionBlock);
+          byte[][] bytesValues = transformToBytesValuesSV(valueBlock);
           ArrayCopyUtils.copy(bytesValues, _stringValuesSV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _stringValuesSV[i] = (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read SV %s as STRING", resultDataType));
@@ -354,26 +452,36 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _stringValuesSV;
   }
 
-  @Override
-  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_bytesValuesSV == null) {
+  protected void initBytesValuesSV(int length) {
+    if (_bytesValuesSV == null || _bytesValuesSV.length < length) {
       _bytesValuesSV = new byte[length][];
     }
+  }
+
+  @Override
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initBytesValuesSV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[] dictIds = transformToDictIdsSV(projectionBlock);
+      int[] dictIds = transformToDictIdsSV(valueBlock);
       dictionary.readBytesValues(dictIds, length, _bytesValuesSV);
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case BIG_DECIMAL:
-          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(projectionBlock);
+          BigDecimal[] bigDecimalValues = transformToBigDecimalValuesSV(valueBlock);
           ArrayCopyUtils.copy(bigDecimalValues, _bytesValuesSV, length);
           break;
         case STRING:
-          String[] stringValues = transformToStringValuesSV(projectionBlock);
+          String[] stringValues = transformToStringValuesSV(valueBlock);
           ArrayCopyUtils.copy(stringValues, _bytesValuesSV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _bytesValuesSV[i] = (byte[]) DataSchema.ColumnDataType.BYTES.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read SV %s as BYTES", resultDataType));
@@ -382,15 +490,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _bytesValuesSV;
   }
 
-  @Override
-  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_intValuesMV == null) {
+  protected void initIntValuesMV(int length) {
+    if (_intValuesMV == null || _intValuesMV.length < length) {
       _intValuesMV = new int[length][];
     }
+  }
+
+  @Override
+  public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initIntValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
+      int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;
@@ -402,20 +514,26 @@ public abstract class BaseTransformFunction implements TransformFunction {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case LONG:
-          long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
+          long[][] longValuesMV = transformToLongValuesMV(valueBlock);
           ArrayCopyUtils.copy(longValuesMV, _intValuesMV, length);
           break;
         case FLOAT:
-          float[][] floatValuesMV = transformToFloatValuesMV(projectionBlock);
+          float[][] floatValuesMV = transformToFloatValuesMV(valueBlock);
           ArrayCopyUtils.copy(floatValuesMV, _intValuesMV, length);
           break;
         case DOUBLE:
-          double[][] doubleValuesMV = transformToDoubleValuesMV(projectionBlock);
+          double[][] doubleValuesMV = transformToDoubleValuesMV(valueBlock);
           ArrayCopyUtils.copy(doubleValuesMV, _intValuesMV, length);
           break;
         case STRING:
-          String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
+          String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
           ArrayCopyUtils.copy(stringValuesMV, _intValuesMV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _intValuesMV[i] = (int[]) DataSchema.ColumnDataType.INT_ARRAY.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read MV %s as INT", resultDataType));
@@ -424,15 +542,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _intValuesMV;
   }
 
-  @Override
-  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_longValuesMV == null) {
+  protected void initLongValuesMV(int length) {
+    if (_longValuesMV == null || _longValuesMV.length < length) {
       _longValuesMV = new long[length][];
     }
+  }
+
+  @Override
+  public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initLongValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
+      int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;
@@ -444,20 +566,26 @@ public abstract class BaseTransformFunction implements TransformFunction {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case INT:
-          int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
+          int[][] intValuesMV = transformToIntValuesMV(valueBlock);
           ArrayCopyUtils.copy(intValuesMV, _longValuesMV, length);
           break;
         case FLOAT:
-          float[][] floatValuesMV = transformToFloatValuesMV(projectionBlock);
+          float[][] floatValuesMV = transformToFloatValuesMV(valueBlock);
           ArrayCopyUtils.copy(floatValuesMV, _longValuesMV, length);
           break;
         case DOUBLE:
-          double[][] doubleValuesMV = transformToDoubleValuesMV(projectionBlock);
+          double[][] doubleValuesMV = transformToDoubleValuesMV(valueBlock);
           ArrayCopyUtils.copy(doubleValuesMV, _longValuesMV, length);
           break;
         case STRING:
-          String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
+          String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
           ArrayCopyUtils.copy(stringValuesMV, _longValuesMV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _longValuesMV[i] = (long[]) DataSchema.ColumnDataType.LONG_ARRAY.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read MV %s as LONG", resultDataType));
@@ -466,15 +594,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _longValuesMV;
   }
 
-  @Override
-  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_floatValuesMV == null) {
+  protected void initFloatValuesMV(int length) {
+    if (_floatValuesMV == null || _floatValuesMV.length < length) {
       _floatValuesMV = new float[length][];
     }
+  }
+
+  @Override
+  public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initFloatValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
+      int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;
@@ -486,20 +618,26 @@ public abstract class BaseTransformFunction implements TransformFunction {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case INT:
-          int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
+          int[][] intValuesMV = transformToIntValuesMV(valueBlock);
           ArrayCopyUtils.copy(intValuesMV, _floatValuesMV, length);
           break;
         case LONG:
-          long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
+          long[][] longValuesMV = transformToLongValuesMV(valueBlock);
           ArrayCopyUtils.copy(longValuesMV, _floatValuesMV, length);
           break;
         case DOUBLE:
-          double[][] doubleValuesMV = transformToDoubleValuesMV(projectionBlock);
+          double[][] doubleValuesMV = transformToDoubleValuesMV(valueBlock);
           ArrayCopyUtils.copy(doubleValuesMV, _floatValuesMV, length);
           break;
         case STRING:
-          String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
+          String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
           ArrayCopyUtils.copy(stringValuesMV, _floatValuesMV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _floatValuesMV[i] = (float[]) DataSchema.ColumnDataType.FLOAT_ARRAY.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read MV %s as FLOAT", resultDataType));
@@ -508,15 +646,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _floatValuesMV;
   }
 
-  @Override
-  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_doubleValuesMV == null) {
+  protected void initDoubleValuesMV(int length) {
+    if (_doubleValuesMV == null || _doubleValuesMV.length < length) {
       _doubleValuesMV = new double[length][];
     }
+  }
+
+  @Override
+  public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initDoubleValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
+      int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;
@@ -528,20 +670,26 @@ public abstract class BaseTransformFunction implements TransformFunction {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType.getStoredType()) {
         case INT:
-          int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
+          int[][] intValuesMV = transformToIntValuesMV(valueBlock);
           ArrayCopyUtils.copy(intValuesMV, _doubleValuesMV, length);
           break;
         case LONG:
-          long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
+          long[][] longValuesMV = transformToLongValuesMV(valueBlock);
           ArrayCopyUtils.copy(longValuesMV, _doubleValuesMV, length);
           break;
         case FLOAT:
-          float[][] floatValuesMV = transformToFloatValuesMV(projectionBlock);
+          float[][] floatValuesMV = transformToFloatValuesMV(valueBlock);
           ArrayCopyUtils.copy(floatValuesMV, _doubleValuesMV, length);
           break;
         case STRING:
-          String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
+          String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
           ArrayCopyUtils.copy(stringValuesMV, _doubleValuesMV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _doubleValuesMV[i] = (double[]) DataSchema.ColumnDataType.DOUBLE_ARRAY.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read MV %s as DOUBLE", resultDataType));
@@ -550,15 +698,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _doubleValuesMV;
   }
 
-  @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_stringValuesMV == null) {
+  protected void initStringValuesMV(int length) {
+    if (_stringValuesMV == null || _stringValuesMV.length < length) {
       _stringValuesMV = new String[length][];
     }
+  }
+
+  @Override
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initStringValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
+      int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;
@@ -570,20 +722,26 @@ public abstract class BaseTransformFunction implements TransformFunction {
       DataType resultDataType = getResultMetadata().getDataType();
       switch (resultDataType) {
         case INT:
-          int[][] intValuesMV = transformToIntValuesMV(projectionBlock);
+          int[][] intValuesMV = transformToIntValuesMV(valueBlock);
           ArrayCopyUtils.copy(intValuesMV, _stringValuesMV, length);
           break;
         case LONG:
-          long[][] longValuesMV = transformToLongValuesMV(projectionBlock);
+          long[][] longValuesMV = transformToLongValuesMV(valueBlock);
           ArrayCopyUtils.copy(longValuesMV, _stringValuesMV, length);
           break;
         case FLOAT:
-          float[][] floatValuesMV = transformToFloatValuesMV(projectionBlock);
+          float[][] floatValuesMV = transformToFloatValuesMV(valueBlock);
           ArrayCopyUtils.copy(floatValuesMV, _stringValuesMV, length);
           break;
         case DOUBLE:
-          double[][] doubleValuesMV = transformToDoubleValuesMV(projectionBlock);
+          double[][] doubleValuesMV = transformToDoubleValuesMV(valueBlock);
           ArrayCopyUtils.copy(doubleValuesMV, _stringValuesMV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _stringValuesMV[i] = (String[]) DataSchema.ColumnDataType.STRING_ARRAY.getNullPlaceholder();
+          }
           break;
         default:
           throw new IllegalStateException(String.format("Cannot read MV %s as STRING", resultDataType));
@@ -592,15 +750,19 @@ public abstract class BaseTransformFunction implements TransformFunction {
     return _stringValuesMV;
   }
 
-  @Override
-  public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_bytesValuesMV == null) {
+  protected void initBytesValuesMV(int length) {
+    if (_bytesValuesMV == null || _bytesValuesMV.length < length) {
       _bytesValuesMV = new byte[length][][];
     }
+  }
+
+  @Override
+  public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initBytesValuesMV(length);
     Dictionary dictionary = getDictionary();
     if (dictionary != null) {
-      int[][] dictIdsMV = transformToDictIdsMV(projectionBlock);
+      int[][] dictIdsMV = transformToDictIdsMV(valueBlock);
       for (int i = 0; i < length; i++) {
         int[] dictIds = dictIdsMV[i];
         int numValues = dictIds.length;
@@ -610,9 +772,29 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     } else {
       assert getResultMetadata().getDataType().getStoredType() == DataType.STRING;
-      String[][] stringValuesMV = transformToStringValuesMV(projectionBlock);
+      String[][] stringValuesMV = transformToStringValuesMV(valueBlock);
       ArrayCopyUtils.copy(stringValuesMV, _bytesValuesMV, length);
     }
     return _bytesValuesMV;
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    // TODO: _arguments shouldn't be null if all the transform functions call the init().
+    if (_arguments == null) {
+      return null;
+    }
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (TransformFunction arg : _arguments) {
+      RoaringBitmap argBitmap = arg.getNullBitmap(valueBlock);
+      if (argBitmap != null) {
+        bitmap.or(argBitmap);
+      }
+    }
+    if (bitmap.isEmpty()) {
+      return null;
+    }
+    return bitmap;
   }
 }

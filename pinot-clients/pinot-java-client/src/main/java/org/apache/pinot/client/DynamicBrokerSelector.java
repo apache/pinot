@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import javax.annotation.Nullable;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
+import org.apache.pinot.client.utils.BrokerSelectorUtils;
 
 
 /**
@@ -86,24 +88,16 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
 
   @Nullable
   @Override
-  public String selectBroker(String table) {
-    if (table != null) {
-      String tableName =
-          table.replace(ExternalViewReader.OFFLINE_SUFFIX, "").replace(ExternalViewReader.REALTIME_SUFFIX, "");
-      List<String> list = _tableToBrokerListMapRef.get().get(tableName);
-      if (list != null && !list.isEmpty()) {
-        return list.get(RANDOM.nextInt(list.size()));
-      }
-      // In case tableName is formatted as <db>.<table>
-      int idx = tableName.indexOf('.');
-      if (idx > 0) {
-        tableName = tableName.substring(idx + 1);
-      }
-      list = _tableToBrokerListMapRef.get().get(tableName);
+  public String selectBroker(String... tableNames) {
+    if (tableNames != null) {
+      // getting list of brokers hosting all the tables.
+      List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
+          _tableToBrokerListMapRef.get());
       if (list != null && !list.isEmpty()) {
         return list.get(RANDOM.nextInt(list.size()));
       }
     }
+
     // Return a broker randomly if table is null or no broker is found for the specified table.
     List<String> list = _allBrokerListRef.get();
     if (list != null && !list.isEmpty()) {

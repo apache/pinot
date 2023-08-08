@@ -37,6 +37,9 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -81,6 +84,7 @@ public class PinotUpsertRestletResource {
    */
   @POST
   @Path("/upsert/estimateHeapUsage")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.ESTIMATE_UPSERT_MEMORY)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Estimate memory usage for an upsert table", notes =
@@ -129,14 +133,25 @@ public class PinotUpsertRestletResource {
     // Estimated value space, it contains <segmentName, DocId, ComparisonValue(timestamp)> and overhead.
     // Here we only calculate the map content size. TODO: Add the map entry size and the array size within the map.
     int bytesPerValue = 60;
-    String comparisonColumn = tableConfig.getUpsertConfig().getComparisonColumn();
-    if (comparisonColumn != null) {
-      FieldSpec.DataType dt = schema.getFieldSpecFor(comparisonColumn).getDataType();
-      if (!dt.isFixedWidth()) {
-        String msg = "Not support data types for the comparison column";
-        throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST);
-      } else {
-        bytesPerValue = 52 + dt.size();
+    List<String> comparisonColumns = tableConfig.getUpsertConfig().getComparisonColumns();
+    if (comparisonColumns != null) {
+      int bytesPerArrayElem = 8;  // object ref
+      bytesPerValue = 52;
+      for (String columnName : comparisonColumns) {
+        FieldSpec.DataType dt = schema.getFieldSpecFor(columnName).getDataType();
+        if (!dt.isFixedWidth()) {
+          String msg = "Not support data types for the comparison column";
+          throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST);
+        } else {
+          if (comparisonColumns.size() == 1) {
+            bytesPerValue += dt.size();
+          } else {
+            bytesPerValue += bytesPerArrayElem + dt.size();
+          }
+        }
+      }
+      if (comparisonColumns.size() > 1) {
+        bytesPerValue += 48 + 4;  // array overhead + comparableIndex integer
       }
     }
 

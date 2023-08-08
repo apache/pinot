@@ -19,10 +19,7 @@
 package org.apache.pinot.controller.helix;
 
 import java.io.IOException;
-import java.util.Set;
-import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -35,7 +32,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
 
 
 public class ControllerInstanceToggleTest extends ControllerTest {
@@ -120,28 +116,14 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     // It may take time for an instance to toggle the state.
     TestUtils.waitForCondition(aVoid -> {
       try {
-        sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forInstanceState(instanceName), state);
+        sendPutRequest(
+            DEFAULT_INSTANCE.getControllerRequestURLBuilder().forInstanceState(instanceName) + "?state=" + state);
       } catch (IOException ioe) {
         // receive non-200 status code
         return false;
       }
       return true;
     }, TIMEOUT_MS, "Failed to toggle instance state: '" + state + "' for instance: " + instanceName);
-  }
-
-  private void checkNumOnlineInstancesFromExternalView(String resourceName, int expectedNumOnlineInstances)
-      throws InterruptedException {
-    long endTime = System.currentTimeMillis() + TIMEOUT_MS;
-    while (System.currentTimeMillis() < endTime) {
-      ExternalView resourceExternalView = DEFAULT_INSTANCE.getHelixAdmin()
-          .getResourceExternalView(DEFAULT_INSTANCE.getHelixClusterName(), resourceName);
-      Set<String> instanceSet = HelixHelper.getOnlineInstanceFromExternalView(resourceExternalView);
-      if (instanceSet.size() == expectedNumOnlineInstances) {
-        return;
-      }
-      Thread.sleep(100L);
-    }
-    fail("Failed to reach " + expectedNumOnlineInstances + " online instances for resource: " + resourceName);
   }
 
   @AfterClass

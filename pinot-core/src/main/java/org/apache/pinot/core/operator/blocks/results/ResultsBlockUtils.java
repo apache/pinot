@@ -29,7 +29,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
@@ -43,16 +42,16 @@ public class ResultsBlockUtils {
   public static BaseResultsBlock buildEmptyQueryResults(QueryContext queryContext) {
     if (QueryContextUtils.isSelectionQuery(queryContext)) {
       return buildEmptySelectionQueryResults(queryContext);
-    } else if (QueryContextUtils.isAggregationQuery(queryContext)) {
+    }
+    if (QueryContextUtils.isAggregationQuery(queryContext)) {
       if (queryContext.getGroupByExpressions() == null) {
         return buildEmptyAggregationQueryResults(queryContext);
       } else {
         return buildEmptyGroupByQueryResults(queryContext);
       }
-    } else {
-      assert QueryContextUtils.isDistinctQuery(queryContext);
-      return buildEmptyDistinctQueryResults(queryContext);
     }
+    assert QueryContextUtils.isDistinctQuery(queryContext);
+    return buildEmptyDistinctQueryResults(queryContext);
   }
 
   private static SelectionResultsBlock buildEmptySelectionQueryResults(QueryContext queryContext) {
@@ -71,8 +70,6 @@ public class ResultsBlockUtils {
 
   private static AggregationResultsBlock buildEmptyAggregationQueryResults(QueryContext queryContext) {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-    List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
-        queryContext.getFilteredAggregationFunctions();
     assert aggregationFunctions != null;
     int numAggregations = aggregationFunctions.length;
     List<Object> results = new ArrayList<>(numAggregations);
@@ -85,9 +82,8 @@ public class ResultsBlockUtils {
   private static GroupByResultsBlock buildEmptyGroupByQueryResults(QueryContext queryContext) {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
         queryContext.getFilteredAggregationFunctions();
-
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
-    assert groupByExpressions != null;
+    assert filteredAggregationFunctions != null && groupByExpressions != null;
     int numColumns = groupByExpressions.size() + filteredAggregationFunctions.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
@@ -98,12 +94,9 @@ public class ResultsBlockUtils {
       columnDataTypes[index] = ColumnDataType.STRING;
       index++;
     }
-    for (Pair<AggregationFunction, FilterContext> aggFilterPair : filteredAggregationFunctions) {
-      // NOTE: Use AggregationFunction.getResultColumnName() for SQL format response
-      AggregationFunction aggregationFunction = aggFilterPair.getLeft();
-      String columnName =
-          AggregationFunctionUtils.getResultColumnName(aggregationFunction, aggFilterPair.getRight());
-      columnNames[index] = columnName;
+    for (Pair<AggregationFunction, FilterContext> pair : filteredAggregationFunctions) {
+      AggregationFunction aggregationFunction = pair.getLeft();
+      columnNames[index] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
       index++;
     }
@@ -111,17 +104,17 @@ public class ResultsBlockUtils {
   }
 
   private static DistinctResultsBlock buildEmptyDistinctQueryResults(QueryContext queryContext) {
-    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null && aggregationFunctions.length == 1
-        && aggregationFunctions[0] instanceof DistinctAggregationFunction;
-    DistinctAggregationFunction distinctAggregationFunction = (DistinctAggregationFunction) aggregationFunctions[0];
-    String[] columnNames = distinctAggregationFunction.getColumns();
-    ColumnDataType[] columnDataTypes = new ColumnDataType[columnNames.length];
+    List<ExpressionContext> expressions = queryContext.getSelectExpressions();
+    int numExpressions = expressions.size();
+    String[] columns = new String[numExpressions];
+    for (int i = 0; i < numExpressions; i++) {
+      columns[i] = expressions.get(i).toString();
+    }
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
     // NOTE: Use STRING column data type as default for distinct query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-    DistinctTable distinctTable =
-        new DistinctTable(new DataSchema(columnNames, columnDataTypes), Collections.emptySet(),
-            queryContext.isNullHandlingEnabled());
-    return new DistinctResultsBlock(distinctAggregationFunction, distinctTable);
+    DistinctTable distinctTable = new DistinctTable(new DataSchema(columns, columnDataTypes), Collections.emptySet(),
+        queryContext.isNullHandlingEnabled());
+    return new DistinctResultsBlock(distinctTable);
   }
 }

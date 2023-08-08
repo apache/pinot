@@ -107,9 +107,10 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
     return 10;
   }
 
-  @Test
-  public void testThetaSketchQuery()
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testThetaSketchQueryV1(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     /*
     Original data:
 
@@ -206,6 +207,174 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
       runAndAssert(query, expected);
     }
 
+    // gender = female DIFF course = history
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender'' and dimValue = ''Female''', 'dimName = ''course'' and dimValue = ''History''', "
+          + "'SET_DIFF($1, $2)') from " + DEFAULT_TABLE_NAME;
+      int expected = 50 + 110 + 70 + 130;
+      runAndAssert(query, expected);
+
+      query = "select distinctCountThetaSketch(thetaSketchCol, '', "
+          + "'dimName = ''gender''', 'dimValue = ''Female''', 'dimName = ''course''', 'dimValue = ''History''', "
+          + "'SET_DIFF(SET_INTERSECT($1, $2), SET_INTERSECT($3, $4))') from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+
+    // group by gender
+    {
+      String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
+          + " where dimName = 'gender' group by dimValue";
+      ImmutableMap<String, Integer> expected =
+          ImmutableMap.of("Female", 50 + 60 + 70 + 110 + 120 + 130, "Male", 80 + 90 + 100 + 140 + 150 + 160);
+      runAndAssert(query, expected);
+    }
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testThetaSketchQueryV2(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    /*
+    Original data:
+
+    Gender    Course   Shard#1  Shard#2
+    --------  -------  -------  -------
+    Female    Math     50       110
+    Female    History  60       120
+    Female    Biology  70       130
+    Male      Math     80       140
+    Male      History  90       150
+    Male      Biology  100      160
+     */
+
+    // gender = female
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
+          + " where dimName = 'gender' and dimValue = 'Female'";
+      int expected = 50 + 60 + 70 + 110 + 120 + 130;
+      runAndAssert(query, expected);
+
+      query = "select getThetaSketchEstimate(distinctCountRAWThetaSketch(thetaSketchCol)"
+          + " FILTER (WHERE dimName = 'gender' and dimValue = 'Female')) from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'),"
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Female'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+
+    // gender = male
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
+          + " where dimName = 'gender' and dimValue = 'Male'";
+      int expected = 80 + 90 + 100 + 140 + 150 + 160;
+      runAndAssert(query, expected);
+
+      query = "select getThetaSketchEstimate(distinctCountRAWThetaSketch(thetaSketchCol)"
+          + " FILTER (WHERE dimName = 'gender' and dimValue = 'Male')) from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'),"
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Male'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+
+    // course = math
+    {
+      String query = "select distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
+          + " where dimName = 'course' AND dimValue = 'Math'";
+      int expected = 50 + 80 + 110 + 140;
+      runAndAssert(query, expected);
+
+      query = "select getThetaSketchEstimate(distinctCountRAWThetaSketch(thetaSketchCol)"
+          + " FILTER (WHERE dimName = 'course' and dimValue = 'Math')) from " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'course'),"
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Math'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+
+    // gender = female INTERSECT course = math
+    {
+      String query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'gender' and dimValue = 'Female'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'course' and dimValue = 'Math'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
+      int expected = 50 + 110;
+      runAndAssert(query, expected);
+
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Female'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'course'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Math'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT(THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Female')), "
+          + "  THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'course'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Math')))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+
+    // gender = male UNION course = biology
+    {
+      String query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'gender' and dimValue = 'Male'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'course' and dimValue = 'Biology'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
+      int expected = 70 + 80 + 90 + 100 + 130 + 140 + 150 + 160;
+      runAndAssert(query, expected);
+
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION("
+          + "  THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Male')), "
+          + "  THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'course'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Biology')))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+
+    // gender = female DIFF course = history
+    {
+      String query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'gender' and dimValue = 'Female'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER ("
+          + "        WHERE dimName = 'course' and dimValue = 'History'))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
+      int expected = 50 + 110 + 70 + 130;
+      runAndAssert(query, expected);
+
+      query = "select GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF("
+          + "  THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'Female')), "
+          + "  THETA_SKETCH_INTERSECT("
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'course'), "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimValue = 'History')))) "
+          + "  FROM " + DEFAULT_TABLE_NAME;
+      runAndAssert(query, expected);
+    }
+
     // group by gender
     {
       String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + DEFAULT_TABLE_NAME
@@ -218,7 +387,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
 
   private void runAndAssert(String query, int expected)
       throws Exception {
-    JsonNode jsonNode = postQuery(query, _brokerBaseApiUrl);
+    JsonNode jsonNode = postQuery(query);
     int actual = Integer.parseInt(jsonNode.get("resultTable").get("rows").get(0).get(0).asText());
     assertEquals(actual, expected);
   }
@@ -226,7 +395,7 @@ public class ThetaSketchIntegrationTest extends BaseClusterIntegrationTest {
   private void runAndAssert(String query, Map<String, Integer> expectedGroupToValueMap)
       throws Exception {
     Map<String, Integer> actualGroupToValueMap = new HashMap<>();
-    JsonNode jsonNode = postQuery(query, _brokerBaseApiUrl);
+    JsonNode jsonNode = postQuery(query);
     jsonNode.get("resultTable").get("rows").forEach(node -> {
       String group = node.get(0).textValue();
       int value = node.get(1).intValue();

@@ -44,11 +44,10 @@ public class InstanceAssignmentConfigUtils {
    * backward-compatibility) COMPLETED server tag is overridden to be different from the CONSUMING server tag.
    */
   public static boolean shouldRelocateCompletedSegments(TableConfig tableConfig) {
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        tableConfig.getInstanceAssignmentConfigMap();
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     return (instanceAssignmentConfigMap != null
-        && instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED) != null) || TagNameUtils
-        .isRelocateCompletedSegments(tableConfig.getTenantConfig());
+        && instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED.toString()) != null)
+        || TagNameUtils.isRelocateCompletedSegments(tableConfig.getTenantConfig());
   }
 
   /**
@@ -60,21 +59,20 @@ public class InstanceAssignmentConfigUtils {
       return true;
     }
     TableType tableType = tableConfig.getTableType();
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        tableConfig.getInstanceAssignmentConfigMap();
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     switch (instancePartitionsType) {
       // Allow OFFLINE instance assignment if the offline table has it configured or (for backward-compatibility) is
       // using replica-group segment assignment
       case OFFLINE:
         return tableType == TableType.OFFLINE && ((instanceAssignmentConfigMap != null
-            && instanceAssignmentConfigMap.get(InstancePartitionsType.OFFLINE) != null)
+            && instanceAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString()) != null)
             || AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY
             .equalsIgnoreCase(tableConfig.getValidationConfig().getSegmentAssignmentStrategy()));
       // Allow CONSUMING/COMPLETED instance assignment if the real-time table has it configured
       case CONSUMING:
       case COMPLETED:
         return tableType == TableType.REALTIME && (instanceAssignmentConfigMap != null
-            && instanceAssignmentConfigMap.get(instancePartitionsType) != null);
+            && instanceAssignmentConfigMap.get(instancePartitionsType.toString()) != null);
       default:
         throw new IllegalStateException();
     }
@@ -89,10 +87,10 @@ public class InstanceAssignmentConfigUtils {
         "Instance assignment is not allowed for the given table config");
 
     // Use the instance assignment config from the table config if it exists
-    Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap =
-        tableConfig.getInstanceAssignmentConfigMap();
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     if (instanceAssignmentConfigMap != null) {
-      InstanceAssignmentConfig instanceAssignmentConfig = instanceAssignmentConfigMap.get(instancePartitionsType);
+      InstanceAssignmentConfig instanceAssignmentConfig =
+          instanceAssignmentConfigMap.get(instancePartitionsType.toString());
       if (instanceAssignmentConfig != null) {
         return instanceAssignmentConfig;
       }
@@ -116,12 +114,12 @@ public class InstanceAssignmentConfigUtils {
       Preconditions.checkState(numPartitions > 0, "Number of partitions for column: %s is not properly configured",
           partitionColumn);
       replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups, 0, numPartitions,
-          replicaGroupStrategyConfig.getNumInstancesPerPartition(), minimizeDataMovement);
+          replicaGroupStrategyConfig.getNumInstancesPerPartition(), minimizeDataMovement, partitionColumn);
     } else {
       // If partition column is not configured, use replicaGroupStrategyConfig.getNumInstancesPerPartition() as
       // number of instances per replica-group for backward-compatibility
       replicaGroupPartitionConfig = new InstanceReplicaGroupPartitionConfig(true, 0, numReplicaGroups,
-          replicaGroupStrategyConfig.getNumInstancesPerPartition(), 0, 0, minimizeDataMovement);
+          replicaGroupStrategyConfig.getNumInstancesPerPartition(), 0, 0, minimizeDataMovement, null);
     }
 
     return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig);

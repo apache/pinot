@@ -48,6 +48,9 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -77,6 +80,7 @@ public class LLCSegmentCompletionHandlers {
   // We don't want to document these in swagger since they are internal APIs
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_EXTEND_BUILD_TIME)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String extendBuildTime(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -122,6 +126,7 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_CONSUMED)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentConsumed(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -150,6 +155,7 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentStoppedConsuming(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -175,6 +181,7 @@ public class LLCSegmentCompletionHandlers {
 
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_START)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitStart(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -210,6 +217,7 @@ public class LLCSegmentCompletionHandlers {
   // TODO: remove this API. Should not allow committing without metadata
   @GET
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitEnd(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
@@ -259,6 +267,7 @@ public class LLCSegmentCompletionHandlers {
 
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Produces(MediaType.APPLICATION_JSON)
@@ -346,6 +355,7 @@ public class LLCSegmentCompletionHandlers {
   // TODO: remove this API. Should not upload segment via controller
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_SEGMENT_UPLOAD)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPLOAD_SEGMENT)
   @Authenticate(AccessType.CREATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -388,6 +398,7 @@ public class LLCSegmentCompletionHandlers {
 
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END_METADATA)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
   @Authenticate(AccessType.CREATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -448,8 +459,10 @@ public class LLCSegmentCompletionHandlers {
           "Invalid multi-part for segment: %s", segmentName);
       FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
 
-      File localTempFile = new File(ControllerFilePathProvider.getInstance().getFileUploadTempDir(),
-          getTempSegmentFileName(segmentName));
+      File localTempFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
+          ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName),
+          "Invalid segment name: %s", segmentName);
+
       try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
         Files.copy(inputStream, localTempFile.toPath());
       } catch (Exception e) {
@@ -468,8 +481,10 @@ public class LLCSegmentCompletionHandlers {
    */
   private static SegmentMetadataImpl extractMetadataFromLocalSegmentFile(File segmentFile)
       throws Exception {
-    File tempIndexDir =
-        new File(ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), segmentFile.getName());
+    File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
+        ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), segmentFile.getName(),
+        "Invalid segment file: %s", segmentFile);
+
     try {
       FileUtils.forceMkdir(tempIndexDir);
 
@@ -494,8 +509,10 @@ public class LLCSegmentCompletionHandlers {
    */
   private static SegmentMetadataImpl extractSegmentMetadataFromForm(FormDataMultiPart form, String segmentName)
       throws IOException {
-    File tempIndexDir = new File(ControllerFilePathProvider.getInstance().getUntarredFileTempDir(),
-        getTempSegmentFileName(segmentName));
+    File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
+        ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), getTempSegmentFileName(segmentName),
+        "Invalid segment name: %s", segmentName);
+
     try {
       FileUtils.forceMkdir(tempIndexDir);
 
@@ -532,8 +549,10 @@ public class LLCSegmentCompletionHandlers {
    */
   private static SegmentMetadataImpl extractMetadataFromSegmentFileURI(URI segmentFileURI, String segmentName)
       throws Exception {
-    File localTempFile =
-        new File(ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName));
+    File localTempFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
+        ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName),
+        "Invalid segment name: %s", segmentName);
+
     try {
       SegmentFetcherFactory.fetchSegmentToLocal(segmentFileURI, localTempFile);
       return extractMetadataFromLocalSegmentFile(localTempFile);

@@ -29,12 +29,10 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.concurrent.Executor;
 import javax.inject.Inject;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -44,6 +42,9 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,19 +72,17 @@ public class TableSize {
 
   @GET
   @Path("/tables/{tableName}/size")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SIZE)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Read table sizes",
-      notes = "Get table size details. Table size is the size of untarred segments including replication")
+  @ApiOperation(value = "Read table sizes", notes = "Get table size details. Table size is the size of untarred "
+      + "segments including replication")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public TableSizeReader.TableSizeDetails getTableSize(
       @ApiParam(value = "Table name without type", required = true, example = "myTable | myTable_OFFLINE")
-      @PathParam("tableName") String tableName,
-      @ApiParam(value = "Get detailed information", required = false) @DefaultValue("true") @QueryParam("detailed")
-          boolean detailed) {
+      @PathParam("tableName") String tableName) {
     TableSizeReader tableSizeReader =
         new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;

@@ -20,7 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -32,49 +32,66 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.utils.SortUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class SortOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "SORT";
-  private final MultiStageOperator _upstreamOperator;
   private static final Logger LOGGER = LoggerFactory.getLogger(SortOperator.class);
 
+  private final MultiStageOperator _upstreamOperator;
   private final int _fetch;
   private final int _offset;
   private final DataSchema _dataSchema;
-  private final PriorityQueue<Object[]> _rows;
+  private final PriorityQueue<Object[]> _priorityQueue;
+  private final ArrayList<Object[]> _rows;
   private final int _numRowsToKeep;
 
   private boolean _readyToConstruct;
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
-  private OperatorStats _operatorStats;
 
-  public SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      long requestId, int stageId) {
-    this(upstreamOperator, collationKeys, collationDirections, fetch, offset, dataSchema,
-        SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY, requestId, stageId);
+  public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
+      List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
+      boolean isInputSorted) {
+    this(context, upstreamOperator, collationKeys, collationDirections, collationNullDirections, fetch, offset,
+        dataSchema, isInputSorted, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
   }
 
   @VisibleForTesting
-  SortOperator(MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections, int fetch, int offset, DataSchema dataSchema,
-      int maxHolderCapacity, long requestId, int stageId) {
+  SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
+      List<RelFieldCollation.Direction> collationDirections,
+      List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
+      boolean isInputSorted, int defaultHolderCapacity, int defaultResponseLimit) {
+    super(context);
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
-    _offset = offset;
+    _offset = Math.max(offset, 0);
     _dataSchema = dataSchema;
     _upstreamErrorBlock = null;
     _isSortedBlockConstructed = false;
-    _numRowsToKeep = _fetch > 0
-        ? Math.min(maxHolderCapacity, _fetch + (Math.max(_offset, 0)))
-        : maxHolderCapacity;
-    _rows = new PriorityQueue<>(_numRowsToKeep,
-        new SortComparator(collationKeys, collationDirections, dataSchema, false));
-    _operatorStats = new OperatorStats(requestId, stageId, EXPLAIN_NAME);
+    // Setting numRowsToKeep as default maximum on Broker if limit not set.
+    // TODO: make this default behavior configurable.
+    _numRowsToKeep = _fetch > 0 ? _fetch + _offset : defaultResponseLimit;
+    // Under the following circumstances, the SortOperator is a simple selection with row trim on limit & offset:
+    // - There are no collationKeys
+    // - 'isInputSorted' is set to true indicating that the data was already sorted
+    if (collationKeys.isEmpty() || isInputSorted) {
+      _priorityQueue = null;
+      _rows = new ArrayList<>();
+    } else {
+      // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
+      // which elements to keep and which to remove based on the limits.
+      _priorityQueue = new PriorityQueue<>(Math.min(defaultHolderCapacity, _numRowsToKeep),
+          new SortUtils.SortComparator(collationKeys, collationDirections, collationNullDirections, dataSchema, true));
+      _rows = null;
+    }
   }
 
   @Override
@@ -82,47 +99,53 @@ public class SortOperator extends MultiStageOperator {
     return ImmutableList.of(_upstreamOperator);
   }
 
+  @Override
+  public void cancel(Throwable e) {
+  }
+
   @Nullable
   @Override
   public String toExplainString() {
-    _upstreamOperator.toExplainString();
-    LOGGER.debug(_operatorStats.toString());
     return EXPLAIN_NAME;
   }
 
   @Override
   protected TransferableBlock getNextBlock() {
-    _operatorStats.startTimer();
     try {
       consumeInputBlocks();
       return produceSortedBlock();
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
-    } finally {
-      _operatorStats.endTimer();
     }
   }
 
   private TransferableBlock produceSortedBlock() {
     if (_upstreamErrorBlock != null) {
-      LOGGER.error("OperatorStats:" + _operatorStats);
       return _upstreamErrorBlock;
     } else if (!_readyToConstruct) {
       return TransferableBlockUtils.getNoOpTransferableBlock();
     }
 
     if (!_isSortedBlockConstructed) {
-      LinkedList<Object[]> rows = new LinkedList<>();
-      while (_rows.size() > _offset) {
-        Object[] row = _rows.poll();
-        rows.addFirst(row);
-      }
-      _operatorStats.recordOutput(1, rows.size());
       _isSortedBlockConstructed = true;
-      if (rows.size() == 0) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      if (_priorityQueue == null) {
+        if (_rows.size() > _offset) {
+          List<Object[]> row = _rows.subList(_offset, _rows.size());
+          return new TransferableBlock(row, _dataSchema, DataBlock.Type.ROW);
+        } else {
+          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        }
       } else {
-        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
+        LinkedList<Object[]> rows = new LinkedList<>();
+        while (_priorityQueue.size() > _offset) {
+          Object[] row = _priorityQueue.poll();
+          rows.addFirst(row);
+        }
+        if (rows.size() == 0) {
+          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        } else {
+          return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
+        }
       }
     } else {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
@@ -131,9 +154,7 @@ public class SortOperator extends MultiStageOperator {
 
   private void consumeInputBlocks() {
     if (!_isSortedBlockConstructed) {
-      _operatorStats.endTimer();
       TransferableBlock block = _upstreamOperator.nextBlock();
-      _operatorStats.startTimer();
       while (!block.isNoOpBlock()) {
         // setting upstream error block
         if (block.isErrorBlock()) {
@@ -145,55 +166,22 @@ public class SortOperator extends MultiStageOperator {
         }
 
         List<Object[]> container = block.getContainer();
-        for (Object[] row : container) {
-          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
-        }
-        _operatorStats.endTimer();
-        block = _upstreamOperator.nextBlock();
-        _operatorStats.startTimer();
-        _operatorStats.recordInput(1, container.size());
-      }
-    }
-  }
-
-  private static class SortComparator implements Comparator<Object[]> {
-    private final int _size;
-    private final int[] _valueIndices;
-    private final int[] _multipliers;
-    private final boolean[] _useDoubleComparison;
-
-    public SortComparator(List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
-        DataSchema dataSchema, boolean isNullHandlingEnabled) {
-      DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-      _size = collationKeys.size();
-      _valueIndices = new int[_size];
-      _multipliers = new int[_size];
-      _useDoubleComparison = new boolean[_size];
-      for (int i = 0; i < _size; i++) {
-        _valueIndices[i] = ((RexExpression.InputRef) collationKeys.get(i)).getIndex();
-        _multipliers[i] = collationDirections.get(i).isDescending() ? 1 : -1;
-        _useDoubleComparison[i] = columnDataTypes[_valueIndices[i]].isNumber();
-      }
-    }
-
-    @Override
-    public int compare(Object[] o1, Object[] o2) {
-      for (int i = 0; i < _size; i++) {
-        int index = _valueIndices[i];
-        Object v1 = o1[index];
-        Object v2 = o2[index];
-        int result;
-        if (_useDoubleComparison[i]) {
-          result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
+        if (_priorityQueue == null) {
+          // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
+          if (_rows.size() <= _numRowsToKeep) {
+            if (_rows.size() + container.size() <= _numRowsToKeep) {
+              _rows.addAll(container);
+            } else {
+              _rows.addAll(container.subList(0, _numRowsToKeep - _rows.size()));
+            }
+          }
         } else {
-          //noinspection unchecked
-          result = ((Comparable) v1).compareTo(v2);
+          for (Object[] row : container) {
+            SelectionOperatorUtils.addToPriorityQueue(row, _priorityQueue, _numRowsToKeep);
+          }
         }
-        if (result != 0) {
-          return result * _multipliers[i];
-        }
+        block = _upstreamOperator.nextBlock();
       }
-      return 0;
     }
   }
 }

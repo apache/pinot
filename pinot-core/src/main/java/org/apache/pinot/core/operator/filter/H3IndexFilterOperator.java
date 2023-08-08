@@ -27,12 +27,13 @@ import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -46,33 +47,34 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * A filter operator that uses H3 index for geospatial data retrieval
  */
 public class H3IndexFilterOperator extends BaseFilterOperator {
-
   private static final String EXPLAIN_NAME = "FILTER_H3_INDEX";
+
   private final IndexSegment _segment;
+  private final QueryContext _queryContext;
   private final Predicate _predicate;
-  private final int _numDocs;
   private final H3IndexReader _h3IndexReader;
   private final long _h3Id;
   private final double _edgeLength;
   private final double _lowerBound;
   private final double _upperBound;
 
-  public H3IndexFilterOperator(IndexSegment segment, Predicate predicate, int numDocs) {
+  public H3IndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
+    super(numDocs, false);
     _segment = segment;
+    _queryContext = queryContext;
     _predicate = predicate;
-    _numDocs = numDocs;
 
     // TODO: handle nested geography/geometry conversion functions
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
     Coordinate coordinate;
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
       _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
-      coordinate =
-          GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteralString())).getCoordinate();
+      coordinate = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteral().getStringValue()))
+          .getCoordinate();
     } else {
       _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
-      coordinate =
-          GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteralString())).getCoordinate();
+      coordinate = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral().getStringValue()))
+          .getCoordinate();
     }
     assert _h3IndexReader != null;
     int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
@@ -93,10 +95,10 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
+  protected BlockDocIdSet getTrues() {
     if (_upperBound < 0 || _lowerBound > _upperBound) {
       // Invalid upper bound, return an empty block
-      return new FilterBlock(EmptyDocIdSet.getInstance());
+      return EmptyDocIdSet.getInstance();
     }
 
     try {
@@ -105,7 +107,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
         if (Double.isNaN(_upperBound)) {
           // No bound, return a match-all block
-          return new FilterBlock(new MatchAllDocIdSet(_numDocs));
+          return new MatchAllDocIdSet(_numDocs);
         }
 
         // Upper bound only
@@ -182,7 +184,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
       return getFilterBlock(fullMatchDocIds, partialMatchDocIds);
     } catch (Exception e) {
       // Fall back to ExpressionFilterOperator when the execution encounters exception (e.g. numRings is too large)
-      return new ExpressionFilterOperator(_segment, _predicate, _numDocs).getNextBlock();
+      return new ExpressionFilterOperator(_segment, _queryContext, _predicate, _numDocs).getTrues();
     }
   }
 
@@ -226,20 +228,21 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   }
 
   /**
-   * Returns the filter block based on the given full match doc ids and the partial match doc ids.
+   * Returns the filter block document IDs based on the given full match doc ids and the partial match doc ids.
    */
-  private FilterBlock getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
-    ExpressionFilterOperator expressionFilterOperator = new ExpressionFilterOperator(_segment, _predicate, _numDocs);
+  private BlockDocIdSet getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
+    ExpressionFilterOperator expressionFilterOperator =
+        new ExpressionFilterOperator(_segment, _queryContext, _predicate, _numDocs);
     ScanBasedDocIdIterator docIdIterator =
-        (ScanBasedDocIdIterator) expressionFilterOperator.getNextBlock().getBlockDocIdSet().iterator();
+        (ScanBasedDocIdIterator) expressionFilterOperator.getTrues().iterator();
     MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);
     result.or(fullMatchDocIds);
-    return new FilterBlock(new BitmapDocIdSet(result, _numDocs) {
+    return new BitmapDocIdSet(result, _numDocs) {
       @Override
       public long getNumEntriesScannedInFilter() {
         return docIdIterator.getNumEntriesScanned();
       }
-    });
+    };
   }
 
 

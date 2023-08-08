@@ -19,6 +19,8 @@
 package org.apache.pinot.core.query.pruner;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -45,4 +47,9 @@ public interface SegmentPruner {
    *                 TODO: Revisit this because the caller doesn't require not changing the input segments
    */
   List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query);
+
+  default List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query,
+      @Nullable ExecutorService executorService) {
+    return prune(segments, query);
+  }
 }

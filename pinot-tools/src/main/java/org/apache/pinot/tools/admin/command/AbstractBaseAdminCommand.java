@@ -101,7 +101,10 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     try {
       return readInputStream(conn.getInputStream());
     } catch (Exception e) {
-      return readInputStream(conn.getErrorStream());
+      if (conn.getErrorStream() != null) {
+        return readInputStream(conn.getErrorStream());
+      }
+      throw new IOException("Request failed due to connection error", e);
     }
   }
 

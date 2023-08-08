@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -51,6 +52,28 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
     testTransformFunction(transformFunction, expectedValues);
   }
 
+  @Test(dataProvider = "testTimeConversionTransformFunctionNull")
+  public void testTimeConversionTransformFunctionNullColumn(String expressionStr) {
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof TimeConversionTransformFunction);
+    assertEquals(transformFunction.getName(), TimeConversionTransformFunction.FUNCTION_NAME);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.LONG);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
+    long[] expectedValues = new long[NUM_ROWS];
+    RoaringBitmap expectedNull = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        expectedNull.add(i);
+      } else {
+        expectedValues[i] = TimeUnit.MILLISECONDS.toDays(_timeValues[i]);
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, expectedNull);
+  }
+
   @DataProvider(name = "testTimeConversionTransformFunction")
   public Object[][] testTimeConversionTransformFunction() {
     return new Object[][]{
@@ -60,6 +83,19 @@ public class TimeConversionTransformFunctionTest extends BaseTransformFunctionTe
         String.format(
             "timeConvert(timeConvert(timeConvert(%s,'MILLISECONDS','SECONDS'),'SECONDS','HOURS'),'HOURS','DAYS')",
             TIME_COLUMN)
+    }
+    };
+  }
+
+  @DataProvider(name = "testTimeConversionTransformFunctionNull")
+  public Object[][] testTimeConversionTransformFunctionNull() {
+    return new Object[][]{
+        new Object[]{
+            String.format("timeConvert(%s,'MILLISECONDS','DAYS')", TIMESTAMP_COLUMN_NULL)
+        }, new Object[]{
+        String.format(
+            "timeConvert(timeConvert(timeConvert(%s,'MILLISECONDS','SECONDS'),'SECONDS','HOURS'),'HOURS','DAYS')",
+            TIMESTAMP_COLUMN_NULL)
     }
     };
   }

@@ -26,7 +26,7 @@ import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.QueryConfig;
-import org.apache.pinot.query.service.QueryServer;
+import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -79,7 +79,7 @@ public class WorkerQueryServer {
     int servicePort =
         newConfig.getProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT);
     if (servicePort == -1) {
-      servicePort = newConfig.getProperty(CommonConstants.Server.CONFIG_OF_NETTY_PORT,
+      servicePort = newConfig.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
           CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
       newConfig.addProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, servicePort);
     }

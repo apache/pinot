@@ -21,7 +21,7 @@
 
 image:
   repository: apachepinot/pinot
-  tag: latest # release-0.11.0
+  tag: latest # release-0.12.0
   pullPolicy: Always # Use IfNotPresent when you pinged a version of image tag
 
 cluster:
@@ -76,6 +76,7 @@ controller:
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
+  startCommand: "StartController"
 
   probes:
     endpoint: "/health"
@@ -115,6 +116,10 @@ controller:
     nodePort: ""
     protocol: TCP
     name: controller
+    extraPorts: []
+      # - containerPort: 1234
+      #   protocol: PROTOCOL
+      #   name: extra-port
 
   external:
     enabled: true
@@ -185,6 +190,7 @@ broker:
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
+  startCommand: "StartBroker"
 
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
 
@@ -214,6 +220,10 @@ broker:
     port: 8099
     name: broker
     nodePort: ""
+    extraPorts: []
+      # - containerPort: 1234
+      #   protocol: PROTOCOL
+      #   name: extra-port
 
   external:
     enabled: true
@@ -273,6 +283,8 @@ broker:
   extra:
     configs: |-
       pinot.set.instance.id.to.hostname=true
+      pinot.query.server.port=7321
+      pinot.query.runner.port=7732
 
 # ------------------------------------------------------------------------------
 # Pinot Server:
@@ -284,6 +296,7 @@ server:
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
+  startCommand: "StartServer"
 
   probes:
     endpoint: "/health"
@@ -322,6 +335,10 @@ server:
     adminPortName: admin
     nodePort: ""
     protocol: TCP
+    extraPorts: []
+      # - containerPort: 1234
+      #   protocol: PROTOCOL
+      #   name: extra-port
 
   resources:
     requests:
@@ -360,6 +377,8 @@ server:
     configs: |-
       pinot.set.instance.id.to.hostname=true
       pinot.server.instance.realtime.alloc.offheap=true
+      pinot.query.server.port=7321
+      pinot.query.runner.port=7732
 
 # ------------------------------------------------------------------------------
 # Pinot Minion:
@@ -372,6 +391,7 @@ minion:
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
+  startCommand: "StartMinion"
 
   probes:
     endpoint: "/health"
@@ -405,6 +425,10 @@ minion:
     nodePort: ""
     protocol: TCP
     name: minion
+    extraPorts: []
+      # - containerPort: 1234
+      #   protocol: PROTOCOL
+      #   name: extra-port
 
   resources:
     requests:
@@ -454,6 +478,7 @@ minionStateless:
   podSecurityContext: {}
     # fsGroup: 2000
   securityContext: {}
+  startCommand: "StartMinion"
 
   probes:
     endpoint: "/health"
@@ -481,7 +506,11 @@ minionStateless:
     port: 9514
     protocol: TCP
     name: minion
-
+    extraPorts: []
+      # - containerPort: 1234
+      #   protocol: PROTOCOL
+      #   name: extra-port
+      
   resources:
     requests:
       memory: "1.25Gi"

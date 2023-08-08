@@ -45,10 +45,9 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneTextIndex.class);
-
-  private final QueryParser _queryParser;
   private final LuceneTextIndexCreator _indexCreator;
   private SearcherManager _searcherManager;
+  private final StandardAnalyzer _analyzer = new StandardAnalyzer();
   private final String _column;
   private final String _segmentName;
 
@@ -84,8 +83,6 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
           e.getMessage());
       throw new RuntimeException(e);
     }
-    StandardAnalyzer analyzer = new StandardAnalyzer();
-    _queryParser = new QueryParser(column, analyzer);
   }
 
   /**
@@ -94,6 +91,14 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   @Override
   public void add(String document) {
     _indexCreator.add(document);
+  }
+
+  /**
+   * Adds a new document, made up of multiple values.
+   */
+  @Override
+  public void add(String[] documents) {
+    _indexCreator.add(documents, documents.length);
   }
 
   @Override
@@ -107,7 +112,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     Collector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
     IndexSearcher indexSearcher = null;
     try {
-      Query query = _queryParser.parse(searchQuery);
+      Query query = new QueryParser(_column, _analyzer).parse(searchQuery);
       indexSearcher = _searcherManager.acquire();
       indexSearcher.search(query, docIDCollector);
       return getPinotDocIds(indexSearcher, docIDs);

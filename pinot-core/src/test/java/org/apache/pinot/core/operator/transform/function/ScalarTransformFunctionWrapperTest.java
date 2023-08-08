@@ -34,6 +34,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -1011,5 +1012,37 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "bytesToBigDecimal");
     testTransformFunction(transformFunction, _bigDecimalSVValues);
+  }
+
+  @Test
+  public void testStringLowerTransformFunctionNullLiteral() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression("lower(null)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "lower");
+    String[] expectedValues = new String[NUM_ROWS];
+    RoaringBitmap bitmap = new RoaringBitmap();
+    bitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+  }
+
+  @Test
+  public void testStringLowerTransformFunctionNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("lower(%s)", STRING_ALPHANUM_NULL_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "lower");
+    String[] expectedValues = new String[NUM_ROWS];
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        bitmap.add(i);
+      } else {
+        expectedValues[i] = _stringAlphaNumericSVValues[i].toLowerCase();
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
   }
 }

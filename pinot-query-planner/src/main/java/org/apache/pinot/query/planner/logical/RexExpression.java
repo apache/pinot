@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.logical;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -47,7 +48,7 @@ public interface RexExpression {
       return new RexExpression.InputRef(((RexInputRef) rexNode).getIndex());
     } else if (rexNode instanceof RexLiteral) {
       RexLiteral rexLiteral = ((RexLiteral) rexNode);
-      FieldSpec.DataType dataType = RelToStageConverter.convertToFieldSpecDataType(rexLiteral.getType());
+      FieldSpec.DataType dataType = RelToPlanNodeConverter.convertToFieldSpecDataType(rexLiteral.getType());
       return new RexExpression.Literal(dataType, toRexValue(dataType, rexLiteral.getValue()));
     } else if (rexNode instanceof RexCall) {
       RexCall rexCall = (RexCall) rexNode;
@@ -69,7 +70,7 @@ public interface RexExpression {
         List<RexExpression> operands =
             rexCall.getOperands().stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
         return new RexExpression.FunctionCall(rexCall.getKind(),
-            RelToStageConverter.convertToFieldSpecDataType(rexCall.getType()),
+            RelToPlanNodeConverter.convertToFieldSpecDataType(rexCall.getType()),
             rexCall.getOperator().getName(), operands);
     }
   }
@@ -77,26 +78,38 @@ public interface RexExpression {
   static RexExpression toRexExpression(AggregateCall aggCall) {
     List<RexExpression> operands = aggCall.getArgList().stream().map(InputRef::new).collect(Collectors.toList());
     return new RexExpression.FunctionCall(aggCall.getAggregation().getKind(),
-        RelToStageConverter.convertToFieldSpecDataType(aggCall.getType()), aggCall.getAggregation().getName(),
+        RelToPlanNodeConverter.convertToFieldSpecDataType(aggCall.getType()), aggCall.getAggregation().getName(),
         operands);
   }
 
-  static Object toRexValue(FieldSpec.DataType dataType, Comparable value) {
+  @Nullable
+  static Object toRexValue(FieldSpec.DataType dataType, @Nullable Comparable<?> value) {
+    if (value == null) {
+      return null;
+    }
     switch (dataType) {
       case INT:
-        return value == null ? 0 : ((BigDecimal) value).intValue();
+        return ((BigDecimal) value).intValue();
       case LONG:
-        return value == null ? 0L : ((BigDecimal) value).longValue();
+        return ((BigDecimal) value).longValue();
       case FLOAT:
-        return value == null ? 0f : ((BigDecimal) value).floatValue();
-      case BIG_DECIMAL:
+        return ((BigDecimal) value).floatValue();
       case DOUBLE:
-        return value == null ? 0d : ((BigDecimal) value).doubleValue();
+      case BIG_DECIMAL:
+        return ((BigDecimal) value).doubleValue();
       case STRING:
-        return value == null ? "" : ((NlsString) value).getValue();
+        return ((NlsString) value).getValue();
       default:
         return value;
     }
+  }
+
+  static List<RexExpression> toRexInputRefs(Iterable<Integer> bitset) {
+    List<RexExpression> rexInputRefList = new ArrayList<>();
+    for (int index : bitset) {
+      rexInputRefList.add(new RexExpression.InputRef(index));
+    }
+    return rexInputRefList;
   }
 
   class InputRef implements RexExpression {

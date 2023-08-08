@@ -349,7 +349,7 @@ public class DateTimeFunctionsTest {
     // name variations
     testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
     testFunction("date_trunc('MILLISECOND', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
-    testFunction("dateTrunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
+    testFunction("dateTrunc('millisecond', epochMillis, 'milliseconds')", arguments, row, 1612296732123L);
     testFunction("DATE_TRUNC('SECOND', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732000L);
 
     // MILLISECONDS to various
@@ -399,6 +399,8 @@ public class DateTimeFunctionsTest {
     DateTime result = WEIRD_TIMESTAMP;
     testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
         result.getMillis());
+    testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "', 'milliseconds')",
+        arguments, row, result.getMillis());
     result = result.withMillisOfSecond(0);
     testFunction("datetrunc('second', epochMillis, 'MILLISECONDS', '" + weirdDateTimeZoneid + "')", arguments, row,
         result.getMillis());

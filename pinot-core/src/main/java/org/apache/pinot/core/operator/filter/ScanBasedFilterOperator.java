@@ -21,41 +21,45 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.MVScanDocIdSet;
 import org.apache.pinot.core.operator.docidsets.SVScanDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 
 
-public class ScanBasedFilterOperator extends BaseFilterOperator {
+public class ScanBasedFilterOperator extends BaseColumnFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_FULL_SCAN";
 
   private final PredicateEvaluator _predicateEvaluator;
-  private final DataSource _dataSource;
-  private final int _numDocs;
-  private final boolean _nullHandlingEnabled;
+  private final int _batchSize;
 
-  ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
-      boolean nullHandlingEnabled) {
+  public ScanBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
+      DataSource dataSource, int numDocs) {
+    this(queryContext, predicateEvaluator, dataSource, numDocs, BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE);
+  }
+
+  public ScanBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
+      DataSource dataSource, int numDocs, int batchSize) {
+    super(queryContext, dataSource, numDocs);
     _predicateEvaluator = predicateEvaluator;
-    _dataSource = dataSource;
-    _numDocs = numDocs;
-    _nullHandlingEnabled = nullHandlingEnabled;
     Preconditions.checkState(_dataSource.getForwardIndex() != null,
         "Forward index disabled for column: %s, scan based filtering not supported!",
         _dataSource.getDataSourceMetadata().getFieldSpec().getName());
+    _batchSize = batchSize;
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
+  protected BlockDocIdSet getNextBlockWithoutNullHandling() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
     if (dataSourceMetadata.isSingleValue()) {
-      return new FilterBlock(new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _nullHandlingEnabled));
+      return new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _batchSize);
     } else {
-      return new FilterBlock(new MVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs));
+      return new MVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs);
     }
   }
 

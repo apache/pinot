@@ -33,11 +33,12 @@ import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.index.IndexingOverrides;
+import org.apache.pinot.segment.spi.index.IndexHandler;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
@@ -103,20 +104,31 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
 
       // Update single-column indices, like inverted index, json index etc.
-      IndexCreatorProvider indexCreatorProvider = IndexingOverrides.getIndexCreatorProvider();
       List<IndexHandler> indexHandlers = new ArrayList<>();
-      for (ColumnIndexType type : ColumnIndexType.values()) {
-        IndexHandler handler =
-            IndexHandlerFactory.getIndexHandler(type, _segmentDirectory, _indexLoadingConfig, _schema);
-        indexHandlers.add(handler);
-        // TODO: Find a way to ensure ForwardIndexHandler is always executed before other handlers instead of
-        // relying on enum ordering.
-        handler.updateIndices(segmentWriter, indexCreatorProvider);
-        // ForwardIndexHandler may modify the segment metadata while rewriting forward index to create / remove a
-        // dictionary. Other IndexHandler classes may modify the segment metadata while creating a temporary forward
-        // index to generate their respective indexes from if the forward index was disabled. This new metadata is
-        // needed to construct other indexes like RangeIndex.
-        _segmentMetadata = _segmentDirectory.getSegmentMetadata();
+
+      // We cannot just create all the index handlers in a random order.
+      // Specifically, ForwardIndexHandler needs to be executed first. This is because it modifies the segment metadata
+      // while rewriting forward index to create a dictionary. Some other handlers (like the range one) assume that
+      // metadata was already been modified by ForwardIndexHandler.
+      IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
+      indexHandlers.add(forwardHandler);
+      forwardHandler.updateIndices(segmentWriter);
+
+      // Now that ForwardIndexHandler.updateIndices has been updated, we can run all other indexes in any order
+
+      _segmentMetadata = new SegmentMetadataImpl(indexDir);
+      _segmentDirectory.reloadMetadata();
+
+      for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
+        if (type != StandardIndexes.forward()) {
+          IndexHandler handler = createHandler(type);
+          indexHandlers.add(handler);
+          handler.updateIndices(segmentWriter);
+          // Other IndexHandler classes may modify the segment metadata while creating a temporary forward
+          // index to generate their respective indexes from if the forward index was disabled. This new metadata is
+          // needed to construct other indexes like RangeIndex.
+          _segmentMetadata = _segmentDirectory.getSegmentMetadata();
+        }
       }
 
       // Create/modify/remove star-trees if required.
@@ -143,6 +155,11 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
   }
 
+  private IndexHandler createHandler(IndexType<?, ?, ?> type) {
+    return type.createIndexHandler(_segmentDirectory,
+        _indexLoadingConfig.getFieldIndexConfigByColName(), _schema, _indexLoadingConfig.getTableConfig());
+  }
+
   /**
    * This method checks if there is any discrepancy between the segment and current table config and schema.
    * If so, it returns true indicating the segment needs to be reprocessed. Right now, the default columns,
@@ -164,9 +181,8 @@ public class SegmentPreProcessor implements AutoCloseable {
         }
       }
       // Check if there is need to update single-column indices, like inverted index, json index etc.
-      for (ColumnIndexType type : ColumnIndexType.values()) {
-        if (IndexHandlerFactory.getIndexHandler(type, _segmentDirectory, _indexLoadingConfig, _schema)
-            .needUpdateIndices(segmentReader)) {
+      for (IndexType<?, ?, ?> type : IndexService.getInstance().getAllIndexes()) {
+        if (createHandler(type).needUpdateIndices(segmentReader)) {
           LOGGER.info("Found index type: {} needs updates", type);
           return true;
         }
@@ -207,9 +223,10 @@ public class SegmentPreProcessor implements AutoCloseable {
     List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
     // There are existing star-trees, but if they match the builder configs exactly,
     // then there is no need to generate the star-trees
-    if (starTreeMetadataList != null && !StarTreeBuilderUtils
-        .shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
-      return false;
+
+    // We need reprocessing if existing configs are to be removed, or new configs have been added
+    if (starTreeMetadataList != null) {
+      return StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList);
     }
     return !starTreeBuilderConfigs.isEmpty();
   }
@@ -225,11 +242,14 @@ public class SegmentPreProcessor implements AutoCloseable {
       List<StarTreeV2Metadata> starTreeMetadataList = _segmentMetadata.getStarTreeV2MetadataList();
       if (starTreeMetadataList != null) {
         // There are existing star-trees
-        if (StarTreeBuilderUtils.shouldRemoveExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
-          // Remove the existing star-trees
+        if (!shouldGenerateStarTree) {
+          // Newer config does not have star-trees. Delete all existing star-trees.
           LOGGER.info("Removing star-trees from segment: {}", _segmentMetadata.getName());
           StarTreeBuilderUtils.removeStarTrees(indexDir);
           _segmentMetadata = new SegmentMetadataImpl(indexDir);
+        } else if (StarTreeBuilderUtils.shouldModifyExistingStarTrees(starTreeBuilderConfigs, starTreeMetadataList)) {
+          // Existing and newer both have star-trees, but they don't match. Rebuild the star-trees.
+          LOGGER.info("Change detected in star-trees for segment: {}", _segmentMetadata.getName());
         } else {
           // Existing star-trees match the builder configs, no need to generate the star-trees
           shouldGenerateStarTree = false;

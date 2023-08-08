@@ -21,8 +21,6 @@ package org.apache.pinot.core.accounting;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -32,7 +30,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant;
-import org.apache.pinot.core.accounting.utils.RunnerWorkerThreadOffsetProvider;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
@@ -53,45 +50,6 @@ import org.testng.annotations.Test;
 public class ResourceManagerAccountingTest {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(ResourceManagerAccountingTest.class);
-
-  @Test
-  public void testThreadIDProvider()
-      throws Exception {
-    ResourceManager rm = getResourceManager(2, 5, 1, 3, Collections.emptyMap());
-    Future[] futures = new Future[2001];
-    Set<Integer> threadIds = ConcurrentHashMap.newKeySet();
-
-    RunnerWorkerThreadOffsetProvider runnerWorkerThreadOffsetProvider = new RunnerWorkerThreadOffsetProvider();
-
-    for (int i = 0; i < 1000; i++) {
-      int finalI = i;
-      futures[i + 1000] = rm.getQueryWorkers().submit(() -> {
-        int id = runnerWorkerThreadOffsetProvider.get();
-        threadIds.add(id);
-        futures[2000].cancel(true);
-      });
-      futures[i] = rm.getQueryRunners().submit(() -> {
-        int id = runnerWorkerThreadOffsetProvider.get();
-        threadIds.add(id);
-        futures[2500 - finalI] = null;
-      });
-    }
-    for (int i = 0; i < 2000; i++) {
-      try {
-        futures[i].get();
-      } catch (Exception ignored) {
-      }
-    }
-    Assert.assertEquals(threadIds.size(), 7);
-
-    Assert.assertTrue(threadIds.contains(0));
-    Assert.assertTrue(threadIds.contains(1));
-    Assert.assertTrue(threadIds.contains(2));
-    Assert.assertTrue(threadIds.contains(3));
-    Assert.assertTrue(threadIds.contains(4));
-    Assert.assertTrue(threadIds.contains(5));
-    Assert.assertTrue(threadIds.contains(6));
-  }
 
   /**
    * Test thread cpu usage tracking in multithread environment, add @Test to run.

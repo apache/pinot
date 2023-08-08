@@ -18,19 +18,17 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.SVScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
-public final class SVScanDocIdSet implements FilterBlockDocIdSet {
+public final class SVScanDocIdSet implements BlockDocIdSet {
   private final SVScanDocIdIterator _docIdIterator;
 
-  public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
-      boolean nullHandlingEnabled) {
-    NullValueVectorReader nullValueVector = nullHandlingEnabled ? dataSource.getNullValueVector() : null;
-    _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource, numDocs, nullValueVector);
+  public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize) {
+    _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource, numDocs, batchSize);
   }
 
   @Override

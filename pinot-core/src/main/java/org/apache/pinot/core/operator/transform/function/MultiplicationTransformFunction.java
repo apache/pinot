@@ -23,9 +23,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 
@@ -44,7 +44,8 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there are more than 1 arguments
     if (arguments.size() < 2) {
       throw new IllegalArgumentException("At least 2 arguments are required for MULT transform function");
@@ -57,10 +58,10 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
         DataType dataType = literalTransformFunction.getResultMetadata().getDataType();
         if (dataType == DataType.BIG_DECIMAL) {
           _literalBigDecimalProduct =
-              _literalBigDecimalProduct.multiply(new BigDecimal(literalTransformFunction.getLiteral()));
+              _literalBigDecimalProduct.multiply(literalTransformFunction.getBigDecimalLiteral());
           _resultDataType = DataType.BIG_DECIMAL;
         } else {
-          _literalDoubleProduct *= Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
+          _literalDoubleProduct *= ((LiteralTransformFunction) argument).getDoubleLiteral();
         }
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {
@@ -86,18 +87,16 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initDoubleValuesSV(length);
     if (_resultDataType == DataType.BIG_DECIMAL) {
-      BigDecimal[] values = transformToBigDecimalValuesSV(projectionBlock);
+      BigDecimal[] values = transformToBigDecimalValuesSV(valueBlock);
       ArrayCopyUtils.copy(values, _doubleValuesSV, length);
     } else {
       Arrays.fill(_doubleValuesSV, 0, length, _literalDoubleProduct);
       for (TransformFunction transformFunction : _transformFunctions) {
-        double[] values = transformFunction.transformToDoubleValuesSV(projectionBlock);
+        double[] values = transformFunction.transformToDoubleValuesSV(valueBlock);
         for (int i = 0; i < length; i++) {
           _doubleValuesSV[i] *= values[i];
         }
@@ -107,18 +106,16 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_bigDecimalValuesSV == null) {
-      _bigDecimalValuesSV = new BigDecimal[length];
-    }
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initBigDecimalValuesSV(length);
     if (_resultDataType == DataType.DOUBLE) {
-      double[] values = transformToDoubleValuesSV(projectionBlock);
+      double[] values = transformToDoubleValuesSV(valueBlock);
       ArrayCopyUtils.copy(values, _bigDecimalValuesSV, length);
     } else {
       Arrays.fill(_bigDecimalValuesSV, 0, length, _literalBigDecimalProduct);
       for (TransformFunction transformFunction : _transformFunctions) {
-        BigDecimal[] values = transformFunction.transformToBigDecimalValuesSV(projectionBlock);
+        BigDecimal[] values = transformFunction.transformToBigDecimalValuesSV(valueBlock);
         for (int i = 0; i < length; i++) {
           _bigDecimalValuesSV[i] = _bigDecimalValuesSV[i].multiply(values[i]);
         }

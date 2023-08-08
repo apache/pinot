@@ -41,6 +41,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
 
   private final int _maxNumStatusToTrack;
   private final Deque<StatusEntry> _lastStatus = new LinkedList<>();
+  private MinionTaskState _taskState;
   private long _startTs;
 
   public MinionProgressObserver() {
@@ -49,12 +50,13 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
 
   public MinionProgressObserver(int maxNumStatusToTrack) {
     _maxNumStatusToTrack = maxNumStatusToTrack;
+    _taskState = MinionTaskState.UNKNOWN;
   }
 
   @Override
   public synchronized void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
     _startTs = System.currentTimeMillis();
-    addStatus(_startTs, "Task started");
+    addStatus(_startTs, "Task started", MinionTaskState.IN_PROGRESS);
     super.notifyTaskStart(pinotTaskConfig);
   }
 
@@ -64,14 +66,16 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
    * @param pinotTaskConfig Pinot task config
    * @param progress progress status and its toString() returns sth meaningful.
    */
+  @Override
   public synchronized void notifyProgress(PinotTaskConfig pinotTaskConfig, @Nullable Object progress) {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Update progress: {} for task: {}", progress, pinotTaskConfig.getTaskId());
     }
-    addStatus(System.currentTimeMillis(), (progress == null) ? "" : progress.toString());
+    addStatus(System.currentTimeMillis(), (progress == null) ? "" : progress.toString(), MinionTaskState.IN_PROGRESS);
     super.notifyProgress(pinotTaskConfig, progress);
   }
 
+  @Override
   @Nullable
   public synchronized List<StatusEntry> getProgress() {
     return new ArrayList<>(_lastStatus);
@@ -80,25 +84,37 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   @Override
   public synchronized void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
     long endTs = System.currentTimeMillis();
-    addStatus(endTs, "Task succeeded in " + (endTs - _startTs) + "ms");
+    addStatus(endTs, "Task succeeded in " + (endTs - _startTs) + "ms", MinionTaskState.SUCCEEDED);
     super.notifyTaskSuccess(pinotTaskConfig, executionResult);
   }
 
   @Override
   public synchronized void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
     long endTs = System.currentTimeMillis();
-    addStatus(endTs, "Task got cancelled after " + (endTs - _startTs) + "ms");
+    addStatus(endTs, "Task got cancelled after " + (endTs - _startTs) + "ms", MinionTaskState.CANCELLED);
     super.notifyTaskCancelled(pinotTaskConfig);
   }
 
   @Override
   public synchronized void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception e) {
     long endTs = System.currentTimeMillis();
-    addStatus(endTs, "Task failed in " + (endTs - _startTs) + "ms with error: " + ExceptionUtils.getStackTrace(e));
+    addStatus(endTs, "Task failed in " + (endTs - _startTs) + "ms with error: " + ExceptionUtils.getStackTrace(e),
+        MinionTaskState.ERROR);
     super.notifyTaskError(pinotTaskConfig, e);
   }
 
-  private void addStatus(long ts, String progress) {
+  @Override
+  public MinionTaskState getTaskState() {
+    return _taskState;
+  }
+
+  @Override
+  public long getStartTs() {
+    return _startTs;
+  }
+
+  private void addStatus(long ts, String progress, MinionTaskState taskState) {
+    _taskState = taskState;
     _lastStatus.addLast(new StatusEntry(ts, progress));
     if (_lastStatus.size() > _maxNumStatusToTrack) {
       _lastStatus.pollFirst();

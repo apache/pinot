@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
-import java.io.Closeable;
 import java.io.IOException;
+import org.apache.pinot.segment.spi.index.IndexCreator;
 
 
 /**
  * Marker interface for all inverted index creators.
  */
-public interface InvertedIndexCreator extends Closeable {
+public interface InvertedIndexCreator extends IndexCreator {
 
   /**
    * Seals the index and flushes it to disk.
    */
+  @Override
   void seal()
       throws IOException;
 }

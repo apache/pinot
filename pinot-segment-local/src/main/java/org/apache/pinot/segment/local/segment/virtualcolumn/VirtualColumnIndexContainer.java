@@ -19,16 +19,14 @@
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
 import java.io.IOException;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
-import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
-import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 
 
 /**
@@ -46,53 +44,18 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
     _dictionary = dictionary;
   }
 
+  @Nullable
   @Override
-  public ForwardIndexReader<?> getForwardIndex() {
-    return _forwardIndex;
-  }
-
-  @Override
-  public InvertedIndexReader<?> getInvertedIndex() {
-    return _invertedIndex;
-  }
-
-  @Override
-  public RangeIndexReader<?> getRangeIndex() {
-    return null;
-  }
-
-  @Override
-  public TextIndexReader getTextIndex() {
-    return null;
-  }
-
-  @Override
-  public TextIndexReader getFSTIndex() {
-    return null;
-  }
-
-  @Override
-  public JsonIndexReader getJsonIndex() {
-    return null;
-  }
-
-  @Override
-  public H3IndexReader getH3Index() {
-    return null;
-  }
-
-  @Override
-  public Dictionary getDictionary() {
-    return _dictionary;
-  }
-
-  @Override
-  public BloomFilterReader getBloomFilter() {
-    return null;
-  }
-
-  @Override
-  public NullValueVectorReader getNullValueVector() {
+  public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
+    if (indexType.equals(StandardIndexes.forward())) {
+      return (I) _forwardIndex;
+    }
+    if (indexType.equals(StandardIndexes.inverted())) {
+      return (I) _invertedIndex;
+    }
+    if (indexType.equals(StandardIndexes.dictionary())) {
+      return (I) _dictionary;
+    }
     return null;
   }
 

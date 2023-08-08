@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.minion.event;
 
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.minion.MinionConf;
@@ -25,6 +26,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
@@ -63,5 +65,26 @@ public class MinionEventObserversTest {
           .waitForCondition(aVoid -> MinionEventObservers.getInstance().getMinionEventObserver(taskId) == null, 5000,
               "Failed to clean up observer");
     }
+  }
+
+  @Test
+  public void testGetMinionEventObserverWithGivenState() {
+    MinionEventObserver observer1 = new MinionProgressObserver();
+    observer1.notifyTaskStart(null);
+    MinionEventObservers.getInstance().addMinionEventObserver("t01", observer1);
+
+    MinionEventObserver observer2 = new MinionProgressObserver();
+    observer2.notifyProgress(null, "");
+    MinionEventObservers.getInstance().addMinionEventObserver("t02", observer2);
+
+    MinionEventObserver observer3 = new MinionProgressObserver();
+    observer3.notifyTaskSuccess(null, "");
+    MinionEventObservers.getInstance().addMinionEventObserver("t03", observer3);
+
+    Map<String, MinionEventObserver> minionEventObserverWithGivenState =
+        MinionEventObservers.getInstance().getMinionEventObserverWithGivenState(MinionTaskState.IN_PROGRESS);
+    assertEquals(minionEventObserverWithGivenState.size(), 2);
+    assertSame(minionEventObserverWithGivenState.get("t01"), observer1);
+    assertSame(minionEventObserverWithGivenState.get("t02"), observer2);
   }
 }

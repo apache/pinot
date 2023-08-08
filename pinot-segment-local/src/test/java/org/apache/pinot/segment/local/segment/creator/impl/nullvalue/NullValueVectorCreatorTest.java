@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.nullvalue;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -49,7 +49,7 @@ public class NullValueVectorCreatorTest {
     for (int i = 0; i < 100; i++) {
       creator.setNull(i);
     }
-    ImmutableRoaringBitmap nullBitmap = creator.getNullBitmap();
+    RoaringBitmap nullBitmap = creator.getNullBitmap();
     for (int i = 0; i < 100; i++) {
       Assert.assertTrue(nullBitmap.contains(i));
     }

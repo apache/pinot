@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.fetcher;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -40,7 +41,7 @@ public interface SegmentFetcher {
   /**
    * Fetches a segment from URI location and untar to local in a streamed manner
    */
-  File fetchUntarSegmentToLocalStreamed(URI uri, File dest, long rateLimit)
+  File fetchUntarSegmentToLocalStreamed(URI uri, File dest, long rateLimit, AtomicInteger attempts)
       throws Exception;
 
   /**

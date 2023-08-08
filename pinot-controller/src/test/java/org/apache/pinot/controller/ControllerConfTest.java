@@ -158,6 +158,29 @@ public class ControllerConfTest {
     Assert.assertEquals(conf.getTaskManagerFrequencyInSeconds(), -1);
   }
 
+  @Test
+  public void shouldBeAbleToSetDataDir() {
+    Map<String, Object> controllerConfig = new HashMap<>();
+    ControllerConf conf = new ControllerConf(controllerConfig);
+    Assert.assertEquals(conf.getDataDir(), null);
+
+    // test for the dataDir s3 value with ending slash
+    conf.setDataDir("s3://<bucket_name>/controller/");
+    Assert.assertEquals(conf.getDataDir(), "s3://<bucket_name>/controller");
+
+    // test for the dataDir s3 value without ending slash
+    conf.setDataDir("s3://<bucket_name>/controller");
+    Assert.assertEquals(conf.getDataDir(), "s3://<bucket_name>/controller");
+
+    // test for the dataDir non-s3 value without ending slash
+    conf.setDataDir("/tmp/PinotController");
+    Assert.assertEquals(conf.getDataDir(), "/tmp/PinotController");
+
+    // test for the dataDir non-s3 value with ending slash
+    conf.setDataDir("/tmp/PinotController/");
+    Assert.assertEquals(conf.getDataDir(), "/tmp/PinotController");
+  }
+
   private void assertOnDurations(ControllerConf conf, long expectedDuration, Map<String, Object> controllerConfig) {
     int segmentLevelValidationIntervalInSeconds = conf.getSegmentLevelValidationIntervalInSeconds();
     int segmentRelocatorFrequencyInSeconds = conf.getSegmentRelocatorFrequencyInSeconds();

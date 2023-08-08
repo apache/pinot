@@ -20,7 +20,7 @@ package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -31,34 +31,33 @@ public final class DimensionFieldSpec extends FieldSpec {
     super();
   }
 
-  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField) {
+  public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField) {
     super(name, dataType, isSingleValueField);
   }
 
-  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
-      @Nonnull Object defaultNullValue) {
+  public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField,
+      @Nullable Object defaultNullValue) {
     super(name, dataType, isSingleValueField, defaultNullValue);
   }
 
-  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField, int maxLength,
-      @Nonnull Object defaultNullValue) {
+  public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
+      @Nullable Object defaultNullValue) {
     super(name, dataType, isSingleValueField, maxLength, defaultNullValue);
   }
 
-  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
+  public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField,
       Class virtualColumnProviderClass) {
     super(name, dataType, isSingleValueField);
     _virtualColumnProvider = virtualColumnProviderClass.getName();
   }
 
-  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
-      Class virtualColumnProviderClass, Object defaultNullValue) {
+  public DimensionFieldSpec(String name, DataType dataType, boolean isSingleValueField,
+      Class virtualColumnProviderClass, @Nullable Object defaultNullValue) {
     super(name, dataType, isSingleValueField, defaultNullValue);
     _virtualColumnProvider = virtualColumnProviderClass.getName();
   }
 
   @JsonIgnore
-  @Nonnull
   @Override
   public FieldType getFieldType() {
     return FieldType.DIMENSION;

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import java.io.IOException;
+import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -26,7 +28,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
  * primarily used to check if a particular column value corresponding to
  * a document ID is null or not.
  */
-public interface NullValueVectorReader {
+public interface NullValueVectorReader extends IndexReader {
 
   /**
    * Check if the given docId has a null value in the corresponding column
@@ -40,4 +42,9 @@ public interface NullValueVectorReader {
    * Return the underlying null bitmap (used in query execution)
    */
   ImmutableRoaringBitmap getNullBitmap();
+
+  @Override
+  default void close()
+      throws IOException {
+  }
 }

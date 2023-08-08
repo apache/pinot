@@ -54,32 +54,41 @@ public class TypeFactory extends JavaTypeFactoryImpl {
   private RelDataType toRelDataType(FieldSpec fieldSpec) {
     switch (fieldSpec.getDataType()) {
       case INT:
-        return createSqlType(SqlTypeName.INTEGER);
+        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.INTEGER)
+            : createArrayType(createSqlType(SqlTypeName.INTEGER), -1);
       case LONG:
-        return createSqlType(SqlTypeName.BIGINT);
+        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BIGINT)
+            : createArrayType(createSqlType(SqlTypeName.BIGINT), -1);
       case FLOAT:
-        return createSqlType(SqlTypeName.FLOAT);
+        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.REAL)
+            : createArrayType(createSqlType(SqlTypeName.REAL), -1);
       case DOUBLE:
-        return createSqlType(SqlTypeName.DOUBLE);
+        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
+            : createArrayType(createSqlType(SqlTypeName.DOUBLE), -1);
       case BOOLEAN:
-        return createSqlType(SqlTypeName.BOOLEAN);
+        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BOOLEAN)
+            : createArrayType(createSqlType(SqlTypeName.BOOLEAN), -1);
       case TIMESTAMP:
-        return createSqlType(SqlTypeName.TIMESTAMP);
+        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.TIMESTAMP)
+            : createArrayType(createSqlType(SqlTypeName.TIMESTAMP), -1);
       case STRING:
-        return createSqlType(SqlTypeName.VARCHAR);
+        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARCHAR)
+            : createArrayType(createSqlType(SqlTypeName.VARCHAR), -1);
       case BYTES:
-        return createSqlType(SqlTypeName.VARBINARY);
+        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARBINARY)
+            : createArrayType(createSqlType(SqlTypeName.VARBINARY), -1);
       case BIG_DECIMAL:
-        return createSqlType(SqlTypeName.DECIMAL);
+        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DECIMAL)
+            : createArrayType(createSqlType(SqlTypeName.DECIMAL), -1);
       case JSON:
-        // TODO: support JSON, JSON should be supported using a special RelDataType as it is not a simple String,
-        // nor can it be easily parsed as a STRUCT.
+        return createSqlType(SqlTypeName.VARCHAR);
       case LIST:
         // TODO: support LIST, MV column should go fall into this category.
       case STRUCT:
       case MAP:
       default:
-        throw new UnsupportedOperationException("unsupported!");
+        String message = String.format("Unsupported type: %s ", fieldSpec.getDataType().toString());
+        throw new UnsupportedOperationException(message);
     }
   }
 }

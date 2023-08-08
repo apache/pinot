@@ -257,6 +257,10 @@ public class DateTimeFormatSpec {
     return _patternSpec.getDateTimeFormatter();
   }
 
+  public DateTimeFormatPatternSpec getDateTimeFormatPattenSpec() {
+    return _patternSpec;
+  }
+
   /**
    * Converts the time in millis to the date time format.
    * <ul>

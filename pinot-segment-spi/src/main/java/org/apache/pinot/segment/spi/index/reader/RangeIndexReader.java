@@ -18,15 +18,14 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import java.io.Closeable;
 import javax.annotation.Nullable;
-
+import org.apache.pinot.segment.spi.index.IndexReader;
 
 /**
  * Interface for indexed range queries
  * @param <T>
  */
-public interface RangeIndexReader<T> extends Closeable {
+public interface RangeIndexReader<T> extends IndexReader {
 
   /**
    * @return true if the results are exact and don't need refinement by scanning.

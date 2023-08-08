@@ -18,18 +18,22 @@
  */
 package org.apache.pinot.core.query.selection;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.PriorityQueue;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.BeforeClass;
@@ -38,6 +42,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -48,45 +53,30 @@ import static org.testng.Assert.assertTrue;
  */
 public class SelectionOperatorServiceTest {
   private final String[] _columnNames = {
-      "int", "long", "float", "double", "string", "int_array", "long_array", "float_array", "double_array",
-      "string_array", "bytes"
+      "int", "long", "float", "double", "big_decimal", "string", "bytes", "int_array", "long_array", "float_array",
+      "double_array", "string_array"
   };
-  private final DataSchema.ColumnDataType[] _columnDataTypes = {
-      DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT,
-      DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT_ARRAY,
-      DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY,
-      DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES
+  private final ColumnDataType[] _columnDataTypes = {
+      ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
+      ColumnDataType.BIG_DECIMAL, ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.INT_ARRAY,
+      ColumnDataType.LONG_ARRAY, ColumnDataType.FLOAT_ARRAY, ColumnDataType.DOUBLE_ARRAY, ColumnDataType.STRING_ARRAY
   };
   private final DataSchema _dataSchema = new DataSchema(_columnNames, _columnDataTypes);
-  private final DataSchema.ColumnDataType[] _compatibleColumnDataTypes = {
-      DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT, DataSchema.ColumnDataType.DOUBLE,
-      DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG_ARRAY,
-      DataSchema.ColumnDataType.FLOAT_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
-      DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES
-  };
-  private final DataSchema _compatibleDataSchema = new DataSchema(_columnNames, _compatibleColumnDataTypes);
-  private final DataSchema.ColumnDataType[] _upgradedColumnDataTypes = new DataSchema.ColumnDataType[]{
-      DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
-      DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG_ARRAY,
-      DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
-      DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY, DataSchema.ColumnDataType.BYTES
-  };
-  private final DataSchema _upgradedDataSchema = new DataSchema(_columnNames, _upgradedColumnDataTypes);
   private final Object[] _row1 = {
-      0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"},
-      BytesUtils.toByteArray("1020")
+      0, 1L, 2.0F, 3.0, new BigDecimal(4), "5", BytesUtils.toByteArray(
+      "0606"), new int[]{7}, new long[]{8L}, new float[]{9.0F}, new double[]{10.0}, new String[]{"11"}
   };
   private final Object[] _row2 = {
-      10, 11L, 12.0F, 13.0, "14", new int[]{15}, new long[]{16L}, new float[]{17.0F}, new double[]{18.0},
-      new String[]{"19"}, BytesUtils.toByteArray("3040")
+      10, 11L, 12.0F, 13.0, new BigDecimal(14), "15", BytesUtils.toByteArray(
+      "1616"), new int[]{17}, new long[]{18L}, new float[]{19.0F}, new double[]{20.0}, new String[]{"21"}
   };
-  private final Object[] _compatibleRow1 = {
-      1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"},
-      BytesUtils.toByteArray("5060")
+  private final Object[] _row3 = {
+      1, 2L, 3.0F, 4.0, new BigDecimal(5), "6", BytesUtils.toByteArray(
+      "0707"), new int[]{8}, new long[]{9L}, new float[]{10.0F}, new double[]{11.0}, new String[]{"12"}
   };
-  private final Object[] _compatibleRow2 = {
-      11L, 12.0F, 13.0, 14, "15", new long[]{16L}, new float[]{17.0F}, new double[]{18.0}, new int[]{19},
-      new String[]{"20"}, BytesUtils.toByteArray("7000")
+  private final Object[] _row4 = {
+      11, 12L, 13.0F, 14.0, new BigDecimal(15), "16", BytesUtils.toByteArray(
+      "1717"), new int[]{18}, new long[]{19L}, new float[]{20.0F}, new double[]{21.0}, new String[]{"22"}
   };
   private QueryContext _queryContext;
 
@@ -167,59 +157,50 @@ public class SelectionOperatorServiceTest {
   }
 
   @Test
-  public void testCompatibleRowsMergeWithoutOrdering() {
-    ArrayList<Object[]> mergedRows = new ArrayList<>(2);
+  public void testRowsMergeWithoutOrdering() {
+    List<Object[]> mergedRows = new ArrayList<>(2);
     mergedRows.add(_row1);
     mergedRows.add(_row2);
-    Collection<Object[]> rowsToMerge = new ArrayList<>(2);
-    rowsToMerge.add(_compatibleRow1);
-    rowsToMerge.add(_compatibleRow2);
-    SelectionOperatorUtils.mergeWithoutOrdering(mergedRows, rowsToMerge, 3);
+    SelectionResultsBlock mergedBlock = new SelectionResultsBlock(_dataSchema, mergedRows);
+    List<Object[]> rowsToMerge = new ArrayList<>(2);
+    rowsToMerge.add(_row3);
+    rowsToMerge.add(_row4);
+    SelectionResultsBlock blockToMerge = new SelectionResultsBlock(_dataSchema, rowsToMerge);
+    SelectionOperatorUtils.mergeWithoutOrdering(mergedBlock, blockToMerge, 3);
     assertEquals(mergedRows.size(), 3);
     assertSame(mergedRows.get(0), _row1);
     assertSame(mergedRows.get(1), _row2);
-    assertSame(mergedRows.get(2), _compatibleRow1);
+    assertSame(mergedRows.get(2), _row3);
   }
 
   @Test
-  public void testCompatibleRowsMergeWithOrdering() {
-    SelectionOperatorService selectionOperatorService = new SelectionOperatorService(_queryContext, _dataSchema);
-    PriorityQueue<Object[]> mergedRows = selectionOperatorService.getRows();
+  public void testRowsMergeWithOrdering() {
+    assertNotNull(_queryContext.getOrderByExpressions());
+    Comparator<Object[]> comparator =
+        OrderByComparatorFactory.getComparator(_queryContext.getOrderByExpressions(), false);
     int maxNumRows = _queryContext.getOffset() + _queryContext.getLimit();
-    Collection<Object[]> rowsToMerge1 = new ArrayList<>(2);
-    rowsToMerge1.add(_row1);
-    rowsToMerge1.add(_row2);
-    SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge1, maxNumRows);
-    Collection<Object[]> rowsToMerge2 = new ArrayList<>(2);
-    rowsToMerge2.add(_compatibleRow1);
-    rowsToMerge2.add(_compatibleRow2);
-    SelectionOperatorUtils.mergeWithOrdering(mergedRows, rowsToMerge2, maxNumRows);
+    SelectionResultsBlock mergedBlock = new SelectionResultsBlock(_dataSchema, Collections.emptyList(), comparator);
+    List<Object[]> rowsToMerge1 = Arrays.asList(_row2, _row1);
+    SelectionResultsBlock blockToMerge1 = new SelectionResultsBlock(_dataSchema, rowsToMerge1, comparator);
+    SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge1, maxNumRows);
+    List<Object[]> rowsToMerge2 = Arrays.asList(_row4, _row3);
+    SelectionResultsBlock blockToMerge2 = new SelectionResultsBlock(_dataSchema, rowsToMerge2, comparator);
+    SelectionOperatorUtils.mergeWithOrdering(mergedBlock, blockToMerge2, maxNumRows);
+    List<Object[]> mergedRows = mergedBlock.getRows();
     assertEquals(mergedRows.size(), 3);
-    assertSame(mergedRows.poll(), _compatibleRow1);
-    assertSame(mergedRows.poll(), _row2);
-    assertSame(mergedRows.poll(), _compatibleRow2);
+    assertSame(mergedRows.get(0), _row4);
+    assertSame(mergedRows.get(1), _row2);
+    assertSame(mergedRows.get(2), _row3);
   }
 
   @Test
-  public void testCompatibleRowsDataTableTransformation()
+  public void testExtractRowFromDataTable()
       throws Exception {
     Collection<Object[]> rows = new ArrayList<>(2);
     rows.add(_row1);
-    rows.add(_compatibleRow1);
-    DataSchema dataSchema = _dataSchema.clone();
-    assertTrue(dataSchema.isTypeCompatibleWith(_compatibleDataSchema));
-    dataSchema = DataSchema.upgradeToCover(dataSchema, _compatibleDataSchema);
-    assertEquals(dataSchema, _upgradedDataSchema);
-    DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, false);
-    Object[] expectedRow1 = {
-        0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0},
-        new String[]{"9"}, BytesUtils.toByteArray("1020")
-    };
-    Object[] expectedCompatibleRow1 = {
-        1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0},
-        new String[]{"10"}, BytesUtils.toByteArray("5060")
-    };
-    assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 0), expectedRow1));
-    assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 1), expectedCompatibleRow1));
+    rows.add(_row2);
+    DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, _dataSchema, false);
+    assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 0), _row1));
+    assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 1), _row2));
   }
 }

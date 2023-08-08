@@ -19,15 +19,14 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Iterators;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.function.Consumer;
 import java.util.function.IntFunction;
-import org.apache.pinot.query.mailbox.MailboxIdentifier;
-import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
 /**
@@ -39,21 +38,22 @@ class RandomExchange extends BlockExchange {
 
   private final IntFunction<Integer> _rand;
 
-  RandomExchange(MailboxService<TransferableBlock> mailbox, List<MailboxIdentifier> destinations,
-      BlockSplitter splitter) {
-    this(mailbox, destinations, RANDOM::nextInt, splitter);
+  RandomExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
+      Consumer<OpChainId> callback, long deadlineMs) {
+    this(opChainId, sendingMailboxes, RANDOM::nextInt, splitter, callback, deadlineMs);
   }
 
   @VisibleForTesting
-  RandomExchange(MailboxService<TransferableBlock> mailbox, List<MailboxIdentifier> destinations,
-      IntFunction<Integer> rand, BlockSplitter splitter) {
-    super(mailbox, destinations, splitter);
+  RandomExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, IntFunction<Integer> rand,
+      BlockSplitter splitter, Consumer<OpChainId> callback, long deadlineMs) {
+    super(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
     _rand = rand;
   }
 
   @Override
-  protected Iterator<RoutedBlock> route(List<MailboxIdentifier> destinations, TransferableBlock block) {
+  protected void route(List<SendingMailbox> destinations, TransferableBlock block)
+      throws Exception {
     int destinationIdx = _rand.apply(destinations.size());
-    return Iterators.singletonIterator(new RoutedBlock(destinations.get(destinationIdx), block));
+    sendBlock(destinations.get(destinationIdx), block);
   }
 }

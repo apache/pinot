@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
 /**
@@ -38,13 +40,39 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
  *                 to be excluded.
  * - excludeFields: Exclude the given fields, e.g. "b", "c", even if it is under the included paths.
  */
-public class JsonIndexConfig extends BaseJsonConfig {
+public class JsonIndexConfig extends IndexConfig {
+  public static final JsonIndexConfig DISABLED = new JsonIndexConfig(true);
+
   private int _maxLevels = -1;
   private boolean _excludeArray = false;
   private boolean _disableCrossArrayUnnest = false;
   private Set<String> _includePaths;
   private Set<String> _excludePaths;
   private Set<String> _excludeFields;
+
+  public JsonIndexConfig() {
+    super(false);
+  }
+
+  public JsonIndexConfig(Boolean disabled) {
+    super(disabled);
+  }
+
+  @JsonCreator
+  public JsonIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("maxLevels") int maxLevels,
+      @JsonProperty("excludeArray") boolean excludeArray,
+      @JsonProperty("disableCrossArrayUnnest") boolean disableCrossArrayUnnest,
+      @JsonProperty("includePaths") @Nullable Set<String> includePaths,
+      @JsonProperty("excludePaths") @Nullable Set<String> excludePaths,
+      @JsonProperty("excludeFields") @Nullable Set<String> excludeFields) {
+    super(disabled);
+    _maxLevels = maxLevels;
+    _excludeArray = excludeArray;
+    _disableCrossArrayUnnest = disableCrossArrayUnnest;
+    _includePaths = includePaths;
+    _excludePaths = excludePaths;
+    _excludeFields = excludeFields;
+  }
 
   public int getMaxLevels() {
     return _maxLevels;
@@ -100,5 +128,29 @@ public class JsonIndexConfig extends BaseJsonConfig {
 
   public void setExcludeFields(@Nullable Set<String> excludeFields) {
     _excludeFields = excludeFields;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    JsonIndexConfig config = (JsonIndexConfig) o;
+    return _maxLevels == config._maxLevels && _excludeArray == config._excludeArray
+        && _disableCrossArrayUnnest == config._disableCrossArrayUnnest && Objects.equals(_includePaths,
+        config._includePaths) && Objects.equals(_excludePaths, config._excludePaths) && Objects.equals(_excludeFields,
+        config._excludeFields);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _maxLevels, _excludeArray, _disableCrossArrayUnnest, _includePaths,
+        _excludePaths, _excludeFields);
   }
 }

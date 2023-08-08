@@ -20,8 +20,9 @@ package org.apache.pinot.segment.local.io.readerwriter;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.HLCSegmentName;
@@ -32,34 +33,37 @@ import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 
 
 /**
- * @class RealtimeIndexOffHeapMemoryManager is an abstract class that implements base functionality to allocate and
- * release
+ * RealtimeIndexOffHeapMemoryManager is an abstract class that implements base functionality to allocate and release
  * memory that is acquired during realtime segment consumption.
  *
- * Realtime consuming segments use memory for dictionary, forward index, and inverted indices. For off-heap
- * allocation of memory, we instantiate one OffHeapMemoryManager for each segment in the server,
+ * Realtime consuming segments use memory for dictionary, forward index, and inverted indices. For off-heap allocation
+ * of memory, we instantiate one RealtimeIndexOffHeapMemoryManager for each segment.
  *
- * Closing the RealtimeOffHeapMemoryManager also releases all the resources allocated by the OffHeapMemoryManager.
+ * Closing the RealtimeOffHeapMemoryManager also releases all the resources allocated.
+ *
+ * This class is NOT thread safe. Only one thread should access this class.
  */
+@NotThreadSafe
 public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBufferMemoryManager {
-  private final List<PinotDataBuffer> _buffers = new LinkedList<>();
+  private final List<PinotDataBuffer> _buffers = new ArrayList<>();
+  private final String _rawTableName;
   private final String _segmentName;
   private final ServerMetrics _serverMetrics;
+
   private long _totalAllocatedBytes = 0;
-  private final String _tableName;
 
   protected RealtimeIndexOffHeapMemoryManager(ServerMetrics serverMetrics, String segmentName) {
     _serverMetrics = serverMetrics;
     _segmentName = segmentName;
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     if (llcSegmentName != null) {
-      _tableName = llcSegmentName.getTableName();
+      _rawTableName = llcSegmentName.getTableName();
     } else if (SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
       HLCSegmentName hlcSegmentName = new HLCSegmentName(segmentName);
-      _tableName = hlcSegmentName.getTableName();
+      _rawTableName = hlcSegmentName.getTableName();
     } else {
       // For testing only
-      _tableName = "NoSuchTable";
+      _rawTableName = "NoSuchTable";
     }
   }
 
@@ -82,7 +86,7 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
     _totalAllocatedBytes += size;
     _buffers.add(buffer);
     if (_serverMetrics != null) {
-      _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, size);
+      _serverMetrics.addValueToTableGauge(_rawTableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, size);
     }
     return buffer;
   }
@@ -97,9 +101,9 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
 
   /**
    * Close out this memory manager and release all memory and resources.
-   * This method must be called when all the memory allocated by this class is not longer in use.
-   * The application may choose to call (or not call) PinotDataBuffer.close(), but this.close() MUST
-   * be called to release all resources allocated.
+   * This method must be called when all the memory allocated by this class is no longer in use.
+   * The application may choose to call (or not call) PinotDataBuffer.close(), but this.close() MUST be called to
+   * release all resources allocated.
    *
    * @throws IOException
    */
@@ -109,7 +113,8 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
       buffer.close();
     }
     if (_serverMetrics != null) {
-      _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, -_totalAllocatedBytes);
+      _serverMetrics.addValueToTableGauge(_rawTableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED,
+          -_totalAllocatedBytes);
     }
     doClose();
     _buffers.clear();

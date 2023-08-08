@@ -7,6 +7,7 @@
     "start": "npm-run-all --parallel lint dev",
     "build": "webpack --mode production",
     "build-dev": "webpack --mode development",
+    "build-ci": "if [ \"$CI\" = true ]; then npm run-script build; else npm run-script build-dev; fi",
     "build-analyze": "webpack --mode production --analyze",
     "lint": "eslint 'app/**/*.{js,ts,tsx,jsx}' --quiet --fix",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -78,6 +79,7 @@
     "file": "0.2.2",
     "json-bigint": "1.0.0",
     "jsonlint": "1.6.3",
+    "jwt-decode": "^3.1.2",
     "lodash": "4.17.21",
     "moment": "2.29.3",
     "prop-types": "15.8.1",

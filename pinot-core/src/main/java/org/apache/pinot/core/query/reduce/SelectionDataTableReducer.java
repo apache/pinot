@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -64,63 +65,50 @@ public class SelectionDataTableReducer implements DataTableReducer {
       List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
       DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(dataSchema, selectionColumns);
       brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
-    } else {
-      // For data table map with more than one data tables, remove conflicting data tables
-      if (dataTableMap.size() > 1) {
-        List<ServerRoutingInstance> droppedServers = removeConflictingResponses(dataSchema, dataTableMap);
-        if (!droppedServers.isEmpty()) {
-          String errorMessage = QueryException.MERGE_RESPONSE_ERROR.getMessage() + ": responses for table: " + tableName
-              + " from servers: " + droppedServers + " got dropped due to data schema inconsistency.";
-          LOGGER.warn(errorMessage);
-          if (brokerMetrics != null) {
-            brokerMetrics.addMeteredTableValue(TableNameBuilder.extractRawTableName(tableName),
-                BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1L);
-          }
-          brokerResponseNative.addToExceptions(
-              new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
+      return;
+    }
+
+    // For data table map with more than one data tables, remove conflicting data tables
+    if (dataTableMap.size() > 1) {
+      DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+      List<ServerRoutingInstance> droppedServers = new ArrayList<>();
+      Iterator<Map.Entry<ServerRoutingInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
+      while (iterator.hasNext()) {
+        Map.Entry<ServerRoutingInstance, DataTable> entry = iterator.next();
+        DataSchema dataSchemaToCompare = entry.getValue().getDataSchema();
+        assert dataSchemaToCompare != null;
+        if (!Arrays.equals(columnDataTypes, dataSchemaToCompare.getColumnDataTypes())) {
+          droppedServers.add(entry.getKey());
+          iterator.remove();
         }
       }
-
-      int limit = _queryContext.getLimit();
-      if (limit > 0 && _queryContext.getOrderByExpressions() != null) {
-        // Selection order-by
-        SelectionOperatorService selectionService = new SelectionOperatorService(_queryContext, dataSchema);
-        selectionService.reduceWithOrdering(dataTableMap.values(), _queryContext.isNullHandlingEnabled());
-        brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering());
-      } else {
-        // Selection only
-        List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
-        List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit,
-            _queryContext.isNullHandlingEnabled());
-        brokerResponseNative.setResultTable(
-            SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema, selectionColumns));
+      if (!droppedServers.isEmpty()) {
+        String errorMessage =
+            QueryException.MERGE_RESPONSE_ERROR.getMessage() + ": responses for table: " + tableName + " from servers: "
+                + droppedServers + " got dropped due to data schema inconsistency.";
+        LOGGER.warn(errorMessage);
+        if (brokerMetrics != null) {
+          brokerMetrics.addMeteredTableValue(TableNameBuilder.extractRawTableName(tableName),
+              BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1L);
+        }
+        brokerResponseNative.addToExceptions(
+            new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
       }
     }
-  }
 
-  /**
-   * Given a data schema, remove data tables that are not compatible with this data schema.
-   * <p>Upgrade the data schema passed in to cover all remaining data schemas.
-   *
-   * @param dataSchema data schema.
-   * @param dataTableMap map from server to data table.
-   * @return list of server names where the data table got removed.
-   */
-  private List<ServerRoutingInstance> removeConflictingResponses(DataSchema dataSchema,
-      Map<ServerRoutingInstance, DataTable> dataTableMap) {
-    List<ServerRoutingInstance> droppedServers = new ArrayList<>();
-    Iterator<Map.Entry<ServerRoutingInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
-    while (iterator.hasNext()) {
-      Map.Entry<ServerRoutingInstance, DataTable> entry = iterator.next();
-      DataSchema dataSchemaToCompare = entry.getValue().getDataSchema();
-      assert dataSchemaToCompare != null;
-      if (!dataSchema.isTypeCompatibleWith(dataSchemaToCompare)) {
-        droppedServers.add(entry.getKey());
-        iterator.remove();
-      } else {
-        dataSchema = DataSchema.upgradeToCover(dataSchema, dataSchemaToCompare);
-      }
+    int limit = _queryContext.getLimit();
+    if (limit > 0 && _queryContext.getOrderByExpressions() != null) {
+      // Selection order-by
+      SelectionOperatorService selectionService = new SelectionOperatorService(_queryContext, dataSchema);
+      selectionService.reduceWithOrdering(dataTableMap.values(), _queryContext.isNullHandlingEnabled());
+      brokerResponseNative.setResultTable(selectionService.renderResultTableWithOrdering());
+    } else {
+      // Selection only
+      List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
+      List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit,
+          _queryContext.isNullHandlingEnabled());
+      brokerResponseNative.setResultTable(
+          SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, dataSchema, selectionColumns));
     }
-    return droppedServers;
   }
 }

@@ -21,12 +21,14 @@ package org.apache.pinot.core.operator.transform.function;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -38,12 +40,11 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   private final Dictionary _dictionary;
   private final TransformResultMetadata _resultMetadata;
 
-  public IdentifierTransformFunction(String columnName, DataSource dataSource) {
+  public IdentifierTransformFunction(String columnName, ColumnContext columnContext) {
     _columnName = columnName;
-    _dictionary = dataSource.getDictionary();
-    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-    _resultMetadata = new TransformResultMetadata(dataSourceMetadata.getDataType(), dataSourceMetadata.isSingleValue(),
-        _dictionary != null);
+    _dictionary = columnContext.getDictionary();
+    _resultMetadata =
+        new TransformResultMetadata(columnContext.getDataType(), columnContext.isSingleValue(), _dictionary != null);
   }
 
   public String getColumnName() {
@@ -56,7 +57,7 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     throw new UnsupportedOperationException();
   }
 
@@ -65,85 +66,85 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
     return _resultMetadata;
   }
 
+  @Nullable
   @Override
   public Dictionary getDictionary() {
     return _dictionary;
   }
 
   @Override
-  public int[] transformToDictIdsSV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getDictionaryIdsSV();
+  public int[] transformToDictIdsSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getDictionaryIdsSV();
   }
 
   @Override
-  public int[][] transformToDictIdsMV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getDictionaryIdsMV();
+  public int[][] transformToDictIdsMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getDictionaryIdsMV();
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getIntValuesSV();
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getIntValuesSV();
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getLongValuesSV();
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getLongValuesSV();
   }
 
   @Override
-  public float[] transformToFloatValuesSV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getFloatValuesSV();
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getFloatValuesSV();
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getDoubleValuesSV();
-  }
-
-
-  @Override
-  public BigDecimal[] transformToBigDecimalValuesSV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getBigDecimalValuesSV();
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getDoubleValuesSV();
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getStringValuesSV();
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getBigDecimalValuesSV();
   }
 
   @Override
-  public byte[][] transformToBytesValuesSV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getBytesValuesSV();
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getStringValuesSV();
   }
 
   @Override
-  public int[][] transformToIntValuesMV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getIntValuesMV();
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getBytesValuesSV();
   }
 
   @Override
-  public long[][] transformToLongValuesMV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getLongValuesMV();
+  public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getIntValuesMV();
   }
 
   @Override
-  public float[][] transformToFloatValuesMV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getFloatValuesMV();
+  public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getLongValuesMV();
   }
 
   @Override
-  public double[][] transformToDoubleValuesMV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getDoubleValuesMV();
+  public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getFloatValuesMV();
   }
 
   @Override
-  public String[][] transformToStringValuesMV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getStringValuesMV();
+  public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getDoubleValuesMV();
   }
 
   @Override
-  public byte[][][] transformToBytesValuesMV(ProjectionBlock projectionBlock) {
-    return projectionBlock.getBlockValueSet(_columnName).getBytesValuesMV();
+  public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getStringValuesMV();
+  }
+
+  @Override
+  public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getBytesValuesMV();
   }
 
   @Override
@@ -205,5 +206,10 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   public void transformToStringValuesMV(ProjectionBlock projectionBlock, TransformEvaluator evaluator,
       String[][] buffer) {
     projectionBlock.fillValues(_columnName, evaluator, buffer);
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getNullBitmap();
   }
 }

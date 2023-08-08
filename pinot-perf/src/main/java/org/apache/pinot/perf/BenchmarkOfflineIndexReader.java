@@ -42,11 +42,11 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVFo
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -130,29 +130,31 @@ public class BenchmarkOfflineIndexReader {
     // Forward index
     _numDocs = segmentMetadata.getTotalDocs();
     _fixedBitSingleValueReader = new FixedBitSVForwardIndexReader(
-        segmentReader.getIndexFor(SV_UNSORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX), _numDocs,
+        segmentReader.getIndexFor(SV_UNSORTED_COLUMN_NAME, StandardIndexes.forward()), _numDocs,
         segmentMetadata.getColumnMetadataFor(SV_UNSORTED_COLUMN_NAME).getBitsPerElement());
     _sortedForwardIndexReader =
-        new SortedIndexReaderImpl(segmentReader.getIndexFor(SV_SORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
+        new SortedIndexReaderImpl(segmentReader.getIndexFor(SV_SORTED_COLUMN_NAME, StandardIndexes.forward()),
             segmentMetadata.getColumnMetadataFor(SV_SORTED_COLUMN_NAME).getCardinality());
     ColumnMetadata mvColumnMetadata = segmentMetadata.getColumnMetadataFor(MV_COLUMN_NAME);
     _fixedBitMultiValueReader =
-        new FixedBitMVForwardIndexReader(segmentReader.getIndexFor(MV_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
+        new FixedBitMVForwardIndexReader(segmentReader.getIndexFor(MV_COLUMN_NAME, StandardIndexes.forward()),
             _numDocs, mvColumnMetadata.getTotalNumberOfEntries(), mvColumnMetadata.getBitsPerElement());
     _buffer = new int[mvColumnMetadata.getMaxNumberOfMultiValues()];
 
     // Dictionary
-    _intDictionary = new IntDictionary(segmentReader.getIndexFor(INT_COLUMN_NAME, ColumnIndexType.DICTIONARY),
+    _intDictionary = new IntDictionary(segmentReader.getIndexFor(INT_COLUMN_NAME, StandardIndexes.dictionary()),
         segmentMetadata.getColumnMetadataFor(INT_COLUMN_NAME).getCardinality());
-    _longDictionary = new LongDictionary(segmentReader.getIndexFor(LONG_COLUMN_NAME, ColumnIndexType.DICTIONARY),
+    _longDictionary = new LongDictionary(segmentReader.getIndexFor(LONG_COLUMN_NAME, StandardIndexes.dictionary()),
         segmentMetadata.getColumnMetadataFor(LONG_COLUMN_NAME).getCardinality());
-    _floatDictionary = new FloatDictionary(segmentReader.getIndexFor(FLOAT_COLUMN_NAME, ColumnIndexType.DICTIONARY),
+    _floatDictionary = new FloatDictionary(segmentReader.getIndexFor(FLOAT_COLUMN_NAME, StandardIndexes.dictionary()),
         segmentMetadata.getColumnMetadataFor(FLOAT_COLUMN_NAME).getCardinality());
-    _doubleDictionary = new DoubleDictionary(segmentReader.getIndexFor(DOUBLE_COLUMN_NAME, ColumnIndexType.DICTIONARY),
-        segmentMetadata.getColumnMetadataFor(DOUBLE_COLUMN_NAME).getCardinality());
+    _doubleDictionary =
+        new DoubleDictionary(segmentReader.getIndexFor(DOUBLE_COLUMN_NAME, StandardIndexes.dictionary()),
+            segmentMetadata.getColumnMetadataFor(DOUBLE_COLUMN_NAME).getCardinality());
     ColumnMetadata stringColumnMetadata = segmentMetadata.getColumnMetadataFor(STRING_COLUMN_NAME);
-    _stringDictionary = new StringDictionary(segmentReader.getIndexFor(STRING_COLUMN_NAME, ColumnIndexType.DICTIONARY),
-        stringColumnMetadata.getCardinality(), stringColumnMetadata.getColumnMaxLength());
+    _stringDictionary =
+        new StringDictionary(segmentReader.getIndexFor(STRING_COLUMN_NAME, StandardIndexes.dictionary()),
+            stringColumnMetadata.getCardinality(), stringColumnMetadata.getColumnMaxLength());
   }
 
   @Benchmark

@@ -98,6 +98,7 @@ public class TableCacheTest {
     // Add a table config
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSchemaName(SCHEMA_NAME).build();
+    TEST_INSTANCE.waitForEVToDisappear(tableConfig.getTableName());
     TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
     // Wait for at most 10 seconds for the callback to add the table config to the cache
     TestUtils.waitForCondition(
@@ -128,7 +129,7 @@ public class TableCacheTest {
 
     // Update the schema
     schema.addField(new DimensionFieldSpec("newColumn", DataType.LONG, true));
-    TEST_INSTANCE.getHelixResourceManager().updateSchema(schema, false);
+    TEST_INSTANCE.getHelixResourceManager().updateSchema(schema, false, false);
     // Wait for at most 10 seconds for the callback to update the schema in the cache
     // NOTE:
     // - Schema should never be null during the transitioning
@@ -196,7 +197,7 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
 
     // Remove the schema
-    TEST_INSTANCE.getHelixResourceManager().deleteSchema(schema);
+    TEST_INSTANCE.getHelixResourceManager().deleteSchema(SCHEMA_NAME);
     // Wait for at most 10 seconds for the callback to remove the schema from the cache
     // NOTE:
     // - Verify if the callback is fully done by checking the schema change lister because it is the last step of the

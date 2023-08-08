@@ -18,6 +18,13 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
+
 public class GreaterThanOrEqualTransformFunctionTest extends BinaryOperatorTransformFunctionTest {
 
   @Override
@@ -28,5 +35,37 @@ public class GreaterThanOrEqualTransformFunctionTest extends BinaryOperatorTrans
   @Override
   String getFunctionName() {
     return new GreaterThanOrEqualTransformFunction().getName();
+  }
+
+  @Test
+  public void testGreaterThanOrEqualNullLiteral() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("greater_than_or_equal(null, %s)", INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof GreaterThanOrEqualTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "greater_than_or_equal");
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testEqualsNullColumn() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("greater_than_or_equal(%s, %s)", INT_SV_NULL_COLUMN, INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof GreaterThanOrEqualTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "greater_than_or_equal");
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = 1;
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

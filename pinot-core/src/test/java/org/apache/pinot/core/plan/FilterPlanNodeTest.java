@@ -20,8 +20,8 @@ package org.apache.pinot.core.plan;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.Constants;
@@ -80,7 +80,7 @@ public class FilterPlanNodeTest {
     BaseFilterOperator op = node.run();
     int numDocsFiltered = 0;
     FilterBlock block = op.nextBlock();
-    FilterBlockDocIdSet blockIds = block.getBlockDocIdSet();
+    BlockDocIdSet blockIds = block.getBlockDocIdSet();
     BlockDocIdIterator it = blockIds.iterator();
     while (it.next() != Constants.EOF) {
       numDocsFiltered++;

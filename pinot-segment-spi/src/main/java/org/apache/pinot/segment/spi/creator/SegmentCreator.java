@@ -22,7 +22,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.Map;
+import java.util.TreeMap;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.spi.data.Schema;
@@ -44,7 +44,7 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @throws Exception
    */
   void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
       throws Exception;
 
   /**

@@ -33,6 +33,8 @@ import org.slf4j.LoggerFactory;
 /**
  * A {@link StreamLevelConsumer} implementation for the Pulsar stream
  */
+// Pinot no longer support high level consumer model since v0.12.*
+@Deprecated
 public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
   private Logger _logger;
 
@@ -81,9 +83,9 @@ public class PulsarStreamLevelConsumer implements StreamLevelConsumer {
         // Log every minute or 100k events
         if (now - _lastLogTime > 60000 || _currentCount - _lastCount >= 100000) {
           if (_lastCount == 0) {
-            _logger.info("Consumed {} events from kafka stream {}", _currentCount, _streamConfig.getTopicName());
+            _logger.info("Consumed {} events from pulsar stream {}", _currentCount, _streamConfig.getTopicName());
           } else {
-            _logger.info("Consumed {} events from kafka stream {} (rate:{}/s)", _currentCount - _lastCount,
+            _logger.info("Consumed {} events from pulsar stream {} (rate:{}/s)", _currentCount - _lastCount,
                 _streamConfig.getTopicName(), (float) (_currentCount - _lastCount) * 1000 / (now - _lastLogTime));
           }
           _lastCount = _currentCount;

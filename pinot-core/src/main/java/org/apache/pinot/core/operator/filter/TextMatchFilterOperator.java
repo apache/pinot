@@ -21,8 +21,8 @@ package org.apache.pinot.core.operator.filter;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
@@ -43,14 +43,16 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   private final TextMatchPredicate _predicate;
 
   public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {
+    // This filter operator does not support AND/OR/NOT operations.
+    super(0, false);
     _textIndexReader = textIndexReader;
     _predicate = predicate;
     _numDocs = numDocs;
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
-    return new FilterBlock(new BitmapDocIdSet(_textIndexReader.getDocIds(_predicate.getValue()), _numDocs));
+  protected BlockDocIdSet getTrues() {
+    return new BitmapDocIdSet(_textIndexReader.getDocIds(_predicate.getValue()), _numDocs);
   }
 
   @Override

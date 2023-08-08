@@ -111,6 +111,10 @@ public class ColumnIndexCreationInfo implements Serializable {
     return _columnStatistics.getNumPartitions();
   }
 
+  public boolean isFixedLength() {
+    return _columnStatistics.isFixedLength();
+  }
+
   @Nullable
   public Map<String, String> getPartitionFunctionConfig() {
     return _columnStatistics.getPartitionFunctionConfig();

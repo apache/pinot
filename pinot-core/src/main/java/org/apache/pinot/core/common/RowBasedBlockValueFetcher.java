@@ -67,6 +67,8 @@ public class RowBasedBlockValueFetcher {
           return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
         case BYTES:
           return new BytesValueFetcher(blockValSet.getBytesValuesSV());
+        case UNKNOWN:
+          return new UnknownValueFetcher();
         default:
           throw new IllegalStateException("Unsupported value type: " + storedType + " for single-value column");
       }
@@ -233,6 +235,15 @@ public class RowBasedBlockValueFetcher {
 
     public String[] getValue(int docId) {
       return _values[docId];
+    }
+  }
+
+  private static class UnknownValueFetcher implements ValueFetcher {
+    UnknownValueFetcher() {
+    }
+
+    public Object getValue(int docId) {
+      return null;
     }
   }
 }

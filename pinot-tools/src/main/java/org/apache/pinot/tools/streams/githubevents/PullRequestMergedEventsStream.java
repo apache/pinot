@@ -46,6 +46,9 @@ import static org.apache.pinot.tools.Quickstart.printStatus;
 public class PullRequestMergedEventsStream {
   private static final Logger LOGGER = LoggerFactory.getLogger(PullRequestMergedEventsStream.class);
 
+  private static final String PULSAR_DATA_PRODUCER_CLASS_NAME =
+      "org.apache.pinot.plugin.stream.pulsar.server.PulsarDataProducer";
+
   private PinotRealtimeSource _pinotStream;
 
   public PullRequestMergedEventsStream(File schemaFile, String topicName, String personalAccessToken,
@@ -67,7 +70,8 @@ public class PullRequestMergedEventsStream {
     try {
       if (schemaFilePath == null) {
         ClassLoader classLoader = PullRequestMergedEventsStream.class.getClassLoader();
-        URL resource = classLoader.getResource("examples/stream/githubEvents/pullRequestMergedEvents_schema.json");
+        URL resource = classLoader.getResource(
+            "examples/stream/pullRequestMergedEvents/pullRequestMergedEvents_schema.json");
         Preconditions.checkNotNull(resource);
         pinotSchema = new File(resource.getFile());
       } else {
@@ -82,15 +86,29 @@ public class PullRequestMergedEventsStream {
 
   public static StreamDataProducer getKafkaStreamDataProducer()
       throws Exception {
-    return getKafkaStreamDataProducer(KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
+    return getKafkaStreamDataProducer(KafkaStarterUtils.DEFAULT_KAFKA_BROKER, null, null, null);
   }
 
-  public static StreamDataProducer getKafkaStreamDataProducer(String kafkaBrokerList)
+  public static StreamDataProducer getKafkaStreamDataProducer(String kafkaBrokerList, String kafkaSecurityProtocol,
+      String kafkaSaslUserName, String kafkaSaslPassword)
       throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBrokerList);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
+
+    if (StringUtils.isNotEmpty(kafkaSecurityProtocol)) {
+      properties.put("security.protocol", kafkaSecurityProtocol);
+      // If the protocol is 'SASL_SSL', fill the sasl related configs
+      if (kafkaSecurityProtocol.equals("SASL_SSL") && StringUtils.isNotEmpty(kafkaSaslUserName)
+          && StringUtils.isNotEmpty(kafkaSaslPassword)) {
+        properties.put("sasl.mechanism", "PLAIN");
+        String jaasConfig = String.format(
+            "org.apache.kafka.common.security.plain.PlainLoginModule required \n username=\"%s\" \n password=\"%s\";",
+            kafkaSaslUserName, kafkaSaslPassword);
+        properties.put("sasl.jaas.config", jaasConfig);
+      }
+    }
     return StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
   }
 
@@ -109,6 +127,21 @@ public class PullRequestMergedEventsStream {
     }
     properties.put("region", region);
     return StreamDataProvider.getStreamDataProducer(KinesisStarterUtils.KINESIS_PRODUCER_CLASS_NAME, properties);
+  }
+
+  public static StreamDataProducer getPulsarStreamDataProducer(String brokerServiceUrl, String token)
+      throws Exception {
+    Properties properties = new Properties();
+
+    if (StringUtils.isNotEmpty(brokerServiceUrl)) {
+      properties.put("brokerServiceUrl", brokerServiceUrl);
+    }
+
+    if (StringUtils.isNotEmpty(token)) {
+      properties.put("token", token);
+    }
+
+    return StreamDataProvider.getStreamDataProducer(PULSAR_DATA_PRODUCER_CLASS_NAME, properties);
   }
 
   public static StreamDataProducer getKinesisStreamDataProducer()

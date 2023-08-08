@@ -18,6 +18,13 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
+
 public class NotEqualsTransformFunctionTest extends BinaryOperatorTransformFunctionTest {
 
   @Override
@@ -28,5 +35,37 @@ public class NotEqualsTransformFunctionTest extends BinaryOperatorTransformFunct
   @Override
   String getFunctionName() {
     return new NotEqualsTransformFunction().getName();
+  }
+
+  @Test
+  public void testNotEqualsNullLiteral() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("not_equals(null, %s)", INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof NotEqualsTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "not_equals");
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testNotEqualsNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("not_equals(%s, %s)", INT_SV_NULL_COLUMN, INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof NotEqualsTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "not_equals");
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = 0;
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

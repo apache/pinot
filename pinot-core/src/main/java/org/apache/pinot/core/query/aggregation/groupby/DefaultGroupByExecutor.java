@@ -25,9 +25,9 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -60,25 +60,17 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   protected final int[][] _mvGroupKeys;
 
   public DefaultGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
-      TransformOperator transformOperator) {
-    this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, transformOperator, null);
+      BaseProjectOperator<?> projectOperator) {
+    this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, projectOperator, null);
   }
 
   public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
-      ExpressionContext[] groupByExpressions, TransformOperator transformOperator) {
-    this(queryContext, aggregationFunctions, groupByExpressions, transformOperator, null);
+      ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator) {
+    this(queryContext, aggregationFunctions, groupByExpressions, projectOperator, null);
   }
 
-  /**
-   * Constructor for the class.
-   *
-   * @param queryContext Query context
-   * @param aggregationFunctions Aggregation functions
-   * @param groupByExpressions Array of group-by expressions
-   * @param transformOperator Transform operator
-   */
   public DefaultGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
-      ExpressionContext[] groupByExpressions, TransformOperator transformOperator,
+      ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator,
       @Nullable GroupKeyGenerator groupKeyGenerator) {
     _aggregationFunctions = aggregationFunctions;
     assert _aggregationFunctions != null;
@@ -87,9 +79,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
     for (ExpressionContext groupByExpression : groupByExpressions) {
-      TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpression);
-      hasMVGroupByExpression |= !transformResultMetadata.isSingleValue();
-      hasNoDictionaryGroupByExpression |= !transformResultMetadata.hasDictionary();
+      ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
+      hasMVGroupByExpression |= !columnContext.isSingleValue();
+      hasNoDictionaryGroupByExpression |= columnContext.getDictionary() == null;
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
 
@@ -103,14 +95,15 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         if (groupByExpressions.length == 1) {
           // TODO(nhejazi): support MV and dictionary based when null handling is enabled.
           _groupKeyGenerator =
-              new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit,
+              new NoDictionarySingleColumnGroupKeyGenerator(projectOperator, groupByExpressions[0], numGroupsLimit,
                   _nullHandlingEnabled);
         } else {
           _groupKeyGenerator =
-              new NoDictionaryMultiColumnGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit);
+              new NoDictionaryMultiColumnGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
+                  _nullHandlingEnabled);
         }
       } else {
-        _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
+        _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
             maxInitialResultHolderCapacity);
       }
     }
@@ -135,29 +128,29 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   }
 
   @Override
-  public void process(TransformBlock transformBlock) {
+  public void process(ValueBlock valueBlock) {
     // Generate group keys
     // NOTE: groupKeyGenerator will limit the number of groups. Once reaching limit, no new group will be generated
     if (_hasMVGroupByExpression) {
-      _groupKeyGenerator.generateKeysForBlock(transformBlock, _mvGroupKeys);
+      _groupKeyGenerator.generateKeysForBlock(valueBlock, _mvGroupKeys);
     } else {
-      _groupKeyGenerator.generateKeysForBlock(transformBlock, _svGroupKeys);
+      _groupKeyGenerator.generateKeysForBlock(valueBlock, _svGroupKeys);
     }
 
     int capacityNeeded = _groupKeyGenerator.getCurrentGroupKeyUpperBound();
-    int length = transformBlock.getNumDocs();
+    int length = valueBlock.getNumDocs();
     int numAggregationFunctions = _aggregationFunctions.length;
     for (int i = 0; i < numAggregationFunctions; i++) {
       GroupByResultHolder groupByResultHolder = _groupByResultHolders[i];
       groupByResultHolder.ensureCapacity(capacityNeeded);
-      aggregate(transformBlock, length, i);
+      aggregate(valueBlock, length, i);
     }
   }
 
-  protected void aggregate(TransformBlock transformBlock, int length, int functionIndex) {
+  protected void aggregate(ValueBlock valueBlock, int length, int functionIndex) {
     AggregationFunction aggregationFunction = _aggregationFunctions[functionIndex];
     Map<ExpressionContext, BlockValSet> blockValSetMap =
-        AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, transformBlock);
+        AggregationFunctionUtils.getBlockValSetMap(aggregationFunction, valueBlock);
     GroupByResultHolder groupByResultHolder = _groupByResultHolders[functionIndex];
     if (_hasMVGroupByExpression) {
       aggregationFunction.aggregateGroupByMV(length, _mvGroupKeys, groupByResultHolder, blockValSetMap);

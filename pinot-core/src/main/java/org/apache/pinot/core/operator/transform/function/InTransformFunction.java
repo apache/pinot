@@ -28,13 +28,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -48,6 +50,7 @@ public class InTransformFunction extends BaseTransformFunction {
   private TransformFunction _mainFunction;
   private TransformFunction[] _valueFunctions;
   private Set _valueSet;
+  private boolean _valueSetContainsNull;
 
   @Override
   public String getName() {
@@ -55,7 +58,7 @@ public class InTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments >= 2, "At least 2 arguments are required for [%s] "
         + "transform function: (expression, values)", getName());
@@ -66,7 +69,12 @@ public class InTransformFunction extends BaseTransformFunction {
     for (int i = 1; i < numArguments; i++) {
       TransformFunction valueFunction = arguments.get(i);
       if (valueFunction instanceof LiteralTransformFunction) {
-        stringValues.add(((LiteralTransformFunction) valueFunction).getLiteral());
+        LiteralTransformFunction literalTransformFunction = ((LiteralTransformFunction) valueFunction);
+        if (literalTransformFunction.getResultMetadata().getDataType() == DataType.UNKNOWN) {
+          _valueSetContainsNull = true;
+        } else {
+          stringValues.add(literalTransformFunction.getStringLiteral());
+        }
       } else {
         allLiteralValues = false;
         break;
@@ -115,6 +123,9 @@ public class InTransformFunction extends BaseTransformFunction {
           }
           _valueSet = bytesValues;
           break;
+        case UNKNOWN:
+          _valueSet = new ObjectOpenHashSet<>();
+          break;
         default:
           throw new IllegalStateException();
       }
@@ -137,15 +148,9 @@ public class InTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-
-    if (_intValuesSV == null) {
-      _intValuesSV = new int[length];
-    } else {
-      Arrays.fill(_intValuesSV, 0);
-    }
-
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initZeroFillingIntValuesSV(length);
     TransformResultMetadata mainFunctionMetadata = _mainFunction.getResultMetadata();
     DataType storedType = mainFunctionMetadata.getDataType().getStoredType();
     if (_valueSet != null) {
@@ -153,7 +158,7 @@ public class InTransformFunction extends BaseTransformFunction {
         switch (storedType) {
           case INT:
             IntOpenHashSet inIntValues = (IntOpenHashSet) _valueSet;
-            int[] intValues = _mainFunction.transformToIntValuesSV(projectionBlock);
+            int[] intValues = _mainFunction.transformToIntValuesSV(valueBlock);
             for (int i = 0; i < length; i++) {
               if (inIntValues.contains(intValues[i])) {
                 _intValuesSV[i] = 1;
@@ -162,7 +167,7 @@ public class InTransformFunction extends BaseTransformFunction {
             break;
           case LONG:
             LongOpenHashSet inLongValues = (LongOpenHashSet) _valueSet;
-            long[] longValues = _mainFunction.transformToLongValuesSV(projectionBlock);
+            long[] longValues = _mainFunction.transformToLongValuesSV(valueBlock);
             for (int i = 0; i < length; i++) {
               if (inLongValues.contains(longValues[i])) {
                 _intValuesSV[i] = 1;
@@ -171,7 +176,7 @@ public class InTransformFunction extends BaseTransformFunction {
             break;
           case FLOAT:
             FloatOpenHashSet inFloatValues = (FloatOpenHashSet) _valueSet;
-            float[] floatValues = _mainFunction.transformToFloatValuesSV(projectionBlock);
+            float[] floatValues = _mainFunction.transformToFloatValuesSV(valueBlock);
             for (int i = 0; i < length; i++) {
               if (inFloatValues.contains(floatValues[i])) {
                 _intValuesSV[i] = 1;
@@ -180,7 +185,7 @@ public class InTransformFunction extends BaseTransformFunction {
             break;
           case DOUBLE:
             DoubleOpenHashSet inDoubleValues = (DoubleOpenHashSet) _valueSet;
-            double[] doubleValues = _mainFunction.transformToDoubleValuesSV(projectionBlock);
+            double[] doubleValues = _mainFunction.transformToDoubleValuesSV(valueBlock);
             for (int i = 0; i < length; i++) {
               if (inDoubleValues.contains(doubleValues[i])) {
                 _intValuesSV[i] = 1;
@@ -189,7 +194,7 @@ public class InTransformFunction extends BaseTransformFunction {
             break;
           case STRING:
             ObjectOpenHashSet<String> inStringValues = (ObjectOpenHashSet<String>) _valueSet;
-            String[] stringValues = _mainFunction.transformToStringValuesSV(projectionBlock);
+            String[] stringValues = _mainFunction.transformToStringValuesSV(valueBlock);
             for (int i = 0; i < length; i++) {
               if (inStringValues.contains(stringValues[i])) {
                 _intValuesSV[i] = 1;
@@ -198,12 +203,15 @@ public class InTransformFunction extends BaseTransformFunction {
             break;
           case BYTES:
             ObjectOpenHashSet<ByteArray> inBytesValues = (ObjectOpenHashSet<ByteArray>) _valueSet;
-            byte[][] bytesValues = _mainFunction.transformToBytesValuesSV(projectionBlock);
+            byte[][] bytesValues = _mainFunction.transformToBytesValuesSV(valueBlock);
             for (int i = 0; i < length; i++) {
               if (inBytesValues.contains(new ByteArray(bytesValues[i]))) {
                 _intValuesSV[i] = 1;
               }
             }
+            break;
+          case UNKNOWN:
+            fillResultUnknown(length);
             break;
           default:
             throw new IllegalStateException();
@@ -212,7 +220,7 @@ public class InTransformFunction extends BaseTransformFunction {
         switch (storedType) {
           case INT:
             IntOpenHashSet inIntValues = (IntOpenHashSet) _valueSet;
-            int[][] intValues = _mainFunction.transformToIntValuesMV(projectionBlock);
+            int[][] intValues = _mainFunction.transformToIntValuesMV(valueBlock);
             for (int i = 0; i < length; i++) {
               for (int intValue : intValues[i]) {
                 if (inIntValues.contains(intValue)) {
@@ -224,7 +232,7 @@ public class InTransformFunction extends BaseTransformFunction {
             break;
           case LONG:
             LongOpenHashSet inLongValues = (LongOpenHashSet) _valueSet;
-            long[][] longValues = _mainFunction.transformToLongValuesMV(projectionBlock);
+            long[][] longValues = _mainFunction.transformToLongValuesMV(valueBlock);
             for (int i = 0; i < length; i++) {
               for (long longValue : longValues[i]) {
                 if (inLongValues.contains(longValue)) {
@@ -236,7 +244,7 @@ public class InTransformFunction extends BaseTransformFunction {
             break;
           case FLOAT:
             FloatOpenHashSet inFloatValues = (FloatOpenHashSet) _valueSet;
-            float[][] floatValues = _mainFunction.transformToFloatValuesMV(projectionBlock);
+            float[][] floatValues = _mainFunction.transformToFloatValuesMV(valueBlock);
             for (int i = 0; i < length; i++) {
               for (float floatValue : floatValues[i]) {
                 if (inFloatValues.contains(floatValue)) {
@@ -248,7 +256,7 @@ public class InTransformFunction extends BaseTransformFunction {
             break;
           case DOUBLE:
             DoubleOpenHashSet inDoubleValues = (DoubleOpenHashSet) _valueSet;
-            double[][] doubleValues = _mainFunction.transformToDoubleValuesMV(projectionBlock);
+            double[][] doubleValues = _mainFunction.transformToDoubleValuesMV(valueBlock);
             for (int i = 0; i < length; i++) {
               for (double doubleValue : doubleValues[i]) {
                 if (inDoubleValues.contains(doubleValue)) {
@@ -260,7 +268,7 @@ public class InTransformFunction extends BaseTransformFunction {
             break;
           case STRING:
             ObjectOpenHashSet<String> inStringValues = (ObjectOpenHashSet<String>) _valueSet;
-            String[][] stringValues = _mainFunction.transformToStringValuesMV(projectionBlock);
+            String[][] stringValues = _mainFunction.transformToStringValuesMV(valueBlock);
             for (int i = 0; i < length; i++) {
               for (String stringValue : stringValues[i]) {
                 if (inStringValues.contains(stringValue)) {
@@ -270,6 +278,9 @@ public class InTransformFunction extends BaseTransformFunction {
               }
             }
             break;
+          case UNKNOWN:
+            fillResultUnknown(length);
+            break;
           default:
             throw new IllegalStateException();
         }
@@ -278,10 +289,10 @@ public class InTransformFunction extends BaseTransformFunction {
       int numValues = _valueFunctions.length;
       switch (storedType) {
         case INT:
-          int[] intValues = _mainFunction.transformToIntValuesSV(projectionBlock);
+          int[] intValues = _mainFunction.transformToIntValuesSV(valueBlock);
           int[][] inIntValues = new int[numValues][];
           for (int i = 0; i < numValues; i++) {
-            inIntValues[i] = _valueFunctions[i].transformToIntValuesSV(projectionBlock);
+            inIntValues[i] = _valueFunctions[i].transformToIntValuesSV(valueBlock);
           }
           for (int i = 0; i < length; i++) {
             for (int[] inIntValue : inIntValues) {
@@ -293,10 +304,10 @@ public class InTransformFunction extends BaseTransformFunction {
           }
           break;
         case LONG:
-          long[] longValues = _mainFunction.transformToLongValuesSV(projectionBlock);
+          long[] longValues = _mainFunction.transformToLongValuesSV(valueBlock);
           long[][] inLongValues = new long[numValues][];
           for (int i = 0; i < numValues; i++) {
-            inLongValues[i] = _valueFunctions[i].transformToLongValuesSV(projectionBlock);
+            inLongValues[i] = _valueFunctions[i].transformToLongValuesSV(valueBlock);
           }
           for (int i = 0; i < length; i++) {
             for (long[] inLongValue : inLongValues) {
@@ -308,10 +319,10 @@ public class InTransformFunction extends BaseTransformFunction {
           }
           break;
         case FLOAT:
-          float[] floatValues = _mainFunction.transformToFloatValuesSV(projectionBlock);
+          float[] floatValues = _mainFunction.transformToFloatValuesSV(valueBlock);
           float[][] inFloatValues = new float[numValues][];
           for (int i = 0; i < numValues; i++) {
-            inFloatValues[i] = _valueFunctions[i].transformToFloatValuesSV(projectionBlock);
+            inFloatValues[i] = _valueFunctions[i].transformToFloatValuesSV(valueBlock);
           }
           for (int i = 0; i < length; i++) {
             // Check int bits to be aligned with the Set (Float.equals()) behavior
@@ -325,10 +336,10 @@ public class InTransformFunction extends BaseTransformFunction {
           }
           break;
         case DOUBLE:
-          double[] doubleValues = _mainFunction.transformToDoubleValuesSV(projectionBlock);
+          double[] doubleValues = _mainFunction.transformToDoubleValuesSV(valueBlock);
           double[][] inDoubleValues = new double[numValues][];
           for (int i = 0; i < numValues; i++) {
-            inDoubleValues[i] = _valueFunctions[i].transformToDoubleValuesSV(projectionBlock);
+            inDoubleValues[i] = _valueFunctions[i].transformToDoubleValuesSV(valueBlock);
           }
           for (int i = 0; i < length; i++) {
             // Check long bits to be aligned with the Set (Double.equals()) behavior
@@ -342,10 +353,10 @@ public class InTransformFunction extends BaseTransformFunction {
           }
           break;
         case STRING:
-          String[] stringValues = _mainFunction.transformToStringValuesSV(projectionBlock);
+          String[] stringValues = _mainFunction.transformToStringValuesSV(valueBlock);
           String[][] inStringValues = new String[numValues][];
           for (int i = 0; i < numValues; i++) {
-            inStringValues[i] = _valueFunctions[i].transformToStringValuesSV(projectionBlock);
+            inStringValues[i] = _valueFunctions[i].transformToStringValuesSV(valueBlock);
           }
           for (int i = 0; i < length; i++) {
             for (String[] inStringValue : inStringValues) {
@@ -357,10 +368,10 @@ public class InTransformFunction extends BaseTransformFunction {
           }
           break;
         case BYTES:
-          byte[][] bytesValues = _mainFunction.transformToBytesValuesSV(projectionBlock);
+          byte[][] bytesValues = _mainFunction.transformToBytesValuesSV(valueBlock);
           byte[][][] inBytesValues = new byte[numValues][][];
           for (int i = 0; i < numValues; i++) {
-            inBytesValues[i] = _valueFunctions[i].transformToBytesValuesSV(projectionBlock);
+            inBytesValues[i] = _valueFunctions[i].transformToBytesValuesSV(valueBlock);
           }
           for (int i = 0; i < length; i++) {
             for (byte[][] inBytesValue : inBytesValues) {
@@ -371,11 +382,60 @@ public class InTransformFunction extends BaseTransformFunction {
             }
           }
           break;
+        case UNKNOWN:
+          fillResultUnknown(length);
+          break;
         default:
           throw new IllegalStateException();
       }
     }
 
     return _intValuesSV;
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    RoaringBitmap result = new RoaringBitmap();
+    RoaringBitmap mainFunctionNullBitmap = _mainFunction.getNullBitmap(valueBlock);
+    if (mainFunctionNullBitmap != null) {
+      result.or(mainFunctionNullBitmap);
+      if (result.getCardinality() == length) {
+        return result;
+      }
+    }
+    int[] intValuesSV = transformToIntValuesSV(valueBlock);
+    if (_valueSet == null) {
+      RoaringBitmap valueFunctionsContainNull = new RoaringBitmap();
+      RoaringBitmap[] valueFunctionNullBitmaps = new RoaringBitmap[_valueFunctions.length];
+      for (int i = 0; i < _valueFunctions.length; i++) {
+        valueFunctionNullBitmaps[i] = _valueFunctions[i].getNullBitmap(valueBlock);
+      }
+      for (int i = 0; i < length; i++) {
+        for (int j = 0; j < _valueFunctions.length; j++) {
+          if (valueFunctionNullBitmaps[j] != null && valueFunctionNullBitmaps[j].contains(i)) {
+            valueFunctionsContainNull.add(i);
+            break;
+          }
+        }
+      }
+      for (int i = 0; i < length; i++) {
+        if (mainFunctionNotContainedInValues(intValuesSV[i]) && valueFunctionsContainNull.contains(i)) {
+          result.add(i);
+        }
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        if (mainFunctionNotContainedInValues(intValuesSV[i]) && _valueSetContainsNull) {
+          result.add(i);
+        }
+      }
+    }
+    return result;
+  }
+
+  protected boolean mainFunctionNotContainedInValues(int value) {
+    return value == 0;
   }
 }

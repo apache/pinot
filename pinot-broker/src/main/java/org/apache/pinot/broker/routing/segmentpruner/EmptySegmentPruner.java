@@ -18,18 +18,14 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
-import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -45,35 +41,23 @@ public class EmptySegmentPruner implements SegmentPruner {
   private static final Logger LOGGER = LoggerFactory.getLogger(EmptySegmentPruner.class);
 
   private final String _tableNameWithType;
-  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private final String _segmentZKMetadataPathPrefix;
 
   private final Set<String> _segmentsLoaded = new HashSet<>();
   private final Set<String> _emptySegments = ConcurrentHashMap.newKeySet();
 
   private volatile ResultCache _resultCache;
 
-  public EmptySegmentPruner(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public EmptySegmentPruner(TableConfig tableConfig) {
     _tableNameWithType = tableConfig.getTableName();
-    _propertyStore = propertyStore;
-    _segmentZKMetadataPathPrefix = ZKMetadataProvider.constructPropertyStorePathForResource(_tableNameWithType) + "/";
   }
 
   @Override
-  public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
+  public void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,
+      List<ZNRecord> znRecords) {
     // Bulk load info for all online segments
-    int numSegments = onlineSegments.size();
-    List<String> segments = new ArrayList<>(numSegments);
-    List<String> segmentZKMetadataPaths = new ArrayList<>(numSegments);
-    for (String segment : onlineSegments) {
-      segments.add(segment);
-      segmentZKMetadataPaths.add(_segmentZKMetadataPathPrefix + segment);
-    }
-    _segmentsLoaded.addAll(segments);
-    List<ZNRecord> znRecords = _propertyStore.get(segmentZKMetadataPaths, null, AccessOption.PERSISTENT, false);
-    for (int i = 0; i < numSegments; i++) {
-      String segment = segments.get(i);
-      if (isEmpty(segment, znRecords.get(i))) {
+    for (int idx = 0; idx < onlineSegments.size(); idx++) {
+      String segment = onlineSegments.get(idx);
+      if (isEmpty(segment, znRecords.get(idx))) {
         _emptySegments.add(segment);
       }
     }
@@ -81,14 +65,14 @@ public class EmptySegmentPruner implements SegmentPruner {
 
   @Override
   public synchronized void onAssignmentChange(IdealState idealState, ExternalView externalView,
-      Set<String> onlineSegments) {
+      Set<String> onlineSegments, List<String> pulledSegments, List<ZNRecord> znRecords) {
     // NOTE: We don't update all the segment ZK metadata for every external view change, but only the new added/removed
     //       ones. The refreshed segment ZK metadata change won't be picked up.
     boolean emptySegmentsChanged = false;
-    for (String segment : onlineSegments) {
+    for (int idx = 0; idx < pulledSegments.size(); idx++) {
+      String segment = pulledSegments.get(idx);
       if (_segmentsLoaded.add(segment)) {
-        if (isEmpty(segment,
-            _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT))) {
+        if (isEmpty(segment, znRecords.get(idx))) {
           emptySegmentsChanged |= _emptySegments.add(segment);
         }
       }
@@ -103,9 +87,9 @@ public class EmptySegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public synchronized void refreshSegment(String segment) {
+  public synchronized void refreshSegment(String segment, @Nullable ZNRecord znRecord) {
     _segmentsLoaded.add(segment);
-    if (isEmpty(segment, _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT))) {
+    if (isEmpty(segment, znRecord)) {
       if (_emptySegments.add(segment)) {
         // Reset the result cache when empty segments changed
         _resultCache = null;

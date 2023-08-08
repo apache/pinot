@@ -70,15 +70,16 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     List<ConsumerRecord<String, Bytes>> messageAndOffsets = consumerRecords.records(_topicPartition);
     List<StreamMessage<byte[]>> filtered = new ArrayList<>(messageAndOffsets.size());
     long lastOffset = startOffset;
+    StreamMessageMetadata rowMetadata = null;
     for (ConsumerRecord<String, Bytes> messageAndOffset : messageAndOffsets) {
       long offset = messageAndOffset.offset();
       _lastFetchedOffset = offset;
       if (offset >= startOffset && (endOffset > offset || endOffset < 0)) {
         Bytes message = messageAndOffset.value();
+        rowMetadata = (StreamMessageMetadata) _kafkaMetadataExtractor.extract(messageAndOffset);
         if (message != null) {
           String key = messageAndOffset.key();
           byte[] keyBytes = key != null ? key.getBytes(StandardCharsets.UTF_8) : null;
-          StreamMessageMetadata rowMetadata = (StreamMessageMetadata) _kafkaMetadataExtractor.extract(messageAndOffset);
           filtered.add(new KafkaStreamMessage(keyBytes, message.get(), rowMetadata));
         } else if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Tombstone message at offset: {}", offset);
@@ -89,6 +90,6 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
             endOffset);
       }
     }
-    return new KafkaMessageBatch(messageAndOffsets.size(), lastOffset, filtered);
+    return new KafkaMessageBatch(messageAndOffsets.size(), lastOffset, filtered, rowMetadata);
   }
 }

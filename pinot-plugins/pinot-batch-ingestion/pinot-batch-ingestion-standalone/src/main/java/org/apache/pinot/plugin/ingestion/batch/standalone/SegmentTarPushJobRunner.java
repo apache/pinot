@@ -20,7 +20,9 @@ package org.apache.pinot.plugin.ingestion.batch.standalone;
 
 import java.util.ArrayList;
 import java.util.Map;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
+import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
@@ -33,6 +35,28 @@ public class SegmentTarPushJobRunner extends BaseSegmentPushJobRunner {
 
   public SegmentTarPushJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
+  }
+
+  /**
+   * Initialize SegmentTarPushJobRunner with SegmentGenerationJobSpec
+   * Checks for required parameters in the spec and enablement of consistent data push.
+   * This overrides the init method in BaseSegmentPushJobRunner as the push job spec is required in the base class.
+   */
+  @Override
+  public void init(SegmentGenerationJobSpec spec) {
+    _spec = spec;
+
+    // Read Table spec
+    if (_spec.getTableSpec() == null) {
+      throw new RuntimeException("Missing tableSpec");
+    }
+
+    // Read Table config
+    if (_spec.getTableSpec().getTableConfigURI() != null) {
+      _tableConfig =
+          SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), spec.getAuthToken());
+      _consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(_tableConfig);
+    }
   }
 
   public void uploadSegments(Map<String, String> segmentsUriToTarPathMap)

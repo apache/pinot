@@ -19,9 +19,8 @@
 package org.apache.pinot.controller.utils;
 
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -40,24 +39,36 @@ public class SegmentMetadataMockUtils {
   }
 
   public static SegmentMetadata mockSegmentMetadata(String tableName, String segmentName, int numTotalDocs,
-      String crc) {
+      String crc, long startTime, long endTime, TimeUnit timeUnit) {
     SegmentMetadata segmentMetadata = Mockito.mock(SegmentMetadata.class);
     Mockito.when(segmentMetadata.getTableName()).thenReturn(tableName);
     Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
     Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(numTotalDocs);
     Mockito.when(segmentMetadata.getCrc()).thenReturn(crc);
-    Mockito.when(segmentMetadata.getStartTime()).thenReturn(1L);
-    Mockito.when(segmentMetadata.getEndTime()).thenReturn(10L);
+    Mockito.when(segmentMetadata.getStartTime()).thenReturn(startTime);
+    Mockito.when(segmentMetadata.getEndTime()).thenReturn(endTime);
     Mockito.when(segmentMetadata.getTimeInterval()).thenReturn(
-        new Interval(TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS),
-            TimeUnit.MILLISECONDS.convert(10, TimeUnit.DAYS)));
-    Mockito.when(segmentMetadata.getTimeUnit()).thenReturn(TimeUnit.DAYS);
+        new Interval(TimeUnit.MILLISECONDS.convert(startTime, timeUnit),
+            TimeUnit.MILLISECONDS.convert(endTime, timeUnit)));
+    Mockito.when(segmentMetadata.getTimeUnit()).thenReturn(timeUnit);
     return segmentMetadata;
+  }
+
+  public static SegmentMetadata mockSegmentMetadata(String tableName, String segmentName, int numTotalDocs,
+      String crc) {
+    return mockSegmentMetadata(tableName, segmentName, numTotalDocs, crc, 1L, 10L, TimeUnit.DAYS);
   }
 
   public static SegmentMetadata mockSegmentMetadata(String tableName) {
     String uniqueNumericString = Long.toString(System.nanoTime());
     return mockSegmentMetadata(tableName, tableName + uniqueNumericString, 100, uniqueNumericString);
+  }
+
+  public static SegmentMetadata mockSegmentMetadata(String tableName, long startTime,
+      long endTime, TimeUnit timeUnit) {
+    String uniqueNumericString = Long.toString(System.nanoTime());
+    return mockSegmentMetadata(tableName, tableName + uniqueNumericString, 100,
+        uniqueNumericString, startTime, endTime, timeUnit);
   }
 
   public static SegmentMetadata mockSegmentMetadata(String tableName, String segmentName) {
@@ -72,7 +83,7 @@ public class SegmentMetadataMockUtils {
     return segmentZKMetadata;
   }
 
-  public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String tableName, String segmentName,
+  public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String rawTableName, String segmentName,
       String columnName, int partitionNumber) {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     Set<Integer> partitions = Collections.singleton(partitionNumber);
@@ -83,11 +94,11 @@ public class SegmentMetadataMockUtils {
     if (columnName != null) {
       when(segmentMetadata.getColumnMetadataFor(columnName)).thenReturn(columnMetadata);
     }
-    when(segmentMetadata.getTableName()).thenReturn(tableName);
+    when(segmentMetadata.getTableName()).thenReturn(rawTableName);
     when(segmentMetadata.getName()).thenReturn(segmentName);
     when(segmentMetadata.getCrc()).thenReturn("0");
 
-    Map<String, ColumnMetadata> columnMetadataMap = new HashMap<>();
+    TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
     columnMetadataMap.put(columnName, columnMetadata);
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
     return segmentMetadata;

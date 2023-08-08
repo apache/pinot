@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,15 +31,23 @@ public class IndexKey implements Comparable<IndexKey> {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexKey.class);
 
   final String _name;
-  final ColumnIndexType _type;
+  final IndexType<?, ?, ?> _type;
 
   /**
    * @param name column name
    * @param type index type
    */
-  public IndexKey(String name, ColumnIndexType type) {
+  public IndexKey(String name, IndexType<?, ?, ?> type) {
     _name = name;
     _type = type;
+  }
+
+  /**
+   * @throws IllegalArgumentException if there is no index with the given index id
+   */
+  public static IndexKey fromIndexName(String name, String indexName) {
+    IndexType<?, ?, ?> type = IndexService.getInstance().get(indexName);
+    return new IndexKey(name, type);
   }
 
   @Override
@@ -67,13 +76,13 @@ public class IndexKey implements Comparable<IndexKey> {
 
   @Override
   public String toString() {
-    return _name + "." + _type.getIndexName();
+    return _name + "." + _type.getId();
   }
 
   @Override
   public int compareTo(IndexKey o) {
     if (_name.equals(o._name)) {
-      return _type.compareTo(o._type);
+      return _type.getId().compareTo(o._type.getId());
     }
     return _name.compareTo(o._name);
   }

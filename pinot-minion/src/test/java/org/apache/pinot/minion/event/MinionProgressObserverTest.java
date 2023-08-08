@@ -49,4 +49,31 @@ public class MinionProgressObserverTest {
     entry = progress.get(2);
     assertTrue(entry.getStatus().contains("bad bug"), entry.getStatus());
   }
+
+  @Test
+  public void testGetStartTs() {
+    MinionProgressObserver observer = new MinionProgressObserver(3);
+    long ts1 = System.currentTimeMillis();
+    observer.notifyTaskStart(null);
+    long ts = observer.getStartTs();
+    long ts2 = System.currentTimeMillis();
+    assertTrue(ts1 <= ts);
+    assertTrue(ts2 >= ts);
+  }
+
+  @Test
+  public void testUpdateAndGetTaskState() {
+    MinionProgressObserver observer = new MinionProgressObserver(3);
+    assertEquals(observer.getTaskState(), MinionTaskState.UNKNOWN);
+    observer.notifyTaskStart(null);
+    assertEquals(observer.getTaskState(), MinionTaskState.IN_PROGRESS);
+    observer.notifyProgress(null, "");
+    assertEquals(observer.getTaskState(), MinionTaskState.IN_PROGRESS);
+    observer.notifyTaskSuccess(null, "");
+    assertEquals(observer.getTaskState(), MinionTaskState.SUCCEEDED);
+    observer.notifyTaskCancelled(null);
+    assertEquals(observer.getTaskState(), MinionTaskState.CANCELLED);
+    observer.notifyTaskError(null, new Exception());
+    assertEquals(observer.getTaskState(), MinionTaskState.ERROR);
+  }
 }

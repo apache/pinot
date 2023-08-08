@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,8 +36,11 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -56,25 +61,21 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
   private static final String PURGE_FIRST_RUN_TABLE = "myTable1";
   private static final String PURGE_DELTA_PASSED_TABLE = "myTable2";
   private static final String PURGE_DELTA_NOT_PASSED_TABLE = "myTable3";
+  private static final String PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE = "myTable4";
+
 
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
   protected PinotTaskManager _taskManager;
   protected PinotHelixResourceManager _pinotHelixResourceManager;
   protected String _tableName;
 
-  protected final File _segmentDir1 = new File(_tempDir, "segmentDir1");
-  protected final File _segmentDir2 = new File(_tempDir, "segmentDir2");
-  protected final File _segmentDir3 = new File(_tempDir, "segmentDir3");
-
-  protected final File _tarDir1 = new File(_tempDir, "tarDir1");
-  protected final File _tarDir2 = new File(_tempDir, "tarDir2");
-  protected final File _tarDir3 = new File(_tempDir, "tarDir3");
+  protected final File _segmentDataDir = new File(_tempDir, "segmentDataDir");
+  protected final File _segmentTarDir = new File(_tempDir, "segmentTarDir");
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir1, _tarDir1, _segmentDir2, _tarDir2, _segmentDir3,
-        _tarDir3);
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDataDir, _segmentTarDir);
 
     // Start the Pinot cluster
     startZk();
@@ -82,37 +83,38 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     startBrokers(1);
     startServers(1);
 
-    // Create and upload the schema and table config
-    Schema schema = createSchema();
-    addSchema(schema);
-    setTableName(PURGE_DELTA_NOT_PASSED_TABLE);
-    TableConfig purgeDeltaNotPassedTableConfig = createOfflineTableConfig();
-    purgeDeltaNotPassedTableConfig.setTaskConfig(getPurgeTaskConfig());
-    setTableName(PURGE_FIRST_RUN_TABLE);
-    TableConfig purgeTableConfig = createOfflineTableConfig();
-    purgeTableConfig.setTaskConfig(getPurgeTaskConfig());
+    List<String> allTables = ImmutableList.of(
+        PURGE_FIRST_RUN_TABLE,
+        PURGE_DELTA_PASSED_TABLE,
+        PURGE_DELTA_NOT_PASSED_TABLE,
+        PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE
+    );
+    Schema schema = null;
+    TableConfig tableConfig = null;
+    for (String tableName : allTables) {
+      // create and upload schema
+      schema = createSchema();
+      schema.setSchemaName(tableName);
+      addSchema(schema);
 
-    setTableName(PURGE_DELTA_PASSED_TABLE);
-    TableConfig purgeDeltaPassedTableConfig = createOfflineTableConfig();
-    purgeDeltaPassedTableConfig.setTaskConfig(getPurgeTaskConfig());
-
-    addTableConfig(purgeTableConfig);
-    addTableConfig(purgeDeltaPassedTableConfig);
-    addTableConfig(purgeDeltaNotPassedTableConfig);
+      // create and upload table config
+      setTableName(tableName);
+      tableConfig = createOfflineTableConfig();
+      tableConfig.setTaskConfig(getPurgeTaskConfig());
+      addTableConfig(tableConfig);
+    }
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
-    // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, purgeTableConfig, schema, 0, _segmentDir1, _tarDir1);
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, purgeDeltaPassedTableConfig, schema, 0, _segmentDir2,
-        _tarDir2);
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, purgeDeltaNotPassedTableConfig, schema, 0,
-        _segmentDir3, _tarDir3);
+    // Create segments
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDataDir,
+        _segmentTarDir);
 
-    uploadSegments(PURGE_FIRST_RUN_TABLE, _tarDir1);
-    uploadSegments(PURGE_DELTA_PASSED_TABLE, _tarDir2);
-    uploadSegments(PURGE_DELTA_NOT_PASSED_TABLE, _tarDir3);
+    // Upload segments for all tables
+    for (String tableName : allTables) {
+      uploadSegments(tableName, _segmentTarDir);
+    }
 
     startMinion();
     setRecordPurger();
@@ -150,10 +152,14 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
   private void setRecordPurger() {
     MinionContext minionContext = MinionContext.getInstance();
     minionContext.setRecordPurgerFactory(rawTableName -> {
-      List<String> tableNames =
-          Arrays.asList(PURGE_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE, PURGE_DELTA_NOT_PASSED_TABLE);
+      List<String> tableNames = Arrays.asList(
+          PURGE_FIRST_RUN_TABLE,
+          PURGE_DELTA_PASSED_TABLE,
+          PURGE_DELTA_NOT_PASSED_TABLE,
+          PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE
+      );
       if (tableNames.contains(rawTableName)) {
-        return row -> row.getValue("Quarter").equals(1);
+        return row -> row.getValue("ArrTime").equals(1);
       } else {
         return null;
       }
@@ -205,11 +211,11 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // Should not generate new purge task as the last time purge is not greater than last + 1day (default purge delay)
     assertNull(_taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));
 
-    // 28057 rows with quarter = 1
+    // 52 rows with ArrTime = 1
     // 115545 totals rows
-    // Expecting 115545 - 28057 = 87488 rows after purging
+    // Expecting 115545 - 52 = 115493 rows after purging
     // It might take some time for server to load the purged segments
-    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(PURGE_FIRST_RUN_TABLE) == 87488, 60_000L,
+    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(PURGE_FIRST_RUN_TABLE) == 115493, 60_000L,
         "Failed to get expected purged records");
 
     // Drop the table
@@ -251,11 +257,11 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     // Should not generate new purge task as the last time purge is not greater than last + 1day (default purge delay)
     assertNull(_taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));
 
-    // 28057 rows with quarter = 1
+    // 52 rows with ArrTime = 1
     // 115545 totals rows
-    // Expecting 115545 - 28057 = 87488 rows after purging
+    // Expecting 115545 - 52 = 115493 rows after purging
     // It might take some time for server to load the purged segments
-    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(PURGE_DELTA_PASSED_TABLE) == 87488, 60_000L,
+    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(PURGE_DELTA_PASSED_TABLE) == 115493, 60_000L,
         "Failed to get expected purged records");
 
     // Drop the table
@@ -297,6 +303,63 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
     // Drop the table
     dropOfflineTable(PURGE_DELTA_NOT_PASSED_TABLE);
+
+    // Check if the task metadata is cleaned up on table deletion
+    verifyTableDelete(offlineTableName);
+  }
+
+  /**
+   * Test purge on segments which were built by older schema and table config.
+   * Two new columns are added after segments are built and indices are defined for the new columns in the table config.
+   */
+  @Test
+  public void testPurgeOnOldSegmentsWithIndicesOnNewColumns()
+      throws Exception {
+
+    // add new columns to schema
+    Schema schema = createSchema();
+    schema.addField(new DimensionFieldSpec("ColumnABC", FieldSpec.DataType.INT, true));
+    schema.addField(new DimensionFieldSpec("ColumnXYZ", FieldSpec.DataType.INT, true));
+    schema.setSchemaName(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
+    updateSchema(schema);
+
+    // add indices to the new columns
+    setTableName(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
+    TableConfig tableConfig = createOfflineTableConfig();
+    tableConfig.setTaskConfig(getPurgeTaskConfig());
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    List<String> invertedIndices = new ArrayList<>(indexingConfig.getInvertedIndexColumns());
+    invertedIndices.add("ColumnABC");
+    List<String> rangeIndices = new ArrayList<>(indexingConfig.getRangeIndexColumns());
+    rangeIndices.add("ColumnXYZ");
+    indexingConfig.setInvertedIndexColumns(invertedIndices);
+    indexingConfig.setRangeIndexColumns(rangeIndices);
+    updateTableConfig(tableConfig);
+
+    // schedule purge tasks
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
+    assertNotNull(_taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));
+    assertTrue(_helixTaskResourceManager.getTaskQueues()
+        .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.PurgeTask.TASK_TYPE)));
+    assertNull(_taskManager.scheduleTasks(offlineTableName).get(MinionConstants.PurgeTask.TASK_TYPE));
+    waitForTaskToComplete();
+
+    // Check that metadata contains expected values
+    for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
+      // Check purge time
+      assertTrue(
+          metadata.getCustomMap().containsKey(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX));
+    }
+
+    // 52 rows with ArrTime = 1
+    // 115545 totals rows
+    // Expecting 115545 - 52 = 115493 rows after purging
+    // It might take some time for server to load the purged segments
+    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResult(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE) == 115493,
+        60_000L, "Failed to get expected purged records");
+
+    // Drop the table
+    dropOfflineTable(PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
 
     // Check if the task metadata is cleaned up on table deletion
     verifyTableDelete(offlineTableName);

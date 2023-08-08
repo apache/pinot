@@ -31,6 +31,7 @@ import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 
 
 public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
+  public static final String RESOURCE_TEMP_DIR_NAME = "_tmp";
 
   @Override
   public abstract MutableSegment getSegment();
@@ -50,6 +51,12 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
    * Get the current offsets for all partitions of this consumer
    */
   public abstract Map<String, String> getPartitionToCurrentOffset();
+
+  /**
+   * Starts the consumption of the underlying realtime segments.
+   * In some cases, it is helpful to not do this inside the constructor itself.
+   */
+  public abstract void startConsumption();
 
   /**
    * Get the state of the consumer

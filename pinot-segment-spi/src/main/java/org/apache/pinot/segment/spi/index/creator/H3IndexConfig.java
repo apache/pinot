@@ -18,20 +18,39 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
+import org.apache.pinot.spi.config.table.IndexConfig;
 
 
-public class H3IndexConfig {
+public class H3IndexConfig extends IndexConfig {
+  public static final H3IndexConfig DISABLED = new H3IndexConfig(true, null);
   public static final String RESOLUTIONS_KEY = "resolutions";
 
   private final H3IndexResolution _resolution;
 
-  public H3IndexConfig(Map<String, String> properties) {
+  public H3IndexConfig(H3IndexResolution resolution) {
+    this(false, resolution);
+  }
+
+  @JsonCreator
+  public H3IndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
+      @JsonProperty("resolution") H3IndexResolution resolution) {
+    super(disabled);
+    _resolution = resolution;
+  }
+
+  // Used to read from older configs
+  public H3IndexConfig(@Nullable Map<String, String> properties) {
+    super(false);
     Preconditions.checkArgument(properties != null && properties.containsKey(RESOLUTIONS_KEY),
         "Properties must contain H3 resolutions");
     List<Integer> resolutions = new ArrayList<>();
@@ -47,5 +66,25 @@ public class H3IndexConfig {
 
   public H3IndexResolution getResolution() {
     return _resolution;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    H3IndexConfig that = (H3IndexConfig) o;
+    return Objects.equals(_resolution, that._resolution);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _resolution);
   }
 }

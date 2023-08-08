@@ -21,7 +21,9 @@ package org.apache.pinot.segment.local.segment.creator.impl;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -33,77 +35,32 @@ import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
+
+
 public class SegmentColumnarIndexCreatorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentColumnarIndexCreatorTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
-  private static final String PROPERTY_KEY = "testKey";
   private static final String COLUMN_NAME = "testColumn";
   private static final String COLUMN_PROPERTY_KEY_PREFIX = Column.COLUMN_PROPS_KEY_PREFIX + COLUMN_NAME + ".";
-  private static final int NUM_ROUNDS = 1000;
 
   @BeforeClass
   public void setUp()
       throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
-  }
-
-  @Test
-  public void testPropertyValueWithSpecialCharacters()
-      throws Exception {
-    // Leading/trailing whitespace
-    Assert.assertFalse(SegmentColumnarIndexCreator.isValidPropertyValue(" a"));
-    Assert.assertFalse(SegmentColumnarIndexCreator.isValidPropertyValue("a\t"));
-    Assert.assertFalse(SegmentColumnarIndexCreator.isValidPropertyValue("\na"));
-
-    // Whitespace in the middle
-    Assert.assertTrue(SegmentColumnarIndexCreator.isValidPropertyValue("a\t b"));
-    testPropertyValueWithSpecialCharacters("a\t b");
-    Assert.assertTrue(SegmentColumnarIndexCreator.isValidPropertyValue("a \nb"));
-    testPropertyValueWithSpecialCharacters("a \nb");
-
-    // List separator
-    Assert.assertFalse(SegmentColumnarIndexCreator.isValidPropertyValue("a,b,c"));
-    Assert.assertFalse(SegmentColumnarIndexCreator.isValidPropertyValue(",a b"));
-
-    // Empty string
-    Assert.assertTrue(SegmentColumnarIndexCreator.isValidPropertyValue(""));
-    testPropertyValueWithSpecialCharacters("");
-
-    // Variable substitution (should be disabled)
-    Assert.assertTrue(SegmentColumnarIndexCreator.isValidPropertyValue("$${testKey}"));
-    testPropertyValueWithSpecialCharacters("$${testKey}");
-
-    // Escape character for variable substitution
-    Assert.assertTrue(SegmentColumnarIndexCreator.isValidPropertyValue("$${"));
-    testPropertyValueWithSpecialCharacters("$${");
-
-    for (int i = 0; i < NUM_ROUNDS; i++) {
-      testPropertyValueWithSpecialCharacters(RandomStringUtils.randomAscii(5));
-      testPropertyValueWithSpecialCharacters(RandomStringUtils.random(5));
-    }
-  }
-
-  private void testPropertyValueWithSpecialCharacters(String value)
-      throws Exception {
-    if (SegmentColumnarIndexCreator.isValidPropertyValue(value)) {
-      PropertiesConfiguration configuration = new PropertiesConfiguration(CONFIG_FILE);
-      configuration.setProperty(PROPERTY_KEY, value);
-      Assert.assertEquals(configuration.getProperty(PROPERTY_KEY), value);
-      configuration.save();
-
-      configuration = new PropertiesConfiguration(CONFIG_FILE);
-      Assert.assertEquals(configuration.getProperty(PROPERTY_KEY), value);
-    }
   }
 
   @Test
@@ -116,19 +73,19 @@ public class SegmentColumnarIndexCreatorTest {
     configuration.save();
 
     configuration = new PropertiesConfiguration(CONFIG_FILE);
-    Assert.assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
-    Assert.assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
-    Assert.assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
+    assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
+    assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
+    assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(configuration, COLUMN_NAME);
-    Assert.assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
-    Assert.assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
-    Assert.assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
+    assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
+    assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
+    assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
     configuration.save();
 
     configuration = new PropertiesConfiguration(CONFIG_FILE);
-    Assert.assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
-    Assert.assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
-    Assert.assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
+    assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
+    assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
+    assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
   }
 
   @Test
@@ -138,15 +95,16 @@ public class SegmentColumnarIndexCreatorTest {
         getStartTimeInSegmentMetadata("1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ssZ", "2021-07-21T06:48:51Z");
     long withoutTZ =
         getStartTimeInSegmentMetadata("1:SECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd'T'HH:mm:ss", "2021-07-21T06:48:51");
-    Assert.assertEquals(withTZ, 1626850131000L); // as UTC timestamp.
-    Assert.assertEquals(withTZ, withoutTZ);
+    assertEquals(withTZ, 1626850131000L); // as UTC timestamp.
+    assertEquals(withTZ, withoutTZ);
   }
 
   private static long getStartTimeInSegmentMetadata(String testDateTimeFormat, String testDateTime)
       throws Exception {
     String timeColumn = "foo";
-    Schema schema = new Schema.SchemaBuilder().addDateTime(timeColumn, FieldSpec.DataType.STRING, testDateTimeFormat,
-        "1:MILLISECONDS").build();
+    Schema schema =
+        new Schema.SchemaBuilder().addDateTime(timeColumn, DataType.STRING, testDateTimeFormat, "1:MILLISECONDS")
+            .build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(timeColumn).build();
 
@@ -174,21 +132,80 @@ public class SegmentColumnarIndexCreatorTest {
   }
 
   @Test
-  public void testAddMinMaxValueInvalid() {
-    PropertiesConfiguration props = new PropertiesConfiguration();
-    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "foo");
-    Assert.assertFalse(Boolean.parseBoolean(
-        String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+  public void testGetValueWithinLengthLimit() {
+    // String value without '\uFFFF' suffix
+    String value = RandomStringUtils.randomAscii(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 1);
+    String minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.STRING);
+    assertEquals(minValue, value.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
+    assertTrue(minValue.compareTo(value) < 0);
+    String maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.STRING);
+    assertEquals(maxValue,
+        value.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT - 1) + '\uFFFF');
+    assertTrue(maxValue.compareTo(value) > 0);
 
-    props = new PropertiesConfiguration();
-    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", ",bar", "foo");
-    Assert.assertTrue(Boolean.parseBoolean(
-        String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+    // String value with '\uFFFF' suffix
+    value =
+        RandomStringUtils.randomAscii(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT - 1) + "\uFFFF\uFFFF";
+    minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.STRING);
+    assertEquals(minValue, value.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
+    assertTrue(minValue.compareTo(value) < 0);
+    maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.STRING);
+    assertEquals(maxValue, value);
 
-    props = new PropertiesConfiguration();
-    SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(props, "colA", "bar", "  ");
-    Assert.assertTrue(Boolean.parseBoolean(
-        String.valueOf(props.getProperty(Column.getKeyFor("colA", Column.MIN_MAX_VALUE_INVALID)))));
+    // String value with '\uFFFF' and another character
+    value = RandomStringUtils.randomAscii(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT - 1) + "\uFFFFa";
+    minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.STRING);
+    assertEquals(minValue, value.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
+    assertTrue(minValue.compareTo(value) < 0);
+    maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.STRING);
+    assertEquals(maxValue, value.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT) + '\uFFFF');
+    assertTrue(maxValue.compareTo(value) > 0);
+
+    // Bytes value without 0xFF suffix
+    int numBytes = SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT / 2 + 1;
+    byte[] bytes = new byte[numBytes];
+    Random random = new Random();
+    random.nextBytes(bytes);
+    bytes[numBytes - 2] = 5;
+    value = BytesUtils.toHexString(bytes);
+    minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.BYTES);
+    byte[] minBytes = BytesUtils.toBytes(minValue);
+    assertEquals(minBytes.length, numBytes - 1);
+    assertEquals(Arrays.copyOfRange(minBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
+    assertTrue(ByteArray.compare(minBytes, bytes) < 0);
+    maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.BYTES);
+    byte[] maxBytes = BytesUtils.toBytes(maxValue);
+    assertEquals(maxBytes.length, numBytes - 1);
+    assertEquals(Arrays.copyOfRange(maxBytes, 0, numBytes - 2), Arrays.copyOfRange(bytes, 0, numBytes - 2));
+    assertEquals(maxBytes[numBytes - 2], (byte) 0xFF);
+    assertTrue(ByteArray.compare(maxBytes, bytes) > 0);
+
+    // Bytes value with 0xFF suffix
+    bytes[numBytes - 2] = (byte) 0xFF;
+    bytes[numBytes - 1] = (byte) 0xFF;
+    value = BytesUtils.toHexString(bytes);
+    minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.BYTES);
+    minBytes = BytesUtils.toBytes(minValue);
+    assertEquals(minBytes.length, numBytes - 1);
+    assertEquals(Arrays.copyOfRange(minBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
+    assertTrue(ByteArray.compare(minBytes, bytes) < 0);
+    maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.BYTES);
+    assertEquals(maxValue, value);
+
+    // Bytes value with 0xFF and another byte
+    bytes[numBytes - 1] = 5;
+    value = BytesUtils.toHexString(bytes);
+    minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.BYTES);
+    minBytes = BytesUtils.toBytes(minValue);
+    assertEquals(minBytes.length, numBytes - 1);
+    assertEquals(Arrays.copyOfRange(minBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
+    assertTrue(ByteArray.compare(minBytes, bytes) < 0);
+    maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.BYTES);
+    maxBytes = BytesUtils.toBytes(maxValue);
+    assertEquals(maxBytes.length, numBytes);
+    assertEquals(Arrays.copyOfRange(maxBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
+    assertEquals(maxBytes[numBytes - 1], (byte) 0xFF);
+    assertTrue(ByteArray.compare(maxBytes, bytes) > 0);
   }
 
   @AfterClass

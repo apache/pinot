@@ -26,17 +26,20 @@ import java.util.Set;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
-import org.apache.pinot.query.planner.stage.AggregateNode;
-import org.apache.pinot.query.planner.stage.FilterNode;
-import org.apache.pinot.query.planner.stage.JoinNode;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.planner.stage.MailboxSendNode;
-import org.apache.pinot.query.planner.stage.ProjectNode;
-import org.apache.pinot.query.planner.stage.SortNode;
-import org.apache.pinot.query.planner.stage.StageNode;
-import org.apache.pinot.query.planner.stage.StageNodeVisitor;
-import org.apache.pinot.query.planner.stage.TableScanNode;
-import org.apache.pinot.query.planner.stage.ValueNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 
 
 /**
@@ -45,10 +48,10 @@ import org.apache.pinot.query.planner.stage.ValueNode;
  * a single host. It gathers the information recursively by checking which partitioned
  * data is selected by each node in the tree.
  *
- * <p>The only method that should be used externally is {@link #optimizeShuffles(StageNode)},
- * other public methods are used only by {@link StageNode#visit(StageNodeVisitor, Object)}.
+ * <p>The only method that should be used externally is {@link #optimizeShuffles(PlanNode)},
+ * other public methods are used only by {@link PlanNode#visit(PlanNodeVisitor, Object)}.
  */
-public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Void> {
+public class ShuffleRewriteVisitor implements PlanNodeVisitor<Set<Integer>, Void> {
 
   /**
    * This method rewrites {@code root} <b>in place</b>, removing any unnecessary shuffles
@@ -56,12 +59,12 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
    *
    * @param root the root node of the tree to rewrite
    */
-  public static void optimizeShuffles(StageNode root) {
+  public static void optimizeShuffles(PlanNode root) {
     root.visit(new ShuffleRewriteVisitor(), null);
   }
 
   /**
-   * Access to this class should only be used via {@link #optimizeShuffles(StageNode)}
+   * Access to this class should only be used via {@link #optimizeShuffles(PlanNode)}
    */
   private ShuffleRewriteVisitor() {
   }
@@ -71,6 +74,23 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
     Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
     List<RexExpression> groupSet = node.getGroupSet();
     return deriveNewPartitionKeysFromRexExpressions(groupSet, oldPartitionKeys);
+  }
+
+  @Override
+  public Set<Integer> visitWindow(WindowNode node, Void context) {
+    throw new UnsupportedOperationException("Window not yet supported!");
+  }
+
+  @Override
+  public Set<Integer> visitSetOp(SetOpNode setOpNode, Void context) {
+    Set<Integer> newPartitionKeys = new HashSet<>();
+    setOpNode.getInputs().forEach(input -> newPartitionKeys.addAll(input.visit(this, context)));
+    return newPartitionKeys;
+  }
+
+  @Override
+  public Set<Integer> visitExchange(ExchangeNode exchangeNode, Void context) {
+    throw new UnsupportedOperationException("Exchange not yet supported!");
   }
 
   @Override
@@ -116,7 +136,7 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
     KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
 
     if (canSkipShuffle(oldPartitionKeys, selector)) {
-      node.setExchangeType(RelDistribution.Type.SINGLETON);
+      node.setDistributionType(RelDistribution.Type.SINGLETON);
       return oldPartitionKeys;
     } else if (selector == null) {
       return new HashSet<>();
@@ -131,7 +151,7 @@ public class ShuffleRewriteVisitor implements StageNodeVisitor<Set<Integer>, Voi
     KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
 
     if (canSkipShuffle(oldPartitionKeys, selector)) {
-      node.setExchangeType(RelDistribution.Type.SINGLETON);
+      node.setDistributionType(RelDistribution.Type.SINGLETON);
       return oldPartitionKeys;
     } else {
       // reset the context partitionKeys since we've determined that

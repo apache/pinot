@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -40,11 +39,11 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.LoopUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -192,54 +191,74 @@ public class SelectionOperatorUtils {
   /**
    * Merge two partial results for selection queries without <code>ORDER BY</code>. (Server side)
    *
-   * @param mergedRows partial results 1.
-   * @param rowsToMerge partial results 2.
+   * @param mergedBlock partial results 1.
+   * @param blockToMerge partial results 2.
    * @param selectionSize size of the selection.
    */
-  public static void mergeWithoutOrdering(Collection<Object[]> mergedRows, Collection<Object[]> rowsToMerge,
+  public static void mergeWithoutOrdering(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge,
       int selectionSize) {
-    Iterator<Object[]> iterator = rowsToMerge.iterator();
-    int numMergedRows = 0;
-    while (mergedRows.size() < selectionSize && iterator.hasNext()) {
-      LoopUtils.checkMergePhaseInterruption(numMergedRows);
-      mergedRows.add(iterator.next());
-      numMergedRows++;
+    List<Object[]> mergedRows = mergedBlock.getRows();
+    List<Object[]> rowsToMerge = blockToMerge.getRows();
+    int numRowsToMerge = Math.min(selectionSize - mergedRows.size(), rowsToMerge.size());
+    if (numRowsToMerge > 0) {
+      mergedRows.addAll(rowsToMerge.subList(0, numRowsToMerge));
     }
   }
 
   /**
    * Merge two partial results for selection queries with <code>ORDER BY</code>. (Server side)
-   * TODO: Should use type compatible comparator to compare the rows
    *
-   * @param mergedRows partial results 1.
-   * @param rowsToMerge partial results 2.
+   * @param mergedBlock partial results 1 (sorted).
+   * @param blockToMerge partial results 2 (sorted).
    * @param maxNumRows maximum number of rows need to be stored.
    */
-  public static void mergeWithOrdering(PriorityQueue<Object[]> mergedRows, Collection<Object[]> rowsToMerge,
+  public static void mergeWithOrdering(SelectionResultsBlock mergedBlock, SelectionResultsBlock blockToMerge,
       int maxNumRows) {
-    int numMergedRows = 0;
-    for (Object[] row : rowsToMerge) {
-      LoopUtils.checkMergePhaseInterruption(numMergedRows);
-      addToPriorityQueue(row, mergedRows, maxNumRows);
-      numMergedRows++;
+    List<Object[]> sortedRows1 = mergedBlock.getRows();
+    List<Object[]> sortedRows2 = blockToMerge.getRows();
+    Comparator<? super Object[]> comparator = mergedBlock.getComparator();
+    assert comparator != null;
+    int numSortedRows1 = sortedRows1.size();
+    int numSortedRows2 = sortedRows2.size();
+    if (numSortedRows1 == 0) {
+      mergedBlock.setRows(sortedRows2);
+      return;
     }
+    if (numSortedRows2 == 0 || (numSortedRows1 == maxNumRows
+        && comparator.compare(sortedRows1.get(numSortedRows1 - 1), sortedRows2.get(0)) <= 0)) {
+      return;
+    }
+    int numRowsToMerge = Math.min(numSortedRows1 + numSortedRows2, maxNumRows);
+    List<Object[]> mergedRows = new ArrayList<>(numRowsToMerge);
+    int i1 = 0;
+    int i2 = 0;
+    int numMergedRows = 0;
+    while (i1 < numSortedRows1 && i2 < numSortedRows2 && numMergedRows < numRowsToMerge) {
+      Object[] row1 = sortedRows1.get(i1);
+      Object[] row2 = sortedRows2.get(i2);
+      if (comparator.compare(row1, row2) <= 0) {
+        mergedRows.add(row1);
+        i1++;
+      } else {
+        mergedRows.add(row2);
+        i2++;
+      }
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numMergedRows++);
+    }
+    if (numMergedRows < numRowsToMerge) {
+      if (i1 < numSortedRows1) {
+        assert i2 == numSortedRows2;
+        mergedRows.addAll(sortedRows1.subList(i1, i1 + numRowsToMerge - numMergedRows));
+      } else {
+        assert i1 == numSortedRows1;
+        mergedRows.addAll(sortedRows2.subList(i2, i2 + numRowsToMerge - numMergedRows));
+      }
+    }
+    mergedBlock.setRows(mergedRows);
   }
 
   /**
    * Build a {@link DataTable} from a {@link Collection} of selection rows with {@link DataSchema}. (Server side)
-   * <p>The passed in data schema stored the column data type that can cover all actual data types for that column.
-   * <p>The actual data types for each column in rows can be different but must be compatible with each other.
-   * <p>Before write each row into the data table, first convert it to match the data types in data schema.
-   *
-   * TODO: Type compatibility is not supported for selection order-by because all segments on the same server shared the
-   *       same comparator. Another solution is to always use the table schema to execute the query (preferable because
-   *       type compatible checks are expensive).
-   *
-   * @param rows {@link Collection} of selection rows.
-   * @param dataSchema data schema.
-   * @param nullHandlingEnabled whether null handling is enabled.
-   * @return data table.
-   * @throws IOException
    */
   public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema,
       boolean nullHandlingEnabled)
@@ -276,25 +295,28 @@ public class SelectionOperatorUtils {
         switch (storedColumnDataTypes[i]) {
           // Single-value column
           case INT:
-            dataTableBuilder.setColumn(i, ((Number) columnValue).intValue());
+            dataTableBuilder.setColumn(i, (int) columnValue);
             break;
           case LONG:
-            dataTableBuilder.setColumn(i, ((Number) columnValue).longValue());
+            dataTableBuilder.setColumn(i, (long) columnValue);
             break;
           case FLOAT:
-            dataTableBuilder.setColumn(i, ((Number) columnValue).floatValue());
+            dataTableBuilder.setColumn(i, (float) columnValue);
             break;
           case DOUBLE:
-            dataTableBuilder.setColumn(i, ((Number) columnValue).doubleValue());
+            dataTableBuilder.setColumn(i, (double) columnValue);
             break;
           case BIG_DECIMAL:
             dataTableBuilder.setColumn(i, (BigDecimal) columnValue);
             break;
           case STRING:
-            dataTableBuilder.setColumn(i, ((String) columnValue));
+            dataTableBuilder.setColumn(i, (String) columnValue);
             break;
           case BYTES:
             dataTableBuilder.setColumn(i, (ByteArray) columnValue);
+            break;
+          case UNKNOWN:
+            dataTableBuilder.setColumn(i, (Object) null);
             break;
 
           // Multi-value column
@@ -302,43 +324,13 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, (int[]) columnValue);
             break;
           case LONG_ARRAY:
-            // LONG_ARRAY type covers INT_ARRAY and LONG_ARRAY
-            if (columnValue instanceof int[]) {
-              int[] ints = (int[]) columnValue;
-              int length = ints.length;
-              long[] longs = new long[length];
-              ArrayCopyUtils.copy(ints, longs, length);
-              dataTableBuilder.setColumn(i, longs);
-            } else {
-              dataTableBuilder.setColumn(i, (long[]) columnValue);
-            }
+            dataTableBuilder.setColumn(i, (long[]) columnValue);
             break;
           case FLOAT_ARRAY:
             dataTableBuilder.setColumn(i, (float[]) columnValue);
             break;
           case DOUBLE_ARRAY:
-            // DOUBLE_ARRAY type covers INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY and DOUBLE_ARRAY
-            if (columnValue instanceof int[]) {
-              int[] ints = (int[]) columnValue;
-              int length = ints.length;
-              double[] doubles = new double[length];
-              ArrayCopyUtils.copy(ints, doubles, length);
-              dataTableBuilder.setColumn(i, doubles);
-            } else if (columnValue instanceof long[]) {
-              long[] longs = (long[]) columnValue;
-              int length = longs.length;
-              double[] doubles = new double[length];
-              ArrayCopyUtils.copy(longs, doubles, length);
-              dataTableBuilder.setColumn(i, doubles);
-            } else if (columnValue instanceof float[]) {
-              float[] floats = (float[]) columnValue;
-              int length = floats.length;
-              double[] doubles = new double[length];
-              ArrayCopyUtils.copy(floats, doubles, length);
-              dataTableBuilder.setColumn(i, doubles);
-            } else {
-              dataTableBuilder.setColumn(i, (double[]) columnValue);
-            }
+            dataTableBuilder.setColumn(i, (double[]) columnValue);
             break;
           case STRING_ARRAY:
             dataTableBuilder.setColumn(i, (String[]) columnValue);
@@ -397,6 +389,9 @@ public class SelectionOperatorUtils {
           break;
         case BYTES:
           row[i] = dataTable.getBytes(rowId, i);
+          break;
+        case UNKNOWN:
+          row[i] = null;
           break;
 
         // Multi-value column
@@ -460,21 +455,21 @@ public class SelectionOperatorUtils {
           nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
         }
         for (int rowId = 0; rowId < numRows; rowId++) {
-          LoopUtils.checkMergePhaseInterruption(rowId);
           if (rows.size() < limit) {
             rows.add(extractRowFromDataTableWithNullHandling(dataTable, rowId, nullBitmaps));
           } else {
             break;
           }
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       } else {
         for (int rowId = 0; rowId < numRows; rowId++) {
-          LoopUtils.checkMergePhaseInterruption(rowId);
           if (rows.size() < limit) {
             rows.add(extractRowFromDataTable(dataTable, rowId));
           } else {
             break;
           }
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       }
     }
@@ -558,86 +553,6 @@ public class SelectionOperatorUtils {
       columnToIndexMap.put(columns[i], i);
     }
     return columnToIndexMap;
-  }
-
-  /**
-   * Helper method to get the type-compatible {@link Comparator} for selection rows. (Inter segment)
-   * <p>Type-compatible comparator allows compatible types to compare with each other.
-   *
-   * @return flexible {@link Comparator} for selection rows.
-   */
-  public static Comparator<Object[]> getTypeCompatibleComparator(List<OrderByExpressionContext> orderByExpressions,
-      DataSchema dataSchema, boolean isNullHandlingEnabled) {
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
-
-    // Compare all single-value columns
-    int numOrderByExpressions = orderByExpressions.size();
-    List<Integer> valueIndexList = new ArrayList<>(numOrderByExpressions);
-    for (int i = 0; i < numOrderByExpressions; i++) {
-      if (!columnDataTypes[i].isArray()) {
-        valueIndexList.add(i);
-      }
-    }
-
-    int numValuesToCompare = valueIndexList.size();
-    int[] valueIndices = new int[numValuesToCompare];
-    boolean[] useDoubleComparison = new boolean[numValuesToCompare];
-    // Use multiplier -1 or 1 to control ascending/descending order
-    int[] multipliers = new int[numValuesToCompare];
-    for (int i = 0; i < numValuesToCompare; i++) {
-      int valueIndex = valueIndexList.get(i);
-      valueIndices[i] = valueIndex;
-      if (columnDataTypes[valueIndex].isNumber()) {
-        useDoubleComparison[i] = true;
-      }
-      multipliers[i] = orderByExpressions.get(valueIndex).isAsc() ? -1 : 1;
-    }
-
-    if (isNullHandlingEnabled) {
-      return (o1, o2) -> {
-        for (int i = 0; i < numValuesToCompare; i++) {
-          int index = valueIndices[i];
-          Object v1 = o1[index];
-          Object v2 = o2[index];
-          if (v1 == null) {
-            // The default null ordering is: 'NULLS LAST'.
-            return v2 == null ? 0 : -multipliers[i];
-          } else if (v2 == null) {
-            return multipliers[i];
-          }
-          int result;
-          if (useDoubleComparison[i]) {
-            result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-          } else {
-            //noinspection unchecked
-            result = ((Comparable) v1).compareTo(v2);
-          }
-          if (result != 0) {
-            return result * multipliers[i];
-          }
-        }
-        return 0;
-      };
-    } else {
-      return (o1, o2) -> {
-        for (int i = 0; i < numValuesToCompare; i++) {
-          int index = valueIndices[i];
-          Object v1 = o1[index];
-          Object v2 = o2[index];
-          int result;
-          if (useDoubleComparison[i]) {
-            result = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
-          } else {
-            //noinspection unchecked
-            result = ((Comparable) v1).compareTo(v2);
-          }
-          if (result != 0) {
-            return result * multipliers[i];
-          }
-        }
-        return 0;
-      };
-    }
   }
 
   /**

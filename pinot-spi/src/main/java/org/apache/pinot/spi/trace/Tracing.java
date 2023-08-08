@@ -26,6 +26,7 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,8 +58,8 @@ public class Tracing {
 
   private static final class Holder {
     static final Tracer TRACER = TRACER_REGISTRATION.get() == null ? createDefaultTracer() : TRACER_REGISTRATION.get();
-    static final ThreadResourceUsageAccountant ACCOUNTANT = ACCOUNTANT_REGISTRATION.get() == null
-        ? createDefaultThreadAccountant() : ACCOUNTANT_REGISTRATION.get();
+    static final ThreadResourceUsageAccountant ACCOUNTANT =
+        ACCOUNTANT_REGISTRATION.get() == null ? createDefaultThreadAccountant() : ACCOUNTANT_REGISTRATION.get();
   }
 
   /**
@@ -79,6 +80,13 @@ public class Tracing {
    */
   public static boolean register(ThreadResourceUsageAccountant threadResourceUsageAccountant) {
     return ACCOUNTANT_REGISTRATION.compareAndSet(null, threadResourceUsageAccountant);
+  }
+
+  /**
+   * visible for testing only
+   */
+  public static boolean isAccountantRegistered() {
+    return ACCOUNTANT_REGISTRATION.get() != null;
   }
 
   /**
@@ -108,8 +116,7 @@ public class Tracing {
     String defaultImplementationClassName = "org.apache.pinot.core.util.trace.BuiltInTracer";
     try {
       Class<?> clazz = Class.forName(defaultImplementationClassName, false, Tracing.class.getClassLoader());
-      return (Tracer) MethodHandles.publicLookup()
-          .findConstructor(clazz, MethodType.methodType(void.class)).invoke();
+      return (Tracer) MethodHandles.publicLookup().findConstructor(clazz, MethodType.methodType(void.class)).invoke();
     } catch (Throwable missing) {
       return FallbackTracer.INSTANCE;
     }
@@ -184,8 +191,11 @@ public class Tracing {
     }
 
     @Override
-    public final void createExecutionContext(String queryId, int taskId,
-        ThreadExecutionContext parentContext) {
+    public void updateQueryUsageConcurrently(String queryId) {
+    }
+
+    @Override
+    public final void createExecutionContext(String queryId, int taskId, ThreadExecutionContext parentContext) {
       _anchorThread.set(parentContext == null ? Thread.currentThread() : parentContext.getAnchorThread());
       createExecutionContextInner(queryId, taskId, parentContext);
     }
@@ -223,13 +233,14 @@ public class Tracing {
    */
   public static class ThreadAccountantOps {
 
+    public static final int MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK = 0b1_1111_1111_1111;
+
     private ThreadAccountantOps() {
     }
 
     public static void setupRunner(String queryId) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
-      Tracing.getThreadAccountant().createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID,
-          null);
+      Tracing.getThreadAccountant().createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, null);
     }
 
     public static void setupWorker(int taskId, ThreadResourceUsageProvider threadResourceUsageProvider,
@@ -246,26 +257,52 @@ public class Tracing {
       Tracing.getThreadAccountant().clear();
     }
 
-    public static void initializeThreadAccountant(int numPqr, int numPqw, PinotConfiguration config) {
+    public static void initializeThreadAccountant(PinotConfiguration config, String instanceId) {
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
-      LOGGER.info("Config-specified accountant factory name {}", factoryName);
-      try {
-        ThreadAccountantFactory threadAccountantFactory =
-            (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
-        boolean registered = Tracing.register(threadAccountantFactory.init(numPqr, numPqw, config));
-        LOGGER.info("Using accountant provided by {}", factoryName);
-        if (!registered) {
-          LOGGER.warn("ThreadAccountant {} register unsuccessful, as it is already registered.", factoryName);
+      if (factoryName == null) {
+        LOGGER.warn("No thread accountant factory provided, using default implementation");
+      } else {
+        LOGGER.info("Config-specified accountant factory name {}", factoryName);
+        try {
+          ThreadAccountantFactory threadAccountantFactory =
+              (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
+          boolean registered = Tracing.register(threadAccountantFactory.init(config, instanceId));
+          LOGGER.info("Using accountant provided by {}", factoryName);
+          if (!registered) {
+            LOGGER.warn("ThreadAccountant {} register unsuccessful, as it is already registered.", factoryName);
+          }
+        } catch (Exception exception) {
+          LOGGER.warn("Using default implementation of thread accountant, "
+              + "due to invalid thread accountant factory {} provided, exception:", factoryName, exception);
         }
-      } catch (Exception exception) {
-        LOGGER.warn("Using default implementation of thread accountant, "
-            + "due to invalid thread accountant factory {} provided.", factoryName);
       }
       Tracing.getThreadAccountant().startWatcherTask();
     }
 
     public static boolean isInterrupted() {
       return Thread.interrupted() || Tracing.getThreadAccountant().isAnchorThreadInterrupted();
+    }
+
+    public static void sampleAndCheckInterruption() {
+      if (isInterrupted()) {
+        throw new EarlyTerminationException("Interrupted while merging records");
+      }
+      sample();
+    }
+
+    public static void updateQueryUsageConcurrently(String queryId) {
+      Tracing.getThreadAccountant().updateQueryUsageConcurrently(queryId);
+    }
+
+    public static void setThreadResourceUsageProvider() {
+      Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
+    }
+
+    // Check for thread interruption, every time after merging 8192 keys
+    public static void sampleAndCheckInterruptionPeriodically(int mergedKeys) {
+      if ((mergedKeys & MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0) {
+        sampleAndCheckInterruption();
+      }
     }
   }
 }

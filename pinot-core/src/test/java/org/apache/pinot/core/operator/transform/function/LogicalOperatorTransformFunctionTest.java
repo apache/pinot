@@ -27,6 +27,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -84,5 +85,52 @@ public abstract class LogicalOperatorTransformFunctionTest extends BaseTransform
   public Object[][] testIllegalArguments() {
     String intEqualsExpr = String.format("EQUALS(%s, %d)", INT_SV_COLUMN, _intSVValues[0]);
     return new Object[][]{new Object[]{intEqualsExpr}, new Object[]{intEqualsExpr, STRING_SV_COLUMN}};
+  }
+
+  @Test
+  public void testLogicalOperatorNullLiteral() {
+    ExpressionContext intEqualsExpr =
+        RequestContextUtils.getExpression(String.format("EQUALS(%s, null)", INT_SV_COLUMN));
+    ExpressionContext longEqualsExpr =
+        RequestContextUtils.getExpression(String.format("EQUALS(%s, null)", LONG_SV_COLUMN));
+    String functionName = getFunctionName();
+    ExpressionContext expression = ExpressionContext.forFunction(
+        new FunctionContext(FunctionContext.Type.TRANSFORM, functionName,
+            Arrays.asList(intEqualsExpr, longEqualsExpr)));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertEquals(transformFunction.getName(), functionName);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), FieldSpec.DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    nullBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, nullBitmap);
+  }
+
+  @Test
+  public void testLogicalOperatorNullColumn() {
+    ExpressionContext intEqualsExpr =
+        RequestContextUtils.getExpression(String.format("EQUALS(%s, %s)", INT_SV_COLUMN, INT_SV_NULL_COLUMN));
+    String functionName = getFunctionName();
+    ExpressionContext expression = ExpressionContext.forFunction(
+        new FunctionContext(FunctionContext.Type.TRANSFORM, functionName, Arrays.asList(intEqualsExpr, intEqualsExpr)));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertEquals(transformFunction.getName(), functionName);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), FieldSpec.DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        nullBitmap.add(i);
+      } else {
+        expectedValues[i] = true;
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, nullBitmap);
   }
 }

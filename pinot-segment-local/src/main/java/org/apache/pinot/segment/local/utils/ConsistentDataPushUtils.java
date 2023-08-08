@@ -168,7 +168,8 @@ public class ConsistentDataPushUtils {
       DEFAULT_RETRY_POLICY.attempt(() -> {
         try {
           SimpleHttpResponse response =
-              FILE_UPLOAD_DOWNLOAD_CLIENT.endReplaceSegments(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, authProvider);
+              FILE_UPLOAD_DOWNLOAD_CLIENT.endReplaceSegments(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS,
+                  null, authProvider);
           LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURI: {}",
               response.getStatusCode(), response.getResponse(), rawTableName, uri);
           return true;

@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -56,6 +57,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -70,15 +72,30 @@ public abstract class BaseTransformFunctionTest {
   protected static final int NUM_ROWS = 1000;
   protected static final int MAX_NUM_MULTI_VALUES = 5;
   protected static final int MAX_MULTI_VALUE = 10;
+  protected static final int VECTOR_DIM_SIZE = 512;
   protected static final String INT_SV_COLUMN = "intSV";
+  // INT_SV_NULL_COLUMN's even row equals to INT_SV_COLUMN. odd row is null.
+  protected static final String INT_SV_NULL_COLUMN = "intSVNull";
   protected static final String LONG_SV_COLUMN = "longSV";
   protected static final String FLOAT_SV_COLUMN = "floatSV";
   protected static final String DOUBLE_SV_COLUMN = "doubleSV";
   protected static final String BIG_DECIMAL_SV_COLUMN = "bigDecimalSV";
   protected static final String STRING_SV_COLUMN = "stringSV";
+  protected static final String STRING_SV_NULL_COLUMN = "stringSVNull";
+
   protected static final String BYTES_SV_COLUMN = "bytesSV";
+
+  protected static final String VECTOR_1_COLUMN = "vector1";
+  protected static final String VECTOR_2_COLUMN = "vector2";
+  protected static final String ZERO_VECTOR_COLUMN = "zeroVector";
+
   protected static final String STRING_ALPHANUM_SV_COLUMN = "stringAlphaNumSV";
+
+  protected static final String STRING_ALPHANUM_NULL_SV_COLUMN = "stringAlphaNumSVNull";
+
   protected static final String INT_MV_COLUMN = "intMV";
+  protected static final String INT_MV_NULL_COLUMN = "intMVNull";
+
   protected static final String LONG_MV_COLUMN = "longMV";
   protected static final String FLOAT_MV_COLUMN = "floatMV";
   protected static final String DOUBLE_MV_COLUMN = "doubleMV";
@@ -87,6 +104,8 @@ public abstract class BaseTransformFunctionTest {
   protected static final String STRING_LONG_MV_COLUMN = "stringLongMV";
   protected static final String TIME_COLUMN = "timeColumn";
   protected static final String TIMESTAMP_COLUMN = "timestampColumn";
+  protected static final String TIMESTAMP_COLUMN_NULL = "timestampColumnNull";
+
   protected static final String JSON_COLUMN = "json";
   protected static final String DEFAULT_JSON_COLUMN = "defaultJson";
   protected final int[] _intSVValues = new int[NUM_ROWS];
@@ -106,6 +125,8 @@ public abstract class BaseTransformFunctionTest {
   protected final String[][] _stringLongFormatMVValues = new String[NUM_ROWS][];
   protected final long[] _timeValues = new long[NUM_ROWS];
   protected final String[] _jsonValues = new String[NUM_ROWS];
+  protected final float[][] _vector1Values = new float[NUM_ROWS][];
+  protected final float[][] _vector2Values = new float[NUM_ROWS][];
 
   protected Map<String, DataSource> _dataSourceMap;
   protected ProjectionBlock _projectionBlock;
@@ -135,6 +156,8 @@ public abstract class BaseTransformFunctionTest {
       _stringMVValues[i] = new String[numValues];
       _stringAlphaNumericMVValues[i] = new String[numValues];
       _stringLongFormatMVValues[i] = new String[numValues];
+      _vector1Values[i] = new float[VECTOR_DIM_SIZE];
+      _vector2Values[i] = new float[VECTOR_DIM_SIZE];
 
       for (int j = 0; j < numValues; j++) {
         _intMVValues[i][j] = 1 + RANDOM.nextInt(MAX_MULTI_VALUE);
@@ -146,6 +169,11 @@ public abstract class BaseTransformFunctionTest {
         _stringLongFormatMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextLong());
       }
 
+      for (int j = 0; j < VECTOR_DIM_SIZE; j++) {
+        _vector1Values[i][j] = Math.abs(RandomUtils.nextFloat(0.0f, 1.0f));
+        _vector2Values[i][j] = Math.abs(RandomUtils.nextFloat(0.0f, 1.0f));
+      }
+
       // Time in the past year
       _timeValues[i] = currentTimeMs - RANDOM.nextInt(365 * 24 * 3600) * 1000L;
     }
@@ -154,21 +182,50 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       Map<String, Object> map = new HashMap<>();
       map.put(INT_SV_COLUMN, _intSVValues[i]);
+      if (isNullRow(i)) {
+        map.put(INT_SV_NULL_COLUMN, null);
+      } else {
+        map.put(INT_SV_NULL_COLUMN, _intSVValues[i]);
+      }
       map.put(LONG_SV_COLUMN, _longSVValues[i]);
       map.put(FLOAT_SV_COLUMN, _floatSVValues[i]);
       map.put(DOUBLE_SV_COLUMN, _doubleSVValues[i]);
       map.put(BIG_DECIMAL_SV_COLUMN, _bigDecimalSVValues[i]);
       map.put(STRING_SV_COLUMN, _stringSVValues[i]);
+      if (isNullRow(i)) {
+        map.put(STRING_SV_NULL_COLUMN, null);
+      } else {
+        map.put(STRING_SV_NULL_COLUMN, _stringSVValues[i]);
+      }
       map.put(STRING_ALPHANUM_SV_COLUMN, _stringAlphaNumericSVValues[i]);
+      if (isNullRow(i)) {
+        map.put(STRING_ALPHANUM_NULL_SV_COLUMN, null);
+      } else {
+        map.put(STRING_ALPHANUM_NULL_SV_COLUMN, _stringAlphaNumericSVValues[i]);
+      }
       map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
+
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
+      if (isNullRow(i)) {
+        map.put(INT_MV_NULL_COLUMN, null);
+      } else {
+        map.put(INT_MV_NULL_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
+      }
       map.put(LONG_MV_COLUMN, ArrayUtils.toObject(_longMVValues[i]));
       map.put(FLOAT_MV_COLUMN, ArrayUtils.toObject(_floatMVValues[i]));
+      map.put(VECTOR_1_COLUMN, ArrayUtils.toObject(_vector1Values[i]));
+      map.put(VECTOR_2_COLUMN, ArrayUtils.toObject(_vector2Values[i]));
+      map.put(ZERO_VECTOR_COLUMN, ArrayUtils.toObject(new float[VECTOR_DIM_SIZE]));
       map.put(DOUBLE_MV_COLUMN, ArrayUtils.toObject(_doubleMVValues[i]));
       map.put(STRING_MV_COLUMN, _stringMVValues[i]);
       map.put(STRING_ALPHANUM_MV_COLUMN, _stringAlphaNumericMVValues[i]);
       map.put(STRING_LONG_MV_COLUMN, _stringLongFormatMVValues[i]);
       map.put(TIMESTAMP_COLUMN, _timeValues[i]);
+      if (isNullRow(i)) {
+        map.put(TIMESTAMP_COLUMN_NULL, null);
+      } else {
+        map.put(TIMESTAMP_COLUMN_NULL, _timeValues[i]);
+      }
       map.put(TIME_COLUMN, _timeValues[i]);
       _jsonValues[i] = JsonUtils.objectToJsonNode(map).toString();
       map.put(JSON_COLUMN, _jsonValues[i]);
@@ -178,26 +235,35 @@ public abstract class BaseTransformFunctionTest {
     }
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_SV_COLUMN, FieldSpec.DataType.INT)
+        .addSingleValueDimension(INT_SV_NULL_COLUMN, FieldSpec.DataType.INT)
         .addSingleValueDimension(LONG_SV_COLUMN, FieldSpec.DataType.LONG)
         .addSingleValueDimension(FLOAT_SV_COLUMN, FieldSpec.DataType.FLOAT)
         .addSingleValueDimension(DOUBLE_SV_COLUMN, FieldSpec.DataType.DOUBLE)
         .addMetric(BIG_DECIMAL_SV_COLUMN, FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_SV_NULL_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_ALPHANUM_NULL_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(BYTES_SV_COLUMN, FieldSpec.DataType.BYTES)
         .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
         .addSingleValueDimension(DEFAULT_JSON_COLUMN, FieldSpec.DataType.JSON)
         .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
+        .addMultiValueDimension(INT_MV_NULL_COLUMN, FieldSpec.DataType.INT)
         .addMultiValueDimension(LONG_MV_COLUMN, FieldSpec.DataType.LONG)
         .addMultiValueDimension(FLOAT_MV_COLUMN, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(DOUBLE_MV_COLUMN, FieldSpec.DataType.DOUBLE)
         .addMultiValueDimension(STRING_MV_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(STRING_ALPHANUM_MV_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(STRING_LONG_MV_COLUMN, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(VECTOR_1_COLUMN, FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension(VECTOR_2_COLUMN, FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension(ZERO_VECTOR_COLUMN, FieldSpec.DataType.FLOAT)
         .addDateTime(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addDateTime(TIMESTAMP_COLUMN_NULL, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN)
+            .setNullHandlingEnabled(true).build();
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(INDEX_DIR_PATH);
@@ -217,6 +283,15 @@ public abstract class BaseTransformFunctionTest {
         new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
   }
 
+  protected boolean isNullRow(int i) {
+    return i % 2 != 0;
+  }
+
+  protected void testNullBitmap(TransformFunction transformFunction, RoaringBitmap expectedNull) {
+    RoaringBitmap nullBitmap = transformFunction.getNullBitmap(_projectionBlock);
+    assertEquals(nullBitmap, expectedNull);
+  }
+
   protected void testTransformFunction(TransformFunction transformFunction, int[] expectedValues) {
     int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
@@ -232,6 +307,31 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues[i].intValue(), expectedValues[i]);
       assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, null);
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, int[] expectedValues,
+      RoaringBitmap expectedNull) {
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues =
+        transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (expectedNull.contains(i)) {
+        continue;
+      }
+      // only compare the rows that are not null.
+      assertEquals(intValues[i], expectedValues[i]);
+      assertEquals(longValues[i], expectedValues[i]);
+      assertEquals(floatValues[i], (float) expectedValues[i]);
+      assertEquals(doubleValues[i], (double) expectedValues[i]);
+      assertEquals(bigDecimalValues[i].intValue(), expectedValues[i]);
+      assertEquals(stringValues[i], Integer.toString(expectedValues[i]));
+    }
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, long[] expectedValues) {
@@ -249,6 +349,31 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues[i].longValue(), expectedValues[i]);
       assertEquals(stringValues[i], Long.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, null);
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, long[] expectedValues,
+      RoaringBitmap expectedNull) {
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues =
+        transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (expectedNull.contains(i)) {
+        continue;
+      }
+      // only compare the rows that are not null.
+      assertEquals(intValues[i], (int) expectedValues[i]);
+      assertEquals(longValues[i], expectedValues[i]);
+      assertEquals(floatValues[i], (float) expectedValues[i]);
+      assertEquals(doubleValues[i], (double) expectedValues[i]);
+      assertEquals(bigDecimalValues[i].longValue(), expectedValues[i]);
+      assertEquals(stringValues[i], Long.toString(expectedValues[i]));
+    }
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, float[] expectedValues) {
@@ -266,6 +391,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues[i].floatValue(), expectedValues[i]);
       assertEquals(stringValues[i], Float.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, double[] expectedValues) {
@@ -292,6 +418,39 @@ public abstract class BaseTransformFunctionTest {
       }
       assertEquals(stringValues[i], Double.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, null);
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, double[] expectedValues,
+      RoaringBitmap expectedNull) {
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues = null;
+    try {
+      // 1- Some transform functions cannot work with BigDecimal (e.g. exp, ln, and sqrt).
+      // 2- NumberFormatException is thrown when converting double.NaN, Double.POSITIVE_INFINITY,
+      // or Double.NEGATIVE_INFINITY.
+      bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    } catch (UnsupportedOperationException | NumberFormatException ignored) {
+    }
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      // only compare the results for non-null rows.
+      if (expectedNull.contains(i)) {
+        continue;
+      }
+      assertEquals(intValues[i], (int) expectedValues[i]);
+      assertEquals(longValues[i], (long) expectedValues[i]);
+      assertEquals(floatValues[i], (float) expectedValues[i]);
+      assertEquals(doubleValues[i], expectedValues[i]);
+      if (bigDecimalValues != null) {
+        assertEquals(bigDecimalValues[i].doubleValue(), expectedValues[i]);
+      }
+      assertEquals(stringValues[i], Double.toString(expectedValues[i]));
+    }
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, BigDecimal[] expectedValues) {
@@ -311,6 +470,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals((new BigDecimal(stringValues[i])).compareTo(expectedValues[i]), 0);
       assertEquals(BigDecimalUtils.deserialize(bytesValues[i]).compareTo(expectedValues[i]), 0);
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, boolean[] expectedValues) {
@@ -320,15 +480,36 @@ public abstract class BaseTransformFunctionTest {
     double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
     // TODO: Support implicit cast from BOOLEAN to STRING
-//    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(intValues[i] == 1, expectedValues[i]);
       assertEquals(longValues[i] == 1, expectedValues[i]);
       assertEquals(floatValues[i] == 1, expectedValues[i]);
       assertEquals(doubleValues[i] == 1, expectedValues[i]);
       assertEquals(bigDecimalValues[i].intValue() == 1, expectedValues[i]);
-//      assertEquals(stringValues[i], Boolean.toString(expectedValues[i]));
     }
+    testNullBitmap(transformFunction, null);
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, boolean[] expectedValues,
+      RoaringBitmap expectedNulls) {
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    BigDecimal[] bigDecimalValues =
+        transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (expectedNulls.contains(i)) {
+        continue;
+      }
+      assertEquals(intValues[i] == 1, expectedValues[i]);
+      assertEquals(longValues[i] == 1, expectedValues[i]);
+      assertEquals(floatValues[i] == 1, expectedValues[i]);
+      assertEquals(doubleValues[i] == 1, expectedValues[i]);
+      assertEquals(bigDecimalValues[i].intValue() == 1, expectedValues[i]);
+    }
+    testNullBitmap(transformFunction, expectedNulls);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, Timestamp[] expectedValues) {
@@ -347,6 +528,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bigDecimalValues[i], BigDecimal.valueOf(expectedValues[i].getTime()));
 //      assertEquals(stringValues[i], expectedValues[i].toString());
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, String[] expectedValues) {
@@ -354,6 +536,19 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(stringValues[i], expectedValues[i]);
     }
+    testNullBitmap(transformFunction, null);
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, String[] expectedValues,
+      RoaringBitmap expectedNulls) {
+    String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (expectedNulls.contains(i)) {
+        continue;
+      }
+      assertEquals(stringValues[i], expectedValues[i]);
+    }
+    testNullBitmap(transformFunction, expectedNulls);
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, byte[][] expectedValues) {
@@ -363,6 +558,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(bytesValues[i], BytesUtils.toBytes(stringValues[i]));
       assertEquals(bytesValues[i], expectedValues[i]);
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, int[][] expectedValues) {
@@ -387,6 +583,7 @@ public abstract class BaseTransformFunctionTest {
         assertEquals(stringValuesMV[i][j], Integer.toString(expectedValues[i][j]));
       }
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, long[][] expectedValues) {
@@ -411,6 +608,7 @@ public abstract class BaseTransformFunctionTest {
         assertEquals(stringValuesMV[i][j], Long.toString(expectedValues[i][j]));
       }
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, float[][] expectedValues) {
@@ -435,6 +633,7 @@ public abstract class BaseTransformFunctionTest {
         assertEquals(stringValuesMV[i][j], Float.toString(expectedValues[i][j]));
       }
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, double[][] expectedValues) {
@@ -459,6 +658,7 @@ public abstract class BaseTransformFunctionTest {
         assertEquals(stringValuesMV[i][j], Double.toString(expectedValues[i][j]));
       }
     }
+    testNullBitmap(transformFunction, null);
   }
 
   protected void testTransformFunctionMV(TransformFunction transformFunction, String[][] expectedValues) {
@@ -466,6 +666,7 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(stringValuesMV[i], expectedValues[i]);
     }
+    testNullBitmap(transformFunction, null);
   }
 
   @AfterClass

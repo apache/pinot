@@ -23,8 +23,10 @@ import java.io.File;
 import java.net.URL;
 import java.util.Collections;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.dedup.TableDedupMetadataManager;
+import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
@@ -56,8 +58,7 @@ public class MutableSegmentDedupeTest {
     CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     PartitionDedupMetadataManager partitionDedupMetadataManager =
-        (dedupEnabled) ? new TableDedupMetadataManager("testTable_REALTIME", schema.getPrimaryKeyColumns(),
-            Mockito.mock(ServerMetrics.class), HashFunction.NONE).getOrCreatePartitionManager(0) : null;
+        (dedupEnabled) ? getTableDedupMetadataManager(schema).getOrCreatePartitionManager(0) : null;
     _mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.emptySet(), Collections.emptySet(),
             Collections.emptySet(), false, true, null, "secondsSinceEpoch", null, partitionDedupMetadataManager);
@@ -71,6 +72,14 @@ public class MutableSegmentDedupeTest {
         reuse.clear();
       }
     }
+  }
+
+  private static TableDedupMetadataManager getTableDedupMetadataManager(Schema schema) {
+    TableConfig tableConfig = Mockito.mock(TableConfig.class);
+    Mockito.when(tableConfig.getTableName()).thenReturn("testTable_REALTIME");
+    Mockito.when(tableConfig.getDedupConfig()).thenReturn(new DedupConfig(true, HashFunction.NONE));
+    return TableDedupMetadataManagerFactory.create(tableConfig, schema, Mockito.mock(TableDataManager.class),
+        Mockito.mock(ServerMetrics.class));
   }
 
   @Test

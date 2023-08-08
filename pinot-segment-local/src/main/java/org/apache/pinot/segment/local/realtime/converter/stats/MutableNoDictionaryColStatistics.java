@@ -83,7 +83,7 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics {
 
   @Override
   public int getMaxNumberOfMultiValues() {
-    return 0;
+    return _dataSourceMetadata.getMaxNumValuesPerMVEntry();
   }
 
   @Override

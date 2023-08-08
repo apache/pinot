@@ -36,11 +36,23 @@ jobs:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
     name: Pinot Compatibility Regression Testing against ${{ github.event.inputs.oldCommit }} and ${{ github.event.inputs.newCommit }} on ${{ matrix.test_suite }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up JDK 11
-        uses: actions/setup-java@v1
+        uses: actions/setup-java@v3
         with:
           java-version: 11
+          distribution: 'adopt'
+          cache: 'maven'
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: v10.16.1
+          cache: 'npm'
+          cache-dependency-path: pinot-controller/src/main/resources/package-lock.json
+      - name: Install npm
+        run: |
+          npm install -g npm@6.10.0
+          npm --version
       - name: Pinot Compatibility Regression Testing
         if : ${{github.event_name == 'workflow_dispatch'}}
         env:
@@ -50,7 +62,7 @@ jobs:
           TEST_SUITE: ${{ matrix.test_suite }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-            -Dmaven.wagon.http.retryHandler.count=3 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
             -XX:+IgnoreUnrecognizedVMOptions
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
@@ -62,7 +74,7 @@ jobs:
         if: always()
         run: |
           zip -1 -r artifacts.zip /tmp/compatibility-verifier/*
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         name: Store compatibility verifier work directory
         if: always()
         with:

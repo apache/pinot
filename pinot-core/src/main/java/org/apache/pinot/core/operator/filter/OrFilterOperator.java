@@ -20,9 +20,12 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
@@ -30,26 +33,40 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class OrFilterOperator extends BaseFilterOperator {
-
   private static final String EXPLAIN_NAME = "FILTER_OR";
-  private final List<BaseFilterOperator> _filterOperators;
-  private final int _numDocs;
 
-  public OrFilterOperator(List<BaseFilterOperator> filterOperators, int numDocs) {
+  private final List<BaseFilterOperator> _filterOperators;
+  private final Map<String, String> _queryOptions;
+
+  public OrFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
+      int numDocs, boolean nullHandlingEnabled) {
+    super(numDocs, nullHandlingEnabled);
     _filterOperators = filterOperators;
-    _numDocs = numDocs;
+    _queryOptions = queryOptions;
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
+  protected BlockDocIdSet getTrues() {
     Tracing.activeRecording().setNumChildren(_filterOperators.size());
-    List<FilterBlockDocIdSet> filterBlockDocIdSets = new ArrayList<>(_filterOperators.size());
+    List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      filterBlockDocIdSets.add(filterOperator.nextBlock().getBlockDocIdSet());
+      blockDocIdSets.add(filterOperator.getTrues());
     }
-    return new FilterBlock(new OrDocIdSet(filterBlockDocIdSets, _numDocs));
+    return new OrDocIdSet(blockDocIdSets, _numDocs);
   }
 
+  @Override
+  protected BlockDocIdSet getFalses() {
+    List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
+    for (BaseFilterOperator filterOperator : _filterOperators) {
+      if (filterOperator.isResultEmpty()) {
+        blockDocIdSets.add(new MatchAllDocIdSet(_numDocs));
+      } else {
+        blockDocIdSets.add(filterOperator.getFalses());
+      }
+    }
+    return new AndDocIdSet(blockDocIdSets, _queryOptions);
+  }
 
   @Override
   public String toExplainString() {

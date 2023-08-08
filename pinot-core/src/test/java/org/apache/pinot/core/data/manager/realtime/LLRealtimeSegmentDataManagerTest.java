@@ -841,6 +841,7 @@ public class LLRealtimeSegmentDataManagerTest {
     when(tableDataManagerConfig.getTableName()).thenReturn(REALTIME_TABLE_NAME);
     when(tableDataManagerConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
+    when(tableDataManagerConfig.getTableConfig()).thenReturn(tableConfig);
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getMaxParallelSegmentBuilds()).thenReturn(4);
     when(instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit()).thenReturn(-1L);
@@ -1001,7 +1002,7 @@ public class LLRealtimeSegmentDataManagerTest {
         throws Exception {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
-          semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null);
+          semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null, () -> true);
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
@@ -1051,7 +1052,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected void startConsumerThread() {
+    public void startConsumption() {
       // Do nothing.
     }
 

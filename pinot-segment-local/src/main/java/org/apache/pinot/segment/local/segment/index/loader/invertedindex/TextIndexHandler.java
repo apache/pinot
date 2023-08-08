@@ -41,23 +41,24 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
-import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
-import org.apache.pinot.segment.spi.creator.IndexCreatorProvider;
-import org.apache.pinot.segment.spi.creator.TextIndexCreatorProvider;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.table.FSTType;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,21 +87,18 @@ public class TextIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexHandler.class);
 
   private final Set<String> _columnsToAddIdx;
-  private final FSTType _fstType;
-  private final Map<String, Map<String, String>> _columnProperties;
 
-  public TextIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
-    super(segmentDirectory, indexLoadingConfig);
-    _fstType = indexLoadingConfig.getFSTIndexType();
-    _columnsToAddIdx = indexLoadingConfig.getTextIndexColumns();
-    _columnProperties = indexLoadingConfig.getColumnProperties();
+  public TextIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
+      @Nullable TableConfig tableConfig) {
+    super(segmentDirectory, fieldIndexConfigs, tableConfig);
+    _columnsToAddIdx = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.text(), _fieldIndexConfigs);
   }
 
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
-    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
@@ -120,23 +118,23 @@ public class TextIndexHandler extends BaseIndexHandler {
   }
 
   @Override
-  public void updateIndices(SegmentDirectory.Writer segmentWriter, IndexCreatorProvider indexCreatorProvider)
+  public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
     // Remove indices not set in table config any more
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
-    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ColumnIndexType.TEXT_INDEX);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing text index from segment: {}, column: {}", segmentName, column);
-        segmentWriter.removeIndex(column, ColumnIndexType.TEXT_INDEX);
+        segmentWriter.removeIndex(column, StandardIndexes.text());
         LOGGER.info("Removed existing text index from segment: {}, column: {}", segmentName, column);
       }
     }
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateTextIndex(columnMetadata)) {
-        createTextIndexForColumn(segmentWriter, columnMetadata, indexCreatorProvider, indexCreatorProvider);
+        createTextIndexForColumn(segmentWriter, columnMetadata);
       }
     }
   }
@@ -162,8 +160,7 @@ public class TextIndexHandler extends BaseIndexHandler {
     }
   }
 
-  private void createTextIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata,
-      TextIndexCreatorProvider textIndexCreatorProvider, IndexCreatorProvider indexCreatorProvider)
+  private void createTextIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
@@ -172,7 +169,7 @@ public class TextIndexHandler extends BaseIndexHandler {
     boolean hasDictionary = columnMetadata.hasDictionary();
 
     // Create a temporary forward index if it is disabled and does not exist
-    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, indexCreatorProvider, true);
+    columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
 
     LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", columnName, segmentName,
         hasDictionary);
@@ -183,12 +180,17 @@ public class TextIndexHandler extends BaseIndexHandler {
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
     // further need to move around the lucene index directory since it is created with correct directory structure
     // based on segmentVersion.
-    try (ForwardIndexReader forwardIndexReader = LoaderUtils.getForwardIndexReader(segmentWriter, columnMetadata);
+
+    IndexCreationContext context = IndexCreationContext.builder()
+        .withColumnMetadata(columnMetadata)
+        .withIndexDir(segmentDirectory)
+        .withTextCommitOnClose(true)
+        .build();
+    TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
+
+    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        TextIndexCreator textIndexCreator = textIndexCreatorProvider.newTextIndexCreator(IndexCreationContext.builder()
-            .withColumnMetadata(columnMetadata).withIndexDir(segmentDirectory).build().forTextIndex(_fstType, true,
-                TextIndexUtils.extractStopWordsInclude(columnName, _columnProperties),
-                TextIndexUtils.extractStopWordsExclude(columnName, _columnProperties)))) {
+        TextIndexCreator textIndexCreator = StandardIndexes.text().createIndexCreator(context, config)) {
       if (columnMetadata.isSingleValue()) {
         processSVField(segmentWriter, hasDictionary, forwardIndexReader, readerContext, textIndexCreator, numDocs,
             columnMetadata);
@@ -215,7 +217,7 @@ public class TextIndexHandler extends BaseIndexHandler {
       // text index on dictionary encoded SV column
       // read forward index to get dictId
       // read the raw value from dictionary using dictId
-      try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
+      try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
         for (int docId = 0; docId < numDocs; docId++) {
           int dictId = forwardIndexReader.getDictId(docId, readerContext);
           textIndexCreator.add(dictionary.getStringValue(dictId));
@@ -239,7 +241,7 @@ public class TextIndexHandler extends BaseIndexHandler {
       // text index on dictionary encoded MV column
       // read forward index to get dictId
       // read the raw value from dictionary using dictId
-      try (Dictionary dictionary = LoaderUtils.getDictionary(segmentWriter, columnMetadata)) {
+      try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
         int maxNumEntries = columnMetadata.getMaxNumberOfMultiValues();
         int[] dictIdBuffer = new int[maxNumEntries];
         String[] valueBuffer = new String[maxNumEntries];

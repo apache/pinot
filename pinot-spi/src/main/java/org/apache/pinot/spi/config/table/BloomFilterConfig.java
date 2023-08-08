@@ -21,20 +21,28 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.spi.config.BaseJsonConfig;
+import java.util.Objects;
 
 
-public class BloomFilterConfig extends BaseJsonConfig {
+public class BloomFilterConfig extends IndexConfig {
   public static final double DEFAULT_FPP = 0.05;
+  public static final BloomFilterConfig DEFAULT = new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 0, false);
+  public static final BloomFilterConfig DISABLED = new BloomFilterConfig(true, BloomFilterConfig.DEFAULT_FPP, 0,
+      false);
 
   private final double _fpp;
   private final int _maxSizeInBytes;
   private final boolean _loadOnHeap;
 
+  public BloomFilterConfig(double fpp, int maxSizeInBytes, boolean loadOnHeap) {
+    this(false, fpp, maxSizeInBytes, loadOnHeap);
+  }
+
   @JsonCreator
-  public BloomFilterConfig(@JsonProperty(value = "fpp") double fpp,
+  public BloomFilterConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty(value = "fpp") double fpp,
       @JsonProperty(value = "maxSizeInBytes") int maxSizeInBytes,
       @JsonProperty(value = "loadOnHeap") boolean loadOnHeap) {
+    super(disabled);
     if (fpp != 0.0) {
       Preconditions.checkArgument(fpp > 0.0 && fpp < 1.0, "Invalid fpp (false positive probability): %s", fpp);
       _fpp = fpp;
@@ -55,5 +63,26 @@ public class BloomFilterConfig extends BaseJsonConfig {
 
   public boolean isLoadOnHeap() {
     return _loadOnHeap;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    BloomFilterConfig that = (BloomFilterConfig) o;
+    return Double.compare(that._fpp, _fpp) == 0 && _maxSizeInBytes == that._maxSizeInBytes
+        && _loadOnHeap == that._loadOnHeap && isEnabled() == that.isEnabled();
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), _fpp, _maxSizeInBytes, _loadOnHeap, isEnabled());
   }
 }

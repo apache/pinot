@@ -20,7 +20,8 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.transformer.datetime.BaseDateTimeTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.DateTimeTransformerFactory;
@@ -28,8 +29,8 @@ import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToEpoc
 import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToSDFTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToEpochTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -90,12 +91,11 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     // Check that there are exactly 4 arguments
     if (arguments.size() != 4) {
       throw new IllegalArgumentException("Exactly 4 arguments are required for DATE_TIME_CONVERT transform function");
     }
-
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || !firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
@@ -104,10 +104,10 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     }
     _mainTransformFunction = firstArgument;
 
-    _dateTimeTransformer =
-        DateTimeTransformerFactory.getDateTimeTransformer(((LiteralTransformFunction) arguments.get(1)).getLiteral(),
-            ((LiteralTransformFunction) arguments.get(2)).getLiteral(),
-            ((LiteralTransformFunction) arguments.get(3)).getLiteral());
+    _dateTimeTransformer = DateTimeTransformerFactory.getDateTimeTransformer(
+        ((LiteralTransformFunction) arguments.get(1)).getStringLiteral(),
+        ((LiteralTransformFunction) arguments.get(2)).getStringLiteral(),
+        ((LiteralTransformFunction) arguments.get(3)).getStringLiteral());
     if (_dateTimeTransformer instanceof EpochToEpochTransformer
         || _dateTimeTransformer instanceof SDFToEpochTransformer) {
       _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
@@ -122,44 +122,44 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public long[] transformToLongValuesSV(ProjectionBlock projectionBlock) {
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata != LONG_SV_NO_DICTIONARY_METADATA) {
-      return super.transformToLongValuesSV(projectionBlock);
+      return super.transformToLongValuesSV(valueBlock);
     }
-    int length = projectionBlock.getNumDocs();
-    if (_longValuesSV == null) {
-      _longValuesSV = new long[length];
-    }
+    int length = valueBlock.getNumDocs();
+    initLongValuesSV(length);
     if (_dateTimeTransformer instanceof EpochToEpochTransformer) {
       EpochToEpochTransformer dateTimeTransformer = (EpochToEpochTransformer) _dateTimeTransformer;
-      dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _longValuesSV,
-          length);
+      dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _longValuesSV, length);
     } else {
       SDFToEpochTransformer dateTimeTransformer = (SDFToEpochTransformer) _dateTimeTransformer;
-      dateTimeTransformer.transform(_mainTransformFunction.transformToStringValuesSV(projectionBlock), _longValuesSV,
+      dateTimeTransformer.transform(_mainTransformFunction.transformToStringValuesSV(valueBlock), _longValuesSV,
           length);
     }
     return _longValuesSV;
   }
 
   @Override
-  public String[] transformToStringValuesSV(ProjectionBlock projectionBlock) {
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     if (_resultMetadata != STRING_SV_NO_DICTIONARY_METADATA) {
-      return super.transformToStringValuesSV(projectionBlock);
+      return super.transformToStringValuesSV(valueBlock);
     }
-    int length = projectionBlock.getNumDocs();
-    if (_stringValuesSV == null) {
-      _stringValuesSV = new String[length];
-    }
+    int length = valueBlock.getNumDocs();
+    initStringValuesSV(length);
     if (_dateTimeTransformer instanceof EpochToSDFTransformer) {
       EpochToSDFTransformer dateTimeTransformer = (EpochToSDFTransformer) _dateTimeTransformer;
-      dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(projectionBlock), _stringValuesSV,
+      dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _stringValuesSV,
           length);
     } else {
       SDFToSDFTransformer dateTimeTransformer = (SDFToSDFTransformer) _dateTimeTransformer;
-      dateTimeTransformer.transform(_mainTransformFunction.transformToStringValuesSV(projectionBlock), _stringValuesSV,
+      dateTimeTransformer.transform(_mainTransformFunction.transformToStringValuesSV(valueBlock), _stringValuesSV,
           length);
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return _mainTransformFunction.getNullBitmap(valueBlock);
   }
 }

@@ -19,71 +19,49 @@
 package org.apache.pinot.core.util;
 
 import java.io.File;
+import java.net.URL;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import org.apache.pinot.segment.local.utils.CrcUtils;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
-/**
- * Dec 4, 2014
- */
 
 public class CrcUtilsTest {
-
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "CrcUtilsTest");
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static final File INDEX_DIR = new File("/tmp/testingCrc");
+  private static final long EXPECTED_V1_CRC = 4139425029L;
+  private static final long EXPECTED_V3_CRC = 94877217L;
 
   @Test
-  public void test1()
+  public void testCrc()
       throws Exception {
-    if (INDEX_DIR.exists()) {
-      FileUtils.deleteQuietly(INDEX_DIR);
-    }
+    FileUtils.deleteDirectory(INDEX_DIR);
 
-    final CrcUtils u1 = CrcUtils.forAllFilesInFolder(new File(makeSegmentAndReturnPath()));
-    final long crc1 = u1.computeCrc();
-    final String md51 = u1.computeMD5();
-
-    FileUtils.deleteQuietly(INDEX_DIR);
-
-    final CrcUtils u2 = CrcUtils.forAllFilesInFolder(new File(makeSegmentAndReturnPath()));
-    final long crc2 = u2.computeCrc();
-    final String md52 = u2.computeMD5();
-
-    Assert.assertEquals(crc1, crc2);
-    Assert.assertEquals(md51, md52);
-
-    FileUtils.deleteQuietly(INDEX_DIR);
-
-    final IndexSegment segment = ImmutableSegmentLoader.load(new File(makeSegmentAndReturnPath()), ReadMode.mmap);
-    final SegmentMetadata m = segment.getSegmentMetadata();
-
-    FileUtils.deleteQuietly(INDEX_DIR);
-  }
-
-  private String makeSegmentAndReturnPath()
-      throws Exception {
-    final String filePath = TestUtils.getFileFromResourceUrl(CrcUtils.class.getClassLoader().getResource(AVRO_DATA));
-
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.DAYS,
-            "testTable");
-    config.setSegmentNamePostfix("1");
-    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
+    assertNotNull(resource);
+    String filePath = TestUtils.getFileFromResourceUrl(resource);
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
+            TimeUnit.DAYS, "testTable");
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
 
-    return new File(INDEX_DIR, driver.getSegmentName()).getAbsolutePath();
+    File indexDir = driver.getOutputDirectory();
+    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(), EXPECTED_V1_CRC);
+
+    new SegmentV1V2ToV3FormatConverter().convert(indexDir);
+    assertEquals(CrcUtils.forAllFilesInFolder(indexDir).computeCrc(), EXPECTED_V3_CRC);
+
+    FileUtils.deleteDirectory(INDEX_DIR);
   }
 }

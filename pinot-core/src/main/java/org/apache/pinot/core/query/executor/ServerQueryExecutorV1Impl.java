@@ -47,15 +47,13 @@ import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ResultsBlockUtils;
-import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
-import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.plan.Plan;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.config.QueryExecutorConfig;
@@ -78,8 +76,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,7 +94,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private ServerMetrics _serverMetrics;
   private SegmentPrunerService _segmentPrunerService;
   private PlanMaker _planMaker;
-  private long _defaultTimeoutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
+  private long _defaultTimeoutMs;
   private boolean _enablePrefetch;
 
   @Override
@@ -108,11 +106,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(config);
     LOGGER.info("Trying to build SegmentPrunerService");
     _segmentPrunerService = new SegmentPrunerService(queryExecutorConfig.getPrunerConfig());
-    LOGGER.info("Trying to build QueryPlanMaker");
-    _planMaker = new InstancePlanMakerImplV2(queryExecutorConfig);
-    if (queryExecutorConfig.getTimeOut() > 0) {
-      _defaultTimeoutMs = queryExecutorConfig.getTimeOut();
+    String planMakerClass = queryExecutorConfig.getPlanMakerClass();
+    LOGGER.info("Trying to build PlanMaker with class: {}", planMakerClass);
+    try {
+      _planMaker = PluginManager.get().createInstance(planMakerClass);
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while creating PlanMaker with class: " + planMakerClass);
     }
+    _planMaker.init(config);
+    _defaultTimeoutMs = queryExecutorConfig.getTimeOut();
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
     LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}", _defaultTimeoutMs,
         _enablePrefetch);
@@ -268,10 +270,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         // return the error table to broker sooner than here. But in case of race condition, we construct the error
         // table here too.
         instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR,
-            "Query cancelled on: " + _instanceDataManager.getInstanceId() + e));
+            "Query cancelled on: " + _instanceDataManager.getInstanceId() + " " + e));
       } else {
         LOGGER.error("Exception processing requestId {}", requestId, e);
-        instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+        instanceResponse.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR,
+            "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e));
       }
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
@@ -351,7 +354,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
     int numTotalSegments = indexSegments.size();
     SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
-    List<IndexSegment> selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext, prunerStats);
+    List<IndexSegment> selectedSegments =
+        _segmentPrunerService.prune(indexSegments, queryContext, prunerStats, executorService);
     segmentPruneTimer.stopAndRecord();
     int numSelectedSegments = selectedSegments.size();
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
@@ -413,7 +417,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       int[] operatorId = {3};
       ExplainPlanRows explainPlanRows = new ExplainPlanRows();
       // Get the segment explain plan for a single segment
-      getSegmentExplainPlanRowData(child, explainPlanRows, operatorId, 2);
+      if (child != null) {
+        child.explainPlan(explainPlanRows, operatorId, 2);
+      }
       int numRows = explainPlanRows.getExplainPlanRowData().size();
       if (numRows > 0) {
         operatorDepthToRowDataMap.putIfAbsent(numRows, new ArrayList<>());
@@ -453,72 +459,52 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     return operatorDepthToRowDataMap;
   }
 
-  /**
-   * Get the list of Explain Plan rows for a single segment
-   */
-  private static void getSegmentExplainPlanRowData(Operator node, ExplainPlanRows explainPlanRows, int[] globalId,
-      int parentId) {
-    if (node == null) {
-      return;
-    }
-
-    String explainPlanString = node.toExplainString();
-    if (explainPlanString != null) {
-      ExplainPlanRowData explainPlanRowData = new ExplainPlanRowData(explainPlanString, globalId[0], parentId);
-      parentId = globalId[0]++;
-      explainPlanRows.appendExplainPlanRowData(explainPlanRowData);
-      if (node instanceof EmptyFilterOperator) {
-        explainPlanRows.setHasEmptyFilter(true);
-      }
-      if (node instanceof MatchAllFilterOperator) {
-        explainPlanRows.setHasMatchAllFilter(true);
-      }
-    }
-
-    List<Operator> children = node.getChildOperators();
-    for (Operator child : children) {
-      getSegmentExplainPlanRowData(child, explainPlanRows, globalId, parentId);
-    }
-  }
-
   public static InstanceResponseBlock executeExplainQuery(Plan queryPlan, QueryContext queryContext) {
     ExplainResultsBlock explainResults = new ExplainResultsBlock();
-    List<? extends Operator> childOperators = queryPlan.getPlanNode().run().getChildOperators();
-    assert childOperators.size() == 1;
-    Operator root = childOperators.get(0);
-    Map<Integer, List<ExplainPlanRows>> operatorDepthToRowDataMap;
-    int numEmptyFilterSegments = 0;
-    int numMatchAllFilterSegments = 0;
+    InstanceResponseOperator responseOperator = (InstanceResponseOperator) queryPlan.getPlanNode().run();
 
-    // Get the list of unique explain plans
-    operatorDepthToRowDataMap = getAllSegmentsUniqueExplainPlanRowData(root);
-    List<ExplainPlanRows> listOfExplainPlans = new ArrayList<>();
-    operatorDepthToRowDataMap.forEach((key, value) -> listOfExplainPlans.addAll(value));
+    try {
+      responseOperator.prefetchAll();
 
-    // Setup the combine root's explain string
-    explainResults.addOperator(root.toExplainString(), 2, 1);
+      List<? extends Operator> childOperators = queryPlan.getPlanNode().run().getChildOperators();
+      assert childOperators.size() == 1;
+      Operator root = childOperators.get(0);
+      Map<Integer, List<ExplainPlanRows>> operatorDepthToRowDataMap;
+      int numEmptyFilterSegments = 0;
+      int numMatchAllFilterSegments = 0;
 
-    // Walk through all the explain plans and create the entries in the explain plan output for each plan
-    for (ExplainPlanRows explainPlanRows : listOfExplainPlans) {
-      numEmptyFilterSegments +=
-          explainPlanRows.isHasEmptyFilter() ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
-      numMatchAllFilterSegments +=
-          explainPlanRows.isHasMatchAllFilter() ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
-      explainResults.addOperator(
-          String.format(ExplainPlanRows.PLAN_START_FORMAT, explainPlanRows.getNumSegmentsMatchingThisPlan()),
-          ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS);
-      for (ExplainPlanRowData explainPlanRowData : explainPlanRows.getExplainPlanRowData()) {
-        explainResults.addOperator(explainPlanRowData.getExplainPlanString(), explainPlanRowData.getOperatorId(),
-            explainPlanRowData.getParentId());
+      // Get the list of unique explain plans
+      operatorDepthToRowDataMap = getAllSegmentsUniqueExplainPlanRowData(root);
+      List<ExplainPlanRows> listOfExplainPlans = new ArrayList<>();
+      operatorDepthToRowDataMap.forEach((key, value) -> listOfExplainPlans.addAll(value));
+
+      // Setup the combine root's explain string
+      explainResults.addOperator(root.toExplainString(), 2, 1);
+
+      // Walk through all the explain plans and create the entries in the explain plan output for each plan
+      for (ExplainPlanRows explainPlanRows : listOfExplainPlans) {
+        numEmptyFilterSegments +=
+            explainPlanRows.isHasEmptyFilter() ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
+        numMatchAllFilterSegments +=
+            explainPlanRows.isHasMatchAllFilter() ? explainPlanRows.getNumSegmentsMatchingThisPlan() : 0;
+        explainResults.addOperator(
+            String.format(ExplainPlanRows.PLAN_START_FORMAT, explainPlanRows.getNumSegmentsMatchingThisPlan()),
+            ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS);
+        for (ExplainPlanRowData explainPlanRowData : explainPlanRows.getExplainPlanRowData()) {
+          explainResults.addOperator(explainPlanRowData.getExplainPlanString(), explainPlanRowData.getOperatorId(),
+              explainPlanRowData.getParentId());
+        }
       }
-    }
 
-    InstanceResponseBlock instanceResponse = new InstanceResponseBlock(explainResults, queryContext);
-    instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
-        String.valueOf(numEmptyFilterSegments));
-    instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
-        String.valueOf(numMatchAllFilterSegments));
-    return instanceResponse;
+      InstanceResponseBlock instanceResponse = new InstanceResponseBlock(explainResults, queryContext);
+      instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
+          String.valueOf(numEmptyFilterSegments));
+      instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
+          String.valueOf(numMatchAllFilterSegments));
+      return instanceResponse;
+    } finally {
+      responseOperator.releaseAll();
+    }
   }
 
   /**
@@ -572,7 +558,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       ExpressionContext subqueryExpression = arguments.get(1);
       Preconditions.checkState(subqueryExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of IN_PARTITIONED_SUBQUERY must be a literal (subquery)");
-      QueryContext subquery = QueryContextConverterUtils.getQueryContext(subqueryExpression.getLiteralString());
+      QueryContext subquery =
+          QueryContextConverterUtils.getQueryContext(subqueryExpression.getLiteral().getStringValue());
       // Subquery should be an ID_SET aggregation only query
       //noinspection rawtypes
       AggregationFunction[] aggregationFunctions = subquery.getAggregationFunctions();

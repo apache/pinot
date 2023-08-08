@@ -65,11 +65,16 @@ import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.events.SchemaEventType;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -101,6 +106,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA)
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
   public String listSchemaNames() {
     List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();
@@ -117,6 +123,7 @@ public class PinotSchemaRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.GET_SCHEMA)
   @ApiOperation(value = "Get a schema", notes = "Gets a schema by name")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -136,6 +143,7 @@ public class PinotSchemaRestletResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.DELETE_SCHEMA)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete a schema", notes = "Deletes a schema by name")
   @ApiResponses(value = {
@@ -153,6 +161,7 @@ public class PinotSchemaRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.UPDATE_SCHEMA)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
   @ApiResponses(value = {
@@ -176,6 +185,7 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.UPDATE_SCHEMA)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
   @ApiResponses(value = {
@@ -226,6 +236,10 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema.getSchemaName());
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.CREATE_SCHEMA)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
@@ -263,6 +277,10 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema.getSchemaName());
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.CREATE_SCHEMA)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProperties.getRight());
   }
@@ -287,6 +305,10 @@ public class PinotSchemaRestletResource {
     validateSchemaInternal(schema);
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.VALIDATE_SCHEMA)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -321,12 +343,33 @@ public class PinotSchemaRestletResource {
     validateSchemaInternal(schema);
     AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.VALIDATE_SCHEMA)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
       return JsonUtils.objectToPrettyString(response);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Gets the metadata on the valid {@link org.apache.pinot.spi.data.FieldSpec.DataType} for each
+   * {@link org.apache.pinot.spi.data.FieldSpec.FieldType} and the default null values for each combination
+   */
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/schemas/fieldSpec")
+  @ManualAuthorization // Always allow this API
+  @ApiOperation(value = "Get fieldSpec metadata", notes = "Get fieldSpec metadata")
+  public String getFieldSpecMetadata() {
+    try {
+      return JsonUtils.objectToString(FieldSpec.FIELD_SPEC_METADATA);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -341,7 +384,8 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema.getSchemaName());
     try {
       List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schema.getSchemaName());
-      SchemaUtils.validate(schema, tableConfigs);
+      boolean isIgnoreCase = _pinotHelixResourceManager.getTableCache().isIgnoreCase();
+      SchemaUtils.validate(schema, tableConfigs, isIgnoreCase);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Invalid schema: " + schema.getSchemaName() + ". Reason: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
@@ -396,7 +440,7 @@ public class PinotSchemaRestletResource {
     }
 
     try {
-      _pinotHelixResourceManager.updateSchema(schema, reload);
+      _pinotHelixResourceManager.updateSchema(schema, reload, false);
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
@@ -450,20 +494,28 @@ public class PinotSchemaRestletResource {
     }
 
     // If the schema is associated with a table, we should not delete it.
-    List<String> tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
-    for (String tableName : tableNames) {
-      TableConfig config = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
-      String tableSchema = config.getValidationConfig().getSchemaName();
-
-      if (schemaName.equals(tableSchema)) {
+    // TODO: Check OFFLINE tables as well. There are 2 side effects:
+    //       - Increases ZK read when there are lots of OFFLINE tables
+    //       - Behavior change since we don't allow deleting schema for OFFLINE tables
+    List<String> realtimeTables = _pinotHelixResourceManager.getAllRealtimeTables();
+    for (String realtimeTableName : realtimeTables) {
+      if (schemaName.equals(TableNameBuilder.extractRawTableName(realtimeTableName))) {
         throw new ControllerApplicationException(LOGGER,
-            String.format("Cannot delete schema %s, as it is associated with table %s", schemaName, tableName),
+            String.format("Cannot delete schema %s, as it is associated with table %s", schemaName, realtimeTableName),
             Response.Status.CONFLICT);
+      }
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(realtimeTableName);
+      if (tableConfig != null) {
+        if (schemaName.equals(tableConfig.getValidationConfig().getSchemaName())) {
+          throw new ControllerApplicationException(LOGGER,
+              String.format("Cannot delete schema %s, as it is associated with table %s", schemaName,
+                  realtimeTableName), Response.Status.CONFLICT);
+        }
       }
     }
 
     LOGGER.info("Trying to delete schema {}", schemaName);
-    if (_pinotHelixResourceManager.deleteSchema(schema)) {
+    if (_pinotHelixResourceManager.deleteSchema(schemaName)) {
       LOGGER.info("Notifying metadata event for deleting schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.DELETE);
       LOGGER.info("Success: Deleted schema {}", schemaName);

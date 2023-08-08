@@ -21,9 +21,9 @@ package org.apache.pinot.segment.spi.store;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Set;
 import org.apache.pinot.segment.spi.FetchContext;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
@@ -53,7 +53,7 @@ public abstract class ColumnIndexDirectory implements Closeable {
    * @return ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer getBuffer(String column, ColumnIndexType type)
+  public abstract PinotDataBuffer getBuffer(String column, IndexType<?, ?, ?> type)
       throws IOException;
 
   /**
@@ -64,7 +64,7 @@ public abstract class ColumnIndexDirectory implements Closeable {
    * @return ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newBuffer(String column, ColumnIndexType type, long sizeBytes)
+  public abstract PinotDataBuffer newBuffer(String column, IndexType<?, ?, ?> type, long sizeBytes)
       throws IOException;
 
   /**
@@ -73,20 +73,20 @@ public abstract class ColumnIndexDirectory implements Closeable {
    * @param type index type
    * @return true if the index exists; false otherwise
    */
-  public abstract boolean hasIndexFor(String column, ColumnIndexType type);
+  public abstract boolean hasIndexFor(String column, IndexType<?, ?, ?> type);
 
   /**
    * Remove the specified index
    * @param columnName column name
    * @param indexType index type
    */
-  public abstract void removeIndex(String columnName, ColumnIndexType indexType);
+  public abstract void removeIndex(String columnName, IndexType<?, ?, ?> indexType);
 
   /**
    * Get the columns with specific index type, loaded by column index directory.
    * @return a set of columns with such index type.
    */
-  public abstract Set<String> getColumnsWithIndex(ColumnIndexType type);
+  public abstract Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type);
 
   /**
    * A hint to prefetch the buffers for columns in the context, in preparation for operating on the segment.
@@ -104,18 +104,5 @@ public abstract class ColumnIndexDirectory implements Closeable {
    * An instruction to release the fetched buffers for columns in this context, after operating on this segment.
    */
   public void releaseBuffer(FetchContext fetchContext) {
-  }
-
-  public PinotDataBuffer getStarTreeIndex()
-      throws IOException {
-    throw new UnsupportedOperationException();
-  }
-
-  /**
-   * The caller should close the input stream.
-   */
-  public InputStream getStarTreeIndexMap()
-      throws IOException {
-    throw new UnsupportedOperationException();
   }
 }

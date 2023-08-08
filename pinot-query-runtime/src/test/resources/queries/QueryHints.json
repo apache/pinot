@@ -1,0 +1,110 @@
+{
+  "hint_option_queries": {
+    "tables": {
+      "tbl1" : {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "name", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "a"],
+          [2, "b"],
+          [3, "c"],
+          [3, "yyy"],
+          [4, "e"],
+          [4, "e"],
+          [6, "e"],
+          [7, "d"],
+          [7, "f"],
+          [8, "z"]
+        ],
+        "partitionColumns": [
+          "num"
+        ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "val", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "xxx"],
+          [1, "xxx"],
+          [3, "yyy"],
+          [3, "zzz"],
+          [5, "zzz"],
+          [6, "e"],
+          [7, "d"],
+          [8, "z"]
+        ],
+        "partitionColumns": [
+          "num"
+        ]
+      },
+      "tbl_empty" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "strCol2", "type": "STRING"}
+        ],
+        "inputs": [ ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Wrong partition key",
+        "sql": "SELECT {tbl1}.num, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='name', partition_size='4') */ GROUP BY {tbl1}.num",
+        "expectedException": "Error composing query plan for.*"
+      },
+      {
+        "description": "Wrong partition size",
+        "sql": "SELECT {tbl1}.num, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='2') */ GROUP BY {tbl1}.num",
+        "expectedException": "Error composing query plan for.*"
+      },
+      {
+        "description": "Group by partition column",
+        "sql": "SELECT {tbl1}.num, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "Colocated JOIN with partition column",
+        "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Colocated JOIN with partition column and group by partition column",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, {tbl1}.name, SUM({tbl2}.num) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num GROUP BY {tbl1}.num, {tbl1}.name"
+      },
+      {
+        "description": "Colocated JOIN with partition column and group by non-partitioned column",
+        "sql": "SELECT {tbl1}.name, SUM({tbl2}.num) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Colocated JOIN with partition column and group by non-partitioned column with stage parallelism",
+        "sql": "SET stageParallelism=2; SELECT {tbl1}.name, SUM({tbl2}.num) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Colocated, Dynamic broadcast SEMI-JOIN with partition column",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.num, {tbl1}.name FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.val IN ('xxx', 'yyy'))"
+      },
+      {
+        "description": "Colocated, Dynamic broadcast SEMI-JOIN with partition column and group by partition column",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast'), aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, COUNT({tbl1}.name) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.val IN ('xxx', 'yyy')) GROUP BY {tbl1}.num, {tbl1}.name"
+      },
+      {
+        "description": "Colocated, Dynamic broadcast SEMI-JOIN with partition column and group by non-partitioned column",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.name, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.val IN ('xxx', 'yyy')) GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Dynamic broadcast SEMI-JOIN with empty right table result",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.name, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.val = 'non-exist') GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Colocated, Dynamic broadcast SEMI-JOIN with partially empty right table result for some servers",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.name, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.val = 'z') GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Skip leaf stage aggregation with GROUP BY hint",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), MIN({tbl1}.num) FROM {tbl1} WHERE {tbl1}.num >= 0 GROUP BY {tbl1}.name"
+      }
+    ]
+  }
+}

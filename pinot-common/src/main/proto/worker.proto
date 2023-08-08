@@ -44,12 +44,22 @@ import "plan.proto";
 service PinotQueryWorker {
   // Dispatch a QueryRequest to a PinotQueryWorker
   rpc Submit(QueryRequest) returns (QueryResponse);
+
+  rpc Cancel(CancelRequest) returns (CancelResponse);
 }
 
-// QueryRequest is the dispatched content for a specific query stage on a specific worker.
+message CancelRequest {
+  int64 requestId = 1;
+}
+
+message CancelResponse {
+  // intentionally left empty
+}
+
+// QueryRequest is the dispatched content for all query stages to a physical worker.
 message QueryRequest {
-  map<string, string> metadata = 1;
-  StagePlan stagePlan = 2;
+  repeated StagePlan stagePlan = 1;
+  map<string, string> metadata = 2;
 }
 
 // QueryResponse is the dispatched response from worker, it doesn't contain actual data, only dispatch status.
@@ -60,23 +70,25 @@ message QueryResponse {
 
 message StagePlan {
   int32 stageId = 1;
-  string instanceId = 2;
-  StageNode stageRoot = 3;
-  map<int32, StageMetadata> stageMetadata = 4;
+  StageNode stageRoot = 2;
+  StageMetadata stageMetadata = 3;
 }
 
 message StageMetadata {
-  repeated string instances = 1;
-  repeated string dataSources = 2;
-  map<string, SegmentMap> instanceToSegmentMap = 3;
-  string timeColumn = 4;
-  string timeValue = 5;
+  repeated WorkerMetadata workerMetadata = 1;
+  map<string, string> customProperty = 2;
+  string serverAddress = 3;
+  repeated int32 workerIds = 4;
 }
 
-message SegmentMap {
-  map<string, SegmentList> tableTypeToSegmentList = 1;
+message WorkerMetadata {
+  string virtualAddress = 1;
+  map<int32, MailboxMetadata> mailboxMetadata = 2;
+  map<string, string> customProperty = 3;
 }
 
-message SegmentList {
-  repeated string segments = 1;
+message MailboxMetadata {
+  repeated string mailboxId = 1;
+  repeated string virtualAddress = 2;
+  map<string, string> customProperty = 3;
 }

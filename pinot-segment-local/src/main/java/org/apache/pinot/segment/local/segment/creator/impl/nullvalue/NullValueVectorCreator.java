@@ -19,44 +19,67 @@
 package org.apache.pinot.segment.local.segment.creator.impl.nullvalue;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.RoaringBitmapWriter;
 
 
 /**
  * Used to persist the null bitmap on disk. This is used by SegmentCreator while indexing rows.
+ *
+ * Although this class implements {@link IndexCreator}, it is not intended to be used as a normal IndexCreator.
+ * Specifically, neither {@link #add(Object, int)} or {@link #add(Object[], int[])} should be called on this object.
+ * In order to make sure these methods are not being called, they throw exceptions in this class.
+ *
+ * This requirement is a corollary from the fact that the {@link IndexCreator} contract assumes the value will never be
+ * null, which is true for all index creators types unless this one.
  */
-public class NullValueVectorCreator implements Closeable {
-  private final MutableRoaringBitmap _nullBitmap = new MutableRoaringBitmap();
+public class NullValueVectorCreator implements IndexCreator {
+  private final RoaringBitmapWriter<RoaringBitmap> _bitmapWriter;
   private final File _nullValueVectorFile;
 
+  @Override
+  public void add(@Nonnull Object value, int dictId)
+      throws IOException {
+    throw new UnsupportedOperationException("NullValueVector should not be built as a normal index");
+  }
+
+  @Override
+  public void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+      throws IOException {
+    throw new UnsupportedOperationException("NullValueVector should not be built as a normal index");
+  }
+
   public NullValueVectorCreator(File indexDir, String columnName) {
+    _bitmapWriter = RoaringBitmapWriter.writer().get();
     _nullValueVectorFile = new File(indexDir, columnName + V1Constants.Indexes.NULLVALUE_VECTOR_FILE_EXTENSION);
   }
 
   public void setNull(int docId) {
-    _nullBitmap.add(docId);
+    _bitmapWriter.add(docId);
   }
 
   public void seal()
       throws IOException {
     // Create null value vector file only if the bitmap is not empty
-    if (!_nullBitmap.isEmpty()) {
+    RoaringBitmap nullBitmap = _bitmapWriter.get();
+    if (!nullBitmap.isEmpty()) {
       try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_nullValueVectorFile))) {
-        _nullBitmap.serialize(outputStream);
+        nullBitmap.serialize(outputStream);
       }
     }
   }
 
   @VisibleForTesting
-  ImmutableRoaringBitmap getNullBitmap() {
-    return _nullBitmap;
+  RoaringBitmap getNullBitmap() {
+    return _bitmapWriter.get();
   }
 
   @Override

@@ -19,9 +19,10 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
-import java.io.Closeable;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.List;
+import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -31,7 +32,7 @@ import org.apache.pinot.spi.utils.ByteArray;
  * supported. Type conversion between STRING and BYTES via Hex encoding/decoding should be supported.
  */
 @SuppressWarnings("rawtypes")
-public interface Dictionary extends Closeable {
+public interface Dictionary extends IndexReader {
   int NULL_VALUE_INDEX = -1;
 
   /**
@@ -240,6 +241,20 @@ public interface Dictionary extends Closeable {
   default void readBytesValues(int[] dictIds, int length, byte[][] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = getBytesValue(dictIds[i]);
+    }
+  }
+
+  /**
+   * Returns the dictIds for the given sorted values. This method is for the IN/NOT IN predicate evaluation.
+   * @param sortedValues
+   * @param dictIds
+   */
+  default void getDictIds(List<String> sortedValues, IntSet dictIds) {
+    for (String value : sortedValues) {
+      int dictId = indexOf(value);
+      if (dictId >= 0) {
+        dictIds.add(dictId);
+      }
     }
   }
 }

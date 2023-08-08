@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.math.DoubleMath;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -39,28 +38,43 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
-import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.QueryTestSet;
-import org.apache.pinot.query.mailbox.GrpcMailboxService;
-import org.apache.pinot.query.planner.QueryPlan;
-import org.apache.pinot.query.planner.stage.MailboxReceiveNode;
-import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.service.QueryConfig;
-import org.apache.pinot.query.service.QueryDispatcher;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.h2.jdbc.JdbcArray;
 import org.testng.Assert;
 
 
 public abstract class QueryRunnerTestBase extends QueryTestSet {
+  protected static final ExecutorService REDUCE_EXECUTOR = Executors.newCachedThreadPool(
+      new NamedThreadFactory("TEST_REDUCER_SCHEDULER_EXECUTOR"));
   protected static final double DOUBLE_CMP_EPSILON = 0.0001d;
   protected static final String SEGMENT_BREAKER_KEY = "__SEGMENT_BREAKER_KEY__";
   protected static final String SEGMENT_BREAKER_STR = "------";
@@ -69,8 +83,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected QueryEnvironment _queryEnvironment;
   protected String _reducerHostname;
   protected int _reducerGrpcPort;
-  protected Map<ServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
-  protected GrpcMailboxService _mailboxService;
+  protected Map<QueryServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
+  protected MailboxService _mailboxService;
+  protected OpChainSchedulerService _reducerScheduler;
 
   static {
     SEGMENT_BREAKER_ROW.putValue(SEGMENT_BREAKER_KEY, SEGMENT_BREAKER_STR);
@@ -79,37 +94,77 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   // --------------------------------------------------------------------------
   // QUERY UTILS
   // --------------------------------------------------------------------------
-  protected List<Object[]> queryRunner(String sql) {
-    QueryPlan queryPlan = _queryEnvironment.planQuery(sql);
-    Map<String, String> requestMetadataMap =
-        ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()),
-            QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
-            String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
-    MailboxReceiveOperator mailboxReceiveOperator = null;
-    for (int stageId : queryPlan.getStageMetadataMap().keySet()) {
-      if (queryPlan.getQueryStageMap().get(stageId) instanceof MailboxReceiveNode) {
-        MailboxReceiveNode reduceNode = (MailboxReceiveNode) queryPlan.getQueryStageMap().get(stageId);
-        mailboxReceiveOperator = QueryDispatcher.createReduceStageOperator(_mailboxService,
-            queryPlan.getStageMetadataMap().get(reduceNode.getSenderStageId()).getServerInstances(),
-            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID)), reduceNode.getSenderStageId(),
-            reduceNode.getDataSchema(), "localhost", _reducerGrpcPort,
-            Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)));
+
+  /**
+   * Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
+   * ser/de dispatches.
+   */
+  protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
+    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+    QueryEnvironment.QueryPlannerResult queryPlannerResult =
+        _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
+    DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
+    Map<String, String> requestMetadataMap = new HashMap<>();
+    requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId));
+    requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
+        String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
+
+    // Putting trace testing here as extra options as it doesn't go along with the rest of the items.
+    if (executionStatsAggregatorMap != null) {
+      requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
+    }
+
+    int reducerStageId = -1;
+    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
+      if (dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
+          .getFragmentRoot() instanceof MailboxReceiveNode) {
+        reducerStageId = stageId;
       } else {
-        for (ServerInstance serverInstance : queryPlan.getStageMetadataMap().get(stageId).getServerInstances()) {
-          DistributedStagePlan distributedStagePlan =
-              QueryDispatcher.constructDistributedStagePlan(queryPlan, stageId, serverInstance);
-          _servers.get(serverInstance).processQuery(distributedStagePlan, requestMetadataMap);
-        }
+        processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
+      }
+      if (executionStatsAggregatorMap != null) {
+        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
-    Preconditions.checkNotNull(mailboxReceiveOperator);
-    return QueryDispatcher.toResultTable(
-        QueryDispatcher.reduceMailboxReceive(mailboxReceiveOperator, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS),
-        queryPlan.getQueryResultFields(), queryPlan.getQueryStageMap().get(0).getDataSchema()).getRows();
+    Preconditions.checkState(reducerStageId != -1);
+    ResultTable resultTable = QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
+        Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
+        _reducerScheduler, executionStatsAggregatorMap, true);
+    return resultTable.getRows();
+  }
+
+  protected void processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan, int stageId,
+      Map<String, String> requestMetadataMap) {
+    Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
+        dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap();
+    for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverInstanceToWorkerIdMap.entrySet()) {
+      QueryServerInstance server = entry.getKey();
+      for (int workerId : entry.getValue()) {
+        DistributedStagePlan distributedStagePlan = constructDistributedStagePlan(
+            dispatchableSubPlan, stageId, new VirtualServerAddress(server, workerId));
+        _servers.get(server).processQuery(distributedStagePlan, requestMetadataMap);
+      }
+    }
+  }
+
+  protected static DistributedStagePlan constructDistributedStagePlan(DispatchableSubPlan dispatchableSubPlan,
+      int stageId, VirtualServerAddress serverAddress) {
+    return new DistributedStagePlan(stageId, serverAddress,
+        dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment().getFragmentRoot(),
+        new StageMetadata.Builder().setWorkerMetadataList(
+                dispatchableSubPlan.getQueryStageList().get(stageId).getWorkerMetadataList())
+            .addCustomProperties(dispatchableSubPlan.getQueryStageList().get(stageId).getCustomProperties()).build());
   }
 
   protected List<Object[]> queryH2(String sql)
       throws Exception {
+    int firstSemi = sql.indexOf(';');
+    if (firstSemi > 0 && firstSemi != sql.length() - 1) {
+      // trim off any SET statements for H2
+      sql = sql.substring(firstSemi + 1);
+    }
     Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     h2statement.execute(sql);
     ResultSet h2ResultSet = h2statement.getResultSet();
@@ -126,6 +181,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected void compareRowEquals(List<Object[]> resultRows, List<Object[]> expectedRows) {
+    compareRowEquals(resultRows, expectedRows, false);
+  }
+
+  protected void compareRowEquals(List<Object[]> resultRows, List<Object[]> expectedRows,
+      boolean keepOutputRowsInOrder) {
     Assert.assertEquals(resultRows.size(), expectedRows.size(),
         String.format("Mismatched number of results. expected: %s, actual: %s",
             expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
@@ -144,16 +204,31 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       } else if (l instanceof Long) {
         return Long.compare((Long) l, ((Number) r).longValue());
       } else if (l instanceof Float) {
-        if (DoubleMath.fuzzyEquals((Float) l, ((Number) r).floatValue(), DOUBLE_CMP_EPSILON)) {
+        float lf = (Float) l;
+        float rf = ((Number) r).floatValue();
+        if (DoubleMath.fuzzyEquals(lf, rf, DOUBLE_CMP_EPSILON)) {
           return 0;
         }
-        return Float.compare((Float) l, ((Number) r).floatValue());
+        float maxf = Math.max(Math.abs(lf), Math.abs(rf));
+        if (DoubleMath.fuzzyEquals(lf / maxf, rf / maxf, DOUBLE_CMP_EPSILON)) {
+          return 0;
+        }
+        return Float.compare(lf, rf);
       } else if (l instanceof Double) {
-        if (DoubleMath.fuzzyEquals((Double) l, ((Number) r).doubleValue(), DOUBLE_CMP_EPSILON)) {
+        double ld = (Double) l;
+        double rd = ((Number) r).doubleValue();
+        if (DoubleMath.fuzzyEquals(ld, rd, DOUBLE_CMP_EPSILON)) {
           return 0;
         }
-        return Double.compare((Double) l, ((Number) r).doubleValue());
+        double maxd = Math.max(Math.abs(ld), Math.abs(rd));
+        if (DoubleMath.fuzzyEquals(ld / maxd, rd / maxd, DOUBLE_CMP_EPSILON)) {
+          return 0;
+        }
+        return Double.compare(ld, rd);
       } else if (l instanceof String) {
+        if (r instanceof byte[]) {
+          return ((String) l).compareTo(BytesUtils.toHexString((byte[]) r));
+        }
         return ((String) l).compareTo((String) r);
       } else if (l instanceof Boolean) {
         return ((Boolean) l).compareTo((Boolean) r);
@@ -163,10 +238,78 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         } else {
           return ((BigDecimal) l).compareTo(new BigDecimal((String) r));
         }
+      } else if (l instanceof byte[]) {
+        if (r instanceof byte[]) {
+          return ByteArray.compare((byte[]) l, (byte[]) r);
+        } else {
+          return ByteArray.compare((byte[]) l, ((ByteArray) r).getBytes());
+        }
       } else if (l instanceof ByteArray) {
-        return ((ByteArray) l).compareTo(new ByteArray((byte[]) r));
+        if (r instanceof ByteArray) {
+          return ((ByteArray) l).compareTo((ByteArray) r);
+        } else {
+          return ByteArray.compare(((ByteArray) l).getBytes(), (byte[]) r);
+        }
       } else if (l instanceof Timestamp) {
         return ((Timestamp) l).compareTo((Timestamp) r);
+      } else if (l instanceof int[]) {
+        int[] larray = (int[]) l;
+        try {
+          if (r instanceof JdbcArray) {
+            Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
+            for (int idx = 0; idx < larray.length; idx++) {
+              Number relement = (Number) rarray[idx];
+              if (larray[idx] != relement.intValue()) {
+                return -1;
+              }
+            }
+          } else {
+            int[] rarray = (int[]) r;
+            for (int idx = 0; idx < larray.length; idx++) {
+              if (larray[idx] != rarray[idx]) {
+                return -1;
+              }
+            }
+          }
+        } catch (SQLException e) {
+          throw new RuntimeException(e);
+        }
+        return 0;
+      } else if (l instanceof String[]) {
+        String[] larray = (String[]) l;
+        try {
+          if (r instanceof JdbcArray) {
+            Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
+            for (int idx = 0; idx < larray.length; idx++) {
+              if (!larray[idx].equals(rarray[idx])) {
+                return -1;
+              }
+            }
+          } else {
+            String[] rarray = (r instanceof List) ? ((List<String>) r).toArray(new String[0]) : (String[]) r;
+            for (int idx = 0; idx < larray.length; idx++) {
+              if (!larray[idx].equals(rarray[idx])) {
+                return -1;
+              }
+            }
+          }
+        } catch (SQLException e) {
+          throw new RuntimeException(e);
+        }
+        return 0;
+      } else if (l instanceof JdbcArray) {
+        try {
+          Object[] larray = (Object[]) ((JdbcArray) l).getArray();
+          Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
+          for (int idx = 0; idx < larray.length; idx++) {
+            if (!larray[idx].equals(rarray[idx])) {
+              return -1;
+            }
+          }
+        } catch (SQLException e) {
+          throw new RuntimeException(e);
+        }
+        return 0;
       } else {
         throw new RuntimeException("non supported type " + l.getClass());
       }
@@ -181,8 +324,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       }
       return 0;
     };
-    resultRows.sort(rowComp);
-    expectedRows.sort(rowComp);
+    if (!keepOutputRowsInOrder) {
+      resultRows.sort(rowComp);
+      expectedRows.sort(rowComp);
+    }
     for (int i = 0; i < resultRows.size(); i++) {
       Object[] resultRow = resultRows.get(i);
       Object[] expectedRow = expectedRows.get(i);
@@ -203,7 +348,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected Schema constructSchema(String schemaName, List<QueryTestCase.ColumnAndType> columnAndTypes) {
     Schema.SchemaBuilder builder = new Schema.SchemaBuilder();
     for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
-      builder.addSingleValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
+      if (columnAndType._isSingleValue) {
+        builder.addSingleValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
+      } else {
+        builder.addMultiValueDimension(columnAndType._name, FieldSpec.DataType.valueOf(columnAndType._type));
+      }
     }
     // TODO: ts is built-in, but we should allow user overwrite
     builder.addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:SECONDS");
@@ -255,7 +404,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected void addDataToH2(String tableName, Schema schema, List<GenericRow> rows)
-      throws SQLException {
+      throws SQLException, DecoderException {
     if (rows != null && rows.size() > 0) {
       // prepare the statement for ingestion
       List<String> h2FieldNamesAndTypes = toH2FieldNamesAndTypes(schema);
@@ -264,14 +413,27 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         params.append(",?");
       }
       PreparedStatement h2Statement =
-          _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params.toString() + ")");
+          _h2Connection.prepareStatement("INSERT INTO " + tableName + " VALUES (" + params + ")");
 
       // insert data into table
       for (GenericRow row : rows) {
         int h2Index = 1;
         for (String fieldName : schema.getColumnNames()) {
           Object value = row.getValue(fieldName);
-          h2Statement.setObject(h2Index++, value);
+          if (value instanceof List) {
+            h2Statement.setArray(h2Index++,
+                _h2Connection.createArrayOf(getH2FieldType(schema.getFieldSpecFor(fieldName).getDataType()),
+                    ((List) value).toArray()));
+          } else {
+            switch (schema.getFieldSpecFor(fieldName).getDataType()) {
+              case BYTES:
+                h2Statement.setBytes(h2Index++, Hex.decodeHex((String) value));
+                break;
+              default:
+                h2Statement.setObject(h2Index++, value);
+                break;
+            }
+          }
         }
         h2Statement.execute();
       }
@@ -282,39 +444,37 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     List<String> fieldNamesAndTypes = new ArrayList<>(pinotSchema.size());
     for (String fieldName : pinotSchema.getColumnNames()) {
       FieldSpec.DataType dataType = pinotSchema.getFieldSpecFor(fieldName).getDataType();
-      String fieldType;
-      switch (dataType) {
-        case INT:
-        case LONG:
-          fieldType = "bigint";
-          break;
-        case STRING:
-          fieldType = "varchar(128)";
-          break;
-        case FLOAT:
-          fieldType = "real";
-          break;
-        case DOUBLE:
-          fieldType = "double";
-          break;
-        case BOOLEAN:
-          fieldType = "BOOLEAN";
-          break;
-        case BIG_DECIMAL:
-          fieldType = "NUMERIC";
-          break;
-        case BYTES:
-          fieldType = "BYTEA";
-          break;
-        case TIMESTAMP:
-          fieldType = "TIMESTAMP";
-          break;
-        default:
-          throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
+      String fieldType = getH2FieldType(dataType);
+      if (!pinotSchema.getFieldSpecFor(fieldName).isSingleValueField()) {
+        fieldType += " ARRAY";
       }
       fieldNamesAndTypes.add(fieldName + " " + fieldType);
     }
     return fieldNamesAndTypes;
+  }
+
+  private static String getH2FieldType(FieldSpec.DataType dataType) {
+    switch (dataType) {
+      case INT:
+      case LONG:
+        return "bigint";
+      case STRING:
+        return "varchar(128)";
+      case FLOAT:
+        return "real";
+      case DOUBLE:
+        return "double";
+      case BOOLEAN:
+        return "BOOLEAN";
+      case BIG_DECIMAL:
+        return "NUMERIC(1200, 600)";
+      case BYTES:
+        return "BYTEA";
+      case TIMESTAMP:
+        return "TIMESTAMP";
+      default:
+        throw new UnsupportedOperationException("Unsupported type conversion to h2 type: " + dataType);
+    }
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -348,12 +508,18 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public boolean _ignored;
       @JsonProperty("sql")
       public String _sql;
+      @JsonProperty("h2Sql")
+      public String _h2Sql;
       @JsonProperty("description")
       public String _description;
       @JsonProperty("outputs")
       public List<List<Object>> _outputs = null;
       @JsonProperty("expectedException")
       public String _expectedException;
+      @JsonProperty("keepOutputRowOrder")
+      public boolean _keepOutputRowOrder;
+      @JsonProperty("expectedNumSegments")
+      public Integer _expectedNumSegments;
     }
 
     public static class ColumnAndType {
@@ -361,6 +527,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       String _name;
       @JsonProperty("type")
       String _type;
+      @JsonProperty("isSingleValue")
+      boolean _isSingleValue = true;
     }
   }
 }

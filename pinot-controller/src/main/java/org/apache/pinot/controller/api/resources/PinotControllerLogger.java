@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -61,6 +62,9 @@ import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -84,6 +88,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOGGER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all the loggers", notes = "Return all the logger names")
   public List<String> getLoggers() {
@@ -92,6 +97,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/{loggerName}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOGGER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get logger configs", notes = "Return logger info")
   public Map<String, String> getLogger(
@@ -105,6 +111,7 @@ public class PinotControllerLogger {
 
   @PUT
   @Path("/loggers/{loggerName}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_LOGGER)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Set logger level", notes = "Set logger level for a given logger")
   public Map<String, String> setLoggerLevel(@ApiParam(value = "Logger name") @PathParam("loggerName") String loggerName,
@@ -114,6 +121,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/files")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get all local log files")
   public Set<String> getLocalLogFiles() {
@@ -129,6 +137,7 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/download")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Download a log file")
@@ -143,9 +152,11 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/instances")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Collect log files from all the instances")
-  public Map<String, Set<String>> getLogFilesFromAllInstances() {
+  public Map<String, Set<String>> getLogFilesFromAllInstances(
+      @HeaderParam(HttpHeaders.AUTHORIZATION) String authorization) {
     if (_logFileServer == null || _logFileServer instanceof DummyLogFileServer) {
       throw new WebApplicationException("Root directory doesn't exist", Response.Status.INTERNAL_SERVER_ERROR);
     }
@@ -154,7 +165,7 @@ public class PinotControllerLogger {
     onlineInstanceList.forEach(
         instance -> {
           try {
-            instancesToLogFilesMap.put(instance, getLogFilesFromInstance(instance));
+            instancesToLogFilesMap.put(instance, getLogFilesFromInstance(authorization, instance));
           } catch (Exception e) {
             // Skip the instance for any exception.
           }
@@ -164,13 +175,19 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/instances/{instanceName}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Collect log files from a given instance")
   public Set<String> getLogFilesFromInstance(
+      @HeaderParam(HttpHeaders.AUTHORIZATION) String authorization,
       @ApiParam(value = "Instance Name", required = true) @PathParam("instanceName") String instanceName) {
     try {
       URI uri = new URI(getInstanceBaseUri(instanceName) + "/loggers/files");
-      SimpleHttpResponse simpleHttpResponse = _fileUploadDownloadClient.getHttpClient().sendGetRequest(uri);
+      Map<String, String> headers = new HashMap<>();
+      if (authorization != null) {
+        headers.put(HttpHeaders.AUTHORIZATION, authorization);
+      }
+      SimpleHttpResponse simpleHttpResponse = _fileUploadDownloadClient.getHttpClient().sendGetRequest(uri, headers);
       if (simpleHttpResponse.getStatusCode() >= 400) {
         throw new WebApplicationException("Failed to fetch logs from instance name: " + instanceName,
             Response.Status.fromStatusCode(simpleHttpResponse.getStatusCode()));
@@ -185,10 +202,12 @@ public class PinotControllerLogger {
 
   @GET
   @Path("/loggers/instances/{instanceName}/download")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_LOG_FILE)
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Download a log file from a given instance")
   public Response downloadLogFileFromInstance(
+      @HeaderParam(HttpHeaders.AUTHORIZATION) String authorization,
       @ApiParam(value = "Instance Name", required = true) @PathParam("instanceName") String instanceName,
       @ApiParam(value = "Log file path", required = true) @QueryParam("filePath") String filePath,
       @Context Map<String, String> headers) {
@@ -200,6 +219,9 @@ public class PinotControllerLogger {
         for (Map.Entry<String, String> header : headers.entrySet()) {
           requestBuilder.addHeader(header.getKey(), header.getValue());
         }
+      }
+      if (authorization != null) {
+        requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authorization);
       }
       CloseableHttpResponse httpResponse = _fileUploadDownloadClient.getHttpClient().execute(requestBuilder.build());
       if (httpResponse.getStatusLine().getStatusCode() >= 400) {

@@ -99,9 +99,11 @@ public class SegmentCommitterFactoryTest {
     Map<String, String> streamConfigMap = new HashMap<>(getMinimumStreamConfigMap());
     streamConfigMap.put(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE, "true");
     TableConfig config = createRealtimeTableConfig("testDeepStoreConfig", streamConfigMap).build();
+    IndexLoadingConfig indexLoadingConfig = Mockito.mock(IndexLoadingConfig.class);
+    Mockito.when(indexLoadingConfig.getSegmentStoreURI()).thenReturn("file:///path/to/segment/store.txt");
 
     SegmentCommitterFactory factory = new SegmentCommitterFactory(Mockito.mock(Logger.class), protocolHandler, config,
-        Mockito.mock(IndexLoadingConfig.class), Mockito.mock(ServerMetrics.class));
+        indexLoadingConfig, Mockito.mock(ServerMetrics.class));
     SegmentCommitter committer = factory.createSegmentCommitter(true, requestParams, controllerVipUrl);
     Assert.assertNotNull(committer);
     Assert.assertTrue(committer instanceof SplitSegmentCommitter);
@@ -115,7 +117,7 @@ public class SegmentCommitterFactoryTest {
         .build();
 
     factory = new SegmentCommitterFactory(Mockito.mock(Logger.class), protocolHandler, config1,
-        Mockito.mock(IndexLoadingConfig.class), Mockito.mock(ServerMetrics.class));
+        indexLoadingConfig, Mockito.mock(ServerMetrics.class));
     committer = factory.createSegmentCommitter(true, requestParams, controllerVipUrl);
     Assert.assertNotNull(committer);
     Assert.assertTrue(committer instanceof SplitSegmentCommitter);

@@ -19,22 +19,15 @@
 package org.apache.pinot.segment.spi.creator;
 
 import java.io.File;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
-import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
-import org.apache.pinot.spi.config.table.BloomFilterConfig;
-import org.apache.pinot.spi.config.table.FSTType;
-import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Provides parameters for constructing indexes via {@see IndexCreatorProvider}.
+ * Provides parameters for constructing indexes via {@link IndexType#createIndexCreator(IndexCreationContext, Object)}.
  * The responsibility for ensuring that the correct parameters for a particular
  * index type lies with the caller.
  */
@@ -68,6 +61,33 @@ public interface IndexCreationContext {
 
   boolean forwardIndexDisabled();
 
+  /**
+   * Returns a sorted array with the unique values for the associated column.
+   *
+   * Primitive types will be stored in an unboxed array (ie if the column contains {@code int}s, this method returns an
+   * {@code int[]}).
+   *
+   * This is an abstraction leak from Text and FST indexes.
+   */
+  Object getSortedUniqueElementsArray();
+
+  /**
+   * This could be set for all metrics in {@link IndexingConfig#isOptimizeDictionary()} or only when the field is a
+   * metric with {@link IndexingConfig#isOptimizeDictionaryForMetrics()}, in which case this method will only return
+   * true if the column is a metric.
+   *
+   * Therefore the caller code doesn't need to verify the later condition.
+   */
+  boolean isOptimizeDictionary();
+
+  boolean isFixedLength();
+
+  /**
+   * This is an abstraction leak from TextIndexType.
+   * @return
+   */
+  boolean isTextCommitOnClose();
+
   final class Builder {
     private File _indexDir;
     private int _lengthOfLongestEntry;
@@ -83,11 +103,22 @@ public interface IndexCreationContext {
     private Comparable<?> _minValue;
     private Comparable<?> _maxValue;
     private boolean _forwardIndexDisabled;
+    private Object _sortedUniqueElementsArray;
+    private boolean _optimizedDictionary;
+    private boolean _fixedLength;
+    private boolean _textCommitOnClose;
 
     public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
       return withLengthOfLongestEntry(columnIndexCreationInfo.getLengthOfLongestEntry())
           .withMaxNumberOfMultiValueElements(columnIndexCreationInfo.getMaxNumberOfMultiValueElements())
-          .withMaxRowLengthInBytes(columnIndexCreationInfo.getMaxRowLengthInBytes());
+          .withMaxRowLengthInBytes(columnIndexCreationInfo.getMaxRowLengthInBytes())
+          .withMinValue((Comparable<?>) columnIndexCreationInfo.getMin())
+          .withMaxValue((Comparable<?>) columnIndexCreationInfo.getMax())
+          .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
+          .withSortedUniqueElementsArray(columnIndexCreationInfo.getSortedUniqueElementsArray())
+          .withCardinality(columnIndexCreationInfo.getDistinctValueCount())
+          .withFixedLength(columnIndexCreationInfo.isFixedLength())
+          .sorted(columnIndexCreationInfo.isSorted());
     }
 
     public Builder withIndexDir(File indexDir) {
@@ -110,6 +141,16 @@ public interface IndexCreationContext {
           .withMinValue(columnMetadata.getMinValue())
           .withMaxValue(columnMetadata.getMaxValue())
           .withMaxNumberOfMultiValueElements(columnMetadata.getMaxNumberOfMultiValues());
+    }
+
+    public Builder withOptimizedDictionary(boolean optimized) {
+      _optimizedDictionary = optimized;
+      return this;
+    }
+
+    public Builder withFixedLength(boolean fixedLength) {
+      _fixedLength = fixedLength;
+      return this;
     }
 
     public Builder withLengthOfLongestEntry(int lengthOfLongestEntry) {
@@ -167,15 +208,26 @@ public interface IndexCreationContext {
       return this;
     }
 
-    public Builder withforwardIndexDisabled(boolean forwardIndexDisabled) {
+    public Builder withForwardIndexDisabled(boolean forwardIndexDisabled) {
       _forwardIndexDisabled = forwardIndexDisabled;
+      return this;
+    }
+
+    public Builder withTextCommitOnClose(boolean textCommitOnClose) {
+      _textCommitOnClose = textCommitOnClose;
       return this;
     }
 
     public Common build() {
       return new Common(Objects.requireNonNull(_indexDir), _lengthOfLongestEntry, _maxNumberOfMultiValueElements,
           _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
-          _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled);
+          _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled,
+          _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose);
+    }
+
+    public Builder withSortedUniqueElementsArray(Object sortedUniqueElementsArray) {
+      _sortedUniqueElementsArray = sortedUniqueElementsArray;
+      return this;
     }
   }
 
@@ -199,12 +251,17 @@ public interface IndexCreationContext {
     private final Comparable<?> _minValue;
     private final Comparable<?> _maxValue;
     private final boolean _forwardIndexDisabled;
+    private final Object _sortedUniqueElementsArray;
+    private final boolean _optimizeDictionary;
+    private final boolean _fixedLength;
+    private final boolean _textCommitOnClose;
 
     public Common(File indexDir, int lengthOfLongestEntry,
         int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
         FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
         int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
-        boolean forwardIndexDisabled) {
+        boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary,
+        boolean fixedLength, boolean textCommitOnClose) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
@@ -219,6 +276,10 @@ public interface IndexCreationContext {
       _minValue = minValue;
       _maxValue = maxValue;
       _forwardIndexDisabled = forwardIndexDisabled;
+      _sortedUniqueElementsArray = sortedUniqueElementsArray;
+      _optimizeDictionary = optimizeDictionary;
+      _fixedLength = fixedLength;
+      _textCommitOnClose = textCommitOnClose;
     }
 
     public FieldSpec getFieldSpec() {
@@ -280,264 +341,24 @@ public interface IndexCreationContext {
       return _forwardIndexDisabled;
     }
 
-    public BloomFilter forBloomFilter(BloomFilterConfig bloomFilterConfig) {
-      return new BloomFilter(this, bloomFilterConfig);
-    }
-
-    public Forward forForwardIndex(ChunkCompressionType chunkCompressionType,
-        @Nullable Map<String, Map<String, String>> columnProperties) {
-      return new Forward(this, chunkCompressionType, columnProperties);
-    }
-
-    public Text forFSTIndex(FSTType fstType, String[] sortedUniqueElementsArray) {
-      return new Text(this, fstType, sortedUniqueElementsArray);
-    }
-
-    public Geospatial forGeospatialIndex(H3IndexConfig h3IndexConfig) {
-      return new Geospatial(this, h3IndexConfig);
-    }
-
-    public Inverted forInvertedIndex() {
-      return new Inverted(this);
-    }
-
-    public Json forJsonIndex(JsonIndexConfig jsonIndexConfig) {
-      return new Json(this, jsonIndexConfig);
-    }
-
-    public Range forRangeIndex(int rangeIndexVersion) {
-      return new Range(this, rangeIndexVersion);
-    }
-
-    public Text forTextIndex(FSTType fstType, boolean commitOnClose, List<String> stopWordsInclude,
-        List<String> stopWordExclude) {
-      return new Text(this, fstType, commitOnClose, stopWordsInclude, stopWordExclude);
-    }
-  }
-
-  class Wrapper implements IndexCreationContext {
-
-    private final IndexCreationContext _delegate;
-
-    Wrapper(IndexCreationContext delegate) {
-      _delegate = delegate;
-    }
-
     @Override
-    public FieldSpec getFieldSpec() {
-      return _delegate.getFieldSpec();
-    }
-
-    @Override
-    public File getIndexDir() {
-      return _delegate.getIndexDir();
-    }
-
-    @Override
-    public boolean isOnHeap() {
-      return _delegate.isOnHeap();
-    }
-
-    @Override
-    public int getLengthOfLongestEntry() {
-      return _delegate.getLengthOfLongestEntry();
-    }
-
-    @Override
-    public int getMaxNumberOfMultiValueElements() {
-      return _delegate.getMaxNumberOfMultiValueElements();
-    }
-
-    @Override
-    public int getMaxRowLengthInBytes() {
-      return _delegate.getMaxRowLengthInBytes();
-    }
-
-    @Override
-    public boolean isSorted() {
-      return _delegate.isSorted();
-    }
-
-    @Override
-    public int getCardinality() {
-      return _delegate.getCardinality();
-    }
-
-    @Override
-    public int getTotalNumberOfEntries() {
-      return _delegate.getTotalNumberOfEntries();
-    }
-
-    @Override
-    public int getTotalDocs() {
-      return _delegate.getTotalDocs();
-    }
-
-    @Override
-    public boolean hasDictionary() {
-      return _delegate.hasDictionary();
-    }
-
-    @Override
-    public Comparable getMinValue() {
-      return _delegate.getMinValue();
-    }
-
-    @Override
-    public Comparable getMaxValue() {
-      return _delegate.getMaxValue();
-    }
-
-    @Override
-    public boolean forwardIndexDisabled() {
-      return _delegate.forwardIndexDisabled();
-    }
-  }
-
-  class BloomFilter extends Wrapper {
-
-    private final BloomFilterConfig _bloomFilterConfig;
-
-    public BloomFilter(IndexCreationContext wrapped, BloomFilterConfig bloomFilterConfig) {
-      super(wrapped);
-      _bloomFilterConfig = bloomFilterConfig;
-    }
-
-    public BloomFilterConfig getBloomFilterConfig() {
-      return _bloomFilterConfig;
-    }
-  }
-
-  class Forward extends Wrapper {
-
-    private final ChunkCompressionType _chunkCompressionType;
-    private final Map<String, Map<String, String>> _columnProperties;
-
-    Forward(IndexCreationContext delegate, ChunkCompressionType chunkCompressionType,
-        @Nullable Map<String, Map<String, String>> columnProperties) {
-      super(delegate);
-      _chunkCompressionType = chunkCompressionType;
-      _columnProperties = columnProperties;
-    }
-
-    public ChunkCompressionType getChunkCompressionType() {
-      return _chunkCompressionType;
-    }
-
-    @Nullable
-    public Map<String, Map<String, String>> getColumnProperties() {
-      return _columnProperties;
-    }
-  }
-
-  class Geospatial extends Wrapper {
-
-    private final H3IndexConfig _h3IndexConfig;
-
-    Geospatial(IndexCreationContext delegate, H3IndexConfig h3IndexConfig) {
-      super(delegate);
-      _h3IndexConfig = h3IndexConfig;
-    }
-
-    public H3IndexConfig getH3IndexConfig() {
-      return _h3IndexConfig;
-    }
-  }
-
-  class Inverted extends Wrapper {
-
-    Inverted(IndexCreationContext delegate) {
-      super(delegate);
-    }
-  }
-
-  class Json extends Wrapper {
-    private final JsonIndexConfig _jsonIndexConfig;
-
-    public Json(IndexCreationContext delegate, JsonIndexConfig jsonIndexConfig) {
-      super(delegate);
-      _jsonIndexConfig = jsonIndexConfig;
-    }
-
-    public JsonIndexConfig getJsonIndexConfig() {
-      return _jsonIndexConfig;
-    }
-  }
-
-  class Range extends Wrapper {
-    private final int _rangeIndexVersion;
-
-
-    Range(IndexCreationContext delegate, int rangeIndexVersion) {
-      super(delegate);
-      _rangeIndexVersion = rangeIndexVersion;
-    }
-
-    public int getRangeIndexVersion() {
-      return _rangeIndexVersion;
-    }
-  }
-
-  class Text extends Wrapper {
-    private final boolean _commitOnClose;
-    private final boolean _isFst;
-    private final FSTType _fstType;
-    private final String[] _sortedUniqueElementsArray;
-
-    @Nullable
-    public List<String> getStopWordsInclude() {
-      return _stopWordsInclude;
-    }
-
-    @Nullable
-    public List<String> getStopWordsExclude() {
-      return _stopWordsExclude;
-    }
-
-    private final List<String> _stopWordsInclude;
-    private final List<String> _stopWordsExclude;
-
-    /**
-     * For text indexes
-     */
-    public Text(IndexCreationContext wrapped, FSTType fstType, boolean commitOnClose, List<String> stopWordsInclude,
-        List<String> stopWordExclude) {
-      super(wrapped);
-      _commitOnClose = commitOnClose;
-      _fstType = fstType;
-      _sortedUniqueElementsArray = null;
-      _isFst = false;
-      _stopWordsInclude = stopWordsInclude;
-      _stopWordsExclude = stopWordExclude;
-    }
-
-    /**
-     * For FST indexes
-     */
-    public Text(IndexCreationContext wrapped, FSTType fstType, String[] sortedUniqueElementsArray) {
-      super(wrapped);
-      _commitOnClose = true;
-      _fstType = fstType;
-      _sortedUniqueElementsArray = sortedUniqueElementsArray;
-      _isFst = true;
-      _stopWordsInclude = Collections.EMPTY_LIST;
-      _stopWordsExclude = Collections.EMPTY_LIST;
-    }
-
-    public boolean isCommitOnClose() {
-      return _commitOnClose;
-    }
-
-    public FSTType getFstType() {
-      return _fstType;
-    }
-
-    public boolean isFst() {
-      return _isFst;
-    }
-
-    public String[] getSortedUniqueElementsArray() {
+    public Object getSortedUniqueElementsArray() {
       return _sortedUniqueElementsArray;
+    }
+
+    @Override
+    public boolean isOptimizeDictionary() {
+      return _optimizeDictionary;
+    }
+
+    @Override
+    public boolean isFixedLength() {
+      return _fixedLength;
+    }
+
+    @Override
+    public boolean isTextCommitOnClose() {
+      return _textCommitOnClose;
     }
   }
 }

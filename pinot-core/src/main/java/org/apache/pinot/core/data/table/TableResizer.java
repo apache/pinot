@@ -86,10 +86,12 @@ public class TableResizer {
     _numOrderByExpressions = orderByExpressions.size();
     _orderByValueExtractors = new OrderByValueExtractor[_numOrderByExpressions];
     Comparator[] comparators = new Comparator[_numOrderByExpressions];
+    int[] nullComparisonResults = new int[_numOrderByExpressions];
     for (int i = 0; i < _numOrderByExpressions; i++) {
       OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
       _orderByValueExtractors[i] = getOrderByValueExtractor(orderByExpression.getExpression());
       comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
+      nullComparisonResults[i] = orderByExpression.isNullsLast() ? -1 : 1;
     }
     boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     if (nullHandlingEnabled) {
@@ -101,10 +103,9 @@ public class TableResizer {
             if (v2 == null) {
               continue;
             }
-            // The default null ordering is NULLS LAST, regardless of the ordering direction.
-            return 1;
+            return -nullComparisonResults[i];
           } else if (v2 == null) {
-            return -1;
+            return nullComparisonResults[i];
           }
           int result = comparators[i].compare(v1, v2);
           if (result != 0) {
@@ -131,7 +132,7 @@ public class TableResizer {
    */
   private OrderByValueExtractor getOrderByValueExtractor(ExpressionContext expression) {
     if (expression.getType() == ExpressionContext.Type.LITERAL) {
-      return new LiteralExtractor(expression.getLiteralString());
+      return new LiteralExtractor(expression.getLiteral().getStringValue());
     }
     Integer groupByExpressionIndex = _groupByExpressionIndexMap.get(expression);
     if (groupByExpressionIndex != null) {

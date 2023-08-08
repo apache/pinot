@@ -129,6 +129,15 @@ public class VarLengthValueReader implements ValueReader {
   }
 
   @Override
+  public int compareBytes(int index, int numBytesPerValue, byte[] bytes) {
+    int offsetPosition = _dataSectionStartOffSet + Integer.BYTES * index;
+    int startOffset = _dataBuffer.getInt(offsetPosition);
+    int endOffset = _dataBuffer.getInt(offsetPosition + Integer.BYTES);
+    int length = endOffset - startOffset;
+    return ValueReaderComparisons.compareBytes(_dataBuffer, startOffset, length, bytes);
+  }
+
+  @Override
   public void close() {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.

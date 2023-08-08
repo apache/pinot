@@ -1,0 +1,175 @@
+{
+  "stats_aggregate_non_h2": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "groupingCol", "type": "STRING"},
+          {"name": "partitionCol", "type": "STRING"},
+          {"name": "val", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", "key1", 1],
+          ["a", "key2", 2],
+          ["a", "key3", 3],
+          ["a", "key1", 4],
+          ["a", "key2", 4],
+          ["a", "key3", 4],
+          ["a", "key1", 7],
+          ["a", "key2", 9],
+          ["b", "key3", 1],
+          ["b", "key1", 2],
+          ["b", "key2", 3],
+          ["b", "key3", 4],
+          ["b", "key1", 4],
+          ["b", "key2", 4],
+          ["b", "key3", 7],
+          ["b", "key1", 9]
+        ],
+        "partitionColumns": [
+          "partitionCol"
+        ]
+      },
+      "tbl2": {
+        "schema": [
+          {"name": "groupingCol", "type": "STRING"},
+          {"name": "partitionCol", "type": "STRING"},
+          {"name": "val", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", "key1", 1],
+          ["a", "key2", 2],
+          ["a", "key3", 3],
+          ["a", "key1", 4],
+          ["a", "key2", 4],
+          ["a", "key3", 4],
+          ["a", "key1", 7],
+          ["a", "key2", 9],
+          ["b", "key3", 1],
+          ["b", "key1", 2],
+          ["b", "key2", 3],
+          ["b", "key3", 4],
+          ["b", "key1", 4],
+          ["b", "key2", 4],
+          ["b", "key3", 7],
+          ["b", "key1", 9]
+        ],
+        "partitionColumns": [
+          "partitionCol"
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "skew for int column",
+        "sql": "SELECT groupingCol, SKEWNESS(val), KURTOSIS(val) FROM {tbl} GROUP BY groupingCol",
+        "outputs": [
+          ["a", 0.8647536091225356, 0.3561662049861511],
+          ["b", 0.8647536091225356, 0.3561662049861511]
+        ]
+      },
+      {
+        "description": "no group by clause",
+        "sql": "SELECT SKEWNESS(val), KURTOSIS(val) FROM {tbl} WHERE groupingCol='a'",
+        "outputs": [
+          [0.8647536091225356, 0.3561662049861511]
+        ]
+      },
+      {
+        "sql": "SELECT t1.groupingCol, SKEWNESS(t1.val + t2.val), KURTOSIS(t1.val + t2.val) FROM {tbl} AS t1 LEFT JOIN {tbl2} AS t2 USING (partitionCol) GROUP BY t1.groupingCol",
+        "outputs": [
+          ["a", 0.5412443772804422, -0.001438580062540293],
+          ["b", 0.5412443772804422, -0.001438580062540293]
+        ]
+      }
+    ]
+  },
+  "stats_aggregate_h2": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "groupingCol", "type": "STRING"},
+          {"name": "partitionCol", "type": "STRING"},
+          {"name": "val", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", "key1", 1],
+          ["a", "key2", 2],
+          ["a", "key3", 3],
+          ["a", "key1", 4],
+          ["a", "key2", 4],
+          ["a", "key3", 4],
+          ["a", "key1", 7],
+          ["a", "key2", 9],
+          ["b", "key3", 1],
+          ["b", "key1", 2],
+          ["b", "key2", 3],
+          ["b", "key3", 4],
+          ["b", "key1", 4],
+          ["b", "key2", 4],
+          ["b", "key3", 7],
+          ["b", "key1", 9]
+        ],
+        "partitionColumns": [
+          "partitionCol"
+        ]
+      },
+      "tbl2": {
+        "schema": [
+          {"name": "groupingCol", "type": "STRING"},
+          {"name": "partitionCol", "type": "STRING"},
+          {"name": "val", "type": "INT"}
+        ],
+        "inputs": [
+          ["a", "key1", 1],
+          ["a", "key2", 2],
+          ["a", "key3", 3],
+          ["a", "key1", 4],
+          ["a", "key2", 4],
+          ["a", "key3", 4],
+          ["a", "key1", 7],
+          ["a", "key2", 9],
+          ["b", "key3", 1],
+          ["b", "key1", 2],
+          ["b", "key2", 3],
+          ["b", "key3", 4],
+          ["b", "key1", 4],
+          ["b", "key2", 4],
+          ["b", "key3", 7],
+          ["b", "key1", 9]
+        ],
+        "partitionColumns": [
+          "partitionCol"
+        ]
+      }
+    },
+    "queries": [
+      {
+        "sql": "SELECT groupingCol, COVARPOP(val, val), COVARSAMP(val, val), VARPOP(val), VARSAMP(val), STDDEVPOP(val), STDDEVSAMP(val) FROM {tbl} GROUP BY groupingCol",
+        "h2Sql": "SELECT groupingCol, COVAR_POP(val, val), COVAR_SAMP(val, val), VAR_POP(val), VAR_SAMP(val), STDDEV_POP(val), STDDEV_SAMP(val) FROM {tbl} GROUP BY groupingCol"
+      },
+      {
+        "sql": "SELECT COVARPOP(val, val), COVARSAMP(val, val), VARPOP(val), VARSAMP(val), STDDEVPOP(val), STDDEVSAMP(val) FROM {tbl} WHERE groupingCol='a'",
+        "h2Sql": "SELECT COVAR_POP(val, val), COVAR_SAMP(val, val), VAR_POP(val), VAR_SAMP(val), STDDEV_POP(val), STDDEV_SAMP(val) FROM {tbl} WHERE groupingCol='a'"
+      },
+      {
+        "sql": "SELECT t1.groupingCol, COVARPOP(t1.val, t2.val), COVARSAMP(t1.val, t2.val), VARPOP(t1.val + t2.val), VARSAMP(t1.val + t2.val), STDDEVPOP(t1.val + t2.val), STDDEVSAMP(t1.val + t2.val) FROM {tbl} AS t1 LEFT JOIN {tbl2} AS t2 USING (partitionCol) GROUP BY t1.groupingCol",
+        "h2Sql": "SELECT t1.groupingCol, COVAR_POP(t1.val, t2.val), COVAR_SAMP(t1.val, t2.val), VAR_POP(t1.val + t2.val), VAR_SAMP(t1.val + t2.val), STDDEV_POP(t1.val + t2.val), STDDEV_SAMP(t1.val + t2.val) FROM {tbl} AS t1 LEFT JOIN {tbl2} AS t2 USING (partitionCol) GROUP BY t1.groupingCol"
+      },
+      {
+        "ignored": true,
+        "comments": "standard name with underscore creates un-supported function from agg-reduce-function calcite rule",
+        "sql": "SELECT groupingCol, COVAR_POP(val, val), COVAR_SAMP(val, val), VAR_POP(val), VAR_SAMP(val), STD_DEV_POP(val), STD_DEV_SAMP(val) FROM {tbl} GROUP BY groupingCol"
+      },
+      {
+        "ignored": true,
+        "comments": "standard name with underscore creates un-supported function from agg-reduce-function calcite rule",
+        "sql": "SELECT COVAR_POP(val, val), COVAR_SAMP(val, val), VAR_POP(val), VAR_SAMP(val), STD_DEV_POP(val), STD_DEV_SAMP(val) FROM {tbl} WHERE groupingCol='a'"
+      },
+      {
+        "ignored": true,
+        "comments": "standard name with underscore creates un-supported function from agg-reduce-function calcite rule",
+        "sql": "SELECT t1.groupingCol, COVAR_POP(t1.val, t2.val), COVAR_SAMP(t1.val, t2.val), VAR_POP(t1.val + t2.val), VAR_SAMP(t1.val + t2.val), STD_DEV_POP(t1.val + t2.val), STD_DEV_SAMP(t1.val + t2.val) FROM {tbl} AS t1 LEFT JOIN {tbl2} AS t2 USING (partitionCol) GROUP BY t1.groupingCol"
+      }
+    ]
+  }
+}

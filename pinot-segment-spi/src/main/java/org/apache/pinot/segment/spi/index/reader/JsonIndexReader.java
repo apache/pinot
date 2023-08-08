@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
-import java.io.Closeable;
+import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
  * Reader for json index.
  */
-public interface JsonIndexReader extends Closeable {
+public interface JsonIndexReader extends IndexReader {
 
   /**
    * Returns the matching document ids for the given filter.

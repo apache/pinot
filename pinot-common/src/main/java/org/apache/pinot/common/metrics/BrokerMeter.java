@@ -32,6 +32,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", false),
 
   // These metrics track the exceptions caught during query execution in broker side.
+  // Query rejected by Jersey thread pool executor
+  QUERY_REJECTED_EXCEPTIONS("exceptions", true),
   // Query compile phase.
   REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
   // Get resource phase.
@@ -40,6 +42,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
   // Query validation phase.
   UNKNOWN_COLUMN_EXCEPTIONS("exceptions", false),
+  // Queries preempted by accountant
+  QUERIES_KILLED("query", true),
   // Scatter phase.
   NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
   REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS("exceptions", false),
@@ -51,6 +55,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   DATA_TABLE_DESERIALIZATION_EXCEPTIONS("exceptions", false),
   // Reduce responses phase.
   RESPONSE_MERGE_EXCEPTIONS("exceptions", false),
+  HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
+  HEAP_PANIC_LEVEL_EXCEEDED("count", true),
 
   // These metrics track the number of bad broker responses.
   // This metric track the number of broker responses with processing exceptions inside.

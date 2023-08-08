@@ -84,9 +84,9 @@ public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegr
   @Test
   public void testControllerExtraEndpointsAutoLoaded()
       throws Exception {
-    String response = sendGetRequest(_controllerBaseApiUrl + "/test/echo/doge");
+    String response = sendGetRequest(getControllerBaseApiUrl() + "/test/echo/doge");
     Assert.assertEquals(response, "doge");
-    response = sendGetRequest(_brokerBaseApiUrl + "/test/echo/doge");
+    response = sendGetRequest(getBrokerBaseApiUrl() + "/test/echo/doge");
     Assert.assertEquals(response, "doge");
   }
 }

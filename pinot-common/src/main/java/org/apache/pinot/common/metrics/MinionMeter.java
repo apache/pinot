@@ -24,12 +24,14 @@ import org.apache.pinot.common.Utils;
 public enum MinionMeter implements AbstractMetrics.Meter {
   HEALTH_CHECK_GOOD_CALLS("healthChecks", true),
   HEALTH_CHECK_BAD_CALLS("healthChecks", true),
-
+  NUMBER_TASKS("tasks", false),
   NUMBER_TASKS_EXECUTED("tasks", false),
   NUMBER_TASKS_COMPLETED("tasks", false),
   NUMBER_TASKS_CANCELLED("tasks", false),
   NUMBER_TASKS_FAILED("tasks", false),
-  NUMBER_TASKS_FATAL_FAILED("tasks", false);
+  NUMBER_TASKS_FATAL_FAILED("tasks", false),
+  SEGMENT_UPLOAD_FAIL_COUNT("segments", false),
+  SEGMENT_DOWNLOAD_FAIL_COUNT("segments", false);
 
   private final String _meterName;
   private final String _unit;

@@ -194,6 +194,23 @@ public class NullHandlingTransformFunctionTest {
   }
 
   @Test
+  public void testIsNullTransformFunctionNullLiteral()
+      throws Exception {
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("null IS NULL"));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof IsNullTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.IS_NULL.getName());
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = true;
+    }
+    testTransformFunction(expression, expectedValues);
+  }
+
+  @Test
   public void testIsNotNullTransformFunction()
       throws Exception {
     testIsNotNullTransformFunction(INT_SV_COLUMN);
@@ -221,6 +238,23 @@ public class NullHandlingTransformFunctionTest {
     testTransformFunction(expression, expectedValues);
   }
 
+  @Test
+  public void testIsNotNullTransformFunctionNullLiteral()
+      throws Exception {
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("null IS NOT NULL"));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof IsNotNullTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.IS_NOT_NULL.getName());
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = false;
+    }
+    testTransformFunction(expression, expectedValues);
+  }
+
   protected void testTransformFunction(ExpressionContext expression, boolean[] expectedValues)
       throws Exception {
     int[] intValues = getTransformFunctionInstance(expression).transformToIntValuesSV(_projectionBlock);
@@ -229,16 +263,14 @@ public class NullHandlingTransformFunctionTest {
     double[] doubleValues = getTransformFunctionInstance(expression).transformToDoubleValuesSV(_projectionBlock);
     BigDecimal[] bigDecimalValues =
         getTransformFunctionInstance(expression).transformToBigDecimalValuesSV(_projectionBlock);
-    // TODO: Support implicit cast from BOOLEAN to STRING
-//    String[] stringValues = getTransformFunctionInstance(expression).transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(intValues[i] == 1, expectedValues[i]);
       assertEquals(longValues[i] == 1, expectedValues[i]);
       assertEquals(floatValues[i] == 1, expectedValues[i]);
       assertEquals(doubleValues[i] == 1, expectedValues[i]);
       assertEquals(bigDecimalValues[i].intValue() == 1, expectedValues[i]);
-//      assertEquals(stringValues[i], Boolean.toString(expectedValues[i]));
     }
+    assertEquals(getTransformFunctionInstance(expression).getNullBitmap(_projectionBlock), null);
   }
 
   private TransformFunction getTransformFunctionInstance(ExpressionContext expression) {

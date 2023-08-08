@@ -145,6 +145,7 @@ public abstract class QueryScheduler {
   @Nullable
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
 
+    //Start instrumentation context. This must not be moved further below interspersed into the code.
     Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
 
     _latestQueryTime.accumulate(System.currentTimeMillis());
@@ -278,7 +279,7 @@ public abstract class QueryScheduler {
         _numDroppedLogCounter.incrementAndGet();
       }
 
-      if (minConsumingFreshnessMs > -1) {
+      if (minConsumingFreshnessMs > -1 && minConsumingFreshnessMs != Long.MAX_VALUE) {
         _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.FRESHNESS_LAG_MS,
             (System.currentTimeMillis() - minConsumingFreshnessMs), TimeUnit.MILLISECONDS);
       }

@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -103,5 +104,37 @@ public class ModuloTransformFunctionTest extends BaseTransformFunctionTest {
         String.format("mod(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)
     }
     };
+  }
+
+  @Test
+  public void testModuloNullLiteral() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("mod(null, %s)", INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "mod");
+    double[] expectedValues = new double[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testModuloNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("mod(%s, %s)", INT_SV_NULL_COLUMN, LONG_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof ModuloTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "mod");
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = (double) _intSVValues[i] % (double) _longSVValues[i];
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

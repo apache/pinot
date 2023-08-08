@@ -24,12 +24,9 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.DistinctAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
-@SuppressWarnings("rawtypes")
 public class QueryContextUtils {
   private QueryContextUtils() {
   }
@@ -38,7 +35,7 @@ public class QueryContextUtils {
    * Returns {@code true} if the given query is a selection query, {@code false} otherwise.
    */
   public static boolean isSelectionQuery(QueryContext query) {
-    return query.getAggregationFunctions() == null;
+    return !query.isDistinct() && query.getAggregationFunctions() == null;
   }
 
   /**
@@ -47,25 +44,21 @@ public class QueryContextUtils {
    * Selection-only query at this moment means selection query without order-by.
    */
   public static boolean isSelectionOnlyQuery(QueryContext query) {
-    return query.getAggregationFunctions() == null && query.getOrderByExpressions() == null;
+    return isSelectionQuery(query) && query.getOrderByExpressions() == null;
   }
 
   /**
    * Returns {@code true} if the given query is an aggregation query, {@code false} otherwise.
    */
   public static boolean isAggregationQuery(QueryContext query) {
-    AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
-    return aggregationFunctions != null && (aggregationFunctions.length != 1
-        || !(aggregationFunctions[0] instanceof DistinctAggregationFunction));
+    return query.getAggregationFunctions() != null;
   }
 
   /**
    * Returns {@code true} if the given query is a distinct query, {@code false} otherwise.
    */
   public static boolean isDistinctQuery(QueryContext query) {
-    AggregationFunction[] aggregationFunctions = query.getAggregationFunctions();
-    return aggregationFunctions != null && aggregationFunctions.length == 1
-        && aggregationFunctions[0] instanceof DistinctAggregationFunction;
+    return query.isDistinct();
   }
 
   /** Collect aggregation functions (except for the ones in filter). */
@@ -95,7 +88,6 @@ public class QueryContextUtils {
       }
     }
   }
-
 
   /** Collect aggregation functions from an ExpressionContext. */
   public static void collectPostAggregations(ExpressionContext expression, Set<String> postAggregations) {

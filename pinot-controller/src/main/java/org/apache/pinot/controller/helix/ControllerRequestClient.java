@@ -81,6 +81,16 @@ public class ControllerRequestClient {
     }
   }
 
+  public void updateSchema(Schema schema)
+      throws IOException {
+    String url = _controllerRequestURLBuilder.forSchemaUpdate(schema.getSchemaName());
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendMultipartPutRequest(url, schema.toSingleLineJsonString()));
+    } catch (HttpErrorStatusException e) {
+      throw new IOException(e);
+    }
+  }
+
   public void deleteSchema(String schemaName)
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaDelete(schemaName);
@@ -276,6 +286,16 @@ public class ControllerRequestClient {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPutRequest(new URL(
               _controllerRequestURLBuilder.forTenantCreate()).toURI(),
           getBrokerTenantRequestPayload(tenantName, numBrokers)));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void deleteBrokerTenant(String tenantName)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(
+              _controllerRequestURLBuilder.forBrokerTenantDelete(tenantName)).toURI()));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

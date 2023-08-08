@@ -1,0 +1,30 @@
+{{- if .Values.broker.ingress.v1beta1.enabled -}}
+{{- $ingressPath := .Values.broker.ingress.v1beta1.path -}}
+{{- $serviceName := include "pinot.broker.fullname" . -}}
+{{- $servicePort := .Values.broker.service.port -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ $serviceName }}
+{{- if .Values.broker.ingress.v1beta1.annotations }}
+  annotations:
+{{ toYaml .Values.broker.ingress.v1beta1.annotations | indent 4 }}
+{{- end }}
+  labels:
+{{- include "pinot.brokerLabels" . | nindent 4 }}
+spec:
+{{- if .Values.broker.ingress.v1beta1.tls }}
+  tls:
+{{ toYaml .Values.broker.ingress.v1beta1.tls | indent 4 }}
+{{- end }}
+  rules:
+    {{- range .Values.broker.ingress.v1beta1.hosts }}
+  - host: {{ . }}
+    http:
+      paths:
+        - path: {{ $ingressPath }}
+          backend:
+            serviceName: {{ $serviceName }}
+            servicePort: {{ $servicePort }}
+    {{- end }}
+{{- end }}

@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table.assignment;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -51,6 +52,10 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
           + "instances if not " + "specified")
   private final int _numInstancesPerPartition;
 
+  @JsonPropertyDescription(
+      "Name of the column used for partition, if not provided table level replica group will be used")
+  private final String _partitionColumn;
+
   private final boolean _minimizeDataMovement;
 
   @JsonCreator
@@ -59,7 +64,8 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
       @JsonProperty("numInstancesPerReplicaGroup") int numInstancesPerReplicaGroup,
       @JsonProperty("numPartitions") int numPartitions,
       @JsonProperty("numInstancesPerPartition") int numInstancesPerPartition,
-      @JsonProperty("minimizeDataMovement") boolean minimizeDataMovement) {
+      @JsonProperty("minimizeDataMovement") boolean minimizeDataMovement,
+      @Nullable @JsonProperty("partitionColumn") String partitionColumn) {
     _replicaGroupBased = replicaGroupBased;
     _numInstances = numInstances;
     _numReplicaGroups = numReplicaGroups;
@@ -67,6 +73,7 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
     _numPartitions = numPartitions;
     _numInstancesPerPartition = numInstancesPerPartition;
     _minimizeDataMovement = minimizeDataMovement;
+    _partitionColumn = partitionColumn;
   }
 
   public boolean isReplicaGroupBased() {
@@ -95,5 +102,10 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
 
   public boolean isMinimizeDataMovement() {
     return _minimizeDataMovement;
+  }
+
+  @Nullable
+  public String getPartitionColumn() {
+    return _partitionColumn;
   }
 }

@@ -43,6 +43,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -114,6 +115,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig offlineTableConfig = createOfflineTableConfig();
+    waitForEVToDisappear(offlineTableConfig.getTableName());
     addTableConfig(offlineTableConfig);
 
     List<File> avroFiles = getAllAvroFiles();
@@ -138,7 +140,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
-    clusterSpec.setControllerURI(_controllerBaseApiUrl);
+    clusterSpec.setControllerURI(getControllerBaseApiUrl());
     jobSpec.setPinotClusterSpecs(new PinotClusterSpec[]{clusterSpec});
 
     File dataDir = new File(_controllerConfig.getDataDir());
@@ -213,6 +215,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig offlineTableConfig = createOfflineTableConfigWithConsistentPush();
+    waitForEVToDisappear(offlineTableConfig.getTableName());
     addTableConfig(offlineTableConfig);
 
     List<File> avroFiles = getAllAvroFiles();
@@ -238,7 +241,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
-    clusterSpec.setControllerURI(_controllerBaseApiUrl);
+    clusterSpec.setControllerURI(getControllerBaseApiUrl());
     jobSpec.setPinotClusterSpecs(new PinotClusterSpec[]{clusterSpec});
 
     File dataDir = new File(_controllerConfig.getDataDir());
@@ -264,7 +267,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Fetch segment lineage entry after running segment metadata push with consistent push enabled.
     String segmentLineageResponse = ControllerTest.sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl)
+        ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
             .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
     // Segment lineage should be in completed state.
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
@@ -313,7 +316,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Fetch segment lineage entry after running segment tar push with consistent push enabled.
     segmentLineageResponse = ControllerTest.sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl)
+        ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
             .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
     // Segment lineage should be in completed state.
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
@@ -362,7 +365,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   @AfterMethod
   public void tearDownTest()
       throws IOException {
-    dropOfflineTable(getTableName());
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    dropOfflineTable(offlineTableName);
   }
 
   @AfterClass

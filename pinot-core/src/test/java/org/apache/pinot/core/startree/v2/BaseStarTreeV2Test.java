@@ -33,7 +33,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.plan.FilterPlanNode;
-import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -256,7 +255,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     assertNotNull(predicateEvaluatorsMap);
 
     // Extract values with star-tree
-    PlanNode starTreeFilterPlanNode =
+    StarTreeFilterPlanNode starTreeFilterPlanNode =
         new StarTreeFilterPlanNode(queryContext, _starTreeV2, predicateEvaluatorsMap, groupByColumnSet);
     List<ForwardIndexReader> starTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
@@ -271,7 +270,7 @@ abstract class BaseStarTreeV2Test<R, A> {
         computeStarTreeResult(starTreeFilterPlanNode, starTreeAggregationColumnReaders, starTreeGroupByColumnReaders);
 
     // Extract values without star-tree
-    PlanNode nonStarTreeFilterPlanNode = new FilterPlanNode(_indexSegment, queryContext);
+    FilterPlanNode nonStarTreeFilterPlanNode = new FilterPlanNode(_indexSegment, queryContext);
     List<ForwardIndexReader> nonStarTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     List<Dictionary> nonStarTreeAggregationColumnDictionaries = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
@@ -305,7 +304,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     }
   }
 
-  private Map<List<Integer>, List<Object>> computeStarTreeResult(PlanNode starTreeFilterPlanNode,
+  private Map<List<Integer>, List<Object>> computeStarTreeResult(StarTreeFilterPlanNode starTreeFilterPlanNode,
       List<ForwardIndexReader> aggregationColumnReaders, List<ForwardIndexReader> groupByColumnReaders)
       throws IOException {
     Map<List<Integer>, List<Object>> result = new HashMap<>();
@@ -372,7 +371,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     }
   }
 
-  private Map<List<Integer>, List<Object>> computeNonStarTreeResult(PlanNode nonStarTreeFilterPlanNode,
+  private Map<List<Integer>, List<Object>> computeNonStarTreeResult(FilterPlanNode nonStarTreeFilterPlanNode,
       List<ForwardIndexReader> aggregationColumnReaders, List<Dictionary> aggregationColumnDictionaries,
       List<ForwardIndexReader> groupByColumnReaders)
       throws IOException {

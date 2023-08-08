@@ -60,7 +60,7 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [
-          "StartBroker",
+          "{{ .Values.broker.startCommand }}",
           "-clusterName", "{{ .Values.cluster.name }}",
           "-zkAddress", {{ include "zookeeper.url" . | quote }},
           "-configFileName", "/var/pinot/broker/config/pinot-broker.conf"
@@ -77,6 +77,9 @@ spec:
           - containerPort: {{ .Values.broker.service.port }}
             protocol: {{ .Values.broker.service.protocol }}
             name: {{ .Values.broker.service.name }}
+{{- if .Values.broker.service.extraPorts }}
+{{ toYaml .Values.broker.service.extraPorts | indent 10 }}
+{{- end }}                  
         volumeMounts:
           - name: config
             mountPath: /var/pinot/broker/config

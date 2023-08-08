@@ -40,8 +40,8 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.LoopUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -93,10 +93,12 @@ public class DistinctTable {
       int numOrderByExpressions = orderByExpressions.size();
       int[] orderByExpressionIndices = new int[numOrderByExpressions];
       int[] comparisonFactors = new int[numOrderByExpressions];
+      int[] nullComparisonFactors = new int[numOrderByExpressions];
       for (int i = 0; i < numOrderByExpressions; i++) {
         OrderByExpressionContext orderByExpression = orderByExpressions.get(i);
         orderByExpressionIndices[i] = columnNames.indexOf(orderByExpression.getExpression().toString());
         comparisonFactors[i] = orderByExpression.isAsc() ? -1 : 1;
+        nullComparisonFactors[i] = orderByExpression.isNullsLast() ? -1 : 1;
       }
       if (_nullHandlingEnabled) {
         _priorityQueue = new ObjectHeapPriorityQueue<>(initialCapacity, (r1, r2) -> {
@@ -110,9 +112,9 @@ public class DistinctTable {
               if (value2 == null) {
                 continue;
               }
-              return comparisonFactors[i];
+              return nullComparisonFactors[i];
             } else if (value2 == null) {
-              return -comparisonFactors[i];
+              return -nullComparisonFactors[i];
             }
             int result = value1.compareTo(value2) * comparisonFactors[i];
             if (result != 0) {
@@ -244,8 +246,8 @@ public class DistinctTable {
     if (hasOrderBy()) {
       for (Record record : distinctTable._records) {
         addWithOrderBy(record);
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedRecords);
         mergedRecords++;
-        LoopUtils.checkMergePhaseInterruption(mergedRecords);
       }
     } else {
       if (_recordSet.size() < _limit) {
@@ -253,8 +255,8 @@ public class DistinctTable {
           if (addWithoutOrderBy(record)) {
             return;
           }
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedRecords);
           mergedRecords++;
-          LoopUtils.checkMergePhaseInterruption(mergedRecords);
         }
       }
     }

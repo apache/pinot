@@ -23,7 +23,7 @@ import { UnControlled as CodeMirror } from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript';
-import { TableData } from 'Models';
+import { InstanceState, TableData } from 'Models';
 import { RouteComponentProps } from 'react-router-dom';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import AppLoader from '../components/AppLoader';
@@ -120,6 +120,11 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
       type: instanceType,
       tags: instanceDetails.tags,
       pools: instanceDetails.pools,
+      grpcPort: instanceDetails.grpcPort,
+      adminPort: instanceDetails.adminPort,
+      queryServicePort: instanceDetails.queryServicePort,
+      queryMailboxPort: instanceDetails.queryMailboxPort,
+      queriesDisabled: instanceDetails.queriesDisabled,
     };
     setState({enabled: instanceDetails.enabled});
     setInstanceDetails(JSON.stringify(instancePutObj, null, 2));
@@ -251,7 +256,7 @@ const InstanceDetails = ({ match }: RouteComponentProps<Props>) => {
   };
 
   const toggleInstanceState = async () => {
-    const result = await PinotMethodUtils.toggleInstanceState(instanceName, state.enabled ? 'DISABLE' : 'ENABLE');
+    const result = await PinotMethodUtils.toggleInstanceState(instanceName, state.enabled ? InstanceState.DISABLE : InstanceState.ENABLE);
     if(result.status){
       dispatch({type: 'success', message: result.status, show: true});
       fetchData();

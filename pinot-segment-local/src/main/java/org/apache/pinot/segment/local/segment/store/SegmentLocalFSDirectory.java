@@ -22,20 +22,20 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -64,6 +64,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   private final ReadMode _readMode;
   private SegmentMetadataImpl _segmentMetadata;
   private ColumnIndexDirectory _columnIndexDirectory;
+  private StarTreeIndexReader _starTreeIndexReader;
   private String _tier;
 
   // Create an empty SegmentLocalFSDirectory object mainly used to
@@ -207,7 +208,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
-  public Set<String> getColumnsWithIndex(ColumnIndexType type) {
+  public Set<String> getColumnsWithIndex(IndexType<?, ?, ?> type) {
     if (_columnIndexDirectory == null) {
       return Collections.emptySet();
     }
@@ -251,7 +252,6 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     if (_columnIndexDirectory != null) {
       return;
     }
-
     switch (_segmentMetadata.getVersion()) {
       case v1:
       case v2:
@@ -268,6 +268,9 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       default:
         break;
     }
+    if (CollectionUtils.isNotEmpty(_segmentMetadata.getStarTreeV2MetadataList())) {
+      _starTreeIndexReader = new StarTreeIndexReader(_segmentDirectory, _segmentMetadata, _readMode);
+    }
   }
 
   @Override
@@ -279,10 +282,14 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         _columnIndexDirectory.close();
         _columnIndexDirectory = null;
       }
+      if (_starTreeIndexReader != null) {
+        _starTreeIndexReader.close();
+        _starTreeIndexReader = null;
+      }
     }
   }
 
-  private PinotDataBuffer getIndexForColumn(String column, ColumnIndexType type)
+  private PinotDataBuffer getIndexForColumn(String column, IndexType<?, ?, ?> type)
       throws IOException {
     PinotDataBuffer buffer;
 
@@ -325,11 +332,9 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         PREFETCHED_PAGES.incrementAndGet();
       }
     } else {
-      // pos needs to be long because buffer.size() is 32 bit but
-      // adding 4k can make it go over int size
       for (long pos = 0; pos < buffer.size() && PREFETCHED_PAGES.get() < prefetchSlowdownPageLimit;
           pos += PAGE_SIZE_BYTES) {
-        buffer.getByte((int) pos);
+        buffer.getByte(pos);
         PREFETCHED_PAGES.incrementAndGet();
       }
     }
@@ -339,14 +344,46 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   public class Reader extends SegmentDirectory.Reader {
 
     @Override
-    public PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
+    public PinotDataBuffer getIndexFor(String column, IndexType<?, ?, ?> type)
         throws IOException {
       return getIndexForColumn(column, type);
     }
 
     @Override
-    public boolean hasIndexFor(String column, ColumnIndexType type) {
+    public boolean hasIndexFor(String column, IndexType<?, ?, ?> type) {
       return _columnIndexDirectory.hasIndexFor(column, type);
+    }
+
+    @Override
+    public boolean hasStarTreeIndex() {
+      return _starTreeIndexReader != null;
+    }
+
+    @Override
+    public SegmentDirectory.Reader getStarTreeIndexReader(int starTreeId) {
+      return new SegmentDirectory.Reader() {
+        @Override
+        public PinotDataBuffer getIndexFor(String column, IndexType<?, ?, ?> type)
+            throws IOException {
+          return _starTreeIndexReader.getBuffer(starTreeId, column, type);
+        }
+
+        @Override
+        public boolean hasIndexFor(String column, IndexType<?, ?, ?> type) {
+          return _starTreeIndexReader.hasIndexFor(starTreeId, column, type);
+        }
+
+        @Override
+        public String toString() {
+          return _starTreeIndexReader.toString() + " for " + starTreeId;
+        }
+
+        @Override
+        public void close()
+            throws IOException {
+          // Noop as _starTreeIndexReader is owned by the top level Reader
+        }
+      };
     }
 
     @Override
@@ -358,18 +395,6 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     @Override
     public String toString() {
       return _segmentDirectory.toString();
-    }
-
-    @Override
-    public PinotDataBuffer getStarTreeIndex()
-        throws IOException {
-      return _columnIndexDirectory.getStarTreeIndex();
-    }
-
-    @Override
-    public InputStream getStarTreeIndexMap()
-        throws IOException {
-      return _columnIndexDirectory.getStarTreeIndexMap();
     }
   }
 
@@ -383,13 +408,13 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes)
+    public PinotDataBuffer newIndexFor(String columnName, IndexType<?, ?, ?> indexType, long sizeBytes)
         throws IOException {
       return getNewIndexBuffer(new IndexKey(columnName, indexType), sizeBytes);
     }
 
     @Override
-    public void removeIndex(String columnName, ColumnIndexType indexType) {
+    public void removeIndex(String columnName, IndexType<?, ?, ?> indexType) {
       _columnIndexDirectory.removeIndex(columnName, indexType);
     }
 
@@ -413,18 +438,22 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
       _segmentLock.unlock();
       if (_columnIndexDirectory != null) {
         _columnIndexDirectory.close();
+        _columnIndexDirectory = null;
       }
-      _columnIndexDirectory = null;
+      if (_starTreeIndexReader != null) {
+        _starTreeIndexReader.close();
+        _starTreeIndexReader = null;
+      }
     }
 
     @Override
-    public PinotDataBuffer getIndexFor(String column, ColumnIndexType type)
+    public PinotDataBuffer getIndexFor(String column, IndexType<?, ?, ?> type)
         throws IOException {
       return getIndexForColumn(column, type);
     }
 
     @Override
-    public boolean hasIndexFor(String column, ColumnIndexType type) {
+    public boolean hasIndexFor(String column, IndexType<?, ?, ?> type) {
       return _columnIndexDirectory.hasIndexFor(column, type);
     }
   }

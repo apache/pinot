@@ -18,32 +18,41 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import java.io.IOException;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+
+
 /**
- * Mailbox is used to send and receive data.
- *
- * Mailbox should be instantiated on both side of MailboxServer.
- *
- * @param <T> type of data carried over the mailbox.
+ * Mailbox that's used to send data.
  */
-public interface SendingMailbox<T> {
+public interface SendingMailbox {
 
   /**
-   * get the unique identifier for the mailbox.
+   * Sends a block to the receiver. Note that SendingMailbox are required to acquire resources lazily in this call, and
+   * they should <b>not</b> acquire any resources when they are created. This method should throw if there was an error
+   * sending the data, since that would allow {@link BlockExchange} to exit early.
+   */
+  void send(TransferableBlock block)
+      throws IOException;
+
+  /**
+   * Called when there is no more data to be sent by the {@link BlockExchange}. This is also a signal for the
+   * SendingMailbox that the sender is done sending data from its end. Note that this doesn't mean that the receiver
+   * has received all the data.
    *
-   * @return Mailbox ID.
-   */
-  String getMailboxId();
-
-  /**
-   * send a data packet through the mailbox.
-   * @param data
-   * @throws UnsupportedOperationException
-   */
-  void send(T data)
-      throws UnsupportedOperationException;
-
-  /**
-   * Complete delivery of the current mailbox.
+   * <p>
+   * <b>Note:</b> While this is similar to a close() method that's usually provided with objects that hold releasable
+   * resources, the key difference is that a SendingMailbox cannot completely release the resources on its end
+   * gracefully, since it would be waiting for the receiver to ack that it has received all the data. See
+   * {@link #cancel} which can allow callers to force release the underlying resources.
+   * </p>
    */
   void complete();
+
+  /**
+   * Cancels the mailbox and notifies the receiver of the cancellation so that it can release the underlying resources.
+   * No more blocks can be sent after calling this method.
+   */
+  void cancel(Throwable t);
 }

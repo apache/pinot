@@ -27,18 +27,10 @@ import java.sql.Statement;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.client.Connection;
-import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.datatable.DataTableFactory;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
@@ -103,9 +95,6 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
       // H2
       ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
     }
-
-    // Setting data table version to 4
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_4);
   }
 
   @Test(dataProvider = "QueryDataProvider")
@@ -161,26 +150,8 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected Connection getPinotConnection() {
-    Properties properties = new Properties();
-    properties.put("queryOptions", "useMultistageEngine=true");
-    if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName());
-    }
-    return _pinotConnection;
-  }
-
-  @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
-    brokerConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, 8421);
-  }
-
-  @Override
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, true);
-    serverConf.setProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, 8842);
-    serverConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, 8422);
+  protected boolean useMultiStageQueryEngine() {
+    return true;
   }
 
   @AfterClass

@@ -33,9 +33,9 @@ import java.util.Queue;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
@@ -115,6 +115,8 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
 
   public StarTreeFilterOperator(QueryContext queryContext, StarTreeV2 starTreeV2,
       Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns) {
+    // This filter operator does not support AND/OR/NOT operations.
+    super(0, false);
     _queryContext = queryContext;
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
@@ -123,11 +125,11 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public FilterBlock getNextBlock() {
+  protected BlockDocIdSet getTrues() {
     if (_resultEmpty) {
-      return EmptyFilterBlock.getInstance();
+      return EmptyDocIdSet.getInstance();
     }
-    return getFilterOperator().nextBlock();
+    return getFilterOperator().nextBlock().getBlockDocIdSet();
   }
 
   @Override
@@ -178,13 +180,14 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         if (numPredicateEvaluators == 1) {
           // Single predicate evaluator
           childFilterOperators.add(
-              FilterOperatorUtils.getLeafFilterOperator(predicateEvaluators.get(0), dataSource, numDocs));
+              FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluators.get(0), dataSource,
+                  numDocs));
         } else {
           // Predicate evaluators conjoined with OR
           List<BaseFilterOperator> orChildFilterOperators = new ArrayList<>(numPredicateEvaluators);
           for (PredicateEvaluator childPredicateEvaluator : predicateEvaluators) {
             orChildFilterOperators.add(
-                FilterOperatorUtils.getLeafFilterOperator(childPredicateEvaluator, dataSource, numDocs));
+                FilterOperatorUtils.getLeafFilterOperator(_queryContext, childPredicateEvaluator, dataSource, numDocs));
           }
           childFilterOperators.add(
               FilterOperatorUtils.getOrFilterOperator(_queryContext, orChildFilterOperators, numDocs));
@@ -203,12 +206,16 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   @Nullable
   private StarTreeResult traverseStarTree() {
     MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
-    Set<String> globalRemainingPredicateColumns = Collections.emptySet();
-    boolean globalRemainingPredicateColumnsSet = false;
+    Set<String> globalRemainingPredicateColumns = null;
 
     StarTree starTree = _starTreeV2.getStarTree();
     List<String> dimensionNames = starTree.getDimensionNames();
     StarTreeNode starTreeRootNode = starTree.getRoot();
+
+    // Track whether we have found a leaf node added to the queue. If we have found a leaf node, and traversed to the
+    // level of the leave node, we can set globalRemainingPredicateColumns if not already set because we know the leaf
+    // node won't split further on other predicate columns.
+    boolean foundLeafNode = starTreeRootNode.isLeaf();
 
     // Use BFS to traverse the star tree
     Queue<StarTreeNode> queue = new ArrayDeque<>();
@@ -216,6 +223,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     int currentDimensionId = -1;
     Set<String> remainingPredicateColumns = new HashSet<>(_predicateEvaluatorsMap.keySet());
     Set<String> remainingGroupByColumns = new HashSet<>(_groupByColumns);
+    if (foundLeafNode) {
+      globalRemainingPredicateColumns = new HashSet<>(remainingPredicateColumns);
+    }
     IntSet matchingDictIds = null;
     StarTreeNode starTreeNode;
     while ((starTreeNode = queue.poll()) != null) {
@@ -225,6 +235,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         String dimension = dimensionNames.get(dimensionId);
         remainingPredicateColumns.remove(dimension);
         remainingGroupByColumns.remove(dimension);
+        if (foundLeafNode && globalRemainingPredicateColumns == null) {
+          globalRemainingPredicateColumns = new HashSet<>(remainingPredicateColumns);
+        }
         matchingDictIds = null;
         currentDimensionId = dimensionId;
       }
@@ -240,14 +253,6 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       // remaining predicate columns for this node
       if (starTreeNode.isLeaf()) {
         matchingDocIds.add((long) starTreeNode.getStartDocId(), starTreeNode.getEndDocId());
-        // Only set the global remaining predicate columns once because we traverse the tree with BFS, so the first leaf
-        // node always have all the remaining predicate columns
-        if (!globalRemainingPredicateColumnsSet) {
-          if (!remainingPredicateColumns.isEmpty()) {
-            globalRemainingPredicateColumns = new HashSet<>(remainingPredicateColumns);
-          }
-          globalRemainingPredicateColumnsSet = true;
-        }
         continue;
       }
 
@@ -257,8 +262,8 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       // Only read star-node when the dimension is not in the global remaining predicate columns or group-by columns
       // because we cannot use star-node in such cases
       StarTreeNode starNode = null;
-      if (!globalRemainingPredicateColumns.contains(childDimension) && !remainingGroupByColumns.contains(
-          childDimension)) {
+      if ((globalRemainingPredicateColumns == null || !globalRemainingPredicateColumns.contains(childDimension))
+          && !remainingGroupByColumns.contains(childDimension)) {
         starNode = starTreeNode.getChildForDimensionValue(StarTreeNode.ALL);
       }
 
@@ -287,18 +292,22 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
           // star-node if so
           if (starNode != null && numMatchingDictIds >= numChildren - 1) {
             List<StarTreeNode> matchingChildNodes = new ArrayList<>();
+            boolean findLeafChildNode = false;
             while (childrenIterator.hasNext()) {
               StarTreeNode childNode = childrenIterator.next();
               if (matchingDictIds.contains(childNode.getDimensionValue())) {
                 matchingChildNodes.add(childNode);
+                findLeafChildNode |= childNode.isLeaf();
               }
             }
             if (matchingChildNodes.size() == numChildren - 1) {
               // All the child nodes (except for the star-node) match the predicate, use the star-node
               queue.add(starNode);
+              foundLeafNode |= starNode.isLeaf();
             } else {
               // Some child nodes do not match the predicate, use the matching child nodes
               queue.addAll(matchingChildNodes);
+              foundLeafNode |= findLeafChildNode;
             }
           } else {
             // Cannot use the star-node, use the matching child nodes
@@ -306,6 +315,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
               StarTreeNode childNode = childrenIterator.next();
               if (matchingDictIds.contains(childNode.getDimensionValue())) {
                 queue.add(childNode);
+                foundLeafNode |= childNode.isLeaf();
               }
             }
           }
@@ -318,6 +328,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
             // Child node might be null because the matching dictionary id might not exist under this branch
             if (childNode != null) {
               queue.add(childNode);
+              foundLeafNode |= childNode.isLeaf();
             }
           }
         }
@@ -327,6 +338,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
         if (starNode != null) {
           // Star-node exists, use it
           queue.add(starNode);
+          foundLeafNode |= starNode.isLeaf();
         } else {
           // Star-node does not exist or cannot be used, add all non-star nodes to the queue
           Iterator<? extends StarTreeNode> childrenIterator = starTreeNode.getChildrenIterator();
@@ -334,13 +346,15 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
             StarTreeNode childNode = childrenIterator.next();
             if (childNode.getDimensionValue() != StarTreeNode.ALL) {
               queue.add(childNode);
+              foundLeafNode |= childNode.isLeaf();
             }
           }
         }
       }
     }
 
-    return new StarTreeResult(matchingDocIds, globalRemainingPredicateColumns);
+    return new StarTreeResult(matchingDocIds,
+        globalRemainingPredicateColumns != null ? globalRemainingPredicateColumns : Collections.emptySet());
   }
 
   /**

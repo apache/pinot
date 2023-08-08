@@ -50,7 +50,6 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -111,6 +110,7 @@ public abstract class BaseResourceTest {
     when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
     when(serverInstance.getInstanceDataManager().getSegmentFileDirectory())
         .thenReturn(FileUtils.getTempDirectoryPath());
+    when(serverInstance.getHelixManager()).thenReturn(mock(HelixManager.class));
 
     // Mock the segment uploader
     SegmentUploader segmentUploader = mock(SegmentUploader.class);
@@ -129,7 +129,7 @@ public abstract class BaseResourceTest {
     setUpSegment(realtimeTableName, null, "default", _realtimeIndexSegments);
     setUpSegment(offlineTableName, null, "default", _offlineIndexSegments);
 
-    PinotConfiguration serverConf = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+    PinotConfiguration serverConf = new PinotConfiguration();
     String hostname = serverConf.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
         serverConf.getProperty(CommonConstants.Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false)
             ? NetUtils.getHostnameOrAddress() : NetUtils.getHostAddress());
@@ -194,9 +194,8 @@ public abstract class BaseResourceTest {
     // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager requires
     //       table config.
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager
-        .init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class),
-            mock(HelixManager.class), null, new TableDataManagerParams(0, false, -1));
+    tableDataManager.init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
+        mock(ServerMetrics.class), mock(HelixManager.class), null, null, new TableDataManagerParams(0, false, -1));
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }

@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.docidsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
@@ -30,9 +31,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
- * The FilterBlockDocIdSet to perform OR on all child FilterBlockDocIdSets.
+ * The BlockDocIdSet to perform OR on all child BlockDocIdSets.
  * <p>The OrBlockDocIdSet will construct the BlockDocIdIterator based on the BlockDocIdIterators from the child
- * FilterBlockDocIdSets:
+ * BlockDocIdSets:
  * <ul>
  *   <li>
  *     When there are more than one index-base BlockDocIdIterator (SortedDocIdIterator or BitmapBasedDocIdIterator),
@@ -45,11 +46,11 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  *   </li>
  * </ul>
  */
-public final class OrDocIdSet implements FilterBlockDocIdSet {
-  private final List<FilterBlockDocIdSet> _docIdSets;
+public final class OrDocIdSet implements BlockDocIdSet {
+  private final List<BlockDocIdSet> _docIdSets;
   private final int _numDocs;
 
-  public OrDocIdSet(List<FilterBlockDocIdSet> docIdSets, int numDocs) {
+  public OrDocIdSet(List<BlockDocIdSet> docIdSets, int numDocs) {
     _docIdSets = docIdSets;
     _numDocs = numDocs;
   }
@@ -112,7 +113,7 @@ public final class OrDocIdSet implements FilterBlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     long numEntriesScannedInFilter = 0L;
-    for (FilterBlockDocIdSet docIdSet : _docIdSets) {
+    for (BlockDocIdSet docIdSet : _docIdSets) {
       numEntriesScannedInFilter += docIdSet.getNumEntriesScannedInFilter();
     }
     return numEntriesScannedInFilter;

@@ -26,8 +26,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.lineage.LineageEntry;
-import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -58,8 +56,6 @@ import org.slf4j.LoggerFactory;
  */
 public class RetentionManager extends ControllerPeriodicTask<Void> {
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
-  private static final long REPLACED_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
-  public static final long LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
@@ -94,7 +90,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   @Override
   protected void postprocess() {
     LOGGER.info("Removing aged deleted segments for all tables");
-    _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments();
+    _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_leadControllerManager);
   }
 
   private void manageRetentionForTable(TableConfig tableConfig) {
@@ -163,6 +159,10 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         }
       }
     }
+
+    // Remove last sealed segments such that the table can still create new consuming segments if it's paused
+    segmentsToDelete.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(realtimeTableName));
+
     if (!segmentsToDelete.isEmpty()) {
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
       _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
@@ -198,8 +198,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     try {
       DEFAULT_RETRY_POLICY.attempt(() -> {
         // Fetch segment lineage
-        ZNRecord segmentLineageZNRecord = SegmentLineageAccessHelper
-            .getSegmentLineageZNRecord(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+        ZNRecord segmentLineageZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(_pinotHelixResourceManager.getPropertyStore(),
+                tableNameWithType);
         if (segmentLineageZNRecord == null) {
           return true;
         }
@@ -208,50 +209,19 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         SegmentLineage segmentLineage = SegmentLineage.fromZNRecord(segmentLineageZNRecord);
         int expectedVersion = segmentLineageZNRecord.getVersion();
 
-        // 1. The original segments can be deleted once the merged segments are successfully uploaded
-        // 2. The zombie lineage entry & merged segments should be deleted if the segment replacement failed in
-        //    the middle
-        Set<String> segmentsForTable =
-            new HashSet<>(_pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false));
+        List<String> segmentsForTable = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false);
         List<String> segmentsToDelete = new ArrayList<>();
-        for (String lineageEntryId : segmentLineage.getLineageEntryIds()) {
-          LineageEntry lineageEntry = segmentLineage.getLineageEntry(lineageEntryId);
-          if (lineageEntry.getState() == LineageEntryState.COMPLETED) {
-            Set<String> sourceSegments = new HashSet<>(lineageEntry.getSegmentsFrom());
-            sourceSegments.retainAll(segmentsForTable);
-            if (sourceSegments.isEmpty()) {
-              // If the lineage state is 'COMPLETED' and segmentFrom are removed, it is safe clean up
-              // the lineage entry
-              segmentLineage.deleteLineageEntry(lineageEntryId);
-            } else {
-              // If the lineage state is 'COMPLETED' and we already preserved the original segments for the required
-              // retention, it is safe to delete all segments from 'segmentsFrom'
-              if (shouldDeleteReplacedSegments(tableConfig, lineageEntry)) {
-                segmentsToDelete.addAll(sourceSegments);
-              }
-            }
-          } else if (lineageEntry.getState() == LineageEntryState.REVERTED || (
-              lineageEntry.getState() == LineageEntryState.IN_PROGRESS && lineageEntry.getTimestamp()
-                  < System.currentTimeMillis() - LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS)) {
-            // If the lineage state is 'IN_PROGRESS' or 'REVERTED', we need to clean up the zombie lineage
-            // entry and its segments
-            Set<String> destinationSegments = new HashSet<>(lineageEntry.getSegmentsTo());
-            destinationSegments.retainAll(segmentsForTable);
-            if (destinationSegments.isEmpty()) {
-              // If the lineage state is 'IN_PROGRESS or REVERTED' and source segments are already removed, it is safe
-              // to clean up the lineage entry. Deleting lineage will allow the task scheduler to re-schedule the source
-              // segments to be merged again.
-              segmentLineage.deleteLineageEntry(lineageEntryId);
-            } else {
-              // If the lineage state is 'IN_PROGRESS', it is safe to delete all segments from 'segmentsTo'
-              segmentsToDelete.addAll(destinationSegments);
-            }
-          }
-        }
+        _pinotHelixResourceManager.getLineageManager()
+            .updateLineageForRetention(tableConfig, segmentLineage, segmentsForTable, segmentsToDelete,
+                _pinotHelixResourceManager.getConsumingSegments(tableNameWithType));
 
         // Write back to the lineage entry
-        if (SegmentLineageAccessHelper
-            .writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), segmentLineage, expectedVersion)) {
+        if (SegmentLineageAccessHelper.writeSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
+            segmentLineage, expectedVersion)) {
+          // Remove last sealed segments such that the table can still create new consuming segments if it's paused
+          if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+            segmentsToDelete.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(tableNameWithType));
+          }
           // Delete segments based on the segment lineage
           if (!segmentsToDelete.isEmpty()) {
             _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
@@ -271,27 +241,5 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       throw new RuntimeException(errorMsg, e);
     }
     LOGGER.info("Segment lineage metadata clean-up is successfully processed for table: {}", tableNameWithType);
-  }
-
-  /**
-   * Helper function to decide whether we should delete segmentsFrom (replaced segments) given a lineage entry.
-   *
-   * The replaced segments are safe to delete if the following conditions are all satisfied
-   * 1) Table is "APPEND"
-   * 2) It has been more than 24 hours since the lineage entry became "COMPLETED" state.
-   *
-   * @param tableConfig a table config
-   * @param lineageEntry lineage entry
-   * @return True if we can safely delete the replaced segments. False otherwise.
-   */
-  private boolean shouldDeleteReplacedSegments(TableConfig tableConfig, LineageEntry lineageEntry) {
-    // TODO: Currently, we preserve the replaced segments for 1 day for REFRESH tables only. Once we support
-    // data rollback for APPEND tables, we should remove this check.
-    String batchSegmentIngestionType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
-    if (!batchSegmentIngestionType.equalsIgnoreCase("REFRESH")
-        || lineageEntry.getTimestamp() < System.currentTimeMillis() - REPLACED_SEGMENTS_RETENTION_IN_MILLIS) {
-      return true;
-    }
-    return false;
   }
 }

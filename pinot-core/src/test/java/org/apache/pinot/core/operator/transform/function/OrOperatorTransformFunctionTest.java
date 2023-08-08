@@ -19,6 +19,11 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class OrOperatorTransformFunctionTest extends LogicalOperatorTransformFunctionTest {
@@ -31,5 +36,41 @@ public class OrOperatorTransformFunctionTest extends LogicalOperatorTransformFun
   @Override
   String getFunctionName() {
     return TransformFunctionType.OR.getName();
+  }
+
+  @Test
+  public void testOrNullLiteral() {
+    ExpressionContext expression = RequestContextUtils.getExpression(String.format("or(%s,null)", INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof OrOperatorTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.OR.getName());
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = 1;
+    }
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testOrNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("or(%s,%s)", INT_SV_COLUMN, INT_SV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof OrOperatorTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.OR.getName());
+    int[] expectedValues = new int[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        // null int is set to int min in field spec.
+        expectedValues[i] = 1;
+        roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = (_intSVValues[i] == 0) ? 0 : 1;
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

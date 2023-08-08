@@ -85,6 +85,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables");
   }
 
+  public String forTablesFromTenant(String tenantName, String componentType) {
+    return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables") + "?type=" + componentType;
+  }
+
   // V2 API started
   public String forTenantCreate() {
     return StringUtil.join("/", _baseUrl, "tenants");
@@ -161,6 +165,11 @@ public class ControllerRequestURLBuilder {
       return StringUtil.join("/", _baseUrl, "brokers", "tables");
     }
     return StringUtil.join("/", _baseUrl, "brokers", "tables", "?state=" + state);
+  }
+
+  public String forTenantInstancesToggle(String tenant, String tenantType, String state) {
+    return StringUtil.join("/", _baseUrl, "tenants", tenant)
+        + "?type=" + tenantType + "&state=" + state;
   }
 
   public String forLiveBrokerTablesGet() {
@@ -379,29 +388,58 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentListAPI(String tableName) {
-    return forSegmentListAPI(tableName, null, false);
+    return forSegmentListAPI(tableName, null, false, Long.MIN_VALUE, Long.MAX_VALUE, false);
   }
 
   public String forSegmentListAPI(String tableName, String tableType) {
-    return forSegmentListAPI(tableName, tableType, false);
+    return forSegmentListAPI(tableName, tableType, false, Long.MIN_VALUE, Long.MAX_VALUE, false);
   }
 
-  public String forSegmentListAPI(String tableName, @Nullable String tableType, boolean excludeReplacedSegments) {
-    String url = StringUtil.join("/", _baseUrl, "segments", tableName);
+  public String forSegmentListAPI(String tableName, String tableType, boolean excludeReplacedSegments) {
+    return forSegmentListAPI(tableName, tableType, excludeReplacedSegments, Long.MIN_VALUE, Long.MAX_VALUE, false);
+  }
+
+  public String forSegmentListAPI(String tableName, @Nullable String tableType, boolean excludeReplacedSegments,
+      long startTimestamp, long endTimestamp, boolean excludeOverlapping) {
+    StringBuilder url = new StringBuilder();
+    url.append(StringUtil.join("/", _baseUrl, "segments", tableName));
+
+    StringBuilder parameter = new StringBuilder();
     if (tableType != null) {
-      url += "?type=" + tableType;
-      if (excludeReplacedSegments) {
-        url += "&excludeReplacedSegments=" + excludeReplacedSegments;
-      }
-    } else {
-      if (excludeReplacedSegments) {
-        url += "?excludeReplacedSegments=" + excludeReplacedSegments;
-      }
+      appendUrlParameter(parameter, "type", tableType);
     }
-    return url;
+    if (excludeReplacedSegments) {
+      appendUrlParameter(parameter, "excludeReplacedSegments", "true");
+    }
+    if (startTimestamp != Long.MIN_VALUE) {
+      appendUrlParameter(parameter, "startTimestamp", Long.toString(startTimestamp));
+    }
+    if (endTimestamp != Long.MAX_VALUE) {
+      appendUrlParameter(parameter, "endTimestamp", Long.toString(endTimestamp));
+    }
+    if (excludeOverlapping) {
+      appendUrlParameter(parameter, "excludeOverlapping", "true");
+    }
+    return url.append(parameter).toString();
   }
 
-  public String forInstancePartitions(String tableName, @Nullable InstancePartitionsType instancePartitionsType) {
+  public String forSegmentDeleteWithTimeWindowAPI(String tableName, long startTimeInMilliSeconds,
+      long endTimeInMilliSeconds) {
+    StringBuilder url = new StringBuilder();
+    url.append(StringUtil.join("/", _baseUrl, "segments", tableName,
+        String.format("choose?startTimestamp=%d&endTimestamp=%d", startTimeInMilliSeconds, endTimeInMilliSeconds)));
+    return url.toString();
+  }
+
+  private void appendUrlParameter(StringBuilder url, String urlParameterKey, String urlParameterValue) {
+    if (url.length() == 0) {
+      url.append("?").append(urlParameterKey).append("=").append(urlParameterValue);
+    } else {
+      url.append("&").append(urlParameterKey).append("=").append(urlParameterValue);
+    }
+  }
+
+  public String forInstancePartitions(String tableName, @Nullable String instancePartitionsType) {
     String url = StringUtil.join("/", _baseUrl, "tables", tableName, "instancePartitions");
     if (instancePartitionsType != null) {
       url += "?type=" + instancePartitionsType;
@@ -508,6 +546,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "pauseStatus");
   }
 
+  public String forUpdateTagsValidation() {
+    return String.format("%s/instances/updateTags/validate", _baseUrl);
+  }
+
   private static String encode(String s) {
     try {
       return URLEncoder.encode(s, "UTF-8");
@@ -515,5 +557,9 @@ public class ControllerRequestURLBuilder {
       // Should never happen
       throw new RuntimeException(e);
     }
+  }
+
+  public String forSegmentUpload() {
+    return StringUtil.join("/", _baseUrl, "v2/segments");
   }
 }

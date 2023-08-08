@@ -18,31 +18,20 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 
 
-public class TableDedupMetadataManager {
-  private final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
-  private final String _tableNameWithType;
-  private final List<String> _primaryKeyColumns;
-  private final ServerMetrics _serverMetrics;
-  private final HashFunction _hashFunction;
+public interface TableDedupMetadataManager {
+  /**
+   * Initialize TableDedupMetadataManager.
+   */
+  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, ServerMetrics serverMetrics);
 
-  public TableDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
-      ServerMetrics serverMetrics, HashFunction hashFunction) {
-    _tableNameWithType = tableNameWithType;
-    _primaryKeyColumns = primaryKeyColumns;
-    _serverMetrics = serverMetrics;
-    _hashFunction = hashFunction;
-  }
-
-  public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> new PartitionDedupMetadataManager(_tableNameWithType, _primaryKeyColumns, k, _serverMetrics,
-            _hashFunction));
-  }
+  /**
+   * Create a new PartitionDedupMetadataManager if not present already, otherwise return existing one.
+   */
+  PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId);
 }

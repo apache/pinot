@@ -20,8 +20,10 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -59,10 +61,41 @@ public class RoundDecimalTransformFunctionTest extends BaseTransformFunctionTest
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = round(_doubleSVValues[i], 0);
     }
-    testTransformFunction(transformFunction, expectedValues);
   }
 
   public Double round(double a, int b) {
     return BigDecimal.valueOf(a).setScale(b, RoundingMode.HALF_UP).doubleValue();
+  }
+
+  @Test
+  public void testRoundDecimalNullLiteral() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("round_decimal(null)", INT_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.ROUND_DECIMAL.getName());
+    double[] expectedValues = new double[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    roaringBitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
+  }
+
+  @Test
+  public void testRoundDecimalNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("round_decimal(%s)", INT_SV_NULL_COLUMN, 0));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof RoundDecimalTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), TransformFunctionType.ROUND_DECIMAL.getName());
+    double[] expectedValues = new double[NUM_ROWS];
+    RoaringBitmap roaringBitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        roaringBitmap.add(i);
+      } else {
+        expectedValues[i] = _intSVValues[i];
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, roaringBitmap);
   }
 }

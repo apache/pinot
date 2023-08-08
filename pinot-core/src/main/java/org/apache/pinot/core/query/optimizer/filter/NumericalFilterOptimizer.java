@@ -25,11 +25,9 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
-
 
 
 /**
@@ -62,35 +60,26 @@ import org.apache.pinot.sql.FilterKind;
  *
  * TODO: Add support for BETWEEN, IN, and NOT IN operators.
  */
-public class NumericalFilterOptimizer implements FilterOptimizer {
-  private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
-  private static final Expression FALSE = RequestUtils.getLiteralExpression(false);
+public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
   @Override
-  public Expression optimize(Expression expression, @Nullable Schema schema) {
-    ExpressionType type = expression.getType();
-    if (type != ExpressionType.FUNCTION || schema == null) {
-      // We have nothing to rewrite if expression is not a function or schema is null
-      return expression;
-    }
+  boolean canBeOptimized(Expression filterExpression, @Nullable Schema schema) {
+    ExpressionType type = filterExpression.getType();
+    // We have nothing to rewrite if expression is not a function or schema is null
+    return type == ExpressionType.FUNCTION && schema != null;
+  }
 
-    Function function = expression.getFunctionCall();
-    List<Expression> operands = function.getOperands();
+  @Override
+  Expression optimizeChild(Expression filterExpression, @Nullable Schema schema) {
+    Function function = filterExpression.getFunctionCall();
     FilterKind kind = FilterKind.valueOf(function.getOperator());
     switch (kind) {
-      case AND:
-      case OR:
-      case NOT:
-        // Recursively traverse the expression tree to find an operator node that can be rewritten.
-        operands.forEach(operand -> optimize(operand, schema));
-
-        // We have rewritten the child operands, so rewrite the parent if needed.
-        return optimizeCurrent(expression);
       case IS_NULL:
       case IS_NOT_NULL:
         // No need to try to optimize IS_NULL and IS_NOT_NULL operations on numerical columns.
         break;
       default:
+        List<Expression> operands = function.getOperands();
         // Verify that LHS is a numeric column and RHS is a numeric literal before rewriting.
         Expression lhs = operands.get(0);
         Expression rhs = operands.get(1);
@@ -100,12 +89,12 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             switch (kind) {
               case EQUALS:
               case NOT_EQUALS:
-                return rewriteEqualsExpression(expression, kind, dataType, rhs);
+                return rewriteEqualsExpression(filterExpression, kind, dataType, rhs);
               case GREATER_THAN:
               case GREATER_THAN_OR_EQUAL:
               case LESS_THAN:
               case LESS_THAN_OR_EQUAL:
-                return rewriteRangeExpression(expression, kind, lhs, rhs, schema);
+                return rewriteRangeExpression(filterExpression, kind, lhs, rhs, schema);
               default:
                 break;
             }
@@ -113,56 +102,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
         }
         break;
     }
-    return expression;
-  }
-
-  /**
-   * If any of the operands of AND function is "false", then the AND function itself is false and can be replaced with
-   * "false" literal. Otherwise, remove all the "true" operands of the AND function. Similarly, if any of the operands
-   * of OR function is "true", then the OR function itself is true and can be replaced with "true" literal. Otherwise,
-   * remove all the "false" operands of the OR function.
-   */
-  private static Expression optimizeCurrent(Expression expression) {
-    Function function = expression.getFunctionCall();
-    String operator = function.getOperator();
-    List<Expression> operands = function.getOperands();
-    if (operator.equals(FilterKind.AND.name())) {
-      // If any of the literal operands are FALSE, then replace AND function with FALSE.
-      for (Expression operand : operands) {
-        if (operand.equals(FALSE)) {
-          return FALSE;
-        }
-      }
-
-      // Remove all Literal operands that are TRUE.
-      operands.removeIf(x -> x.equals(TRUE));
-      if (operands.isEmpty()) {
-        return TRUE;
-      }
-    } else if (operator.equals(FilterKind.OR.name())) {
-      // If any of the literal operands are TRUE, then replace OR function with TRUE
-      for (Expression operand : operands) {
-        if (operand.equals(TRUE)) {
-          return TRUE;
-        }
-      }
-
-      // Remove all Literal operands that are FALSE.
-      operands.removeIf(x -> x.equals(FALSE));
-      if (operands.isEmpty()) {
-        return FALSE;
-      }
-    } else if (operator.equals(FilterKind.NOT.name())) {
-      assert operands.size() == 1;
-      Expression operand = operands.get(0);
-      if (operand.equals(TRUE)) {
-        return FALSE;
-      }
-      if (operand.equals(FALSE)) {
-        return TRUE;
-      }
-    }
-    return expression;
+    return filterExpression;
   }
 
   /**
@@ -187,7 +127,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             int converted = (int) actual;
             if (converted != actual) {
               // Long value does not fall within the bounds of INT column.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace long value with converted int value.
               rhs.getLiteral().setLongValue(converted);
@@ -198,7 +138,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             float converted = (float) actual;
             if (BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted)) != 0) {
               // Long to float conversion is lossy.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace long value with converted float value.
               rhs.getLiteral().setDoubleValue(converted);
@@ -209,7 +149,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             double converted = (double) actual;
             if (BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted)) != 0) {
               // Long to double conversion is lossy.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace long value with converted double value.
               rhs.getLiteral().setDoubleValue(converted);
@@ -228,7 +168,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             int converted = (int) actual;
             if (converted != actual) {
               // Double value does not fall within the bounds of INT column.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace double value with converted int value.
               rhs.getLiteral().setLongValue(converted);
@@ -239,7 +179,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             long converted = (long) actual;
             if (BigDecimal.valueOf(actual).compareTo(BigDecimal.valueOf(converted)) != 0) {
               // Double to long conversion is lossy.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace double value with converted long value.
               rhs.getLiteral().setLongValue(converted);
@@ -250,7 +190,7 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             float converted = (float) actual;
             if (converted != actual) {
               // Double to float conversion is lossy.
-              setExpressionToBoolean(equals, result);
+              return getExpressionFromBoolean(result);
             } else {
               // Replace double value with converted float value.
               rhs.getLiteral().setDoubleValue(converted);
@@ -294,12 +234,12 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
               // INT column can never have a value greater than Integer.MAX_VALUE. < and <= expressions will always be
               // true, because an INT column will always have values greater than or equal to Integer.MIN_VALUE and less
               // than or equal to Integer.MAX_VALUE.
-              setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
+              return getExpressionFromBoolean(kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (comparison < 0) {
               // Literal value is less than the bounds of INT. > and >= expressions will always be true because an
               // INT column will always have a value greater than or equal to Integer.MIN_VALUE. < and <= expressions
               // will always be false, because an INT column will never have values less than Integer.MIN_VALUE.
-              setExpressionToBoolean(range,
+              return getExpressionFromBoolean(
                   kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               // Long literal value falls within the bounds of INT column, server will successfully convert the literal
@@ -351,10 +291,10 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             int comparison = Double.compare(actual, converted);
             if (comparison > 0 && converted == Integer.MAX_VALUE) {
               // Literal value is greater than the bounds of INT.
-              setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
+              return getExpressionFromBoolean(kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (comparison < 0 && converted == Integer.MIN_VALUE) {
               // Literal value is less than the bounds of INT.
-              setExpressionToBoolean(range,
+              return getExpressionFromBoolean(
                   kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               // Literal value falls within the bounds of INT.
@@ -371,10 +311,10 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
 
             if (comparison > 0 && converted == Long.MAX_VALUE) {
               // Literal value is greater than the bounds of LONG.
-              setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
+              return getExpressionFromBoolean(kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (comparison < 0 && converted == Long.MIN_VALUE) {
               // Literal value is less than the bounds of LONG.
-              setExpressionToBoolean(range,
+              return getExpressionFromBoolean(
                   kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               // Rewrite range operator
@@ -389,10 +329,10 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
             float converted = (float) actual;
             if (converted == Float.POSITIVE_INFINITY) {
               // Literal value is greater than the bounds of FLOAT
-              setExpressionToBoolean(range, kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
+              return getExpressionFromBoolean(kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL);
             } else if (converted == Float.NEGATIVE_INFINITY) {
               // Literal value is less than the bounds of LONG.
-              setExpressionToBoolean(range,
+              return getExpressionFromBoolean(
                   kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
             } else {
               int comparison = Double.compare(actual, converted);
@@ -458,11 +398,11 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
       if (fieldSpec != null && fieldSpec.isSingleValueField()) {
         return fieldSpec.getDataType();
       }
-    } else if (expression.getType() == ExpressionType.FUNCTION
-        && "cast".equalsIgnoreCase(expression.getFunctionCall().getOperator())) {
+    } else if (expression.getType() == ExpressionType.FUNCTION && "cast".equalsIgnoreCase(
+        expression.getFunctionCall().getOperator())) {
       // expression is not identifier but we can also determine the data type.
-      String targetTypeLiteral = expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue()
-          .toUpperCase();
+      String targetTypeLiteral =
+          expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue().toUpperCase();
       FieldSpec.DataType dataType;
       if ("INTEGER".equals(targetTypeLiteral)) {
         dataType = FieldSpec.DataType.INT;
@@ -491,12 +431,5 @@ public class NumericalFilterOptimizer implements FilterOptimizer {
       }
     }
     return false;
-  }
-
-  /** Change the expression value to boolean literal with given value. */
-  private static void setExpressionToBoolean(Expression expression, boolean value) {
-    expression.unsetFunctionCall();
-    expression.setType(ExpressionType.LITERAL);
-    expression.setLiteral(Literal.boolValue(value));
   }
 }

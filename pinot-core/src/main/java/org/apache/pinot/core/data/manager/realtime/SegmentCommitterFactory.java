@@ -69,16 +69,18 @@ public class SegmentCommitterFactory {
 
     boolean uploadToFs = _streamConfig.isServerUploadToDeepStore();
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
-    // TODO: exists for backwards compatibility. remove peerDownloadScheme non-null check once users have migrated
+    String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();
+
     if (uploadToFs || peerSegmentDownloadScheme != null) {
-      segmentUploader = new PinotFSSegmentUploader(_indexLoadingConfig.getSegmentStoreURI(),
-          PinotFSSegmentUploader.DEFAULT_SEGMENT_UPLOAD_TIMEOUT_MILLIS);
+      // TODO: peer scheme non-null check exists for backwards compatibility. remove check once users have migrated
+      segmentUploader = new PinotFSSegmentUploader(segmentStoreUri,
+          ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics);
     } else {
       segmentUploader = new Server2ControllerSegmentUploader(_logger,
           _protocolHandler.getFileUploadDownloadClient(),
           _protocolHandler.getSegmentCommitUploadURL(params, controllerVipUrl), params.getSegmentName(),
           ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), _serverMetrics,
-          _protocolHandler.getAuthProvider());
+          _protocolHandler.getAuthProvider(), _tableConfig.getTableName());
     }
 
     return new SplitSegmentCommitter(_logger, _protocolHandler, params, segmentUploader, peerSegmentDownloadScheme);

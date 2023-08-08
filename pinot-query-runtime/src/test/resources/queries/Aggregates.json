@@ -1,5 +1,5 @@
 {
-  "general_aggregate": {
+  "general_aggregate_no_filter": {
     "tables": {
       "tbl": {
         "schema": [
@@ -21,62 +21,611 @@
     },
     "queries": [
       {
-        "ignored": true,
         "psql": "4.2.7",
-        "comments": "result error:average doesn't work because we round up but h2 round down for integer",
-        "description": "average int",
-        "sql": "SELECT avg(int_col) FROM {tbl}"
+        "description": "count * aggregation",
+        "sql": "SELECT count(*) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
-        "description": "average double",
-        "sql": "SELECT avg(double_col) FROM {tbl}"
+        "description": "aggregations on double column",
+        "sql": "SELECT min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
-        "description": "average double with filter",
-        "sql": "SELECT avg(double_col) FROM {tbl} WHERE double_col >= 100"
+        "description": "aggregations on int column",
+        "sql": "SELECT min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
-        "description": "sum double",
-        "sql": "SELECT sum(double_col) FROM {tbl}"
+        "description": "aggregations on bool column",
+        "sql": "SELECT bool_and(bool_col), bool_or(bool_col), count(bool_col), count(distinct(bool_col)), count(*) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
-        "description": "sum int",
-        "sql": "SELECT sum(int_col) FROM {tbl}"
+        "description": "aggregations on string column",
+        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*) FROM {tbl}"
+      }
+    ]
+  },
+  "general_aggregate_with_filter": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [100, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [175, 1.75, "c", true]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "4.2.7",
+        "description": "count aggregation with filters",
+        "sql": "SELECT count(*) FROM {tbl} WHERE string_col='b'"
       },
       {
         "psql": "4.2.7",
-        "description": "max double",
-        "sql": "SELECT max(double_col) FROM {tbl}"
+        "description": "aggregations on double column with string filters",
+        "sql": "SELECT min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} WHERE string_col='b'"
       },
       {
         "psql": "4.2.7",
-        "description": "max int",
-        "sql": "SELECT max(int_col) FROM {tbl}"
+        "description": "aggregations on double column with int filters",
+        "sql": "SELECT min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} WHERE int_col > 100"
       },
       {
         "psql": "4.2.7",
-        "description": "count int",
-        "sql": "SELECT count(int_col) FROM {tbl}"
+        "description": "aggregate int column and filter by int column",
+        "sql": "SELECT sum(1 / int_col) FROM {tbl} WHERE int_col > 0",
+        "h2Sql": "SELECT sum(1.0 / int_col) FROM {tbl} WHERE int_col > 0"
       },
       {
         "psql": "4.2.7",
-        "description": "count double",
-        "sql": "SELECT count(double_col) FROM {tbl}"
+        "description": "aggregate double column and filter by double column",
+        "sql": "SELECT sum(1 / double_col) FROM {tbl} WHERE double_col < 2"
       },
       {
         "psql": "4.2.7",
-        "description": "count, sum group by order by",
-        "sql": "select string_col, count(int_col), sum(double_col) from {tbl} group by string_col order by string_col;"
+        "description": "aggregations on double column with filters",
+        "sql": "SELECT min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75"
       },
       {
         "psql": "4.2.7",
-        "description": "min, max",
-        "sql": "SELECT min(int_col), max(int_col) FROM {tbl}"
+        "description": "aggregations on int column with filters",
+        "sql": "SELECT min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE string_col='b'"
       },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on int column with filters",
+        "sql": "SELECT min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE int_col > 100"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on int column with filters",
+        "sql": "SELECT min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on int column with filters",
+        "sql": "SELECT min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE string_col='b'"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on int column with filters",
+        "sql": "SELECT min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE int_col > 100"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on int column with filters",
+        "sql": "SELECT min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on bool column with filters",
+        "sql": "SELECT bool_and(bool_col), bool_or(bool_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE string_col='b'"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on bool column with filters",
+        "sql": "SELECT bool_and(bool_col), bool_or(bool_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE int_col > 100"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on bool column with filters",
+        "sql": "SELECT bool_and(bool_col), bool_or(bool_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on string column with filters",
+        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE string_col='b'"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on string column with filters",
+        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE int_col > 100"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on string column with filters",
+        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75"
+      }
+    ]
+  },
+  "general_group_by_aggregate_no_filter": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [100, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [175, 1.75, "c", true]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "4.2.7",
+        "description": "group by with count",
+        "sql": "SELECT int_col, count(*) FROM {tbl} GROUP BY int_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by with aggregation on double column",
+        "sql": "SELECT int_col, min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} GROUP BY int_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by with aggregation on double column and order by",
+        "sql": "SELECT int_col, min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} GROUP BY int_col ORDER BY int_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by with aggregations on int column",
+        "sql": "SELECT double_col, min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} GROUP BY double_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by with aggregations on int column and order by",
+        "sql": "SELECT double_col, min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} GROUP BY double_col ORDER BY double_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by with aggregations on bool column",
+        "sql": "SELECT string_col, bool_and(bool_col), bool_or(bool_col), count(bool_col), count(distinct(bool_col)), count(*) FROM {tbl} GROUP BY string_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by with aggregations on bool column and order by",
+        "sql": "SELECT string_col, bool_and(bool_col), bool_or(bool_col), count(bool_col), count(distinct(bool_col)), count(*) FROM {tbl} GROUP BY string_col ORDER BY string_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by with aggregations on string column",
+        "sql": "SELECT bool_col, count(string_col), count(distinct(string_col)), count(*) FROM {tbl} GROUP BY bool_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by with aggregations on string column and order by",
+        "sql": "SELECT bool_col, count(string_col), count(distinct(string_col)), count(*) FROM {tbl} GROUP BY bool_col ORDER BY bool_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by on multiple columns with aggregation on double column",
+        "sql": "SELECT int_col, string_col, min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} GROUP BY int_col, string_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by multiple columns with aggregations on int column",
+        "sql": "SELECT double_col, string_col, bool_col, min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} GROUP BY double_col, string_col, bool_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by and order by on multiple columns with aggregation on double column",
+        "sql": "SELECT int_col, string_col, min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} GROUP BY int_col, string_col ORDER BY int_col, string_col"
+      }
+    ]
+  },
+  "general_group_by_aggregate_with_filter": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [100, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [175, 1.75, "c", true]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on double column with filters",
+        "sql": "SELECT string_col, count(*) FROM {tbl} WHERE string_col='b' GROUP BY string_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on double column with filters",
+        "sql": "SELECT int_col, min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} WHERE string_col='b' GROUP BY int_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on double column with filters",
+        "sql": "SELECT int_col, string_col, min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} WHERE int_col > 100 GROUP BY int_col, string_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on double column with filters",
+        "sql": "SELECT int_col, string_col, bool_col, min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75 GROUP BY int_col, string_col, bool_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on int column with filters",
+        "sql": "SELECT bool_col, min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE string_col='b' GROUP BY bool_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on int column with filters",
+        "sql": "SELECT bool_col, double_col, min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE int_col > 100 GROUP BY bool_col, double_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on int column with filters",
+        "sql": "SELECT bool_col, double_col, string_col, min(int_col), max(int_col), avg(int_col), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75 GROUP BY bool_col, double_col, string_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on bool column with filters",
+        "sql": "SELECT string_col, bool_and(bool_col), bool_or(bool_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE string_col='b' GROUP BY string_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on bool column with filters",
+        "sql": "SELECT string_col, double_col, bool_and(bool_col), bool_or(bool_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE int_col > 100 GROUP BY string_col, double_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on bool column with filters",
+        "sql": "SELECT string_col, double_col, int_col, bool_and(bool_col), bool_or(bool_col), count(int_col), count(distinct(int_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75GROUP BY string_col, double_col, int_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on string column with filters",
+        "sql": "SELECT double_col, count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE string_col='b' GROUP BY double_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on string column with filters",
+        "sql": "SELECT double_col, int_col, count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE int_col > 100 GROUP BY double_col, int_col"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregations on string column with filters",
+        "sql": "SELECT double_col, int_col, bool_col, count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75 GROUP BY double_col, int_col, bool_col"
+      }
+    ]
+  },
+  "aggregations_with_transform": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [100, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [175, 1.75, "c", true]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "4.2.7",
+        "description": "transform in groupby column with filter",
+        "sql": "SELECT CONCAT(string_col, bool_col, '-') as c1, min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} WHERE string_col='b' GROUP BY c1",
+        "outputs": [
+          ["b-false", 1.0, 100.0, 50.5, 101.0, 2, 2, 2]
+        ]
+      },
+      {
+        "psql": "4.2.7",
+        "description": "aggregation with transform column with filter",
+        "sql": "SELECT count(CONCAT(string_col, bool_col, '-')), count(distinct(CONCAT(string_col, bool_col, '-'))), count(*) FROM {tbl}",
+        "outputs": [
+          [7, 4, 7]
+        ]
+      },
+      {
+        "psql": "4.2.7",
+        "description": "group by and aggregation with transform column with filter",
+        "sql": "SELECT int_col, count(CONCAT(string_col, bool_col, '-')), count(distinct(CONCAT(string_col, bool_col, '-'))), count(*) FROM {tbl} GROUP BY int_col",
+        "outputs": [
+          [2, 2, 1, 2],
+          [3, 1, 1, 1],
+          [100, 1, 1, 1],
+          [101, 1, 1, 1],
+          [150, 1, 1, 1],
+          [175, 1, 1, 1]
+        ]
+      }
+    ]
+  },
+  "aggregation_with_complex_sql": {
+    "tables": {
+      "tbl1": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [100, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [175, 1.75, "c", true]
+        ]
+      },
+      "tbl2": {
+        "schema":[
+          {"name": "int_col2", "type": "INT"},
+          {"name": "string_col2", "type": "STRING"},
+          {"name":  "double_col2", "type":  "DOUBLE"}
+        ],
+        "inputs": [
+          [1, "apple", 1000.0],
+          [2, "a", 1.323],
+          [3, "b", 1212.12],
+          [3, "c", 341],
+          [4, "orange", 1212.121]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with simple aggregations on int and double columns",
+        "sql": "SELECT min(double_col), min(int_col), min(double_col2), min(int_col2), max(double_col), max(int_col), max(double_col2), max(int_col2), avg(int_col), avg(double_col), avg(double_col2), avg(int_col2), sum(int_col), sum(double_col), sum(double_col2), sum(int_col2), count(*), count(distinct int_col), count(distinct double_col), count(distinct int_col2), count(distinct double_col2) from {tbl1} JOIN {tbl2} ON string_col = string_col2"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with simple aggregations on boolean columns",
+        "sql": "SELECT count(bool_col), count(distinct bool_col), bool_and(bool_col), bool_or(bool_col) from {tbl1} JOIN {tbl2} ON string_col = string_col2"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with simple aggregations on string columns",
+        "sql": "SELECT count(string_col), count(string_col2), count(distinct string_col), count(distinct string_col2) from {tbl1} JOIN {tbl2} ON int_col = int_col2"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with simple aggregations on int and double columns and group by on bool_col",
+        "sql": "SELECT bool_col, min(double_col), min(int_col), min(double_col2), min(int_col2), max(double_col), max(int_col), max(double_col2), max(int_col2), avg(int_col), avg(double_col), avg(double_col2), avg(int_col2), sum(int_col), sum(double_col), sum(double_col2), sum(int_col2), count(*), count(distinct int_col), count(distinct double_col), count(distinct int_col2), count(distinct double_col2) from {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY bool_col"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with aggregations on int and double columns and group by on bool_col and string_col",
+        "sql": "SELECT bool_col, string_col, min(double_col), min(int_col), min(double_col2), min(int_col2), max(double_col), max(int_col), max(double_col2), max(int_col2), avg(int_col), avg(double_col), avg(double_col2), avg(int_col2), sum(int_col), sum(double_col), sum(double_col2), sum(int_col2), count(*), count(distinct int_col), count(distinct double_col), count(distinct int_col2), count(distinct double_col2) from {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY bool_col, string_col"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with  aggregations on boolean columns and group by on string",
+        "sql": "SELECT string_col, count(bool_col), count(distinct bool_col), bool_and(bool_col), bool_or(bool_col) from {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY string_col"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with  aggregations on boolean columns and group by on string and int",
+        "sql": "SELECT string_col, int_col, count(bool_col), count(distinct bool_col), bool_and(bool_col), bool_or(bool_col) from {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY string_col, int_col"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with  aggregations on string columns and group by on double",
+        "sql": "SELECT double_col, count(string_col), count(string_col2), count(distinct string_col), count(distinct string_col2) from {tbl1} JOIN {tbl2} ON int_col = int_col2 GROUP BY double_col"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with  aggregations on string columns and group by on double, bool and int",
+        "sql": "SELECT double_col, bool_col, int_col, count(string_col), count(string_col2), count(distinct string_col), count(distinct string_col2) from {tbl1} JOIN {tbl2} ON int_col = int_col2 GROUP BY double_col, bool_col, int_col"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "Aggregation on semi join with multiple not in",
+        "sql": "SELECT bool_col, int_col, count(string_col), count(distinct string_col), min(double_col), max(double_col), avg(double_col), count(double_col) from {tbl1} WHERE string_col = 'c' AND int_col NOT IN (SELECT int_col2 FROM {tbl2} WHERE string_col2='a') AND int_col NOT IN (SELECT int_col2 FROM {tbl2} WHERE string_col2='bar') AND int_col NOT IN (SELECT int_col2 FROM {tbl2} WHERE string_col2='orange') GROUP BY bool_col, int_col"
+      }
+    ]
+  },
+  "aggregations_not_supported_by_h2": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [3, 3213, "a", true],
+          [11, 545.12, "a", true],
+          [12, 543.12, "a", true],
+          [13, 765.4, "a", true],
+          [13, 400, "a", true],
+          [3, 100, "b", false],
+          [100, 1, "b", false],
+          [30, 10120, "b", false],
+          [100, 23121, "b", false],
+          [3, 43, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [175, 1.75, "c", true],
+          [152, 1.25, "c", false],
+          [177, 1.095, "c", true]
+        ]
+      },
+      "tbl2": {
+        "schema":[
+          {"name": "int_col2", "type": "INT"},
+          {"name": "string_col2", "type": "STRING"},
+          {"name":  "double_col2", "type":  "DOUBLE"}
+        ],
+        "inputs": [
+          [1, "apple", 1000.0],
+          [2, "a", 1.323],
+          [3, "b", 1212.12],
+          [4, "orange", 1212.121]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "9.21.0",
+        "description": "distinct count on all columns",
+        "sql": "SELECT distinctcount(int_col), distinctcount(double_col), distinctcount(bool_col), distinctcount(string_col) FROM {tbl}",
+        "outputs": [
+          [12, 16, 2, 3]
+        ]
+      },
+      {
+        "psql": "9.21.0",
+        "description": "distinct count with filter",
+        "sql": "SELECT distinctcount(int_col), distinctcount(double_col), distinctcount(bool_col), distinctcount(string_col) FROM {tbl} where string_col='c'",
+        "outputs": [
+          [5, 5, 2, 1]
+        ]
+      },
+      {
+        "psql": "9.21.0",
+        "description": "distintcount with group by",
+        "sql": "SELECT string_col, distinctcount(int_col), distinctcount(double_col), distinctcount(bool_col) FROM {tbl} group by string_col",
+        "outputs": [
+          ["a", 5, 6, 1],
+          ["b", 3, 5, 1],
+          ["c", 5, 5, 2]
+        ]
+      },
+      {
+        "psql": "9.21.0",
+        "description": "distinctcount with multiple group by columns",
+        "sql": "SELECT string_col, bool_col, distinctcount(int_col), distinctcount(double_col) FROM {tbl} group by string_col, bool_col",
+        "outputs": [
+          ["a", true, 5, 6],
+          ["b", false, 3, 5],
+          ["c", true, 2, 2],
+          ["c", false, 3, 3]
+        ]
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with distinct count on columns",
+        "sql": "SELECT distinctcount(double_col), distinctcount(int_col), distinctcount(double_col2), distinctcount(int_col2), distinctcount(bool_col), distinctcount(string_col), distinctcount(string_col2) from {tbl} JOIN {tbl2} ON string_col = string_col2",
+        "outputs": [
+          [11, 7, 2, 2, 2, 2, 2]
+        ]
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with distinct count and group by on columns",
+        "sql": "SELECT string_col, distinctcount(double_col), distinctcount(int_col), distinctcount(double_col2), distinctcount(int_col2), distinctcount(bool_col) from {tbl} JOIN {tbl2} ON string_col = string_col2 GROUP BY string_col",
+        "outputs": [
+          ["a", 6, 5, 1, 1, 1],
+          ["b", 5, 3, 1, 1, 1]
+        ]
+      },
+      {
+        "psql": "9.21.0",
+        "description": "skewness and kurtosis and int and double cols",
+        "sql": "SELECT skewness(double_col), skewness(int_col), kurtosis(double_col), kurtosis(int_col) FROM {tbl}",
+        "outputs": [
+          [3.1103657693253997, 0.5794666900768517, 9.965595397275615, -1.4550234124062964]
+        ]
+      },
+      {
+        "psql": "9.21.0",
+        "description": "skewness and kurtosis and int and double cols with group by",
+        "sql": "SELECT string_col, skewness(double_col), skewness(int_col), kurtosis(double_col), kurtosis(int_col) FROM {tbl} group by string_col",
+        "outputs": [
+          ["a", 2.3416450161609847, -0.8960998790160103, 5.582974376555998, -1.791124260355027],
+          ["b", 1.4293497662867718, 0.40194821599933056, 1.220463765626068, -3.1341049510321075],
+          ["c", 0.6353100324008337, -1.3564793650180287, -1.1100427274943443, 1.989350375759732]
+        ]
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with skewness on columns",
+        "sql": "SELECT skewness(double_col), skewness(int_col), kurtosis(double_col2), kurtosis(int_col2) from {tbl} JOIN {tbl2} ON string_col = string_col2",
+        "outputs": [
+          [2.5196193851884536, 1.7344829395977062, -2.444444444444445, -2.444444444444444]
+        ]
+      },
+      {
+        "psql": "9.21.0",
+        "description": "JOIN with distinct count and group by on columns",
+        "sql": "SELECT string_col, skewness(double_col), skewness(int_col), kurtosis(double_col2), kurtosis(int_col2) from {tbl} JOIN {tbl2} ON string_col = string_col2 GROUP BY string_col",
+        "outputs": [
+          ["a", 2.3416450161609847, -0.8960998790160102, 0.0, 0.0],
+          ["b", 1.4293497662867716, 0.4019482159993307, 0.0, 0.0]
+        ]
+      }
+    ]
+  },
+  "unsupported_aggregates": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [100, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [175, 1.75, "c", true]
+        ]
+      }
+    },
+    "queries": [
       {
         "psql": "4.2.7",
         "comments": "plan error:Unsupported SQL aggregation kind: {}. Only splittable aggregation functions are supported! [SINGLE_VALUE]",
@@ -89,13 +638,13 @@
         "description": "nested aggregation",
         "sql": "SELECT min(max(int_col)) FROM {tbl}",
         "comments": ".*Aggregate expressions cannot be nested.",
-        "expectedException": ".*Error composing query plan for.*"
+        "expectedException": "Error composing query plan for.*"
       },
       {
         "psql": "4.2.7",
         "description": "nested aggregation",
         "sql": "SELECT (SELECT max(min(int_col)) FROM {tbl}) from {tbl};",
-        "expectedException": ".*Error composing query plan for.*"
+        "expectedException": "Error composing query plan for.*"
       },
       {
         "psql": "4.2.7",
@@ -113,81 +662,19 @@
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
-        "comments": "class java.lang.Double cannot be cast to class java.lang.Boolean",
         "description": "aggregate boolean column",
         "sql": "SELECT min(bool_col) FROM {tbl}"
       },
       {
         "psql": "9.21.0",
-        "description": "aggregate boolean column",
-        "sql": "SELECT bool_and(bool_col), bool_or(bool_col) FROM {tbl} GROUP BY string_col"
-      },
-      {
-        "psql": "9.21.0",
-        "description": "aggregate boolean column no group by",
-        "sql": "SELECT bool_and(bool_col), bool_or(bool_col) FROM {tbl}"
-      },
-      {
-        "ignored": true,
-        "comment": "issue with converting data types:  Unexpected RelDataTypeField: ANY for column: EXPR$0",
-        "psql": "9.21.0",
         "description": "aggregate boolean column no group by with inner function",
-        "sql": "SELECT bool_and(startsWith(string_col, 'a')), bool_or(startsWith(string_col, 'a')) FROM {tbl}"
+        "sql": "SELECT bool_and(startsWith(string_col, 'a')), bool_or(startsWith(string_col, 'a')) FROM {tbl}",
+        "h2Sql": "SELECT bool_and(CASE WHEN string_col LIKE 'a%' THEN TRUE ELSE FALSE END), bool_or(CASE WHEN string_col LIKE 'a%' THEN TRUE ELSE FALSE END) FROM {tbl}"
       },
       {
-        "ignored": true,
-        "comment": "issue with converting data types:  Unexpected RelDataTypeField: ANY for column: EXPR$0",
         "description": "sum with inner function",
-        "sql": "SELECT sum(pow(int_col, 2)) FROM {tbl}"
-      }
-    ]
-  },
-  "aggregate_filter": {
-    "tables": {
-      "tbl": {
-        "schema": [
-          {"name": "int_col", "type": "INT"},
-          {"name": "double_col", "type": "DOUBLE"},
-          {"name": "string_col", "type": "STRING"},
-          {"name": "bool_col", "type": "BOOLEAN"}
-        ],
-        "inputs": [
-          [2, 300, "a", false],
-          [2, 400, "a", true],
-          [3, 100, "b", true],
-          [0.001, 1, "b", false],
-          [101, 1.01, "c", false],
-          [150, 1.5, "c", true],
-          [175, 1.75, "c", true],
-          [-10000, 1.75, "c", false],
-          [-2, 0.5, "c", false]
-        ]
-      }
-    },
-    "queries": [
-      {
-        "psql": "4.2.7",
-        "description": "aggregate int column and filter by int column",
-        "sql": "SELECT min(int_col) FROM {tbl} WHERE int_col < 100"
-      },
-      {
-        "psql": "4.2.7",
-        "ignored": true,
-        "description": "aggregate int column and filter by int column",
-        "comments": "rounding error",
-        "sql": "SELECT sum(1 /int_col) FROM {tbl} WHERE int_col > 0"
-      },
-      {
-        "psql": "4.2.7",
-        "description": "aggregate double column and filter by double column",
-        "comments": "rounding error",
-        "sql": "SELECT sum(1 /double_col) FROM {tbl} WHERE double_col < 1"
-      },
-      {
-        "psql": "4.2.7",
-        "description": "aggregate double column and filter by string column",
-        "sql": "SELECT sum(double_col) FROM {tbl} WHERE string_col > 'a'"
+        "sql": "SELECT sum(pow(int_col, 2)) FROM {tbl}",
+        "h2Sql": "SELECT sum(int_col * int_col) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
@@ -206,9 +693,213 @@
       {
         "psql": "4.2.7",
         "comments": "parse error:Encountered HAVING",
-        "description": "aggregate query with having clause",
         "ignored": true,
+        "description": "aggregate query with having clause",
         "sql": "select string_col, count(int_col) from {tbl} a group by string_col order by string_col having (select count(*) from {tbl} b where count(int_col) = b.int_col) > 0;"
+      }
+    ]
+  },
+  "empty_return_type_test_h2": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [100, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [175, 1.75, "c", true]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Return empty for sum",
+        "sql": "SELECT sum(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "Return empty for sum with subquery",
+        "sql": "SELECT sum(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "ignored": true,
+        "comment": "min empty returns [infinity] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
+        "description": "Return empty for min",
+        "sql": "SELECT min(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "Return empty for min with subquery",
+        "sql": "SELECT min(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "ignored": true,
+        "comment": "max empty returns [-infinity] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
+        "description": "Return empty for max",
+        "sql": "SELECT max(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "Return empty for min with subquery",
+        "sql": "SELECT max(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "comment": "avg empty returns [NaN] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
+        "description": "Return empty for avg",
+        "sql": "SELECT avg(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "Return empty for avg with subquery",
+        "sql": "SELECT avg(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "description": "Return empty for count",
+        "sql": "SELECT count(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "Return empty for count with subquery",
+        "sql": "SELECT count(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "description": "Return empty for count(*)",
+        "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "Return empty for count * with subquery",
+        "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "ignored": true,
+        "comment": "bool_and empty returns [true] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
+        "description": "Return empty for bool_and",
+        "sql": "SELECT bool_and(bool_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "Return empty for bool_and with subquery",
+        "sql": "SELECT bool_and(bool_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "ignored": true,
+        "comment": "bool_or empty returns [false] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
+        "description": "Return empty for bool_or",
+        "sql": "SELECT bool_or(bool_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "Return empty for bool_or with subquery",
+        "sql": "SELECT bool_or(bool_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "description": "Return empty for count distinct",
+        "sql": "SELECT count(distinct int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "description": "Return empty for count distinct with subquery",
+        "sql": "SELECT count(distinct int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "ignored": true,
+        "comment": "DistinctCount agg function doesn't support null handling",
+        "description": "Return empty for distinctcount",
+        "sql": "SELECT distinctcount(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "ignored": true,
+        "comment": "DistinctCount agg function doesn't support null handling",
+        "description": "Return empty for distinctcount with subquery",
+        "sql": "SELECT distinctcount(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "ignored": true,
+        "comment": "FourthMoment agg function doesn't support null handling",
+        "description": "Return empty for skewness",
+        "sql": "SELECT skewness(double_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "ignored": true,
+        "comment": "FourthMoment agg function doesn't support null handling",
+        "description": "Return empty for skewness with subquery",
+        "sql": "SELECT skewness(double_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "ignored": true,
+        "comment": "FourthMoment agg function doesn't support null handling",
+        "description": "Return empty for kurtosis",
+        "sql": "SELECT kurtosis(double_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
+      },
+      {
+        "ignored": true,
+        "comment": "FourthMoment agg function doesn't support null handling",
+        "description": "Return empty for kurtosis with subquery",
+        "sql": "SELECT kurtosis(double_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      }
+    ]
+  },
+  "aggregate_with_hints": {
+    "tables": {
+      "tbl": {
+        "schema": [
+          {"name": "int_col", "type": "INT"},
+          {"name": "double_col", "type": "DOUBLE"},
+          {"name": "string_col", "type": "STRING"},
+          {"name": "bool_col", "type": "BOOLEAN"}
+        ],
+        "inputs": [
+          [2, 300, "a", true],
+          [2, 400, "a", true],
+          [3, 100, "b", false],
+          [100, 1, "b", false],
+          [101, 1.01, "c", false],
+          [150, 1.5, "c", false],
+          [175, 1.75, "c", true]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "psql": "4.2.7",
+        "description": "aggregation without groupby. hint is a no-op.",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ avg(double_col) FROM {tbl}"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "count, sum group by order by",
+        "sql": "select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col, count(int_col), sum(double_col) from {tbl} group by string_col order by string_col;"
+      },
+      {
+        "psql": "4.2.7",
+        "description": "count, sum group by order by. Multiple aggregations on single column.",
+        "sql": "select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col, max(int_col), min(double_col), count(int_col), sum(double_col) from {tbl} group by string_col order by string_col;"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "aggregate boolean column",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ bool_and(bool_col), bool_or(bool_col) FROM {tbl} GROUP BY string_col"
+      },
+      {
+        "psql": "9.21.0",
+        "description": "aggregate boolean column no group by",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ bool_and(bool_col), bool_or(bool_col) FROM {tbl}"
+      },
+      {
+        "description": "sum empty input after filter with subquery",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ sum(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "description": "count empty input after filter with sub-query",
+        "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ( SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "description": "count empty input after filter with sub-query",
+        "sql": "SELECT count(int_col) FROM {tbl} WHERE string_col IN ( SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
+      },
+      {
+        "description": "group by optimization with filter",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ double_col, sum(int_col) FROM {tbl} WHERE int_col > 3 AND double_col > 1.0 GROUP BY double_col"
       }
     ]
   },

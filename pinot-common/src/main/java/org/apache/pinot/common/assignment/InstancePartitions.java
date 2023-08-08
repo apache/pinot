@@ -25,6 +25,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -145,5 +146,23 @@ public class InstancePartitions {
   @Override
   public String toString() {
     return toJsonString();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == this) {
+      return true;
+    }
+    if (!(obj instanceof InstancePartitions)) {
+      return false;
+    }
+    InstancePartitions other = (InstancePartitions) obj;
+    return Objects.equals(_instancePartitionsName, other._instancePartitionsName)
+            && Objects.equals(_partitionToInstancesMap, other._partitionToInstancesMap);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_instancePartitionsName, _partitionToInstancesMap);
   }
 }

@@ -21,9 +21,9 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
 public class ModuloTransformFunction extends BaseTransformFunction {
@@ -40,7 +40,8 @@ public class ModuloTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, DataSource> dataSourceMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there are exactly 2 arguments
     if (arguments.size() != 2) {
       throw new IllegalArgumentException("Exactly 2 arguments are required for MOD transform function");
@@ -48,7 +49,7 @@ public class ModuloTransformFunction extends BaseTransformFunction {
 
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction) {
-      _firstLiteral = Double.parseDouble(((LiteralTransformFunction) firstArgument).getLiteral());
+      _firstLiteral = ((LiteralTransformFunction) firstArgument).getDoubleLiteral();
     } else {
       if (!firstArgument.getResultMetadata().isSingleValue()) {
         throw new IllegalArgumentException("First argument of MOD transform function must be single-valued");
@@ -58,7 +59,7 @@ public class ModuloTransformFunction extends BaseTransformFunction {
 
     TransformFunction secondArgument = arguments.get(1);
     if (secondArgument instanceof LiteralTransformFunction) {
-      _secondLiteral = Double.parseDouble(((LiteralTransformFunction) secondArgument).getLiteral());
+      _secondLiteral = ((LiteralTransformFunction) secondArgument).getDoubleLiteral();
     } else {
       if (!secondArgument.getResultMetadata().isSingleValue()) {
         throw new IllegalArgumentException("Second argument of MOD transform function must be single-valued");
@@ -73,15 +74,13 @@ public class ModuloTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public double[] transformToDoubleValuesSV(ProjectionBlock projectionBlock) {
-    int length = projectionBlock.getNumDocs();
-    if (_doubleValuesSV == null) {
-      _doubleValuesSV = new double[length];
-    }
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initDoubleValuesSV(length);
     if (_firstTransformFunction == null) {
       Arrays.fill(_doubleValuesSV, 0, length, _firstLiteral);
     } else {
-      double[] values = _firstTransformFunction.transformToDoubleValuesSV(projectionBlock);
+      double[] values = _firstTransformFunction.transformToDoubleValuesSV(valueBlock);
       System.arraycopy(values, 0, _doubleValuesSV, 0, length);
     }
     if (_secondTransformFunction == null) {
@@ -89,7 +88,7 @@ public class ModuloTransformFunction extends BaseTransformFunction {
         _doubleValuesSV[i] %= _secondLiteral;
       }
     } else {
-      double[] values = _secondTransformFunction.transformToDoubleValuesSV(projectionBlock);
+      double[] values = _secondTransformFunction.transformToDoubleValuesSV(valueBlock);
       for (int i = 0; i < length; i++) {
         _doubleValuesSV[i] %= values[i];
       }

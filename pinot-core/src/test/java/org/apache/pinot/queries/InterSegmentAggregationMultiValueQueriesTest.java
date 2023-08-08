@@ -550,6 +550,11 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     testPercentileRawTDigestMV(90);
     testPercentileRawTDigestMV(95);
     testPercentileRawTDigestMV(99);
+
+    testPercentileRawTDigestCustomCompression(50, 150);
+    testPercentileRawTDigestCustomCompression(90, 500);
+    testPercentileRawTDigestCustomCompression(95, 200);
+    testPercentileRawTDigestCustomCompression(99, 1000);
   }
 
   private void testPercentileRawTDigestMV(int percentile) {
@@ -567,6 +572,25 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         getBrokerResponse(regularQuery + SV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER + SV_GROUP_BY),
         getBrokerResponse(regularQuery + FILTER + SV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + MV_GROUP_BY),
+        getBrokerResponse(regularQuery + MV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER + MV_GROUP_BY),
+        getBrokerResponse(regularQuery + FILTER + MV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+  }
+
+  private void testPercentileRawTDigestCustomCompression(int percentile, int compressionFactor) {
+    Function<Object, Object> quantileExtractor =
+        value -> ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .quantile(percentile / 100.0);
+
+    String rawQuery = String.format("SELECT PERCENTILERAWTDIGESTMV(column6, %d, %d) AS value FROM testTable",
+        percentile, compressionFactor);
+    String regularQuery = String.format("SELECT PERCENTILETDIGESTMV(column6, %d, %d) AS value FROM testTable",
+        percentile, compressionFactor);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery), getBrokerResponse(regularQuery),
+        quantileExtractor, PERCENTILE_TDIGEST_DELTA);
+    QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER),
+        getBrokerResponse(regularQuery + FILTER), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + MV_GROUP_BY),
         getBrokerResponse(regularQuery + MV_GROUP_BY), quantileExtractor, PERCENTILE_TDIGEST_DELTA);
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(rawQuery + FILTER + MV_GROUP_BY),
@@ -595,7 +619,7 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
     ResultTable expectedResultTable =
         new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{370236L}));
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 740472L, 400000L, 0L, 400000L, expectedResultTable);
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 370236L, 400000L, 0L, 400000L, expectedResultTable);
   }
 
   @Test

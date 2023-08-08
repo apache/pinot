@@ -28,12 +28,13 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.RowBasedBlockValueFetcher;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorUtils;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -43,11 +44,14 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
   private final List<ExpressionContext> _expressions;
   private final boolean _hasMVExpression;
   private final DistinctTable _distinctTable;
+  private final boolean _nullHandlingEnabled;
 
   public RawMultiColumnDistinctExecutor(List<ExpressionContext> expressions, boolean hasMVExpression,
-      List<DataType> dataTypes, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit) {
+      List<DataType> dataTypes, @Nullable List<OrderByExpressionContext> orderByExpressions,
+      boolean nullHandlingEnabled, int limit) {
     _expressions = expressions;
     _hasMVExpression = hasMVExpression;
+    _nullHandlingEnabled = nullHandlingEnabled;
 
     int numExpressions = expressions.size();
     String[] columnNames = new String[numExpressions];
@@ -57,37 +61,48 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
       columnDataTypes[i] = ColumnDataType.fromDataTypeSV(dataTypes.get(i));
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    _distinctTable = new DistinctTable(dataSchema, orderByExpressions, limit, false);
+    _distinctTable = new DistinctTable(dataSchema, orderByExpressions, limit, _nullHandlingEnabled);
   }
 
   @Override
-  public boolean process(TransformBlock transformBlock) {
-    int numDocs = transformBlock.getNumDocs();
+  public boolean process(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
     int numExpressions = _expressions.size();
     if (!_hasMVExpression) {
       BlockValSet[] blockValSets = new BlockValSet[numExpressions];
       for (int i = 0; i < numExpressions; i++) {
-        blockValSets[i] = transformBlock.getBlockValueSet(_expressions.get(i));
+        blockValSets[i] = valueBlock.getBlockValueSet(_expressions.get(i));
+      }
+      RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
+      if (_nullHandlingEnabled) {
+        for (int i = 0; i < numExpressions; i++) {
+          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+        }
       }
       RowBasedBlockValueFetcher valueFetcher = new RowBasedBlockValueFetcher(blockValSets);
-      if (_distinctTable.hasOrderBy()) {
-        for (int i = 0; i < numDocs; i++) {
-          Record record = new Record(valueFetcher.getRow(i));
-          _distinctTable.addWithOrderBy(record);
+      for (int docId = 0; docId < numDocs; docId++) {
+        Record record = new Record(valueFetcher.getRow(docId));
+        if (_nullHandlingEnabled) {
+          for (int i = 0; i < numExpressions; i++) {
+            if (nullBitmaps[i] != null && nullBitmaps[i].contains(docId)) {
+              record.getValues()[i] = null;
+            }
+          }
         }
-      } else {
-        for (int i = 0; i < numDocs; i++) {
-          Record record = new Record(valueFetcher.getRow(i));
+        if (_distinctTable.hasOrderBy()) {
+          _distinctTable.addWithOrderBy(record);
+        } else {
           if (_distinctTable.addWithoutOrderBy(record)) {
             return true;
           }
         }
       }
     } else {
+      // TODO(https://github.com/apache/pinot/issues/10882): support NULL for multi-value
       Object[][] svValues = new Object[numExpressions][];
       Object[][][] mvValues = new Object[numExpressions][][];
       for (int i = 0; i < numExpressions; i++) {
-        BlockValSet blockValueSet = transformBlock.getBlockValueSet(_expressions.get(i));
+        BlockValSet blockValueSet = valueBlock.getBlockValueSet(_expressions.get(i));
         if (blockValueSet.isSingleValue()) {
           svValues[i] = getSVValues(blockValueSet, numDocs);
         } else {

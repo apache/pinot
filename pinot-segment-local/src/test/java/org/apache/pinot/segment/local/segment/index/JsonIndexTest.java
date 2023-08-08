@@ -18,23 +18,33 @@
  */
 package org.apache.pinot.segment.local.segment.index;
 
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
+import org.apache.pinot.segment.local.segment.index.json.JsonIndexType;
 import org.apache.pinot.segment.local.segment.index.readers.json.ImmutableJsonIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 /**
@@ -225,5 +235,27 @@ public class JsonIndexTest {
 
   private MutableRoaringBitmap getMatchingDocIds(JsonIndexReader indexReader, String filter) {
     return indexReader.getMatchingDocIds(filter);
+  }
+
+  public static class ConfTest extends AbstractSerdeIndexContract {
+
+    @Test
+    public void oldToNewConfConversion() {
+      Map<String, JsonIndexConfig> configs = new HashMap<>();
+      JsonIndexConfig config = new JsonIndexConfig();
+      config.setMaxLevels(2);
+      configs.put("dimStr", config);
+      _tableConfig.getIndexingConfig().setJsonIndexConfigs(configs);
+      _tableConfig.getIndexingConfig().setJsonIndexColumns(Lists.newArrayList("dimStr2"));
+      convertToUpdatedFormat();
+      assertNotNull(_tableConfig.getFieldConfigList());
+      assertFalse(_tableConfig.getFieldConfigList().isEmpty());
+      FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
+          .filter(fc -> fc.getName().equals("dimStr"))
+          .collect(Collectors.toList()).get(0);
+      assertNotNull(fieldConfig.getIndexes().get(JsonIndexType.INDEX_DISPLAY_NAME));
+      assertNull(_tableConfig.getIndexingConfig().getJsonIndexColumns());
+      assertNull(_tableConfig.getIndexingConfig().getJsonIndexConfigs());
+    }
   }
 }

@@ -19,11 +19,13 @@
 package org.apache.pinot.query.parser;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelFieldCollation.Direction;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -31,6 +33,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -48,6 +51,7 @@ import org.slf4j.LoggerFactory;
 public class CalciteRexExpressionParser {
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteRexExpressionParser.class);
   private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
+  private static final String ARRAY_TO_MV_FUNCTION_NAME = "arraytomv";
 
   static {
     CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();
@@ -64,18 +68,29 @@ public class CalciteRexExpressionParser {
   // Relational conversion Utils
   // --------------------------------------------------------------------------
 
-  public static List<Expression> overwriteSelectList(List<RexExpression> rexNodeList, PinotQuery pinotQuery) {
-    return addSelectList(new ArrayList<>(), rexNodeList, pinotQuery);
-  }
-
-  public static List<Expression> addSelectList(List<Expression> existingList, List<RexExpression> rexNodeList,
-      PinotQuery pinotQuery) {
-    List<Expression> selectExpr = new ArrayList<>(existingList);
-
-    final Iterator<RexExpression> iterator = rexNodeList.iterator();
+  public static List<Expression> convertProjectList(List<RexExpression> projectList, PinotQuery pinotQuery) {
+    List<Expression> selectExpr = new ArrayList<>();
+    final Iterator<RexExpression> iterator = projectList.iterator();
     while (iterator.hasNext()) {
       final RexExpression next = iterator.next();
       selectExpr.add(toExpression(next, pinotQuery));
+    }
+    return selectExpr;
+  }
+
+  public static List<Expression> convertAggregateList(List<Expression> groupSetList, List<RexExpression> aggCallList,
+      List<Integer> filterArgIndices, PinotQuery pinotQuery) {
+    List<Expression> selectExpr = new ArrayList<>(groupSetList);
+
+    for (int idx = 0; idx < aggCallList.size(); idx++) {
+      final RexExpression aggCall = aggCallList.get(idx);
+      int filterArgIdx = filterArgIndices.get(idx);
+      if (filterArgIdx == -1) {
+        selectExpr.add(toExpression(aggCall, pinotQuery));
+      } else {
+        selectExpr.add(toExpression(new RexExpression.FunctionCall(SqlKind.FILTER, aggCall.getDataType(), "FILTER",
+            Arrays.asList(aggCall, new RexExpression.InputRef(filterArgIdx))), pinotQuery));
+      }
     }
 
     return selectExpr;
@@ -99,37 +114,51 @@ public class CalciteRexExpressionParser {
     return selectExpr;
   }
 
-  public static List<Expression> convertOrderByList(List<RexExpression> rexInputRefs,
-      List<RelFieldCollation.Direction> directions, PinotQuery pinotQuery) {
-    List<Expression> orderByExpr = new ArrayList<>();
-
-    for (int i = 0; i < rexInputRefs.size(); i++) {
-      orderByExpr.add(convertOrderBy(rexInputRefs.get(i), directions.get(i), pinotQuery));
+  public static List<Expression> convertOrderByList(SortNode node, PinotQuery pinotQuery) {
+    List<RexExpression> collationKeys = node.getCollationKeys();
+    List<Direction> collationDirections = node.getCollationDirections();
+    List<NullDirection> collationNullDirections = node.getCollationNullDirections();
+    int numKeys = collationKeys.size();
+    List<Expression> orderByExpressions = new ArrayList<>(numKeys);
+    for (int i = 0; i < numKeys; i++) {
+      orderByExpressions.add(
+          convertOrderBy(collationKeys.get(i), collationDirections.get(i), collationNullDirections.get(i), pinotQuery));
     }
-    return orderByExpr;
+    return orderByExpressions;
   }
 
-  private static Expression convertOrderBy(RexExpression rexNode, RelFieldCollation.Direction direction,
+  private static Expression convertOrderBy(RexExpression rexNode, Direction direction, NullDirection nullDirection,
       PinotQuery pinotQuery) {
-    Expression expression;
-    switch (direction) {
-      case DESCENDING:
-        expression = getFunctionExpression("DESC");
-        expression.getFunctionCall().addToOperands(toExpression(rexNode, pinotQuery));
-        break;
-      case ASCENDING:
-      default:
-        expression = getFunctionExpression("ASC");
-        expression.getFunctionCall().addToOperands(toExpression(rexNode, pinotQuery));
-        break;
+    if (direction == Direction.ASCENDING) {
+      Expression expression = getFunctionExpression("asc");
+      expression.getFunctionCall().addToOperands(toExpression(rexNode, pinotQuery));
+      // NOTE: Add explicit NULL direction only if it is not the default behavior (default behavior treats NULL as the
+      //       largest value)
+      if (nullDirection == NullDirection.FIRST) {
+        Expression nullFirstExpression = getFunctionExpression("nullsfirst");
+        nullFirstExpression.getFunctionCall().addToOperands(expression);
+        return nullFirstExpression;
+      } else {
+        return expression;
+      }
+    } else {
+      Expression expression = getFunctionExpression("desc");
+      expression.getFunctionCall().addToOperands(toExpression(rexNode, pinotQuery));
+      // NOTE: Add explicit NULL direction only if it is not the default behavior (default behavior treats NULL as the
+      //       largest value)
+      if (nullDirection == NullDirection.LAST) {
+        Expression nullLastExpression = getFunctionExpression("nullslast");
+        nullLastExpression.getFunctionCall().addToOperands(expression);
+        return nullLastExpression;
+      } else {
+        return expression;
+      }
     }
-    return expression;
   }
 
   private static Expression convertDistinctAndSelectListToFunctionExpression(RexExpression.FunctionCall rexCall,
       PinotQuery pinotQuery) {
-    String functionName = AggregationFunctionType.DISTINCT.getName();
-    Expression functionExpression = getFunctionExpression(functionName);
+    Expression functionExpression = getFunctionExpression("distinct");
     for (RexExpression node : rexCall.getFunctionOperands()) {
       Expression columnExpression = toExpression(node, pinotQuery);
       if (columnExpression.getType() == ExpressionType.IDENTIFIER && columnExpression.getIdentifier().getName()
@@ -183,16 +212,25 @@ public class CalciteRexExpressionParser {
         return compileOrExpression(rexCall, pinotQuery);
       case OTHER_FUNCTION:
         functionName = rexCall.getFunctionName();
+        // Special handle for leaf stage multi-value columns, as the default behavior for filter and group by is not
+        // sql standard, so need to use `array_to_mv` to convert the array to v1 multi-value column for behavior
+        // consistency meanwhile not violating the sql standard.
+        if (ARRAY_TO_MV_FUNCTION_NAME.equals(canonicalizeFunctionName(functionName))) {
+          return toExpression(rexCall.getFunctionOperands().get(0), pinotQuery);
+        }
         break;
       default:
         functionName = functionKind.name();
         break;
     }
-    // When there is no argument, set an empty list as the operands
     List<RexExpression> childNodes = rexCall.getFunctionOperands();
     List<Expression> operands = new ArrayList<>(childNodes.size());
     for (RexExpression childNode : childNodes) {
       operands.add(toExpression(childNode, pinotQuery));
+    }
+    // for COUNT, add a star (*) identifier to operand list b/c V1 doesn't handle empty operand functions.
+    if (functionKind == SqlKind.COUNT && operands.isEmpty()) {
+      operands.add(RequestUtils.getIdentifierExpression("*"));
     }
     ParserUtils.validateFunction(functionName, operands);
     Expression functionExpression = getFunctionExpression(functionName);

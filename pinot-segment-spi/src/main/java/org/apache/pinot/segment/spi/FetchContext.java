@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.apache.pinot.segment.spi.store.ColumnIndexType;
+import org.apache.pinot.segment.spi.index.IndexType;
 
 
 /**
@@ -32,7 +32,7 @@ import org.apache.pinot.segment.spi.store.ColumnIndexType;
 public class FetchContext {
   private final UUID _fetchId;
   private final String _segmentName;
-  private final Map<String, List<ColumnIndexType>> _columnToIndexList;
+  private final Map<String, List<IndexType<?, ?, ?>>> _columnToIndexList;
 
   /**
    * Create a new FetchRequest for this segment, to fetch all buffers of the given columns
@@ -55,7 +55,7 @@ public class FetchContext {
    * @param segmentName segment name
    * @param columnToIndexList map of column names as key, and list of indexes to fetch as values
    */
-  public FetchContext(UUID fetchId, String segmentName, Map<String, List<ColumnIndexType>> columnToIndexList) {
+  public FetchContext(UUID fetchId, String segmentName, Map<String, List<IndexType<?, ?, ?>>> columnToIndexList) {
     _fetchId = fetchId;
     _segmentName = segmentName;
     _columnToIndexList = columnToIndexList;
@@ -80,7 +80,7 @@ public class FetchContext {
    * Map of columns to fetch as key, and the list of indexes to fetch for the column as value
    * The list of indexes can be null, which indicates that every index for this column should be fetched
    */
-  public Map<String, List<ColumnIndexType>> getColumnToIndexList() {
+  public Map<String, List<IndexType<?, ?, ?>>> getColumnToIndexList() {
     return _columnToIndexList;
   }
 

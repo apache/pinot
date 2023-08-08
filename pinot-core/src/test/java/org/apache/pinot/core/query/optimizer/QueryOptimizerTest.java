@@ -225,9 +225,35 @@ public class QueryOptimizerTest {
     testQuery(
         "SELECT * FROM testTable WHERE int >= 20 AND (int > 10 AND (int IN (1, 2) OR (int = 2 OR int = 3)) AND int <="
             + " 30)", "SELECT * FROM testTable WHERE int BETWEEN 20 AND 30 AND int IN (1, 2, 3)");
+
+    // IdenticalPredicateOptimizer
+    testQuery("SELECT * FROM testTable WHERE 1=1", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE 1!=1", "SELECT * FROM testTable WHERE false");
+    testQuery("SELECT * FROM testTable WHERE 1=1 AND 1!=1", "SELECT * FROM testTable WHERE false");
+    testQuery("SELECT * FROM testTable WHERE 1=1 OR 1!=1", "SELECT * FROM testTable WHERE true");
+
+    testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\"", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE \"a\"!=\"a\"", "SELECT * FROM testTable WHERE false");
+    testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\" AND \"a\"!=\"a\"", "SELECT * FROM testTable WHERE false");
+    testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\" OR \"a\"!=\"a\"", "SELECT * FROM testTable WHERE true");
+
+    testQuery("SELECT * FROM testTable WHERE 1=1 AND \"a\"=\"a\"", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE 1=1 OR \"a\"=\"a\"", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE 1!=1 AND \"a\"=\"a\"", "SELECT * FROM testTable WHERE false");
+    testQuery("SELECT * FROM testTable WHERE 1=1 AND \"a\"!=\"a\"", "SELECT * FROM testTable WHERE false");
+    testQuery("SELECT * FROM testTable WHERE 1!=1 OR \"a\"=\"a\"", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE 1=1 OR \"a\"!=\"a\"", "SELECT * FROM testTable WHERE true");
+
+    testQuery("SELECT * FROM testTable WHERE 1.0=1.0", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE 1.0=1", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE 1.01=1", "SELECT * FROM testTable WHERE false");
+
+    testQuery("SELECT * FROM testTable WHERE 1=1 AND true", "SELECT * FROM testTable WHERE true");
+    testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\" AND true", "SELECT * FROM testTable WHERE true");
   }
 
   private static void testQuery(String actual, String expected) {
+    assertNotEquals(actual, expected, "You must provide different queries to test");
     PinotQuery actualPinotQuery = CalciteSqlParser.compileToPinotQuery(actual);
     OPTIMIZER.optimize(actualPinotQuery, SCHEMA);
     // Also optimize the expected query because the expected range can only be generate via optimizer
@@ -245,30 +271,37 @@ public class QueryOptimizerTest {
   }
 
   private static void compareFilterExpression(Expression actual, Expression expected) {
-    Function actualFilterFunction = actual.getFunctionCall();
-    Function expectedFilterFunction = expected.getFunctionCall();
-    FilterKind actualFilterKind = FilterKind.valueOf(actualFilterFunction.getOperator());
-    FilterKind expectedFilterKind = FilterKind.valueOf(expectedFilterFunction.getOperator());
-    List<Expression> actualOperands = actualFilterFunction.getOperands();
-    List<Expression> expectedOperands = expectedFilterFunction.getOperands();
-    if (!actualFilterKind.isRange()) {
-      assertEquals(actualFilterKind, expectedFilterKind);
-      assertEquals(actualOperands.size(), expectedOperands.size());
-      if (actualFilterKind == FilterKind.AND || actualFilterKind == FilterKind.OR) {
-        compareFilterExpressionChildren(actualOperands, expectedOperands);
-      } else {
-        assertEquals(actualOperands.get(0), expectedOperands.get(0));
-        if (actualFilterKind == FilterKind.IN || actualFilterKind == FilterKind.NOT_IN) {
-          // Handle different order of values
-          assertEqualsNoOrder(actualOperands.toArray(), expectedOperands.toArray());
-        } else {
-          assertEquals(actualOperands, expectedOperands);
-        }
-      }
+    if (actual.isSetLiteral()) {
+      assertNull(actual.getFunctionCall());
+      assertNull(expected.getFunctionCall());
+      assertTrue(expected.isSetLiteral());
+      assertEquals(actual.getLiteral(), expected.getLiteral());
     } else {
-      assertTrue(expectedFilterKind.isRange());
-      assertEquals(getRangeString(actualFilterKind, actualOperands),
-          getRangeString(expectedFilterKind, expectedOperands));
+      Function actualFilterFunction = actual.getFunctionCall();
+      Function expectedFilterFunction = expected.getFunctionCall();
+      FilterKind actualFilterKind = FilterKind.valueOf(actualFilterFunction.getOperator());
+      FilterKind expectedFilterKind = FilterKind.valueOf(expectedFilterFunction.getOperator());
+      List<Expression> actualOperands = actualFilterFunction.getOperands();
+      List<Expression> expectedOperands = expectedFilterFunction.getOperands();
+      if (!actualFilterKind.isRange()) {
+        assertEquals(actualFilterKind, expectedFilterKind);
+        assertEquals(actualOperands.size(), expectedOperands.size());
+        if (actualFilterKind == FilterKind.AND || actualFilterKind == FilterKind.OR) {
+          compareFilterExpressionChildren(actualOperands, expectedOperands);
+        } else {
+          assertEquals(actualOperands.get(0), expectedOperands.get(0));
+          if (actualFilterKind == FilterKind.IN || actualFilterKind == FilterKind.NOT_IN) {
+            // Handle different order of values
+            assertEqualsNoOrder(actualOperands.toArray(), expectedOperands.toArray());
+          } else {
+            assertEquals(actualOperands, expectedOperands);
+          }
+        }
+      } else {
+        assertTrue(expectedFilterKind.isRange());
+        assertEquals(getRangeString(actualFilterKind, actualOperands),
+            getRangeString(expectedFilterKind, expectedOperands));
+      }
     }
   }
 

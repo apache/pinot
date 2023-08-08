@@ -35,13 +35,16 @@ import java.util.stream.StreamSupport;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
  * Provide utility functions to manipulate Apache Commons {@link Configuration} instances.
- *
  */
-public abstract class CommonsConfigurationUtils {
+public class CommonsConfigurationUtils {
+  private CommonsConfigurationUtils() {
+  }
+
   /**
    * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
    * @param file containing properties
@@ -119,8 +122,96 @@ public abstract class CommonsConfigurationUtils {
   }
 
   private static Object mapValue(String key, Configuration configuration) {
-    return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1).<Object>map(
-        values -> Arrays.stream(values).collect(Collectors.joining(",")))
-        .orElseGet(() -> configuration.getProperty(key));
+    // For multi-value config, convert it to a single comma connected string value.
+    // For single-value config, return its raw property, unless it needs interpolation.
+    return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1)
+        .<Object>map(values -> Arrays.stream(values).collect(Collectors.joining(","))).orElseGet(() -> {
+          Object rawProperty = configuration.getProperty(key);
+          if (!needInterpolate(rawProperty)) {
+            return rawProperty;
+          }
+          // The string value is converted to the requested type when accessing it via PinotConfiguration.
+          return configuration.getString(key);
+        });
+  }
+
+  public static boolean needInterpolate(Object rawProperty) {
+    if (rawProperty instanceof String) {
+      String strProperty = (String) rawProperty;
+      // e.g. if config value is '${sys:FOO}', it's replaced by value of system property FOO; If config value is
+      // '${env:FOO}', it's replaced by value of env var FOO.
+      return StringUtils.isNotEmpty(strProperty) && strProperty.startsWith("${") && strProperty.endsWith("}");
+    }
+    return false;
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> T interpolate(Configuration configuration, String key, T defaultValue, Class<T> returnType) {
+    // Different from the generic getProperty() method, those type specific getters do config interpolation.
+    if (Integer.class.equals(returnType)) {
+      return (T) configuration.getInteger(key, (Integer) defaultValue);
+    } else if (Boolean.class.equals(returnType)) {
+      return (T) configuration.getBoolean(key, (Boolean) defaultValue);
+    } else if (Long.class.equals(returnType)) {
+      return (T) configuration.getLong(key, (Long) defaultValue);
+    } else if (Double.class.equals(returnType)) {
+      return (T) configuration.getDouble(key, (Double) defaultValue);
+    } else {
+      throw new IllegalArgumentException(returnType + " is not a supported type for conversion.");
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> T convert(Object value, Class<T> returnType) {
+    if (Integer.class.equals(returnType)) {
+      return (T) Integer.valueOf(value.toString());
+    } else if (Boolean.class.equals(returnType)) {
+      return (T) Boolean.valueOf(value.toString());
+    } else if (Long.class.equals(returnType)) {
+      return (T) Long.valueOf(value.toString());
+    } else if (Double.class.equals(returnType)) {
+      return (T) Double.valueOf(value.toString());
+    } else {
+      throw new IllegalArgumentException(returnType + " is not a supported type for conversion.");
+    }
+  }
+
+  /**
+   * Replaces the special character in the given property value.
+   * - Leading/trailing space is prefixed/suffixed with "\0"
+   * - Comma is replaces with "\0\0"
+   *
+   * Note:
+   * - '\0' is not allowed in string values, so we can use it as the replaced character
+   * - Escaping comma with backslash doesn't work when comma is preceded by a backslash
+   */
+  public static String replaceSpecialCharacterInPropertyValue(String value) {
+    if (value.isEmpty()) {
+      return value;
+    }
+    if (value.charAt(0) == ' ') {
+      value = "\0" + value;
+    }
+    if (value.charAt(value.length() - 1) == ' ') {
+      value = value + "\0";
+    }
+    return value.replace(",", "\0\0");
+  }
+
+  /**
+   * Recovers the special character in the given property value that is previous replaced by
+   * {@link #replaceSpecialCharacterInPropertyValue(String)}.
+   */
+  public static String recoverSpecialCharacterInPropertyValue(String value) {
+    if (value.isEmpty()) {
+      return value;
+    }
+    if (value.startsWith("\0 ")) {
+      value = value.substring(1);
+    }
+    if (value.endsWith(" \0")) {
+      value = value.substring(0, value.length() - 1);
+    }
+    return value.replace("\0\0", ",");
   }
 }

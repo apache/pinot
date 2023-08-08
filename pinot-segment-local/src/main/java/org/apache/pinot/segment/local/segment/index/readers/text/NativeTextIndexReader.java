@@ -52,10 +52,14 @@ public class NativeTextIndexReader implements TextIndexReader {
   public NativeTextIndexReader(String column, File indexDir) {
     _column = column;
     try {
-      _buffer = PinotDataBuffer.loadBigEndianFile(getTextIndexFile(indexDir));
+      String desc = "Native text index buffer: " + column;
+      File indexFile = getTextIndexFile(indexDir);
+      //TODO: Pass the load mode in (Direct, MMap)
+      _buffer =
+          PinotDataBuffer.mapFile(indexFile, /* readOnly */ true, 0, indexFile.length(), ByteOrder.BIG_ENDIAN, desc);
       populateIndexes();
     } catch (Exception e) {
-      LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
+      LOGGER.error("Failed to instantiate native text index reader for column {}, exception {}", column,
           e.getMessage());
       throw new RuntimeException(e);
     }
@@ -115,5 +119,6 @@ public class NativeTextIndexReader implements TextIndexReader {
   @Override
   public void close()
       throws IOException {
+    _buffer.close();
   }
 }

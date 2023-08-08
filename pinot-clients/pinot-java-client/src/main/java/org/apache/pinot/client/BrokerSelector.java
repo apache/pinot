@@ -23,10 +23,10 @@ import java.util.List;
 public interface BrokerSelector {
   /**
    * Returns the broker address in the form host:port
-   * @param table
+   * @param tableNames
    * @return
    */
-  String selectBroker(String table);
+  String selectBroker(String... tableNames);
 
   /**
    * Returns list of all brokers.

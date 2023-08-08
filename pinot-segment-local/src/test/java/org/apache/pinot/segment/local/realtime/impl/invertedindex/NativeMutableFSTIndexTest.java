@@ -32,13 +32,12 @@ import static org.testng.Assert.assertTrue;
 
 
 public class NativeMutableFSTIndexTest {
-  private static final String TEXT_COLUMN_NAME = "testColumnName";
   private NativeMutableFSTIndex _nativeMutableFSTIndex;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    _nativeMutableFSTIndex = new NativeMutableFSTIndex(TEXT_COLUMN_NAME);
+    _nativeMutableFSTIndex = new NativeMutableFSTIndex();
     List<String> documents = getTextData();
 
     for (String doc : documents) {

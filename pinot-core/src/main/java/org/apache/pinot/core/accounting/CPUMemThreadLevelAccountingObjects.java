@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.accounting;
 
-import java.util.HashMap;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -32,33 +30,47 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public class CPUMemThreadLevelAccountingObjects {
 
-  public static class StatsDigest {
-
-    // The current usage sampling for each thread
-    final long[] _currentStatsSample;
-    // The previous usage sampling for each thread
-    final long[] _lastStatSample;
-    // The aggregated usage sampling for the finished tasks of a (still) running queries
-    final HashMap<String, Long> _finishedTaskStatAggregator;
-
-    StatsDigest(int numThreads) {
-      _currentStatsSample = new long[numThreads];
-      _lastStatSample = new long[numThreads];
-      _finishedTaskStatAggregator = new HashMap<>();
-    }
-  }
-
   /**
-   * Entry to track the task execution status of a worker/runner given thread
+   * Entry to track the task execution status and usage stats of a Thread
+   * (including but not limited to server worker thread, runner thread, broker jetty thread, or broker netty thread)
    */
-  public static class TaskEntryHolder {
-    AtomicReference<TaskEntry> _threadTaskStatus = new AtomicReference<>(null);
+  public static class ThreadEntry {
+    // current query_id, task_id of the thread; this field is accessed by the thread itself and the accountant
+    AtomicReference<TaskEntry> _currentThreadTaskStatus = new AtomicReference<>();
+    // current sample of thread memory usage/cputime ; this field is accessed by the thread itself and the accountant
+    volatile long _currentThreadCPUTimeSampleMS = 0;
+    volatile long _currentThreadMemoryAllocationSampleBytes = 0;
+
+    // previous query_id, task_id of the thread, this field should only be accessed by the accountant
+    TaskEntry _previousThreadTaskStatus = null;
+    // previous cpu time and memory allocation of the thread
+    // these fields should only be accessed by the accountant
+    long _previousThreadCPUTimeSampleMS = 0;
+    long _previousThreadMemoryAllocationSampleBytes = 0;
+
+    // error message store per runner/worker thread,
+    // will put preemption reasons in this for the killed thread to pickup
+    AtomicReference<Exception> _errorStatus = new AtomicReference<>();
+
+    @Override
+    public String toString() {
+      TaskEntry taskEntry = _currentThreadTaskStatus.get();
+      return "ThreadEntry{"
+          + "_currentThreadTaskStatus=" + (taskEntry == null ? "idle" : taskEntry.toString())
+          + ", _errorStatus=" + _errorStatus
+          + '}';
+    }
 
     /**
-     * set the thread tracking info to null
+     * set the thread tracking info to null and usage samples to zero
      */
     public void setToIdle() {
-      _threadTaskStatus.set(null);
+      // clear task info
+      _currentThreadTaskStatus.set(null);
+      // clear CPU time
+      _currentThreadCPUTimeSampleMS = 0;
+      // clear memory usage
+      _currentThreadMemoryAllocationSampleBytes = 0;
     }
 
     /**
@@ -66,16 +78,20 @@ public class CPUMemThreadLevelAccountingObjects {
      * @return the current query id on the thread, {@code null} if idle
      */
     @Nullable
-    public TaskEntry getThreadTaskStatus() {
-      return _threadTaskStatus.get();
+    public TaskEntry getCurrentThreadTaskStatus() {
+      return _currentThreadTaskStatus.get();
     }
 
-    public TaskEntryHolder setThreadTaskStatus(@Nonnull String queryId, int taskId, @Nonnull Thread thread) {
-      _threadTaskStatus.set(new TaskEntry(queryId, taskId, thread));
-      return this;
+    public void setThreadTaskStatus(@Nonnull String queryId, int taskId, @Nonnull Thread anchorThread) {
+      _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, anchorThread));
     }
   }
 
+  /**
+   * Class to track the execution status of a thread. query_id is an instance level unique query_id,
+   * taskId is the worker thread id when we have a runner-worker thread model
+   * anchor thread refers to the runner in runner-worker thread model
+   */
   public static class TaskEntry implements ThreadExecutionContext {
     private final String _queryId;
     private final int _taskId;
@@ -89,17 +105,6 @@ public class CPUMemThreadLevelAccountingObjects {
       _queryId = queryId;
       _taskId = taskId;
       _anchorThread = anchorThread;
-    }
-
-    public static boolean isSameTask(TaskEntry currentTaskStatus, TaskEntry lastQueryTask) {
-      if (currentTaskStatus == null) {
-        return lastQueryTask == null;
-      } else if (lastQueryTask == null) {
-        return false;
-      } else {
-        return Objects.equals(currentTaskStatus.getQueryId(), lastQueryTask.getQueryId())
-            || currentTaskStatus.getTaskId() == lastQueryTask.getTaskId();
-      }
     }
 
     public String getQueryId() {

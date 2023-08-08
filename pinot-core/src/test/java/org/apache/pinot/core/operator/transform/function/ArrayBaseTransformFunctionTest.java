@@ -22,6 +22,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -69,6 +70,71 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
         String[] stringResults = transformFunction.transformToStringValuesSV(_projectionBlock);
         for (int i = 0; i < NUM_ROWS; i++) {
           Assert.assertEquals(stringResults[i], getExpectResult(_intMVValues[i]));
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  @Test
+  public void testArrayNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("%s(%s)", getFunctionName(), INT_MV_NULL_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertEquals(transformFunction.getClass().getName(), getArrayFunctionClass().getName());
+    Assert.assertEquals(transformFunction.getName(), getFunctionName());
+    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), getResultDataType(FieldSpec.DataType.INT));
+    Assert.assertTrue(transformFunction.getResultMetadata().isSingleValue());
+    Assert.assertFalse(transformFunction.getResultMetadata().hasDictionary());
+
+    RoaringBitmap expectedNulls = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        expectedNulls.add(i);
+      }
+    }
+    testNullBitmap(transformFunction, expectedNulls);
+
+    switch (getResultDataType(FieldSpec.DataType.INT)) {
+      case INT:
+        int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          if (!isNullRow(i)) {
+            Assert.assertEquals(intValues[i], getExpectResult(_intMVValues[i]));
+          }
+        }
+        break;
+      case LONG:
+        long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          if (!isNullRow(i)) {
+            Assert.assertEquals(longValues[i], getExpectResult(_intMVValues[i]));
+          }
+        }
+        break;
+      case FLOAT:
+        float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          if (!isNullRow(i)) {
+            Assert.assertEquals(floatValues[i], getExpectResult(_intMVValues[i]));
+          }
+        }
+        break;
+      case DOUBLE:
+        double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          if (!isNullRow(i)) {
+            Assert.assertEquals(doubleValues[i], getExpectResult(_intMVValues[i]));
+          }
+        }
+        break;
+      case STRING:
+        String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          if (!isNullRow(i)) {
+            Assert.assertEquals(stringValues[i], getExpectResult(_intMVValues[i]));
+          }
         }
         break;
       default:

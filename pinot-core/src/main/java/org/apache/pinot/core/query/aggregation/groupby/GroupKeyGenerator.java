@@ -19,7 +19,7 @@
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Iterator;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
 /**
@@ -39,22 +39,22 @@ public interface GroupKeyGenerator {
   int getGlobalGroupKeyUpperBound();
 
   /**
-   * Generates group keys on the given transform block and returns the result to the given buffer.
+   * Generates group keys on the given value block and returns the result to the given buffer.
    * <p>This method is for situation where all the group-by columns are single-valued.
    *
-   * @param transformBlock Transform block
-   * @param groupKeys Buffer to return the results
+   * @param valueBlock Value block
+   * @param groupKeys  Buffer to return the results
    */
-  void generateKeysForBlock(TransformBlock transformBlock, int[] groupKeys);
+  void generateKeysForBlock(ValueBlock valueBlock, int[] groupKeys);
 
   /**
-   * Generate group keys on the given transform block and returns the result to the given buffer.
+   * Generate group keys on the given value block and returns the result to the given buffer.
    * <p>This method is for situation where at least one group-by columns are multi-valued.
    *
-   * @param transformBlock Transform block
-   * @param groupKeys Buffer to return the results
+   * @param valueBlock Value block
+   * @param groupKeys  Buffer to return the results
    */
-  void generateKeysForBlock(TransformBlock transformBlock, int[][] groupKeys);
+  void generateKeysForBlock(ValueBlock valueBlock, int[][] groupKeys);
 
   /**
    * Get the current upper bound of the group key. All group keys already generated should be less than this value. This

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.queries;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -61,10 +62,14 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -195,24 +200,33 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    Map<String, Map<String, String>> columnProperties = new HashMap<>();
-    Map<String, String> props = new HashMap<>();
-    props.put(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true");
-    props.put(FieldConfig.TEXT_INDEX_RAW_VALUE, "ILoveCoding");
-    columnProperties.put(SKILLS_TEXT_NO_RAW_NAME, props);
-    props = new HashMap<>();
-    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, "coordinator");
-    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "it, those");
-    columnProperties.put(SKILLS_TEXT_COL_NAME, props);
-    props = new HashMap<>();
-    props.put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "");
-    columnProperties.put(SKILLS_TEXT_COL_DICT_NAME, props);
-    config.setColumnProperties(columnProperties);
+    addTextIndexProp(config, SKILLS_TEXT_NO_RAW_NAME, ImmutableMap.<String, String>builder()
+        .put(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true")
+        .put(FieldConfig.TEXT_INDEX_RAW_VALUE, "ILoveCoding")
+        .build());
+    addTextIndexProp(config, SKILLS_TEXT_COL_NAME, ImmutableMap.<String, String>builder()
+        .put(FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, "coordinator")
+        .put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "it, those")
+        .build());
+    addTextIndexProp(config, SKILLS_TEXT_COL_DICT_NAME,
+        Collections.singletonMap(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, ""));
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
     }
+  }
+
+
+  private void addTextIndexProp(SegmentGeneratorConfig config, String colName, Map<String, String> propMap) {
+    FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(colName);
+    TextIndexConfig textConfig = fieldIndexConfigs.getConfig(StandardIndexes.text());
+
+    TextIndexConfig newTextConfig = new TextIndexConfigBuilder(textConfig)
+        .withProperties(propMap)
+        .build();
+
+    config.setIndexOn(StandardIndexes.text(), newTextConfig, colName);
   }
 
   private List<GenericRow> createTestData()

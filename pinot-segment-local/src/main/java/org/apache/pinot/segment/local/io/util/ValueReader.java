@@ -65,4 +65,9 @@ public interface ValueReader extends Closeable {
    * Returns the comparison result of the UTF-8 decoded values.
    */
   int compareUtf8Bytes(int index, int numBytesPerValue, byte[] bytes);
+
+  /**
+   * Returns the comparison result of the bytes values.
+   */
+  int compareBytes(int index, int numBytesPerValue, byte[] bytes);
 }

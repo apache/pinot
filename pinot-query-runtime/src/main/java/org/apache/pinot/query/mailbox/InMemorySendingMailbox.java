@@ -18,41 +18,49 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.function.Consumer;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-public class InMemorySendingMailbox implements SendingMailbox<TransferableBlock> {
-  private final BlockingQueue<TransferableBlock> _queue;
-  private final Consumer<MailboxIdentifier> _gotMailCallback;
-  private final String _mailboxId;
+public class InMemorySendingMailbox implements SendingMailbox {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
 
-  public InMemorySendingMailbox(String mailboxId, BlockingQueue<TransferableBlock> queue,
-      Consumer<MailboxIdentifier> gotMailCallback) {
-    _mailboxId = mailboxId;
-    _queue = queue;
-    _gotMailCallback = gotMailCallback;
+  private final String _id;
+  private final MailboxService _mailboxService;
+  private final long _deadlineMs;
+
+  private ReceivingMailbox _receivingMailbox;
+
+  public InMemorySendingMailbox(String id, MailboxService mailboxService, long deadlineMs) {
+    _id = id;
+    _mailboxService = mailboxService;
+    _deadlineMs = deadlineMs;
   }
 
   @Override
-  public String getMailboxId() {
-    return _mailboxId;
-  }
-
-  @Override
-  public void send(TransferableBlock data)
-      throws UnsupportedOperationException {
-    if (!_queue.offer(data)) {
-      // this should never happen, since we use a LinkedBlockingQueue
-      // which does not have capacity bounds
-      throw new IllegalStateException("Failed to insert into in-memory mailbox "
-          + _mailboxId);
+  public void send(TransferableBlock block) {
+    if (_receivingMailbox == null) {
+      _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
-    _gotMailCallback.accept(JsonMailboxIdentifier.parse(_mailboxId));
+    long timeoutMs = _deadlineMs - System.currentTimeMillis();
+    if (!_receivingMailbox.offer(block, timeoutMs)) {
+      throw new RuntimeException(String.format("Failed to offer block into mailbox: %s within: %dms", _id, timeoutMs));
+    }
   }
 
   @Override
   public void complete() {
+  }
+
+  @Override
+  public void cancel(Throwable t) {
+    LOGGER.debug("Cancelling mailbox: {}", _id);
+    if (_receivingMailbox == null) {
+      _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
+    }
+    _receivingMailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
+        new RuntimeException("Cancelled by sender with exception: " + t.getMessage(), t)));
   }
 }

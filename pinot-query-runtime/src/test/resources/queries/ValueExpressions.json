@@ -45,8 +45,6 @@
   },
   "scalar_subqueries": {
     "psql": "4.2.11",
-    "ignored": true,
-    "comment": "can't compile the logical plan",
     "tables": {
       "cities": {
         "schema": [

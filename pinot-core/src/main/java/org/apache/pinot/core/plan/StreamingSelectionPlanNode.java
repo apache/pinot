@@ -21,8 +21,8 @@ package org.apache.pinot.core.plan;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyOperator;
-import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -47,8 +47,8 @@ public class StreamingSelectionPlanNode implements PlanNode {
   @Override
   public StreamingSelectionOnlyOperator run() {
     List<ExpressionContext> expressions = SelectionOperatorUtils.extractExpressions(_queryContext, _indexSegment);
-    TransformOperator transformOperator = new TransformPlanNode(_indexSegment, _queryContext, expressions,
+    BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_indexSegment, _queryContext, expressions,
         Math.min(_queryContext.getLimit(), DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
-    return new StreamingSelectionOnlyOperator(_indexSegment, _queryContext, expressions, transformOperator);
+    return new StreamingSelectionOnlyOperator(_indexSegment, _queryContext, expressions, projectOperator);
   }
 }

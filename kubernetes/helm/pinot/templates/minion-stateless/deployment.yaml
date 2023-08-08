@@ -37,6 +37,7 @@ spec:
 {{ toYaml .Values.minionStateless.podAnnotations | indent 8 }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      serviceAccountName: {{ include "pinot.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.minionStateless.podSecurityContext | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
@@ -56,7 +57,7 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         args: [
-          "StartMinion",
+          "{{ .Values.minionStateless.startCommand }}",
           "-clusterName", "{{ .Values.cluster.name }}",
           "-zkAddress", {{ include "zookeeper.url" . | quote }},
           "-configFileName", "/var/pinot/minion/config/pinot-minion-stateless.conf"
@@ -73,6 +74,9 @@ spec:
           - containerPort: {{ .Values.minionStateless.service.port }}
             protocol: {{ .Values.minionStateless.service.protocol }}
             name: {{ .Values.minionStateless.service.name }}
+{{- if .Values.minionStateless.service.extraPorts }}
+{{ toYaml .Values.minionStateless.service.extraPorts | indent 10 }}
+{{- end }}  
         {{- if .Values.minionStateless.probes.livenessEnabled }}
         livenessProbe:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}

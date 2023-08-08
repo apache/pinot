@@ -43,24 +43,22 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider
   public Object[][] params() {
-    return Stream.of(INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN)
-        .flatMap(col -> Stream.of(
-            new int[] {3, 2, 1},
-            new int[] {1, 2, 3},
-            new int[] {Integer.MAX_VALUE / 2, Integer.MAX_VALUE / 4, 0},
-            new int[] {0, Integer.MAX_VALUE / 4, Integer.MAX_VALUE / 2},
-            new int[] {0, Integer.MIN_VALUE / 4, Integer.MIN_VALUE},
-            new int[] {Integer.MIN_VALUE, 0, 1},
-            new int[] {Integer.MAX_VALUE, Integer.MIN_VALUE, 1},
-            new int[] {Integer.MAX_VALUE, Integer.MAX_VALUE - 1, Integer.MAX_VALUE - 2}
-        ).map(thresholds -> new Object[]{col, thresholds[0], thresholds[1], thresholds[2]}))
+    return Stream.of(INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN).flatMap(
+            col -> Stream.of(new int[]{3, 2, 1}, new int[]{1, 2, 3},
+                    new int[]{Integer.MAX_VALUE / 2, Integer.MAX_VALUE / 4, 0},
+                    new int[]{0, Integer.MAX_VALUE / 4, Integer.MAX_VALUE / 2},
+                    new int[]{0, Integer.MIN_VALUE / 4, Integer.MIN_VALUE}, new int[]{Integer.MIN_VALUE, 0, 1},
+                    new int[]{Integer.MAX_VALUE, Integer.MIN_VALUE, 1},
+                    new int[]{Integer.MAX_VALUE, Integer.MAX_VALUE - 1, Integer.MAX_VALUE - 2})
+                .map(thresholds -> new Object[]{col, thresholds[0], thresholds[1], thresholds[2]}))
         .toArray(Object[][]::new);
   }
 
   @Test(dataProvider = "params")
   public void testCasePriorityObserved(String column, int threshold1, int threshold2, int threshold3) {
-    String statement = String.format("CASE WHEN %s > %d THEN 3 WHEN %s > %d THEN 2 WHEN %s > %d THEN 1 ELSE -1 END",
-        column, threshold1, column, threshold2, column, threshold3);
+    String statement =
+        String.format("CASE WHEN %s > %d THEN 3 WHEN %s > %d THEN 2 WHEN %s > %d THEN 1 ELSE -1 END", column,
+            threshold1, column, threshold2, column, threshold3);
     ExpressionContext expression = RequestContextUtils.getExpression(statement);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedIntResults = new int[NUM_ROWS];
@@ -103,7 +101,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), LONG_SV_COLUMN,
           String.format("%d", _longSVValues[INDEX_TO_COMPARE])), getExpectedIntResults(LONG_SV_COLUMN, functionType));
       testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
-          String.format("%f", _floatSVValues[INDEX_TO_COMPARE])), getExpectedIntResults(FLOAT_SV_COLUMN, functionType));
+              String.format("%f", _floatSVValues[INDEX_TO_COMPARE])),
+          getExpectedIntResults(FLOAT_SV_COLUMN, functionType));
       testCaseQueryWithIntResults(String.format("%s(%s, %s)", functionType.getName(), DOUBLE_SV_COLUMN,
               String.format("%.20f", _doubleSVValues[INDEX_TO_COMPARE])),
           getExpectedIntResults(DOUBLE_SV_COLUMN, functionType));
@@ -125,7 +124,8 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), INT_SV_COLUMN,
           String.format("%d", _intSVValues[INDEX_TO_COMPARE])), getExpectedFloatResults(INT_SV_COLUMN, functionType));
       testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), LONG_SV_COLUMN,
-          String.format("%d", _longSVValues[INDEX_TO_COMPARE])), getExpectedFloatResults(LONG_SV_COLUMN, functionType));
+              String.format("%d", _longSVValues[INDEX_TO_COMPARE])),
+          getExpectedFloatResults(LONG_SV_COLUMN, functionType));
       testCaseQueryWithFloatResults(String.format("%s(%s, %s)", functionType.getName(), FLOAT_SV_COLUMN,
               String.format("%f", _floatSVValues[INDEX_TO_COMPARE])),
           getExpectedFloatResults(FLOAT_SV_COLUMN, functionType));

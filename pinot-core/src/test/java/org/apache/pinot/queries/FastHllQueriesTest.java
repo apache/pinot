@@ -193,8 +193,6 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(
-        Arrays.asList("column6", "column7", "column11", "column17", "column18"));
 
     // Build the index segment
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();

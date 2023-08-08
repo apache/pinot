@@ -19,15 +19,12 @@
 package org.apache.pinot.segment.spi.index.column;
 
 import java.io.Closeable;
-import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
-import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
-import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
-import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
-import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
-import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.index.IndexReader;
+import org.apache.pinot.segment.spi.index.IndexType;
 
 
 /**
@@ -36,53 +33,69 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 public interface ColumnIndexContainer extends Closeable {
 
   /**
-   * Returns the forward index for the column.
+   * Returns the index reader of the given type or null if the column doesn't have an index of that type.
+   * @param indexType the type of the index the caller is interested in.
+   * @return The index reader of the given type, or null if the column doesn't have an index of that type.
+   * @param <I> The index reader class
+   * @param <T> The index type
    */
-  ForwardIndexReader<?> getForwardIndex();
+  @Nullable
+  <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType);
 
-  /**
-   * Returns the inverted index for the column, or {@code null} if it does not exist.
-   */
-  InvertedIndexReader<?> getInvertedIndex();
+  class Empty implements ColumnIndexContainer {
+    public static final Empty INSTANCE = new Empty();
 
-  /**
-   * Returns the range index for the column, or {@code null} if it does not exist.
-   */
-  RangeIndexReader<?> getRangeIndex();
+    @Nullable
+    @Override
+    public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
+      return null;
+    }
 
-  /**
-   * Returns the text index for the column, or {@code null} if it does not exist.
-   */
-  TextIndexReader getTextIndex();
+    @Override
+    public void close()
+        throws IOException {
+    }
+  }
 
-  /**
-   * Returns the FST index for the column, or {@code null} if it does not exist.
-   */
-  TextIndexReader getFSTIndex();
+  class FromMap implements ColumnIndexContainer {
+    private final Map<IndexType, ? extends IndexReader> _readersByIndex;
 
-  /**
-   * Returns the json index for the column, or {@code null} if it does not exist.
-   */
-  JsonIndexReader getJsonIndex();
+    /**
+     * @param readersByIndex it is assumed that each index is associated with a compatible reader, but there is no check
+     *                       to verify that. It is recommended to construct instances of this class by using
+     *                       {@link FromMap.Builder}
+     */
+    public FromMap(Map<IndexType, ? extends IndexReader> readersByIndex) {
+      _readersByIndex = readersByIndex;
+    }
 
-  /**
-   * Returns the H3 index for the column, or {@code null} if it does not exist.
-   */
-  H3IndexReader getH3Index();
+    @Nullable
+    @Override
+    public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
+      return (I) _readersByIndex.get(indexType);
+    }
 
-  /**
-   * Returns the dictionary for the column, or {@code null} if it does not exist.
-   */
-  Dictionary getDictionary();
+    @Override
+    public void close()
+        throws IOException {
+    }
 
-  /**
-   * Returns the bloom filter for the column, or {@code null} if it does not exist.
-   */
-  BloomFilterReader getBloomFilter();
+    public static class Builder {
+      private final Map<IndexType, IndexReader> _readersByIndex = new HashMap<>();
 
-  /**
-   * Returns the null value vector for the column, or {@code null} if it does not exist.
-   * @return
-   */
-  NullValueVectorReader getNullValueVector();
+      public Builder withAll(Map<IndexType, ? extends IndexReader> safeMap) {
+        _readersByIndex.putAll(safeMap);
+        return this;
+      }
+
+      public <R extends IndexReader> Builder with(IndexType<?, ? super R, ?> type, R reader) {
+        _readersByIndex.put(type, reader);
+        return this;
+      }
+
+      public FromMap build() {
+        return new FromMap(_readersByIndex);
+      }
+    }
+  }
 }

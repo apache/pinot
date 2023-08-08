@@ -44,7 +44,8 @@ public class RegexpLikePredicateEvaluatorFactory {
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
       RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType) {
-    Preconditions.checkArgument(dataType == DataType.STRING, "Unsupported data type: " + dataType);
+    boolean condition = (dataType == DataType.STRING || dataType == DataType.JSON);
+    Preconditions.checkArgument(condition, "Unsupported data type: " + dataType);
     return new DictionaryBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
   }
 

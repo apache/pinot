@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.query.distinct;
 
-import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
 /**
@@ -29,10 +29,10 @@ public interface DistinctExecutor {
   int MAX_INITIAL_CAPACITY = 10000;
 
   /**
-   * Processes the given transform block, returns {@code true} if the query is already satisfied, {@code false}
+   * Processes the given value block, returns {@code true} if the query is already satisfied, {@code false}
    * otherwise. No more calls should be made after it returns {@code true}.
    */
-  boolean process(TransformBlock transformBlock);
+  boolean process(ValueBlock valueBlock);
 
   /**
    * Returns the distinct result. Note that the returned DistinctTable might not be a main DistinctTable, thus cannot be

@@ -18,12 +18,39 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
-import java.io.Closeable;
 import java.io.IOException;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
-public interface BloomFilterCreator extends Closeable {
+public interface BloomFilterCreator extends IndexCreator {
 
+  FieldSpec.DataType getDataType();
+
+  @Override
+  default void add(@Nonnull Object value, int dictId) {
+    if (getDataType() == FieldSpec.DataType.BYTES) {
+      add(BytesUtils.toHexString((byte[]) value));
+    } else {
+      add(value.toString());
+    }
+  }
+
+  @Override
+  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+    if (getDataType() == FieldSpec.DataType.BYTES) {
+      for (Object value : values) {
+        add(BytesUtils.toHexString((byte[]) value));
+      }
+    } else {
+      for (Object value : values) {
+        add(value.toString());
+      }
+    }
+  }
   /**
    * Adds a value to the bloom filter.
    */

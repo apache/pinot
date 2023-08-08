@@ -94,33 +94,41 @@ public class ObjectFunctions {
     return null;
   }
 
-  @ScalarFunction
-  public static Object caseWhen(boolean c1, Object o1, Object oe) {
+  @Nullable
+  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen", "case_when"})
+  public static Object caseWhen(boolean c1, @Nullable Object o1, @Nullable Object oe) {
     return caseWhenVar(c1, o1, oe);
   }
 
-  @ScalarFunction
-  public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, Object oe) {
+  @Nullable
+  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen", "case_when"})
+  public static Object caseWhen(boolean c1, @Nullable Object o1, boolean c2, @Nullable Object o2, @Nullable Object oe) {
     return caseWhenVar(c1, o1, c2, o2, oe);
   }
 
-  @ScalarFunction
-  public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, boolean c3, Object o3, Object oe) {
+  @Nullable
+  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen", "case_when"})
+  public static Object caseWhen(boolean c1, @Nullable Object o1, boolean c2, @Nullable Object o2, boolean c3,
+                                @Nullable Object o3, @Nullable Object oe) {
     return caseWhenVar(c1, o1, c2, o2, c3, o3, oe);
   }
 
-  @ScalarFunction
-  public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, boolean c3, Object o3, boolean c4,
-      Object o4, Object oe) {
+  @Nullable
+  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen", "case_when"})
+  public static Object caseWhen(boolean c1, @Nullable Object o1, boolean c2, @Nullable Object o2, boolean c3,
+                                @Nullable Object o3, boolean c4, @Nullable Object o4, @Nullable Object oe) {
     return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, oe);
   }
 
-  @ScalarFunction
-  public static Object caseWhen(boolean c1, Object o1, boolean c2, Object o2, boolean c3, Object o3, boolean c4,
-      Object o4, boolean c5, Object o5, Object oe) {
+  @Nullable
+  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen", "case_when"})
+  public static Object caseWhen(boolean c1, @Nullable Object o1, boolean c2, @Nullable Object o2, boolean c3,
+                                @Nullable Object o3, boolean c4, @Nullable Object o4, boolean c5, @Nullable Object o5,
+                                @Nullable Object oe) {
     return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, oe);
   }
 
+  @Nullable
   private static Object caseWhenVar(Object... objs) {
     for (int i = 0; i < objs.length - 1; i += 2) {
       if (BooleanUtils.toBoolean(objs[i])) {

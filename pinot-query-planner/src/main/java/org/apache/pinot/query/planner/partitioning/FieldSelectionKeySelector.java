@@ -85,11 +85,14 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]
     // TODO: consider better hashing algorithms than hashCode sum, such as XOR'ing
     int hashCode = 0;
     for (int columnIndex : _columnIndices) {
-      hashCode += input[columnIndex].hashCode();
+      Object value = input[columnIndex];
+      if (value != null) {
+        hashCode += value.hashCode();
+      }
     }
 
     // return a positive number because this is used directly to modulo-index
-    return Math.abs(hashCode);
+    return hashCode & Integer.MAX_VALUE;
   }
 
   @Override
