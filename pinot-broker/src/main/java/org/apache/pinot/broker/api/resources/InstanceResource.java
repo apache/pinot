@@ -39,26 +39,32 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
+
 
 /**
  * This resource API can be used to retrieve instance level information like instance tags.
  */
-@Api(description = "Metadata for this instance (like tenant tags)", tags = "instance",
-    authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
+@Api(tags = "Instance", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
-@Path("instance")
+@Path("/")
 public class InstanceResource {
+
   @Inject
   @Named(BrokerAdminApiApplication.BROKER_INSTANCE_ID)
   private String _instanceId;
+
   @Inject
   private HelixManager _helixManager;
 
   @GET
-  @Path("tags")
+  @Path("/instance/tags")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @ApiOperation(value = "Tenant tags for current instance")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
