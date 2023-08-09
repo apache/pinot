@@ -615,6 +615,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           errorMessage = String.format("%d segments unavailable: %s", numUnavailableSegments, unavailableSegments);
         }
         exceptions.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
       }
 
       if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
