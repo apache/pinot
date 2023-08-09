@@ -21,6 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -86,6 +87,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -113,6 +115,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
+  private static final Map<String, String> DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP =
+      ImmutableMap.<String, String>builder().put("distinctcount", "distinctcountmv")
+          .put("distinctcountbitmap", "distinctcountbitmapmv").put("distinctcounthll", "distinctcounthllmv")
+          .put("distinctcountrawhll", "distinctcountrawhllmv").put("distinctsum", "distinctsummv")
+          .put("distinctavg", "distinctavgmv").build();
 
   protected final PinotConfiguration _config;
   protected final BrokerRoutingManager _routingManager;
@@ -379,6 +386,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (_enableDistinctCountBitmapOverride) {
         handleDistinctCountBitmapOverride(serverPinotQuery);
       }
+      handleDistinctMultiValuedOverride(serverPinotQuery, getMultiValuedColumns(_tableCache, tableName));
 
       long compilationEndTimeNs = System.nanoTime();
       // full request compile time = compilationTimeNs + parserTimeNs
@@ -941,6 +949,30 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Retrieve multivalued columns for a table.
+   * From the table Schema , we get the multi valued columns of dimension fields.
+   *
+   * @param tableCache
+   * @param tableName
+   * @return multivalued columns of the table .
+   */
+  private static Set<String> getMultiValuedColumns(TableCache tableCache, String tableName) {
+
+    Set<String> multiValuedColumns = new HashSet<>();
+    final Schema tableSchema = tableCache.getSchema(tableName);
+    if (tableSchema == null) {
+      return multiValuedColumns;
+    }
+    for (FieldSpec dimFieldSpec : tableSchema.getDimensionFieldSpecs()) {
+      if (!dimFieldSpec.isSingleValueField()) {
+        multiValuedColumns.add(dimFieldSpec.getName());
+      }
+    }
+
+    return multiValuedColumns;
+  }
+
+  /**
    * Sets the table name in the given broker request.
    * NOTE: Set table name in broker request because it is used for access control, query routing etc.
    */
@@ -1070,6 +1102,48 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
       handleDistinctCountBitmapOverride(havingExpression);
+    }
+  }
+
+  /**
+   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   */
+  @VisibleForTesting
+  static void handleDistinctMultiValuedOverride(PinotQuery pinotQuery, Set<String> multiValuedDimColumns) {
+    for (Expression expression : pinotQuery.getSelectList()) {
+      handleDistinctMultiValuedOverride(expression, multiValuedDimColumns);
+    }
+    List<Expression> orderByExpressions = pinotQuery.getOrderByList();
+    if (orderByExpressions != null) {
+      for (Expression expression : orderByExpressions) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        handleDistinctMultiValuedOverride(expression.getFunctionCall().getOperands().get(0), multiValuedDimColumns);
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleDistinctMultiValuedOverride(havingExpression, multiValuedDimColumns);
+    }
+  }
+
+  /**
+   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   */
+  private static void handleDistinctMultiValuedOverride(Expression expression, Set<String> multiValuedDimColumns) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+    if (function.getOperator() != null && DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.containsKey(function.getOperator())) {
+      List<Expression> operands = function.getOperands();
+      if (operands.size() == 1 && operands.get(0).isSetIdentifier() && multiValuedDimColumns
+          .contains(operands.get(0).getIdentifier().getName())) {
+        function.setOperator(DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator()));
+      }
+    } else {
+      for (Expression operand : function.getOperands()) {
+        handleSegmentPartitionedDistinctCountOverride(operand, multiValuedDimColumns);
+      }
     }
   }
 

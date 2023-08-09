@@ -64,6 +64,17 @@ public class QueryOverrideTest {
   }
 
   @Test
+  public void testDistinctMultiValuedOverride() {
+    String query = "SELECT DISTINCT_COUNT(col1) FROM myTable";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    BaseBrokerRequestHandler.handleDistinctMultiValuedOverride(pinotQuery, ImmutableSet.of("col2", "col3"));
+    assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcount");
+    BaseBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(pinotQuery,
+        ImmutableSet.of("col1", "col2", "col3"));
+    assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcountmv");
+  }
+
+  @Test
   public void testApproximateFunctionOverride() {
     {
       String query = "SELECT DISTINCT_COUNT(col1) FROM myTable GROUP BY col2 HAVING DISTINCT_COUNT(col1) > 10 "
