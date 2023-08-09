@@ -1844,7 +1844,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>versions-maven-plugin</artifactId>
-        <version>2.13.0</version>
+        <version>2.16.0</version>
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
