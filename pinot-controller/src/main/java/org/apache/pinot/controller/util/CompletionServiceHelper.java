@@ -28,6 +28,7 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.slf4j.Logger;
@@ -90,12 +91,13 @@ public class CompletionServiceHelper {
         URI uri = multiHttpRequestResponse.getURI();
         String instance =
             _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
-        if (multiHttpRequestResponse.getResponseStatusCode() >= 300) {
-          LOGGER.error("Server: {} returned error: {}", instance, multiHttpRequestResponse.getResponseStatusCode());
+        int statusCode = multiHttpRequestResponse.getResponse().getStatusLine().getStatusCode();
+        if (statusCode >= 300) {
+          LOGGER.error("Server: {} returned error: {}", instance, statusCode);
           completionServiceResponse._failedResponseCount++;
           continue;
         }
-        String responseString = multiHttpRequestResponse.getResponseContent();
+        String responseString = EntityUtils.toString(multiHttpRequestResponse.getResponse().getEntity());
         completionServiceResponse._httpResponses
             .put(multiRequestPerServer ? uri.toString() : instance, responseString);
       } catch (Exception e) {

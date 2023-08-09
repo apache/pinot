@@ -33,6 +33,7 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -120,12 +121,12 @@ public class MultiHttpRequestTest {
     int timeouts = 0;
     for (int i = 0; i < urls.size(); i++) {
       try (MultiHttpRequestResponse httpRequestResponse = completionService.take().get()) {
-        if (httpRequestResponse.getResponseStatusCode() >= 300) {
+        if (httpRequestResponse.getResponse().getStatusLine().getStatusCode() >= 300) {
           errors++;
-          Assert.assertEquals(httpRequestResponse.getResponseContent(), ERROR_MSG);
+          Assert.assertEquals(EntityUtils.toString(httpRequestResponse.getResponse().getEntity()), ERROR_MSG);
         } else {
           success++;
-          Assert.assertEquals(httpRequestResponse.getResponseContent(), SUCCESS_MSG);
+          Assert.assertEquals(EntityUtils.toString(httpRequestResponse.getResponse().getEntity()), SUCCESS_MSG);
         }
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted", e);

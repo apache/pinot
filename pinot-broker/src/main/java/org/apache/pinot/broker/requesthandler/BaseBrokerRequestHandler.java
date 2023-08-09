@@ -45,6 +45,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -208,10 +209,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         // requests. The completion order is different from serverUrls, thus use uri in the response.
         httpRequestResponse = completionService.take().get();
         URI uri = httpRequestResponse.getURI();
-        int status = httpRequestResponse.getResponseStatusCode();
+        int status = httpRequestResponse.getResponse().getStatusLine().getStatusCode();
         // Unexpected server responses are collected and returned as exception.
         if (status != 200 && status != 404) {
-          String responseString = httpRequestResponse.getResponseContent();
+          String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
           throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,
               responseString, uri));
         }

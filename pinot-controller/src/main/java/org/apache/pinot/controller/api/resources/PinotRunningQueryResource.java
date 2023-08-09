@@ -196,8 +196,8 @@ public class PinotRunningQueryResource {
         // The completion order is different from brokerUrls, thus use uri in the response.
         httpRequestResponse = completionService.take().get();
         URI uri = httpRequestResponse.getURI();
-        int status = httpRequestResponse.getResponseStatusCode();
-        String responseString = httpRequestResponse.getResponseContent();
+        int status = httpRequestResponse.getResponse().getStatusLine().getStatusCode();
+        String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
         // Unexpected server responses are collected and returned as exception.
         if (status != 200) {
           throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,

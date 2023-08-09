@@ -18,38 +18,26 @@
  */
 package org.apache.pinot.common.http;
 
+import java.io.IOException;
 import java.net.URI;
 import org.apache.http.client.methods.CloseableHttpResponse;
-
-
 public class MultiHttpRequestResponse implements AutoCloseable {
   private final URI _uri;
-  private final int _responseStatusCode;
-  private final String _responseContent;
   private final CloseableHttpResponse _response;
 
-  public MultiHttpRequestResponse(URI uri, int responseStatusCode,
-      String responseContent, CloseableHttpResponse response) {
+  public MultiHttpRequestResponse(URI uri, CloseableHttpResponse response) {
     _uri = uri;
     _response = response;
-    _responseStatusCode = responseStatusCode;
-    _responseContent = responseContent;
   }
-
   public URI getURI() {
     return _uri;
   }
-
-  public int getResponseStatusCode() {
-    return _responseStatusCode;
+  public CloseableHttpResponse getResponse() {
+    return _response;
   }
-
-  public String getResponseContent() {
-    return _responseContent;
-  }
-
   @Override
-  public void close() throws Exception {
+  public void close()
+      throws IOException {
     _response.close();
   }
 }

@@ -103,9 +103,7 @@ public class MultiHttpRequest {
         CloseableHttpResponse response = null;
         try {
           response = client.execute(httpMethod);
-          int statusCode = response.getStatusLine().getStatusCode();
-          String responseContent = EntityUtils.toString(response.getEntity());
-          return new MultiHttpRequestResponse(httpMethod.getURI(), statusCode, responseContent, response);
+          return new MultiHttpRequestResponse(httpMethod.getURI(), response);
         } catch (IOException ex) {
           if (response != null) {
             String error = EntityUtils.toString(response.getEntity());

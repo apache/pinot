@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.executor.sql;
 
 import com.google.common.collect.ImmutableList;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +26,6 @@ import javax.annotation.Nullable;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
-import org.apache.http.HttpException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.minion.MinionClient;
@@ -104,7 +102,7 @@ public class SqlQueryExecutor {
           List<Object[]> rows = new ArrayList<>();
           tableToTaskIdMap.forEach((key, value) -> rows.add(new Object[]{key, value}));
           result.setResultTable(new ResultTable(statement.getResultSchema(), rows));
-        } catch (IOException | HttpException e) {
+        } catch (Exception e) {
           result.setExceptions(ImmutableList.of(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e)));
         }
         break;
