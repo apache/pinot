@@ -38,7 +38,7 @@
     <phase.prop>package</phase.prop>
     <scala.major.version>2.12</scala.major.version>
     <spark.version>3.2.1</spark.version>
-    <scala.minor.version>2.12.15</scala.minor.version>
+    <scala.minor.version>2.13.11</scala.minor.version>
     <commons-lang3.version>3.11</commons-lang3.version>
   </properties>
 
