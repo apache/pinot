@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -76,7 +77,8 @@ public class ProjectPlanNode implements PlanNode {
     DocIdSetOperator docIdSetOperator =
         _maxDocsPerCall > 0 ? new DocIdSetPlanNode(_indexSegment, _queryContext, _maxDocsPerCall, _filterOperator).run()
             : null;
-    ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
+    ProjectionOperator projectionOperator =
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator);
     return hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator, _expressions)
         : projectionOperator;
   }
