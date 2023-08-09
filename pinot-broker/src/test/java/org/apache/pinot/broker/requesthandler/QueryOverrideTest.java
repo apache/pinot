@@ -69,7 +69,7 @@ public class QueryOverrideTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     BaseBrokerRequestHandler.handleDistinctMultiValuedOverride(pinotQuery, ImmutableSet.of("col2", "col3"));
     assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcount");
-    BaseBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(pinotQuery,
+    BaseBrokerRequestHandler.handleDistinctMultiValuedOverride(pinotQuery,
         ImmutableSet.of("col1", "col2", "col3"));
     assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcountmv");
   }
