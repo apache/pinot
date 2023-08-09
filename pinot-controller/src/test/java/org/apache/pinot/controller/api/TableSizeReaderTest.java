@@ -306,8 +306,7 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testGetTableSubTypeSizeAllSuccess()
-      throws Exception {
+  public void testGetTableSubTypeSizeAllSuccess() throws InvalidConfigException {
     final String[] servers = {"server0", "server1"};
     String table = "offline";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
@@ -391,8 +390,7 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void getTableSizeDetailsRealtimeOnly()
-      throws Exception {
+  public void getTableSizeDetailsRealtimeOnly() throws InvalidConfigException {
     final String[] servers = {"server3", "server4"};
     String table = "realtime";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);

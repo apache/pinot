@@ -28,7 +28,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,7 +47,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.http.client.config.RequestConfig;
@@ -179,8 +177,7 @@ public class PinotRunningQueryResource {
   }
 
   private Map<String, Map<String, String>> getRunningQueries(Map<String, InstanceInfo> brokers, int timeoutMs,
-      Map<String, String> requestHeaders)
-      throws Exception {
+      Map<String, String> requestHeaders) throws Exception {
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int portOverride = _controllerConf.getControllerBrokerPortOverride();
     List<String> brokerUrls = new ArrayList<>();
@@ -199,9 +196,8 @@ public class PinotRunningQueryResource {
         // The completion order is different from brokerUrls, thus use uri in the response.
         httpRequestResponse = completionService.take().get();
         URI uri = httpRequestResponse.getURI();
-        CloseableHttpResponse response = httpRequestResponse.getResponse();
-        int status = response.getStatusLine().getStatusCode();
-        String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
+        int status = httpRequestResponse.getResponseStatusCode();
+        String responseString = httpRequestResponse.getResponseContent();
         // Unexpected server responses are collected and returned as exception.
         if (status != 200) {
           throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,
@@ -216,7 +212,7 @@ public class PinotRunningQueryResource {
         errMsgs.add(e.getMessage());
       } finally {
         if (httpRequestResponse != null) {
-          httpRequestResponse.getResponse().close();
+          httpRequestResponse.close();
         }
       }
     }

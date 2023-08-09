@@ -34,6 +34,7 @@ import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,40 +42,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Class to support multiple http operations in parallel by using the executor that is passed in. This is a wrapper
  * around Apache common HTTP client.
- *
- * The execute method is re-usable but there is no real benefit to it. All the connection management is handled by
- * the input HttpConnectionManager. Note that we cannot use SimpleHttpConnectionManager as it is not thread safe. Use
- * MultiThreadedHttpConnectionManager as shown in the example below. As GET is commonly used, there is a dedicated
- * execute method for it. Other http methods like DELETE can use the generic version of execute method.
- *
- * Usage:
- * <pre>
- * {@code
- *    List<String> urls = Arrays.asList("http://www.linkedin.com", "http://www.google.com");
- *    MultiHttpRequest mhr = new MultiHttpRequest(Executors.newCachedThreadPool(),
- *           new MultiThreadedHttpConnectionManager());
- *    CompletionService<GetMethod> completionService = mhr.execute(urls, headers, timeoutMs);
- *    for (int i = 0; i < urls.size(); i++) {
- *      GetMethod getMethod = null;
- *      try {
- *        getMethod = completionService.take().get();
- *        if (getMethod.getStatusCode() >= 300) {
- *          System.out.println("error");
- *          continue;
- *        }
- *        System.out.println("Got data: " +  getMethod.getResponseBodyAsString());
- *      } catch (ExecutionException e) {
- *         if (Throwables.getRootcause(e) instanceof SocketTimeoutException) {
- *           System.out.println("Timeout");
- *         }
- *      } finally {
- *        if (getMethod != null) {
- *          getMethod.releaseConnection();
- *        }
- *      }
- *    }
- * }
- * </pre>
  */
 public class MultiHttpRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiHttpRequest.class);
@@ -136,12 +103,16 @@ public class MultiHttpRequest {
         CloseableHttpResponse response = null;
         try {
           response = client.execute(httpMethod);
-          return new MultiHttpRequestResponse(httpMethod.getURI(), response);
+          int statusCode = response.getStatusLine().getStatusCode();
+          String responseContent = EntityUtils.toString(response.getEntity());
+          return new MultiHttpRequestResponse(httpMethod.getURI(), statusCode, responseContent, response);
         } catch (IOException ex) {
-          // Log only exception type and message instead of the whole stack trace
-          LOGGER.warn("Caught '{}' while executing: {} on URL: {}", ex, httpMethodName, url);
           if (response != null) {
-            response.close();
+            String error = EntityUtils.toString(response.getEntity());
+            LOGGER.warn("Caught '{}' while executing: {} on URL: {}", error, httpMethodName, url);
+          } else {
+            // Log only exception type and message instead of the whole stack trace
+            LOGGER.warn("Caught '{}' while executing: {} on URL: {}", ex, httpMethodName, url);
           }
           throw ex;
         }

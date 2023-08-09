@@ -20,7 +20,6 @@
 package org.apache.pinot.controller.util;
 
 import com.google.common.collect.BiMap;
-import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
@@ -28,9 +27,7 @@ import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
-import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.slf4j.Logger;
@@ -91,15 +88,14 @@ public class CompletionServiceHelper {
       try {
         multiHttpRequestResponse = completionService.take().get();
         URI uri = multiHttpRequestResponse.getURI();
-        CloseableHttpResponse response = multiHttpRequestResponse.getResponse();
         String instance =
             _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
-        if (response.getStatusLine().getStatusCode() >= 300) {
-          LOGGER.error("Server: {} returned error: {}", instance, response.getStatusLine().getStatusCode());
+        if (multiHttpRequestResponse.getResponseStatusCode() >= 300) {
+          LOGGER.error("Server: {} returned error: {}", instance, multiHttpRequestResponse.getResponseStatusCode());
           completionServiceResponse._failedResponseCount++;
           continue;
         }
-        String responseString = EntityUtils.toString(response.getEntity());
+        String responseString = multiHttpRequestResponse.getResponseContent();
         completionServiceResponse._httpResponses
             .put(multiRequestPerServer ? uri.toString() : instance, responseString);
       } catch (Exception e) {
@@ -109,8 +105,8 @@ public class CompletionServiceHelper {
       } finally {
         if (multiHttpRequestResponse != null) {
           try {
-            multiHttpRequestResponse.getResponse().close();
-          } catch (IOException e) {
+            multiHttpRequestResponse.close();
+          } catch (Exception e) {
             LOGGER.error("Connection close error. Details: {}", e.getMessage());
           }
         }

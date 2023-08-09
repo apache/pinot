@@ -32,9 +32,7 @@ import java.util.List;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -91,7 +89,7 @@ public class MultiHttpRequestTest {
     };
   }
 
-  private HttpServer startServer(int port, HttpHandler handler)
+  private void startServer(int port, HttpHandler handler)
       throws IOException {
     final HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
     server.createContext(URI_PATH, handler);
@@ -102,12 +100,10 @@ public class MultiHttpRequestTest {
       }
     }).start();
     _servers.add(server);
-    return server;
   }
 
   @Test
-  public void testMultiGet()
-      throws IOException {
+  public void testMultiGet() throws Exception {
     MultiHttpRequest mget =
         new MultiHttpRequest(Executors.newCachedThreadPool(), new PoolingHttpClientConnectionManager());
     List<String> urls = Arrays.asList("http://localhost:" + String.valueOf(_portStart) + URI_PATH,
@@ -123,16 +119,13 @@ public class MultiHttpRequestTest {
     int errors = 0;
     int timeouts = 0;
     for (int i = 0; i < urls.size(); i++) {
-      MultiHttpRequestResponse httpRequestResponse = null;
-      try {
-        httpRequestResponse = completionService.take().get();
-        CloseableHttpResponse response = httpRequestResponse.getResponse();
-        if (response.getStatusLine().getStatusCode() >= 300) {
+      try (MultiHttpRequestResponse httpRequestResponse = completionService.take().get()) {
+        if (httpRequestResponse.getResponseStatusCode() >= 300) {
           errors++;
-          Assert.assertEquals(EntityUtils.toString(response.getEntity()), ERROR_MSG);
+          Assert.assertEquals(httpRequestResponse.getResponseContent(), ERROR_MSG);
         } else {
           success++;
-          Assert.assertEquals(EntityUtils.toString(response.getEntity()), SUCCESS_MSG);
+          Assert.assertEquals(httpRequestResponse.getResponseContent(), SUCCESS_MSG);
         }
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted", e);
@@ -145,12 +138,8 @@ public class MultiHttpRequestTest {
           LOGGER.error("Error", e);
           errors++;
         }
-      } catch (IOException e) {
+      } catch (Exception e) {
         errors++;
-      } finally {
-        if (httpRequestResponse != null) {
-          httpRequestResponse.getResponse().close();
-        }
       }
     }
 
