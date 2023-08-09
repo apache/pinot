@@ -59,7 +59,7 @@ public class PartialUpsertHandlerTest {
   @Test
   public void testComparisonColumn() {
     // Even though the default strategy is IGNORE, we do not apply the mergers to comparison columns
-    testMerge(true, 0, true, 0, "hoursSinceEpoch", 2);
+    testMerge(true, 0, true, 0, "hoursSinceEpoch", 0);
     testMerge(true, 0, false, 8, "hoursSinceEpoch", 8);
     testMerge(false, 8, true, 0, "hoursSinceEpoch", 8);
     testMerge(false, 2, false, 8, "hoursSinceEpoch", 8);
