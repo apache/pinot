@@ -37,10 +37,10 @@ import org.apache.pinot.spi.trace.Tracing;
 public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> {
   private static final String EXPLAIN_NAME = "PROJECT";
 
-  private final Map<String, DataSource> _dataSourceMap;
-  private final BaseOperator<DocIdSetBlock> _docIdSetOperator;
-  private final DataBlockCache _dataBlockCache;
-  private final Map<String, ColumnContext> _columnContextMap;
+  protected final Map<String, DataSource> _dataSourceMap;
+  protected final BaseOperator<DocIdSetBlock> _docIdSetOperator;
+  protected final DataBlockCache _dataBlockCache;
+  protected final Map<String, ColumnContext> _columnContextMap;
 
   public ProjectionOperator(Map<String, DataSource> dataSourceMap,
       @Nullable BaseOperator<DocIdSetBlock> docIdSetOperator) {
