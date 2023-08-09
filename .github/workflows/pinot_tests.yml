@@ -115,7 +115,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 5
         with:
-          flags: unittests${{ matrix.testset }}${{matrix.distribution}}${{matrix.java}}
+          flags: unittests${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-unit-tests
           fail_ci_if_error: false
           verbose: true
@@ -167,7 +167,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 5
         with:
-          flags: integration${{ matrix.testset }}${{matrix.distribution}}${{matrix.java}}
+          flags: integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-integration-tests
           fail_ci_if_error: false
           verbose: true
