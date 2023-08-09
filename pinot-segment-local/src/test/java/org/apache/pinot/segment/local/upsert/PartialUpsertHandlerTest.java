@@ -22,121 +22,77 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.mockito.MockedConstruction;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
 
 
 public class PartialUpsertHandlerTest {
 
   @Test
-  public void testMerge() {
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("field1", FieldSpec.DataType.LONG)
-        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
-        .setPrimaryKeyColumns(Arrays.asList("pk")).build();
-    Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
-    partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
-    PartialUpsertHandler handler =
-        new PartialUpsertHandler(schema, partialUpsertStrategies, UpsertConfig.Strategy.OVERWRITE,
-            Collections.singletonList("hoursSinceEpoch"));
-
-    // both records are null.
-    GenericRow previousRecord = new GenericRow();
-    GenericRow incomingRecord = new GenericRow();
-
-    previousRecord.putDefaultNullValue("field1", 1);
-    incomingRecord.putDefaultNullValue("field1", 2);
-    GenericRow newRecord = handler.merge(previousRecord, incomingRecord);
-    assertTrue(newRecord.isNullValue("field1"));
-    assertEquals(newRecord.getValue("field1"), 2);
-
-    // previousRecord is null default value, while newRecord is not.
-    previousRecord.clear();
-    incomingRecord.clear();
-    previousRecord.putDefaultNullValue("field1", 1);
-    incomingRecord.putValue("field1", 2);
-    newRecord = handler.merge(previousRecord, incomingRecord);
-    assertFalse(newRecord.isNullValue("field1"));
-    assertEquals(newRecord.getValue("field1"), 2);
-
-    // newRecord is default null value, while previousRecord is not.
-    // field1 should not be incremented since the newRecord is null.
-    // special case: field2 should be merged based on default partial upsert strategy.
-    previousRecord.clear();
-    incomingRecord.clear();
-    previousRecord.putValue("field1", 1);
-    previousRecord.putValue("field2", 2);
-    incomingRecord.putDefaultNullValue("field1", 2);
-    incomingRecord.putDefaultNullValue("field2", 0);
-    newRecord = handler.merge(previousRecord, incomingRecord);
-    assertFalse(newRecord.isNullValue("field1"));
-    assertEquals(newRecord.getValue("field1"), 1);
-    assertFalse(newRecord.isNullValue("field2"));
-    assertEquals(newRecord.getValue("field2"), 2);
-
-    // neither of records is null.
-    previousRecord.clear();
-    incomingRecord.clear();
-    previousRecord.putValue("field1", 1);
-    incomingRecord.putValue("field1", 2);
-    newRecord = handler.merge(previousRecord, incomingRecord);
-    assertFalse(newRecord.isNullValue("field1"));
-    assertEquals(newRecord.getValue("field1"), 3);
+  public void testOverwrite() {
+    testMerge(true, 2, true, 2, "field1", 2);
+    testMerge(true, 2, false, 8, "field1", 8);
+    testMerge(false, 8, true, 2, "field1", 8);
+    testMerge(false, 3, false, 5, "field1", 5);
   }
 
   @Test
-  public void testMergeWithDefaultPartialUpsertStrategy() {
+  public void testNonOverwrite() {
+    testMerge(true, 2, true, 2, "field2", 2);
+    testMerge(true, 2, false, 8, "field2", 8);
+    testMerge(false, 8, true, 2, "field2", 8);
+    testMerge(false, 3, false, 5, "field2", 3);
+  }
+
+  @Test
+  public void testComparisonColumn() {
+    // Even though the default strategy is IGNORE, we do not apply the mergers to comparison columns
+    testMerge(true, 0, true, 0, "hoursSinceEpoch", 2);
+    testMerge(true, 0, false, 8, "hoursSinceEpoch", 8);
+    testMerge(false, 8, true, 0, "hoursSinceEpoch", 8);
+    testMerge(false, 2, false, 8, "hoursSinceEpoch", 8);
+  }
+
+  public void testMerge(boolean isPreviousNull, Object previousValue, boolean isNewNull, Object newValue,
+      String columnName, Object expected) {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
-    partialUpsertStrategies.put("field1", UpsertConfig.Strategy.INCREMENT);
-    PartialUpsertHandler handler =
-        new PartialUpsertHandler(schema, partialUpsertStrategies, UpsertConfig.Strategy.OVERWRITE,
-            Collections.singletonList("hoursSinceEpoch"));
+    partialUpsertStrategies.put("field1", UpsertConfig.Strategy.OVERWRITE);
 
-    // previousRecord is null default value, while newRecord is not.
-    GenericRow previousRecord = new GenericRow();
-    GenericRow incomingRecord = new GenericRow();
-    previousRecord.putDefaultNullValue("field1", 1);
-    previousRecord.putDefaultNullValue("field2", 2);
-    incomingRecord.putValue("field1", 2);
-    incomingRecord.putValue("field2", 1);
-    GenericRow newRecord = handler.merge(previousRecord, incomingRecord);
-    assertFalse(newRecord.isNullValue("field1"));
-    assertEquals(newRecord.getValue("field1"), 2);
-    assertEquals(newRecord.getValue("field2"), 1);
+    try (MockedConstruction<PinotSegmentColumnReader> reader = mockConstruction(PinotSegmentColumnReader.class,
+        (mockReader, context) -> {
+          when(mockReader.isNull(1)).thenReturn(isPreviousNull);
+          when(mockReader.getValue(1)).thenReturn(previousValue);
+        })) {
+      PartialUpsertHandler handler =
+          spy(new PartialUpsertHandler(schema, partialUpsertStrategies, UpsertConfig.Strategy.IGNORE,
+              Collections.singletonList("hoursSinceEpoch")));
 
-    // newRecord is default null value, while previousRecord is not.
-    // field1 should not be incremented since the newRecord is null.
-    // field2 should not be overrided by null value since we have default partial upsert strategy.
-    previousRecord.clear();
-    incomingRecord.clear();
-    previousRecord.putValue("field1", 8);
-    previousRecord.putValue("field2", 8);
-    incomingRecord.putDefaultNullValue("field1", 1);
-    incomingRecord.putDefaultNullValue("field2", 0);
-    newRecord = handler.merge(previousRecord, incomingRecord);
-    assertEquals(newRecord.getValue("field1"), 8);
-    assertEquals(newRecord.getValue("field2"), 8);
+      ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
 
-    // neither of records is null.
-    previousRecord.clear();
-    incomingRecord.clear();
-    previousRecord.putValue("field1", 1);
-    previousRecord.putValue("field2", 100);
-    incomingRecord.putValue("field1", 2);
-    incomingRecord.putValue("field2", 1000);
-    newRecord = handler.merge(previousRecord, incomingRecord);
-    assertEquals(newRecord.getValue("field1"), 3);
-    assertEquals(newRecord.getValue("field2"), 1000);
+      GenericRow row = new GenericRow();
+      if (isNewNull) {
+        row.putDefaultNullValue(columnName, newValue);
+      } else {
+        row.putValue(columnName, newValue);
+      }
+      handler.merge(segment, 1, row);
+      assertEquals(row.getValue(columnName), expected);
+    }
   }
 }
