@@ -127,17 +127,6 @@ public class MailboxReceiveOperatorTest {
     }
   }
 
-  @Test(enabled = false)
-  public void shouldReceiveSingletonNullMailbox() {
-    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-
-    OpChainExecutionContext context =
-        OperatorTestUtil.getOpChainContext(_mailboxService, RECEIVER_ADDRESS, Long.MAX_VALUE, _stageMetadata1);
-    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.SINGLETON, 1)) {
-      assertTrue(receiveOp.nextBlock().isNoOpBlock());
-    }
-  }
-
   @Test
   public void shouldReceiveEosDirectlyFromSender() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);

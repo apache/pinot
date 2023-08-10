@@ -164,14 +164,6 @@ public class TransferableBlock implements Block {
     return isType(MetadataBlock.MetadataBlockType.EOS);
   }
 
-  /**
-   * @return whether this block represents a NOOP block
-   */
-  @Deprecated(forRemoval = true)
-  public boolean isNoOpBlock() {
-    return false;
-  }
-
   public boolean isDataBlock() {
     return _type != DataBlock.Type.METADATA;
   }
