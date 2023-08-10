@@ -16,70 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Base64;
-import java.util.Random;
-import org.apache.avro.Schema.Field;
-import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.io.FileUtils;
 import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class TupleSketchIntegrationTest extends BaseClusterIntegrationTest {
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
+
+  private static final String DEFAULT_TABLE_NAME = "TupleSketchTest";
   private static final String MET_TUPLE_SKETCH_BYTES = "metTupleSketchBytes";
-
-  private static final Random RANDOM = new Random();
-
-  @BeforeClass
-  public void setup()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
-
-    // create & upload schema AND table config
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
-        .addMetric(MET_TUPLE_SKETCH_BYTES, FieldSpec.DataType.BYTES)
-        .build();
-    addSchema(schema);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME).build();
-    addTableConfig(tableConfig);
-
-    // create & upload segments
-    File avroFile = createAvroFile(getCountStarResult());
-    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
-
-    waitForAllDocsLoaded(60_000);
-  }
 
   @Override
   protected long getCountStarResult() {
@@ -95,7 +58,7 @@ public class TupleSketchIntegrationTest extends BaseClusterIntegrationTest {
             "SELECT DISTINCT_COUNT_TUPLE_SKETCH(%s), DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(%s), "
                 + "SUM_VALUES_INTEGER_SUM_TUPLE_SKETCH(%s), AVG_VALUE_INTEGER_SUM_TUPLE_SKETCH(%s) FROM %s",
             MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES, MET_TUPLE_SKETCH_BYTES,
-            DEFAULT_TABLE_NAME);
+            getTableName());
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
@@ -108,19 +71,32 @@ public class TupleSketchIntegrationTest extends BaseClusterIntegrationTest {
     assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(3).asLong() > 0);
   }
 
-  private File createAvroFile(long totalNumRecords)
-      throws IOException {
+  @Override
+  public String getTableName() {
+    return DEFAULT_TABLE_NAME;
+  }
 
+  @Override
+  public Schema createSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(getTableName())
+        .addMetric(MET_TUPLE_SKETCH_BYTES, FieldSpec.DataType.BYTES)
+        .build();
+  }
+
+  @Override
+  public File createAvroFile()
+      throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(ImmutableList.of(
-        new Field(MET_TUPLE_SKETCH_BYTES, org.apache.avro.Schema.create(Type.BYTES), null, null)));
+        new org.apache.avro.Schema.Field(MET_TUPLE_SKETCH_BYTES, org.apache.avro.Schema.create(
+            org.apache.avro.Schema.Type.BYTES), null, null)));
 
     // create avro file
     File avroFile = new File(_tempDir, "data.avro");
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, avroFile);
-      for (int i = 0; i < totalNumRecords; i++) {
+      for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(MET_TUPLE_SKETCH_BYTES, ByteBuffer.wrap(getRandomRawValue()));
@@ -135,18 +111,5 @@ public class TupleSketchIntegrationTest extends BaseClusterIntegrationTest {
     IntegerSketch is = new IntegerSketch(4, IntegerSummary.Mode.Sum);
     is.update(RANDOM.nextInt(100), RANDOM.nextInt(100));
     return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws IOException {
-    dropOfflineTable(DEFAULT_TABLE_NAME);
-
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
   }
 }

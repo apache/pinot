@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
@@ -24,30 +24,28 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.avro.Schema.Field;
-import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 
 
-public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
+
+  // Default settings
+  protected static final String DEFAULT_TABLE_NAME = "MapTypeTest";
   private static final int NUM_DOCS = 1000;
   private static final String STRING_KEY_MAP_FIELD_NAME = "stringKeyMap";
   private static final String INT_KEY_MAP_FIELD_NAME = "intKeyMap";
@@ -60,55 +58,45 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     return NUM_DOCS;
   }
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+  @Override
+  public String getTableName() {
+    return DEFAULT_TABLE_NAME;
+  }
 
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
+  @Override
+  public Schema createSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(getTableName())
+        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX,
+            FieldSpec.DataType.STRING)
+        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, FieldSpec.DataType.INT)
+        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX, FieldSpec.DataType.INT)
+        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, FieldSpec.DataType.INT)
+        .addSingleValueDimension(STRING_KEY_MAP_STR_FIELD_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(INT_KEY_MAP_STR_FIELD_NAME, FieldSpec.DataType.STRING).build();
+  }
 
-    // Create and upload the schema and table config
-    String rawTableName = getTableName();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(rawTableName)
-        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX, DataType.STRING)
-        .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT)
-        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX, DataType.INT)
-        .addMultiValueDimension(INT_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_VALUE_COLUMN_SUFFIX, DataType.INT)
-        .addSingleValueDimension(STRING_KEY_MAP_STR_FIELD_NAME, DataType.STRING)
-        .addSingleValueDimension(INT_KEY_MAP_STR_FIELD_NAME, DataType.STRING).build();
-    addSchema(schema);
+  @Override
+  public TableConfig createOfflineTableConfig() {
     List<TransformConfig> transformConfigs = Arrays.asList(
         new TransformConfig(STRING_KEY_MAP_STR_FIELD_NAME, "toJsonMapStr(" + STRING_KEY_MAP_FIELD_NAME + ")"),
         new TransformConfig(INT_KEY_MAP_STR_FIELD_NAME, "toJsonMapStr(" + INT_KEY_MAP_FIELD_NAME + ")"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setIngestionConfig(ingestionConfig)
-            .build();
-    addTableConfig(tableConfig);
-
-    // Create and upload segments
-    File avroFile = createAvroFile();
-    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(rawTableName, _tarDir);
-
-    // Wait for all documents loaded
-    waitForAllDocsLoaded(60_000);
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setIngestionConfig(ingestionConfig)
+        .build();
   }
 
-  private File createAvroFile()
+  public File createAvroFile()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     org.apache.avro.Schema stringKeyMapAvroSchema =
-        org.apache.avro.Schema.createMap(org.apache.avro.Schema.create(Type.INT));
+        org.apache.avro.Schema.createMap(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT));
     org.apache.avro.Schema intKeyMapAvroSchema =
-        org.apache.avro.Schema.createMap(org.apache.avro.Schema.create(Type.STRING));
-    List<Field> fields = Arrays.asList(new Field(STRING_KEY_MAP_FIELD_NAME, stringKeyMapAvroSchema, null, null),
-        new Field(INT_KEY_MAP_FIELD_NAME, intKeyMapAvroSchema, null, null));
+        org.apache.avro.Schema.createMap(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING));
+    List<org.apache.avro.Schema.Field> fields =
+        Arrays.asList(
+            new org.apache.avro.Schema.Field(STRING_KEY_MAP_FIELD_NAME, stringKeyMapAvroSchema, null, null),
+            new org.apache.avro.Schema.Field(INT_KEY_MAP_FIELD_NAME, intKeyMapAvroSchema, null, null));
     avroSchema.setFields(fields);
 
     File avroFile = new File(_tempDir, "data.avro");
@@ -421,19 +409,6 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), 0);
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    dropOfflineTable(getTableName());
-
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
   }
 
   @Override

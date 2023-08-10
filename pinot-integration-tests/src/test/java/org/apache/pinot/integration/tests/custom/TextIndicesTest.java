@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -32,13 +32,13 @@ import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -47,10 +47,11 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.AssertJUnit.fail;
 
 
-/**
- * Cluster integration test for near realtime text search (lucene) and realtime text search (native).
- */
-public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
+
+  private static final String DEFAULT_TABLE_NAME = "TextIndicesTest";
+
   private static final String TEXT_COLUMN_NAME = "skills";
   private static final String TEXT_COLUMN_NAME_NATIVE = "skills_native";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
@@ -61,10 +62,10 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
   private static final int NUM_MATCHING_RECORDS_NATIVE = 7000;
 
   private static final String TEST_TEXT_COLUMN_QUERY =
-      "SELECT COUNT(*) FROM mytable WHERE TEXT_MATCH(skills, '\"machine learning\" AND spark')";
+      "SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(skills, '\"machine learning\" AND spark')";
 
   private static final String TEST_TEXT_COLUMN_QUERY_NATIVE =
-      "SELECT COUNT(*) FROM mytable WHERE TEXT_CONTAINS(skills_native, 'm.*') AND TEXT_CONTAINS(skills_native, "
+      "SELECT COUNT(*) FROM %s WHERE TEXT_CONTAINS(skills_native, 'm.*') AND TEXT_CONTAINS(skills_native, "
           + "'spark')";
 
   @Override
@@ -112,57 +113,26 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
             propertiesMap));
   }
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+  @Override
+  public String getTableName() {
+    return DEFAULT_TABLE_NAME;
+  }
 
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
-
-    // Start Kafka
-    startKafka();
-
-    // Create the Avro file
-    File avroFile = createAvroFile();
-
-    // Create and upload the schema and table config
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
+  @Override
+  public Schema createSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(TEXT_COLUMN_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TEXT_COLUMN_NAME_NATIVE, FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
-    addSchema(schema);
-    addTableConfig(createRealtimeTableConfig(avroFile));
-
-    // Push data into Kafka
-    pushAvroIntoKafka(Collections.singletonList(avroFile));
-
-    // Wait until the table is queryable
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return getCurrentCountStarResult() >= 0;
-      } catch (Exception e) {
-        return null;
-      }
-    }, 10_000L, "Failed to get COUNT(*) result");
   }
 
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    dropRealtimeTable(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+  @Override
+  protected long getCountStarResult() {
+    return NUM_RECORDS;
   }
 
-  private File createAvroFile()
+  @Override
+  public File createAvroFile()
       throws Exception {
     // Read all skills from the skill file
     InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/text_search_data/skills.txt");
@@ -197,13 +167,24 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
     return avroFile;
   }
 
+  @Override
+  public TableConfig createOfflineTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
+        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setIngestionConfig(getIngestionConfig())
+        .setQueryConfig(getQueryConfig()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+  }
+
   @Test
   public void testTextSearchCountQuery()
       throws Exception {
     // Keep posting queries until all records are consumed
     long previousResult = 0;
     while (getCurrentCountStarResult() < NUM_RECORDS) {
-      long result = getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY);
+      long result = getTextColumnQueryResult(String.format(TEST_TEXT_COLUMN_QUERY, getTableName()));
       assertTrue(result >= previousResult);
       previousResult = result;
       Thread.sleep(100);
@@ -212,7 +193,7 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
     //Lucene index on consuming segments to update the latest records
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY) == NUM_MATCHING_RECORDS;
+        return getTextColumnQueryResult(String.format(TEST_TEXT_COLUMN_QUERY, getTableName())) == NUM_MATCHING_RECORDS;
       } catch (Exception e) {
         fail("Caught exception while getting text column query result");
         return false;
@@ -226,13 +207,14 @@ public class TextIndicesRealtimeClusterIntegrationTest extends BaseClusterIntegr
     // Keep posting queries until all records are consumed
     long previousResult = 0;
     while (getCurrentCountStarResult() < NUM_RECORDS) {
-      long result = getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY_NATIVE);
+      long result = getTextColumnQueryResult(String.format(TEST_TEXT_COLUMN_QUERY_NATIVE, getTableName()));
       assertTrue(result >= previousResult);
       previousResult = result;
       Thread.sleep(100);
     }
 
-    assertTrue(getTextColumnQueryResult(TEST_TEXT_COLUMN_QUERY_NATIVE) == NUM_MATCHING_RECORDS_NATIVE);
+    assertTrue(getTextColumnQueryResult(String.format(TEST_TEXT_COLUMN_QUERY_NATIVE, getTableName()))
+        == NUM_MATCHING_RECORDS_NATIVE);
   }
 
   private long getTextColumnQueryResult(String query)

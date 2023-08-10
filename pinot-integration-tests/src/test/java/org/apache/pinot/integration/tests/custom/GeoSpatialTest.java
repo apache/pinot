@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
@@ -25,28 +25,23 @@ import java.nio.ByteBuffer;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.util.TestUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Point;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
-public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest {
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
 
+  protected static final String DEFAULT_TABLE_NAME = "GeoSpatialTest";
   private static final int NUM_TOTAL_DOCS = 1000;
   private static final String DIM_NAME = "dimName";
   private static final String ST_POINT = "st_point";
@@ -105,19 +100,13 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
       1.2364036567076416E10, 163290.93943479148, 999999.9979474121, 6.375825913974856E13, 3.480423348045961E12
   };
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+  @Override
+  public String getTableName() {
+    return DEFAULT_TABLE_NAME;
+  }
 
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
-
-    // create & upload schema AND table config
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
+  public Schema createSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(DIM_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(ST_POINT, FieldSpec.DataType.BYTES)
         .addSingleValueDimension(ST_X_NAME, FieldSpec.DataType.DOUBLE)
@@ -130,16 +119,6 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
         .addSingleValueDimension(AREA_GEOG_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(AREA_GEOG_SIZE_NAME, FieldSpec.DataType.DOUBLE)
         .build();
-    addSchema(schema);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME).build();
-    addTableConfig(tableConfig);
-
-    // create & upload segments
-    File avroFile = createAvroFile();
-    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
-
-    waitForAllDocsLoaded(60_000);
   }
 
   @Override
@@ -147,9 +126,9 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
     return NUM_TOTAL_DOCS;
   }
 
-  private File createAvroFile()
+  @Override
+  public File createAvroFile()
       throws Exception {
-
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(ImmutableList.of(
@@ -202,50 +181,37 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
     return avroFile;
   }
 
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    dropOfflineTable(getTableName());
-
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
-  }
-
   @Test(dataProvider = "useBothQueryEngines")
   public void testGetHexagonAddress(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
-    String query = "Select geoToH3(20,102,5) from " + DEFAULT_TABLE_NAME;
+    String query = "Select geoToH3(20,102,5) from " + getTableName();
     JsonNode pinotResponse = postQuery(query);
     long result = pinotResponse.get("resultTable").get("rows").get(0).get(0).longValue();
     Assert.assertEquals(result, 599041711439609855L);
 
-    query = "Select geoToH3(-122.419,37.775,6) from " + DEFAULT_TABLE_NAME;
+    query = "Select geoToH3(-122.419,37.775,6) from " + getTableName();
     pinotResponse = postQuery(query);
     result = pinotResponse.get("resultTable").get("rows").get(0).get(0).longValue();
     Assert.assertEquals(result, 604189371209351167L);
 
-    query = "Select geoToH3(116.407394,39.904202,6) from " + DEFAULT_TABLE_NAME;
+    query = "Select geoToH3(116.407394,39.904202,6) from " + getTableName();
     pinotResponse = postQuery(query);
     result = pinotResponse.get("resultTable").get("rows").get(0).get(0).longValue();
     Assert.assertEquals(result, 604356067480043519L);
 
-    query = "Select geoToH3(ST_point(20,102),5) from " + DEFAULT_TABLE_NAME;
+    query = "Select geoToH3(ST_point(20,102),5) from " + getTableName();
     pinotResponse = postQuery(query);
     result = pinotResponse.get("resultTable").get("rows").get(0).get(0).longValue();
     Assert.assertEquals(result, 599041711439609855L);
 
-    query = "Select geoToH3(ST_point(-122.419,37.775),6) from " + DEFAULT_TABLE_NAME;
+    query = "Select geoToH3(ST_point(-122.419,37.775),6) from " + getTableName();
     pinotResponse = postQuery(query);
     result = pinotResponse.get("resultTable").get("rows").get(0).get(0).longValue();
     Assert.assertEquals(result, 604189371209351167L);
 
-    query = "Select geoToH3(ST_point(116.407394,39.904202),6) from " + DEFAULT_TABLE_NAME;
+    query = "Select geoToH3(ST_point(116.407394,39.904202),6) from " + getTableName();
     pinotResponse = postQuery(query);
     result = pinotResponse.get("resultTable").get("rows").get(0).get(0).longValue();
     Assert.assertEquals(result, 604356067480043519L);
@@ -257,7 +223,7 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     for (int isGeography = 0; isGeography < 2; isGeography++) {
-      String query = String.format("Select ST_Point(20, 10, %d) from %s", isGeography, DEFAULT_TABLE_NAME);
+      String query = String.format("Select ST_Point(20, 10, %d) from %s", isGeography, getTableName());
       JsonNode pinotResponse = postQuery(query);
       String result = pinotResponse.get("resultTable").get("rows").get(0).get(0).asText();
       Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(20, 10));
@@ -277,7 +243,7 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
 
     for (int isGeography = 0; isGeography < 2; isGeography++) {
       String query =
-          String.format("Select ST_Point(st_x, st_y, %d), st_x, st_y from %s", isGeography, DEFAULT_TABLE_NAME);
+          String.format("Select ST_Point(st_x, st_y, %d), st_x, st_y from %s", isGeography, getTableName());
       JsonNode pinotResponse = postQuery(query);
       JsonNode rows = pinotResponse.get("resultTable").get("rows");
       for (int i = 0; i < rows.size(); i++) {
@@ -301,10 +267,9 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query =
         String.format("Select ST_Within(ST_GeomFromText(%s), ST_GeomFromText(%s)), %s from %s", WKT_1_NAME, WKT_2_NAME,
-            ST_WITHIN_RESULT_NAME, DEFAULT_TABLE_NAME);
+            ST_WITHIN_RESULT_NAME, getTableName());
     JsonNode pinotResponse = postQuery(query);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
-    System.out.println("rows = " + rows);
     for (int i = 0; i < rows.size(); i++) {
       JsonNode row = rows.get(i);
       boolean actualResult = row.get(0).intValue() == 1 ? true : false;
@@ -336,7 +301,7 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
 
   private void testStWithinResult(String leftWkt, String rightWkt, boolean result)
       throws Exception {
-    String queryFormat = "Select ST_Within(ST_GeomFromText('%s'), ST_GeomFromText('%s')) from " + DEFAULT_TABLE_NAME;
+    String queryFormat = "Select ST_Within(ST_GeomFromText('%s'), ST_GeomFromText('%s')) from " + getTableName();
     String query = String.format(queryFormat, leftWkt, rightWkt);
     JsonNode pinotResponse = postQuery(query);
     int actualResult = pinotResponse.get("resultTable").get("rows").get(0).get(0).intValue();
@@ -349,7 +314,7 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query =
         String.format("Select ST_Area(ST_GeomFromText(%s)), %s, ST_Area(ST_GeogFromText(%s)), %s from %s",
-            AREA_GEOM_NAME, AREA_GEOM_SIZE_NAME, AREA_GEOG_NAME, AREA_GEOG_SIZE_NAME, DEFAULT_TABLE_NAME);
+            AREA_GEOM_NAME, AREA_GEOM_SIZE_NAME, AREA_GEOG_NAME, AREA_GEOG_SIZE_NAME, getTableName());
     JsonNode pinotResponse = postQuery(query);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < rows.size(); i++) {
@@ -369,7 +334,7 @@ public class GeoSpatialClusterIntegrationTest extends BaseClusterIntegrationTest
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query =
         String.format("Select STUnion(ST_GeogFromText(%s)) from %s",
-            AREA_GEOG_NAME, DEFAULT_TABLE_NAME);
+            AREA_GEOG_NAME, getTableName());
     JsonNode pinotResponse = postQuery(query);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
     String actualResult = rows.get(0).get(0).asText();
