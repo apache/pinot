@@ -2,11 +2,11 @@
   "aggregates_planning_tests": {
     "queries": [
       {
-        "description": "Select AVG aggregation for a BIG_DECIMAL column",
+        "description": "Select AVG aggregation for a BIG_DECIMAL column, TODO:(No need to cast in LogicalProject)",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)])",
+          "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
@@ -17,11 +17,11 @@
         ]
       },
       {
-        "description": "Select many aggregations for a BIG_DECIMAL column",
+        "description": "Select many aggregations for a BIG_DECIMAL column, TODO:(No need to cast in LogicalProject)",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg, SUM(a.col4) as sum, MAX(a.col4) as max FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(avg=[/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)], sum=[CASE(=($1, 0), null:DECIMAL(1000, 0), $0)], max=[$2])",
+          "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)], sum=[CASE(=($1, 0), null:DECIMAL(1000, 0), $0)], max=[$2])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], agg#2=[MAX($2)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], agg#2=[MAX($2)])",

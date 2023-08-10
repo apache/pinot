@@ -139,18 +139,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String query;
     String h2Query;
 
-    // SUM result will overflow INTEGER
+    // SUM INTEGER result will be BIGINT
     query = "SELECT SUM(ActualElapsedTime) FROM mytable";
-
-    // SUM result will overflow INTEGER
+    testQuery(query);
+    // SUM FLOAT result will be FLOAT
     query = "SELECT SUM(CAST(ActualElapsedTime AS FLOAT)) FROM mytable";
-
-    // SUM result will overflow INTEGER
-    query = "SELECT SUM(CAST(ActualElapsedTime AS BIGINT)) FROM mytable";
-
-    // SUM result will overflow INTEGER
+    testQuery(query);
+    // SUM DOUBLE result will be DOUBLE
     query = "SELECT SUM(CAST(ActualElapsedTime AS DOUBLE)) FROM mytable";
-
     testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
