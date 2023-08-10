@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Joiner;
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -45,7 +44,6 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     _opChainStats = _context.getStats();
   }
 
-  @Nonnull
   @Override
   public TransferableBlock nextBlock() {
     if (Tracing.ThreadAccountantOps.isInterrupted()) {

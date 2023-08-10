@@ -39,7 +39,6 @@ public interface Operator<T extends Block> {
    * @throws EarlyTerminationException if the operator is early-terminated (interrupted) before processing the next
    *         block of data. Operator can early terminated when the query times out, or is already satisfied.
    */
-  @Nullable
   T nextBlock();
 
   /** @return List of {@link Operator}s that this operator depends upon. */
