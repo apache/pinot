@@ -32,7 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class OpChainSchedulerService implements SchedulerService {
+public class OpChainSchedulerService {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainSchedulerService.class);
 
   private final ExecutorService _executorService;
@@ -43,7 +43,6 @@ public class OpChainSchedulerService implements SchedulerService {
     _submittedOpChainMap = new ConcurrentHashMap<>();
   }
 
-  @Override
   public void register(OpChain operatorChain) {
     Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
       @Override
@@ -85,7 +84,6 @@ public class OpChainSchedulerService implements SchedulerService {
     _submittedOpChainMap.put(operatorChain.getId(), scheduledFuture);
   }
 
-  @Override
   public void cancel(long requestId) {
     // simple cancellation. for leaf stage this cannot be a dangling opchain b/c they will eventually be cleared up
     // via query timeout.
