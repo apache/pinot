@@ -34,6 +34,34 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
  */
 public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends IndexReader {
 
+  interface DocIdRangeProvider<T extends ForwardIndexReaderContext> {
+    /**
+     * Returns the range of document ids for the given value.
+     *
+     * @param docId to find the range for
+     * @return Range of document ids for the given value
+     */
+    List<ForwardIndexByteRange> getDocIdRange(int docId, T context);
+
+    /**
+     * Returns whether the forward index is fixed type.
+     * @return
+     */
+    boolean isFixedOffsetType();
+
+    /**
+     * Returns the base offset for the forward index if it's fixed type
+     * @return
+     */
+    long getBaseOffset();
+
+    int getDocLength();
+
+    default boolean isDocLengthInIBits() {
+      return false;
+    }
+  }
+
   /**
    * Returns {@code true} if the forward index is dictionary-encoded, {@code false} if it is raw.
    */
@@ -105,14 +133,6 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   default void readDictIds(int[] docIds, int length, int[] dictIdBuffer, T context) {
     throw new UnsupportedOperationException();
   }
-
-  /**
-   * Returns the buffer level absolute byte range for the given document id.
-   * @param docId
-   * @param context
-   * @return
-   */
-  List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, T context);
 
   /**
    * Reads the dictionary ids for a multi-value column at the given document id into the passed in buffer (the buffer

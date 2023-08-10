@@ -24,6 +24,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -33,7 +34,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * LONG, FLOAT, DOUBLE).
  * <p>For data layout, please refer to the documentation for {@link FixedByteChunkSVForwardIndexWriter}
  */
-public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkForwardIndexReader {
+public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkForwardIndexReader implements
+    ForwardIndexReader.DocIdRangeProvider<ChunkReaderContext> {
   public static final int VERSION = 4;
 
   private final int _shift;
@@ -51,37 +53,6 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
     } else {
       return null;
     }
-  }
-
-  @Override
-  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ChunkReaderContext context) {
-    List<ForwardIndexByteRange> ranges = new ArrayList<>();
-    if (_isCompressed) {
-      getChunkBufferAndRecordRanges(docId, context, ranges);
-    } else {
-      switch (_storedType) {
-        case INT: {
-          ranges.add(ForwardIndexByteRange.newByteRange(_rawDataStart + docId * Integer.BYTES, Integer.BYTES));
-        }
-        break;
-        case LONG: {
-          ranges.add(ForwardIndexByteRange.newByteRange(_rawDataStart + docId * Long.BYTES, Long.BYTES));
-        }
-        break;
-        case FLOAT: {
-          ranges.add(ForwardIndexByteRange.newByteRange(_rawDataStart + docId * Float.BYTES, Float.BYTES));
-        }
-        break;
-        case DOUBLE: {
-          ranges.add(ForwardIndexByteRange.newByteRange(_rawDataStart + docId * Double.BYTES, Double.BYTES));
-        }
-        break;
-        default:
-          throw new IllegalArgumentException();
-      }
-    }
-
-    return ranges;
   }
 
   @Override
@@ -146,13 +117,41 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
     return decompressChunk(chunkId, context);
   }
 
-  protected ByteBuffer getChunkBufferAndRecordRanges(int docId, ChunkReaderContext context,
+  protected void recordDocIdRanges(int docId, ChunkReaderContext context,
       List<ForwardIndexByteRange> ranges) {
     int chunkId = docId >>> _shift;
     if (context.getChunkId() == chunkId) {
       ranges.addAll(context.getRanges());
-      return context.getChunkBuffer();
+      return;
     }
-    return decompressChunkAndRecordRanges(chunkId, context, ranges);
+    recordChunkRanges(chunkId, context, ranges);
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getDocIdRange(int docId, ChunkReaderContext context) {
+    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+    if (_isCompressed) {
+      recordDocIdRanges(docId, context, ranges);
+    } else {
+      // If uncompressed, should use fixed offset
+      throw new IllegalStateException("Cannot get docId range for uncompressed forward index reader");
+    }
+
+    return ranges;
+  }
+
+  @Override
+  public boolean isFixedOffsetType() {
+    return !_isCompressed;
+  }
+
+  @Override
+  public long getBaseOffset() {
+    return _rawDataStart;
+  }
+
+  @Override
+  public int getDocLength() {
+    return _storedType.size();
   }
 }

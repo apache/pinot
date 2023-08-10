@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
-import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.io.reader.impl.FixedBitIntReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
@@ -32,13 +31,17 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * Bit-compressed dictionary-encoded forward index reader for single-value columns. The values returned are dictionary
  * ids.
  */
-public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<ForwardIndexReaderContext> {
+public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<ForwardIndexReaderContext>,
+                                                             ForwardIndexReader.DocIdRangeProvider
+                                                                 <ForwardIndexReaderContext> {
   private final FixedBitIntReader _reader;
   private final int _numDocs;
+  private final int _numBitsPerValue;
 
   public FixedBitSVForwardIndexReaderV2(PinotDataBuffer dataBuffer, int numDocs, int numBitsPerValue) {
     _reader = FixedBitIntReader.getReader(dataBuffer, numBitsPerValue);
     _numDocs = numDocs;
+    _numBitsPerValue = numBitsPerValue;
   }
 
   @Override
@@ -99,13 +102,31 @@ public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<
   }
 
   @Override
-  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ForwardIndexReaderContext context) {
-    List<ForwardIndexByteRange> ranges = new ArrayList<>();
-    _reader.readAndRecordRanges(docId, 0, ranges);
-    return ranges;
+  public void close() {
   }
 
   @Override
-  public void close() {
+  public List<ForwardIndexByteRange> getDocIdRange(int docId, ForwardIndexReaderContext context) {
+    throw new UnsupportedOperationException("Unsupported");
+  }
+
+  @Override
+  public boolean isFixedOffsetType() {
+    return true;
+  }
+
+  @Override
+  public long getBaseOffset() {
+    return 0;
+  }
+
+  @Override
+  public int getDocLength() {
+    return _numBitsPerValue;
+  }
+
+  @Override
+  public boolean isDocLengthInIBits() {
+    return true;
   }
 }

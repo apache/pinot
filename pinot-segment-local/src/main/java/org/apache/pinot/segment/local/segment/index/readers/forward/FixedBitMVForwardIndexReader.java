@@ -51,7 +51,9 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  *   </li>
  * </ul>
  */
-public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<FixedBitMVForwardIndexReader.Context> {
+public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<FixedBitMVForwardIndexReader.Context>,
+                                                           ForwardIndexReader.DocIdRangeProvider
+                                                               <FixedBitMVForwardIndexReader.Context> {
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
   private final FixedByteValueReaderWriter _chunkOffsetReader;
@@ -99,51 +101,6 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   @Override
   public Context createContext() {
     return new Context();
-  }
-
-  @Override
-  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, Context context) {
-    List<ForwardIndexByteRange> ranges = new ArrayList<>();
-    int contextDocId = context._docId;
-    int contextEndOffset = context._endOffset;
-    int startIndex;
-    if (docId == contextDocId + 1) {
-      startIndex = contextEndOffset;
-    } else {
-      int chunkId = docId / _numDocsPerChunk;
-      if (docId > contextDocId && chunkId == contextDocId / _numDocsPerChunk) {
-        // Same chunk
-        startIndex =
-            _bitmapReader.getNextNthSetBitOffsetOffsetAndRecordRanges(contextEndOffset + 1, docId - contextDocId - 1,
-                _bitmapReaderStartOffset, ranges);
-      } else {
-        // Different chunk
-        ranges.add(ForwardIndexByteRange.newByteRange(chunkId, Integer.BYTES));
-        int chunkOffset = _chunkOffsetReader.getInt(chunkId);
-        int indexInChunk = docId % _numDocsPerChunk;
-        if (indexInChunk == 0) {
-          startIndex = chunkOffset;
-        } else {
-          startIndex = _bitmapReader.getNextNthSetBitOffsetOffsetAndRecordRanges(chunkOffset + 1, indexInChunk,
-              _bitmapReaderStartOffset, ranges);
-        }
-      }
-    }
-    int endIndex;
-    if (docId == _numDocs - 1) {
-      endIndex = _numValues;
-    } else {
-      endIndex = _bitmapReader.getNextSetBitOffsetRanges(startIndex + 1, _bitmapReaderStartOffset, ranges);
-    }
-    int numValues = endIndex - startIndex;
-    int[] dictIdBuffer = new int[numValues];
-    _rawDataReader.readIntAndRecordRanges(startIndex, numValues, dictIdBuffer, _rawDataReaderStartOffset, ranges);
-
-    // Update context
-    context._docId = docId;
-    context._endOffset = endIndex;
-
-    return ranges;
   }
 
   @Override
@@ -264,6 +221,66 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     _chunkOffsetReader.close();
     _bitmapReader.close();
     _rawDataReader.close();
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getDocIdRange(int docId, Context context) {
+    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+    int contextDocId = context._docId;
+    int contextEndOffset = context._endOffset;
+    int startIndex;
+    if (docId == contextDocId + 1) {
+      startIndex = contextEndOffset;
+    } else {
+      int chunkId = docId / _numDocsPerChunk;
+      if (docId > contextDocId && chunkId == contextDocId / _numDocsPerChunk) {
+        // Same chunk
+        startIndex =
+            _bitmapReader.getNextNthSetBitOffsetOffsetAndRecordRanges(contextEndOffset + 1, docId - contextDocId - 1,
+                _bitmapReaderStartOffset, ranges);
+      } else {
+        // Different chunk
+        ranges.add(ForwardIndexByteRange.newByteRange(chunkId, Integer.BYTES));
+        int chunkOffset = _chunkOffsetReader.getInt(chunkId);
+        int indexInChunk = docId % _numDocsPerChunk;
+        if (indexInChunk == 0) {
+          startIndex = chunkOffset;
+        } else {
+          startIndex = _bitmapReader.getNextNthSetBitOffsetOffsetAndRecordRanges(chunkOffset + 1, indexInChunk,
+              _bitmapReaderStartOffset, ranges);
+        }
+      }
+    }
+    int endIndex;
+    if (docId == _numDocs - 1) {
+      endIndex = _numValues;
+    } else {
+      endIndex = _bitmapReader.getNextSetBitOffsetRanges(startIndex + 1, _bitmapReaderStartOffset, ranges);
+    }
+    int numValues = endIndex - startIndex;
+    int[] dictIdBuffer = new int[numValues];
+    _rawDataReader.readIntAndRecordRanges(startIndex, numValues, dictIdBuffer, _rawDataReaderStartOffset, ranges);
+
+    // Update context
+    context._docId = docId;
+    context._endOffset = endIndex;
+
+    return ranges;
+  }
+
+  @Override
+  public boolean isFixedOffsetType() {
+    return false;
+  }
+
+  @Override
+  public long getBaseOffset() {
+    throw new UnsupportedOperationException("Unsupported");
+  }
+
+  @Override
+  public int getDocLength() {
+    throw new UnsupportedOperationException("Unsupported");
   }
 
   public static class Context implements ForwardIndexReaderContext {

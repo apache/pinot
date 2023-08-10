@@ -77,34 +77,6 @@ public final class PinotDataBitSet implements Closeable {
     _dataBuffer = dataBuffer;
   }
 
-  public int readIntAndRecordRanges(int index, int numBitsPerValue, long baseOffset,
-      List<ForwardIndexByteRange> ranges) {
-    long bitOffset = (long) index * numBitsPerValue;
-    int byteOffset = (int) (bitOffset / Byte.SIZE);
-    int bitOffsetInFirstByte = (int) (bitOffset % Byte.SIZE);
-
-    // Initiated with the value in first byte
-    ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.SIZE));
-    int currentValue = _dataBuffer.getByte(byteOffset) & (BYTE_MASK >>> bitOffsetInFirstByte);
-
-    int numBitsLeft = numBitsPerValue - (Byte.SIZE - bitOffsetInFirstByte);
-    if (numBitsLeft <= 0) {
-      // The value is inside the first byte
-      return currentValue >>> -numBitsLeft;
-    } else {
-      // The value is in multiple bytes
-      while (numBitsLeft > Byte.SIZE) {
-        byteOffset++;
-        ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.SIZE));
-        currentValue = (currentValue << Byte.SIZE) | (_dataBuffer.getByte(byteOffset) & BYTE_MASK);
-        numBitsLeft -= Byte.SIZE;
-      }
-      ranges.add(ForwardIndexByteRange.newByteRange(baseOffset + byteOffset, Byte.SIZE));
-      return (currentValue << numBitsLeft) | ((_dataBuffer.getByte(byteOffset + 1) & BYTE_MASK) >>> (Byte.SIZE
-          - numBitsLeft));
-    }
-  }
-
   public int readInt(int index, int numBitsPerValue) {
     long bitOffset = (long) index * numBitsPerValue;
     int byteOffset = (int) (bitOffset / Byte.SIZE);

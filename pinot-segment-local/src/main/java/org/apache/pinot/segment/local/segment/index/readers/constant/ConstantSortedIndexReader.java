@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.constant;
 
-import java.util.List;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.spi.utils.Pairs;
@@ -33,11 +31,6 @@ public final class ConstantSortedIndexReader implements SortedIndexReader<Forwar
 
   public ConstantSortedIndexReader(int numDocs) {
     _numDocs = numDocs;
-  }
-
-  @Override
-  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ForwardIndexReaderContext context) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

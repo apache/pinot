@@ -24,6 +24,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -33,7 +34,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * fixed length data type (INT, LONG, FLOAT, DOUBLE).
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
  */
-public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader {
+public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader
+    implements ForwardIndexReader.DocIdRangeProvider<ChunkReaderContext> {
 
   private static final int ROW_OFFSET_SIZE = VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
@@ -52,17 +54,6 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     } else {
       return null;
     }
-  }
-
-  @Override
-  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ChunkReaderContext context) {
-    List<ForwardIndexByteRange> ranges = new ArrayList<>();
-    if (_isCompressed) {
-      sliceBytesCompressedAndRecordRanges(docId, context, ranges);
-    } else {
-      sliceBytesUncompressedAndRecordRanges(docId, ranges);
-    }
-    return ranges;
   }
 
   @Override
@@ -166,16 +157,10 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
   /**
    * Helper method to read BYTES value from the compressed index.
    */
-  private ByteBuffer sliceBytesCompressedAndRecordRanges(int docId, ChunkReaderContext context,
+  private void sliceBytesCompressedAndRecordRanges(int docId, ChunkReaderContext context,
       List<ForwardIndexByteRange> ranges) {
     int chunkRowId = docId % _numDocsPerChunk;
-    ByteBuffer chunkBuffer = getChunkBufferAndRecordRanges(docId, context, ranges);
-
-    // These offsets are offset in the chunk buffer
-    int valueStartOffset = chunkBuffer.getInt(chunkRowId * ROW_OFFSET_SIZE);
-    int valueEndOffset = getValueEndOffset(chunkRowId, chunkBuffer);
-    // cast only for JDK8 compilation profile
-    return (ByteBuffer) chunkBuffer.duplicate().position(valueStartOffset).limit(valueEndOffset);
+    recordDocIdRanges(docId, context, ranges);
   }
 
   private ByteBuffer sliceBytesCompressed(int docId, ChunkReaderContext context) {
@@ -189,7 +174,7 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     return (ByteBuffer) chunkBuffer.duplicate().position(valueStartOffset).limit(valueEndOffset);
   }
 
-  private ByteBuffer sliceBytesUncompressedAndRecordRanges(int docId, List<ForwardIndexByteRange> ranges) {
+  private void sliceBytesUncompressedAndRecordRanges(int docId, List<ForwardIndexByteRange> ranges) {
     int chunkId = docId / _numDocsPerChunk;
     int chunkRowId = docId % _numDocsPerChunk;
 
@@ -203,7 +188,6 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     long valueEndOffset = getValueEndOffsetAndRecordRanges(chunkId, chunkRowId, chunkStartOffset, ranges);
 
     ranges.add(ForwardIndexByteRange.newByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
-    return _dataBuffer.toDirectByteBuffer(valueStartOffset, (int) (valueEndOffset - valueStartOffset));
   }
 
   /**
@@ -295,9 +279,34 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
         // Last row in the chunk
         return getChunkPosition(chunkId + 1);
       } else {
-        return chunkStartOffset + _dataBuffer
-            .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
+        return chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
       }
     }
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getDocIdRange(int docId, ChunkReaderContext context) {
+    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+    if (_isCompressed) {
+      sliceBytesCompressedAndRecordRanges(docId, context, ranges);
+    } else {
+      sliceBytesUncompressedAndRecordRanges(docId, ranges);
+    }
+    return ranges;
+  }
+
+  @Override
+  public boolean isFixedOffsetType() {
+    return false;
+  }
+
+  @Override
+  public long getBaseOffset() {
+    throw new UnsupportedOperationException("Unsupported");
+  }
+
+  @Override
+  public int getDocLength() {
+    throw new UnsupportedOperationException("Unsupported");
   }
 }

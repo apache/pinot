@@ -25,8 +25,10 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+
 
 /**
  * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of
@@ -35,7 +37,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * (STRING, BYTES).
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
  */
-public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader {
+public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader
+    implements ForwardIndexReader.DocIdRangeProvider<ChunkReaderContext> {
 
   private static final int ROW_OFFSET_SIZE = VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
@@ -54,18 +57,6 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     } else {
       return null;
     }
-  }
-
-  @Override
-  public List<ForwardIndexByteRange> getForwardIndexByteRange(int docId, ChunkReaderContext context) {
-    List<ForwardIndexByteRange> ranges = new ArrayList<>();
-    if (_isCompressed) {
-      getBytesCompressedAndRecordRanges(docId, context, ranges);
-    } else {
-      getBytesUncompressedAndRecordRanges(docId, ranges);
-    }
-
-    return ranges;
   }
 
   @Override
@@ -180,21 +171,6 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     }
   }
 
-  private byte[] getBytesCompressedAndRecordRanges(int docId, ChunkReaderContext context,
-      List<ForwardIndexByteRange> ranges) {
-    int chunkRowId = docId % _numDocsPerChunk;
-    ByteBuffer chunkBuffer = getChunkBufferAndRecordRanges(docId, context, ranges);
-
-    // These offsets are offset in the chunk buffer
-    int valueStartOffset = chunkBuffer.getInt(chunkRowId * ROW_OFFSET_SIZE);
-    int valueEndOffset = getValueEndOffset(chunkRowId, chunkBuffer);
-
-    byte[] bytes = new byte[valueEndOffset - valueStartOffset];
-    chunkBuffer.position(valueStartOffset);
-    chunkBuffer.get(bytes);
-    return bytes;
-  }
-
   /**
    * Helper method to read BYTES value from the compressed index.
    */
@@ -212,7 +188,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     return bytes;
   }
 
-  public byte[] getBytesUncompressedAndRecordRanges(int docId, List<ForwardIndexByteRange> ranges) {
+  public void recordDocIdRanges(int docId, List<ForwardIndexByteRange> ranges) {
     int chunkId = docId / _numDocsPerChunk;
     int chunkRowId = docId % _numDocsPerChunk;
 
@@ -224,10 +200,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
         chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
     long valueEndOffset = getValueEndOffsetAndRecordRanges(chunkId, chunkRowId, chunkStartOffset, ranges);
 
-    byte[] bytes = new byte[(int) (valueEndOffset - valueStartOffset)];
-    ranges.add(ForwardIndexByteRange.newByteRange(valueStartOffset, bytes.length));
-    _dataBuffer.copyTo(valueStartOffset, bytes);
-    return bytes;
+    ranges.add(ForwardIndexByteRange.newByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
   }
 
   /**
@@ -324,5 +297,32 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
             .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
       }
     }
+  }
+
+  @Override
+  public List<ForwardIndexByteRange> getDocIdRange(int docId, ChunkReaderContext context) {
+    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+    if (_isCompressed) {
+      recordDocIdRanges(docId, context, ranges);
+    } else {
+      recordDocIdRanges(docId, ranges);
+    }
+
+    return ranges;
+  }
+
+  @Override
+  public boolean isFixedOffsetType() {
+    return false;
+  }
+
+  @Override
+  public long getBaseOffset() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int getDocLength() {
+    throw new UnsupportedOperationException();
   }
 }

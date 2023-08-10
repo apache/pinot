@@ -130,18 +130,17 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     return decompressChunk(chunkId, context);
   }
 
-  protected ByteBuffer getChunkBufferAndRecordRanges(int docId, ChunkReaderContext context,
+  protected void recordDocIdRanges(int docId, ChunkReaderContext context,
       List<ForwardIndexByteRange> ranges) {
     int chunkId = docId / _numDocsPerChunk;
     if (context.getChunkId() == chunkId) {
       ranges.addAll(context.getRanges());
-      return context.getChunkBuffer();
+      return;
     }
-    return decompressChunkAndRecordRanges(chunkId, context, ranges);
+    recordChunkRanges(chunkId, context, ranges);
   }
 
-  protected ByteBuffer decompressChunkAndRecordRanges(int chunkId, ChunkReaderContext context,
-      List<ForwardIndexByteRange> ranges) {
+  protected void recordChunkRanges(int chunkId, ChunkReaderContext context, List<ForwardIndexByteRange> ranges) {
     List<ForwardIndexByteRange> chunkRanges = new ArrayList<>();
     int chunkSize;
     long chunkPosition = getChunkPositionAndRecordRanges(chunkId, chunkRanges);
@@ -153,21 +152,10 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
       long nextChunkOffset = getChunkPositionAndRecordRanges(chunkId + 1, chunkRanges);
       chunkSize = (int) (nextChunkOffset - chunkPosition);
     }
-
-    ByteBuffer decompressedBuffer = context.getChunkBuffer();
-    decompressedBuffer.clear();
-
-    try {
-      chunkRanges.add(ForwardIndexByteRange.newByteRange(chunkPosition, chunkSize));
-      _chunkDecompressor.decompress(_dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize), decompressedBuffer);
-    } catch (IOException e) {
-      LOGGER.error("Exception caught while decompressing data chunk", e);
-      throw new RuntimeException(e);
-    }
+    chunkRanges.add(ForwardIndexByteRange.newByteRange(chunkPosition, chunkSize));
     context.setChunkId(chunkId);
     context.setRanges(chunkRanges);
     ranges.addAll(chunkRanges);
-    return decompressedBuffer;
   }
 
   protected ByteBuffer decompressChunk(int chunkId, ChunkReaderContext context) {

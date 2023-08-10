@@ -40,10 +40,6 @@ public final class FixedBitIntReaderWriter implements Closeable {
     return _dataBitSet.readInt(index, _numBitsPerValue);
   }
 
-  public int readIntAndRecordRanges(int index, long baseOffset, List<ForwardIndexByteRange> ranges) {
-    return _dataBitSet.readIntAndRecordRanges(index, _numBitsPerValue, baseOffset, ranges);
-  }
-
   public void readIntAndRecordRanges(int startIndex, int length, int[] buffer, long baseOffset,
       List<ForwardIndexByteRange> ranges) {
     _dataBitSet.readIntAndRecordRanges(startIndex, _numBitsPerValue, length, buffer, baseOffset, ranges);
