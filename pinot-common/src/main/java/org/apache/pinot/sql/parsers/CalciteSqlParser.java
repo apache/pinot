@@ -513,6 +513,7 @@ public class CalciteSqlParser {
   private static Join compileToJoin(SqlJoin sqlJoin) {
     Join join = new Join();
     switch (sqlJoin.getJoinType()) {
+      case COMMA:
       case INNER:
         join.setType(JoinType.INNER);
         break;
