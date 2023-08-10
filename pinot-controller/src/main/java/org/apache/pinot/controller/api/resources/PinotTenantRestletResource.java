@@ -579,6 +579,7 @@ public class PinotTenantRestletResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.REBALANCE_TENANT_TABLES)
   @Path("/tenants/{tenantName}/rebalance")
   @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
   public TenantRebalanceResult rebalance(
@@ -590,7 +591,8 @@ public class PinotTenantRestletResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Authenticate(AccessType.UPDATE)
+  @Authenticate(AccessType.READ)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_REBALANCE_STATUS)
   @Path("/tenants/rebalanceStatus/{jobId}")
   @ApiOperation(value = "Gets detailed stats of a tenant rebalance operation",
       notes = "Gets detailed stats of a tenant rebalance operation")
