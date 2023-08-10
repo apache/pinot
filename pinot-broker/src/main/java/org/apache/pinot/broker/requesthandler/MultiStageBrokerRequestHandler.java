@@ -113,7 +113,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         new WorkerManager(_reducerHostname, _reducerPort, routingManager), _tableCache);
     _queryDispatcher = new QueryDispatcher();
 
-    _opChainExecutor = ExecutorServiceUtils.create(config, "multiStage", "multiStage_on_" + _reducerPort + "port");
+    String opChainExecConfigPrefix = "pinot.query.runner.opchain";
+    String opChainExecNamePrefix = "multiStage_on_" + _reducerPort + "port";
+    _opChainExecutor = ExecutorServiceUtils.create(config, opChainExecConfigPrefix, opChainExecNamePrefix);
     _reducerScheduler = new OpChainSchedulerService(_opChainExecutor);
     _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config);
 

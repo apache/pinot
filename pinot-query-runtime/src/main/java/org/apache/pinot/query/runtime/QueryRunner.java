@@ -93,7 +93,7 @@ public class QueryRunner {
       long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
           QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
       //TODO: make this configurable
-      _opChainExecutor = ExecutorServiceUtils.create(config, "pinot.query.runner.opchain.executor",
+      _opChainExecutor = ExecutorServiceUtils.create(config, "pinot.query.runner.opchain",
           "op_chain_worker_on_" + _port + "_port");
       _scheduler = new OpChainSchedulerService(getQueryWorkerIntermExecutorService());
       _mailboxService = new MailboxService(_hostname, _port, config);
