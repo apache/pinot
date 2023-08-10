@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 public class ExecutorServiceUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExecutorServiceUtils.class);
+  private static final long DEFAULT_TERMINATION_MILLIS = 30_000;
 
   private ExecutorServiceUtils() {
   }
@@ -43,10 +44,30 @@ public class ExecutorServiceUtils {
     return Executors.newCachedThreadPool(new NamedThreadFactory(baseName));
   }
 
+  /**
+   * Shuts down the given executor service.
+   *
+   * This method blocks a default number of millis in order to wait for termination. In case the executor doesn't
+   * terminate in that time, the code continues with a logging.
+   *
+   * @throws RuntimeException if this threads is interrupted when waiting for termination.
+   */
   public static void close(ExecutorService executorService) {
+    close(executorService, DEFAULT_TERMINATION_MILLIS);
+  }
+
+  /**
+   * Shuts down the given executor service.
+   *
+   * This method blocks up to the given millis in order to wait for termination. In case the executor doesn't terminate
+   * in that time, the code continues with a logging.
+   *
+   * @throws RuntimeException if this threads is interrupted when waiting for termination.
+   */
+  public static void close(ExecutorService executorService, long terminationMillis) {
     executorService.shutdown();
     try {
-      if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
+      if (!executorService.awaitTermination(terminationMillis, TimeUnit.SECONDS)) {
         List<Runnable> runnables = executorService.shutdownNow();
         LOGGER.warn("Around " + runnables.size() + " didn't finish in time after a shutdown");
       }
