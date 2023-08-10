@@ -208,7 +208,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_ADHOC_TASKS_SUBMITTED, 1);
       responseMap.put(tableNameWithType,
           _helixTaskResourceManager.submitTask(parentTaskName, pinotTaskConfigs, minionInstanceTag,
-              taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance()));
+              taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance(),
+              taskGenerator.getMaxAttemptsPerTask()));
     }
     if (responseMap.isEmpty()) {
       throw new NoTaskScheduledException("No task scheduled for 'tableName': " + tableName);
@@ -582,7 +583,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       LOGGER.info("Submitting {} tasks for task type: {} with task configs: {}", numTasks, taskType, pinotTaskConfigs);
       _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
       return _helixTaskResourceManager.submitTask(pinotTaskConfigs, taskGenerator.getTaskTimeoutMs(),
-          taskGenerator.getNumConcurrentTasksPerInstance());
+          taskGenerator.getNumConcurrentTasksPerInstance(), taskGenerator.getMaxAttemptsPerTask());
     }
     LOGGER.info("No task to schedule for task type: {}", taskType);
     return null;
