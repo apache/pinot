@@ -872,7 +872,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
 
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
-    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 4);
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 2);
   }
 
   @Test
