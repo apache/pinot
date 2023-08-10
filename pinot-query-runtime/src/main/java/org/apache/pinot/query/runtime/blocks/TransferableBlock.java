@@ -197,6 +197,6 @@ public class TransferableBlock implements Block {
   @Override
   public String toString() {
     String blockType = isErrorBlock() ? "error" : isSuccessfulEndOfStreamBlock() ? "eos" : "data";
-    return "TransferableBlock{blockType=" + blockType + ", _numRows=" + _numRows + ", _container=" + _container + '}';
+    return "TransferableBlock{blockType=" + blockType + ", _numRows=" + _numRows + '}';
   }
 }
