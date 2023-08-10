@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.routing.MailboxMetadata;
@@ -47,7 +48,7 @@ public class DispatchablePlanMetadata implements Serializable {
   private Map<String, String> _tableOptions;
 
   // used for assigning server/worker nodes.
-  private Map<QueryServerInstance, List<Integer>> _serverInstanceToWorkerIdMap;
+  private Map<Integer, QueryServerInstance> _workerIdToServerInstanceMap;
 
   // used for table scan stage - we use ServerInstance instead of VirtualServer
   // here because all virtual servers that share a server instance will have the
@@ -59,7 +60,7 @@ public class DispatchablePlanMetadata implements Serializable {
   private final Map<Integer, Map<Integer, MailboxMetadata>> _workerIdToMailboxesMap;
 
   // used for tracking unavailable segments from routing table, then assemble missing segments exception.
-  private final Map<String, Collection<String>> _tableToUnavailableSegmentsMap;
+  private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
 
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
@@ -70,13 +71,8 @@ public class DispatchablePlanMetadata implements Serializable {
   // whether a stage is partitioned table scan
   private boolean _isPartitionedTableScan;
 
-  // Total worker count of this stage.
-  private int _totalWorkerCount;
-
   public DispatchablePlanMetadata() {
     _scannedTables = new ArrayList<>();
-    _serverInstanceToWorkerIdMap = new HashMap<>();
-    _workerIdToSegmentsMap = new HashMap<>();
     _workerIdToMailboxesMap = new HashMap<>();
     _tableToUnavailableSegmentsMap = new HashMap<>();
   }
@@ -102,6 +98,15 @@ public class DispatchablePlanMetadata implements Serializable {
   // attached physical plan context.
   // -----------------------------------------------
 
+  public Map<Integer, QueryServerInstance> getWorkerIdToServerInstanceMap() {
+    return _workerIdToServerInstanceMap;
+  }
+
+  public void setWorkerIdToServerInstanceMap(Map<Integer, QueryServerInstance> workerIdToServerInstanceMap) {
+    _workerIdToServerInstanceMap = workerIdToServerInstanceMap;
+  }
+
+  @Nullable
   public Map<Integer, Map<String, List<String>>> getWorkerIdToSegmentsMap() {
     return _workerIdToSegmentsMap;
   }
@@ -110,25 +115,8 @@ public class DispatchablePlanMetadata implements Serializable {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
   }
 
-  public Map<Integer, Map<Integer, MailboxMetadata>> getWorkerIdToMailBoxIdsMap() {
+  public Map<Integer, Map<Integer, MailboxMetadata>> getWorkerIdToMailboxesMap() {
     return _workerIdToMailboxesMap;
-  }
-
-  public void setWorkerIdToMailBoxIdsMap(Map<Integer, Map<Integer, MailboxMetadata>> workerIdToMailboxesMap) {
-    _workerIdToMailboxesMap.putAll(workerIdToMailboxesMap);
-  }
-
-  public void addWorkerIdToMailBoxIdsMap(int planFragmentId,
-      Map<Integer, MailboxMetadata> planFragmentIdToMailboxesMap) {
-    _workerIdToMailboxesMap.put(planFragmentId, planFragmentIdToMailboxesMap);
-  }
-
-  public Map<QueryServerInstance, List<Integer>> getServerInstanceToWorkerIdMap() {
-    return _serverInstanceToWorkerIdMap;
-  }
-
-  public void setServerInstanceToWorkerIdMap(Map<QueryServerInstance, List<Integer>> serverInstances) {
-    _serverInstanceToWorkerIdMap = serverInstances;
   }
 
   public TimeBoundaryInfo getTimeBoundaryInfo() {
@@ -155,30 +143,11 @@ public class DispatchablePlanMetadata implements Serializable {
     _isPartitionedTableScan = isPartitionedTableScan;
   }
 
-  public int getTotalWorkerCount() {
-    return _totalWorkerCount;
-  }
-
-  public void setTotalWorkerCount(int totalWorkerCount) {
-    _totalWorkerCount = totalWorkerCount;
-  }
-
-  public void addTableToUnavailableSegmentsMap(String table, Collection<String> unavailableSegments) {
-    if (!_tableToUnavailableSegmentsMap.containsKey(table)) {
-      _tableToUnavailableSegmentsMap.put(table, new HashSet<>());
-    }
-    _tableToUnavailableSegmentsMap.get(table).addAll(unavailableSegments);
-  }
-
-  public Map<String, Collection<String>> getTableToUnavailableSegmentsMap() {
+  public Map<String, Set<String>> getTableToUnavailableSegmentsMap() {
     return _tableToUnavailableSegmentsMap;
   }
 
-  @Override
-  public String toString() {
-    return "DispatchablePlanMetadata{" + "_scannedTables=" + _scannedTables + ", _serverInstanceToWorkerIdMap="
-        + _serverInstanceToWorkerIdMap + ", _workerIdToSegmentsMap=" + _workerIdToSegmentsMap
-        + ", _workerIdToMailboxesMap=" + _workerIdToMailboxesMap + ", _tableToUnavailableSegmentsMap="
-        + _tableToUnavailableSegmentsMap + ", _timeBoundaryInfo=" + _timeBoundaryInfo + '}';
+  public void addUnavailableSegments(String tableName, Collection<String> unavailableSegments) {
+    _tableToUnavailableSegmentsMap.computeIfAbsent(tableName, k -> new HashSet<>()).addAll(unavailableSegments);
   }
 }

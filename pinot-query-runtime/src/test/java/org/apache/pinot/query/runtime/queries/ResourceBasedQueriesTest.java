@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -75,10 +76,17 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final int NUM_PARTITIONS = 4;
 
   private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
+  private TimeZone _currentSystemTimeZone;
 
   @BeforeClass
   public void setUp()
       throws Exception {
+    // Save the original default timezone
+    _currentSystemTimeZone = TimeZone.getDefault();
+
+    // Change the default timezone
+    TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"));
+
     // Setting up mock server factories.
     // All test data are loaded upfront b/c the mock server and brokers needs to be in sync.
     MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1");
@@ -233,6 +241,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @AfterClass
   public void tearDown() {
+    // Restore the original default timezone
+    TimeZone.setDefault(_currentSystemTimeZone);
     DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
     for (QueryServerEnclosure server : _servers.values()) {
       server.shutDown();

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.testng.annotations.DataProvider;
@@ -59,6 +60,9 @@ public class VectorTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider(name = "testVectorTransformFunctionDataProvider")
   public Object[][] testVectorTransformFunctionDataProvider() {
+    String zeroVectorLiteral = "ARRAY[0.0"
+        + StringUtils.repeat(",0.0", VECTOR_DIM_SIZE - 1)
+        + "]";
     return new Object[][]{
         new Object[]{"cosineDistance(vector1, vector2)", 0.1, 0.4},
         new Object[]{"cosineDistance(vector1, vector2, 0)", 0.1, 0.4},
@@ -67,7 +71,14 @@ public class VectorTransformFunctionTest extends BaseTransformFunctionTest {
         new Object[]{"l1Distance(vector1, vector2)", 140, 210},
         new Object[]{"l2Distance(vector1, vector2)", 8, 11},
         new Object[]{"vectorNorm(vector1)", 10, 16},
-        new Object[]{"vectorNorm(vector2)", 10, 16}
+        new Object[]{"vectorNorm(vector2)", 10, 16},
+
+        new Object[]{String.format("cosineDistance(vector1, %s, 0)", zeroVectorLiteral), 0.0, 0.0},
+        new Object[]{String.format("innerProduct(vector1, %s)", zeroVectorLiteral), 0.0, 0.0},
+        new Object[]{String.format("l1Distance(vector1, %s)", zeroVectorLiteral), 0, VECTOR_DIM_SIZE},
+        new Object[]{String.format("l2Distance(vector1, %s)", zeroVectorLiteral), 0, VECTOR_DIM_SIZE},
+        new Object[]{String.format("vectorDims(%s)", zeroVectorLiteral), VECTOR_DIM_SIZE, VECTOR_DIM_SIZE},
+        new Object[]{String.format("vectorNorm(%s)", zeroVectorLiteral), 0.0, 0.0},
     };
   }
 }

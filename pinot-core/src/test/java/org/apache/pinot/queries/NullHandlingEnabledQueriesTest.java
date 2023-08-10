@@ -650,6 +650,46 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testRangeFiltering()
+      throws Exception {
+    initializeRows();
+    insertRow(-1);
+    insertRow(null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSortedColumn(COLUMN1).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE %s < 0", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{-1});
+  }
+
+  @Test
+  public void testEqualFiltering()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(Integer.MIN_VALUE);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSortedColumn(COLUMN1).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE %s = %d", COLUMN1, Integer.MIN_VALUE);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
+  }
+
+  @Test
   public void testOrFiltering()
       throws Exception {
     initializeRows();
@@ -896,5 +936,196 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 0);
+  }
+
+  @Test
+  public void testExpressionFilterOperatoIsNullPredicate()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, 2);
+    insertRowWithTwoColumns(-1, 3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE ADD(%s, 0) IS NULL LIMIT 100", COLUMN1, COLUMN2, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{null, 1});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorIsNotNullPredicate()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(1, 3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE ADD(%s, 0) IS NOT NULL LIMIT 100", COLUMN1, COLUMN2, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{1, 3});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorIsNullPredicateInsideNotFilterOperator()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(1, 3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE NOT(ADD(%s, 0) IS NULL) LIMIT 100", COLUMN1, COLUMN2,
+            COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{1, 3});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorIsNotNullPredicateInsideNotFilterOperator()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(2, 3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE NOT(ADD(%s, 0) IS NOT NULL) LIMIT 100", COLUMN1, COLUMN2,
+            COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{null, 1});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorApplyIsNullPredicateToNotOfColumn()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(true, 1);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(false, 3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE (NOT %s) IS NULL LIMIT 100", COLUMN1, COLUMN2, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{null, 2});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorApplyAndForGetNulls()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(Integer.MIN_VALUE, null);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(null, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE (add(%s, 0) IS NULL) AND (%s IS NULL)", COLUMN1, COLUMN2,
+            COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{null, null});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorOnMultiValue()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(new Integer[]{1, 2, 3}, 1);
+    insertRowWithTwoColumns(new Integer[]{2, 3, 4}, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT * FROM testTable WHERE (VALUEIN(%s, 2, 3) IN (2, 3)) AND (%s = 1)", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}, 1});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorMultiValueIsNull()
+      throws Exception {
+    initializeRows();
+    insertRow(new Integer[]{1, 2, 3});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE (VALUEIN(%s, 2, 3) IS NULL)", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 0);
+  }
+
+  @Test
+  public void testExpressionFilterOperatorMultiValueIsNotNull()
+      throws Exception {
+    initializeRows();
+    insertRow(new Integer[]{1, 2, 3});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE (VALUEIN(%s, 2, 3) IS NOT NULL)", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}});
   }
 }

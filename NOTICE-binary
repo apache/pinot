@@ -49,7 +49,7 @@ Apache Commons Logging
 Copyright 2003-2014 The Apache Software Foundation
 
 Apache Commons Lang
-Copyright 2001-2020 The Apache Software Foundation
+Copyright 2001-2021 The Apache Software Foundation
 
 Apache Commons Collections
 Copyright 2001-2015 The Apache Software Foundation
@@ -111,7 +111,7 @@ Apache HttpCore
 Copyright 2005-2020 The Apache Software Foundation
 
 Apache Calcite
-Copyright 2012-2021 The Apache Software Foundation
+Copyright 2012-2022 The Apache Software Foundation
 
 This product is based on source code originally developed
 by DynamoBI Corporation, LucidEra Inc., SQLstream Inc. and others
@@ -317,10 +317,17 @@ sources enumerated above at the time of code translation are in the LICENSE.txt
 file.
 
 datasketches-java
-Copyright 2015-2020 The Apache Software Foundation
+Copyright 2015-2022 The Apache Software Foundation
 
-datasketches-memory
-Copyright 2015-2019 The Apache Software Foundation
+Apache DataSketches Memory
+Copyright 2022 - The Apache Software Foundation
+
+Copyright 2015-2018 Yahoo Inc.
+Copyright 2019-2020 Verizon Media
+Copyright 2021 Yahoo Inc.
+
+Prior to moving to ASF, the software for this project was developed at
+Yahoo Inc. (https://developer.yahoo.com).
 
 Apache Lucene
 Copyright 2001-2019 The Apache Software Foundation
@@ -521,7 +528,7 @@ Nori Korean Morphological Analyzer - Apache Lucene Integration
   https://bitbucket.org/eunjeon/mecab-ko-dic/downloads/mecab-ko-dic-2.0.3-20170922.tar.gz
 
 Apache Commons CLI
-Copyright 2001-2009 The Apache Software Foundation
+Copyright 2002-2021 The Apache Software Foundation
 
 Jackson core and extension components may licensed under different licenses.
 To find the details that apply to this artifact see the accompanying LICENSE file.
@@ -642,6 +649,178 @@ its NOTICE file:
 
 Apache Commons Pool
 Copyright 2001-2012 The Apache Software Foundation
+
+AWS SDK for Java 2.0
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+This product includes software developed by
+Amazon Technologies, Inc (http://www.amazon.com/).
+
+**********************
+THIRD PARTY COMPONENTS
+**********************
+This software includes third party software subject to the following copyrights:
+- XML parsing and utility functions from JetS3t - Copyright 2006-2009 James Murty.
+- PKCS#1 PEM encoded private key parsing and utility functions from oauth.googlecode.com - Copyright 1998-2010 AOL Inc.
+- Apache Commons Lang - https://github.com/apache/commons-lang
+- Netty Reactive Streams - https://github.com/playframework/netty-reactive-streams
+- Jackson-core - https://github.com/FasterXML/jackson-core
+- Jackson-dataformat-cbor - https://github.com/FasterXML/jackson-dataformats-binary
+
+The licenses for these third party components are included in LICENSE.txt
+
+- For Apache Commons Lang see also this required NOTICE:
+  Apache Commons Lang
+  Copyright 2001-2020 The Apache Software Foundation
+
+  This product includes software developed at
+  The Apache Software Foundation (https://www.apache.org/).
+
+==============================================================
+ Jetty Web Container
+ Copyright 1995-2018 Mort Bay Consulting Pty Ltd.
+==============================================================
+
+The Jetty Web Container is Copyright Mort Bay Consulting Pty Ltd
+unless otherwise noted.
+
+Jetty is dual licensed under both
+
+  * The Apache 2.0 License
+    http://www.apache.org/licenses/LICENSE-2.0.html
+
+      and
+
+  * The Eclipse Public 1.0 License
+    http://www.eclipse.org/legal/epl-v10.html
+
+Jetty may be distributed under either license.
+
+------
+Eclipse
+
+The following artifacts are EPL.
+ * org.eclipse.jetty.orbit:org.eclipse.jdt.core
+
+The following artifacts are EPL and ASL2.
+ * org.eclipse.jetty.orbit:javax.security.auth.message
+
+The following artifacts are EPL and CDDL 1.0.
+ * org.eclipse.jetty.orbit:javax.mail.glassfish
+
+------
+Oracle
+
+The following artifacts are CDDL + GPLv2 with classpath exception.
+https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
+
+ * javax.servlet:javax.servlet-api
+ * javax.annotation:javax.annotation-api
+ * javax.transaction:javax.transaction-api
+ * javax.websocket:javax.websocket-api
+
+------
+Oracle OpenJDK
+
+If ALPN is used to negotiate HTTP/2 connections, then the following
+artifacts may be included in the distribution or downloaded when ALPN
+module is selected.
+
+ * java.sun.security.ssl
+
+These artifacts replace/modify OpenJDK classes.  The modififications
+are hosted at github and both modified and original are under GPL v2 with
+classpath exceptions.
+http://openjdk.java.net/legal/gplv2+ce.html
+
+------
+OW2
+
+The following artifacts are licensed by the OW2 Foundation according to the
+terms of http://asm.ow2.org/license.html
+
+org.ow2.asm:asm-commons
+org.ow2.asm:asm
+
+------
+Apache
+
+The following artifacts are ASL2 licensed.
+
+org.apache.taglibs:taglibs-standard-spec
+org.apache.taglibs:taglibs-standard-impl
+
+------
+MortBay
+
+The following artifacts are ASL2 licensed.  Based on selected classes from
+following Apache Tomcat jars, all ASL2 licensed.
+
+org.mortbay.jasper:apache-jsp
+  org.apache.tomcat:tomcat-jasper
+  org.apache.tomcat:tomcat-juli
+  org.apache.tomcat:tomcat-jsp-api
+  org.apache.tomcat:tomcat-el-api
+  org.apache.tomcat:tomcat-jasper-el
+  org.apache.tomcat:tomcat-api
+  org.apache.tomcat:tomcat-util-scan
+  org.apache.tomcat:tomcat-util
+
+org.mortbay.jasper:apache-el
+  org.apache.tomcat:tomcat-jasper-el
+  org.apache.tomcat:tomcat-el-api
+
+------
+Mortbay
+
+The following artifacts are CDDL + GPLv2 with classpath exception.
+
+https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
+
+org.eclipse.jetty.toolchain:jetty-schemas
+
+------
+Assorted
+
+The UnixCrypt.java code implements the one way cryptography used by
+Unix systems for simple password protection.  Copyright 1996 Aki Yoshida,
+modified April 2001  by Iris Van den Broeke, Daniel Deville.
+Permission to use, copy, modify and distribute UnixCrypt
+for non-commercial or commercial purposes and without fee is
+granted provided that the copyright notice appears in all copies.
+
+Pulsar Client Java
+Copyright 2017-2020 Apache Software Foundation
+
+Pulsar Client :: API
+Copyright 2017-2020 Apache Software Foundation
+
+Pulsar Common
+Copyright 2017-2020 Apache Software Foundation
+
+Apache BookKeeper :: Common :: Allocator
+Copyright 2011-2022 The Apache Software Foundation
+
+Apache BookKeeper :: CPU Affinity Library
+Copyright 2011-2022 The Apache Software Foundation
+
+Apache BookKeeper :: Circe Checksum Library
+Copyright 2011-2022 The Apache Software Foundation
+
+Apache Pulsar :: Bouncy Castle :: BC
+Copyright 2017-2020 Apache Software Foundation
+
+Apache Avro Protobuf Compatibility
+Copyright 2009-2020 The Apache Software Foundation
+
+Pulsar Client Admin Original
+Copyright 2017-2020 Apache Software Foundation
+
+Pulsar Client Admin :: API
+Copyright 2017-2020 Apache Software Foundation
+
+Apache Pulsar :: Package Management :: Core
+Copyright 2017-2020 Apache Software Foundation
 
 Apache Log4j Core
 Copyright 1999-2012 Apache Software Foundation

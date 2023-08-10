@@ -153,6 +153,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.ARRAYMAX, ArrayMaxTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAYMIN, ArrayMinTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAYSUM, ArraySumTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_VALUE_CONSTRUCTOR, ArrayLiteralTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
@@ -280,6 +281,13 @@ public class TransformFunctionFactory {
         String functionName = canonicalize(function.getFunctionName());
         List<ExpressionContext> arguments = function.getArguments();
         int numArguments = arguments.size();
+
+        // Check if the function is ArrayLiteraltransform function
+        if (functionName.equalsIgnoreCase(ArrayLiteralTransformFunction.FUNCTION_NAME)) {
+          return queryContext.getOrComputeSharedValue(ArrayLiteralTransformFunction.class,
+              expression.getFunction().getArguments(),
+              ArrayLiteralTransformFunction::new);
+        }
 
         TransformFunction transformFunction;
         Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);

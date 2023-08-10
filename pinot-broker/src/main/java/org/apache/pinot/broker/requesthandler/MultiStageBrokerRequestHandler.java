@@ -20,7 +20,6 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +34,7 @@ import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -66,7 +66,6 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -79,7 +78,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
   private final String _reducerHostname;
   private final int _reducerPort;
-  private final long _defaultBrokerTimeoutMs;
 
   private final MailboxService _mailboxService;
   private final OpChainSchedulerService _reducerScheduler;
@@ -106,8 +104,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     _reducerHostname = reducerHostname;
     // This config has to be set to a valid port number.
     _reducerPort = Integer.parseInt(config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT));
-    _defaultBrokerTimeoutMs = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
-        CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager(_reducerHostname, _reducerPort, routingManager), _tableCache);
@@ -124,41 +120,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
-      throws Exception {
-    long requestId = _brokerIdGenerator.get();
-    requestContext.setRequestId(requestId);
-    requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
-
-    // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
-    // check comes later.
-    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity);
-    if (!hasAccess) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      LOGGER.info("Access denied for requestId {}", requestId);
-      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
-    }
-
-    JsonNode sql = request.get(CommonConstants.Broker.Request.SQL);
-    if (sql == null) {
-      throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
-    }
-    String query = sql.asText();
-    requestContext.setQuery(query);
-    BrokerResponse brokerResponse = handleRequest(sqlNodeAndOptions, request, requesterIdentity, requestContext);
-
-    brokerResponse.setRequestId(String.valueOf(requestId));
-    brokerResponse.setBrokerId(_brokerId);
-    brokerResponse.setBrokerReduceTimeMs(requestContext.getReduceTimeMillis());
-    return brokerResponse;
-  }
-
-  private BrokerResponse handleRequest(@Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext) {
-    final String query = requestContext.getQuery();
-    final long requestId = requestContext.getRequestId();
+  protected BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
+      HttpHeaders httpHeaders) {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     long compilationStartTimeNs;
@@ -168,7 +132,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // Parse the request
       sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
-      queryTimeoutMs = timeoutMsFromQueryOption == null ? _defaultBrokerTimeoutMs : timeoutMsFromQueryOption;
+      queryTimeoutMs = timeoutMsFromQueryOption == null ? _brokerTimeoutMs : timeoutMsFromQueryOption;
       // Compile the request
       compilationStartTimeNs = System.nanoTime();
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
@@ -225,29 +189,28 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long executionStartTimeNs = System.nanoTime();
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, _mailboxService,
-          _reducerScheduler,
-          queryTimeoutMs, sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
+      queryResults =
+          _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, _mailboxService, _reducerScheduler,
+              queryTimeoutMs, sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
     } catch (Throwable t) {
       LOGGER.error("query execution failed", t);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, t));
     }
-
-    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     long executionEndTimeNs = System.nanoTime();
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - executionStartTimeNs);
 
-    // Set total query processing time
-    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
-        sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
-    brokerResponse.setTimeUsedMs(totalTimeMs);
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     brokerResponse.setResultTable(queryResults);
 
-    dispatchableSubPlan.getTableToUnavailableSegmentsMap().forEach(
-        (table, segmentList) -> brokerResponse.addToExceptions(
-            new QueryProcessingException(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE,
-                String.format("Some segments are unavailable for table %s, unavailable segments: [%s]", table,
-                    Arrays.toString(segmentList.toArray())))));
+    // Attach unavailable segments
+    int numUnavailableSegments = 0;
+    for (Map.Entry<String, Set<String>> entry : dispatchableSubPlan.getTableToUnavailableSegmentsMap().entrySet()) {
+      String tableName = entry.getKey();
+      Set<String> unavailableSegments = entry.getValue();
+      numUnavailableSegments += unavailableSegments.size();
+      brokerResponse.addToExceptions(new QueryProcessingException(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE,
+          String.format("Find unavailable segments: %s for table: %s", unavailableSegments, tableName)));
+    }
 
     for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
       if (entry.getKey() == 0) {
@@ -268,8 +231,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
     }
 
+    // Set total query processing time
+    // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
+        sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
+    brokerResponse.setTimeUsedMs(totalTimeMs);
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
+
+    // Log query and stats
+    _queryLogger.log(
+        new QueryLogger.QueryLogParams(requestId, query, requestContext, tableNames.toString(), numUnavailableSegments,
+            null, brokerResponse, totalTimeMs, requesterIdentity));
+
     return brokerResponse;
   }
 
