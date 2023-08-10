@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
  * {
  *   "timestamp": 1687786535928,
  *   "hostname": "host1",
+ *   "HOSTNAME": "host1",
  *   "level": "INFO",
  *   "message": "Started processing job1",
  *   "tags": {
@@ -109,31 +110,17 @@ import org.slf4j.LoggerFactory;
  * Notice that the transformer:
  * <ul>
  *   <li>Flattens nested fields which exist in the schema, like "tags.platform"</li>
- *   <li>Moves fields which don't exist in the schema into the "indexableExtras" field</li>
- *   <li>Moves fields which don't exist in the schema and have the suffix "_noIndex" into the "unindexableExtras"
- *   field</li>
+ *   <li>Drops some fields like "HOSTNAME", where "HOSTNAME" must be listed as a field in the config option
+ *   "fieldPathsToDrop".</li>
+ *   <li>Moves fields which don't exist in the schema and have the suffix "_noIndex" into the "unindexableExtras" field
+ *   (the field name is configurable)</li>
+ *   <li>Moves any remaining fields which don't exist in the schema into the "indexableExtras" field (the field name is
+ *   configurable)</li>
  * </ul>
  * <p>
  * The "unindexableExtras" field allows the transformer to separate fields which don't need indexing (because they are
  * only retrieved, not searched) from those that do. The transformer also has other configuration options specified in
  * {@link JsonLogTransformerConfig}.
- * <p>
- * One notable complication that this class handles is adding nested fields to the "extras" fields. E.g., consider
- * this record
- * <pre>
- * {
- *   a: {
- *     b: {
- *       c: 0,
- *       d: 1
- *     }
- *   }
- * }
- * </pre>
- * Assume "$.a.b.c" exists in the schema but "$.a.b.d" doesn't. This class processes the record recursively from the
- * root node to the children, so it would only know that "$.a.b.d" doesn't exist when it gets to "d". At this point we
- * need to add "d" and all of its parents to the indexableExtrasField. To do so efficiently, the class builds this
- * branch starting from the leaf and attaches it to parent nodes as we return from each recursive call.
  */
 public class JsonLogTransformer implements RecordTransformer {
   private static final Logger _logger = LoggerFactory.getLogger(JsonLogTransformer.class);
@@ -199,7 +186,13 @@ public class JsonLogTransformer implements RecordTransformer {
    * Validates the schema with a JsonLogTransformerConfig instance and creates a tree representing the fields in the
    * schema to be used when transforming input records. For instance, the field "a.b" in the schema would be
    * un-flattened into "{a: b: null}" in the tree, allowing us to more easily process records containing the latter.
-   * @throws IllegalArgumentException if schema validation fails
+   * @throws IllegalArgumentException if schema validation fails in one of two ways:
+   * <ul>
+   *   <li>One of the fields in the schema has a name which when interpreted as a JSON path, corresponds to an object
+   *   with an empty sub-key. E.g., the field name "a..b" corresponds to the JSON {"a": {"": {"b": ...}}}</li>
+   *   <li>Two fields in the schema have names which correspond to JSON paths where one is a child of the other. E.g.,
+   *   the field names "a.b" and "a.b.c" are considered invalid since "a.b.c" is a child of "a.b".</li>
+   * </ul>
    */
   private static Map<String, Object> validateSchemaAndCreateTree(@Nonnull Schema schema)
       throws IllegalArgumentException {
@@ -349,6 +342,23 @@ public class JsonLogTransformer implements RecordTransformer {
    * <p>
    * This method works recursively to build the output record. It is similar to {@code addIndexableField} except it
    * handles fields which exist in the schema.
+   * <p>
+   * One notable complication that this method (and {@code addIndexableField}) handles is adding nested fields (even
+   * ones more than two levels deep) to the "extras" fields. E.g., consider this record:
+   * <pre>
+   * {
+   *   a: {
+   *     b: {
+   *       c: 0,
+   *       d: 1
+   *     }
+   *   }
+   * }
+   * </pre>
+   * Assume "a.b.c" exists in the schema but "a.b.d" doesn't. This class processes the record recursively from the root
+   * node to the children, so it would only know that "a.b.d" doesn't exist when it gets to "d". At this point we need
+   * to add "d" and all of its parents to the indexableExtrasField. To do so efficiently, the class builds this branch
+   * starting from the leaf and attaches it to parent nodes as we return from each recursive call.
    * @param schemaNode The current node in the schema tree
    * @param keyJsonPath The JSON path (without the "$." prefix) of the current field
    * @param key
