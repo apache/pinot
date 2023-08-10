@@ -51,10 +51,6 @@ public class OrderByExpressionContext {
     return _isAsc;
   }
 
-  public boolean isDesc() {
-    return !_isAsc;
-  }
-
   public boolean isNullsLast() {
     // By default, null values sort as if larger than any non-null value; that is, NULLS FIRST is the default for DESC
     // order, and NULLS LAST otherwise.
