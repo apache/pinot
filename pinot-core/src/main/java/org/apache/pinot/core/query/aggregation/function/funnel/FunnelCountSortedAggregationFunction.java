@@ -49,18 +49,17 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
  */
 public class FunnelCountSortedAggregationFunction<A> extends FunnelCountAggregationFunction<A, List<Long>> {
   private final ExpressionContext _primaryCorrelationCol;
-  private final AggregationStrategy _sortedAggregationStrategy;
-  private final ResultExtractionStrategy<A, List<Long>> _sortedResultExtractionStrategy;
+  private final AggregationStrategy<SortedAggregationResult> _sortedAggregationStrategy;
+  private final ResultExtractionStrategy<SortedAggregationResult, List<Long>> _sortedResultExtractionStrategy;
 
   public FunnelCountSortedAggregationFunction(List<ExpressionContext> expressions,
       List<ExpressionContext> stepExpressions, List<ExpressionContext> correlateByExpressions,
       AggregationStrategy<A> aggregationStrategy, ResultExtractionStrategy<A, List<Long>> resultExtractionStrategy,
-      MergeStrategy<List<Long>> mergeStrategy, AggregationStrategy sortedAggregationStrategy,
-      ResultExtractionStrategy sortedResultExtractionStrategy) {
+      MergeStrategy<List<Long>> mergeStrategy) {
     super(expressions, stepExpressions, correlateByExpressions, aggregationStrategy, resultExtractionStrategy,
         mergeStrategy);
-    _sortedAggregationStrategy = sortedAggregationStrategy;
-    _sortedResultExtractionStrategy = sortedResultExtractionStrategy;
+    _sortedAggregationStrategy = new SortedAggregationStrategy(stepExpressions, correlateByExpressions);
+    _sortedResultExtractionStrategy = SortedAggregationResult::extractResult;;
     _primaryCorrelationCol = correlateByExpressions.get(0);
   }
 

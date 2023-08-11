@@ -65,22 +65,6 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
   final boolean _thetaSketchSetting;
   final boolean _setSetting;
 
-  final AggregationStrategy<UpdateSketch[]> _thetaSketchAggregationStrategy;
-  final AggregationStrategy<DictIdsWrapper> _bitmapAggregationStrategy;
-  final AggregationStrategy<SortedAggregationResult> _sortedAggregationStrategy;
-
-  final MergeStrategy<List<Sketch>> _thetaSketchMergeStrategy;
-  final MergeStrategy<List<Set>> _setMergeStrategy;
-  final MergeStrategy<List<RoaringBitmap>> _bitmapMergeStrategy;
-  final MergeStrategy<List<Long>> _partitionedMergeStrategy;
-
-  final ResultExtractionStrategy<UpdateSketch[], List<Sketch>> _thetaSketchResultExtractionStrategy;
-  final ResultExtractionStrategy<DictIdsWrapper, List<Set>> _setResultExtractionStrategy;
-  final ResultExtractionStrategy<DictIdsWrapper, List<RoaringBitmap>> _bitmapResultExtractionStrategy;
-  final ResultExtractionStrategy<SortedAggregationResult, List<Long>> _sortedPartitionedResultExtractionStrategy;
-  final ResultExtractionStrategy<DictIdsWrapper, List<Long>> _bitmapPartitionedResultExtractionStrategy;
-  final ResultExtractionStrategy<UpdateSketch[], List<Long>> _thetaSketchPartitionedResultExtractionStrategy;
-
   public FunnelCountAggregationFunctionFactory(List<ExpressionContext> expressions) {
     _expressions = expressions;
     Option.validate(expressions);
@@ -96,69 +80,94 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
     _sortingSetting = Setting.SORTED.isSet(settings);
     _thetaSketchSetting = Setting.THETA_SKETCH.isSet(settings);
     _nominalEntries = Setting.NOMINAL_ENTRIES.getInteger(settings).orElse(ThetaUtil.DEFAULT_NOMINAL_ENTRIES);
-
-    _thetaSketchAggregationStrategy = new ThetaSketchAggregationStrategy(_stepExpressions, _correlateByExpressions,
-        _nominalEntries);
-    _bitmapAggregationStrategy = new BitmapAggregationStrategy(_stepExpressions, _correlateByExpressions);
-    _sortedAggregationStrategy = new SortedAggregationStrategy(_stepExpressions, _correlateByExpressions);
-
-    _setMergeStrategy = new SetMergeStrategy(_numSteps);
-    _thetaSketchMergeStrategy = new ThetaSketchMergeStrategy(_numSteps, _nominalEntries);
-    _bitmapMergeStrategy = new BitmapMergeStrategy(_numSteps);
-    _partitionedMergeStrategy = new PartitionedMergeStrategy(_numSteps);
-
-    _thetaSketchResultExtractionStrategy = new ThetaSketchResultExtractionStrategy(_numSteps);
-    _setResultExtractionStrategy = new SetResultExtractionStrategy(_numSteps);
-    _bitmapResultExtractionStrategy = new BitmapResultExtractionStrategy(_numSteps);
-    _sortedPartitionedResultExtractionStrategy = SortedAggregationResult::extractResult;
-    _bitmapPartitionedResultExtractionStrategy =
-        dictIdsWrapper -> _bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps));
-    _thetaSketchPartitionedResultExtractionStrategy =
-        sketches -> _thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches));
   }
 
   public AggregationFunction get() {
     if (_partitionSetting) {
       if (_thetaSketchSetting) {
-        if (_sortingSetting) {
-          // theta_sketch && partitioned && sorted
-          return new FunnelCountSortedAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-              _thetaSketchAggregationStrategy, _thetaSketchPartitionedResultExtractionStrategy,
-              _partitionedMergeStrategy, _sortedAggregationStrategy, _sortedPartitionedResultExtractionStrategy);
-        } else {
-          // theta_sketch && partitioned && !sorted
-          return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-              _thetaSketchAggregationStrategy, _thetaSketchPartitionedResultExtractionStrategy,
-              _partitionedMergeStrategy);
-        }
+        // theta_sketch && partitioned
+        return createPartionedFunnelCountAggregationFunction(
+            thetaSketchAggregationStrategy(), thetaSketchPartitionedResultExtractionStrategy(),
+            partitionedMergeStrategy());
       } else {
-        if (_sortingSetting) {
-          // partitioned && sorted && !tetha_sketch
-          return new FunnelCountSortedAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-              _bitmapAggregationStrategy, _bitmapPartitionedResultExtractionStrategy, _partitionedMergeStrategy,
-              _sortedAggregationStrategy, _sortedPartitionedResultExtractionStrategy);
-        } else {
-          // partitioned && !sorted && !tetha_sketch
-          return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-              _bitmapAggregationStrategy, _bitmapPartitionedResultExtractionStrategy, _partitionedMergeStrategy);
-        }
+        // partitioned && !theta_sketch
+        return createPartionedFunnelCountAggregationFunction(
+            bitmapAggregationStrategy(), bitmapPartitionedResultExtractionStrategy(), partitionedMergeStrategy());
       }
     } else {
       if (_thetaSketchSetting) {
-        // theta_sketch && !partitioned && !sorted
-        return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-            _thetaSketchAggregationStrategy, _thetaSketchResultExtractionStrategy, _thetaSketchMergeStrategy);
+        // theta_sketch && !partitioned
+        return createFunnelCountAggregationFunction(
+            thetaSketchAggregationStrategy(), thetaSketchResultExtractionStrategy(), thetaSketchMergeStrategy());
       } else if (_setSetting) {
-        // set && !partitioned && !sorted && !theta_sketch
-        return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-            _bitmapAggregationStrategy, _setResultExtractionStrategy, _setMergeStrategy);
+        // set && !partitioned && !theta_sketch
+        return createFunnelCountAggregationFunction(
+            bitmapAggregationStrategy(), setResultExtractionStrategy(), setMergeStrategy());
       } else {
         // default (bitmap)
-        // !partitioned && !sorted && !theta_sketch && !set
-        return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
-            _bitmapAggregationStrategy, _bitmapResultExtractionStrategy, _bitmapMergeStrategy);
+        // !partitioned && !theta_sketch && !set
+        return createFunnelCountAggregationFunction(
+            bitmapAggregationStrategy(), bitmapResultExtractionStrategy(), bitmapMergeStrategy());
       }
     }
+  }
+
+  private <A,I> FunnelCountAggregationFunction<A,I> createFunnelCountAggregationFunction(
+      AggregationStrategy<A> aggregationStrategy,
+      ResultExtractionStrategy<A, I> resultExtractionStrategy,
+      MergeStrategy<I> mergeStrategy) {
+    return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
+        aggregationStrategy, resultExtractionStrategy, mergeStrategy);
+  }
+  private <A> FunnelCountAggregationFunction<A,List<Long>> createPartionedFunnelCountAggregationFunction(
+      AggregationStrategy<A> aggregationStrategy,
+      ResultExtractionStrategy<A, List<Long>> resultExtractionStrategy,
+      MergeStrategy<List<Long>> mergeStrategy) {
+    if (_sortingSetting) {
+      return new FunnelCountSortedAggregationFunction<>(
+          _expressions, _stepExpressions, _correlateByExpressions,
+          aggregationStrategy, resultExtractionStrategy, mergeStrategy);
+    } else {
+      return new FunnelCountAggregationFunction<>(
+          _expressions, _stepExpressions, _correlateByExpressions,
+          aggregationStrategy, resultExtractionStrategy, mergeStrategy);
+    }
+  }
+
+  AggregationStrategy<UpdateSketch[]> thetaSketchAggregationStrategy() {
+    return new ThetaSketchAggregationStrategy(_stepExpressions, _correlateByExpressions, _nominalEntries);
+  }
+  AggregationStrategy<DictIdsWrapper> bitmapAggregationStrategy() {
+    return new BitmapAggregationStrategy(_stepExpressions, _correlateByExpressions);
+  }
+  MergeStrategy<List<Sketch>> thetaSketchMergeStrategy() {
+    return new ThetaSketchMergeStrategy(_numSteps, _nominalEntries);
+  }
+  MergeStrategy<List<Set>> setMergeStrategy() {
+    return new SetMergeStrategy(_numSteps);
+  }
+  MergeStrategy<List<RoaringBitmap>> bitmapMergeStrategy() {
+    return new BitmapMergeStrategy(_numSteps);
+  }
+  MergeStrategy<List<Long>> partitionedMergeStrategy() {
+    return new PartitionedMergeStrategy(_numSteps);
+  }
+  ResultExtractionStrategy<UpdateSketch[], List<Sketch>> thetaSketchResultExtractionStrategy() {
+    return new ThetaSketchResultExtractionStrategy(_numSteps);
+  }
+  ResultExtractionStrategy<DictIdsWrapper, List<Set>> setResultExtractionStrategy() {
+    return new SetResultExtractionStrategy(_numSteps);
+  }
+  ResultExtractionStrategy<DictIdsWrapper, List<RoaringBitmap>> bitmapResultExtractionStrategy() {
+    return new BitmapResultExtractionStrategy(_numSteps);
+  }
+  ResultExtractionStrategy<DictIdsWrapper, List<Long>> bitmapPartitionedResultExtractionStrategy() {
+    final MergeStrategy<List<RoaringBitmap>> bitmapMergeStrategy = bitmapMergeStrategy();
+    return dictIdsWrapper -> bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps));
+  }
+  ResultExtractionStrategy<UpdateSketch[], List<Long>> thetaSketchPartitionedResultExtractionStrategy() {
+    final MergeStrategy<List<Sketch>> thetaSketchMergeStrategy = thetaSketchMergeStrategy();
+    return sketches -> thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches));
   }
 
   enum Option {
