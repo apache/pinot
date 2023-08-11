@@ -35,7 +35,7 @@ public class KafkaConsumerFactory extends StreamConsumerFactory {
   @Override
   public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
       String groupId) {
-    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, fieldsToRead, groupId);
+    throw new UnsupportedOperationException("Apache pinot no longer support stream level consumer");
   }
 
   @Override

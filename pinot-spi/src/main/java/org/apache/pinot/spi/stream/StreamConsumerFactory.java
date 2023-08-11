@@ -51,6 +51,7 @@ public abstract class StreamConsumerFactory {
    * @param groupId consumer group Id
    * @return the stream level consumer
    */
+  @Deprecated
   public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName,
       Set<String> fieldsToRead, String groupId);
 
