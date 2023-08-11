@@ -1405,7 +1405,6 @@
           <artifactId>maven-surefire-plugin</artifactId>
           <version>3.0.0-M5</version>
           <configuration>
-            <!-- Do not set argLine here, it will break the code coverage plugin. Set it in the properties section. -->
             <forkCount>1</forkCount>
             <reuseForks>false</reuseForks>
             <!-- 60 minutes -->
@@ -1417,7 +1416,7 @@
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
             <argLine>
-              ${argLine}
+              @{argLine}
               --add-opens=java.base/java.nio=ALL-UNNAMED
               --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
               --add-opens=java.base/java.lang=ALL-UNNAMED
