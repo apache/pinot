@@ -1154,4 +1154,43 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
     assertArrayEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}});
   }
+
+  @Test
+  public void testScalarFunctionStringNullLiteral()
+      throws Exception {
+    initializeRows();
+    insertRow("abc");
+    insertRow(null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT STARTSWITH(%s, NULL) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 2 * NUM_OF_SEGMENT_COPIES);
+    for (int i = 0; i < 2 * NUM_OF_SEGMENT_COPIES; i++) {
+      assertArrayEquals(rows.get(i), new Object[]{null});
+    }
+  }
+
+  @Test
+  public void testScalarFunctionIntNullLiteral()
+      throws Exception {
+    initializeRows();
+    insertRow(1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT between(%s, NULL, 2) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{null});
+  }
 }
