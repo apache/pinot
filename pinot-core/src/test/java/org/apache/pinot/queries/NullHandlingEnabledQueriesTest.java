@@ -115,6 +115,32 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testGroupByOrderByNullsLastUsingOrdinal()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(null);
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    insertRow(2);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, COUNT(*) FROM testTable GROUP BY %s ORDER BY 1 DESC NULLS LAST", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 3);
+    assertArrayEquals(rows.get(0), new Object[]{2, (long) 2 * NUM_OF_SEGMENT_COPIES});
+    assertArrayEquals(rows.get(1), new Object[]{1, (long) NUM_OF_SEGMENT_COPIES});
+    assertArrayEquals(rows.get(2), new Object[]{null, (long) 3 * NUM_OF_SEGMENT_COPIES});
+  }
+
+  @Test
   public void testHavingFilterIsNull()
       throws Exception {
     initializeRows();

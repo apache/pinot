@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
@@ -973,5 +974,24 @@ public class CalciteSqlParser {
       expression = expression.getFunctionCall().getOperands().get(0);
     }
     return expression;
+  }
+
+  @Nullable
+  public static Boolean isNullsLast(Expression expression) {
+    String operator = expression.getFunctionCall().getOperator();
+    if (operator.equals(CalciteSqlParser.NULLS_LAST)) {
+      return true;
+    } else if (operator.equals(CalciteSqlParser.NULLS_FIRST)) {
+      return false;
+    } else {
+      return null;
+    }
+  }
+
+  public static boolean isAsc(Expression expression, Boolean isNullsLast) {
+    if (isNullsLast != null) {
+      expression = expression.getFunctionCall().getOperands().get(0);
+    }
+    return expression.getFunctionCall().getOperator().equals(CalciteSqlParser.ASC);
   }
 }
