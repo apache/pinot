@@ -29,13 +29,13 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.core.query.aggregation.utils.argminmax.ArgMinMaxMeasuringValSetWrapper;
-import org.apache.pinot.core.query.aggregation.utils.argminmax.ArgMinMaxObject;
-import org.apache.pinot.core.query.aggregation.utils.argminmax.ArgMinMaxProjectionValSetWrapper;
+import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxMeasuringValSetWrapper;
+import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
+import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxProjectionValSetWrapper;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunction<ArgMinMaxObject, ArgMinMaxObject> {
+public class ParentExprMinMaxAggregationFunction extends ParentAggregationFunction<ExprMinMaxObject, ExprMinMaxObject> {
 
   // list of columns that we do min/max on
   private final List<ExpressionContext> _measuringColumns;
@@ -55,9 +55,9 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
   // The following variable need to be initialized
 
   // The wrapper classes for the block value sets
-  private final ThreadLocal<List<ArgMinMaxMeasuringValSetWrapper>> _argMinMaxWrapperMeasuringColumnSets =
+  private final ThreadLocal<List<ExprMinMaxMeasuringValSetWrapper>> _exprMinMaxWrapperMeasuringColumnSets =
       ThreadLocal.withInitial(ArrayList::new);
-  private final ThreadLocal<List<ArgMinMaxProjectionValSetWrapper>> _argMinMaxWrapperProjectionColumnSets =
+  private final ThreadLocal<List<ExprMinMaxProjectionValSetWrapper>> _exprMinMaxWrapperProjectionColumnSets =
       ThreadLocal.withInitial(ArrayList::new);
   // The schema for the measuring columns and projection columns
   private final ThreadLocal<DataSchema> _measuringColumnSchema = new ThreadLocal<>();
@@ -65,7 +65,7 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
   // If the schemas are initialized
   private final ThreadLocal<Boolean> _schemaInitialized = ThreadLocal.withInitial(() -> false);
 
-  public ParentArgMinMaxAggregationFunction(List<ExpressionContext> arguments, boolean isMax) {
+  public ParentExprMinMaxAggregationFunction(List<ExpressionContext> arguments, boolean isMax) {
 
     super(arguments);
     _isMax = isMax;
@@ -81,7 +81,7 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
 
   @Override
   public AggregationFunctionType getType() {
-    return _isMax ? AggregationFunctionType.ARGMAX : AggregationFunctionType.ARGMIN;
+    return _isMax ? AggregationFunctionType.EXPRMAX : AggregationFunctionType.EXPRMIN;
   }
 
   @Override
@@ -109,16 +109,16 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
 
-    ArgMinMaxObject argMinMaxObject = aggregationResultHolder.getResult();
+    ExprMinMaxObject exprMinMaxObject = aggregationResultHolder.getResult();
 
-    if (argMinMaxObject == null) {
+    if (exprMinMaxObject == null) {
       initializeWithNewDataBlocks(blockValSetMap);
-      argMinMaxObject = new ArgMinMaxObject(_measuringColumnSchema.get(), _projectionColumnSchema.get());
+      exprMinMaxObject = new ExprMinMaxObject(_measuringColumnSchema.get(), _projectionColumnSchema.get());
     }
 
     List<Integer> rowIds = new ArrayList<>();
     for (int i = 0; i < length; i++) {
-      int compareResult = argMinMaxObject.compareAndSetKey(_argMinMaxWrapperMeasuringColumnSets.get(), i, _isMax);
+      int compareResult = exprMinMaxObject.compareAndSetKey(_exprMinMaxWrapperMeasuringColumnSets.get(), i, _isMax);
       if (compareResult == 0) {
         // same key, add the rowId to the list
         rowIds.add(i);
@@ -131,10 +131,10 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
 
     // for all the rows that are associated with the extremum key, add the projection columns
     for (Integer rowId : rowIds) {
-      argMinMaxObject.addVal(_argMinMaxWrapperProjectionColumnSets.get(), rowId);
+      exprMinMaxObject.addVal(_exprMinMaxWrapperProjectionColumnSets.get(), rowId);
     }
 
-    aggregationResultHolder.setValue(argMinMaxObject);
+    aggregationResultHolder.setValue(exprMinMaxObject);
   }
 
   // this method is called to initialize the schemas if they are not initialized
@@ -148,10 +148,10 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
     // if the schema is already initialized, just update with the new block value sets
     if (_schemaInitialized.get()) {
       for (int i = 0; i < _numMeasuringColumns; i++) {
-        _argMinMaxWrapperMeasuringColumnSets.get().get(i).setNewBlock(blockValSetMap.get(_measuringColumns.get(i)));
+        _exprMinMaxWrapperMeasuringColumnSets.get().get(i).setNewBlock(blockValSetMap.get(_measuringColumns.get(i)));
       }
       for (int i = 0; i < _numProjectionColumns; i++) {
-        _argMinMaxWrapperProjectionColumnSets.get().get(i).setNewBlock(blockValSetMap.get(_projectionColumns.get(i)));
+        _exprMinMaxWrapperProjectionColumnSets.get().get(i).setNewBlock(blockValSetMap.get(_projectionColumns.get(i)));
       }
       return;
     }
@@ -164,8 +164,8 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
   }
 
   private void initializeProjectionColumnValSet(Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    List<ArgMinMaxProjectionValSetWrapper> argMinMaxWrapperProjectionColumnSets =
-        _argMinMaxWrapperProjectionColumnSets.get();
+    List<ExprMinMaxProjectionValSetWrapper> exprMinMaxWrapperProjectionColumnSets =
+        _exprMinMaxWrapperProjectionColumnSets.get();
     String[] projectionColNames = new String[_projectionColumns.size()];
     DataSchema.ColumnDataType[] projectionColTypes = new DataSchema.ColumnDataType[_projectionColumns.size()];
     for (int i = 0; i < _projectionColumns.size(); i++) {
@@ -175,53 +175,53 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
       if (blockValSet.isSingleValue()) {
         switch (blockValSet.getValueType()) {
           case INT:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.INT, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.INT, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.INT;
             break;
           case BOOLEAN:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.BOOLEAN, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.BOOLEAN, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.INT;
             break;
           case LONG:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.LONG, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.LONG, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.LONG;
             break;
           case TIMESTAMP:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.TIMESTAMP, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.TIMESTAMP, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.LONG;
             break;
           case FLOAT:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.FLOAT, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.FLOAT, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.FLOAT;
             break;
           case DOUBLE:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.DOUBLE, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.DOUBLE, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.DOUBLE;
             break;
           case STRING:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.STRING, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.STRING, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.STRING;
             break;
           case JSON:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.JSON, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.JSON, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.STRING;
             break;
           case BYTES:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.BYTES, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.BYTES, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.BYTES;
             break;
           case BIG_DECIMAL:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.BIG_DECIMAL, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.BIG_DECIMAL, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.BIG_DECIMAL;
             break;
           default:
@@ -231,43 +231,43 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
       } else {
         switch (blockValSet.getValueType()) {
           case INT:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.INT_ARRAY, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.INT_ARRAY, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.INT_ARRAY;
             break;
           case BOOLEAN:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.BOOLEAN_ARRAY, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.BOOLEAN_ARRAY, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.INT_ARRAY;
             break;
           case LONG:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.LONG_ARRAY, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.LONG_ARRAY, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.LONG_ARRAY;
             break;
           case TIMESTAMP:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.TIMESTAMP_ARRAY, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.TIMESTAMP_ARRAY, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.LONG_ARRAY;
             break;
           case FLOAT:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.FLOAT_ARRAY, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.FLOAT_ARRAY, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.FLOAT_ARRAY;
             break;
           case DOUBLE:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.DOUBLE_ARRAY, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.DOUBLE_ARRAY, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.DOUBLE_ARRAY;
             break;
           case STRING:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.STRING_ARRAY, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.STRING_ARRAY, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.STRING_ARRAY;
             break;
           case BYTES:
-            argMinMaxWrapperProjectionColumnSets.add(
-                new ArgMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.BYTES_ARRAY, blockValSet));
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.BYTES_ARRAY, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.BYTES_ARRAY;
             break;
           default:
@@ -281,55 +281,55 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
   }
 
   private void initializeMeasuringColumnValSet(Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    List<ArgMinMaxMeasuringValSetWrapper> argMinMaxWrapperMeasuringColumnSets =
-        _argMinMaxWrapperMeasuringColumnSets.get();
+    List<ExprMinMaxMeasuringValSetWrapper> exprMinMaxWrapperMeasuringColumnSets =
+        _exprMinMaxWrapperMeasuringColumnSets.get();
     String[] measuringColNames = new String[_numMeasuringColumns];
     DataSchema.ColumnDataType[] measuringColTypes = new DataSchema.ColumnDataType[_numMeasuringColumns];
     for (int i = 0; i < _numMeasuringColumns; i++) {
       measuringColNames[i] = _measuringColumns.get(i).toString();
       ExpressionContext measuringColumn = _measuringColumns.get(i);
       BlockValSet blockValSet = blockValSetMap.get(measuringColumn);
-      Preconditions.checkState(blockValSet.isSingleValue(), "ArgMinMax only supports single-valued"
+      Preconditions.checkState(blockValSet.isSingleValue(), "ExprMinMax only supports single-valued"
           + " measuring columns");
       switch (blockValSet.getValueType()) {
         case INT:
-          argMinMaxWrapperMeasuringColumnSets.add(
-              new ArgMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.INT, blockValSet));
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.INT, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.INT;
           break;
         case BOOLEAN:
-          argMinMaxWrapperMeasuringColumnSets.add(
-              new ArgMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.BOOLEAN, blockValSet));
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.BOOLEAN, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.INT;
           break;
         case LONG:
-          argMinMaxWrapperMeasuringColumnSets.add(
-              new ArgMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.LONG, blockValSet));
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.LONG, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.LONG;
           break;
         case TIMESTAMP:
-          argMinMaxWrapperMeasuringColumnSets.add(
-              new ArgMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.TIMESTAMP, blockValSet));
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.TIMESTAMP, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.LONG;
           break;
         case FLOAT:
-          argMinMaxWrapperMeasuringColumnSets.add(
-              new ArgMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.FLOAT, blockValSet));
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.FLOAT, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.FLOAT;
           break;
         case DOUBLE:
-          argMinMaxWrapperMeasuringColumnSets.add(
-              new ArgMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.DOUBLE, blockValSet));
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.DOUBLE, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.DOUBLE;
           break;
         case STRING:
-          argMinMaxWrapperMeasuringColumnSets.add(
-              new ArgMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.STRING, blockValSet));
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.STRING, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.STRING;
           break;
         case BIG_DECIMAL:
-          argMinMaxWrapperMeasuringColumnSets.add(
-              new ArgMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.BIG_DECIMAL, blockValSet));
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.BIG_DECIMAL, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.BIG_DECIMAL;
           break;
         default:
@@ -375,16 +375,16 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
   }
 
   private void updateGroupByResult(GroupByResultHolder groupByResultHolder, int i, int groupKey) {
-    ArgMinMaxObject argMinMaxObject = groupByResultHolder.getResult(groupKey);
-    if (argMinMaxObject == null) {
-      argMinMaxObject = new ArgMinMaxObject(_measuringColumnSchema.get(), _projectionColumnSchema.get());
-      groupByResultHolder.setValueForKey(groupKey, argMinMaxObject);
+    ExprMinMaxObject exprMinMaxObject = groupByResultHolder.getResult(groupKey);
+    if (exprMinMaxObject == null) {
+      exprMinMaxObject = new ExprMinMaxObject(_measuringColumnSchema.get(), _projectionColumnSchema.get());
+      groupByResultHolder.setValueForKey(groupKey, exprMinMaxObject);
     }
-    int compareResult = argMinMaxObject.compareAndSetKey(_argMinMaxWrapperMeasuringColumnSets.get(), i, _isMax);
+    int compareResult = exprMinMaxObject.compareAndSetKey(_exprMinMaxWrapperMeasuringColumnSets.get(), i, _isMax);
     if (compareResult == 0) {
-      argMinMaxObject.addVal(_argMinMaxWrapperProjectionColumnSets.get(), i);
+      exprMinMaxObject.addVal(_exprMinMaxWrapperProjectionColumnSets.get(), i);
     } else if (compareResult > 0) {
-      argMinMaxObject.setToNewVal(_argMinMaxWrapperProjectionColumnSets.get(), i);
+      exprMinMaxObject.setToNewVal(_exprMinMaxWrapperProjectionColumnSets.get(), i);
     }
   }
 
@@ -400,23 +400,23 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
   }
 
   @Override
-  public ArgMinMaxObject extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    ArgMinMaxObject argMinMaxObject = aggregationResultHolder.getResult();
-    if (argMinMaxObject == null) {
+  public ExprMinMaxObject extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+    ExprMinMaxObject exprMinMaxObject = aggregationResultHolder.getResult();
+    if (exprMinMaxObject == null) {
       initializeWithNewDataBlocks(null);
-      return new ArgMinMaxObject(_measuringColumnSchema.get(), _projectionColumnSchema.get());
+      return new ExprMinMaxObject(_measuringColumnSchema.get(), _projectionColumnSchema.get());
     } else {
-      return argMinMaxObject;
+      return exprMinMaxObject;
     }
   }
 
   @Override
-  public ArgMinMaxObject extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public ExprMinMaxObject extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public ArgMinMaxObject merge(ArgMinMaxObject intermediateResult1, ArgMinMaxObject intermediateResult2) {
+  public ExprMinMaxObject merge(ExprMinMaxObject intermediateResult1, ExprMinMaxObject intermediateResult2) {
     return intermediateResult1.merge(intermediateResult2, _isMax);
   }
 
@@ -426,7 +426,7 @@ public class ParentArgMinMaxAggregationFunction extends ParentAggregationFunctio
   }
 
   @Override
-  public ArgMinMaxObject extractFinalResult(ArgMinMaxObject argMinMaxObject) {
-    return argMinMaxObject;
+  public ExprMinMaxObject extractFinalResult(ExprMinMaxObject exprMinMaxObject) {
+    return exprMinMaxObject;
   }
 }

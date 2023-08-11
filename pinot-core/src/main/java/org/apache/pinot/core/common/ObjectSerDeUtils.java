@@ -63,7 +63,7 @@ import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
-import org.apache.pinot.core.query.aggregation.utils.argminmax.ArgMinMaxObject;
+import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
@@ -224,7 +224,7 @@ public class ObjectSerDeUtils {
         return ObjectType.PinotFourthMoment;
       } else if (value instanceof org.apache.datasketches.tuple.Sketch) {
         return ObjectType.IntegerTupleSketch;
-      } else if (value instanceof ArgMinMaxObject) {
+      } else if (value instanceof ExprMinMaxObject) {
         return ObjectType.ArgMinMaxObject;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
@@ -1254,11 +1254,11 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<ArgMinMaxObject> ARG_MIN_MAX_OBJECT_SER_DE =
-      new ObjectSerDe<ArgMinMaxObject>() {
+  public static final ObjectSerDe<ExprMinMaxObject> ARG_MIN_MAX_OBJECT_SER_DE =
+      new ObjectSerDe<ExprMinMaxObject>() {
 
         @Override
-        public byte[] serialize(ArgMinMaxObject value) {
+        public byte[] serialize(ExprMinMaxObject value) {
           try {
             return value.toBytes();
           } catch (IOException e) {
@@ -1267,18 +1267,18 @@ public class ObjectSerDeUtils {
         }
 
         @Override
-        public ArgMinMaxObject deserialize(byte[] bytes) {
+        public ExprMinMaxObject deserialize(byte[] bytes) {
           try {
-            return ArgMinMaxObject.fromBytes(bytes);
+            return ExprMinMaxObject.fromBytes(bytes);
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
         }
 
         @Override
-        public ArgMinMaxObject deserialize(ByteBuffer byteBuffer) {
+        public ExprMinMaxObject deserialize(ByteBuffer byteBuffer) {
           try {
-            return ArgMinMaxObject.fromByteBuffer(byteBuffer);
+            return ExprMinMaxObject.fromByteBuffer(byteBuffer);
           } catch (IOException e) {
             throw new RuntimeException(e);
           }

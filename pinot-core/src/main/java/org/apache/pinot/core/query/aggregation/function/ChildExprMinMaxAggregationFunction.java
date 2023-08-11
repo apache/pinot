@@ -23,17 +23,17 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class ChildArgMinMaxAggregationFunction extends ChildAggregationFunction {
+public class ChildExprMinMaxAggregationFunction extends ChildAggregationFunction {
 
   private final boolean _isMax;
 
-  public ChildArgMinMaxAggregationFunction(List<ExpressionContext> operands, boolean isMax) {
+  public ChildExprMinMaxAggregationFunction(List<ExpressionContext> operands, boolean isMax) {
     super(operands);
     _isMax = isMax;
   }
 
   @Override
   public AggregationFunctionType getType() {
-    return _isMax ? AggregationFunctionType.ARGMAX : AggregationFunctionType.ARGMIN;
+    return _isMax ? AggregationFunctionType.EXPRMAX : AggregationFunctionType.EXPRMIN;
   }
 }
