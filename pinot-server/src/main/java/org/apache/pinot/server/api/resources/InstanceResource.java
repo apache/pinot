@@ -77,7 +77,8 @@ public class InstanceResource {
   }
 
   /**
-   * Retrieve instance pools in the Helix InstanceConfig: https://docs.pinot.apache.org/operators/operating-pinot/instance-assignment#pool-based-instance-assignment.
+   * Retrieve instance pools in the Helix InstanceConfig:
+   * https://docs.pinot.apache.org/operators/operating-pinot/instance-assignment#pool-based-instance-assignment.
    * Returns an empty Map if poolBased config is not enabled or the instance is not assigned to any pool.
    */
   @GET
