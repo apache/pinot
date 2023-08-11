@@ -29,6 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.mockito.MockedConstruction;
+import org.mockito.internal.util.collections.Sets;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -84,6 +85,7 @@ public class PartialUpsertHandlerTest {
               Collections.singletonList("hoursSinceEpoch")));
 
       ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
+      when(segment.getColumnNames()).thenReturn(Sets.newSet("field1", "field2", "hoursSinceEpoch"));
 
       GenericRow row = new GenericRow();
       if (isNewNull) {

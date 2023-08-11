@@ -30,9 +30,6 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 /**
  * Handler for partial-upsert.
@@ -43,7 +40,6 @@ public class PartialUpsertHandler {
   private final PartialUpsertMerger _defaultPartialUpsertMerger;
   private final List<String> _comparisonColumns;
   private final List<String> _primaryKeyColumns;
-  private final Logger _logger;
 
   public PartialUpsertHandler(Schema schema, Map<String, UpsertConfig.Strategy> partialUpsertStrategies,
       UpsertConfig.Strategy defaultPartialUpsertStrategy, List<String> comparisonColumns) {
@@ -54,11 +50,6 @@ public class PartialUpsertHandler {
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
     }
-    _logger = LoggerFactory.getLogger(schema.getSchemaName() + "-" + getClass().getSimpleName());
-  }
-
-  protected PartialUpsertMerger getMergerForColumn(String column) {
-    return _column2Mergers.getOrDefault(column, _defaultPartialUpsertMerger);
   }
 
   /**
@@ -77,13 +68,14 @@ public class PartialUpsertHandler {
    * @param newRecord the new consumed record.
    */
   public void merge(IndexSegment indexSegment, int docId, GenericRow newRecord) {
-    for (String column: newRecord.getFieldToValueMap().keySet()) {
+    for (String column: indexSegment.getColumnNames()) {
       if (!_primaryKeyColumns.contains(column)) {
+        PartialUpsertMerger merger = _column2Mergers.getOrDefault(column, _defaultPartialUpsertMerger);
         // Non-overwrite mergers
         // (1) If the value of the previous is null value, skip merging and use the new value
         // (2) Else If the value of new value is null, use the previous value (even for comparison columns).
         // (3) Else If the column is not a comparison column, we applied the merged value to it.
-        if (!(getMergerForColumn(column) instanceof OverwriteMerger)) {
+        if (!(merger instanceof OverwriteMerger)) {
           PinotSegmentColumnReader pinotSegmentColumnReader = new PinotSegmentColumnReader(indexSegment, column);
           if (!pinotSegmentColumnReader.isNull(docId)) {
             Object previousValue = pinotSegmentColumnReader.getValue(docId);
@@ -94,7 +86,6 @@ public class PartialUpsertHandler {
               // value from the new record.
               newRecord.putValue(column, previousValue);
             } else if (!_comparisonColumns.contains(column)) {
-              PartialUpsertMerger merger = _column2Mergers.getOrDefault(column, _defaultPartialUpsertMerger);
               newRecord.putValue(column,
                   merger.merge(previousValue, newRecord.getValue(column)));
             }
@@ -102,7 +93,8 @@ public class PartialUpsertHandler {
           try {
             pinotSegmentColumnReader.close();
           } catch (IOException e) {
-            _logger.warn("Cannot close pinotSegmentColumnReader for column: {}", column, e);
+            throw new RuntimeException(
+                String.format("Caught exception while closing pinotSegmentColumnReader for column: %s", column), e);
           }
         } else {
           // Overwrite mergers.
@@ -118,7 +110,8 @@ public class PartialUpsertHandler {
             try {
               pinotSegmentColumnReader.close();
             } catch (IOException e) {
-              _logger.warn("Cannot close pinotSegmentColumnReader for column: {}", column, e);
+              throw new RuntimeException(
+                  String.format("Caught exception while closing pinotSegmentColumnReader for column: %s", column), e);
             }
           }
         }
