@@ -40,7 +40,7 @@ public class PulsarConsumerFactory extends StreamConsumerFactory {
   @Override
   public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
       String groupId) {
-    return new PulsarStreamLevelConsumer(clientId, tableName, _streamConfig, fieldsToRead, groupId);
+    throw new UnsupportedOperationException("Apache pinot no longer support high level consumer");
   }
 
   @Override
