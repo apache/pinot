@@ -20,10 +20,10 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -52,8 +52,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * </ul>
  */
 public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<FixedBitMVForwardIndexReader.Context>,
-                                                           ForwardIndexReader.DocIdRangeProvider
-                                                               <FixedBitMVForwardIndexReader.Context> {
+                                                           ForwardIndexReader.ValueRangeProvider<FixedBitMVForwardIndexReader.Context> {
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
   private final FixedByteValueReaderWriter _chunkOffsetReader;
@@ -224,8 +223,10 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
-  public List<ForwardIndexByteRange> getDocIdRange(int docId, Context context) {
-    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+  public List<ValueRange> getDocIdRange(int docId, Context context, @Nullable List<ValueRange> ranges) {
+    if (ranges == null) {
+      ranges = new ArrayList<>();
+    }
     int contextDocId = context._docId;
     int contextEndOffset = context._endOffset;
     int startIndex;
@@ -240,7 +241,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
                 _bitmapReaderStartOffset, ranges);
       } else {
         // Different chunk
-        ranges.add(ForwardIndexByteRange.newByteRange(chunkId, Integer.BYTES));
+        ranges.add(ValueRange.newByteRange(chunkId, Integer.BYTES));
         int chunkOffset = _chunkOffsetReader.getInt(chunkId);
         int indexInChunk = docId % _numDocsPerChunk;
         if (indexInChunk == 0) {
@@ -258,8 +259,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
       endIndex = _bitmapReader.getNextSetBitOffsetRanges(startIndex + 1, _bitmapReaderStartOffset, ranges);
     }
     int numValues = endIndex - startIndex;
-    int[] dictIdBuffer = new int[numValues];
-    _rawDataReader.readIntAndRecordRanges(startIndex, numValues, dictIdBuffer, _rawDataReaderStartOffset, ranges);
+    _rawDataReader.recordRangesForData(startIndex, numValues, _rawDataReaderStartOffset, ranges);
 
     // Update context
     context._docId = docId;
@@ -269,7 +269,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
-  public boolean isFixedOffsetType() {
+  public boolean isFixedLengthType() {
     return false;
   }
 

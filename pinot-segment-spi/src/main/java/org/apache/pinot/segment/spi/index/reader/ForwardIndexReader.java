@@ -33,35 +33,6 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
  * @param <T> Type of the ReaderContext
  */
 public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends IndexReader {
-
-  interface DocIdRangeProvider<T extends ForwardIndexReaderContext> {
-    /**
-     * Returns the range of document ids for the given value.
-     *
-     * @param docId to find the range for
-     * @return Range of document ids for the given value
-     */
-    List<ForwardIndexByteRange> getDocIdRange(int docId, T context);
-
-    /**
-     * Returns whether the forward index is fixed type.
-     * @return
-     */
-    boolean isFixedOffsetType();
-
-    /**
-     * Returns the base offset for the forward index if it's fixed type
-     * @return
-     */
-    long getBaseOffset();
-
-    int getDocLength();
-
-    default boolean isDocLengthInIBits() {
-      return false;
-    }
-  }
-
   /**
    * Returns {@code true} if the forward index is dictionary-encoded, {@code false} if it is raw.
    */
@@ -944,5 +915,71 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    */
   default int getNumValuesMV(int docId, T context) {
     throw new UnsupportedOperationException();
+  }
+
+  class ValueRange {
+    private final long _offset;
+    private final int _size;
+    // To tell if size uses bit or byte as unit, for fwd index reader reading values of fixed bits.
+    private final boolean _isSizeOfBit;
+
+    public static ValueRange newByteRange(long offset, int sizeInBytes) {
+      return new ValueRange(offset, sizeInBytes, false);
+    }
+
+    public static ValueRange newBitRange(long offset, int sizeInBits) {
+      return new ValueRange(offset, sizeInBits, true);
+    }
+
+    private ValueRange(long offset, int size, boolean isSizeOfBit) {
+      _offset = offset;
+      _size = size;
+      _isSizeOfBit = isSizeOfBit;
+    }
+
+    public long getOffset() {
+      return _offset;
+    }
+
+    public int getSize() {
+      return _size;
+    }
+
+    public boolean isSizeOfBit() {
+      return _isSizeOfBit;
+    }
+
+    @Override
+    public String toString() {
+      return "Range{" + "_offset=" + _offset + ", _size=" + _size + ", _isSizeOfBit=" + _isSizeOfBit + '}';
+    }
+  }
+
+  interface ValueRangeProvider<T extends ForwardIndexReaderContext> {
+    /**
+     * Returns the range of document ids for the given value.
+     *
+     * @param docId to find the range for
+     * @return Range of document ids for the given value
+     */
+    List<ValueRange> getDocIdRange(int docId, T context, @Nullable List<ValueRange> ranges);
+
+    /**
+     * Returns whether the forward index is fixed type.
+     * @return
+     */
+    boolean isFixedLengthType();
+
+    /**
+     * Returns the base offset for the forward index if it's fixed type
+     * @return
+     */
+    long getBaseOffset();
+
+    int getDocLength();
+
+    default boolean isDocLengthInBits() {
+      return false;
+    }
   }
 }

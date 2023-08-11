@@ -19,8 +19,8 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -32,8 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * ids.
  */
 public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext>,
-                                                           ForwardIndexReader.DocIdRangeProvider
-                                                               <ForwardIndexReaderContext> {
+                                                           ForwardIndexReader.ValueRangeProvider<ForwardIndexReaderContext> {
   private final FixedBitIntReaderWriter _reader;
   private final int _numBitsPerValue;
 
@@ -75,12 +74,13 @@ public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<Fo
   }
 
   @Override
-  public List<ForwardIndexByteRange> getDocIdRange(int docId, ForwardIndexReaderContext context) {
+  public List<ValueRange> getDocIdRange(int docId, ForwardIndexReaderContext context,
+      @Nullable List<ValueRange> ranges) {
     throw new UnsupportedOperationException("Unsupported");
   }
 
   @Override
-  public boolean isFixedOffsetType() {
+  public boolean isFixedLengthType() {
     return true;
   }
 
@@ -95,7 +95,7 @@ public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<Fo
   }
 
   @Override
-  public boolean isDocLengthInIBits() {
+  public boolean isDocLengthInBits() {
     return true;
   }
 }

@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -35,7 +34,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * <p>For data layout, please refer to the documentation for {@link FixedByteChunkSVForwardIndexWriter}
  */
 public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkForwardIndexReader implements
-    ForwardIndexReader.DocIdRangeProvider<ChunkReaderContext> {
+                                                                                                ForwardIndexReader.ValueRangeProvider<ChunkReaderContext> {
   public static final int VERSION = 4;
 
   private final int _shift;
@@ -118,7 +117,7 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
   }
 
   protected void recordDocIdRanges(int docId, ChunkReaderContext context,
-      List<ForwardIndexByteRange> ranges) {
+      List<ValueRange> ranges) {
     int chunkId = docId >>> _shift;
     if (context.getChunkId() == chunkId) {
       ranges.addAll(context.getRanges());
@@ -128,8 +127,10 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
   }
 
   @Override
-  public List<ForwardIndexByteRange> getDocIdRange(int docId, ChunkReaderContext context) {
-    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+  public List<ValueRange> getDocIdRange(int docId, ChunkReaderContext context, @Nullable List<ValueRange> ranges) {
+    if (ranges == null) {
+      ranges = new ArrayList<>();
+    }
     if (_isCompressed) {
       recordDocIdRanges(docId, context, ranges);
     } else {
@@ -141,7 +142,7 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
   }
 
   @Override
-  public boolean isFixedOffsetType() {
+  public boolean isFixedLengthType() {
     return !_isCompressed;
   }
 

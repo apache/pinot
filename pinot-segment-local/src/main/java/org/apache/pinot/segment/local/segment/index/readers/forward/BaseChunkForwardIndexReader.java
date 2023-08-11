@@ -31,7 +31,6 @@ import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -131,7 +130,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   }
 
   protected void recordDocIdRanges(int docId, ChunkReaderContext context,
-      List<ForwardIndexByteRange> ranges) {
+      List<ValueRange> ranges) {
     int chunkId = docId / _numDocsPerChunk;
     if (context.getChunkId() == chunkId) {
       ranges.addAll(context.getRanges());
@@ -140,8 +139,8 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     recordChunkRanges(chunkId, context, ranges);
   }
 
-  protected void recordChunkRanges(int chunkId, ChunkReaderContext context, List<ForwardIndexByteRange> ranges) {
-    List<ForwardIndexByteRange> chunkRanges = new ArrayList<>();
+  protected void recordChunkRanges(int chunkId, ChunkReaderContext context, List<ValueRange> ranges) {
+    List<ValueRange> chunkRanges = new ArrayList<>();
     int chunkSize;
     long chunkPosition = getChunkPositionAndRecordRanges(chunkId, chunkRanges);
 
@@ -152,7 +151,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
       long nextChunkOffset = getChunkPositionAndRecordRanges(chunkId + 1, chunkRanges);
       chunkSize = (int) (nextChunkOffset - chunkPosition);
     }
-    chunkRanges.add(ForwardIndexByteRange.newByteRange(chunkPosition, chunkSize));
+    chunkRanges.add(ValueRange.newByteRange(chunkPosition, chunkSize));
     context.setChunkId(chunkId);
     context.setRanges(chunkRanges);
     ranges.addAll(chunkRanges);
@@ -196,14 +195,14 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     }
   }
 
-  protected long getChunkPositionAndRecordRanges(int chunkId, List<ForwardIndexByteRange> ranges) {
+  protected long getChunkPositionAndRecordRanges(int chunkId, List<ValueRange> ranges) {
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
       ranges.add(
-          ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES));
+          ValueRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES));
       return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
     } else {
       ranges.add(
-          ForwardIndexByteRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES));
+          ValueRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES));
       return _dataHeader.getLong(chunkId * _headerEntryChunkOffsetSize);
     }
   }

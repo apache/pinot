@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexByteRange;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -38,7 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
  */
 public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader
-    implements ForwardIndexReader.DocIdRangeProvider<ChunkReaderContext> {
+    implements ForwardIndexReader.ValueRangeProvider<ChunkReaderContext> {
 
   private static final int ROW_OFFSET_SIZE = VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
@@ -188,19 +187,18 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     return bytes;
   }
 
-  public void recordDocIdRanges(int docId, List<ForwardIndexByteRange> ranges) {
+  public void recordDocIdRanges(int docId, List<ValueRange> ranges) {
     int chunkId = docId / _numDocsPerChunk;
     int chunkRowId = docId % _numDocsPerChunk;
 
     // These offsets are offset in the data buffer
     long chunkStartOffset = getChunkPositionAndRecordRanges(chunkId, ranges);
-    ranges.add(
-        ForwardIndexByteRange.newByteRange(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE, Integer.BYTES));
+    ranges.add(ValueRange.newByteRange(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE, Integer.BYTES));
     long valueStartOffset =
         chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
     long valueEndOffset = getValueEndOffsetAndRecordRanges(chunkId, chunkRowId, chunkStartOffset, ranges);
 
-    ranges.add(ForwardIndexByteRange.newByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
+    ranges.add(ValueRange.newByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
   }
 
   /**
@@ -240,15 +238,15 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
   }
 
   private long getValueEndOffsetAndRecordRanges(int chunkId, int chunkRowId, long chunkStartOffset,
-      List<ForwardIndexByteRange> ranges) {
+      List<ValueRange> ranges) {
     if (chunkId == _numChunks - 1) {
       // Last chunk
       if (chunkRowId == _numDocsPerChunk - 1) {
         // Last row in the last chunk
         return _dataBuffer.size();
       } else {
-        ranges.add(ForwardIndexByteRange.newByteRange(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE,
-            Integer.BYTES));
+        ranges.add(
+            ValueRange.newByteRange(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE, Integer.BYTES));
         int valueEndOffsetInChunk = _dataBuffer.getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
         if (valueEndOffsetInChunk == 0) {
           // Last row in the last chunk (chunk is incomplete, which stores 0 as the offset for the absent rows)
@@ -262,7 +260,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
         // Last row in the chunk
         return getChunkPositionAndRecordRanges(chunkId + 1, ranges);
       } else {
-        ranges.add(ForwardIndexByteRange.newByteRange(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE,
+        ranges.add(ValueRange.newByteRange(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE,
             Integer.BYTES));
         return chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
       }
@@ -300,8 +298,10 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
   }
 
   @Override
-  public List<ForwardIndexByteRange> getDocIdRange(int docId, ChunkReaderContext context) {
-    List<ForwardIndexByteRange> ranges = new ArrayList<>();
+  public List<ValueRange> getDocIdRange(int docId, ChunkReaderContext context, @Nullable List<ValueRange> ranges) {
+    if (ranges == null) {
+      ranges = new ArrayList<>();
+    }
     if (_isCompressed) {
       recordDocIdRanges(docId, context, ranges);
     } else {
@@ -312,7 +312,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
   }
 
   @Override
-  public boolean isFixedOffsetType() {
+  public boolean isFixedLengthType() {
     return false;
   }
 
