@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -352,7 +353,7 @@ public class AggregationFunctionFactory {
             throw new IllegalArgumentException(
                 "Aggregation function: " + function + " is only supported in selection without alias.");
           case FUNNELCOUNT:
-            return new FunnelCountAggregationFunction(arguments);
+            return new FunnelCountAggregationFunctionFactory(arguments).get();
 
           default:
             throw new IllegalArgumentException();
