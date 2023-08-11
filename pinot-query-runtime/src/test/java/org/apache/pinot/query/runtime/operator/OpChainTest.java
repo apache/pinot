@@ -112,7 +112,6 @@ public class OpChainTest {
       when(_exchange.getRemainingCapacity()).thenReturn(1);
       when(_mailbox2.poll()).then(x -> {
         if (_blockList.isEmpty()) {
-          //return TransferableBlockUtils.getNoOpTransferableBlock();
           return TransferableBlockUtils.getEndOfStreamTransferableBlock();
         }
         return _blockList.remove(0);
