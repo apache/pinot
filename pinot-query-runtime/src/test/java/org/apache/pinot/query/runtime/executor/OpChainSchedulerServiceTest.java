@@ -143,49 +143,36 @@ public class OpChainSchedulerServiceTest {
     Assert.assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
   }
 
-//  @Test
-//  public void shouldCallCancelOnOpChainsWhenItIsCancelledByDispatch()
-//      throws InterruptedException {
-//    initExecutor(1);
-//    OpChain opChain = getChain(_operatorA);
-//    Mockito.when(_scheduler.next(Mockito.anyLong(), Mockito.any())).thenAnswer((Answer<OpChain>) invocation -> {
-//      Thread.sleep(100);
-//      return opChain;
-//    });
-//    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_scheduler, _executor);
-//
-//    Mockito.when(_operatorA.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
-//
-//    CountDownLatch cancelLatch = new CountDownLatch(1);
-//    Mockito.doAnswer(inv -> {
-//      cancelLatch.countDown();
-//      return null;
-//    }).when(_operatorA).cancel(Mockito.any());
-//    CountDownLatch deregisterLatch = new CountDownLatch(1);
-//    Mockito.doAnswer(inv -> {
-//      deregisterLatch.countDown();
-//      return null;
-//    }).when(_scheduler).deregister(Mockito.same(opChain));
-//    CountDownLatch awaitLatch = new CountDownLatch(1);
-//    Mockito.doAnswer(inv -> {
-//      awaitLatch.countDown();
-//      return null;
-//    }).when(_scheduler).yield(Mockito.any());
-//
-//    schedulerService.startAsync().awaitRunning();
-//    schedulerService.register(opChain);
-//
-//    Assert.assertTrue(awaitLatch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
-//
-//    // now cancel the request.
-//    schedulerService.cancel(123);
-//
-//    Assert.assertTrue(cancelLatch.await(10, TimeUnit.SECONDS), "expected OpChain to be cancelled");
-//    Assert.assertTrue(deregisterLatch.await(10, TimeUnit.SECONDS), "expected OpChain to be deregistered");
-//    Mockito.verify(_operatorA, Mockito.times(1)).cancel(Mockito.any());
-//    Mockito.verify(_scheduler, Mockito.times(1)).deregister(Mockito.any());
-//    schedulerService.stopAsync().awaitTerminated();
-//  }
+  @Test
+  public void shouldCallCancelOnOpChainsWhenItIsCancelledByDispatch()
+      throws InterruptedException {
+    OpChain opChain = getChain(_operatorA);
+    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
+
+    CountDownLatch opChainStarted = new CountDownLatch(1);
+    Mockito.doAnswer(inv -> {
+      opChainStarted.countDown();
+      while (true) {
+        Thread.sleep(1000);
+      }
+    }).when(_operatorA).nextBlock();
+
+    CountDownLatch cancelLatch = new CountDownLatch(1);
+    Mockito.doAnswer(inv -> {
+      cancelLatch.countDown();
+      return null;
+    }).when(_operatorA).cancel(Mockito.any());
+
+    schedulerService.register(opChain);
+
+    Assert.assertTrue(opChainStarted.await(10, TimeUnit.SECONDS), "op chain doesn't seem to be started");
+
+    // now cancel the request.
+    schedulerService.cancel(123);
+
+    Assert.assertTrue(cancelLatch.await(10, TimeUnit.SECONDS), "expected OpChain to be cancelled");
+    Mockito.verify(_operatorA, Mockito.times(1)).cancel(Mockito.any());
+  }
 
   @Test
   public void shouldCallCancelOnOpChainsThatThrow()
