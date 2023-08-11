@@ -85,6 +85,8 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
@@ -173,6 +175,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected StaleInstancesCleanupTask _staleInstancesCleanupTask;
   protected TaskMetricsEmitter _taskMetricsEmitter;
   protected MultiThreadedHttpConnectionManager _connectionManager;
+  protected TenantRebalancer _tenantRebalancer;
+  protected ExecutorService _tenantRebalanceExecutorService;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -223,6 +227,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // This executor service is used to do async tasks from multiget util or table rebalancing.
       _executorService =
           Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
+      _tenantRebalanceExecutorService =
+          Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("tenant-rebalance-thread-%d").build());
+      _tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _tenantRebalanceExecutorService);
     }
 
     // Initialize the table config tuner registry.
@@ -484,6 +491,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_periodicTaskScheduler).to(PeriodicTaskScheduler.class);
         bind(_sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(_pinotLLCRealtimeSegmentManager).to(PinotLLCRealtimeSegmentManager.class);
+        bind(_tenantRebalancer).to(TenantRebalancer.class);
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
           bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);
@@ -781,6 +789,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       LOGGER.info("Shutting down executor service");
       _executorService.shutdownNow();
       _executorService.awaitTermination(10L, TimeUnit.SECONDS);
+      _tenantRebalanceExecutorService.shutdownNow();
+      _tenantRebalanceExecutorService.awaitTermination(10L, TimeUnit.SECONDS);
     } catch (final Exception e) {
       LOGGER.error("Caught exception while shutting down", e);
     }

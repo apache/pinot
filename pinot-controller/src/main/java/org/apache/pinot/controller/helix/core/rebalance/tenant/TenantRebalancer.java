@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metadata.controllerjob;
+package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
-public enum ControllerJobType {
-  RELOAD_SEGMENT, FORCE_COMMIT, TABLE_REBALANCE, TENANT_REBALANCE
+
+public interface TenantRebalancer {
+  TenantRebalanceResult rebalance(TenantRebalanceContext context);
 }
