@@ -86,50 +86,46 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
     if (_partitionSetting) {
       if (_thetaSketchSetting) {
         // theta_sketch && partitioned
-        return createPartionedFunnelCountAggregationFunction(
-            thetaSketchAggregationStrategy(), thetaSketchPartitionedResultExtractionStrategy(),
-            partitionedMergeStrategy());
+        return createPartionedFunnelCountAggregationFunction(thetaSketchAggregationStrategy(),
+            thetaSketchPartitionedResultExtractionStrategy(), partitionedMergeStrategy());
       } else {
         // partitioned && !theta_sketch
-        return createPartionedFunnelCountAggregationFunction(
-            bitmapAggregationStrategy(), bitmapPartitionedResultExtractionStrategy(), partitionedMergeStrategy());
+        return createPartionedFunnelCountAggregationFunction(bitmapAggregationStrategy(),
+            bitmapPartitionedResultExtractionStrategy(), partitionedMergeStrategy());
       }
     } else {
       if (_thetaSketchSetting) {
         // theta_sketch && !partitioned
-        return createFunnelCountAggregationFunction(
-            thetaSketchAggregationStrategy(), thetaSketchResultExtractionStrategy(), thetaSketchMergeStrategy());
+        return createFunnelCountAggregationFunction(thetaSketchAggregationStrategy(),
+            thetaSketchResultExtractionStrategy(), thetaSketchMergeStrategy());
       } else if (_setSetting) {
         // set && !partitioned && !theta_sketch
-        return createFunnelCountAggregationFunction(
-            bitmapAggregationStrategy(), setResultExtractionStrategy(), setMergeStrategy());
+        return createFunnelCountAggregationFunction(bitmapAggregationStrategy(), setResultExtractionStrategy(),
+            setMergeStrategy());
       } else {
         // default (bitmap)
         // !partitioned && !theta_sketch && !set
-        return createFunnelCountAggregationFunction(
-            bitmapAggregationStrategy(), bitmapResultExtractionStrategy(), bitmapMergeStrategy());
+        return createFunnelCountAggregationFunction(bitmapAggregationStrategy(), bitmapResultExtractionStrategy(),
+            bitmapMergeStrategy());
       }
     }
   }
 
-  private <A,I> FunnelCountAggregationFunction<A,I> createFunnelCountAggregationFunction(
-      AggregationStrategy<A> aggregationStrategy,
-      ResultExtractionStrategy<A, I> resultExtractionStrategy,
+  private <A, I> FunnelCountAggregationFunction<A, I> createFunnelCountAggregationFunction(
+      AggregationStrategy<A> aggregationStrategy, ResultExtractionStrategy<A, I> resultExtractionStrategy,
       MergeStrategy<I> mergeStrategy) {
     return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
         aggregationStrategy, resultExtractionStrategy, mergeStrategy);
   }
-  private <A> FunnelCountAggregationFunction<A,List<Long>> createPartionedFunnelCountAggregationFunction(
-      AggregationStrategy<A> aggregationStrategy,
-      ResultExtractionStrategy<A, List<Long>> resultExtractionStrategy,
+
+  private <A> FunnelCountAggregationFunction<A, List<Long>> createPartionedFunnelCountAggregationFunction(
+      AggregationStrategy<A> aggregationStrategy, ResultExtractionStrategy<A, List<Long>> resultExtractionStrategy,
       MergeStrategy<List<Long>> mergeStrategy) {
     if (_sortingSetting) {
-      return new FunnelCountSortedAggregationFunction<>(
-          _expressions, _stepExpressions, _correlateByExpressions,
+      return new FunnelCountSortedAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
           aggregationStrategy, resultExtractionStrategy, mergeStrategy);
     } else {
-      return new FunnelCountAggregationFunction<>(
-          _expressions, _stepExpressions, _correlateByExpressions,
+      return new FunnelCountAggregationFunction<>(_expressions, _stepExpressions, _correlateByExpressions,
           aggregationStrategy, resultExtractionStrategy, mergeStrategy);
     }
   }
@@ -137,34 +133,44 @@ public class FunnelCountAggregationFunctionFactory implements Supplier<Aggregati
   AggregationStrategy<UpdateSketch[]> thetaSketchAggregationStrategy() {
     return new ThetaSketchAggregationStrategy(_stepExpressions, _correlateByExpressions, _nominalEntries);
   }
+
   AggregationStrategy<DictIdsWrapper> bitmapAggregationStrategy() {
     return new BitmapAggregationStrategy(_stepExpressions, _correlateByExpressions);
   }
+
   MergeStrategy<List<Sketch>> thetaSketchMergeStrategy() {
     return new ThetaSketchMergeStrategy(_numSteps, _nominalEntries);
   }
+
   MergeStrategy<List<Set>> setMergeStrategy() {
     return new SetMergeStrategy(_numSteps);
   }
+
   MergeStrategy<List<RoaringBitmap>> bitmapMergeStrategy() {
     return new BitmapMergeStrategy(_numSteps);
   }
+
   MergeStrategy<List<Long>> partitionedMergeStrategy() {
     return new PartitionedMergeStrategy(_numSteps);
   }
+
   ResultExtractionStrategy<UpdateSketch[], List<Sketch>> thetaSketchResultExtractionStrategy() {
     return new ThetaSketchResultExtractionStrategy(_numSteps);
   }
+
   ResultExtractionStrategy<DictIdsWrapper, List<Set>> setResultExtractionStrategy() {
     return new SetResultExtractionStrategy(_numSteps);
   }
+
   ResultExtractionStrategy<DictIdsWrapper, List<RoaringBitmap>> bitmapResultExtractionStrategy() {
     return new BitmapResultExtractionStrategy(_numSteps);
   }
+
   ResultExtractionStrategy<DictIdsWrapper, List<Long>> bitmapPartitionedResultExtractionStrategy() {
     final MergeStrategy<List<RoaringBitmap>> bitmapMergeStrategy = bitmapMergeStrategy();
     return dictIdsWrapper -> bitmapMergeStrategy.extractFinalResult(Arrays.asList(dictIdsWrapper._stepsBitmaps));
   }
+
   ResultExtractionStrategy<UpdateSketch[], List<Long>> thetaSketchPartitionedResultExtractionStrategy() {
     final MergeStrategy<List<Sketch>> thetaSketchMergeStrategy = thetaSketchMergeStrategy();
     return sketches -> thetaSketchMergeStrategy.extractFinalResult(Arrays.asList(sketches));
