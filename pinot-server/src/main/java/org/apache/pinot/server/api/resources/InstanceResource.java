@@ -76,6 +76,10 @@ public class InstanceResource {
     return Collections.emptyList();
   }
 
+  /**
+   * Retrieve instance pools in the Helix InstanceConfig: https://docs.pinot.apache.org/operators/operating-pinot/instance-assignment#pool-based-instance-assignment.
+   * Returns an empty Map if poolBased config is not enabled or the instance is not assigned to any pool.
+   */
   @GET
   @Path("pools")
   @ApiOperation(value = "Tenant pools for current instance")
