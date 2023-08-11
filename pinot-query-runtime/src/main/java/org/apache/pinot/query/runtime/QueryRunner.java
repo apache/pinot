@@ -95,7 +95,7 @@ public class QueryRunner {
       //TODO: make this configurable
       _opChainExecutor = ExecutorServiceUtils.create(config, "pinot.query.runner.opchain",
           "op_chain_worker_on_" + _port + "_port");
-      _scheduler = new OpChainSchedulerService(getQueryWorkerIntermExecutorService());
+      _scheduler = new OpChainSchedulerService(getOpChainExecutorService());
       _mailboxService = new MailboxService(_hostname, _port, config);
       _serverExecutor = new ServerQueryExecutorV1Impl();
       _serverExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
@@ -164,12 +164,7 @@ public class QueryRunner {
   }
 
   @VisibleForTesting
-  public ExecutorService getQueryWorkerLeafExecutorService() {
-    return _opChainExecutor;
-  }
-
-  @VisibleForTesting
-  public ExecutorService getQueryWorkerIntermExecutorService() {
+  public ExecutorService getOpChainExecutorService() {
     return _opChainExecutor;
   }
 
@@ -213,7 +208,7 @@ public class QueryRunner {
   private InstanceResponseBlock processServerQueryRequest(ServerQueryRequest request) {
     InstanceResponseBlock result;
     try {
-      result = _serverExecutor.execute(request, getQueryWorkerLeafExecutorService());
+      result = _serverExecutor.execute(request, getOpChainExecutorService());
     } catch (Exception e) {
       InstanceResponseBlock errorResponse = new InstanceResponseBlock();
       errorResponse.getExceptions().put(QueryException.QUERY_EXECUTION_ERROR_CODE,
