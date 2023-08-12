@@ -31,6 +31,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
+
 /**
  * Handler for partial-upsert.
  */
@@ -68,7 +69,7 @@ public class PartialUpsertHandler {
    * @param newRecord the new consumed record.
    */
   public void merge(IndexSegment indexSegment, int docId, GenericRow newRecord) {
-    for (String column: indexSegment.getColumnNames()) {
+    for (String column : indexSegment.getColumnNames()) {
       if (!_primaryKeyColumns.contains(column)) {
         PartialUpsertMerger merger = _column2Mergers.getOrDefault(column, _defaultPartialUpsertMerger);
         // Non-overwrite mergers
@@ -76,39 +77,36 @@ public class PartialUpsertHandler {
         // (2) Else If the value of new value is null, use the previous value (even for comparison columns).
         // (3) Else If the column is not a comparison column, we applied the merged value to it.
         if (!(merger instanceof OverwriteMerger)) {
-          PinotSegmentColumnReader pinotSegmentColumnReader = new PinotSegmentColumnReader(indexSegment, column);
-          if (!pinotSegmentColumnReader.isNull(docId)) {
-            Object previousValue = pinotSegmentColumnReader.getValue(docId);
-            if (newRecord.isNullValue(column)) {
-              // Note that we intentionally want to overwrite any previous _comparisonColumn value in the case of using
-              // multiple comparison columns. We never apply a merge function to it, rather we just take any/all
-              // non-null comparison column values from the previous record, and the sole non-null comparison column
-              // value from the new record.
-              newRecord.putValue(column, previousValue);
-            } else if (!_comparisonColumns.contains(column)) {
-              newRecord.putValue(column,
-                  merger.merge(previousValue, newRecord.getValue(column)));
+          try (PinotSegmentColumnReader pinotSegmentColumnReader = new PinotSegmentColumnReader(indexSegment, column)) {
+            if (!pinotSegmentColumnReader.isNull(docId)) {
+              Object previousValue = pinotSegmentColumnReader.getValue(docId);
+              if (newRecord.isNullValue(column)) {
+                // Note that we intentionally want to overwrite any previous _comparisonColumn value in the case of
+                // using
+                // multiple comparison columns. We never apply a merge function to it, rather we just take any/all
+                // non-null comparison column values from the previous record, and the sole non-null comparison column
+                // value from the new record.
+                newRecord.putValue(column, previousValue);
+              } else if (!_comparisonColumns.contains(column)) {
+                newRecord.putValue(column, merger.merge(previousValue, newRecord.getValue(column)));
+              }
             }
-          }
-          try {
-            pinotSegmentColumnReader.close();
           } catch (IOException e) {
             throw new RuntimeException(
                 String.format("Caught exception while closing pinotSegmentColumnReader for column: %s", column), e);
           }
         } else {
           // Overwrite mergers.
-          // (1) If the merge strategy is Overwrite mergers and newValue is not null. skip and use the new value
+          // (1) If the merge strategy is Overwrite merger and newValue is not null, skip and use the new value
           // (2) Otherwise, if previous is not null, init columnReader and use the previous value.
           if (newRecord.isNullValue(column)) {
-            PinotSegmentColumnReader pinotSegmentColumnReader = new PinotSegmentColumnReader(indexSegment, column);
-            if (!pinotSegmentColumnReader.isNull(docId)) {
-              Object previousValue = pinotSegmentColumnReader.getValue(docId);
-              newRecord.putValue(column, previousValue);
-              newRecord.removeNullValueField(column);
-            }
-            try {
-              pinotSegmentColumnReader.close();
+            try (PinotSegmentColumnReader pinotSegmentColumnReader = new PinotSegmentColumnReader(indexSegment,
+                column)) {
+              if (!pinotSegmentColumnReader.isNull(docId)) {
+                Object previousValue = pinotSegmentColumnReader.getValue(docId);
+                newRecord.putValue(column, previousValue);
+                newRecord.removeNullValueField(column);
+              }
             } catch (IOException e) {
               throw new RuntimeException(
                   String.format("Caught exception while closing pinotSegmentColumnReader for column: %s", column), e);
