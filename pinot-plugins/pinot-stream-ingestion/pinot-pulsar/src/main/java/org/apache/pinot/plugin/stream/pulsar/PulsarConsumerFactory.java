@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
-import java.util.Set;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
-import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 
@@ -35,12 +33,6 @@ public class PulsarConsumerFactory extends StreamConsumerFactory {
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
     throw new UnsupportedOperationException("Partition Level consumer is deprecated!");
-  }
-
-  @Override
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
-      String groupId) {
-    throw new UnsupportedOperationException("Apache pinot no longer support high level consumer");
   }
 
   @Override
