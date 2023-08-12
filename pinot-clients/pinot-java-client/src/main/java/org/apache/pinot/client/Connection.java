@@ -24,8 +24,6 @@ import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
-import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -191,9 +189,7 @@ public class Connection {
   @Nullable
   private static String[] resolveTableName(String query) {
     try {
-      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-      return RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode()))
-          .toArray(new String[0]);
+      return RequestUtils.getTableNames(query).toArray(new String[0]);
     } catch (Exception e) {
       LOGGER.error("Cannot parse table name from query: {}. Fallback to broker selector default.", query, e);
     }

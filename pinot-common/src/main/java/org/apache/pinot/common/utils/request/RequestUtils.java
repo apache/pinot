@@ -24,10 +24,23 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.calcite.sql.SqlAsOperator;
+import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlExplain;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNumericLiteral;
+import org.apache.calcite.sql.SqlOrderBy;
+import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.SqlSetOption;
+import org.apache.calcite.sql.SqlWith;
+import org.apache.calcite.sql.SqlWithItem;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -289,5 +302,91 @@ public class RequestUtils {
 
   public static Map<String, String> getOptionsFromString(String optionStr) {
     return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=').split(optionStr);
+  }
+
+  public static Set<String> getTableNames(SqlNode sqlNode) {
+    Set<String> tableNames = new HashSet<>();
+    if (sqlNode instanceof SqlSelect) {
+      // Handle SqlSelect query
+      SqlNode fromNode = ((SqlSelect) sqlNode).getFrom();
+      if ((fromNode instanceof SqlBasicCall)
+          && (((SqlBasicCall) fromNode).getOperator() instanceof SqlAsOperator)) {
+        tableNames.addAll(getTableNames(((SqlBasicCall) fromNode).getOperandList().get(0)));
+      } else if (fromNode instanceof SqlIdentifier) {
+        tableNames.add(getTableName((SqlIdentifier) fromNode));
+        tableNames.addAll(getTableNames(((SqlSelect) sqlNode).getWhere()));
+      } else {
+        tableNames.addAll(getTableNames(fromNode));
+      }
+    } else if (sqlNode instanceof SqlJoin) {
+      // Handle SqlJoin query
+      SqlNode left = ((SqlJoin) sqlNode).getLeft();
+      SqlNode right = ((SqlJoin) sqlNode).getRight();
+      if (left instanceof SqlIdentifier) {
+        tableNames.add(getTableName(((SqlIdentifier) left)));
+      } else {
+        tableNames.addAll(getTableNames(left));
+      }
+      if (right instanceof SqlIdentifier) {
+        tableNames.add(getTableName(((SqlIdentifier) right)));
+      } else {
+        tableNames.addAll(getTableNames(right));
+      }
+    } else if (sqlNode instanceof SqlOrderBy) {
+      // Handle SqlOrderBy query
+      // tableNames.addAll(getTableNames(((SqlOrderBy) sqlNode).query));
+      for (SqlNode node : ((SqlOrderBy) sqlNode).getOperandList()) {
+        tableNames.addAll(getTableNames(node));
+      }
+    } else if (sqlNode instanceof SqlBasicCall) {
+      // Handle SqlBasicCall query
+      if (((SqlBasicCall) sqlNode).getOperator() instanceof SqlAsOperator) {
+        SqlNode firstOperand = ((SqlBasicCall) sqlNode).getOperandList().get(0);
+        if (firstOperand instanceof SqlIdentifier) {
+          tableNames.add(getTableName((SqlIdentifier) firstOperand));
+        } else {
+          tableNames.addAll(getTableNames(firstOperand));
+        }
+      } else {
+        for (SqlNode node : ((SqlBasicCall) sqlNode).getOperandList()) {
+          tableNames.addAll(getTableNames(node));
+        }
+      }
+    } else if (sqlNode instanceof SqlWith) {
+      // Handle SqlWith query
+      SqlWith sqlWith = (SqlWith) sqlNode;
+      List<SqlNode> withList = sqlWith.withList;
+      // Table names from body, it may contains table alias from WITH clause
+      tableNames.addAll(getTableNames(sqlWith.body));
+      // Table alias from WITH clause, should be removed from the final results
+      withList.forEach(
+          sqlWithItem -> tableNames.remove(getTableName(((SqlWithItem) sqlWithItem).name)));
+      // Table names from WITH clause
+      withList.forEach(
+          sqlWithItem -> tableNames.addAll(getTableNames(((SqlWithItem) sqlWithItem).getOperandList().get(2))));
+    } else if (sqlNode instanceof SqlSetOption) {
+      // Handle SqlSetOption query
+      for (SqlNode node : ((SqlSetOption) sqlNode).getOperandList()) {
+        tableNames.addAll(getTableNames(node));
+      }
+    } else if (sqlNode instanceof SqlExplain) {
+      // Handle SqlExplain query
+      tableNames.addAll(getTableNames(((SqlExplain) sqlNode).getExplicandum()));
+    }
+    return tableNames;
+  }
+
+  /**
+   * Helper method to get table name from SqlIdentifier, it may in the format of dbName.tableName or tableName
+   * @param sqlIdentifier SqlIdentifier
+   * @return table name
+   */
+  public static String getTableName(SqlIdentifier sqlIdentifier) {
+    return sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+  }
+
+  public static Set<String> getTableNames(String query) {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+    return getTableNames(sqlNodeAndOptions.getSqlNode());
   }
 }
