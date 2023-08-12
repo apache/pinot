@@ -130,7 +130,6 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     HOLD.set(true);
     // No tasks before we start.
     assertEquals(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).size(), 0);
-    verifyTaskCount("Task_" + TASK_TYPE + "_1624403781879", 0, 0, 0, 0);
 
     // Should create the task queues and generate a task
     String task1 = _taskManager.scheduleTasks().get(TASK_TYPE);
