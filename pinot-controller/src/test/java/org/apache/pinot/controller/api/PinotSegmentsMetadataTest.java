@@ -32,8 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.controller.utils.FakeHttpServer;
@@ -56,7 +56,7 @@ public class PinotSegmentsMetadataTest {
   private static final String URI_PATH = "/tables/";
   private static final int TIMEOUT_MSEC = 10000;
   private final Executor _executor = Executors.newFixedThreadPool(1);
-  private final HttpConnectionManager _connectionManager = new MultiThreadedHttpConnectionManager();
+  private final HttpClientConnectionManager _connectionManager = new PoolingHttpClientConnectionManager();
   private final Map<String, SegmentsServerMock> _serverMap = new HashMap<>();
   private PinotHelixResourceManager _helix;
 

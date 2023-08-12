@@ -20,16 +20,18 @@ package org.apache.pinot.common.minion;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.io.IOUtils;
+import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -64,12 +66,12 @@ public class MinionClient {
   }
 
   public Map<String, String> scheduleMinionTasks(@Nullable String taskType, @Nullable String tableNameWithType)
-      throws IOException {
+      throws IOException, HttpException {
     HttpPost httpPost = createHttpPostRequest(
         MinionRequestURLBuilder.baseUrl(_controllerUrl).forTaskSchedule(taskType, tableNameWithType));
     HttpResponse response = HTTP_CLIENT.execute(httpPost);
     int statusCode = response.getStatusLine().getStatusCode();
-    final String responseString = IOUtils.toString(response.getEntity().getContent());
+    final String responseString = EntityUtils.toString(response.getEntity());
     if (statusCode >= 400) {
       throw new HttpException(String
           .format("Unable to schedule minion tasks. Error code %d, Error message: %s", statusCode, responseString));
@@ -79,7 +81,7 @@ public class MinionClient {
   }
 
   public Map<String, String> getTasksStates(String taskType)
-      throws IOException {
+      throws IOException, HttpException {
     HttpGet httpGet =
         createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTasksStates(taskType));
     HttpResponse response = HTTP_CLIENT.execute(httpGet);
@@ -94,11 +96,11 @@ public class MinionClient {
   }
 
   public String getTaskState(String taskName)
-      throws IOException {
+      throws IOException, HttpException {
     HttpGet httpGet = createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTaskState(taskName));
     HttpResponse response = HTTP_CLIENT.execute(httpGet);
     int statusCode = response.getStatusLine().getStatusCode();
-    String responseString = IOUtils.toString(response.getEntity().getContent());
+    String responseString = EntityUtils.toString(response.getEntity());
     if (statusCode >= 400) {
       throw new HttpException(String
           .format("Unable to get state for task: %s. Error code %d, Error message: %s", taskName, statusCode,
@@ -108,7 +110,7 @@ public class MinionClient {
   }
 
   public Map<String, String> executeTask(AdhocTaskConfig adhocTaskConfig, @Nullable Map<String, String> headers)
-      throws IOException {
+      throws IOException, HttpException {
     HttpPost httpPost = createHttpPostRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTaskExecute());
     httpPost.setEntity(new StringEntity(adhocTaskConfig.toJsonString()));
     if (headers != null) {
@@ -117,7 +119,7 @@ public class MinionClient {
     }
     HttpResponse response = HTTP_CLIENT.execute(httpPost);
     int statusCode = response.getStatusLine().getStatusCode();
-    final String responseString = IOUtils.toString(response.getEntity().getContent());
+    final String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
     if (statusCode >= 400) {
       throw new HttpException(String
           .format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode, responseString));

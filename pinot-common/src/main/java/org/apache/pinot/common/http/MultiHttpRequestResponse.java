@@ -16,21 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api;
+package org.apache.pinot.common.http;
 
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.io.IOException;
+import java.net.URI;
+import org.apache.http.client.methods.CloseableHttpResponse;
 
 
-public class CallableHttpGet {
-  private static final Logger LOGGER = LoggerFactory.getLogger(CallableHttpGet.class);
-  private HttpClient _client;
-  private GetMethod _getMethod;
+public class MultiHttpRequestResponse implements AutoCloseable {
+  private final URI _uri;
+  private final CloseableHttpResponse _response;
 
-  CallableHttpGet(HttpClient client, GetMethod getMethod) {
-    _client = client;
-    _getMethod = getMethod;
+  public MultiHttpRequestResponse(URI uri, CloseableHttpResponse response) {
+    _uri = uri;
+    _response = response;
+  }
+
+  public URI getURI() {
+    return _uri;
+  }
+
+  public CloseableHttpResponse getResponse() {
+    return _response;
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    _response.close();
   }
 }

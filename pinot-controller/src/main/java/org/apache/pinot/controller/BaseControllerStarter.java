@@ -35,8 +35,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
@@ -50,6 +48,9 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.Message;
 import org.apache.helix.task.TaskDriver;
+import org.apache.http.config.SocketConfig;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -174,7 +175,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbackList;
   protected StaleInstancesCleanupTask _staleInstancesCleanupTask;
   protected TaskMetricsEmitter _taskMetricsEmitter;
-  protected MultiThreadedHttpConnectionManager _connectionManager;
+  protected PoolingHttpClientConnectionManager _connectionManager;
   protected TenantRebalancer _tenantRebalancer;
   protected ExecutorService _tenantRebalanceExecutorService;
 
@@ -441,8 +442,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
-    _connectionManager = new MultiThreadedHttpConnectionManager();
-    _connectionManager.getParams().setConnectionTimeout(_config.getServerAdminRequestTimeoutSeconds() * 1000);
+    _connectionManager = new PoolingHttpClientConnectionManager();
+    _connectionManager.setDefaultSocketConfig(
+        SocketConfig.custom().setSoTimeout(_config.getServerAdminRequestTimeoutSeconds() * 1000).build());
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -482,7 +484,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_segmentCompletionManager).to(SegmentCompletionManager.class);
         bind(_taskManager).to(PinotTaskManager.class);
         bind(_taskManagerStatusCache).to(TaskManagerStatusCache.class);
-        bind(_connectionManager).to(HttpConnectionManager.class);
+        bind(_connectionManager).to(HttpClientConnectionManager.class);
         bind(_executorService).to(Executor.class);
         bind(_controllerMetrics).to(ControllerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);

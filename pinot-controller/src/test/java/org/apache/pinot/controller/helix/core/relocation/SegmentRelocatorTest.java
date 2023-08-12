@@ -27,11 +27,11 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -120,7 +120,7 @@ public class SegmentRelocatorTest {
     when(conf.isSegmentRelocatorRebalanceTablesSequentially()).thenReturn(true);
     SegmentRelocator relocator =
         new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class), conf,
-            mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpConnectionManager.class));
+            mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpClientConnectionManager.class));
     int cnt = 10;
     for (int i = 0; i < cnt; i++) {
       relocator.putTableToWait("t_" + i);
@@ -150,7 +150,7 @@ public class SegmentRelocatorTest {
     when(conf.isSegmentRelocatorRebalanceTablesSequentially()).thenReturn(true);
     SegmentRelocator relocator =
         new SegmentRelocator(mock(PinotHelixResourceManager.class), mock(LeadControllerManager.class), conf,
-            mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpConnectionManager.class));
+            mock(ControllerMetrics.class), mock(ExecutorService.class), mock(HttpClientConnectionManager.class));
     ExecutorService runner = Executors.newCachedThreadPool();
     int cnt = 10;
     // Three threads to submit tables randomly.

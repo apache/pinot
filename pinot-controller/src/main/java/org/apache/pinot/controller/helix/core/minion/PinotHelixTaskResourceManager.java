@@ -39,7 +39,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
@@ -52,6 +51,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
 import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
@@ -536,7 +536,7 @@ public class PinotHelixTaskResourceManager {
   }
 
   public synchronized Map<String, Object> getSubtaskProgress(String taskName, @Nullable String subtaskNames,
-      Executor executor, HttpConnectionManager connMgr, Map<String, String> workerEndpoints,
+      Executor executor, HttpClientConnectionManager connMgr, Map<String, String> workerEndpoints,
       Map<String, String> requestHeaders, int timeoutMs)
       throws Exception {
     return getSubtaskProgress(taskName, subtaskNames,
@@ -628,14 +628,14 @@ public class PinotHelixTaskResourceManager {
    * Gets progress of all subtasks with specified state tracked by given minion workers in memory
    * @param subtaskState a specified subtask state, valid values are in org.apache.pinot.minion.event.MinionTaskState
    * @param executor an {@link Executor} used to run logic on
-   * @param connMgr a {@link HttpConnectionManager} used to manage http connections
+   * @param connMgr a {@link HttpClientConnectionManager} used to manage http connections
    * @param selectedMinionWorkerEndpoints a map of worker id to http endpoint for minions to get subtask progress from
    * @param requestHeaders http headers used to send requests to minion workers
    * @param timeoutMs timeout (in millisecond) for requests sent to minion workers
    * @return a map of minion worker id to subtask progress
    */
   public synchronized Map<String, Object> getSubtaskOnWorkerProgress(String subtaskState,
-      Executor executor, HttpConnectionManager connMgr, Map<String, String> selectedMinionWorkerEndpoints,
+      Executor executor, HttpClientConnectionManager connMgr, Map<String, String> selectedMinionWorkerEndpoints,
       Map<String, String> requestHeaders, int timeoutMs)
       throws JsonProcessingException {
     return getSubtaskOnWorkerProgress(subtaskState,
