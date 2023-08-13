@@ -288,9 +288,9 @@ const syncTableSchemaData = (data, showFieldType) => {
   const columnList = [...dimensionFields, ...metricFields, ...dateTimeField];
   if (showFieldType) {
     return {
-      columns: ['Column', 'Type', 'Field Type'],
+      columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
       records: columnList.map((field) => {
-        return [field.name, field.dataType, field.fieldType];
+        return [field.name, field.dataType, field.fieldType, getMultiValueField(field)];
       }),
     };
   }
@@ -301,6 +301,18 @@ const syncTableSchemaData = (data, showFieldType) => {
     }),
   };
 };
+
+const getMultiValueField = (field): boolean => {
+  if(!field) {
+    return false;
+  }
+
+  if("singleValueField" in field && field.singleValueField === false) {
+    return true;
+  }
+
+  return false;
+}
 
 const encodeString = (str: string) => {
   if(str === unescape(str)){
