@@ -175,6 +175,14 @@ public class SortOperator extends MultiStageOperator {
               _rows.addAll(container.subList(0, _numRowsToKeep - _rows.size()));
             }
           }
+          // '_fetch > 0' means this operator can early terminate, so we can stop consuming input blocks
+          if (_rows.size() >= _numRowsToKeep && _fetch > 0) {
+            _readyToConstruct = true;
+            _upstreamOperator.close();
+            LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
+                _context.getId());
+            return;
+          }
         } else {
           for (Object[] row : container) {
             SelectionOperatorUtils.addToPriorityQueue(row, _priorityQueue, _numRowsToKeep);

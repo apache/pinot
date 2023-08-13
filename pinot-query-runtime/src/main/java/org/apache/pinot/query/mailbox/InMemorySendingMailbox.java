@@ -33,6 +33,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
 
   private ReceivingMailbox _receivingMailbox;
 
+  private boolean _isEarlyTerminated = false;
+
   public InMemorySendingMailbox(String id, MailboxService mailboxService, long deadlineMs) {
     _id = id;
     _mailboxService = mailboxService;
@@ -41,17 +43,36 @@ public class InMemorySendingMailbox implements SendingMailbox {
 
   @Override
   public void send(TransferableBlock block) {
+    if (_isEarlyTerminated) {
+      return;
+    }
     if (_receivingMailbox == null) {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
     long timeoutMs = _deadlineMs - System.currentTimeMillis();
-    if (!_receivingMailbox.offer(block, timeoutMs)) {
-      throw new RuntimeException(String.format("Failed to offer block into mailbox: %s within: %dms", _id, timeoutMs));
+    ReceivingMailbox.ReceivingMailboxStatus offer = _receivingMailbox.offer(block, timeoutMs);
+    switch (offer) {
+      case EARLY_TERMINATED:
+        _isEarlyTerminated = true;
+        break;
+      case TIMEOUT:
+      case ERROR:
+        throw new RuntimeException(
+            String.format("Failed to offer block into mailbox: %s within: %dms", _id, timeoutMs));
+      case SUCCESS:
+        break;
+      default:
+        throw new IllegalStateException("Unsupported mailbox status: " + offer);
     }
   }
 
   @Override
   public void complete() {
+  }
+
+  @Override
+  public boolean isEarlyTerminated() {
+    return _isEarlyTerminated;
   }
 
   @Override
