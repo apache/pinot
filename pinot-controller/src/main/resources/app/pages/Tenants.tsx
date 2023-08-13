@@ -41,8 +41,8 @@ type Props = {
 
 const TableTooltipData = [
   null,
-  "Uncompressed size of all data segments",
-  "Estimated size of all data segments, in case any servers are not reachable for actual size",
+  "Uncompressed size of all data segments with replication",
+  "Estimated size of all data segments with replication, in case any servers are not reachable for actual size",
   null,
   "GOOD if all replicas of all segments are up"
 ];
