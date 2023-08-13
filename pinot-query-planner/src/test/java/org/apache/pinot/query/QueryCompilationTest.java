@@ -29,6 +29,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
@@ -271,7 +272,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   @Test
-  public void testGetTableNamesForQuery() {
+  public void testGetTableNamesForQuery()
+      throws TableNotFoundException {
     // A simple filter query with one table
     String query = "Select * from a where col1 = 'a'";
     List<String> tableNames = _queryEnvironment.getTableNamesForQuery(query);

@@ -59,6 +59,7 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
@@ -228,7 +229,8 @@ public class QueryEnvironment {
     return explainQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), requestId).getExplainPlan();
   }
 
-  public List<String> getTableNamesForQuery(String sqlQuery) {
+  public List<String> getTableNamesForQuery(String sqlQuery)
+      throws TableNotFoundException {
     try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
       SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
@@ -238,6 +240,11 @@ public class QueryEnvironment {
       Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
       return new ArrayList<>(tableNames);
     } catch (Throwable t) {
+      String errorMessage = t.getMessage();
+      if (errorMessage.contains("Could not find schema for table: ")) {
+        String tableNotFound = errorMessage.replace("Could not find schema for table: ", "");
+        throw new TableNotFoundException("Table doesn't exist: '" + tableNotFound + "'");
+      }
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
     }
   }

@@ -56,6 +56,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -203,7 +204,15 @@ public class PinotQueryResource {
 
     QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
-    List<String> tableNames = queryEnvironment.getTableNamesForQuery(query);
+    List<String> tableNames;
+    try {
+      // TODO: This method is costly, it parses the query to RelNode then extract the table names
+      tableNames = queryEnvironment.getTableNamesForQuery(query);
+    } catch (TableNotFoundException e) {
+      return QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR, e).toString();
+    } catch (Exception e) {
+      return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
+    }
     List<String> instanceIds;
     if (tableNames.size() != 0) {
       List<TableConfig> tableConfigList = getListTableConfigs(tableNames);

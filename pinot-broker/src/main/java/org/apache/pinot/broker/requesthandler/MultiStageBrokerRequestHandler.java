@@ -152,10 +152,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           break;
       }
     } catch (Exception e) {
-      LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query,
+          e.getCause().getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e.getMessage()));
+      return new BrokerResponseNative(
+          QueryException.getException(QueryException.SQL_PARSING_ERROR, e.getCause().getMessage()));
     }
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
