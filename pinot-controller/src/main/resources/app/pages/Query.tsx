@@ -316,10 +316,6 @@ const QueryPage = () => {
          + `created with an older schema. `
          + `Please reload the table in order to refresh these segments to the new schema.`);
     }
-    if (checked.useMSE) {
-      warnings.push(`Using V2 Multi-Stage Query Engine. This is an experimental feature. Please report any bugs to `
-          + `Apache Pinot Slack channel.`);
-    }
     return warnings;
   }
 
