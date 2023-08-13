@@ -550,6 +550,18 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_REALTIME_FRESHNESS_BASED_CONSUMPTION_STATUS_CHECKER =
         "pinot.server.starter.enableRealtimeFreshnessBasedConsumptionStatusChecker";
     public static final boolean DEFAULT_ENABLE_REALTIME_FRESHNESS_BASED_CONSUMPTION_STATUS_CHECKER = false;
+    // This configuration is in place to avoid servers getting stuck checking for freshness in
+    // cases where they will never be able to reach the freshness threshold or the latest offset.
+    // The only current case where we have seen this is low volume streams using read_committed
+    // because of transactional publishes where the last message in the stream is an
+    // un-consumable kafka control message, and it is impossible to tell if the consumer is stuck
+    // or some offsets will never be consumable.
+    //
+    // When in doubt, do not enable this configuration as it can cause a lagged server to start
+    // serving queries.
+    public static final String CONFIG_OF_REALTIME_FRESHNESS_IDLE_TIMEOUT_MS =
+        "pinot.server.starter.realtimeFreshnessIdleTimeoutMs";
+    public static final int DEFAULT_REALTIME_FRESHNESS_IDLE_TIMEOUT_MS = 0;
     public static final String CONFIG_OF_STARTUP_REALTIME_MIN_FRESHNESS_MS =
         "pinot.server.starter.realtimeMinFreshnessMs";
     // Use 10 seconds by default so high volume stream are able to catch up.

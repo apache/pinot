@@ -42,8 +42,8 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     private final long _now;
 
     public FakeFreshnessBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager,
-        Set<String> consumingSegments, long minFreshnessMs, long now) {
-      super(instanceDataManager, consumingSegments, minFreshnessMs);
+        Set<String> consumingSegments, long minFreshnessMs, long idleTimeoutMs, long now) {
+      super(instanceDataManager, consumingSegments, minFreshnessMs, idleTimeoutMs);
       _now = now;
     }
 
@@ -61,7 +61,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10000L);
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10000L, 0L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -136,8 +136,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(
-            instanceDataManager, consumingSegments, 10L, 100L);
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -192,6 +191,198 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
   }
 
   @Test
+  public void regularCaseWithEarliestOffsetAfterCurrentOffset() {
+    String segA0 = "tableA__0__0__123Z";
+    String segA1 = "tableA__1__0__123Z";
+    String segB0 = "tableB__0__0__123Z";
+    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10000L, 0L);
+
+    // TableDataManager is not set up yet
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
+
+    // setup TableDataMangers
+    TableDataManager tableDataManagerA = mock(TableDataManager.class);
+    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
+    when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
+
+    // setup SegmentDataManagers
+    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
+    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
+    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
+    when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
+    when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
+
+    MutableSegment mockSegment = mock(MutableSegment.class);
+    SegmentMetadata mockSegmentMetdata = mock(SegmentMetadata.class);
+    when(mockSegment.getSegmentMetadata()).thenReturn(mockSegmentMetdata);
+    when(mockSegmentMetdata.getLatestIngestionTimestamp()).thenReturn(0L);
+
+    //              current offset          earliest stream offset
+    // segA0              15                       null
+    // segA1              15                       null
+    // segB0              15                       null
+    when(segMngrA0.getSegment()).thenReturn(mockSegment);
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(15));
+    when(segMngrA1.getSegment()).thenReturn(mockSegment);
+    when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(15));
+    when(segMngrB0.getSegment()).thenReturn(mockSegment);
+    when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(15));
+
+    when(segMngrA0.fetchEarliestStreamOffset(5000)).thenReturn(new LongMsgOffset(14));
+    when(segMngrA1.fetchEarliestStreamOffset(5000)).thenReturn(new LongMsgOffset(15));
+    when(segMngrB0.fetchEarliestStreamOffset(5000)).thenReturn(new LongMsgOffset(16));
+    //              current offset          earliest stream offset
+    // segA0              15                       14
+    // segA1              15                       15
+    // segB0              15                       16
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
+
+    when(segMngrA0.fetchEarliestStreamOffset(5000)).thenReturn(new LongMsgOffset(15));
+    when(segMngrA1.fetchEarliestStreamOffset(5000)).thenReturn(new LongMsgOffset(16));
+    //              current offset          earliest stream offset
+    // segA0              15                       15
+    // segA1              15                       16
+    // segB0              15                       16
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+
+    when(segMngrA0.fetchEarliestStreamOffset(5000)).thenReturn(new LongMsgOffset(16));
+    //              current offset          earliest stream offset
+    // segA0              15                       16
+    // segA1              15                       16
+    // segB0              15                       16
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
+  }
+
+  @Test
+  public void regularCaseWithIdleTimeout() {
+    String segA0 = "tableA__0__0__123Z";
+    String segA1 = "tableA__1__0__123Z";
+    String segB0 = "tableB__0__0__123Z";
+    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    long idleTimeoutMs = 10L;
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, idleTimeoutMs,
+            100L);
+
+    // TableDataManager is not set up yet
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
+
+    // setup TableDataMangers
+    TableDataManager tableDataManagerA = mock(TableDataManager.class);
+    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
+    when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
+
+    // setup SegmentDataManagers
+    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
+    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
+    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
+    when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
+    when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
+
+    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    when(segMngrA1.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    when(segMngrB0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    // ensure negative values are ignored
+    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
+    setupLatestIngestionTimestamp(segMngrA1, -1L);
+    setupLatestIngestionTimestamp(segMngrB0, 0L);
+
+    when(segMngrA0.getSegmentIdleTime()).thenReturn(0L);
+    when(segMngrA1.getSegmentIdleTime()).thenReturn(0L);
+    when(segMngrB0.getSegmentIdleTime()).thenReturn(0L);
+
+    //              total idle time
+    // segA0              0
+    // segA1              0
+    // segB0              0
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
+
+    when(segMngrA0.getSegmentIdleTime()).thenReturn(idleTimeoutMs - 1);
+    when(segMngrA1.getSegmentIdleTime()).thenReturn(idleTimeoutMs);
+    when(segMngrB0.getSegmentIdleTime()).thenReturn(idleTimeoutMs + 1);
+    //              total idle time
+    // segA0              9
+    // segA1              10
+    // segB0              11
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
+
+    when(segMngrA0.getSegmentIdleTime()).thenReturn(idleTimeoutMs);
+    when(segMngrA1.getSegmentIdleTime()).thenReturn(idleTimeoutMs + 1);
+    //              total idle time
+    // segA0              10
+    // segA1              11
+    // segB0              11
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+
+    when(segMngrA0.getSegmentIdleTime()).thenReturn(idleTimeoutMs + 1);
+    //              total idle time
+    // segA0              11
+    // segA1              11
+    // segB0              11
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
+  }
+
+  @Test
+  public void testSegmentsNeverHealthyWhenIdleTimeoutZeroAndNoOtherCriteriaMet() {
+    String segA0 = "tableA__0__0__123Z";
+    String segA1 = "tableA__1__0__123Z";
+    String segB0 = "tableB__0__0__123Z";
+    Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
+
+    // TableDataManager is not set up yet
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
+
+    // setup TableDataMangers
+    TableDataManager tableDataManagerA = mock(TableDataManager.class);
+    TableDataManager tableDataManagerB = mock(TableDataManager.class);
+    when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
+    when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
+
+    // setup SegmentDataManagers
+    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
+    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
+    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
+    when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
+    when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
+
+    when(segMngrA0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    when(segMngrA1.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    when(segMngrB0.fetchLatestStreamOffset(5000)).thenReturn(new LongMsgOffset(20));
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    // ensure negative values are ignored
+    setupLatestIngestionTimestamp(segMngrA0, Long.MIN_VALUE);
+    setupLatestIngestionTimestamp(segMngrA1, -1L);
+    setupLatestIngestionTimestamp(segMngrB0, 0L);
+
+    when(segMngrA0.getSegmentIdleTime()).thenReturn(0L);
+    when(segMngrA1.getSegmentIdleTime()).thenReturn(0L);
+    when(segMngrB0.getSegmentIdleTime()).thenReturn(0L);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
+
+    when(segMngrA0.getSegmentIdleTime()).thenReturn(10L);
+    when(segMngrA1.getSegmentIdleTime()).thenReturn(100L);
+    when(segMngrB0.getSegmentIdleTime()).thenReturn(1000L);
+    assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
+  }
+
+  @Test
   public void segmentBeingCommmitted() {
     String segA0 = "tableA__0__0__123Z";
     String segA1 = "tableA__1__0__123Z";
@@ -199,7 +390,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 100L);
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
@@ -257,7 +448,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     Set<String> consumingSegments = ImmutableSet.of(segA0, segA1, segB0);
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     FreshnessBasedConsumptionStatusChecker statusChecker =
-        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 100L);
+        new FakeFreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments, 10L, 0L, 100L);
 
     // TableDataManager is not set up yet
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
