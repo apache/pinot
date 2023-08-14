@@ -395,7 +395,7 @@ public class ClusterIntegrationTestUtils {
       }
     }
     CSVFormat csvFormat = CSVFormat.DEFAULT.withSkipHeaderRecord(true);
-    for (String recordCsv: csvRecords) {
+    for (String recordCsv : csvRecords) {
       try (CSVParser parser = CSVParser.parse(recordCsv, csvFormat)) {
         for (CSVRecord csv : parser) {
           byte[] keyBytes = (partitionColumnIndex == null) ? Longs.toByteArray(counter++)
@@ -650,7 +650,7 @@ public class ClusterIntegrationTestUtils {
   static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
-    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null);
+    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null, false);
   }
 
   /**
@@ -659,11 +659,12 @@ public class ClusterIntegrationTestUtils {
    */
   static void testQueryWithMatchingRowCount(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
-      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
+      boolean useMultiStageQueryEngine)
       throws Exception {
     try {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
-          extraJsonProperties, true, false);
+          extraJsonProperties, useMultiStageQueryEngine, true, false);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, e);
     }
@@ -671,10 +672,10 @@ public class ClusterIntegrationTestUtils {
 
   static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers,
-      @Nullable Map<String, String> extraJsonProperties) {
+      @Nullable Map<String, String> extraJsonProperties, boolean useMultiStageQueryEngine) {
     try {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
-          extraJsonProperties, false, false);
+          extraJsonProperties, useMultiStageQueryEngine, false, false);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, e);
     }
@@ -682,10 +683,11 @@ public class ClusterIntegrationTestUtils {
 
   static void testQueryViaController(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
-      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties) {
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
+      boolean useMultiStageQueryEngine) {
     try {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
-          extraJsonProperties, false, true);
+          extraJsonProperties, useMultiStageQueryEngine, false, true);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, e);
     }
@@ -694,14 +696,16 @@ public class ClusterIntegrationTestUtils {
   private static void testQueryInternal(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
-      boolean matchingRowCount, boolean viaController)
+      boolean useMultiStageQueryEngine, boolean matchingRowCount, boolean viaController)
       throws Exception {
     // broker response
     JsonNode pinotResponse;
     if (viaController) {
       pinotResponse = ClusterTest.postQueryToController(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
     } else {
-      pinotResponse = ClusterTest.postQuery(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
+      pinotResponse =
+          ClusterTest.postQuery(pinotQuery, getBrokerQueryApiUrl(queryResourceUrl, useMultiStageQueryEngine), headers,
+              extraJsonProperties);
     }
     if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
@@ -824,8 +828,13 @@ public class ClusterIntegrationTestUtils {
       @Nullable Map<String, String> extraJsonProperties)
       throws Exception {
     JsonNode explainPlanForResponse =
-        ClusterTest.postQuery("explain plan for " + pinotQuery, brokerUrl, headers, extraJsonProperties);
+        ClusterTest.postQuery("explain plan for " + pinotQuery, getBrokerQueryApiUrl(brokerUrl, false), headers,
+            extraJsonProperties);
     return ExplainPlanUtils.formatExplainPlan(explainPlanForResponse);
+  }
+
+  public static String getBrokerQueryApiUrl(String brokerBaseApiUrl, boolean useMultiStageQueryEngine) {
+    return useMultiStageQueryEngine ? brokerBaseApiUrl + "/query" : brokerBaseApiUrl + "/query/sql";
   }
 
   private static int getH2ExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
@@ -1021,6 +1030,7 @@ public class ClusterIntegrationTestUtils {
     String failureMessage = "Caught exception while testing query!";
     failure(pinotQuery, h2Query, failureMessage, e);
   }
+
   /**
    * Helper method to report failures.
    *
