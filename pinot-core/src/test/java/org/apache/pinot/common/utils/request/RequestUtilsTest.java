@@ -150,5 +150,14 @@ public class RequestUtilsTest {
     // test for self join queries
     query = "SELECT tbl1.a FROM tbl1 JOIN(SELECT a FROM tbl1) as self ON tbl1.a=self.a ";
     Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("tbl1"));
+
+    // test for sub query
+    query = "SELECT * FROM (SELECT column1 FROM table_name) AS alias_name";
+    Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("table_name"));
+
+    // test for lateral join
+    query = "SELECT a.col1, newb.sum_col3 FROM a JOIN LATERAL "
+        + "(SELECT SUM(col3) as sum_col3 FROM b WHERE col2 = a.col2) AS newb ON TRUE";
+    Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("a", "b"));
   }
 }

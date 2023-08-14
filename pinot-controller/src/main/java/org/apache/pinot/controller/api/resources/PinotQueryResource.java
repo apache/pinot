@@ -49,7 +49,6 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -66,10 +65,6 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
-import org.apache.pinot.query.QueryEnvironment;
-import org.apache.pinot.query.catalog.PinotCatalog;
-import org.apache.pinot.query.type.TypeFactory;
-import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -201,9 +196,7 @@ public class PinotQueryResource {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
-    QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
-    List<String> tableNames = queryEnvironment.getTableNamesForQuery(query);
+    Set<String> tableNames = RequestUtils.getTableNames(query);
     List<String> instanceIds;
     if (tableNames.size() != 0) {
       List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
@@ -255,7 +248,7 @@ public class PinotQueryResource {
   }
 
   // given a list of tables, returns the list of tableConfigs
-  private List<TableConfig> getListTableConfigs(List<String> tableNames) {
+  private List<TableConfig> getListTableConfigs(Set<String> tableNames) {
     List<TableConfig> allTableConfigList = new ArrayList<>();
     for (String tableName : tableNames) {
       List<TableConfig> tableConfigList = new ArrayList<>();

@@ -304,6 +304,55 @@ public class RequestUtils {
     return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=').split(optionStr);
   }
 
+  /**
+   * Returns all the table names from a given {@link SqlNode}.
+   * <pre>
+   * 1. FROM Clause (FromNode): The main location where the table name is specified.
+   * </pre>
+   * {@code
+   *     SELECT * FROM table_name;
+   * }
+   * <pre>
+   * 2. JOIN Clauses (JoinNode): Table names will be part of INNER JOIN, LEFT JOIN, RIGHT JOIN, FULL JOIN, etc.
+   * </pre>
+   * {@code
+   *     SELECT * FROM table_name1 JOIN table_name2 ON table_name1.column_name = table_name2.column_name;
+   * }
+   * <pre>
+   * 3. SubQueries in FROM Clause (SubQueryNode): Subqueries in the FROM clause might contain additional table names.
+   * </pre>
+   * {@code
+   *     SELECT * FROM (SELECT * FROM table_name) WHERE column_name = value;
+   * }
+   * <pre>
+   * 4. WITH Clause (WithNode): Common Table Expressions (CTEs) may contain table names.
+   * </pre>
+   * {@code
+   *     WITH table_name1 AS (SELECT * FROM table_name2) SELECT * FROM table_name1;
+   * }
+   * <pre>
+   * 5. LATERAL or APPLY Operators (LateralNode, ApplyNode): These operators allow you to reference columns of
+   *    preceding tables in FROM clause sub-queries.
+   * </pre>
+   * {@code
+   *     SELECT * FROM table_name1, LATERAL (SELECT * FROM table_name2) AS table_name2;
+   * }
+   * <pre>
+   * 6. UNION, INTERSECT, EXCEPT Clauses (SetOperationNode): These set operations between multiple SELECT statements
+   *    can also contain table names.
+   * </pre>
+   * {@code
+   *     SELECT * FROM table_name1 UNION SELECT * FROM table_name2;
+   * }
+   * <pre>
+   * 7. WHERE Clause (WhereNode): WHERE clause can contain table names in subqueries.
+   * </pre>
+   * {@code
+   *     SELECT * FROM table_name WHERE column_name IN (SELECT * FROM table_name2);
+   * }
+   * @param sqlNode Sql Query Node
+   * @return Set of table names
+   */
   public static Set<String> getTableNames(SqlNode sqlNode) {
     Set<String> tableNames = new HashSet<>();
     if (sqlNode instanceof SqlSelect) {
