@@ -96,11 +96,11 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
     Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
-    Function equalsFunc = caseFunc.getOperands().get(1).getFunctionCall();
+    Assert.assertEquals(caseFunc.getOperands().get(1).getLiteral().getFieldValue(), "The quantity is greater than 30");
+    Function equalsFunc = caseFunc.getOperands().get(2).getFunctionCall();
     Assert.assertEquals(equalsFunc.getOperator(), FilterKind.EQUALS.name());
     Assert.assertEquals(equalsFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(equalsFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
-    Assert.assertEquals(caseFunc.getOperands().get(2).getLiteral().getFieldValue(), "The quantity is greater than 30");
     Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), "The quantity is 30");
     Assert.assertEquals(caseFunc.getOperands().get(4).getLiteral().getFieldValue(), "The quantity is under 30");
 
@@ -127,16 +127,16 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
     Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
-    greatThanFunc = caseFunc.getOperands().get(1).getFunctionCall();
-    Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
-    Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
-    Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 20L);
+    Assert.assertEquals(caseFunc.getOperands().get(1).getLiteral().getFieldValue(), 3L);
     greatThanFunc = caseFunc.getOperands().get(2).getFunctionCall();
     Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
     Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
+    Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 20L);
+    Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), 2L);
+    greatThanFunc = caseFunc.getOperands().get(4).getFunctionCall();
+    Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
+    Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 10L);
-    Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), 3L);
-    Assert.assertEquals(caseFunc.getOperands().get(4).getLiteral().getFieldValue(), 2L);
     Assert.assertEquals(caseFunc.getOperands().get(5).getLiteral().getFieldValue(), 1L);
     Assert.assertEquals(caseFunc.getOperands().get(6).getLiteral().getFieldValue(), 0L);
   }

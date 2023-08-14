@@ -430,7 +430,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     assertNull(rows.get(0)[1]);
     assertEquals(resultTable.getDataSchema().getColumnName(0), "exprmax(longColumn,intColumn)");
     assertEquals(resultTable.getDataSchema().getColumnName(1),
-        "exprmin(stringColumn,case(equals(stringColumn,'a33'),equals(stringColumn,'a22'),'b','a','c'))");
+        "exprmin(stringColumn,case(equals(stringColumn,'a33'),'b',equals(stringColumn,'a22'),'a','c'))");
     Assert.assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.STRING);
     Assert.assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
   }
