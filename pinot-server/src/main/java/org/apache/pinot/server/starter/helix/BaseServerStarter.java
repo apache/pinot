@@ -478,8 +478,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     long checkIntervalMs = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS,
         Server.DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS);
 
+    Status serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
     while (System.currentTimeMillis() < endTimeMs) {
-      Status serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
+      serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
       long currentTimeMs = System.currentTimeMillis();
       if (serviceStatus == Status.GOOD) {
         LOGGER.info("Service status is GOOD after {}ms", currentTimeMs - startTimeMs);
@@ -501,6 +502,16 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
+    boolean exitServerOnIncompleteStartup = _serverConf.getProperty(Server.CONFIG_OF_EXIT_SERVER_ON_INCOMPLETE_STARTUP,
+        Server.DEFAULT_EXIT_SERVER_ON_INCOMPLETE_STARTUP);
+    if (exitServerOnIncompleteStartup) {
+      String errorMessage = String.format("Service status %s has not turned GOOD within %dms: %s. Exiting server.",
+          serviceStatus, System.currentTimeMillis() - startTimeMs, ServiceStatus.getStatusDescription());
+      LOGGER.error(errorMessage);
+      // Stop the server so that it will be removed from the Helix cluster
+      stop();
+      throw new IllegalStateException(errorMessage);
+    }
     LOGGER.warn("Service status has not turned GOOD within {}ms: {}", System.currentTimeMillis() - startTimeMs,
         ServiceStatus.getStatusDescription());
   }
@@ -651,8 +662,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
-    _serverQueriesDisabledTracker.stop();
-    _realtimeLuceneIndexRefreshState.stop();
+    // If the server stops while waiting for GOOD status, these will not have been setup yet.
+    if (_serverQueriesDisabledTracker != null) {
+      _serverQueriesDisabledTracker.stop();
+    }
+    if (_realtimeLuceneIndexRefreshState != null) {
+      _realtimeLuceneIndexRefreshState.stop();
+    }
     try {
       // Close PinotFS after all data managers are shutdown. Otherwise, segments which are being committed will not
       // be uploaded to the deep-store.
