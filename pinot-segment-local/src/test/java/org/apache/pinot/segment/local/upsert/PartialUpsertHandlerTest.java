@@ -43,31 +43,31 @@ public class PartialUpsertHandlerTest {
 
   @Test
   public void testOverwrite() {
-    testMerge(true, 2, true, 2, "field1", 2);
-    testMerge(true, 2, false, 8, "field1", 8);
-    testMerge(false, 8, true, 2, "field1", 8);
-    testMerge(false, 3, false, 5, "field1", 5);
+    testMerge(true, 2, true, 2, "field1", 2, true);
+    testMerge(true, 2, false, 8, "field1", 8, false);
+    testMerge(false, 8, true, 2, "field1", 8, false);
+    testMerge(false, 3, false, 5, "field1", 5, false);
   }
 
   @Test
   public void testNonOverwrite() {
-    testMerge(true, 2, true, 2, "field2", 2);
-    testMerge(true, 2, false, 8, "field2", 8);
-    testMerge(false, 8, true, 2, "field2", 8);
-    testMerge(false, 3, false, 5, "field2", 3);
+    testMerge(true, 2, true, 2, "field2", 2, true);
+    testMerge(true, 2, false, 8, "field2", 8, false);
+    testMerge(false, 8, true, 2, "field2", 8, false);
+    testMerge(false, 3, false, 5, "field2", 3, false);
   }
 
   @Test
   public void testComparisonColumn() {
     // Even though the default strategy is IGNORE, we do not apply the mergers to comparison columns
-    testMerge(true, 0, true, 0, "hoursSinceEpoch", 0);
-    testMerge(true, 0, false, 8, "hoursSinceEpoch", 8);
-    testMerge(false, 8, true, 0, "hoursSinceEpoch", 8);
-    testMerge(false, 2, false, 8, "hoursSinceEpoch", 8);
+    testMerge(true, 0, true, 0, "hoursSinceEpoch", 0, true);
+    testMerge(true, 0, false, 8, "hoursSinceEpoch", 8, false);
+    testMerge(false, 8, true, 0, "hoursSinceEpoch", 8, false);
+    testMerge(false, 2, false, 8, "hoursSinceEpoch", 8, false);
   }
 
   public void testMerge(boolean isPreviousNull, Object previousValue, boolean isNewNull, Object newValue,
-      String columnName, Object expected) {
+      String columnName, Object expectedValue, boolean isExpectedNull) {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
         .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
@@ -94,7 +94,8 @@ public class PartialUpsertHandlerTest {
         row.putValue(columnName, newValue);
       }
       handler.merge(segment, 1, row);
-      assertEquals(row.getValue(columnName), expected);
+      assertEquals(row.getValue(columnName), expectedValue);
+      assertEquals(row.isNullValue(columnName), isExpectedNull);
     }
   }
 }

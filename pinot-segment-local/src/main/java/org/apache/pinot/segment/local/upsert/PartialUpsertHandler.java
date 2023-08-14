@@ -87,6 +87,7 @@ public class PartialUpsertHandler {
                 // non-null comparison column values from the previous record, and the sole non-null comparison column
                 // value from the new record.
                 newRecord.putValue(column, previousValue);
+                newRecord.removeNullValueField(column);
               } else if (!_comparisonColumns.contains(column)) {
                 newRecord.putValue(column, merger.merge(previousValue, newRecord.getValue(column)));
               }
