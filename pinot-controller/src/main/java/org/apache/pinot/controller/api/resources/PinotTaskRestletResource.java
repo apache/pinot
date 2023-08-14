@@ -410,7 +410,7 @@ public class PinotTaskRestletResource {
   @ApiOperation("Get the task state for the given task (deprecated)")
   public StringResultResponse getTaskStateDeprecated(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
-    return new StringResultResponse(_pinotHelixTaskResourceManager.getTaskState(taskName).toString());
+    return new StringResultResponse(String.valueOf(_pinotHelixTaskResourceManager.getTaskState(taskName)));
   }
 
   @GET
