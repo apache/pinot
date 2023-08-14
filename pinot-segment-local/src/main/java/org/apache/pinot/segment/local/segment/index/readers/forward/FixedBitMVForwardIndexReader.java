@@ -52,7 +52,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * </ul>
  */
 public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<FixedBitMVForwardIndexReader.Context>,
-                                                           ForwardIndexReader.ValueRangeProvider<FixedBitMVForwardIndexReader.Context> {
+                                                           ForwardIndexReader.ValueRangeProvider
+                                                               <FixedBitMVForwardIndexReader.Context> {
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
   private final FixedByteValueReaderWriter _chunkOffsetReader;

@@ -32,7 +32,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * ids.
  */
 public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<ForwardIndexReaderContext>,
-                                                           ForwardIndexReader.ValueRangeProvider<ForwardIndexReaderContext> {
+                                                           ForwardIndexReader.ValueRangeProvider
+                                                               <ForwardIndexReaderContext> {
   private final FixedBitIntReaderWriter _reader;
   private final int _numBitsPerValue;
 

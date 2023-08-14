@@ -33,8 +33,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * LONG, FLOAT, DOUBLE).
  * <p>For data layout, please refer to the documentation for {@link FixedByteChunkSVForwardIndexWriter}
  */
-public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkForwardIndexReader implements
-                                                                                                ForwardIndexReader.ValueRangeProvider<ChunkReaderContext> {
+public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkForwardIndexReader
+    implements ForwardIndexReader.ValueRangeProvider<ChunkReaderContext> {
   public static final int VERSION = 4;
 
   private final int _shift;
@@ -116,8 +116,7 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
     return decompressChunk(chunkId, context);
   }
 
-  protected void recordDocIdRanges(int docId, ChunkReaderContext context,
-      List<ValueRange> ranges) {
+  protected void recordDocIdRanges(int docId, ChunkReaderContext context, List<ValueRange> ranges) {
     int chunkId = docId >>> _shift;
     if (context.getChunkId() == chunkId) {
       ranges.addAll(context.getRanges());
