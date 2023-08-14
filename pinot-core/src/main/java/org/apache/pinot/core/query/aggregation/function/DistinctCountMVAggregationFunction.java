@@ -34,7 +34,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class DistinctCountMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
 
   public DistinctCountMVAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTCOUNTMV);
+    super(expression, AggregationFunctionType.DISTINCTCOUNTMV, false);
   }
 
 

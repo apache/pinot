@@ -479,6 +479,91 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertNotNull(resultTable.getRows().get(0)[0]);
   }
 
+  @Test(dataProvider = "NumberTypes")
+  public void testDistinctCountNumberTypes(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTCOUNT(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0)[0], 1);
+  }
+
+  @DataProvider(name = "DistinctCountObjectTypes")
+  public static Object[][] getDistinctAggregationObjectTypes() {
+    return new Object[][]{
+        {FieldSpec.DataType.STRING, "a"}, {
+        FieldSpec.DataType.BYTES, "a string".getBytes()
+    }
+    };
+  }
+
+  @Test(dataProvider = "DistinctCountObjectTypes")
+  public void testObjectDistinctCountObjectTypes(FieldSpec.DataType dataType, Object value)
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(value);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTCOUNT(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0)[0], 1);
+  }
+
+  @Test
+  public void testDistinctSum()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    insertRow(2);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTSUM(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0)[0], (double) 3);
+  }
+
+  @Test
+  public void testDistinctAvg()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    insertRow(2);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTAVG(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0)[0], 1.5);
+  }
+
   @Test
   public void testTransformBlockValSetGetNullBitmap()
       throws Exception {

@@ -257,7 +257,7 @@ public class AggregationFunctionFactory {
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(firstArgument);
           case DISTINCTCOUNT:
-            return new DistinctCountAggregationFunction(firstArgument);
+            return new DistinctCountAggregationFunction(firstArgument, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
             return new DistinctCountBitmapAggregationFunction(firstArgument);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
@@ -275,9 +275,9 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTRAWTHETASKETCH:
             return new DistinctCountRawThetaSketchAggregationFunction(arguments);
           case DISTINCTSUM:
-            return new DistinctSumAggregationFunction(firstArgument);
+            return new DistinctSumAggregationFunction(firstArgument, nullHandlingEnabled);
           case DISTINCTAVG:
-            return new DistinctAvgAggregationFunction(firstArgument);
+            return new DistinctAvgAggregationFunction(firstArgument, nullHandlingEnabled);
           case IDSET:
             return new IdSetAggregationFunction(arguments);
           case COUNTMV:
