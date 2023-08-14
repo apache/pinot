@@ -49,6 +49,10 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_DEFAULT_RAW_VALUE = "n";
   public static final String TEXT_INDEX_STOP_WORD_INCLUDE_KEY = "stopWordInclude";
   public static final String TEXT_INDEX_STOP_WORD_EXCLUDE_KEY = "stopWordExclude";
+  public static final String TEXT_INDEX_LUCENE_USE_COMPOUND_FILE = "luceneUseCompoundFile";
+  public static final boolean TEXT_INDEX_DEFAULT_LUCENE_USE_COMPOUND_FILE = true;
+  public static final String TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB = "luceneMaxBufferSizeMB";
+  public static final int TEXT_INDEX_DEFAULT_LUCENE_MAX_BUFFER_SIZE_MB = 500;
   public static final String TEXT_INDEX_STOP_WORD_SEPERATOR = ",";
   // "native" for native, default is Lucene
   public static final String TEXT_FST_TYPE = "fstType";

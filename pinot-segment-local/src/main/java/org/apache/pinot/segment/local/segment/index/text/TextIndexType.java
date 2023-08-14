@@ -190,6 +190,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       throw new IllegalArgumentException("A consumer directory is required");
     }
     return new RealtimeLuceneTextIndex(context.getFieldSpec().getName(), context.getConsumerDir(),
-        context.getSegmentName(), config.getStopWordsInclude(), config.getStopWordsExclude());
+        context.getSegmentName(), config.getStopWordsInclude(), config.getStopWordsExclude(),
+        config.isLuceneUseCompoundFile(), config.getLuceneMaxBufferSizeMB());
   }
 }

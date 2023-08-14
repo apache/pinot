@@ -50,9 +50,6 @@ import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCr
  * and realtime from {@link RealtimeLuceneTextIndex}
  */
 public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
-  // TODO: make buffer size configurable choosing a default value based on the heap usage results in design doc
-  private static final int LUCENE_INDEX_MAX_BUFFER_SIZE_MB = 500;
-
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
 
   private final String _textColumn;
@@ -69,7 +66,6 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   public static final CharArraySet ENGLISH_STOP_WORDS_SET = new CharArraySet(getDefaultEnglishStopWordsSet(), true);
-
 
   /**
    * Called by {@link SegmentColumnarIndexCreator}
@@ -97,7 +93,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param stopWordsExclude the words to exclude from the default stop word list
    */
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit,
-      @Nullable List<String> stopWordsInclude, @Nullable List<String> stopWordsExclude) {
+      @Nullable List<String> stopWordsInclude, @Nullable List<String> stopWordsExclude, boolean useCompoundFile,
+      int maxBufferSizeMB) {
     _textColumn = column;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
@@ -108,8 +105,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       StandardAnalyzer standardAnalyzer =
           TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(stopWordsInclude, stopWordsExclude);
       IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
-      indexWriterConfig.setRAMBufferSizeMB(LUCENE_INDEX_MAX_BUFFER_SIZE_MB);
+      indexWriterConfig.setRAMBufferSizeMB(maxBufferSizeMB);
       indexWriterConfig.setCommitOnClose(commit);
+      indexWriterConfig.setUseCompoundFile(useCompoundFile);
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (Exception e) {
       throw new RuntimeException(
@@ -119,7 +117,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   public LuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
     this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(),
-        indexConfig.getStopWordsInclude(), indexConfig.getStopWordsExclude());
+        indexConfig.getStopWordsInclude(), indexConfig.getStopWordsExclude(), indexConfig.isLuceneUseCompoundFile(),
+        indexConfig.getLuceneMaxBufferSizeMB());
   }
 
   public IndexWriter getIndexWriter() {
