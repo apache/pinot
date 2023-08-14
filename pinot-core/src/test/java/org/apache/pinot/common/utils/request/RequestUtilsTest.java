@@ -53,6 +53,12 @@ public class RequestUtilsTest {
     query = "select * from myTable JOIN myTable2 ON myTable.foo = myTable2.bar";
     Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("myTable", "myTable2"));
 
+    query = "SELECT e.employee_id, e.name, d.department_name "
+        + "FROM employees AS e "
+        + "INNER JOIN departments AS d ON e.department_id = d.department_id "
+        + "WHERE e.salary > 50000 ";
+    Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("employees", "departments"));
+
     query = "select * from myTable,myTable2,myTable3 WHERE myTable.foo = myTable2.bar AND myTable3.foo = 'bar'";
     Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("myTable", "myTable2", "myTable3"));
 
@@ -159,5 +165,23 @@ public class RequestUtilsTest {
     query = "SELECT a.col1, newb.sum_col3 FROM a JOIN LATERAL "
         + "(SELECT SUM(col3) as sum_col3 FROM b WHERE col2 = a.col2) AS newb ON TRUE";
     Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("a", "b"));
+
+    // test from with AS clause
+    query = "SELECT * FROM myTable AS T1 WHERE col1 IN (SELECT col2 FROM T2)";
+    Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("myTable", "T2"));
+
+    // test from with AS clause
+    query = "SELECT * FROM (select * from myTable As T3) AS T1 WHERE col1 = (SELECT col2 FROM T2 LIMIT 1)";
+    Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("myTable", "T2"));
+
+    // test from with AS clause
+    query = "SELECT * FROM (select * from myTable As T4 WHERE col4 = (SELECT col2 FROM T3 LIMIT 1)) AS T1 "
+        + "WHERE col1 IN (SELECT col2 FROM T2)";
+    Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("myTable", "T2", "T3"));
+
+    // test from with AS clause
+    query = "SELECT * FROM (select * from myTable As T4 WHERE col4 = (SELECT col2 FROM T4 LIMIT 1)) AS T1 "
+        + "WHERE col1 IN (SELECT col2 FROM T2)";
+    Assert.assertEquals(RequestUtils.getTableNames(query), ImmutableSet.of("myTable", "T2"));
   }
 }

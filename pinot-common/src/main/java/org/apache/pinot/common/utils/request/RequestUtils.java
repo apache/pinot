@@ -355,18 +355,25 @@ public class RequestUtils {
    */
   public static Set<String> getTableNames(SqlNode sqlNode) {
     Set<String> tableNames = new HashSet<>();
+    Set<String> tableNameAlias = new HashSet<>();
+    extractTableNames(sqlNode, tableNames, tableNameAlias);
+    tableNames.removeAll(tableNameAlias);
+    return tableNames;
+  }
+
+  public static void extractTableNames(SqlNode sqlNode, Set<String> tableNames, Set<String> tableNameAlias) {
     if (sqlNode instanceof SqlSelect) {
       // Handle SqlSelect query
       SqlNode fromNode = ((SqlSelect) sqlNode).getFrom();
       if ((fromNode instanceof SqlBasicCall)
           && (((SqlBasicCall) fromNode).getOperator() instanceof SqlAsOperator)) {
-        tableNames.addAll(getTableNames(((SqlBasicCall) fromNode).getOperandList().get(0)));
+        extractTableNames(fromNode, tableNames, tableNameAlias);
       } else if (fromNode instanceof SqlIdentifier) {
         tableNames.add(getTableName((SqlIdentifier) fromNode));
-        tableNames.addAll(getTableNames(((SqlSelect) sqlNode).getWhere()));
       } else {
-        tableNames.addAll(getTableNames(fromNode));
+        extractTableNames(fromNode, tableNames, tableNameAlias);
       }
+      extractTableNames(((SqlSelect) sqlNode).getWhere(), tableNames, tableNameAlias);
     } else if (sqlNode instanceof SqlJoin) {
       // Handle SqlJoin query
       SqlNode left = ((SqlJoin) sqlNode).getLeft();
@@ -374,18 +381,17 @@ public class RequestUtils {
       if (left instanceof SqlIdentifier) {
         tableNames.add(getTableName(((SqlIdentifier) left)));
       } else {
-        tableNames.addAll(getTableNames(left));
+        extractTableNames(left, tableNames, tableNameAlias);
       }
       if (right instanceof SqlIdentifier) {
         tableNames.add(getTableName(((SqlIdentifier) right)));
       } else {
-        tableNames.addAll(getTableNames(right));
+        extractTableNames(right, tableNames, tableNameAlias);
       }
     } else if (sqlNode instanceof SqlOrderBy) {
       // Handle SqlOrderBy query
-      // tableNames.addAll(getTableNames(((SqlOrderBy) sqlNode).query));
       for (SqlNode node : ((SqlOrderBy) sqlNode).getOperandList()) {
-        tableNames.addAll(getTableNames(node));
+        extractTableNames(node, tableNames, tableNameAlias);
       }
     } else if (sqlNode instanceof SqlBasicCall) {
       // Handle SqlBasicCall query
@@ -394,11 +400,15 @@ public class RequestUtils {
         if (firstOperand instanceof SqlIdentifier) {
           tableNames.add(getTableName((SqlIdentifier) firstOperand));
         } else {
-          tableNames.addAll(getTableNames(firstOperand));
+          extractTableNames(firstOperand, tableNames, tableNameAlias);
+        }
+        SqlNode secondOperand = ((SqlBasicCall) sqlNode).getOperandList().get(1);
+        if (secondOperand instanceof SqlIdentifier) {
+          tableNameAlias.add(getTableName((SqlIdentifier) secondOperand));
         }
       } else {
         for (SqlNode node : ((SqlBasicCall) sqlNode).getOperandList()) {
-          tableNames.addAll(getTableNames(node));
+          extractTableNames(node, tableNames, tableNameAlias);
         }
       }
     } else if (sqlNode instanceof SqlWith) {
@@ -406,23 +416,22 @@ public class RequestUtils {
       SqlWith sqlWith = (SqlWith) sqlNode;
       List<SqlNode> withList = sqlWith.withList;
       // Table names from body, it may contains table alias from WITH clause
-      tableNames.addAll(getTableNames(sqlWith.body));
+      extractTableNames(sqlWith.body, tableNames, tableNameAlias);
       // Table alias from WITH clause, should be removed from the final results
-      withList.forEach(
-          sqlWithItem -> tableNames.remove(getTableName(((SqlWithItem) sqlWithItem).name)));
+      withList.forEach(sqlWithItem -> tableNameAlias.add(getTableName(((SqlWithItem) sqlWithItem).name)));
       // Table names from WITH clause
       withList.forEach(
-          sqlWithItem -> tableNames.addAll(getTableNames(((SqlWithItem) sqlWithItem).getOperandList().get(2))));
+          sqlWithItem ->
+              extractTableNames(((SqlWithItem) sqlWithItem).getOperandList().get(2), tableNames, tableNameAlias));
     } else if (sqlNode instanceof SqlSetOption) {
       // Handle SqlSetOption query
       for (SqlNode node : ((SqlSetOption) sqlNode).getOperandList()) {
-        tableNames.addAll(getTableNames(node));
+        extractTableNames(node, tableNames, tableNameAlias);
       }
     } else if (sqlNode instanceof SqlExplain) {
       // Handle SqlExplain query
-      tableNames.addAll(getTableNames(((SqlExplain) sqlNode).getExplicandum()));
+      extractTableNames(((SqlExplain) sqlNode).getExplicandum(), tableNames, tableNameAlias);
     }
-    return tableNames;
   }
 
   /**
