@@ -506,7 +506,7 @@ const QueryPage = () => {
                     onChange={handleChange}
                     checked={checked.useMSE}
                 />
-                Use V2 Engine
+                Use Multi-Stage Engine
               </Grid>
 
               <Grid item xs={3}>
