@@ -483,6 +483,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           recreateStreamConsumer(
               String.format("Total idle time: %d ms exceeded idle timeout: %d ms", streamIdleTimeMs,
                   idleTimeoutMillis));
+          _idleTimer.markStreamNotIdle();
         }
       }
 

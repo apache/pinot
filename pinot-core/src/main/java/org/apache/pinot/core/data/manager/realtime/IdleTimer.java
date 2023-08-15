@@ -32,8 +32,8 @@ package org.apache.pinot.core.data.manager.realtime;
  */
 public class IdleTimer {
 
-  private long _streamIdleStartTimeMs = 0;
-  private long _streamIdleTimeMs = 0;
+  private volatile long _streamIdleStartTimeMs = 0;
+  private volatile long _streamIdleTimeMs = 0;
   private long _consumeIdleStartTimeMs = 0;
   private long _consumeIdleTimeMs = 0;
 

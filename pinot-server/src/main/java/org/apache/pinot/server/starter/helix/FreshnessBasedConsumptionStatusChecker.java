@@ -54,14 +54,6 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     return false;
   }
 
-  private boolean isOffsetOutOfRetention(StreamPartitionMsgOffset earliestOffset,
-      StreamPartitionMsgOffset currentOffset) {
-    if (earliestOffset != null && currentOffset != null) {
-      return earliestOffset.compareTo(currentOffset) > 0;
-    }
-    return false;
-  }
-
   private boolean segmentHasBeenIdleLongerThanThreshold(long segmentIdleTime) {
     return _idleTimeoutMs > 0 && segmentIdleTime > _idleTimeoutMs;
   }
@@ -96,16 +88,7 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
       return true;
     }
 
-    // If the earliest available kafka offset is later than the current offset, then for the purposes of
-    // this check, we are caught up. This can happen if the segment has not consumed data for some time,
-    // and that data has since been retentioned.
     StreamPartitionMsgOffset earliestStreamOffset = rtSegmentDataManager.fetchEarliestStreamOffset(5000);
-    if (isOffsetOutOfRetention(earliestStreamOffset, currentOffset)) {
-      _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}. "
-              + "But the earliest available offset {} is past the current offset {}.", segmentName, freshnessMs,
-          _minFreshnessMs, earliestStreamOffset, currentOffset);
-      return true;
-    }
 
     long idleTimeMs = rtSegmentDataManager.getSegmentIdleTime();
     if (segmentHasBeenIdleLongerThanThreshold(idleTimeMs)) {
