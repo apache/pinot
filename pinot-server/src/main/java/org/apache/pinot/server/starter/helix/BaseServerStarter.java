@@ -663,7 +663,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
-    // If the server stops while waiting for GOOD status, these will not have been setup yet.
     if (_serverQueriesDisabledTracker != null) {
       _serverQueriesDisabledTracker.stop();
     }
