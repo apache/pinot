@@ -555,15 +555,6 @@ public class CommonConstants {
     // Use 10 seconds by default so high volume stream are able to catch up.
     // This is also the default in the case a user misconfigures this by setting to <= 0.
     public static final int DEFAULT_STARTUP_REALTIME_MIN_FRESHNESS_MS = 10000;
-    // The timeouts above determine how long servers will poll their status before giving up.
-    // This configuration determines what we do when we give up. By default, we will mark the
-    // server as healthy and start the query server. If this is set to true, we instead throw
-    // an exception and exit the server. This is useful if you want to ensure that the server
-    // is always fully ready before accepting queries. But note that this can cause the server
-    // to never be healthy if there is some reason that it can never reach a GOOD status.
-    public static final String CONFIG_OF_EXIT_SERVER_ON_INCOMPLETE_STARTUP =
-        "pinot.server.starter.exitServerOnStartupStatusFailure";
-    public static final boolean DEFAULT_EXIT_SERVER_ON_INCOMPLETE_STARTUP = false;
 
     public static final String DEFAULT_READ_MODE = "mmap";
     // Whether to reload consuming segment on scheme update
@@ -594,6 +585,15 @@ public class CommonConstants {
     public static final String CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK =
         "pinot.server.startup.enableServiceStatusCheck";
     public static final boolean DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK = true;
+    // The timeouts above determine how long servers will poll their status before giving up.
+    // This configuration determines what we do when we give up. By default, we will mark the
+    // server as healthy and start the query server. If this is set to true, we instead throw
+    // an exception and exit the server. This is useful if you want to ensure that the server
+    // is always fully ready before accepting queries. But note that this can cause the server
+    // to never be healthy if there is some reason that it can never reach a GOOD status.
+    public static final String CONFIG_OF_EXIT_SERVER_ON_INCOMPLETE_STARTUP =
+        "pinot.server.starter.exitServerOnStartupStatusFailure";
+    public static final boolean DEFAULT_EXIT_SERVER_ON_INCOMPLETE_STARTUP = false;
     public static final String CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS =
         "pinot.server.startup.serviceStatusCheckIntervalMs";
     public static final long DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS = 10_000L;

@@ -478,7 +478,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     long checkIntervalMs = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS,
         Server.DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS);
 
-    Status serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
+    Status serviceStatus = null;
     while (System.currentTimeMillis() < endTimeMs) {
       serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
       long currentTimeMs = System.currentTimeMillis();
@@ -508,8 +508,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
       String errorMessage = String.format("Service status %s has not turned GOOD within %dms: %s. Exiting server.",
           serviceStatus, System.currentTimeMillis() - startTimeMs, ServiceStatus.getStatusDescription());
       LOGGER.error(errorMessage);
-      // Stop the server so that it will be removed from the Helix cluster
-      stop();
+      // If we exit here, only the _adminApiApplication and _helixManager are initialized, so we only stop them
+      _adminApiApplication.stop();
+      _helixManager.disconnect();
       throw new IllegalStateException(errorMessage);
     }
     LOGGER.warn("Service status has not turned GOOD within {}ms: {}", System.currentTimeMillis() - startTimeMs,
