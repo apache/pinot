@@ -41,6 +41,7 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
@@ -270,6 +271,8 @@ public class QueryDispatcher {
               int colRef = field.left;
               if (rawRow[colRef] instanceof ByteArray) {
                 row[colId++] = ((ByteArray) rawRow[colRef]).toHexString();
+              } else if (resultSchema.getColumnDataType(colId) == DataSchema.ColumnDataType.TIMESTAMP) {
+                row[colId++] = PinotDataType.TIMESTAMP.toTimestamp(rawRow[colRef]).toString();
               } else {
                 row[colId++] = rawRow[colRef];
               }
