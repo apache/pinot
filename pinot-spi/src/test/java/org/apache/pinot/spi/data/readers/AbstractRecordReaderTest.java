@@ -46,7 +46,7 @@ public abstract class AbstractRecordReaderTest {
   private final static Random RANDOM = new Random(System.currentTimeMillis());
   protected final static int SAMPLE_RECORDS_SIZE = 10000;
 
-  protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordReaderTest");
+  protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
   protected final File _dataFile = new File(_tempDir, getDataFileName());
   protected List<Map<String, Object>> _records;
   protected List<Object[]> _primaryKeys;

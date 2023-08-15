@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -30,29 +30,27 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.avro.Schema.Field;
-import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
+
+  protected static final String DEFAULT_TABLE_NAME = "JsonPathTest";
+
   protected static final int NUM_TOTAL_DOCS = 1000;
   private static final String MY_MAP_STR_FIELD_NAME = "myMapStr";
   private static final String MY_MAP_STR_K1_FIELD_NAME = "myMapStr_k1";
@@ -67,27 +65,24 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     return NUM_TOTAL_DOCS;
   }
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+  @Override
+  public Schema createSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(getTableName())
+        .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
+        .addSingleValueDimension(MY_MAP_STR_FIELD_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(MY_MAP_STR_K1_FIELD_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(MY_MAP_STR_K2_FIELD_NAME, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(COMPLEX_MAP_STR_FIELD_NAME, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(COMPLEX_MAP_STR_K3_FIELD_NAME, FieldSpec.DataType.STRING).build();
+  }
 
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
+  @Override
+  public String getTableName() {
+    return DEFAULT_TABLE_NAME;
+  }
 
-    // Create and upload the schema and table config
-    String rawTableName = getTableName();
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(rawTableName).addSingleValueDimension("myMap", DataType.STRING)
-            .addSingleValueDimension(MY_MAP_STR_FIELD_NAME, DataType.STRING)
-            .addSingleValueDimension(MY_MAP_STR_K1_FIELD_NAME, DataType.STRING)
-            .addSingleValueDimension(MY_MAP_STR_K2_FIELD_NAME, DataType.STRING)
-            .addSingleValueDimension(COMPLEX_MAP_STR_FIELD_NAME, DataType.STRING)
-            .addMultiValueDimension(COMPLEX_MAP_STR_K3_FIELD_NAME, DataType.STRING).build();
-    addSchema(schema);
+  @Override
+  public TableConfig createOfflineTableConfig() {
     List<TransformConfig> transformConfigs = Arrays.asList(
         new TransformConfig(MY_MAP_STR_K1_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k1')"),
         new TransformConfig(MY_MAP_STR_K2_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k2')"),
@@ -95,26 +90,19 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
             "jsonPathArray(" + COMPLEX_MAP_STR_FIELD_NAME + ", '$.k3')"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setIngestionConfig(ingestionConfig)
-            .build();
-    addTableConfig(tableConfig);
-
-    // Create and upload segments
-    File avroFile = createAvroFile();
-    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(rawTableName, _tarDir);
-
-    // Wait for all documents loaded
-    waitForAllDocsLoaded(60_000);
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setIngestionConfig(ingestionConfig)
+        .build();
   }
 
-  private File createAvroFile()
+  @Override
+  public File createAvroFile()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    List<Field> fields =
-        Arrays.asList(new Field(MY_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(Type.STRING), null, null),
-            new Field(COMPLEX_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(Type.STRING), null, null));
+    List<org.apache.avro.Schema.Field> fields =
+        Arrays.asList(new org.apache.avro.Schema.Field(MY_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(
+                org.apache.avro.Schema.Type.STRING), null, null),
+            new org.apache.avro.Schema.Field(COMPLEX_MAP_STR_FIELD_NAME, org.apache.avro.Schema.create(
+                org.apache.avro.Schema.Type.STRING), null, null));
     avroSchema.setFields(fields);
 
     File avroFile = new File(_tempDir, "data.avro");
@@ -150,7 +138,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     //Selection Query
-    String query = "Select myMapStr from " + DEFAULT_TABLE_NAME;
+    String query = "Select myMapStr from " + getTableName();
     JsonNode pinotResponse = postQuery(query);
     ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
     Assert.assertNotNull(rows);
@@ -161,7 +149,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Filter Query
-    query = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
+    query = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + getTableName()
         + "  where jsonExtractScalar(myMapStr,'$.k1','STRING') = 'value-k1-0'";
     pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
@@ -173,7 +161,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //selection order by
-    query = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + DEFAULT_TABLE_NAME
+    query = "Select jsonExtractScalar(myMapStr,'$.k1','STRING') from " + getTableName()
         + " order by jsonExtractScalar(myMapStr,'$.k1','STRING')";
     pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
@@ -185,7 +173,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Group By Query
-    query = "Select jsonExtractScalar(myMapStr,'$.k1','STRING'), count(*) from " + DEFAULT_TABLE_NAME
+    query = "Select jsonExtractScalar(myMapStr,'$.k1','STRING'), count(*) from " + getTableName()
         + " group by jsonExtractScalar(myMapStr,'$.k1','STRING')";
     pinotResponse = postQuery(query);
     Assert.assertNotNull(pinotResponse.get("resultTable"));
@@ -201,7 +189,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     //Selection Query
-    String query = "Select complexMapStr from " + DEFAULT_TABLE_NAME;
+    String query = "Select complexMapStr from " + getTableName();
     JsonNode pinotResponse = postQuery(query);
     ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
 
@@ -227,7 +215,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //Filter Query
-    query = "Select jsonExtractScalar(complexMapStr,'$.k4','STRING') from " + DEFAULT_TABLE_NAME
+    query = "Select jsonExtractScalar(complexMapStr,'$.k4','STRING') from " + getTableName()
         + "  where jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') = 'value-k4-k1-0'";
     pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
@@ -240,7 +228,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     //selection order by
-    query = "Select complexMapStr from " + DEFAULT_TABLE_NAME
+    query = "Select complexMapStr from " + getTableName()
         + " order by jsonExtractScalar(complexMapStr,'$.k4.k4-k1','STRING') DESC LIMIT " + NUM_TOTAL_DOCS;
     pinotResponse = postQuery(query);
     rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
@@ -272,7 +260,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     //Group By Query
     String query = "Select" + " jsonExtractScalar(complexMapStr,'$.k1','STRING'),"
-        + " sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT'))" + " from " + DEFAULT_TABLE_NAME
+        + " sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT'))" + " from " + getTableName()
         + " group by jsonExtractScalar(complexMapStr,'$.k1','STRING')"
         + " order by sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT')) DESC";
     JsonNode pinotResponse = postQuery(query);
@@ -292,7 +280,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     //Group By Query
     String query = "Select" + " jsonExtractScalar(complexMapStr,'$.k1','STRING'),"
-        + " sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT'))" + " from " + DEFAULT_TABLE_NAME
+        + " sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT'))" + " from " + getTableName()
         + " group by jsonExtractScalar(complexMapStr,'$.k1','STRING')"
         + " order by sum(jsonExtractScalar(complexMapStr,'$.k4.met','INT')) DESC";
     JsonNode pinotResponse = postQuery(query);
@@ -312,7 +300,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     //Group By Query
     String query = "Select" + " jsonExtractScalar(complexMapStr,'$.inExistKey','STRING','defaultKey'),"
-        + " sum(jsonExtractScalar(complexMapStr,'$.inExistMet','INT','1'))" + " from " + DEFAULT_TABLE_NAME
+        + " sum(jsonExtractScalar(complexMapStr,'$.inExistMet','INT','1'))" + " from " + getTableName()
         + " group by jsonExtractScalar(complexMapStr,'$.inExistKey','STRING','defaultKey')"
         + " order by sum(jsonExtractScalar(complexMapStr,'$.inExistMet','INT','1')) DESC";
     JsonNode pinotResponse = postQuery(query);
@@ -330,7 +318,7 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     //Group By Query
     String query = "Select" + " jsonExtractScalar(complexMapStr,'$.inExistKey','STRING', 'defaultKey'),"
-        + " sum(jsonExtractScalar(complexMapStr,'$.inExistMet','DOUBLE','0.1'))" + " from " + DEFAULT_TABLE_NAME
+        + " sum(jsonExtractScalar(complexMapStr,'$.inExistMet','DOUBLE','0.1'))" + " from " + getTableName()
         + " group by jsonExtractScalar(complexMapStr,'$.inExistKey','STRING','defaultKey')"
         + " order by sum(jsonExtractScalar(complexMapStr,'$.inExistMet','DOUBLE','0.1')) DESC";
     JsonNode pinotResponse = postQuery(query);
@@ -346,20 +334,20 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
   void testFailedQuery(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "Select jsonExtractScalar(myMapStr,\"$.k1\",\"STRING\") from " + DEFAULT_TABLE_NAME;
+    String query = "Select jsonExtractScalar(myMapStr,\"$.k1\",\"STRING\") from " + getTableName();
     JsonNode pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);
     Assert.assertEquals(pinotResponse.get("totalDocs").asInt(), 0);
 
-    query = "Select myMapStr from " + DEFAULT_TABLE_NAME
+    query = "Select myMapStr from " + getTableName()
         + "  where jsonExtractScalar(myMapStr, '$.k1',\"STRING\") = 'value-k1-0'";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);
     Assert.assertEquals(pinotResponse.get("totalDocs").asInt(), 0);
 
-    query = "Select jsonExtractScalar(myMapStr,\"$.k1\", 'STRING') from " + DEFAULT_TABLE_NAME
+    query = "Select jsonExtractScalar(myMapStr,\"$.k1\", 'STRING') from " + getTableName()
         + "  where jsonExtractScalar(myMapStr, '$.k1', 'STRING') = 'value-k1-0'";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);
@@ -372,18 +360,5 @@ public class JsonPathClusterIntegrationTest extends BaseClusterIntegrationTest {
     Cache cache = CacheProvider.getCache();
     Assert.assertTrue(cache instanceof JsonPathCache);
     Assert.assertTrue(((JsonPathCache) cache).size() > 0);
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    dropOfflineTable(getTableName());
-
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
   }
 }

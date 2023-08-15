@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
@@ -24,95 +24,62 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import org.apache.avro.Schema.Field;
-import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
-public class SumPrecisionIntegrationTest extends BaseClusterIntegrationTest {
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class SumPrecisionTest extends CustomDataQueryClusterIntegrationTest {
+
+  private static final String DEFAULT_TABLE_NAME = "SumPrecisionTest";
+
+  private static final int NUM_DOCS = 1000;
   private static final String DIM_NAME = "dimName";
   private static final String MET_BIG_DECIMAL_BYTES = "metBigDecimalBytes";
   private static final String MET_BIG_DECIMAL_STRING = "metBigDecimalString";
   private static final String MET_DOUBLE = "metDouble";
   private static final String MET_LONG = "metLong";
 
-  @BeforeClass
-  public void setup()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+  @Override
+  public String getTableName() {
+    return DEFAULT_TABLE_NAME;
+  }
 
-    // Start the Pinot cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
-
-    // create & upload schema AND table config
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(DEFAULT_SCHEMA_NAME)
+  @Override
+  public Schema createSchema() {
+    return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(DIM_NAME, FieldSpec.DataType.STRING)
         .addMetric(MET_BIG_DECIMAL_BYTES, FieldSpec.DataType.BIG_DECIMAL)
         .addMetric(MET_BIG_DECIMAL_STRING, FieldSpec.DataType.BIG_DECIMAL)
         .addMetric(MET_DOUBLE, FieldSpec.DataType.DOUBLE)
         .addMetric(MET_LONG, FieldSpec.DataType.LONG).build();
-    addSchema(schema);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME).build();
-    addTableConfig(tableConfig);
-
-    // create & upload segments
-    File avroFile = createAvroFile(getCountStarResult());
-    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(DEFAULT_TABLE_NAME, _tarDir);
-
-    waitForAllDocsLoaded(60_000);
   }
 
   @Override
-  protected long getCountStarResult() {
-    return 1000;
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testQueries(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query =
-        String.format("SELECT SUMPRECISION(%s), SUMPRECISION(%s), sum(%s), sum(%s) FROM %s",
-            MET_BIG_DECIMAL_BYTES, MET_BIG_DECIMAL_STRING, MET_DOUBLE, MET_LONG, DEFAULT_TABLE_NAME);
-    double sumResult = 2147484147500L;
-    JsonNode jsonNode = postQuery(query);
-    System.out.println("jsonNode = " + jsonNode.toPrettyString());
-    for (int i = 0; i < 4; i++) {
-      assertEquals(Double.parseDouble(jsonNode.get("resultTable").get("rows").get(0).get(i).asText()), sumResult);
-    }
-  }
-
-  private File createAvroFile(long totalNumRecords)
+  public File createAvroFile()
       throws IOException {
 
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(ImmutableList.of(
-        new Field(DIM_NAME, org.apache.avro.Schema.create(Type.STRING), null, null),
-        new Field(MET_BIG_DECIMAL_BYTES, org.apache.avro.Schema.create(Type.BYTES), null, null),
-        new Field(MET_BIG_DECIMAL_STRING, org.apache.avro.Schema.create(Type.STRING), null, null),
-        new Field(MET_DOUBLE, org.apache.avro.Schema.create(Type.DOUBLE), null, null),
-        new Field(MET_LONG, org.apache.avro.Schema.create(Type.LONG), null, null)));
+        new org.apache.avro.Schema.Field(DIM_NAME, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
+            null, null),
+        new org.apache.avro.Schema.Field(MET_BIG_DECIMAL_BYTES, org.apache.avro.Schema.create(
+            org.apache.avro.Schema.Type.BYTES), null, null),
+        new org.apache.avro.Schema.Field(MET_BIG_DECIMAL_STRING, org.apache.avro.Schema.create(
+            org.apache.avro.Schema.Type.STRING), null, null),
+        new org.apache.avro.Schema.Field(MET_DOUBLE, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE),
+            null, null),
+        new org.apache.avro.Schema.Field(MET_LONG, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
+            null, null)));
 
     // create avro file
     File avroFile = new File(_tempDir, "data.avro");
@@ -120,7 +87,7 @@ public class SumPrecisionIntegrationTest extends BaseClusterIntegrationTest {
       fileWriter.create(avroSchema, avroFile);
       int dimCardinality = 50;
       BigDecimal bigDecimalBase = BigDecimal.valueOf(Integer.MAX_VALUE + 1L);
-      for (int i = 0; i < totalNumRecords; i++) {
+      for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(DIM_NAME, "dim" + (RandomUtils.nextInt() % dimCardinality));
@@ -138,16 +105,22 @@ public class SumPrecisionIntegrationTest extends BaseClusterIntegrationTest {
     return avroFile;
   }
 
-  @AfterClass
-  public void tearDown()
-      throws IOException {
-    dropOfflineTable(DEFAULT_TABLE_NAME);
+  @Override
+  protected long getCountStarResult() {
+    return NUM_DOCS;
+  }
 
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-
-    FileUtils.deleteDirectory(_tempDir);
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT SUMPRECISION(%s), SUMPRECISION(%s), sum(%s), sum(%s) FROM %s",
+            MET_BIG_DECIMAL_BYTES, MET_BIG_DECIMAL_STRING, MET_DOUBLE, MET_LONG, getTableName());
+    double sumResult = 2147484147500L;
+    JsonNode jsonNode = postQuery(query);
+    for (int i = 0; i < 4; i++) {
+      assertEquals(Double.parseDouble(jsonNode.get("resultTable").get("rows").get(0).get(i).asText()), sumResult);
+    }
   }
 }
