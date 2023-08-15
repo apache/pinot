@@ -58,6 +58,7 @@ import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
@@ -1252,6 +1253,25 @@ public final class TableConfigUtils {
       throw new IllegalStateException(String.format(
           "Time column names are different for table: %s! Offline time column name: %s. Realtime time column name: %s",
           rawTableName, offlineTimeColumnName, realtimeTimeColumnName));
+    }
+    TenantConfig offlineTenantConfig = offlineTableConfig.getTenantConfig();
+    TenantConfig realtimeTenantConfig = realtimeTableConfig.getTenantConfig();
+    Preconditions.checkNotNull(realtimeTenantConfig,
+        "Found null realtime table tenant config in hybrid table check for table: %s", rawTableName);
+    Preconditions.checkNotNull(offlineTableConfig,
+        "Found null offline table tenant config in hybrid table check for table: %s", rawTableName);
+    String offlineBroker = offlineTenantConfig.getBroker();
+    String realtimeBroker = realtimeTenantConfig.getBroker();
+    if (offlineBroker == null || realtimeBroker == null) {
+      throw new IllegalArgumentException(String.format(
+          "'Broker' cannot be null for table: %s! Offline broker tenant name: %s. Realtime broker tenant name: %s",
+          rawTableName, offlineBroker, realtimeBroker));
+    }
+
+    if (!offlineBroker.equals(realtimeBroker)) {
+      throw new IllegalArgumentException(String.format(
+          "Broker Tenants are different for table: %s! Offline broker tenant name: %s, Realtime broker tenant name: %s",
+          rawTableName, offlineBroker, realtimeBroker));
     }
   }
 
