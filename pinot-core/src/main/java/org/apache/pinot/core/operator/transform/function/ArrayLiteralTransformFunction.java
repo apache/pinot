@@ -218,7 +218,33 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
     int[][] intArrayResult = _intArrayResult;
     if (intArrayResult == null || intArrayResult.length < numDocs) {
       intArrayResult = new int[numDocs][];
-      Arrays.fill(intArrayResult, _intArrayLiteral);
+      if (_intArrayLiteral != null) {
+        Arrays.fill(intArrayResult, _intArrayLiteral);
+      } else {
+        int[] intArrayLiteral;
+        if (_doubleArrayLiteral != null) {
+          intArrayLiteral = new int[_doubleArrayLiteral.length];
+          for (int i = 0; i < _doubleArrayLiteral.length; i++) {
+            intArrayLiteral[i] = (int) _doubleArrayLiteral[i];
+          }
+        } else if (_longArrayLiteral != null) {
+          intArrayLiteral = new int[_longArrayLiteral.length];
+          for (int i = 0; i < _longArrayLiteral.length; i++) {
+            intArrayLiteral[i] = (int) _longArrayLiteral[i];
+          }
+        } else if (_floatArrayLiteral != null) {
+          intArrayLiteral = new int[_floatArrayLiteral.length];
+          for (int i = 0; i < _floatArrayLiteral.length; i++) {
+            intArrayLiteral[i] = (int) _floatArrayLiteral[i];
+          }
+        } else {
+          intArrayLiteral = new int[_stringArrayLiteral.length];
+          for (int i = 0; i < _stringArrayLiteral.length; i++) {
+            intArrayLiteral[i] = Integer.parseInt(_stringArrayLiteral[i]);
+          }
+        }
+        Arrays.fill(intArrayResult, intArrayLiteral);
+      }
       _intArrayResult = intArrayResult;
     }
     return intArrayResult;
@@ -230,7 +256,33 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
     long[][] longArrayResult = _longArrayResult;
     if (longArrayResult == null || longArrayResult.length < numDocs) {
       longArrayResult = new long[numDocs][];
-      Arrays.fill(longArrayResult, _longArrayLiteral);
+      if (_longArrayLiteral != null) {
+        Arrays.fill(longArrayResult, _longArrayLiteral);
+      } else {
+        long[] longArrayLiteral;
+        if (_doubleArrayLiteral != null) {
+          longArrayLiteral = new long[_doubleArrayLiteral.length];
+          for (int i = 0; i < _doubleArrayLiteral.length; i++) {
+            longArrayLiteral[i] = (long) _doubleArrayLiteral[i];
+          }
+        } else if (_intArrayLiteral != null) {
+          longArrayLiteral = new long[_intArrayLiteral.length];
+          for (int i = 0; i < _intArrayLiteral.length; i++) {
+            longArrayLiteral[i] = _intArrayLiteral[i];
+          }
+        } else if (_floatArrayLiteral != null) {
+          longArrayLiteral = new long[_floatArrayLiteral.length];
+          for (int i = 0; i < _floatArrayLiteral.length; i++) {
+            longArrayLiteral[i] = (long) _floatArrayLiteral[i];
+          }
+        } else {
+          longArrayLiteral = new long[_stringArrayLiteral.length];
+          for (int i = 0; i < _stringArrayLiteral.length; i++) {
+            longArrayLiteral[i] = Long.parseLong(_stringArrayLiteral[i]);
+          }
+        }
+        Arrays.fill(longArrayResult, longArrayLiteral);
+      }
       _longArrayResult = longArrayResult;
     }
     return longArrayResult;
@@ -242,7 +294,33 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
     float[][] floatArrayResult = _floatArrayResult;
     if (floatArrayResult == null || floatArrayResult.length < numDocs) {
       floatArrayResult = new float[numDocs][];
-      Arrays.fill(floatArrayResult, _floatArrayLiteral);
+      if (_floatArrayLiteral != null) {
+        Arrays.fill(floatArrayResult, _floatArrayLiteral);
+      } else {
+        float[] floatArrayLiteral;
+        if (_doubleArrayLiteral != null) {
+          floatArrayLiteral = new float[_doubleArrayLiteral.length];
+          for (int i = 0; i < _doubleArrayLiteral.length; i++) {
+            floatArrayLiteral[i] = (float) _doubleArrayLiteral[i];
+          }
+        } else if (_longArrayLiteral != null) {
+          floatArrayLiteral = new float[_longArrayLiteral.length];
+          for (int i = 0; i < _longArrayLiteral.length; i++) {
+            floatArrayLiteral[i] = _longArrayLiteral[i];
+          }
+        } else if (_intArrayLiteral != null) {
+          floatArrayLiteral = new float[_intArrayLiteral.length];
+          for (int i = 0; i < _intArrayLiteral.length; i++) {
+            floatArrayLiteral[i] = _intArrayLiteral[i];
+          }
+        } else {
+          floatArrayLiteral = new float[_stringArrayLiteral.length];
+          for (int i = 0; i < _stringArrayLiteral.length; i++) {
+            floatArrayLiteral[i] = Float.parseFloat(_stringArrayLiteral[i]);
+          }
+        }
+        Arrays.fill(floatArrayResult, floatArrayLiteral);
+      }
       _floatArrayResult = floatArrayResult;
     }
     return floatArrayResult;
@@ -254,7 +332,33 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
     double[][] doubleArrayResult = _doubleArrayResult;
     if (doubleArrayResult == null || doubleArrayResult.length < numDocs) {
       doubleArrayResult = new double[numDocs][];
-      Arrays.fill(doubleArrayResult, _doubleArrayLiteral);
+      if (_doubleArrayLiteral != null) {
+        Arrays.fill(doubleArrayResult, _doubleArrayLiteral);
+      } else {
+        double[] doubleArrayLiteral;
+        if (_floatArrayLiteral != null) {
+          doubleArrayLiteral = new double[_floatArrayLiteral.length];
+          for (int i = 0; i < _floatArrayLiteral.length; i++) {
+            doubleArrayLiteral[i] = _floatArrayLiteral[i];
+          }
+        } else if (_longArrayLiteral != null) {
+          doubleArrayLiteral = new double[_longArrayLiteral.length];
+          for (int i = 0; i < _longArrayLiteral.length; i++) {
+            doubleArrayLiteral[i] = _longArrayLiteral[i];
+          }
+        } else if (_intArrayLiteral != null) {
+          doubleArrayLiteral = new double[_intArrayLiteral.length];
+          for (int i = 0; i < _intArrayLiteral.length; i++) {
+            doubleArrayLiteral[i] = _intArrayLiteral[i];
+          }
+        } else {
+          doubleArrayLiteral = new double[_stringArrayLiteral.length];
+          for (int i = 0; i < _stringArrayLiteral.length; i++) {
+            doubleArrayLiteral[i] = Double.parseDouble(_stringArrayLiteral[i]);
+          }
+        }
+        Arrays.fill(doubleArrayResult, doubleArrayLiteral);
+      }
       _doubleArrayResult = doubleArrayResult;
     }
     return doubleArrayResult;
@@ -266,7 +370,33 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
     String[][] stringArrayResult = _stringArrayResult;
     if (stringArrayResult == null || stringArrayResult.length < numDocs) {
       stringArrayResult = new String[numDocs][];
-      Arrays.fill(stringArrayResult, _stringArrayLiteral);
+      if (_stringArrayLiteral != null) {
+        Arrays.fill(stringArrayResult, _stringArrayLiteral);
+      } else {
+        String[] stringArrayLiteral;
+        if (_floatArrayLiteral != null) {
+          stringArrayLiteral = new String[_floatArrayLiteral.length];
+          for (int i = 0; i < _floatArrayLiteral.length; i++) {
+            stringArrayLiteral[i] = Float.toString(_floatArrayLiteral[i]);
+          }
+        } else if (_longArrayLiteral != null) {
+          stringArrayLiteral = new String[_longArrayLiteral.length];
+          for (int i = 0; i < _longArrayLiteral.length; i++) {
+            stringArrayLiteral[i] = Long.toString(_longArrayLiteral[i]);
+          }
+        } else if (_intArrayLiteral != null) {
+          stringArrayLiteral = new String[_intArrayLiteral.length];
+          for (int i = 0; i < _intArrayLiteral.length; i++) {
+            stringArrayLiteral[i] = Integer.toString(_intArrayLiteral[i]);
+          }
+        } else {
+          stringArrayLiteral = new String[_doubleArrayLiteral.length];
+          for (int i = 0; i < _doubleArrayLiteral.length; i++) {
+            stringArrayLiteral[i] = Double.toString(_doubleArrayLiteral[i]);
+          }
+        }
+        Arrays.fill(stringArrayResult, stringArrayLiteral);
+      }
       _stringArrayResult = stringArrayResult;
     }
     return stringArrayResult;
