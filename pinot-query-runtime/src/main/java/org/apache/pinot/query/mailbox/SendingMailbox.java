@@ -51,11 +51,6 @@ public interface SendingMailbox {
   void complete();
 
   /**
-   * Returns true if the mailbox has been early terminated. This can happen if the receiver has cancelled the mailbox
-   */
-  boolean isEarlyTerminated();
-
-  /**
    * Cancels the mailbox and notifies the receiver of the cancellation so that it can release the underlying resources.
    * No more blocks can be sent after calling this method.
    */

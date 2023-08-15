@@ -49,7 +49,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
 
   private StreamObserver<MailboxContent> _contentObserver;
-  private boolean _isEarlyTerminated = false;
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs) {
     _id = id;
@@ -67,17 +66,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
     Preconditions.checkState(!_statusObserver.isFinished(), "Mailbox: %s is already closed", _id);
     _contentObserver.onNext(toMailboxContent(block));
-    _isEarlyTerminated = _statusObserver.isFinished();
   }
 
   @Override
   public void complete() {
     _contentObserver.onCompleted();
-  }
-
-  @Override
-  public boolean isEarlyTerminated() {
-    return _isEarlyTerminated;
   }
 
   @Override

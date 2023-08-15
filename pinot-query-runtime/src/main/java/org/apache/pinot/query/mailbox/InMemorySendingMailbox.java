@@ -50,8 +50,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
     long timeoutMs = _deadlineMs - System.currentTimeMillis();
-    ReceivingMailbox.ReceivingMailboxStatus offer = _receivingMailbox.offer(block, timeoutMs);
-    switch (offer) {
+    ReceivingMailbox.ReceivingMailboxStatus receivingMailboxStatus = _receivingMailbox.offer(block, timeoutMs);
+    switch (receivingMailboxStatus) {
       case EARLY_TERMINATED:
         _isEarlyTerminated = true;
         break;
@@ -62,7 +62,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
       case SUCCESS:
         break;
       default:
-        throw new IllegalStateException("Unsupported mailbox status: " + offer);
+        throw new IllegalStateException("Unsupported mailbox status: " + receivingMailboxStatus);
     }
   }
 
@@ -71,17 +71,16 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public boolean isEarlyTerminated() {
-    return _isEarlyTerminated;
-  }
-
-  @Override
   public void cancel(Throwable t) {
     LOGGER.debug("Cancelling mailbox: {}", _id);
     if (_receivingMailbox == null) {
       _receivingMailbox = _mailboxService.getReceivingMailbox(_id);
     }
-    _receivingMailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
-        new RuntimeException("Cancelled by sender with exception: " + t.getMessage(), t)));
+    if (_isEarlyTerminated) {
+      _receivingMailbox.cancel();
+    } else {
+      _receivingMailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
+          new RuntimeException("Cancelled by sender with exception: " + t.getMessage(), t)));
+    }
   }
 }

@@ -176,9 +176,8 @@ public class SortOperator extends MultiStageOperator {
             }
           }
           // '_fetch > 0' means this operator can early terminate, so we can stop consuming input blocks
-          if (_rows.size() >= _numRowsToKeep && _fetch > 0) {
+          if (_rows.size() == _numRowsToKeep && _fetch > 0) {
             _readyToConstruct = true;
-            _upstreamOperator.close();
             LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
                 _context.getId());
             return;
