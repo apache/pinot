@@ -109,31 +109,36 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     }
     // Standard optimistic execution. First we try to read without acquiring the lock.
     E block = readDroppingSuccessEos();
-    long timeoutMs = _deadlineMs - System.currentTimeMillis();
-    boolean timeout = false;
+    if (block != null) {
+      return block;
+    }
     try {
-      while (block == null) { // we didn't find a mailbox ready to read, so we need to be pessimistic
+      boolean timeout;
+      while (true) { // we didn't find a mailbox ready to read, so we need to be pessimistic
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("==[RECEIVE]== Blocked on : " + _id + ". " + System.identityHashCode(_newDataReady));
         }
+        long timeoutMs = _deadlineMs - System.currentTimeMillis();
         timeout = _newDataReady.poll(timeoutMs, TimeUnit.MILLISECONDS) == null;
+        if (timeout) {
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.warn("==[RECEIVE]== Timeout on: " + _id);
+          }
+          _errorBlock = onTimeout();
+          return _errorBlock;
+        }
         LOGGER.debug("==[RECEIVE]== More data available. Trying to read again");
         block = readDroppingSuccessEos();
-      }
-
-      if (timeout) {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.warn("==[RECEIVE]== Timeout on: " + _id);
+        if (block != null) {
+          if (LOGGER.isTraceEnabled()) {
+            LOGGER.trace("==[RECEIVE]== Ready to emit on: " + _id);
+          }
+          return block;
         }
-        _errorBlock = onTimeout();
-        return _errorBlock;
-      } else if (LOGGER.isTraceEnabled()) {
-        LOGGER.trace("==[RECEIVE]== Ready to emit on: " + _id);
       }
     } catch (InterruptedException ex) {
       return onException(ex);
     }
-    return block;
   }
 
   /**
@@ -154,8 +159,9 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     }
 
     E block = readBlockOrNull();
-    while (block != null && isEos(block) && !_mailboxes.isEmpty()) {
-      // we have read a EOS
+    while (block != null && isEos(block)) {
+      // we have read an EOS
+      assert !_mailboxes.isEmpty() : "readBlockOrNull should return null when there are no mailboxes";
       AsyncStream<E> removed = _mailboxes.remove(_lastRead);
       // this is done in order to keep the invariant.
       _lastRead--;
