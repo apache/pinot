@@ -494,10 +494,6 @@ public class PinotLLCRealtimeSegmentManager {
     PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
     String uriToMoveTo = moveSegmentFile(rawTableName, segmentName, segmentLocation, pinotFS);
 
-    // Cleans up tmp segment files under table dir.
-    // We only clean up tmp segment files in table level dir, so there's no need to list recursively.
-    // See LLCSegmentCompletionHandlers.uploadSegment().
-    // TODO: move tmp file logic into SegmentCompletionUtils.
     if (!isTmpSegmentAsyncDeletionEnabled()) {
       try {
         for (String uri : pinotFS.listFiles(tableDirURI, false)) {

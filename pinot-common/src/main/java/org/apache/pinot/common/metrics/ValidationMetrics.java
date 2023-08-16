@@ -239,11 +239,11 @@ public class ValidationMetrics {
     removeGauge(resource, ValidationMetricName.SEGMENT_COUNT);
   }
 
-  public void updateTmpSegCountGauge(final String resource, final long tmpSegmentCount) {
+  public void updateTmpSegmentCountGauge(final String resource, final long tmpSegmentCount) {
     makeGauge(resource, ValidationMetricName.DELETED_TMP_SEGMENT_COUNT, _storedValueGaugeFactory, tmpSegmentCount);
   }
 
-  public void cleanupTmpSegCountGauge(final String resource) {
+  public void cleanupTmpSegmentCountGauge(final String resource) {
     removeGauge(resource, ValidationMetricName.DELETED_TMP_SEGMENT_COUNT);
   }
 
