@@ -151,7 +151,11 @@ public class DataBlockBuilder {
             byteBuffer.putInt(((Boolean) value) ? 1 : 0);
             break;
           case TIMESTAMP:
-            byteBuffer.putLong(((Timestamp) value).getTime());
+            if (value instanceof Long) {
+              byteBuffer.putLong((long) value);
+            } else {
+              byteBuffer.putLong(((Timestamp) value).getTime());
+            }
             break;
           case STRING:
             setColumn(rowBuilder, byteBuffer, (String) value);
