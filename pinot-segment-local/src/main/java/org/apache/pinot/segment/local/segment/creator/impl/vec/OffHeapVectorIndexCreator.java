@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.segment.local.segment.creator.impl.vec;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -13,8 +31,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.readers.Vector;
 import org.roaringbitmap.RoaringBitmap;
@@ -22,7 +38,6 @@ import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class OffHeapVectorIndexCreator extends BaseVectorIndexCreator {
@@ -36,7 +51,8 @@ public class OffHeapVectorIndexCreator extends BaseVectorIndexCreator {
 
   private long _postingListChunkOffset;
 
-  public OffHeapVectorIndexCreator(File indexDir, String columnName, int vectorLength, int vectorValueSize) throws IOException {
+  public OffHeapVectorIndexCreator(File indexDir, String columnName, int vectorLength, int vectorValueSize)
+      throws IOException {
     super(indexDir, columnName, vectorLength, vectorValueSize);
     _postingListFile = new File(_tempDir, POSTING_LIST_FILE_NAME);
     _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
@@ -90,8 +106,8 @@ public class OffHeapVectorIndexCreator extends BaseVectorIndexCreator {
     _postingListOutputStream.close();
 
     // Merge posting lists to calculate the final posting lists
-    try (PinotDataBuffer postingListBuffer = PinotDataBuffer
-        .mapFile(_postingListFile, true, 0, _postingListFile.length(), ByteOrder.BIG_ENDIAN, "Vector index posting list")) {
+    try (PinotDataBuffer postingListBuffer = PinotDataBuffer.mapFile(_postingListFile, true, 0,
+        _postingListFile.length(), ByteOrder.BIG_ENDIAN, "Vector index posting list")) {
       // Create chunk iterators from the posting list file
       int numChunks = _postingListChunkEndOffsets.size();
       List<ChunkIterator> chunkIterators = new ArrayList<>(numChunks);
@@ -197,4 +213,3 @@ public class OffHeapVectorIndexCreator extends BaseVectorIndexCreator {
     }
   }
 }
-
