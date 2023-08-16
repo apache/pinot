@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.logical;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -99,6 +100,8 @@ public interface RexExpression {
         return ((BigDecimal) value).doubleValue();
       case STRING:
         return ((NlsString) value).getValue();
+      case TIMESTAMP:
+        return ((GregorianCalendar) value).getTimeInMillis();
       default:
         return value;
     }
