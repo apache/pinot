@@ -3,6 +3,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.vec;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.Vector;
 import org.roaringbitmap.*;
 
@@ -14,9 +15,9 @@ import java.util.TreeMap;
 
 public abstract class BaseVectorIndexCreator implements VectorIndexCreator {
   public static final int VERSION = 1;
-  public static final int HEADER_LENGTH = 10;
+  public static final int HEADER_LENGTH = 16;
 
-  static final String TEMP_DIR_SUFFIX = V1Constants.Indexes.RAW_VECTOR_INDEX_FILE_EXTENSION + ".tmp";
+  static final String TEMP_DIR_SUFFIX = V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION + ".tmp";
   static final String DICTIONARY_FILE_NAME = "dictionary.buf";
   static final String BITMAP_OFFSET_FILE_NAME = "bitmap.offset.buf";
   static final String BITMAP_VALUE_FILE_NAME = "bitmap.value.buf";
@@ -35,9 +36,11 @@ public abstract class BaseVectorIndexCreator implements VectorIndexCreator {
       RoaringBitmapWriter.writer().runCompress(false);
 
   int _nextDocId;
+  int _vectorLength;
+  int _vectorValueSize;
 
-  BaseVectorIndexCreator(File indexDir, String columnName) throws IOException {
-    _indexFile = new File(indexDir, columnName + V1Constants.Indexes.RAW_VECTOR_INDEX_FILE_EXTENSION);
+  BaseVectorIndexCreator(File indexDir, String columnName, int vectorLength, int vectorValueSize) throws IOException {
+    _indexFile = new File(indexDir, columnName + V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, columnName + TEMP_DIR_SUFFIX);
     if (_tempDir.exists()) {
       FileUtils.cleanDirectory(_tempDir);
@@ -50,6 +53,8 @@ public abstract class BaseVectorIndexCreator implements VectorIndexCreator {
     _dictionaryStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_dictionaryFile)));
     _bitmapOffsetStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_bitmapOffsetFile)));
     _bitmapValueStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_bitmapValueFile)));
+    _vectorLength = vectorLength;
+    _vectorValueSize = vectorValueSize;
   }
 
   public void add(Vector vector){
@@ -77,6 +82,8 @@ public abstract class BaseVectorIndexCreator implements VectorIndexCreator {
     ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);
     headerBuffer.putInt(VERSION);
     headerBuffer.putInt(_dictionaryStream.size());  // Adjusted based on the serialized vector length
+    headerBuffer.putInt(_vectorLength);
+    headerBuffer.putInt(_vectorValueSize);
     headerBuffer.position(0);
 
     try (FileChannel indexFileChannel = new RandomAccessFile(_indexFile, "rw").getChannel();

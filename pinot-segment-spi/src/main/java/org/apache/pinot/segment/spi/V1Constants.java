@@ -52,7 +52,7 @@ public class V1Constants {
     public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
     public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
     public static final String LUCENE_TEXT_INDEX_FILE_EXTENSION = ".lucene.index";
-    public static final String RAW_VECTOR_INDEX_FILE_EXTENSION = ".rawvector.idx";
+    public static final String VECTOR_INDEX_FILE_EXTENSION = ".vector.idx";
   }
 
   public static class MetadataKeys {

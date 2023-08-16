@@ -10,9 +10,9 @@ import org.roaringbitmap.RoaringBitmapWriter;
 
 public class OnHeapVectorIndexCreator extends BaseVectorIndexCreator {
 
-  public OnHeapVectorIndexCreator(File indexDir, String columnName)
+  public OnHeapVectorIndexCreator(File indexDir, String columnName, int vectorLength, int vectorValueSize)
       throws IOException {
-    super(indexDir, columnName);
+    super(indexDir, columnName, vectorLength, vectorValueSize);
   }
 
   @Override

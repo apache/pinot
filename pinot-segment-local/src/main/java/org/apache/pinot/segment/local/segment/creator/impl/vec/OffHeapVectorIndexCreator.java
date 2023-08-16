@@ -36,8 +36,8 @@ public class OffHeapVectorIndexCreator extends BaseVectorIndexCreator {
 
   private long _postingListChunkOffset;
 
-  public OffHeapVectorIndexCreator(File indexDir, String columnName) throws IOException {
-    super(indexDir, columnName);
+  public OffHeapVectorIndexCreator(File indexDir, String columnName, int vectorLength, int vectorValueSize) throws IOException {
+    super(indexDir, columnName, vectorLength, vectorValueSize);
     _postingListFile = new File(_tempDir, POSTING_LIST_FILE_NAME);
     _postingListOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_postingListFile)));
   }
