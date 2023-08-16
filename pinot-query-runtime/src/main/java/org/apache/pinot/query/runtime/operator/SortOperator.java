@@ -84,7 +84,7 @@ public class SortOperator extends MultiStageOperator {
     // - 'isInputSorted' is set to true indicating that the data was already sorted
     if (collationKeys.isEmpty() || isInputSorted) {
       _priorityQueue = null;
-      _rows = new ArrayList<>();
+      _rows = new ArrayList<>(Math.min(defaultHolderCapacity, _numRowsToKeep));
     } else {
       // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
       // which elements to keep and which to remove based on the limits.
@@ -160,7 +160,7 @@ public class SortOperator extends MultiStageOperator {
         if (block.isErrorBlock()) {
           _upstreamErrorBlock = block;
           return;
-        } else if (TransferableBlockUtils.isEndOfStream(block)) {
+        } else if (block.isSuccessfulEndOfStreamBlock()) {
           _readyToConstruct = true;
           return;
         }
@@ -168,19 +168,17 @@ public class SortOperator extends MultiStageOperator {
         List<Object[]> container = block.getContainer();
         if (_priorityQueue == null) {
           // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
-          if (_rows.size() <= _numRowsToKeep) {
-            if (_rows.size() + container.size() <= _numRowsToKeep) {
+          int numRows = _rows.size();
+          if (numRows < _numRowsToKeep) {
+            if (numRows + container.size() < _numRowsToKeep) {
               _rows.addAll(container);
             } else {
-              _rows.addAll(container.subList(0, _numRowsToKeep - _rows.size()));
+              _rows.addAll(container.subList(0, _numRowsToKeep - numRows));
+              LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
+                  _context.getId());
+              _readyToConstruct = true;
+              return;
             }
-          }
-          // '_fetch > 0' means this operator can early terminate, so we can stop consuming input blocks
-          if (_rows.size() == _numRowsToKeep && _fetch > 0) {
-            _readyToConstruct = true;
-            LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
-                _context.getId());
-            return;
           }
         } else {
           for (Object[] row : container) {

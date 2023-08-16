@@ -77,27 +77,27 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
       }
 
       long timeoutMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);
-      ReceivingMailbox.ReceivingMailboxStatus receivingMailboxStatus = _mailbox.offer(block, timeoutMs);
-      switch (receivingMailboxStatus) {
+      ReceivingMailbox.ReceivingMailboxStatus status = _mailbox.offer(block, timeoutMs);
+      switch (status) {
         case SUCCESS:
           _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
               .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY,
                   Integer.toString(_mailbox.getNumPendingBlocks())).build());
           break;
         case ERROR:
-          LOGGER.warn("Failed to add block into mailbox: {} within timeout: {}ms", mailboxId, timeoutMs);
+          LOGGER.warn("Mailbox: {} already errored out (received error block before)", mailboxId);
           cancelStream();
-          return;
+          break;
         case TIMEOUT:
-          LOGGER.warn("Timeout adding block into mailbox: {} within timeout: {}ms", mailboxId, timeoutMs);
+          LOGGER.warn("Timed out adding block into mailbox: {} with timeout: {}ms", mailboxId, timeoutMs);
           cancelStream();
-          return;
+          break;
         case EARLY_TERMINATED:
-          LOGGER.debug("Early terminate Mailbox: {}", mailboxId);
+          LOGGER.debug("Mailbox: {} has been early terminated", mailboxId);
           onCompleted();
-          return;
+          break;
         default:
-          throw new IllegalStateException("Unsupported mailbox status: " + receivingMailboxStatus);
+          throw new IllegalStateException("Unsupported mailbox status: " + status);
       }
     } catch (Exception e) {
       String errorMessage = "Caught exception while processing blocks for mailbox: " + mailboxId;

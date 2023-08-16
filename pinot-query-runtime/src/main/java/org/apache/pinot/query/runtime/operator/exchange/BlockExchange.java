@@ -34,6 +34,7 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.OpChainId;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,6 +94,16 @@ public abstract class BlockExchange {
 
   public boolean offerBlock(TransferableBlock block, long timeoutMs)
       throws Exception {
+    boolean isEarlyTerminated = true;
+    for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+      if (!sendingMailbox.isTerminated()) {
+        isEarlyTerminated = false;
+        break;
+      }
+    }
+    if (isEarlyTerminated) {
+      throw new EarlyTerminationException();
+    }
     return _queue.offer(block, timeoutMs, TimeUnit.MILLISECONDS);
   }
 
@@ -110,8 +121,8 @@ public abstract class BlockExchange {
       }
       block = _queue.poll(timeoutMs, TimeUnit.MILLISECONDS);
       if (block == null) {
-        block = TransferableBlockUtils.getErrorTransferableBlock(
-            new TimeoutException("Timed out on exchange for opChain: " + _opChainId));
+        block = TransferableBlockUtils.getErrorTransferableBlock(new TimeoutException(
+            String.format("Timed out polling block for opChain: %s after %dms", _opChainId, timeoutMs)));
       } else {
         // Notify that the block exchange can now accept more blocks.
         _callback.accept(_opChainId);

@@ -66,14 +66,13 @@ public class ReceivingMailbox {
    * added. If the block is not added, an error block is added to the mailbox.
    */
   public ReceivingMailboxStatus offer(TransferableBlock block, long timeoutMs) {
-    if (_errorBlock.get() != null) {
+    TransferableBlock errorBlock = _errorBlock.get();
+    if (errorBlock != null) {
       LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
-      if (isCancelledByReceiver(_errorBlock.get())) {
-        return ReceivingMailboxStatus.EARLY_TERMINATED;
-      }
-      return ReceivingMailboxStatus.ERROR;
+      return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.EARLY_TERMINATED
+          : ReceivingMailboxStatus.ERROR;
     }
-    if (timeoutMs < 0) {
+    if (timeoutMs <= 0) {
       LOGGER.debug("Mailbox: {} is already timed out", _id);
       setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
           new TimeoutException("Timed out while offering data to mailbox: " + _id)));
@@ -81,16 +80,15 @@ public class ReceivingMailbox {
     }
     try {
       if (_blocks.offer(block, timeoutMs, TimeUnit.MILLISECONDS)) {
-        if (_errorBlock.get() == null) {
+        errorBlock = _errorBlock.get();
+        if (errorBlock == null) {
           _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
           return ReceivingMailboxStatus.SUCCESS;
         } else {
           LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
           _blocks.clear();
-          if (isCancelledByReceiver(_errorBlock.get())) {
-            return ReceivingMailboxStatus.EARLY_TERMINATED;
-          }
-          return ReceivingMailboxStatus.ERROR;
+          return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.EARLY_TERMINATED
+              : ReceivingMailboxStatus.ERROR;
         }
       } else {
         LOGGER.debug("Failed to offer block into mailbox: {} within: {}ms", _id, timeoutMs);
@@ -103,11 +101,6 @@ public class ReceivingMailbox {
       setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(e));
       return ReceivingMailboxStatus.ERROR;
     }
-  }
-
-  public static boolean isCancelledByReceiver(TransferableBlock block) {
-    return block.isErrorBlock() && block.getDataBlock().getExceptions() != null && block.getDataBlock().getExceptions()
-        .containsKey(1000) && block.getDataBlock().getExceptions().get(1000).contains("Cancelled by receiver");
   }
 
   /**
@@ -146,9 +139,6 @@ public class ReceivingMailbox {
   }
 
   public enum ReceivingMailboxStatus {
-    SUCCESS,
-    ERROR,
-    TIMEOUT,
-    EARLY_TERMINATED,
+    SUCCESS, ERROR, TIMEOUT, EARLY_TERMINATED
   }
 }
