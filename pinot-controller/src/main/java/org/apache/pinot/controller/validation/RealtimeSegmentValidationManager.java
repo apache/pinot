@@ -117,6 +117,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   private void runSegmentLevelValidation(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig) {
     String realtimeTableName = tableConfig.getTableName();
+
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
 
     // Update the total document count gauge
@@ -130,6 +131,14 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         && _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
+
+    // Delete tmp segments
+    if (streamConfig.hasLowLevelConsumerType()
+        && _llcRealtimeSegmentManager.getIsSplitCommitEnabled()
+        && _llcRealtimeSegmentManager.isTmpSegmentAsyncDeletionEnabled()) {
+      long numDeleteTmpSegments = _llcRealtimeSegmentManager.deleteTmpSegments(realtimeTableName);
+      _validationMetrics.updateTmpSegCountGauge(realtimeTableName, numDeleteTmpSegments);
+    }
   }
 
   @Override
@@ -137,6 +146,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     for (String tableNameWithType : tableNamesWithType) {
       if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
         _validationMetrics.cleanupTotalDocumentCountGauge(tableNameWithType);
+        _validationMetrics.cleanupTmpSegCountGauge(tableNameWithType);
       }
     }
   }

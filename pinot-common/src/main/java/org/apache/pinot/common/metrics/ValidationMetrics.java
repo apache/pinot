@@ -244,7 +244,7 @@ public class ValidationMetrics {
   }
 
   public void cleanupTmpSegCountGauge(final String resource) {
-    removeGauge(resource, ValidationMetricName.SEGMENT_COUNT);
+    removeGauge(resource, ValidationMetricName.DELETED_TMP_SEGMENT_COUNT);
   }
 
   @VisibleForTesting

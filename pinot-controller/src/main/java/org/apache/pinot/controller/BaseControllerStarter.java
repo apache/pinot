@@ -95,7 +95,6 @@ import org.apache.pinot.controller.tuner.TableConfigTunerRegistry;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
-import org.apache.pinot.controller.validation.RealtimeTempSegmentCleaner;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
@@ -173,7 +172,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected StaleInstancesCleanupTask _staleInstancesCleanupTask;
   protected TaskMetricsEmitter _taskMetricsEmitter;
   protected MultiThreadedHttpConnectionManager _connectionManager;
-  protected RealtimeTempSegmentCleaner _realtimeTempSegmentCleaner;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -710,8 +708,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new TaskMetricsEmitter(_helixResourceManager, _helixTaskResourceManager, _leadControllerManager, _config,
             _controllerMetrics);
     periodicTasks.add(_taskMetricsEmitter);
-    _realtimeTempSegmentCleaner = new RealtimeTempSegmentCleaner(_config, _helixResourceManager, _leadControllerManager,
-        _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics);
     return periodicTasks;
   }
 
