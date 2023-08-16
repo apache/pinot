@@ -1256,18 +1256,10 @@ public final class TableConfigUtils {
     }
     TenantConfig offlineTenantConfig = offlineTableConfig.getTenantConfig();
     TenantConfig realtimeTenantConfig = realtimeTableConfig.getTenantConfig();
-    Preconditions.checkNotNull(realtimeTenantConfig,
-        "Found null realtime table tenant config in hybrid table check for table: %s", rawTableName);
-    Preconditions.checkNotNull(offlineTableConfig,
-        "Found null offline table tenant config in hybrid table check for table: %s", rawTableName);
-    String offlineBroker = offlineTenantConfig.getBroker();
-    String realtimeBroker = realtimeTenantConfig.getBroker();
-    if (offlineBroker == null || realtimeBroker == null) {
-      throw new IllegalArgumentException(String.format(
-          "'Broker' cannot be null for table: %s! Offline broker tenant name: %s. Realtime broker tenant name: %s",
-          rawTableName, offlineBroker, realtimeBroker));
-    }
-
+    String offlineBroker =
+        offlineTenantConfig.getBroker() == null ? TagNameUtils.DEFAULT_TENANT_NAME : offlineTenantConfig.getBroker();
+    String realtimeBroker =
+        realtimeTenantConfig.getBroker() == null ? TagNameUtils.DEFAULT_TENANT_NAME : realtimeTenantConfig.getBroker();
     if (!offlineBroker.equals(realtimeBroker)) {
       throw new IllegalArgumentException(String.format(
           "Broker Tenants are different for table: %s! Offline broker tenant name: %s, Realtime broker tenant name: %s",
