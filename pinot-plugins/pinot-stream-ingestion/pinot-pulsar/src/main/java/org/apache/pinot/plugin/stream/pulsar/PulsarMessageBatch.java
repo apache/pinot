@@ -59,6 +59,7 @@ public class PulsarMessageBatch implements MessageBatch<PulsarStreamMessage> {
   public byte[] getMessageBytesAtIndex(int index) {
     return getMessageAtIndex(index).getValue();
   }
+
   @Override
   public int getMessageOffsetAtIndex(int index) {
     return ByteBuffer.wrap(_messageList.get(index).getValue()).arrayOffset();
