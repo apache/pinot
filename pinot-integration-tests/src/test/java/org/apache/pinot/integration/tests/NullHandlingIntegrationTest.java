@@ -338,4 +338,15 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     JsonNode rows = response.get("resultTable").get("rows");
     assertEquals(rows.get(0).get(0).asText(), "null");
   }
+
+  @Test
+  public void testCaseWhenAllLiteral()
+      throws Exception {
+    String sqlQuery =
+        "SELECT CASE WHEN true THEN 1 WHEN NOT true THEN 0 ELSE NULL END FROM mytable OPTION(enableNullHandling=true)";
+
+    JsonNode response = postQuery(sqlQuery);
+
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
+  }
 }

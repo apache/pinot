@@ -754,6 +754,7 @@ public class CommonConstants {
      */
     public static final String JOB_TYPE = "jobType";
     public static final String TABLE_NAME_WITH_TYPE = "tableName";
+    public static final String TENANT_NAME = "tenantName";
     public static final String JOB_ID = "jobId";
     public static final String SUBMISSION_TIME_MS = "submissionTimeMs";
     public static final String MESSAGE_COUNT = "messageCount";

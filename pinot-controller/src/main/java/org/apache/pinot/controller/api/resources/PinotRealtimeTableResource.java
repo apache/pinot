@@ -45,8 +45,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.helix.model.IdealState;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -80,7 +80,7 @@ public class PinotRealtimeTableResource {
   Executor _executor;
 
   @Inject
-  HttpConnectionManager _connectionManager;
+  HttpClientConnectionManager _connectionManager;
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;

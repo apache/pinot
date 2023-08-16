@@ -52,12 +52,18 @@ public class MinionConstants {
    */
   public static final String TIMEOUT_MS_KEY_SUFFIX = ".timeoutMs";
   public static final String NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX = ".numConcurrentTasksPerInstance";
+  public static final String MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX = ".maxAttemptsPerTask";
 
   /**
    * Table level configs
    */
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
   public static final String ENABLE_REPLACE_SEGMENTS_KEY = "enableReplaceSegments";
+
+  /**
+   * Job configs
+   */
+  public static final int DEFAULT_MAX_ATTEMPTS_PER_TASK = 1;
 
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {

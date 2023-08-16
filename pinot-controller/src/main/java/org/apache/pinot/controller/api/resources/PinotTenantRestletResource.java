@@ -32,6 +32,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -49,6 +50,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -56,6 +58,10 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceContext;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -64,6 +70,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,6 +112,9 @@ public class PinotTenantRestletResource {
 
   @Inject
   ControllerMetrics _controllerMetrics;
+
+  @Inject
+  TenantRebalancer _tenantRebalancer;
 
   @POST
   @Path("/tenants")
@@ -564,5 +574,50 @@ public class PinotTenantRestletResource {
     }
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_TENANT_DELETE_ERROR, 1L);
     throw new ControllerApplicationException(LOGGER, "Error deleting tenant", Response.Status.INTERNAL_SERVER_ERROR);
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.UPDATE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.REBALANCE_TENANT_TABLES)
+  @Path("/tenants/{tenantName}/rebalance")
+  @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
+  public TenantRebalanceResult rebalance(
+      @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
+      @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceContext context) {
+    context.setTenantName(tenantName);
+    return _tenantRebalancer.rebalance(context);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.READ)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_REBALANCE_STATUS)
+  @Path("/tenants/rebalanceStatus/{jobId}")
+  @ApiOperation(value = "Gets detailed stats of a tenant rebalance operation",
+      notes = "Gets detailed stats of a tenant rebalance operation")
+  public TenantRebalanceJobStatusResponse rebalanceStatus(
+      @ApiParam(value = "Tenant rebalance job id", required = true) @PathParam("jobId") String jobId)
+      throws JsonProcessingException {
+    Map<String, String> controllerJobZKMetadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TENANT_REBALANCE);
+
+    if (controllerJobZKMetadata == null) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
+          Response.Status.NOT_FOUND);
+    }
+    TenantRebalanceProgressStats tenantRebalanceProgressStats =
+        JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceConfigConstants.REBALANCE_PROGRESS_STATS),
+            TenantRebalanceProgressStats.class);
+    long timeSinceStartInSecs = tenantRebalanceProgressStats.getTimeToFinishInSeconds();
+    if (tenantRebalanceProgressStats.getCompletionStatusMsg() == null) {
+      timeSinceStartInSecs =
+          (System.currentTimeMillis() - tenantRebalanceProgressStats.getStartTimeMs()) / 1000;
+    }
+
+    TenantRebalanceJobStatusResponse tenantRebalanceJobStatusResponse = new TenantRebalanceJobStatusResponse();
+    tenantRebalanceJobStatusResponse.setTenantRebalanceProgressStats(tenantRebalanceProgressStats);
+    tenantRebalanceJobStatusResponse.setTimeElapsedSinceStartInSeconds(timeSinceStartInSecs);
+    return tenantRebalanceJobStatusResponse;
   }
 }

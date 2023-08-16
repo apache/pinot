@@ -27,6 +27,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -159,7 +160,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _intValuesSV[i] = (int) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _intValuesSV[i] = value == null ? (int) DataSchema.ColumnDataType.INT.getNullPlaceholder()
+          : (int) _resultType.toInternal(value);
     }
     return _intValuesSV;
   }
@@ -176,7 +179,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _longValuesSV[i] = (long) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _longValuesSV[i] = value == null ? (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder()
+          : (long) _resultType.toInternal(value);
     }
     return _longValuesSV;
   }
@@ -193,7 +198,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _floatValuesSV[i] = (float) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _floatValuesSV[i] = value == null ? (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder()
+          : (float) _resultType.toInternal(value);
     }
     return _floatValuesSV;
   }
@@ -210,7 +217,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _doubleValuesSV[i] = (double) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      _doubleValuesSV[i] = value == null ? (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder()
+          : (double) _resultType.toInternal(value);
     }
     return _doubleValuesSV;
   }
@@ -227,7 +236,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _bigDecimalValuesSV[i] = (BigDecimal) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _bigDecimalValuesSV[i] = value == null ? null : (BigDecimal) _resultType.toInternal(value);
     }
     return _bigDecimalValuesSV;
   }

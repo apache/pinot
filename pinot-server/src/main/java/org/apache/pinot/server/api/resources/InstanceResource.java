@@ -29,6 +29,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.GET;
@@ -38,6 +39,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.server.api.AdminApiApplication;
 
@@ -72,5 +74,26 @@ public class InstanceResource {
       return config.getTags();
     }
     return Collections.emptyList();
+  }
+
+  /**
+   * Retrieve instance pools in the Helix InstanceConfig:
+   * https://docs.pinot.apache.org/operators/operating-pinot/instance-assignment#pool-based-instance-assignment.
+   * Returns an empty Map if poolBased config is not enabled or the instance is not assigned to any pool.
+   */
+  @GET
+  @Path("pools")
+  @ApiOperation(value = "Tenant pools for current instance")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
+  })
+  @Produces(MediaType.APPLICATION_JSON)
+  public Map<String, String> getInstancePools() {
+    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
+    if (instanceConfig == null || instanceConfig.getRecord() == null) {
+      return Collections.emptyMap();
+    }
+    Map<String, String> pools = instanceConfig.getRecord().getMapField(InstanceUtils.POOL_KEY);
+    return pools == null ? Collections.emptyMap() : pools;
   }
 }

@@ -103,6 +103,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected List<StreamDataServerStartable> _kafkaStarters;
 
   protected org.apache.pinot.client.Connection _pinotConnection;
+  protected org.apache.pinot.client.Connection _pinotConnectionV2;
   protected Connection _h2Connection;
   protected QueryGenerator _queryGenerator;
 
@@ -506,6 +507,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @return Pinot connection
    */
   protected org.apache.pinot.client.Connection getPinotConnection() {
+    if (useMultiStageQueryEngine()) {
+      if (_pinotConnectionV2 == null) {
+        Properties properties = getPinotConnectionProperties();
+        properties.put("useMultiStageEngine", "true");
+        _pinotConnectionV2 = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName());
+      }
+      return _pinotConnectionV2;
+    }
     if (_pinotConnection == null) {
       _pinotConnection =
           ConnectionFactory.fromZookeeper(getPinotConnectionProperties(), getZkUrl() + "/" + getHelixClusterName());
@@ -753,7 +762,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
-        getH2Connection(), null, getExtraQueryProperties());
+        getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());
   }
 
   /**
@@ -762,6 +771,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testQueryWithMatchingRowCount(String pinotQuery, String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
-        h2Query, getH2Connection(), null, getExtraQueryProperties());
+        h2Query, getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());
   }
 }

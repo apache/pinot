@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.docidsets;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -49,9 +50,10 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public final class OrDocIdSet implements BlockDocIdSet {
   private final List<BlockDocIdSet> _docIdSets;
   private final int _numDocs;
+  private long _numEntriesScannedInFilter = 0L;
 
   public OrDocIdSet(List<BlockDocIdSet> docIdSets, int numDocs) {
-    _docIdSets = docIdSets;
+    _docIdSets = docIdSets instanceof ArrayList ? docIdSets : new ArrayList<>(docIdSets);
     _numDocs = numDocs;
   }
 
@@ -62,13 +64,26 @@ public final class OrDocIdSet implements BlockDocIdSet {
     List<SortedDocIdIterator> sortedDocIdIterators = new ArrayList<>();
     List<BitmapBasedDocIdIterator> bitmapBasedDocIdIterators = new ArrayList<>();
     List<BlockDocIdIterator> remainingDocIdIterators = new ArrayList<>();
-    for (int i = 0; i < numDocIdSets; i++) {
-      BlockDocIdIterator docIdIterator = _docIdSets.get(i).iterator();
+
+    Iterator<BlockDocIdSet> iterator = _docIdSets.iterator();
+    for (int i = 0; iterator.hasNext(); i++) {
+      BlockDocIdSet blockDocIdSet = iterator.next();
+      BlockDocIdIterator docIdIterator = blockDocIdSet.iterator();
       allDocIdIterators[i] = docIdIterator;
       if (docIdIterator instanceof SortedDocIdIterator) {
         sortedDocIdIterators.add((SortedDocIdIterator) docIdIterator);
+        // aggregate the number of entries scanned in filter before removing the iterator
+        _numEntriesScannedInFilter += blockDocIdSet.getNumEntriesScannedInFilter();
+        // do not keep holding on to the _docIdRanges since they will occupy heap space during the query execution
+        iterator.remove();
       } else if (docIdIterator instanceof BitmapBasedDocIdIterator) {
         bitmapBasedDocIdIterators.add((BitmapBasedDocIdIterator) docIdIterator);
+        // aggregate the number of entries scanned in filter before removing the iterator
+        // some BitmapBasedDocIdIterator may be generated from underlying index types (e.g. H3Index) that actually
+        // scans documents, so we need to aggregate them here
+        _numEntriesScannedInFilter += blockDocIdSet.getNumEntriesScannedInFilter();
+        // do not keep holding on to the bitmaps since they will occupy heap space during the query execution
+        iterator.remove();
       } else {
         remainingDocIdIterators.add(docIdIterator);
       }
@@ -112,10 +127,9 @@ public final class OrDocIdSet implements BlockDocIdSet {
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    long numEntriesScannedInFilter = 0L;
     for (BlockDocIdSet docIdSet : _docIdSets) {
-      numEntriesScannedInFilter += docIdSet.getNumEntriesScannedInFilter();
+      _numEntriesScannedInFilter += docIdSet.getNumEntriesScannedInFilter();
     }
-    return numEntriesScannedInFilter;
+    return _numEntriesScannedInFilter;
   }
 }

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.helix.task.JobConfig;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 
@@ -64,6 +65,13 @@ public interface PinotTaskGenerator {
    */
   default int getNumConcurrentTasksPerInstance() {
     return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
+  }
+
+  /**
+   * Returns the maximum number of attempts per task, 1 by default.
+   */
+  default int getMaxAttemptsPerTask() {
+    return MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK;
   }
 
   /**

@@ -29,26 +29,23 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
   mvn clean install -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -am -B \
     -pl 'pinot-integration-tests' -T 16 || exit 1
+  cd pinot-integration-tests || exit 1
   if [ "$RUN_TEST_SET" == "1" ]; then
-    mvn test -am -B \
-        -pl 'pinot-integration-tests' \
-        -Dtest='A*Test,B*Test,C*Test,D*Test,E*Test,F*Test,G*Test,H*Test,I*Test,J*Test,K*Test,L*Test,P*Test,Q*Test,R*Test' \
-        -P github-actions,integration-tests-only \
-        -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip && exit 0 || exit 1
+    mvn test \
+        -P github-actions,custom-cluster-integration-test-suite || exit 1
+    mvn test \
+        -P github-actions,integration-tests-set-1 && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
-    mvn test -am -B \
-        -pl 'pinot-integration-tests' \
-        -Dtest='M*Test,N*Test,O*Test,S*Test,T*Test,U*Test,V*Test,W*Test,X*Test,Y*Test,Z*Test' \
-        -P github-actions,integration-tests-only \
-        -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip && exit 0 || exit 1
+    mvn test \
+        -P github-actions,integration-tests-set-2 && exit 0 || exit 1
   fi
 else
   # Unit Tests
   #   - TEST_SET#1 runs install and test together so the module list must ensure no additional modules were tested
   #     due to the -am flag (include dependency modules)
   if [ "$RUN_TEST_SET" == "1" ]; then
-    mvn clean install -am -B \
+    mvn clean install -DskipTests -am -B -T 16 \
         -pl 'pinot-spi' \
         -pl 'pinot-segment-spi' \
         -pl 'pinot-common' \
@@ -57,7 +54,16 @@ else
         -pl 'pinot-query-planner' \
         -pl 'pinot-query-runtime' \
         -P github-actions,no-integration-tests \
-        -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip && exit 0 || exit 1
+        -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip || exit 1
+    mvn test -T 16 \
+        -pl 'pinot-spi' \
+        -pl 'pinot-segment-spi' \
+        -pl 'pinot-common' \
+        -pl 'pinot-segment-local' \
+        -pl 'pinot-core' \
+        -pl 'pinot-query-planner' \
+        -pl 'pinot-query-runtime' \
+        -P github-actions,no-integration-tests && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
     mvn clean install -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -T 16 || exit 1

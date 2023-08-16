@@ -39,7 +39,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * The name also serves as the key to retrieve the result from the parent aggregation function
  * result holder.
  * Please look at getResultColumnName() for the detailed format of the name.
- * Please look at ArgMinMaxRewriter as an example of how a child aggregation function is created.
+ * Please look at ExprMinMaxRewriter as an example of how a child aggregation function is created.
  */
 public abstract class ChildAggregationFunction implements AggregationFunction<Long, Long> {
 
@@ -123,8 +123,8 @@ public abstract class ChildAggregationFunction implements AggregationFunction<Lo
    * The name of the column as follows:
    * CHILD_AGGREGATION_NAME_PREFIX + actual function type + operands + CHILD_AGGREGATION_SEPERATOR
    * + actual function type + parent aggregation function id + CHILD_KEY_SEPERATOR + column key in parent function
-   * e.g. if the child aggregation function is "argmax(0,a,b,x)", the name of the column is
-   * "pinotchildaggregationargmax(a,b,x)@argmax0_x"
+   * e.g. if the child aggregation function is "exprmax(0,a,b,x)", the name of the column is
+   * "pinotchildaggregationepxrmax(a,b,x)@argmax0_x"
    */
   @Override
   public final String getResultColumnName() {

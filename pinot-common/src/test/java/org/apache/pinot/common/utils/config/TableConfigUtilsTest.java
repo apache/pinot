@@ -34,7 +34,6 @@ import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
-import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -215,12 +214,6 @@ public class TableConfigUtilsTest {
   private class TestStreamConsumerFactory extends StreamConsumerFactory {
     @Override
     public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-      return null;
-    }
-
-    @Override
-    public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
-        String groupId) {
       return null;
     }
 

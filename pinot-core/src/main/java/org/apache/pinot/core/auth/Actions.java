@@ -80,6 +80,7 @@ public class Actions {
     public static final String UPDATE_TASK_QUEUE = "UpdateTaskQueue";
     public static final String UPDATE_TENANT = "UpdateTenant";
     public static final String UPDATE_TENANT_METADATA = "UpdateTenantMetadata";
+    public static final String REBALANCE_TENANT_TABLES = "RebalanceTenantTables";
     public static final String UPDATE_TIME_INTERVAL = "UpdateTimeInterval";
     public static final String UPDATE_USER = "UpdateUser";
     public static final String UPDATE_ZNODE = "UpdateZnode";

@@ -30,7 +30,7 @@ import java.util.concurrent.Executor;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -52,11 +52,11 @@ public class TableSizeReader {
   public static final long DEFAULT_SIZE_WHEN_MISSING_OR_ERROR = -1L;
 
   private final Executor _executor;
-  private final HttpConnectionManager _connectionManager;
+  private final HttpClientConnectionManager _connectionManager;
   private final PinotHelixResourceManager _helixResourceManager;
   private final ControllerMetrics _controllerMetrics;
 
-  public TableSizeReader(Executor executor, HttpConnectionManager connectionManager,
+  public TableSizeReader(Executor executor, HttpClientConnectionManager connectionManager,
       ControllerMetrics controllerMetrics, PinotHelixResourceManager helixResourceManager) {
     _executor = executor;
     _connectionManager = connectionManager;

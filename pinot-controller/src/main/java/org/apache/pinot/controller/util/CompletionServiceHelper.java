@@ -20,16 +20,17 @@
 package org.apache.pinot.controller.util;
 
 import com.google.common.collect.BiMap;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.http.MultiHttpRequest;
+import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,10 +46,10 @@ public class CompletionServiceHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(CompletionServiceHelper.class);
 
   private final Executor _executor;
-  private final HttpConnectionManager _httpConnectionManager;
+  private final HttpClientConnectionManager _httpConnectionManager;
   private final BiMap<String, String> _endpointsToServers;
 
-  public CompletionServiceHelper(Executor executor, HttpConnectionManager httpConnectionManager,
+  public CompletionServiceHelper(Executor executor, HttpClientConnectionManager httpConnectionManager,
       BiMap<String, String> endpointsToServers) {
     _executor = executor;
     _httpConnectionManager = httpConnectionManager;
@@ -81,29 +82,35 @@ public class CompletionServiceHelper {
     CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
 
     // TODO: use some service other than completion service so that we know which server encounters the error
-    CompletionService<GetMethod> completionService =
+    CompletionService<MultiHttpRequestResponse> completionService =
         new MultiHttpRequest(_executor, _httpConnectionManager).execute(serverURLs, requestHeaders, timeoutMs);
     for (int i = 0; i < serverURLs.size(); i++) {
-      GetMethod getMethod = null;
+      MultiHttpRequestResponse multiHttpRequestResponse = null;
       try {
-        getMethod = completionService.take().get();
-        URI uri = getMethod.getURI();
+        multiHttpRequestResponse = completionService.take().get();
+        URI uri = multiHttpRequestResponse.getURI();
         String instance =
             _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
-        if (getMethod.getStatusCode() >= 300) {
-          LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
+        int statusCode = multiHttpRequestResponse.getResponse().getStatusLine().getStatusCode();
+        if (statusCode >= 300) {
+          LOGGER.error("Server: {} returned error: {}", instance, statusCode);
           completionServiceResponse._failedResponseCount++;
           continue;
         }
+        String responseString = EntityUtils.toString(multiHttpRequestResponse.getResponse().getEntity());
         completionServiceResponse._httpResponses
-            .put(multiRequestPerServer ? uri.toString() : instance, getMethod.getResponseBodyAsString());
+            .put(multiRequestPerServer ? uri.toString() : instance, responseString);
       } catch (Exception e) {
         String reason = useCase == null ? "" : String.format(" in '%s'", useCase);
         LOGGER.error("Connection error{}. Details: {}", reason, e.getMessage());
         completionServiceResponse._failedResponseCount++;
       } finally {
-        if (getMethod != null) {
-          getMethod.releaseConnection();
+        if (multiHttpRequestResponse != null) {
+          try {
+            multiHttpRequestResponse.close();
+          } catch (Exception e) {
+            LOGGER.error("Connection close error. Details: {}", e.getMessage());
+          }
         }
       }
     }

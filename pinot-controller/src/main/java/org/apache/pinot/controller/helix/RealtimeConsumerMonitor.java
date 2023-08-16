@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import org.apache.commons.httpclient.SimpleHttpConnectionManager;
+import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -59,7 +59,8 @@ public class RealtimeConsumerMonitor extends ControllerPeriodicTask<RealtimeCons
       LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics,
       ExecutorService executorService) {
     this(controllerConf, pinotHelixResourceManager, leadControllerManager, controllerMetrics,
-        new ConsumingSegmentInfoReader(executorService, new SimpleHttpConnectionManager(), pinotHelixResourceManager));
+        new ConsumingSegmentInfoReader(executorService, new BasicHttpClientConnectionManager(),
+            pinotHelixResourceManager));
   }
 
   @Override

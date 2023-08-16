@@ -178,8 +178,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     boolean traceEnabled = Boolean.parseBoolean(
-        request.has(CommonConstants.Broker.Request.TRACE) ? request.get(CommonConstants.Broker.Request.TRACE).asText()
-            : "false");
+        sqlNodeAndOptions.getOptions().getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
 
     ResultTable queryResults;
     Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();

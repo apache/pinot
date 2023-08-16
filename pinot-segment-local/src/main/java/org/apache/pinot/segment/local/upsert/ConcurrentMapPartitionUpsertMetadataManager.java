@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -53,9 +52,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   @VisibleForTesting
   final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
-
-  // Reused for reading previous record during partial upsert
-  private final GenericRow _reuse = new GenericRow();
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
@@ -288,7 +284,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @Override
   protected GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo) {
     assert _partialUpsertHandler != null;
-    AtomicReference<GenericRow> previousRecordReference = new AtomicReference<>();
     _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (pk, recordLocation) -> {
           // Read the previous record if the following conditions are met:
@@ -301,14 +296,12 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
             int currentDocId = recordLocation.getDocId();
             if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-              _reuse.clear();
-              previousRecordReference.set(currentSegment.getRecord(currentDocId, _reuse));
+              _partialUpsertHandler.merge(currentSegment, currentDocId, record);
             }
           }
           return recordLocation;
         });
-    GenericRow previousRecord = previousRecordReference.get();
-    return previousRecord != null ? _partialUpsertHandler.merge(previousRecord, record) : record;
+    return record;
   }
 
   @VisibleForTesting

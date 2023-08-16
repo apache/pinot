@@ -676,7 +676,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertTrue(orderByExpressionContext.isDesc());
+    assertFalse(orderByExpressionContext.isAsc());
     assertTrue(orderByExpressionContext.isNullsLast());
     assertEquals(orderByExpressionContext.getExpression().getFunction().getFunctionName(), "datetrunc");
     assertEquals(orderByExpressionContext.getExpression().getFunction().getArguments().get(0).getIdentifier(), "A");
@@ -762,7 +762,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertTrue(orderByExpressionContext.isDesc());
+    assertFalse(orderByExpressionContext.isAsc());
     assertFalse(orderByExpressionContext.isNullsLast());
   }
 
@@ -776,7 +776,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertTrue(orderByExpressionContext.isDesc());
+    assertFalse(orderByExpressionContext.isAsc());
     assertTrue(orderByExpressionContext.isNullsLast());
   }
 
@@ -790,7 +790,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertFalse(orderByExpressionContext.isDesc());
+    assertTrue(orderByExpressionContext.isAsc());
     assertTrue(orderByExpressionContext.isNullsLast());
   }
 }
