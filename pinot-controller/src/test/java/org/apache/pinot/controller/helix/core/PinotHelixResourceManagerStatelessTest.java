@@ -367,7 +367,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME)
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs().getStreamConfigsMap()).build();
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
     waitForEVToDisappear(tableConfig.getTableName());
     _helixResourceManager.addTable(tableConfig);
     waitForTableOnlineInBrokerResourceEV(REALTIME_TABLE_NAME);
@@ -679,7 +679,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
         if (stateMap.size() != 1) {
           return false;
         }
-        String instanceId = LeadControllerUtils.generateParticipantInstanceId(LOCAL_HOST, _controllerPort);
+        String instanceId = LeadControllerUtils.generateParticipantInstanceId(LOCAL_HOST, getControllerPort());
         return MasterSlaveSMD.States.MASTER.name().equals(stateMap.get(instanceId));
       }
       return true;

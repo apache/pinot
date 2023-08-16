@@ -25,6 +25,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -55,6 +56,9 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -340,6 +344,76 @@ public class ClusterIntegrationTestUtils {
   /**
    * Push the records from the given Avro files into a Kafka stream.
    *
+   * @param csvFile CSV File name
+   * @param kafkaTopic Kafka topic
+   * @param partitionColumnIndex Optional Index of the partition column
+   * @throws Exception
+   */
+  public static void pushCsvIntoKafka(File csvFile, String kafkaTopic,
+      @Nullable Integer partitionColumnIndex, boolean injectTombstones, StreamDataProducer producer)
+      throws Exception {
+    long counter = 0;
+    if (injectTombstones) {
+      // publish lots of tombstones to livelock the consumer if it can't handle this properly
+      for (int i = 0; i < 1000; i++) {
+        // publish a tombstone first
+        producer.produce(kafkaTopic, Longs.toByteArray(counter++), null);
+      }
+    }
+    CSVFormat csvFormat = CSVFormat.DEFAULT.withSkipHeaderRecord(true);
+    try (CSVParser parser = CSVParser.parse(csvFile, StandardCharsets.UTF_8, csvFormat)) {
+      for (CSVRecord csv : parser) {
+        byte[] keyBytes = (partitionColumnIndex == null) ? Longs.toByteArray(counter++)
+            : csv.get(partitionColumnIndex).getBytes(StandardCharsets.UTF_8);
+        List<String> cols = new ArrayList<>();
+        for (String col : csv) {
+          cols.add(col);
+        }
+        byte[] bytes = String.join(",", cols).getBytes(StandardCharsets.UTF_8);
+        producer.produce(kafkaTopic, keyBytes, bytes);
+      }
+    }
+  }
+
+  /**
+   * Push the records from the given Avro files into a Kafka stream.
+   *
+   * @param csvRecords List of CSV record string
+   * @param kafkaTopic Kafka topic
+   * @param partitionColumnIndex Optional Index of the partition column
+   * @throws Exception
+   */
+  public static void pushCsvIntoKafka(List<String> csvRecords, String kafkaTopic,
+      @Nullable Integer partitionColumnIndex, boolean injectTombstones, StreamDataProducer producer)
+      throws Exception {
+    long counter = 0;
+    if (injectTombstones) {
+      // publish lots of tombstones to livelock the consumer if it can't handle this properly
+      for (int i = 0; i < 1000; i++) {
+        // publish a tombstone first
+        producer.produce(kafkaTopic, Longs.toByteArray(counter++), null);
+      }
+    }
+    CSVFormat csvFormat = CSVFormat.DEFAULT.withSkipHeaderRecord(true);
+    for (String recordCsv : csvRecords) {
+      try (CSVParser parser = CSVParser.parse(recordCsv, csvFormat)) {
+        for (CSVRecord csv : parser) {
+          byte[] keyBytes = (partitionColumnIndex == null) ? Longs.toByteArray(counter++)
+              : csv.get(partitionColumnIndex).getBytes(StandardCharsets.UTF_8);
+          List<String> cols = new ArrayList<>();
+          for (String col : csv) {
+            cols.add(col);
+          }
+          byte[] bytes = String.join(",", cols).getBytes(StandardCharsets.UTF_8);
+          producer.produce(kafkaTopic, keyBytes, bytes);
+        }
+      }
+    }
+  }
+
+  /**
+   * Push the records from the given Avro files into a Kafka stream.
+   *
    * @param avroFiles List of Avro files
    * @param kafkaBroker Kafka broker config
    * @param kafkaTopic Kafka topic
@@ -361,12 +435,13 @@ public class ClusterIntegrationTestUtils {
     StreamDataProducer producer =
         StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
 
+    long counter = 0;
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       if (injectTombstones) {
         // publish lots of tombstones to livelock the consumer if it can't handle this properly
         for (int i = 0; i < 1000; i++) {
           // publish a tombstone first
-          producer.produce(kafkaTopic, Longs.toByteArray(System.currentTimeMillis()), null);
+          producer.produce(kafkaTopic, Longs.toByteArray(counter++), null);
         }
       }
       for (File avroFile : avroFiles) {
@@ -381,7 +456,7 @@ public class ClusterIntegrationTestUtils {
             datumWriter.write(genericRecord, binaryEncoder);
             binaryEncoder.flush();
 
-            byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(System.currentTimeMillis())
+            byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(counter++)
                 : (genericRecord.get(partitionColumn)).toString().getBytes();
             byte[] bytes = outputStream.toByteArray();
             producer.produce(kafkaTopic, keyBytes, bytes);
@@ -417,6 +492,7 @@ public class ClusterIntegrationTestUtils {
     // initiate transaction.
     producer.initTransactions();
     producer.beginTransaction();
+    long counter = 0;
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
       for (File avroFile : avroFiles) {
         try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
@@ -430,7 +506,7 @@ public class ClusterIntegrationTestUtils {
             datumWriter.write(genericRecord, binaryEncoder);
             binaryEncoder.flush();
 
-            byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(System.currentTimeMillis())
+            byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(counter++)
                 : (genericRecord.get(partitionColumn)).toString().getBytes();
             byte[] bytes = outputStream.toByteArray();
             ProducerRecord<byte[], byte[]> record = new ProducerRecord(kafkaTopic, keyBytes, bytes);
@@ -469,6 +545,7 @@ public class ClusterIntegrationTestUtils {
     properties.put("request.required.acks", "1");
     properties.put("partitioner.class", "kafka.producer.ByteArrayPartitioner");
 
+    long counter = 0;
     StreamDataProducer producer =
         StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
@@ -488,7 +565,7 @@ public class ClusterIntegrationTestUtils {
           datumWriter.write(genericRecord, binaryEncoder);
           binaryEncoder.flush();
 
-          byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(System.currentTimeMillis())
+          byte[] keyBytes = (partitionColumn == null) ? Longs.toByteArray(counter++)
               : (genericRecord.get(partitionColumn)).toString().getBytes();
           byte[] bytes = outputStream.toByteArray();
 
@@ -573,7 +650,7 @@ public class ClusterIntegrationTestUtils {
   static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
-    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null);
+    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null, false);
   }
 
   /**
@@ -582,11 +659,12 @@ public class ClusterIntegrationTestUtils {
    */
   static void testQueryWithMatchingRowCount(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
-      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
+      boolean useMultiStageQueryEngine)
       throws Exception {
     try {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
-          extraJsonProperties, true, false);
+          extraJsonProperties, useMultiStageQueryEngine, true, false);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, e);
     }
@@ -594,10 +672,10 @@ public class ClusterIntegrationTestUtils {
 
   static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers,
-      @Nullable Map<String, String> extraJsonProperties) {
+      @Nullable Map<String, String> extraJsonProperties, boolean useMultiStageQueryEngine) {
     try {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
-          extraJsonProperties, false, false);
+          extraJsonProperties, useMultiStageQueryEngine, false, false);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, e);
     }
@@ -605,10 +683,11 @@ public class ClusterIntegrationTestUtils {
 
   static void testQueryViaController(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
-      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties) {
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
+      boolean useMultiStageQueryEngine) {
     try {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
-          extraJsonProperties, false, true);
+          extraJsonProperties, useMultiStageQueryEngine, false, true);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, e);
     }
@@ -617,14 +696,16 @@ public class ClusterIntegrationTestUtils {
   private static void testQueryInternal(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
-      boolean matchingRowCount, boolean viaController)
+      boolean useMultiStageQueryEngine, boolean matchingRowCount, boolean viaController)
       throws Exception {
     // broker response
     JsonNode pinotResponse;
     if (viaController) {
       pinotResponse = ClusterTest.postQueryToController(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
     } else {
-      pinotResponse = ClusterTest.postQuery(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
+      pinotResponse =
+          ClusterTest.postQuery(pinotQuery, getBrokerQueryApiUrl(queryResourceUrl, useMultiStageQueryEngine), headers,
+              extraJsonProperties);
     }
     if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
@@ -696,6 +777,7 @@ public class ClusterIntegrationTestUtils {
             return;
           }
 
+          h2Value = convertBooleanToLowerCase(h2Value);
           String brokerValue = brokerResponseRows.get(0).get(c).asText();
           String connectionValue = resultTableResultSet.getString(0, c);
 
@@ -721,7 +803,7 @@ public class ClusterIntegrationTestUtils {
           if (h2ResultSet.first()) {
             for (int i = 0; i < numRows; i++) {
               for (int c = 0; c < numColumns; c++) {
-                String h2Value = h2ResultSet.getString(c + 1);
+                String h2Value = convertBooleanToLowerCase(h2ResultSet.getString(c + 1));
                 String brokerValue = brokerResponseRows.get(i).get(c).asText();
                 String connectionValue = resultTableResultSet.getString(i, c);
                 boolean error = fuzzyCompare(h2Value, brokerValue, connectionValue);
@@ -746,8 +828,13 @@ public class ClusterIntegrationTestUtils {
       @Nullable Map<String, String> extraJsonProperties)
       throws Exception {
     JsonNode explainPlanForResponse =
-        ClusterTest.postQuery("explain plan for " + pinotQuery, brokerUrl, headers, extraJsonProperties);
+        ClusterTest.postQuery("explain plan for " + pinotQuery, getBrokerQueryApiUrl(brokerUrl, false), headers,
+            extraJsonProperties);
     return ExplainPlanUtils.formatExplainPlan(explainPlanForResponse);
+  }
+
+  public static String getBrokerQueryApiUrl(String brokerBaseApiUrl, boolean useMultiStageQueryEngine) {
+    return useMultiStageQueryEngine ? brokerBaseApiUrl + "/query" : brokerBaseApiUrl + "/query/sql";
   }
 
   private static int getH2ExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
@@ -899,11 +986,10 @@ public class ClusterIntegrationTestUtils {
   private static String removeTrailingZeroForNumber(String value, String type) {
     String upperCaseType = StringUtils.upperCase(type);
     // remove trailing zero after decimal point to compare decimal numbers with h2 data
-    if (upperCaseType.equals("FLOAT") || upperCaseType.equals("DECFLOAT")
-        || upperCaseType.equals("DOUBLE") || upperCaseType.equals("DOUBLE PRECISION")) {
+    if (upperCaseType.equals("FLOAT") || upperCaseType.equals("DECFLOAT") || upperCaseType.equals("DOUBLE")
+        || upperCaseType.equals("DOUBLE PRECISION")) {
       try {
-        String result = (new BigDecimal(value)).stripTrailingZeros().toPlainString();
-        return result + ".0";
+        return (new BigDecimal(value)).stripTrailingZeros().toPlainString();
       } catch (NumberFormatException ignored) {
         // ignoring the exception
       }
@@ -944,6 +1030,7 @@ public class ClusterIntegrationTestUtils {
     String failureMessage = "Caught exception while testing query!";
     failure(pinotQuery, h2Query, failureMessage, e);
   }
+
   /**
    * Helper method to report failures.
    *

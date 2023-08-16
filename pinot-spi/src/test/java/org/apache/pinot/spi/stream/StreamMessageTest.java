@@ -29,7 +29,7 @@ public class StreamMessageTest {
   public void testAllowNullKeyAndMetadata() {
     String value = "hello";
     byte[] valBytes = value.getBytes(StandardCharsets.UTF_8);
-    StreamMessage<byte[]> msg = new StreamMessage(valBytes, valBytes.length);
+    StreamMessage<byte[]> msg = new StreamMessage(valBytes, valBytes.length, null);
     Assert.assertNull(msg.getKey());
     Assert.assertNull(msg.getMetadata());
     Assert.assertEquals(new String(msg.getValue()), value);

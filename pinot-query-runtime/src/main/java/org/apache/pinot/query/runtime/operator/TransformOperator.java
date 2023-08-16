@@ -29,7 +29,7 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.query.runtime.operator.utils.FunctionInvokeUtils;
+import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,13 +108,12 @@ public class TransformOperator extends MultiStageOperator {
       return block;
     }
 
-    List<Object[]> resultRows = new ArrayList<>();
     List<Object[]> container = block.getContainer();
+    List<Object[]> resultRows = new ArrayList<>(container.size());
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
       for (int i = 0; i < _resultColumnSize; i++) {
-        resultRow[i] =
-            FunctionInvokeUtils.convert(_transformOperandsList.get(i).apply(row), _resultSchema.getColumnDataType(i));
+        resultRow[i] = TypeUtils.convert(_transformOperandsList.get(i).apply(row), _resultSchema.getColumnDataType(i));
       }
       resultRows.add(resultRow);
     }

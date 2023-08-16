@@ -73,6 +73,7 @@ public class QueryContext {
   private final String _tableName;
   private final QueryContext _subquery;
   private final List<ExpressionContext> _selectExpressions;
+  private final boolean _distinct;
   private final List<String> _aliasList;
   private final FilterContext _filter;
   private final List<ExpressionContext> _groupByExpressions;
@@ -124,14 +125,15 @@ public class QueryContext {
   private boolean _serverReturnFinalResult;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
-      List<ExpressionContext> selectExpressions, List<String> aliasList, @Nullable FilterContext filter,
-      @Nullable List<ExpressionContext> groupByExpressions, @Nullable FilterContext havingFilter,
-      @Nullable List<OrderByExpressionContext> orderByExpressions, int limit, int offset,
-      Map<String, String> queryOptions, @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints,
-      boolean explain) {
+      List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
+      @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
+      @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
+      int offset, Map<String, String> queryOptions,
+      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, boolean explain) {
     _tableName = tableName;
     _subquery = subquery;
     _selectExpressions = selectExpressions;
+    _distinct = distinct;
     _aliasList = Collections.unmodifiableList(aliasList);
     _filter = filter;
     _groupByExpressions = groupByExpressions;
@@ -165,6 +167,13 @@ public class QueryContext {
    */
   public List<ExpressionContext> getSelectExpressions() {
     return _selectExpressions;
+  }
+
+  /**
+   * Returns whether the query is a DISTINCT query.
+   */
+  public boolean isDistinct() {
+    return _distinct;
   }
 
   /**
@@ -413,9 +422,9 @@ public class QueryContext {
   @Override
   public String toString() {
     return "QueryContext{" + "_tableName='" + _tableName + '\'' + ", _subquery=" + _subquery + ", _selectExpressions="
-        + _selectExpressions + ", _aliasList=" + _aliasList + ", _filter=" + _filter + ", _groupByExpressions="
-        + _groupByExpressions + ", _havingFilter=" + _havingFilter + ", _orderByExpressions=" + _orderByExpressions
-        + ", _limit=" + _limit + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions
+        + _selectExpressions + ", _distinct=" + _distinct + ", _aliasList=" + _aliasList + ", _filter=" + _filter
+        + ", _groupByExpressions=" + _groupByExpressions + ", _havingFilter=" + _havingFilter + ", _orderByExpressions="
+        + _orderByExpressions + ", _limit=" + _limit + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions
         + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
   }
 
@@ -423,6 +432,7 @@ public class QueryContext {
     private String _tableName;
     private QueryContext _subquery;
     private List<ExpressionContext> _selectExpressions;
+    private boolean _distinct;
     private List<String> _aliasList;
     private FilterContext _filter;
     private List<ExpressionContext> _groupByExpressions;
@@ -447,6 +457,11 @@ public class QueryContext {
 
     public Builder setSelectExpressions(List<ExpressionContext> selectExpressions) {
       _selectExpressions = selectExpressions;
+      return this;
+    }
+
+    public Builder setDistinct(boolean distinct) {
+      _distinct = distinct;
       return this;
     }
 
@@ -507,8 +522,9 @@ public class QueryContext {
         _queryOptions = Collections.emptyMap();
       }
       QueryContext queryContext =
-          new QueryContext(_tableName, _subquery, _selectExpressions, _aliasList, _filter, _groupByExpressions,
-              _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions, _expressionOverrideHints, _explain);
+          new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList, _filter,
+              _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
+              _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
 
@@ -540,7 +556,7 @@ public class QueryContext {
         }
         int functionIndex = filteredAggregationFunctions.size();
         AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext);
+            AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
         filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
         filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
       }
@@ -561,7 +577,7 @@ public class QueryContext {
           FilterContext filter = pair.getRight();
           int functionIndex = filteredAggregationFunctions.size();
           AggregationFunction aggregationFunction =
-              AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext);
+              AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
           filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
           filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
         }

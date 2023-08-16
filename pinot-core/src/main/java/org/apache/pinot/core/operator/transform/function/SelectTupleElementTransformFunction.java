@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
@@ -26,7 +27,6 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public abstract class SelectTupleElementTransformFunction extends BaseTransformFunction {
@@ -48,7 +48,9 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      boolean nullHandlingEnabled) {
+    super.init(arguments, columnContextMap, nullHandlingEnabled);
     if (arguments.isEmpty()) {
       throw new IllegalArgumentException(_name + " takes at least one argument");
     }
@@ -87,25 +89,6 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
     return _name;
   }
 
-  @Override
-  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    RoaringBitmap bitmap = _arguments.get(0).getNullBitmap(valueBlock);
-    if (bitmap == null || bitmap.isEmpty()) {
-      return bitmap;
-    }
-    for (int i = 1; i < _arguments.size(); i++) {
-      RoaringBitmap curBitmap = _arguments.get(i).getNullBitmap(valueBlock);
-      if (curBitmap == null || curBitmap.isEmpty()) {
-        return curBitmap;
-      }
-      bitmap.and(curBitmap);
-      if (bitmap.isEmpty()) {
-        return null;
-      }
-    }
-    return bitmap;
-  }
-
   private static FieldSpec.DataType getLowestCommonDenominatorType(FieldSpec.DataType left, FieldSpec.DataType right) {
     if (left == null || left == right) {
       return right;
@@ -131,4 +114,106 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
     combinations.put(FieldSpec.DataType.STRING, EnumSet.of(FieldSpec.DataType.STRING));
     return combinations;
   }
+
+  @Override
+  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initIntValuesSV(numDocs);
+    int[] values = _arguments.get(0).transformToIntValuesSV(valueBlock);
+    System.arraycopy(values, 0, _intValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToIntValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _intValuesSV[j] = binaryFunction(_intValuesSV[j], values[j]);
+      }
+    }
+    return _intValuesSV;
+  }
+
+  abstract protected int binaryFunction(int a, int b);
+
+  @Override
+  public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initLongValuesSV(numDocs);
+    long[] values = _arguments.get(0).transformToLongValuesSV(valueBlock);
+    System.arraycopy(values, 0, _longValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToLongValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _longValuesSV[j] = binaryFunction(_longValuesSV[j], values[j]);
+      }
+    }
+    return _longValuesSV;
+  }
+
+  abstract protected long binaryFunction(long a, long b);
+
+  @Override
+  public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initFloatValuesSV(numDocs);
+    float[] values = _arguments.get(0).transformToFloatValuesSV(valueBlock);
+    System.arraycopy(values, 0, _floatValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToFloatValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _floatValuesSV[j] = binaryFunction(_floatValuesSV[j], values[j]);
+      }
+    }
+    return _floatValuesSV;
+  }
+
+  abstract protected float binaryFunction(float a, float b);
+
+  @Override
+  public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initDoubleValuesSV(numDocs);
+    double[] values = _arguments.get(0).transformToDoubleValuesSV(valueBlock);
+    System.arraycopy(values, 0, _doubleValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToDoubleValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _doubleValuesSV[j] = binaryFunction(_doubleValuesSV[j], values[j]);
+      }
+    }
+    return _doubleValuesSV;
+  }
+
+  abstract protected double binaryFunction(double a, double b);
+
+  @Override
+  public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initBigDecimalValuesSV(numDocs);
+    BigDecimal[] values = _arguments.get(0).transformToBigDecimalValuesSV(valueBlock);
+    System.arraycopy(values, 0, _bigDecimalValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToBigDecimalValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _bigDecimalValuesSV[j] = binaryFunction(_bigDecimalValuesSV[j], values[j]);
+      }
+    }
+    return _bigDecimalValuesSV;
+  }
+
+  abstract protected BigDecimal binaryFunction(BigDecimal a, BigDecimal b);
+
+  @Override
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesSV(numDocs);
+    String[] values = _arguments.get(0).transformToStringValuesSV(valueBlock);
+    System.arraycopy(values, 0, _stringValuesSV, 0, numDocs);
+    for (int i = 1; i < _arguments.size(); i++) {
+      values = _arguments.get(i).transformToStringValuesSV(valueBlock);
+      for (int j = 0; j < numDocs & j < values.length; j++) {
+        _stringValuesSV[j] = binaryFunction(_stringValuesSV[j], (values[j]));
+      }
+    }
+    return _stringValuesSV;
+  }
+
+  abstract protected String binaryFunction(String a, String b);
 }

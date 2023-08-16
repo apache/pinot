@@ -303,7 +303,8 @@ public class ControllerConf extends PinotConfiguration {
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
-  private static final boolean DEFAULT_ALLOW_HLC_TABLES = true;
+  // Disallow any high level consumer (HLC) table
+  private static final boolean DEFAULT_ALLOW_HLC_TABLES = false;
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
   private static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
@@ -1007,11 +1008,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public boolean getHLCTablesAllowed() {
-    return getProperty(ALLOW_HLC_TABLES, DEFAULT_ALLOW_HLC_TABLES);
-  }
-
-  public void setHLCTablesAllowed(boolean allowHLCTables) {
-    setProperty(ALLOW_HLC_TABLES, allowHLCTables);
+    return DEFAULT_ALLOW_HLC_TABLES;
   }
 
   public String getMetricsPrefix() {

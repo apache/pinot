@@ -22,7 +22,6 @@ import java.io.StringReader;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.sql.SqlNodeList;
@@ -36,7 +35,6 @@ import org.apache.pinot.common.request.Join;
 import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.ParseException;
@@ -98,11 +96,11 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
     Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
-    Function equalsFunc = caseFunc.getOperands().get(1).getFunctionCall();
+    Assert.assertEquals(caseFunc.getOperands().get(1).getLiteral().getFieldValue(), "The quantity is greater than 30");
+    Function equalsFunc = caseFunc.getOperands().get(2).getFunctionCall();
     Assert.assertEquals(equalsFunc.getOperator(), FilterKind.EQUALS.name());
     Assert.assertEquals(equalsFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(equalsFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
-    Assert.assertEquals(caseFunc.getOperands().get(2).getLiteral().getFieldValue(), "The quantity is greater than 30");
     Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), "The quantity is 30");
     Assert.assertEquals(caseFunc.getOperands().get(4).getLiteral().getFieldValue(), "The quantity is under 30");
 
@@ -129,16 +127,16 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
     Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
-    greatThanFunc = caseFunc.getOperands().get(1).getFunctionCall();
-    Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
-    Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
-    Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 20L);
+    Assert.assertEquals(caseFunc.getOperands().get(1).getLiteral().getFieldValue(), 3L);
     greatThanFunc = caseFunc.getOperands().get(2).getFunctionCall();
     Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
     Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
+    Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 20L);
+    Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), 2L);
+    greatThanFunc = caseFunc.getOperands().get(4).getFunctionCall();
+    Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
+    Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 10L);
-    Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), 3L);
-    Assert.assertEquals(caseFunc.getOperands().get(4).getLiteral().getFieldValue(), 2L);
     Assert.assertEquals(caseFunc.getOperands().get(5).getLiteral().getFieldValue(), 1L);
     Assert.assertEquals(caseFunc.getOperands().get(6).getLiteral().getFieldValue(), 0L);
   }
@@ -1062,7 +1060,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     Function distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 1);
 
     Identifier c1 = distinctFunction.getOperands().get(0).getIdentifier();
@@ -1076,7 +1074,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 2);
 
     c1 = distinctFunction.getOperands().get(0).getIdentifier();
@@ -1093,7 +1091,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 3);
 
     final Expression filter = pinotQuery.getFilterExpression();
@@ -1210,7 +1208,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 1);
 
     Function add = distinctFunction.getOperands().get(0).getFunctionCall();
@@ -1229,7 +1227,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 2);
 
     // check for DISTINCT's first operand ADD(....)
@@ -1272,7 +1270,7 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectListExpressions.get(0).getType(), ExpressionType.FUNCTION);
 
     distinctFunction = selectListExpressions.get(0).getFunctionCall();
-    Assert.assertEquals(distinctFunction.getOperator(), AggregationFunctionType.DISTINCT.getName());
+    Assert.assertEquals(distinctFunction.getOperator(), "distinct");
     Assert.assertEquals(distinctFunction.getOperands().size(), 4);
 
     // check for DISTINCT's first operand ADD(....)
@@ -3026,129 +3024,6 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testExtractTableNamesFromNode() {
-    // A simple filter query with one table
-    String query = "Select * from tbl1 where condition1 = filter1";
-    SqlNodeAndOptions sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    List<String> tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 1);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-
-    // query with IN / NOT IN clause
-    query = "SELECT COUNT(*) FROM tbl1 WHERE userUUID IN (SELECT userUUID FROM tbl2) "
-        + "and uuid NOT IN (SELECT uuid from tbl3)";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 3);
-    Collections.sort(tableNames);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl2");
-    Assert.assertEquals(tableNames.get(2), "tbl3");
-
-    // query with JOIN clause
-    query = "SELECT tbl1.col1, tbl2.col2 FROM tbl1 JOIN tbl2 ON tbl1.key = tbl2.key WHERE tbl1.col1 = value1";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 2);
-    Collections.sort(tableNames);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl2");
-
-    // query with WHERE clause JOIN
-    query = "SELECT tbl1.col1, tbl2.col2 FROM tbl1, tbl2 WHERE tbl1.key = tbl2.key AND tbl1.col1 = value1";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 2);
-    Collections.sort(tableNames);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl2");
-
-    // query with JOIN clause and table alias
-    query = "SELECT A.col1, B.col2 FROM tbl1 AS A JOIN tbl2 AS B ON A.key = B.key WHERE A.col1 = value1";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 2);
-    Collections.sort(tableNames);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl2");
-
-    // query with UNION clause
-    query = "SELECT * FROM tbl1 UNION ALL SELECT * FROM tbl2 UNION ALL SELECT * FROM tbl3";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 3);
-    Collections.sort(tableNames);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl2");
-    Assert.assertEquals(tableNames.get(2), "tbl3");
-
-    // query with UNION clause and table alias
-    query = "SELECT * FROM (SELECT * FROM tbl1) AS t1 UNION SELECT * FROM ( SELECT * FROM tbl2) AS t2";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 2);
-    Collections.sort(tableNames);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl2");
-
-    // query with UNION clause and table alias using WITH clause
-    query = "WITH tmp1 AS (SELECT * FROM tbl1), \n"
-        + "tmp2 AS (SELECT * FROM tbl2) \n"
-        + "SELECT * FROM tmp1 UNION ALL SELECT * FROM tmp2";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 2);
-    Collections.sort(tableNames);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl2");
-
-    // query with aliases, JOIN, IN/NOT-IN, group-by
-    query = "with tmp as (select col1, count(*) from tbl1 where condition1 = filter1 group by col1), "
-        + "tmp2 as (select A.col1, B.col2 from tbl2 as A JOIN tbl3 AS B on A.key = B.key) "
-        + "select sum(col1) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from tbl4)";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 4);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl2");
-    Assert.assertEquals(tableNames.get(2), "tbl3");
-    Assert.assertEquals(tableNames.get(3), "tbl4");
-
-    // query with aliases, JOIN, IN/NOT-IN, group-by
-    query = "with tmp as (select col1, count(*) from tbl1 where condition1 = filter1 group by col1 order by col2), "
-        + "tmp2 as (select A.col1, B.col2 from tbl2 as A JOIN tbl3 AS B on A.key = B.key) "
-        + "select sum(col1) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from tbl4) "
-        + "order by A.col1";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 4);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl2");
-    Assert.assertEquals(tableNames.get(2), "tbl3");
-    Assert.assertEquals(tableNames.get(3), "tbl4");
-
-    // query with aliases, JOIN, IN/NOT-IN, group-by and explain
-    query = "explain plan for with tmp as (select col1, count(*) from tbl1 where condition1 = filter1 group by col1), "
-        + "tmp2 as (select A.col1, B.col2 from tbl2 as A JOIN tbl3 AS B on A.key = B.key) "
-        + "select sum(col1) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from tbl4)";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 4);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl2");
-    Assert.assertEquals(tableNames.get(2), "tbl3");
-    Assert.assertEquals(tableNames.get(3), "tbl4");
-
-    // test for self join queries
-    query = "SELECT tbl1.a FROM tbl1 JOIN(SELECT a FROM tbl1) as self ON tbl1.a=self.a ";
-    sqlNodeAndOptions = RequestUtils.parseQuery(query);
-    tableNames = CalciteSqlParser.extractTableNamesFromNode(sqlNodeAndOptions.getSqlNode());
-    Assert.assertEquals(tableNames.size(), 2);
-    Assert.assertEquals(tableNames.get(0), "tbl1");
-    Assert.assertEquals(tableNames.get(1), "tbl1");
-  }
-
-  @Test
   public void testJoin() {
     String query = "SELECT T1.a, T2.b FROM T1 JOIN T2";
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
@@ -3248,5 +3123,70 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(rightSubquery,
         CalciteSqlParser.compileToPinotQuery("SELECT key FROM T1"));
     Assert.assertEquals(join.getCondition(), CalciteSqlParser.compileToExpression("T1.key = self.key"));
+  }
+
+  @Test
+  public void testInPredicateWithOutNullPasses() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2) AND column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
+      + "filter is not supported")
+  public void testSingleInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2, NULL)");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in NOT_IN "
+      + "filter is not supported")
+  public void testSingleNotInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 NOT IN (1, 2, NULL)");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
+  + "filter is not supported")
+  public void testAndFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2, NULL) AND column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in NOT_IN "
+  + "filter is not supported")
+  public void testOrFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 NOT IN (1, 2, NULL) OR column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
+  + "filter is not supported")
+  public void testNotFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE NOT(column1 IN (NULL, 1, 2))");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
+  + "GREATER_THAN filter is not supported")
+  public void testGreaterThanNullFilterFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 > null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
+  + "LESS_THAN_OR_EQUAL filter is not supported")
+  public void testLessThanOrEqualNullFilterFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 <= null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in LIKE "
+  + "filter is not supported")
+  public void testLikeFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 LIKE null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in EQUALS "
+  + "filter is not supported")
+  public void testEqualFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 = null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
+  + "NOT_EQUALS filter is not supported")
+  public void testInEqualFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 != null");
   }
 }

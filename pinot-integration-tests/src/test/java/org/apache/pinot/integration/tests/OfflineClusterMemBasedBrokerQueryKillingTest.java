@@ -69,8 +69,8 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 3;
   private static final String OOM_QUERY =
-      "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest, intDimSV1 FROM mytable GROUP BY intDimSV1"
-          + " ORDER BY digest LIMIT 15000";
+      "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest, intDimSV1 FROM mytable WHERE intDimSV1 > 450000 GROUP BY"
+          + " intDimSV1 ORDER BY digest LIMIT 15000";
 
   private static final String DIGEST_QUERY_1 =
       "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest FROM mytable";
@@ -153,6 +153,8 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
         + CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.0f);
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.40f);
+    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO, 0.0025f);
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_INSTANCE_TYPE, InstanceType.BROKER);
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."

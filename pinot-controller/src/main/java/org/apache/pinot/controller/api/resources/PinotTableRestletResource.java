@@ -28,6 +28,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
@@ -65,13 +67,13 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -82,6 +84,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -90,6 +93,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
@@ -99,7 +103,10 @@ import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.controller.util.TableMetadataReader;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
@@ -167,7 +174,7 @@ public class PinotTableRestletResource {
   Executor _executor;
 
   @Inject
-  HttpConnectionManager _connectionManager;
+  HttpClientConnectionManager _connectionManager;
 
   /**
    * API to create a table. Before adding, validations will be done (min number of replicas,
@@ -197,6 +204,10 @@ public class PinotTableRestletResource {
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
+      if (!_accessControlFactory.create()
+          .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.CREATE_TABLE)) {
+        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+      }
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
@@ -243,6 +254,7 @@ public class PinotTableRestletResource {
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/recommender")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.RECOMMEND_CONFIG)
   @ApiOperation(value = "Recommend config", notes = "Recommend a config with input json")
   public String recommendConfig(String inputStr) {
     try {
@@ -255,6 +267,7 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE)
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
   public String listTables(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
@@ -362,19 +375,24 @@ public class PinotTableRestletResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
+  @ManualAuthorization
   @Path("/tables/{tableName}")
-  @ApiOperation(value = "Get/Enable/Disable/Drop a table",
-      notes = "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
-          + ", the tableconfig will be printed")
+  @ApiOperation(value = "Lists the table configs")
   public String alterTableStateOrListTableConfig(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "enable|disable|drop") @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     try {
-      if (stateStr == null) {
+      if (StringUtils.isBlank(stateStr)) {
+        if (!_accessControlFactory.create()
+            .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.GET_TABLE_CONFIG)) {
+          throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+        }
         return listTableConfigs(tableName, tableTypeStr);
       }
+
+      // TODO: DO NOT allow toggling state with GET request
 
       StateType stateType = Constants.validateState(stateStr);
       TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -383,6 +401,29 @@ public class PinotTableRestletResource {
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
+
+      // Check access for different state types
+      AccessControl accessControl = _accessControlFactory.create();
+      switch (stateType) {
+        case ENABLE:
+          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.ENABLE_TABLE)) {
+            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+          }
+          break;
+        case DISABLE:
+          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DISABLE_TABLE)) {
+            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+          }
+          break;
+        case DROP:
+          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DELETE_TABLE)) {
+            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+          }
+          break;
+        default:
+          throw new ControllerApplicationException(LOGGER, "Invalid state type: " + stateType,
+              Response.Status.BAD_REQUEST);
+      }
 
       ArrayNode ret = JsonUtils.newArrayNode();
       boolean tableExists = false;
@@ -422,6 +463,7 @@ public class PinotTableRestletResource {
 
   @DELETE
   @Path("/tables/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_TABLE)
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
@@ -480,6 +522,7 @@ public class PinotTableRestletResource {
 
   @PUT
   @Path("/tables/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIG)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
@@ -559,6 +602,10 @@ public class PinotTableRestletResource {
     String endpointUrl = request.getRequestURL().toString();
     AccessControlUtils.validatePermission(tableName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
 
     ObjectNode validationResponse =
         validateConfig(tableConfig.getLeft(), _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig.getLeft()),
@@ -594,6 +641,10 @@ public class PinotTableRestletResource {
     String endpointUrl = request.getRequestURL().toString();
     AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, tableConfig.getTableName(), Actions.Table.VALIDATE_TABLE_CONFIGS)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
 
     return validateConfig(tableSchemaConfig.getTableConfig(), schema, typesToSkip).toString();
   }
@@ -621,6 +672,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebalance")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REBALANCE_TABLE)
   @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
       notes = "Rebalances a table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(
@@ -702,6 +754,7 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/state")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_STATE)
   @ApiOperation(value = "Get current table state", notes = "Get current table state")
   public String getTableState(
       @ApiParam(value = "Name of the table to get its state", required = true) @PathParam("tableName") String tableName,
@@ -717,10 +770,50 @@ public class PinotTableRestletResource {
     }
   }
 
+  @PUT
+  @Path("/tables/{tableName}/state")
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
+  @ApiOperation(value = "Enable/disable a table", notes = "Enable/disable a table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  public SuccessResponse toggleTableState(
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "enable|disable", required = true) @QueryParam("state") String state) {
+    String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
+    StateType stateType;
+    if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
+      stateType = StateType.ENABLE;
+    } else if (StateType.DISABLE.name().equalsIgnoreCase(state)) {
+      stateType = StateType.DISABLE;
+    } else {
+      throw new ControllerApplicationException(LOGGER, "Unknown state '" + state + "'", Response.Status.BAD_REQUEST);
+    }
+    if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist",
+          Response.Status.NOT_FOUND);
+    }
+    PinotResourceManagerResponse response = _pinotHelixResourceManager.toggleTableState(tableNameWithType, stateType);
+    if (response.isSuccessful()) {
+      return new SuccessResponse("Request to " + state + " table '" + tableNameWithType + "' is successful");
+    } else {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to " + state + " table '" + tableNameWithType + "': " + response.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/rebalanceStatus/{jobId}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_REBALANCE_STATUS)
   @ApiOperation(value = "Gets detailed stats of a rebalance operation",
       notes = "Gets detailed stats of a rebalance operation")
   public ServerRebalanceJobStatusResponse rebalanceStatus(
@@ -750,6 +843,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("/tables/{tableName}/stats")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "table stats", notes = "Provides metadata info/stats about the table.")
   public String getTableStats(
@@ -798,6 +892,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("/tables/{tableName}/status")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "table status", notes = "Provides status of the table including ingestion status")
   public String getTableStatus(
@@ -836,6 +931,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("tables/{tableName}/metadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the aggregate metadata of all segments for a table",
       notes = "Get the aggregate metadata of all segments for a table")
@@ -885,6 +981,7 @@ public class PinotTableRestletResource {
 
   @GET
   @Path("table/{tableName}/jobs")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_CONTROLLER_JOBS)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get list of controller jobs for this table",
       notes = "Get list of controller jobs for this table")
@@ -918,6 +1015,7 @@ public class PinotTableRestletResource {
 
   @POST
   @Path("tables/{tableName}/timeBoundary")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIG)
   @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata", notes = "Set "
       + "hybrid table query time boundary based on offline segments' metadata")
   @Produces(MediaType.APPLICATION_JSON)
@@ -958,6 +1056,7 @@ public class PinotTableRestletResource {
 
   @DELETE
   @Path("tables/{tableName}/timeBoundary")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_TIME_BOUNDARY)
   @ApiOperation(value = "Delete hybrid table query time boundary", notes = "Delete hybrid table query time boundary")
   @Produces(MediaType.APPLICATION_JSON)
   public SuccessResponse deleteTimeBoundary(

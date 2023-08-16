@@ -36,6 +36,6 @@ public class RawLongSingleColumnDistinctOnlyExecutor extends BaseRawLongSingleCo
   @Override
   protected boolean add(long val) {
     _valueSet.add(val);
-    return _valueSet.size() >= _limit - (_hasNull ? 1 : 0);
+    return _valueSet.size() >= _limit;
   }
 }

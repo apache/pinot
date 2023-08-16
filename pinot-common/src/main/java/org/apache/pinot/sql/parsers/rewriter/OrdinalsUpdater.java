@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
@@ -39,11 +41,16 @@ public class OrdinalsUpdater implements QueryRewriter {
 
     // handle ORDER BY clause
     for (int i = 0; i < pinotQuery.getOrderByListSize(); i++) {
-      final Expression orderByExpr = pinotQuery.getOrderByList().get(i).getFunctionCall().getOperands().get(0);
+      Expression orderByExpr = CalciteSqlParser.removeOrderByFunctions(pinotQuery.getOrderByList().get(i));
+      Boolean isNullsLast = CalciteSqlParser.isNullsLast(pinotQuery.getOrderByList().get(i));
       if (orderByExpr.isSetLiteral() && orderByExpr.getLiteral().isSetLongValue()) {
         final int ordinal = (int) orderByExpr.getLiteral().getLongValue();
-        pinotQuery.getOrderByList().get(i).getFunctionCall()
-            .setOperands(Arrays.asList(getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal)));
+        Function functionToSet = pinotQuery.getOrderByList().get(i).getFunctionCall();
+        if (isNullsLast != null) {
+          functionToSet = functionToSet.getOperands().get(0).getFunctionCall();
+        }
+        functionToSet.setOperands(
+            Collections.singletonList(getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal)));
       }
     }
     return pinotQuery;

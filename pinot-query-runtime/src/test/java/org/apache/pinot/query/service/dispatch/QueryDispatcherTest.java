@@ -36,8 +36,10 @@ import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.service.QueryServer;
+import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.trace.DefaultRequestContext;
+import org.apache.pinot.spi.trace.RequestContext;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -83,7 +85,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     // reducer port doesn't matter, we are testing the worker instance not GRPC.
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(1, portList.get(0), portList.get(1),
         QueryEnvironmentTestBase.TABLE_SCHEMAS, QueryEnvironmentTestBase.SERVER1_SEGMENTS,
-        QueryEnvironmentTestBase.SERVER2_SEGMENTS);
+        QueryEnvironmentTestBase.SERVER2_SEGMENTS, null);
   }
 
   @AfterClass
@@ -138,8 +140,10 @@ public class QueryDispatcherTest extends QueryTestSet {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
     try {
-      dispatcher.submitAndReduce(requestId, dispatchableSubPlan, null, 10_000L, new HashMap<>(), null, false);
+      dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       Assert.assertTrue(e.getMessage().contains("Error executing query"));
@@ -160,9 +164,11 @@ public class QueryDispatcherTest extends QueryTestSet {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     QueryDispatcher dispatcher = new QueryDispatcher();
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
     try {
       // will throw b/c mailboxService is null
-      dispatcher.submitAndReduce(requestId, dispatchableSubPlan, null, 10_000L, new HashMap<>(), null, false);
+      dispatcher.submitAndReduce(context, dispatchableSubPlan, null, null, 10_000L, new HashMap<>(), null, false);
       Assert.fail("Method call above should have failed");
     } catch (Exception e) {
       System.out.println("e = " + e);

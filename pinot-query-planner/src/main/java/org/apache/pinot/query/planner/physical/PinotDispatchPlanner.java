@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
@@ -50,28 +54,24 @@ public class PinotDispatchPlanner {
    */
   public DispatchableSubPlan createDispatchableSubPlan(SubPlan subPlan) {
     // perform physical plan conversion and assign workers to each stage.
-    DispatchablePlanContext dispatchablePlanContext = new DispatchablePlanContext(_workerManager, _requestId,
-        _plannerContext, subPlan.getSubPlanMetadata().getFields(), subPlan.getSubPlanMetadata().getTableNames());
-    PlanNode subPlanRoot = subPlan.getSubPlanRoot().getFragmentRoot();
+    DispatchablePlanContext context = new DispatchablePlanContext(_workerManager, _requestId, _plannerContext,
+        subPlan.getSubPlanMetadata().getFields(), subPlan.getSubPlanMetadata().getTableNames());
+    PlanFragment rootFragment = subPlan.getSubPlanRoot();
+    PlanNode rootNode = rootFragment.getFragmentRoot();
     // 1. start by visiting the sub plan fragment root.
-    subPlanRoot.visit(DispatchablePlanVisitor.INSTANCE, dispatchablePlanContext);
+    rootNode.visit(DispatchablePlanVisitor.INSTANCE, context);
     // 2. add a special stage for the global mailbox receive, this runs on the dispatcher.
-    dispatchablePlanContext.getDispatchablePlanStageRootMap().put(0, subPlanRoot);
+    context.getDispatchablePlanStageRootMap().put(0, rootNode);
     // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
-    computeWorkerAssignment(subPlan.getSubPlanRoot(), dispatchablePlanContext);
+    context.getWorkerManager().assignWorkers(rootFragment, context);
     // 4. compute the mailbox assignment for each stage.
     // TODO: refactor this to be a pluggable interface.
-    computeMailboxAssignment(dispatchablePlanContext);
+    rootNode.visit(MailboxAssignmentVisitor.INSTANCE, context);
     // 5. Run physical optimizations
-    runPhysicalOptimizers(subPlanRoot, dispatchablePlanContext, _tableCache);
+    runPhysicalOptimizers(rootNode, context, _tableCache);
     // 6. convert it into query plan.
     // TODO: refactor this to be a pluggable interface.
-    return finalizeDispatchableSubPlan(subPlan.getSubPlanRoot(), dispatchablePlanContext);
-  }
-
-  private void computeMailboxAssignment(DispatchablePlanContext dispatchablePlanContext) {
-    dispatchablePlanContext.getDispatchablePlanStageRootMap().get(0).visit(MailboxAssignmentVisitor.INSTANCE,
-        dispatchablePlanContext);
+    return finalizeDispatchableSubPlan(rootFragment, context);
   }
 
   // TODO: Switch to Worker SPI to avoid multiple-places where workers are assigned.
@@ -88,18 +88,16 @@ public class PinotDispatchPlanner {
       DispatchablePlanContext dispatchablePlanContext) {
     return new DispatchableSubPlan(dispatchablePlanContext.getResultFields(),
         dispatchablePlanContext.constructDispatchablePlanFragmentList(subPlanRoot),
-        dispatchablePlanContext.getTableNames());
+        dispatchablePlanContext.getTableNames(),
+        populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()));
   }
 
-  private static void computeWorkerAssignment(PlanFragment planFragment, DispatchablePlanContext context) {
-    computeWorkerAssignment(planFragment.getFragmentRoot(), context);
-    planFragment.getChildren().forEach(child -> computeWorkerAssignment(child, context));
-  }
-
-  private static void computeWorkerAssignment(PlanNode node, DispatchablePlanContext context) {
-    int planFragmentId = node.getPlanFragmentId();
-    context.getWorkerManager()
-        .assignWorkerToStage(planFragmentId, context.getDispatchablePlanMetadataMap().get(planFragmentId),
-            context.getRequestId(), context.getPlannerContext().getOptions(), context.getTableNames());
+  private static Map<String, Set<String>> populateTableUnavailableSegments(
+      Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap) {
+    Map<String, Set<String>> tableToUnavailableSegments = new HashMap<>();
+    dispatchablePlanMetadataMap.values().forEach(metadata -> metadata.getTableToUnavailableSegmentsMap().forEach(
+        (tableName, unavailableSegments) -> tableToUnavailableSegments.computeIfAbsent(tableName, k -> new HashSet<>())
+            .addAll(unavailableSegments)));
+    return tableToUnavailableSegments;
   }
 }

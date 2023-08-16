@@ -41,14 +41,13 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * Supports serialization via JSON.
  */
 @JsonPropertyOrder({
-    "resultTable", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried",
-    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
-    "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
-    "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
-    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
-    "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs", "segmentStatistics",
-    "traceInfo"
-})
+    "resultTable", "requestId", "brokerId", "exceptions", "numServersQueried", "numServersResponded",
+    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
+    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter",
+    "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs",
+    "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
+    "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
+    "realtimeTotalCpuTimeNs", "brokerReduceTimeMs", "segmentStatistics", "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
@@ -57,6 +56,8 @@ public class BrokerResponseNative implements BrokerResponse {
       new BrokerResponseNative(QueryException.TABLE_DOES_NOT_EXIST_ERROR);
   public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
+  private String _requestId;
+  private String _brokerId;
   private int _numServersQueried = 0;
   private int _numServersResponded = 0;
   private long _numDocsScanned = 0L;
@@ -71,6 +72,7 @@ public class BrokerResponseNative implements BrokerResponse {
   // the timestamp indicating the freshness of the data queried in consuming segments.
   // This can be ingestion timestamp if provided by the stream, or the last index time
   private long _minConsumingFreshnessTimeMs = 0L;
+  private long _brokerReduceTimeMs = 0L;
 
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
@@ -556,5 +558,41 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public int getExceptionsSize() {
     return _processingExceptions.size();
+  }
+
+  @JsonProperty("requestId")
+  @Override
+  public String getRequestId() {
+    return _requestId;
+  }
+
+  @JsonProperty("requestId")
+  @Override
+  public void setRequestId(String requestId) {
+    _requestId = requestId;
+  }
+
+  @JsonProperty("brokerId")
+  @Override
+  public String getBrokerId() {
+    return _brokerId;
+  }
+
+  @JsonProperty("brokerId")
+  @Override
+  public void setBrokerId(String requestId) {
+    _brokerId = requestId;
+  }
+
+  @JsonProperty("brokerReduceTimeMs")
+  @Override
+  public long getBrokerReduceTimeMs() {
+    return _brokerReduceTimeMs;
+  }
+
+  @JsonProperty("brokerReduceTimeMs")
+  @Override
+  public void setBrokerReduceTimeMs(long brokerReduceTimeMs) {
+    _brokerReduceTimeMs = brokerReduceTimeMs;
   }
 }

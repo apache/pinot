@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,10 +63,6 @@ import org.slf4j.LoggerFactory;
  * This class' implementation is based on {@link org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor}.
  */
 public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
-  public static final String LOGTYPE_COLUMN_SUFFIX = "_logtype";
-  public static final String DICTIONARY_VARS_COLUMN_SUFFIX = "_dictionaryVars";
-  public static final String ENCODED_VARS_COLUMN_SUFFIX = "_encodedVars";
-
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogRecordExtractor.class);
 
   private Set<String> _fields;
@@ -162,8 +159,8 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
       }
     }
 
-    to.putValue(key + LOGTYPE_COLUMN_SUFFIX, logtype);
-    to.putValue(key + DICTIONARY_VARS_COLUMN_SUFFIX, dictVars);
-    to.putValue(key + ENCODED_VARS_COLUMN_SUFFIX, encodedVars);
+    to.putValue(key + CLPDecodeRewriter.LOGTYPE_COLUMN_SUFFIX, logtype);
+    to.putValue(key + CLPDecodeRewriter.DICTIONARY_VARS_COLUMN_SUFFIX, dictVars);
+    to.putValue(key + CLPDecodeRewriter.ENCODED_VARS_COLUMN_SUFFIX, encodedVars);
   }
 }

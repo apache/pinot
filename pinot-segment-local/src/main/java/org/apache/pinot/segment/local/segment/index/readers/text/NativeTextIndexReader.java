@@ -59,7 +59,7 @@ public class NativeTextIndexReader implements TextIndexReader {
           PinotDataBuffer.mapFile(indexFile, /* readOnly */ true, 0, indexFile.length(), ByteOrder.BIG_ENDIAN, desc);
       populateIndexes();
     } catch (Exception e) {
-      LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
+      LOGGER.error("Failed to instantiate native text index reader for column {}, exception {}", column,
           e.getMessage());
       throw new RuntimeException(e);
     }

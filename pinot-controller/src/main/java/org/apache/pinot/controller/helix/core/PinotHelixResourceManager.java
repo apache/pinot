@@ -134,6 +134,7 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UserAlreadyExistsException;
 import org.apache.pinot.controller.api.resources.InstanceInfo;
+import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.api.resources.PeriodicTaskInvocationResponse;
 import org.apache.pinot.controller.api.resources.StateType;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
@@ -219,7 +220,6 @@ public class PinotHelixResourceManager {
   private final String _dataDir;
   private final boolean _isSingleTenantCluster;
   private final boolean _enableBatchMessageMode;
-  private final boolean _allowHLCTables;
   private final int _deletedSegmentsRetentionInDays;
   private final boolean _enableTieredSegmentAssignment;
 
@@ -234,7 +234,7 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
-      boolean isSingleTenantCluster, boolean enableBatchMessageMode, boolean allowHLCTables,
+      boolean isSingleTenantCluster, boolean enableBatchMessageMode,
       int deletedSegmentsRetentionInDays, boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
@@ -242,7 +242,6 @@ public class PinotHelixResourceManager {
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
-    _allowHLCTables = allowHLCTables;
     _enableTieredSegmentAssignment = enableTieredSegmentAssignment;
     _instanceAdminEndpointCache =
         CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
@@ -264,8 +263,8 @@ public class PinotHelixResourceManager {
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
-        controllerConf.getHLCTablesAllowed(), controllerConf.getDeletedSegmentsRetentionInDays(),
-        controllerConf.tieredSegmentAssignmentEnabled(), LineageManagerFactory.create(controllerConf));
+        controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
+        LineageManagerFactory.create(controllerConf));
   }
 
   /**
@@ -315,10 +314,9 @@ public class PinotHelixResourceManager {
     HelixConfigScope helixConfigScope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
     Map<String, String> configs = _helixAdmin.getConfig(helixConfigScope,
-        Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
-    boolean caseInsensitive =
-        Boolean.parseBoolean(configs.get(Helix.ENABLE_CASE_INSENSITIVE_KEY)) || Boolean.parseBoolean(
-            configs.get(Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY));
+        Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY));
+    boolean caseInsensitive = Boolean.parseBoolean(configs.getOrDefault(Helix.ENABLE_CASE_INSENSITIVE_KEY,
+            Boolean.toString(Helix.DEFAULT_ENABLE_CASE_INSENSITIVE)));
     _tableCache = new TableCache(_propertyStore, caseInsensitive);
   }
 
@@ -336,6 +334,15 @@ public class PinotHelixResourceManager {
    */
   public String getHelixZkURL() {
     return _helixZkURL;
+  }
+
+  /**
+   * Get the tablecache object.
+   *
+   * @return TableCache object
+   */
+  public TableCache getTableCache() {
+    return _tableCache;
   }
 
   /**
@@ -458,6 +465,16 @@ public class PinotHelixResourceManager {
     }
     return HelixHelper.getInstancesConfigsWithTag(HelixHelper.getInstanceConfigs(_helixZkManager),
         TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+  }
+
+  public List<String> getAllBrokerInstances() {
+    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream()
+        .filter(InstanceTypeUtils::isBroker).collect(Collectors.toList());
+  }
+
+  public List<InstanceConfig> getAllBrokerInstanceConfigs() {
+    return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
+        .filter(instance -> InstanceTypeUtils.isBroker(instance.getId())).collect(Collectors.toList());
   }
 
   public List<InstanceConfig> getAllControllerInstanceConfigs() {
@@ -1216,7 +1233,7 @@ public class PinotHelixResourceManager {
     return tenantSet;
   }
 
-  private List<String> getTagsForInstance(String instanceName) {
+  public List<String> getTagsForInstance(String instanceName) {
     InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
     return config.getTags();
   }
@@ -1744,7 +1761,7 @@ public class PinotHelixResourceManager {
     // Check if HLC table is allowed.
     StreamConfig streamConfig =
         new StreamConfig(tableNameWithType, IngestionConfigUtils.getStreamConfigMap(tableConfig));
-    if (streamConfig.hasHighLevelConsumerType() && !_allowHLCTables) {
+    if (streamConfig.hasHighLevelConsumerType()) {
       throw new InvalidTableConfigException(
           "Creating HLC realtime table is not allowed for Table: " + tableNameWithType);
     }
@@ -3015,6 +3032,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all table configs.
+   *
+   * @return List of table configs. Empty list in case of tables configs does not exist.
+   */
+  public List<TableConfig> getAllTableConfigs() {
+    return ZKMetadataProvider.getAllTableConfigs(_propertyStore);
+  }
+
+  /**
    * Get the offline table config for the given table name.
    *
    * @param tableName Table name with or without type suffix
@@ -3114,20 +3140,9 @@ public class PinotHelixResourceManager {
    * </ul>
    */
   public PinotResourceManagerResponse dropInstance(String instanceName) {
-    // Check if the instance is live
-    if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName)) != null) {
-      return PinotResourceManagerResponse.failure("Instance " + instanceName + " is still live");
-    }
-
-    // Check if any ideal state includes the instance
-    for (String resource : getAllResources()) {
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
-      for (String partition : idealState.getPartitionSet()) {
-        if (idealState.getInstanceSet(partition).contains(instanceName)) {
-          return PinotResourceManagerResponse.failure(
-              "Instance " + instanceName + " exists in ideal state for " + resource);
-        }
-      }
+    OperationValidationResponse check = instanceDropSafetyCheck(instanceName);
+    if (!check.isSafe()) {
+      return PinotResourceManagerResponse.failure(check.getIssueMessage(0));
     }
 
     // Remove '/INSTANCES/<instanceName>'
@@ -3147,6 +3162,31 @@ public class PinotHelixResourceManager {
     }
 
     return PinotResourceManagerResponse.success("Instance " + instanceName + " dropped");
+  }
+
+  /**
+   * Utility to perform a safety check of the operation to drop an instance.
+   * If the resource is not safe to drop the utility lists all the possible reasons.
+   * @param instanceName Pinot instance name
+   * @return {@link OperationValidationResponse}
+   */
+  public OperationValidationResponse instanceDropSafetyCheck(String instanceName) {
+    OperationValidationResponse response = new OperationValidationResponse().setInstanceName(instanceName);
+    // Check if the instance is live
+    if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName)) != null) {
+      response.putIssue(OperationValidationResponse.ErrorCode.IS_ALIVE, instanceName);
+    }
+    // Check if any ideal state includes the instance
+    getAllResources().forEach(resource -> {
+      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
+      for (String partition : idealState.getPartitionSet()) {
+        if (idealState.getInstanceSet(partition).contains(instanceName)) {
+          response.putIssue(OperationValidationResponse.ErrorCode.CONTAINS_RESOURCE, instanceName, resource);
+          break;
+        }
+      }
+    });
+    return response.setSafe(response.getIssues().isEmpty());
   }
 
   /**
@@ -4103,6 +4143,31 @@ public class PinotHelixResourceManager {
     LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
         messageCount);
     return new PeriodicTaskInvocationResponse(periodicTaskRequestId, messageCount > 0);
+  }
+
+  /**
+   * Construct a map of all the tags and their respective minimum instance requirements.
+   * The minimum instance requirement is computed by
+   * - for BROKER tenant tag set it to 1 if it hosts any table else set it to 0
+   * - for SERVER tenant tag iterate over all the tables of that tenant and find the maximum table replication.
+   * - for rest of the tags just set it to 0
+   * @return map of tags and their minimum instance requirements
+   */
+  public Map<String, Integer> minimumInstancesRequiredForTags() {
+    Map<String, Integer> tagMinInstanceMap = new HashMap<>();
+    for (InstanceConfig instanceConfig : getAllHelixInstanceConfigs()) {
+      for (String tag : instanceConfig.getTags()) {
+        tagMinInstanceMap.put(tag, 0);
+      }
+    }
+    for (TableConfig tableConfig : getAllTableConfigs()) {
+      String tag = TagNameUtils.getServerTagForTenant(tableConfig.getTenantConfig().getServer(),
+          tableConfig.getTableType());
+      tagMinInstanceMap.put(tag, Math.max(tagMinInstanceMap.getOrDefault(tag, 0), tableConfig.getReplication()));
+      String brokerTag = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
+      tagMinInstanceMap.put(brokerTag, 1);
+    }
+    return tagMinInstanceMap;
   }
 
   /*

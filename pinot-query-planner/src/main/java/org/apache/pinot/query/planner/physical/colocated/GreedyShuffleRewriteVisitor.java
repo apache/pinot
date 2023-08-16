@@ -125,10 +125,8 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
     boolean canColocate = canJoinBeColocated(node);
     // Step-2: Only if the servers assigned to both left and right nodes are equal and the servers assigned to the join
     //         stage are a superset of those servers, can we skip shuffles.
-    canColocate =
-        canColocate && canServerAssignmentAllowShuffleSkip(node.getPlanFragmentId(),
-            innerLeafNodes.get(0).getSenderStageId(),
-            innerLeafNodes.get(1).getSenderStageId());
+    canColocate = canColocate && canServerAssignmentAllowShuffleSkip(node.getPlanFragmentId(),
+        innerLeafNodes.get(0).getSenderStageId(), innerLeafNodes.get(1).getSenderStageId());
     // Step-3: For both left/right MailboxReceiveNode/MailboxSendNode pairs, check whether the key partitioning can
     //         allow shuffle skip.
     canColocate = canColocate && partitionKeyConditionForJoin(innerLeafNodes.get(0),
@@ -140,8 +138,8 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
     canColocate = canColocate && checkPartitionScheme(innerLeafNodes.get(0), innerLeafNodes.get(1), context);
     if (canColocate) {
       // If shuffle can be skipped, reassign servers.
-      _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).setServerInstanceToWorkerIdMap(
-          _dispatchablePlanMetadataMap.get(innerLeafNodes.get(0).getSenderStageId()).getServerInstanceToWorkerIdMap());
+      _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).setWorkerIdToServerInstanceMap(
+          _dispatchablePlanMetadataMap.get(innerLeafNodes.get(0).getSenderStageId()).getWorkerIdToServerInstanceMap());
       _canSkipShuffleForJoin = true;
     }
 
@@ -173,31 +171,31 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
         return new HashSet<>();
       } else if (colocationKeyCondition(oldColocationKeys, selector) && areServersSuperset(node.getPlanFragmentId(),
           node.getSenderStageId())) {
-        node.setExchangeType(RelDistribution.Type.SINGLETON);
-        _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).setServerInstanceToWorkerIdMap(
-            _dispatchablePlanMetadataMap.get(node.getSenderStageId()).getServerInstanceToWorkerIdMap());
+        node.setDistributionType(RelDistribution.Type.SINGLETON);
+        _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).setWorkerIdToServerInstanceMap(
+            _dispatchablePlanMetadataMap.get(node.getSenderStageId()).getWorkerIdToServerInstanceMap());
         return oldColocationKeys;
       }
       // This means we can't skip shuffle and there's a partitioning enforced by receiver.
-      int numPartitions =
-          _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).getServerInstanceToWorkerIdMap().size();
+      int numPartitions = new HashSet<>(
+          _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).getWorkerIdToServerInstanceMap().values()).size();
       List<ColocationKey> colocationKeys = ((FieldSelectionKeySelector) selector).getColumnIndices().stream()
           .map(x -> new ColocationKey(x, numPartitions, selector.hashAlgorithm())).collect(Collectors.toList());
       return new HashSet<>(colocationKeys);
     }
     // If the current stage is a join-stage then we already know whether shuffle can be skipped.
     if (_canSkipShuffleForJoin) {
-      node.setExchangeType(RelDistribution.Type.SINGLETON);
+      node.setDistributionType(RelDistribution.Type.SINGLETON);
       // For the join-case, servers are already re-assigned in visitJoin. Moreover, we haven't yet changed sender's
       // distribution.
-      ((MailboxSendNode) node.getSender()).setExchangeType(RelDistribution.Type.SINGLETON);
+      ((MailboxSendNode) node.getSender()).setDistributionType(RelDistribution.Type.SINGLETON);
       return oldColocationKeys;
     } else if (selector == null) {
       return new HashSet<>();
     }
     // This means we can't skip shuffle and there's a partitioning enforced by receiver.
-    int numPartitions =
-        _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).getServerInstanceToWorkerIdMap().size();
+    int numPartitions = new HashSet<>(
+        _dispatchablePlanMetadataMap.get(node.getPlanFragmentId()).getWorkerIdToServerInstanceMap().values()).size();
     List<ColocationKey> colocationKeys = ((FieldSelectionKeySelector) selector).getColumnIndices().stream()
         .map(x -> new ColocationKey(x, numPartitions, selector.hashAlgorithm())).collect(Collectors.toList());
     return new HashSet<>(colocationKeys);
@@ -214,7 +212,7 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
       Set<ColocationKey> colocationKeys;
       if (canSkipShuffleBasic && areServersSuperset(node.getReceiverStageId(), node.getPlanFragmentId())) {
         // Servers are not re-assigned on sender-side. If needed, they are re-assigned on the receiver side.
-        node.setExchangeType(RelDistribution.Type.SINGLETON);
+        node.setDistributionType(RelDistribution.Type.SINGLETON);
         colocationKeys = oldColocationKeys;
       } else {
         colocationKeys = new HashSet<>();
@@ -307,8 +305,9 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
    * Checks if servers assigned to the receiver stage are a super-set of the sender stage.
    */
   private boolean areServersSuperset(int receiverStageId, int senderStageId) {
-    return _dispatchablePlanMetadataMap.get(receiverStageId).getServerInstanceToWorkerIdMap().keySet()
-        .containsAll(_dispatchablePlanMetadataMap.get(senderStageId).getServerInstanceToWorkerIdMap().keySet());
+    return new HashSet<>(
+        _dispatchablePlanMetadataMap.get(receiverStageId).getWorkerIdToServerInstanceMap().values()).containsAll(
+        _dispatchablePlanMetadataMap.get(senderStageId).getWorkerIdToServerInstanceMap().values());
   }
 
   /*
@@ -317,15 +316,15 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
    * 2. Servers assigned to the join-stage are a superset of S.
    */
   private boolean canServerAssignmentAllowShuffleSkip(int currentStageId, int leftStageId, int rightStageId) {
-    Set<QueryServerInstance> leftServerInstances = new HashSet<>(_dispatchablePlanMetadataMap.get(leftStageId)
-        .getServerInstanceToWorkerIdMap().keySet());
-    Set<QueryServerInstance> rightServerInstances = _dispatchablePlanMetadataMap.get(rightStageId)
-        .getServerInstanceToWorkerIdMap().keySet();
-    Set<QueryServerInstance> currentServerInstances = _dispatchablePlanMetadataMap.get(currentStageId)
-        .getServerInstanceToWorkerIdMap().keySet();
+    Set<QueryServerInstance> leftServerInstances =
+        new HashSet<>(_dispatchablePlanMetadataMap.get(leftStageId).getWorkerIdToServerInstanceMap().values());
+    Set<QueryServerInstance> rightServerInstances =
+        new HashSet<>(_dispatchablePlanMetadataMap.get(rightStageId).getWorkerIdToServerInstanceMap().values());
+    Set<QueryServerInstance> currentServerInstances =
+        new HashSet<>(_dispatchablePlanMetadataMap.get(currentStageId).getWorkerIdToServerInstanceMap().values());
     return leftServerInstances.containsAll(rightServerInstances)
-        && leftServerInstances.size() == rightServerInstances.size()
-        && currentServerInstances.containsAll(leftServerInstances);
+        && leftServerInstances.size() == rightServerInstances.size() && currentServerInstances.containsAll(
+        leftServerInstances);
   }
 
   /**

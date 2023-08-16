@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -218,61 +217,56 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
 
   @Test
   public void testLeastTransformFunctionNullLiteral() {
-    TransformFunction transformFunction =
-        testLeastPreconditions(String.format("least(%s, null, %s)", INT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = testLeastPreconditionsNullHandlingEnabled(
+        String.format("least(%s, null, %s)", INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.DOUBLE);
-    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(doubleValues.getLeft()[i], Math.min(_intSVValues[i], _doubleSVValues[i]));
-    }
-    assertEquals(doubleValues.getRight(), null);
-    assertEquals(transformFunction.getNullBitmap(_projectionBlock), null);
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    nullBitmap.add(0, (long) NUM_ROWS);
+
+    testNullBitmap(transformFunction, nullBitmap);
   }
 
   @Test
   public void testLeastTransformFunctionNullColumn() {
-    TransformFunction transformFunction =
-        testLeastPreconditions(String.format("least(%s, null, %s)", INT_SV_NULL_COLUMN, DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = testLeastPreconditionsNullHandlingEnabled(
+        String.format("least(%s, %s)", INT_SV_NULL_COLUMN, DOUBLE_SV_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.DOUBLE);
-    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    RoaringBitmap nullBitmap = transformFunction.getNullBitmap(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        assertEquals(doubleValues.getLeft()[i], Math.min(_intSVValues[i], _doubleSVValues[i]));
+      if (isNullRow(i)) {
+        assertTrue(nullBitmap.contains(i));
       } else {
-        assertEquals(doubleValues.getLeft()[i], _doubleSVValues[i]);
+        assertEquals(doubleValues[i], Math.min(_intSVValues[i], _doubleSVValues[i]));
       }
     }
-    assertEquals(doubleValues.getRight(), null);
-    assertEquals(transformFunction.getNullBitmap(_projectionBlock), null);
   }
 
   @Test
   public void testLeastTransformFunctionAllNulls() {
-    TransformFunction transformFunction = testLeastPreconditions(String.format("least(null, null, null)"));
+    TransformFunction transformFunction =
+        testLeastPreconditionsNullHandlingEnabled(String.format("least(null, null, null)"));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.UNKNOWN);
-    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
     RoaringBitmap expectedNull = new RoaringBitmap();
     expectedNull.add(0L, NUM_ROWS);
-    assertEquals(doubleValues.getRight(), expectedNull);
     assertEquals(transformFunction.getNullBitmap(_projectionBlock), expectedNull);
   }
 
   @Test
   public void testLeastTransformFunctionPartialAllNulls() {
-    TransformFunction transformFunction = testLeastPreconditions(
+    TransformFunction transformFunction = testLeastPreconditionsNullHandlingEnabled(
         String.format("least(%s, %s, %s)", INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.INT);
-    Pair<int[], RoaringBitmap> intValues = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
+   int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     RoaringBitmap expectedNull = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        assertEquals(intValues.getLeft()[i], _intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         expectedNull.add(i);
+      } else {
+        assertEquals(intValues[i], _intSVValues[i]);
       }
     }
-    assertEquals(intValues.getRight(), expectedNull);
-    assertEquals(transformFunction.getNullBitmap(_projectionBlock), expectedNull);
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   @Test(dataProvider = "rejectedParameters", expectedExceptions = BadQueryRequestException.class)
@@ -366,61 +360,57 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
 
   @Test
   public void testGreatestTransformFunctionNullLiteral() {
-    TransformFunction transformFunction =
-        testGreatestPreconditions(String.format("greatest(%s, null, %s)", INT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = testGreatestPreconditionsNullHandlingEnabled(
+        String.format("greatest(%s, null, %s)", INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.DOUBLE);
-    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
-    for (int i = 0; i < NUM_ROWS; i++) {
-      assertEquals(doubleValues.getLeft()[i], Math.max(_intSVValues[i], _doubleSVValues[i]));
-    }
-    assertEquals(doubleValues.getRight(), null);
-    assertEquals(transformFunction.getNullBitmap(_projectionBlock), null);
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    nullBitmap.add(0, (long) NUM_ROWS);
+
+    testNullBitmap(transformFunction, nullBitmap);
   }
 
   @Test
   public void testGreatestTransformFunctionNullColumn() {
-    TransformFunction transformFunction =
-        testGreatestPreconditions(String.format("greatest(%s, null, %s)", INT_SV_NULL_COLUMN, DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = testGreatestPreconditionsNullHandlingEnabled(
+        String.format("greatest(%s, %s)", INT_SV_NULL_COLUMN, DOUBLE_SV_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.DOUBLE);
-    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+    RoaringBitmap nullBitmap = transformFunction.getNullBitmap(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        assertEquals(doubleValues.getLeft()[i], Math.max(_intSVValues[i], _doubleSVValues[i]));
+      if (isNullRow(i)) {
+        assertTrue(nullBitmap.contains(i));
       } else {
-        assertEquals(doubleValues.getLeft()[i], _doubleSVValues[i]);
+        assertEquals(doubleValues[i], Math.max(_intSVValues[i], _doubleSVValues[i]));
       }
     }
-    assertEquals(doubleValues.getRight(), null);
-    assertEquals(transformFunction.getNullBitmap(_projectionBlock), null);
   }
 
   @Test
   public void testGreatestTransformFunctionAllNulls() {
-    TransformFunction transformFunction = testGreatestPreconditions(String.format("greatest(null, null, null)"));
+    TransformFunction transformFunction =
+        testGreatestPreconditionsNullHandlingEnabled(String.format("greatest(null, null, null)"));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.UNKNOWN);
-    Pair<double[], RoaringBitmap> doubleValues = transformFunction.transformToDoubleValuesSVWithNull(_projectionBlock);
+    double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
     RoaringBitmap expectedNull = new RoaringBitmap();
     expectedNull.add(0L, NUM_ROWS);
-    assertEquals(doubleValues.getRight(), expectedNull);
-    assertEquals(transformFunction.getNullBitmap(_projectionBlock), expectedNull);
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   @Test
   public void testGreatestTransformFunctionPartialAllNulls() {
-    TransformFunction transformFunction = testGreatestPreconditions(
+    TransformFunction transformFunction = testGreatestPreconditionsNullHandlingEnabled(
         String.format("greatest(%s, %s, %s)", INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN, INT_SV_NULL_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.INT);
-    Pair<int[], RoaringBitmap> intValues = transformFunction.transformToIntValuesSVWithNull(_projectionBlock);
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
     RoaringBitmap expectedNull = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (i % 2 == 0) {
-        assertEquals(intValues.getLeft()[i], _intSVValues[i]);
-      } else {
+      if (isNullRow(i)) {
         expectedNull.add(i);
+      } else {
+        assertEquals(intValues[i], _intSVValues[i]);
       }
     }
-    assertEquals(intValues.getRight(), expectedNull);
-    assertEquals(transformFunction.getNullBitmap(_projectionBlock), expectedNull);
+    testNullBitmap(transformFunction, expectedNull);
   }
 
   @Test
@@ -507,6 +497,22 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   private TransformFunction testGreatestPreconditions(String expressionStr) {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof GreatestTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.GREATEST.getName());
+    return transformFunction;
+  }
+
+  private TransformFunction testLeastPreconditionsNullHandlingEnabled(String expressionStr) {
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.getNullHandlingEnabled(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof LeastTransformFunction);
+    assertEquals(transformFunction.getName(), TransformFunctionType.LEAST.getName());
+    return transformFunction;
+  }
+
+  private TransformFunction testGreatestPreconditionsNullHandlingEnabled(String expressionStr) {
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.getNullHandlingEnabled(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof GreatestTransformFunction);
     assertEquals(transformFunction.getName(), TransformFunctionType.GREATEST.getName());
     return transformFunction;

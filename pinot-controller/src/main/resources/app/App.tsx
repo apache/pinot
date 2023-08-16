@@ -32,15 +32,20 @@ export const App = () => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [role, setRole] = useState('');
-  const { authenticated, authWorkflow } = useAuthProvider();
+  const { authUserName, authUserEmail, authenticated, authWorkflow } = useAuthProvider();
   const history = useHistory();
 
   useEffect(() => {
     // authentication already handled by authProvider
+    if (authUserEmail && authenticated) {
+      // Authenticated with an auth method that supports user identity
+      // Any code that needs user identity can go here
+    }
+
     if (authenticated) {
       setIsAuthenticated(true);
     }
-  }, [authenticated]);
+  }, [authUserName, authUserEmail, authenticated]);
 
   useEffect(() => {
     if(authWorkflow === AuthWorkflow.BASIC) {

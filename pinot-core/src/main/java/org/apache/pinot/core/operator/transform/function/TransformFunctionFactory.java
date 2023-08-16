@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -71,9 +70,17 @@ import org.apache.pinot.core.operator.transform.function.TrigonometricTransformF
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.SinhTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanhTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.CosineDistanceTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.InnerProductTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.L1DistanceTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.L2DistanceTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.VectorDimsTransformFunction;
+import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.VectorNormTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,6 +141,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.MAPVALUE, MapValueTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.INIDSET, InIdSetTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.CLPDECODE, CLPDecodeTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.EXTRACT, ExtractTransformFunction.class);
 
@@ -145,6 +153,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.ARRAYMAX, ArrayMaxTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAYMIN, ArrayMinTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAYSUM, ArraySumTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_VALUE_CONSTRUCTOR, ArrayLiteralTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
@@ -215,9 +224,17 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.DEGREES, DegreesTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.RADIANS, RadiansTransformFunction.class);
 
+    // Vector functions
+    typeToImplementation.put(TransformFunctionType.COSINE_DISTANCE, CosineDistanceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.INNER_PRODUCT, InnerProductTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.L1_DISTANCE, L1DistanceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.L2_DISTANCE, L2DistanceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VECTOR_DIMS, VectorDimsTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VECTOR_NORM, VectorNormTransformFunction.class);
+
     Map<String, Class<? extends TransformFunction>> registry = new HashMap<>(typeToImplementation.size());
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {
-      for (String alias : entry.getKey().getAliases()) {
+      for (String alias : entry.getKey().getAlternativeNames()) {
         registry.put(canonicalize(alias), entry.getValue());
       }
     }
@@ -253,17 +270,24 @@ public class TransformFunctionFactory {
    *
    * @param expression       Transform expression
    * @param columnContextMap Map from column name to context
-   * @param queryContext     Query context if available
+   * @param queryContext     Query context
    * @return Transform function
    */
   public static TransformFunction get(ExpressionContext expression, Map<String, ColumnContext> columnContextMap,
-      @Nullable QueryContext queryContext) {
+      QueryContext queryContext) {
     switch (expression.getType()) {
       case FUNCTION:
         FunctionContext function = expression.getFunction();
         String functionName = canonicalize(function.getFunctionName());
         List<ExpressionContext> arguments = function.getArguments();
         int numArguments = arguments.size();
+
+        // Check if the function is ArrayLiteraltransform function
+        if (functionName.equalsIgnoreCase(ArrayLiteralTransformFunction.FUNCTION_NAME)) {
+          return queryContext.getOrComputeSharedValue(ArrayLiteralTransformFunction.class,
+              expression.getFunction().getArguments(),
+              ArrayLiteralTransformFunction::new);
+        }
 
         TransformFunction transformFunction;
         Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
@@ -293,7 +317,7 @@ public class TransformFunctionFactory {
           transformFunctionArguments.add(TransformFunctionFactory.get(argument, columnContextMap, queryContext));
         }
         try {
-          transformFunction.init(transformFunctionArguments, columnContextMap);
+          transformFunction.init(transformFunctionArguments, columnContextMap, queryContext.isNullHandlingEnabled());
         } catch (Exception e) {
           throw new BadQueryRequestException("Caught exception while initializing transform function: " + functionName,
               e);
@@ -303,9 +327,8 @@ public class TransformFunctionFactory {
         String columnName = expression.getIdentifier();
         return new IdentifierTransformFunction(columnName, columnContextMap.get(columnName));
       case LITERAL:
-        return queryContext == null ? new LiteralTransformFunction(expression.getLiteral())
-            : queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
-                LiteralTransformFunction::new);
+        return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
+            LiteralTransformFunction::new);
       default:
         throw new IllegalStateException();
     }
@@ -315,7 +338,19 @@ public class TransformFunctionFactory {
   public static TransformFunction get(ExpressionContext expression, Map<String, DataSource> dataSourceMap) {
     Map<String, ColumnContext> columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
     dataSourceMap.forEach((k, v) -> columnContextMap.put(k, ColumnContext.fromDataSource(v)));
-    return get(expression, columnContextMap, null);
+    QueryContext dummy = QueryContextConverterUtils.getQueryContext(
+        CalciteSqlParser.compileToPinotQuery("SELECT * from testTable;"));
+    return get(expression, columnContextMap, dummy);
+  }
+
+  @VisibleForTesting
+  public static TransformFunction getNullHandlingEnabled(ExpressionContext expression,
+      Map<String, DataSource> dataSourceMap) {
+    Map<String, ColumnContext> columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
+    dataSourceMap.forEach((k, v) -> columnContextMap.put(k, ColumnContext.fromDataSource(v)));
+    QueryContext dummy = QueryContextConverterUtils.getQueryContext(
+        CalciteSqlParser.compileToPinotQuery("SET enableNullHandling = true; SELECT * from testTable;"));
+    return get(expression, columnContextMap, dummy);
   }
 
   /**

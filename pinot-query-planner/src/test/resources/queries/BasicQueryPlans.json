@@ -15,7 +15,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col3 + a.ts FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[+($2, $4)])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[+($2, $6)])",
           "\n  LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n    LogicalTableScan(table=[[a]])",
           "\n"
@@ -26,7 +26,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col3 + a.ts AS colsum FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], colsum=[+($2, $4)])",
+          "\nLogicalProject(col1=[$0], colsum=[+($2, $6)])",
           "\n  LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n    LogicalTableScan(table=[[a]])",
           "\n"
@@ -37,10 +37,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', ts) FROM a LIMIT 10",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[dateTrunc('DAY', $4)])",
-          "\n  LogicalSort(offset=[0], fetch=[10])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
-          "\n      LogicalSort(fetch=[10])",
+          "\nLogicalSort(offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[10])",
+          "\n      LogicalProject(EXPR$0=[DATETRUNC('DAY', $6)])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -50,10 +50,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', ts) AS day FROM a LIMIT 10",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(day=[dateTrunc('DAY', $4)])",
-          "\n  LogicalSort(offset=[0], fetch=[10])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
-          "\n      LogicalSort(fetch=[10])",
+          "\nLogicalSort(offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[10])",
+          "\n      LogicalProject(day=[DATETRUNC('DAY', $6)])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]

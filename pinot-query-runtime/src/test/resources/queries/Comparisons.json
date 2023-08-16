@@ -171,8 +171,6 @@
     ]
   },
   "timestamps_comp": {
-    "ignored": true,
-    "comment": "we don't support timestamp comparisons",
     "psql": "9.2",
     "tables": {
       "tbl": {
@@ -342,21 +340,17 @@
       { "sql": "SELECT i1 > i2, i2 > i1 FROM {tbl}" },
       { "sql": "SELECT i1 >= i2, i2 >= i1 FROM {tbl}" },
       { "sql": "SELECT i1 IS DISTINCT FROM i2, i2 IS DISTINCT FROM i1 FROM {tbl}" },
-      {
-        "ignored": true,
-        "comment": "we don't handle equality checks correctly for float/double",
-        "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}"
-      },
-      {
-        "ignored": true,
-        "comment": "we don't handle equality checks correctly for float/double",
-        "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}"
-      },
-      {
-        "ignored": true,
-        "comment": "we don't handle equality checks correctly for float/double",
-        "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}"
-      }
+      { "sql": "SELECT i1 != i2, i2 != i1 FROM {tbl}" },
+      { "sql": "SELECT i1 <> i2, i2 <> i1 FROM {tbl}" },
+      { "sql": "SELECT i1 = i2, i2 = i1 FROM {tbl}" },
+      { "sql": "SELECT i1 = i1, i2 = i2, i1 != i1, i2 != i2, i1 <> i1, i2 <> i2 FROM {tbl}" },
+      { "sql": "SELECT * FROM (SELECT i1 = i2, i2 = i1, i1 != i2, i2 != i1 FROM {tbl})" },
+      { "sql": "SELECT CASE WHEN i1 = i2 THEN 'Yes' ELSE 'No' END, CASE WHEN i2 = i1 THEN 'Yes' ELSE 'No' END FROM {tbl}"},
+      { "sql": "SELECT CASE WHEN i1 != i2 THEN 'Yes' ELSE 'No' END, CASE WHEN i2 != i1 THEN 'Yes' ELSE 'No' END FROM {tbl}"},
+      { "sql": "SELECT CASE WHEN i1 <> i2 THEN 'Yes' ELSE 'No' END, CASE WHEN i2 <> i1 THEN 'Yes' ELSE 'No' END FROM {tbl}"},
+      { "sql": "SELECT * FROM {tbl} WHERE i1 != i2 and i2 != i1" },
+      { "sql": "SELECT * FROM {tbl} WHERE (i1 = i2 or i2 = i1) and i2 > i1" },
+      { "sql": "SELECT * FROM {tbl} WHERE (i1 <> i2 or i2 <> i1) and i2 > 0" }
     ]
   },
   "float_x_numeric_comp": {
@@ -414,13 +408,9 @@
       { "sql": "SELECT val NOT BETWEEN 3 AND 2 FROM {tbl}" },
       { "sql": "SELECT 3 NOT BETWEEN small AND big FROM {tbl}" },
       {
-        "ignored": true,
-        "comment": "SYMMETRIC not supported",
         "sql": "SELECT val BETWEEN SYMMETRIC small AND big FROM {tbl}"
       },
       {
-        "ignored": true,
-        "comment": "SYMMETRIC not supported",
         "sql": "SELECT val BETWEEN SYMMETRIC big AND small FROM {tbl}"
       }
     ]

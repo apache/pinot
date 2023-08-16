@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
@@ -49,10 +49,10 @@ public class TableTierReader {
   private static final String ERROR_RESP_NOT_IMMUTABLE = "NOT_IMMUTABLE_SEGMENT";
 
   private final Executor _executor;
-  private final HttpConnectionManager _connectionManager;
+  private final HttpClientConnectionManager _connectionManager;
   private final PinotHelixResourceManager _helixResourceManager;
 
-  public TableTierReader(Executor executor, HttpConnectionManager connectionManager,
+  public TableTierReader(Executor executor, HttpClientConnectionManager connectionManager,
       PinotHelixResourceManager helixResourceManager) {
     _executor = executor;
     _connectionManager = connectionManager;

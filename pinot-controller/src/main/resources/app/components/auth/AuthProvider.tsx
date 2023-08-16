@@ -26,6 +26,8 @@ import { AppLoadingIndicator } from '../AppLoadingIndicator';
 
 interface AuthProviderContextProps {
     accessToken: string;
+    authUserName: string;
+    authUserEmail: string;
     authenticated: boolean;
     authWorkflow: AuthWorkflow
 }
@@ -36,6 +38,8 @@ export const AuthProvider = ({ children }) => {
     const [clientId, setClientId] = useState<string | null>(null);
     const [authWorkflow, setAuthWorkflow] = useState<AuthWorkflow | null>(null);
     const [accessToken, setAccessToken] = useState<string>("");
+    const [authUserName, setAuthUserName] = useState<string>("");
+    const [authUserEmail, setAuthUserEmail] = useState<string>("");
     const [authenticated, setAuthenticated] = useState<boolean>(false);
     const [authorizationEndpoint, setAuthorizationEndpoint] = useState<string | null>(null);
     const [autoLogout, setAutoLogout] = useState<boolean>(false);
@@ -115,6 +119,9 @@ export const AuthProvider = ({ children }) => {
         const accessToken = getAuthLocalStorageValue(AuthLocalStorageKeys.AccessToken);
         if (accessToken) {
             setAccessToken(accessToken);
+            setAuthUserName(PinotMethodUtils.getAuthUserNameFromAccessToken(accessToken.replace("Bearer ", "")))
+            setAuthUserEmail(PinotMethodUtils.getAuthUserEmailFromAccessToken(accessToken.replace("Bearer ", "")))
+            
             initAxios(accessToken);
             setAuthenticated(true);
 
@@ -126,6 +133,9 @@ export const AuthProvider = ({ children }) => {
         if (accessTokenFromHashParam) {
             const accessToken = `Bearer ${accessTokenFromHashParam}`;
             setAccessToken(accessToken);
+            setAuthUserName(PinotMethodUtils.getAuthUserNameFromAccessToken(accessTokenFromHashParam))
+            setAuthUserEmail(PinotMethodUtils.getAuthUserEmailFromAccessToken(accessTokenFromHashParam))
+
             setAuthLocalStorageValue(AuthLocalStorageKeys.AccessToken, accessToken);
             initAxios(accessToken);
             setAuthenticated(true);
@@ -211,6 +221,8 @@ export const AuthProvider = ({ children }) => {
     const authProvider: AuthProviderContextProps = {
         authWorkflow: authWorkflow,
         accessToken: accessToken,
+        authUserName: authUserName,
+        authUserEmail: authUserEmail,
         authenticated: authenticated
     }
 

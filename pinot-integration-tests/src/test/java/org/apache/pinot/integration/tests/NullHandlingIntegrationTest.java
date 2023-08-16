@@ -210,7 +210,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
       throws Exception {
     // Null literal only
     String sqlQuery = "SELECT null FROM mytable OPTION(enableNullHandling=true)";
-    JsonNode response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    JsonNode response = postQuery(sqlQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
@@ -218,14 +218,14 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Null related functions
     sqlQuery = "SELECT isNull(null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0).get(0).asBoolean(), true);
 
     sqlQuery = "SELECT isNotNull(null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
@@ -233,28 +233,28 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
 
     sqlQuery = "SELECT coalesce(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0).get(0).asInt(), 1);
 
     sqlQuery = "SELECT coalesce(null, null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0).get(0).asText(), "null");
 
     sqlQuery = "SELECT isDistinctFrom(null, null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0).get(0).asBoolean(), false);
 
     sqlQuery = "SELECT isNotDistinctFrom(null, null) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
@@ -262,21 +262,21 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
 
     sqlQuery = "SELECT isDistinctFrom(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0).get(0).asBoolean(), true);
 
     sqlQuery = "SELECT isNotDistinctFrom(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0).get(0).asBoolean(), false);
 
     sqlQuery = "SELECT case when true then null end FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
@@ -284,7 +284,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
 
     sqlQuery = "SELECT case when false then 1 end FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
@@ -293,7 +293,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Null intolerant functions
     sqlQuery = "SELECT add(null, 1) FROM " + getTableName() + "  OPTION (enableNullHandling=true);";
-    response = postQuery(sqlQuery, _brokerBaseApiUrl);
+    response = postQuery(sqlQuery);
     rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
     assertEquals(rows.size(), 1);
@@ -325,5 +325,28 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     String pinotQuery = h2Query + " option(enableNullHandling=true)";
 
     testQuery(pinotQuery, h2Query);
+  }
+
+  @Test
+  public void testSelectNullLiteral() throws Exception {
+    // Need to also select an identifier column to skip the all literal query optimization which returns without
+    // querying the segment.
+    String sqlQuery = "SELECT NULL, salary FROM mytable OPTION(enableNullHandling=true)";
+
+    JsonNode response = postQuery(sqlQuery);
+
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asText(), "null");
+  }
+
+  @Test
+  public void testCaseWhenAllLiteral()
+      throws Exception {
+    String sqlQuery =
+        "SELECT CASE WHEN true THEN 1 WHEN NOT true THEN 0 ELSE NULL END FROM mytable OPTION(enableNullHandling=true)";
+
+    JsonNode response = postQuery(sqlQuery);
+
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
   }
 }

@@ -1,0 +1,35 @@
+{
+  "schemaName": "supplier",
+  "metricFieldSpecs": [
+    {
+      "dataType": "DOUBLE",
+      "name": "s_acctbal"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "s_suppkey"
+    },
+    {
+      "dataType": "STRING",
+      "name": "s_name"
+    },
+    {
+      "dataType": "STRING",
+      "name": "s_address"
+    },
+    {
+      "dataType": "INT",
+      "name": "s_nationkey"
+    },
+    {
+      "dataType": "STRING",
+      "name": "s_phone"
+    },
+    {
+      "dataType": "STRING",
+      "name": "s_comment"
+    }
+  ]
+}

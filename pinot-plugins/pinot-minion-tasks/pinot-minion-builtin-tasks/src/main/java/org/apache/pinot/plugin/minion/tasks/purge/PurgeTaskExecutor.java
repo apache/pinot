@@ -46,14 +46,14 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
     SegmentPurger.RecordPurgerFactory recordPurgerFactory = MINION_CONTEXT.getRecordPurgerFactory();
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    Schema schema = getSchema(tableNameWithType);
     SegmentPurger.RecordPurger recordPurger =
-        recordPurgerFactory != null ? recordPurgerFactory.getRecordPurger(rawTableName) : null;
+        recordPurgerFactory != null ? recordPurgerFactory.getRecordPurger(pinotTaskConfig, tableConfig, schema) : null;
     SegmentPurger.RecordModifierFactory recordModifierFactory = MINION_CONTEXT.getRecordModifierFactory();
     SegmentPurger.RecordModifier recordModifier =
         recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
 
-    TableConfig tableConfig = getTableConfig(tableNameWithType);
-    Schema schema = getSchema(tableNameWithType);
     _eventObserver.notifyProgress(pinotTaskConfig, "Purging segment: " + indexDir);
     SegmentPurger segmentPurger =
         new SegmentPurger(indexDir, workingDir, tableConfig, schema, recordPurger, recordModifier);

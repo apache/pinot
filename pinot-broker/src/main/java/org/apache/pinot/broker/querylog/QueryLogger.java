@@ -121,6 +121,7 @@ public class QueryLogger {
     final RequestContext _requestContext;
     final String _table;
     final int _numUnavailableSegments;
+    @Nullable
     final BaseBrokerRequestHandler.ServerStats _serverStats;
     final BrokerResponse _response;
     final long _timeUsedMs;
@@ -128,7 +129,7 @@ public class QueryLogger {
     final RequesterIdentity _requester;
 
     public QueryLogParams(long requestId, String query, RequestContext requestContext, String table,
-        int numUnavailableSegments, BaseBrokerRequestHandler.ServerStats serverStats, BrokerResponse response,
+        int numUnavailableSegments, @Nullable BaseBrokerRequestHandler.ServerStats serverStats, BrokerResponse response,
         long timeUsedMs, @Nullable RequesterIdentity requester) {
       _requestId = requestId;
       _query = query;
@@ -225,7 +226,11 @@ public class QueryLogger {
     SERVER_STATS("serverStats") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        builder.append(params._serverStats.getServerStats());
+        if (params._serverStats != null) {
+          builder.append(params._serverStats.getServerStats());
+        } else {
+          builder.append(CommonConstants.UNKNOWN);
+        }
       }
     },
     OFFLINE_THREAD_CPU_TIME("offlineThreadCpuTimeNs(total/thread/sysActivity/resSer)", ':') {

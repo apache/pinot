@@ -33,6 +33,8 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
@@ -91,25 +93,27 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @BeforeClass
   public void setUp()
       throws Exception {
-    MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
-        .addSegment("a_REALTIME", buildRows("a_REALTIME"))
-        .addSegment("a_REALTIME", buildRows("a_REALTIME"))
-        .addSegment("b_REALTIME", buildRows("b_REALTIME"))
-        .addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
-        .addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
-    MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE")
-        .registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d")
-        .addSegment("a_REALTIME", buildRows("a_REALTIME"))
-        .addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
-        .addSegment("c_OFFLINE", buildRows("c_OFFLINE"))
-        .addSegment("d_OFFLINE", buildRows("d_OFFLINE"))
-        .addSegment("d_REALTIME", buildRows("d_REALTIME"));
+    MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
+    factory1.addSegment("a_REALTIME", buildRows("a_REALTIME"));
+    factory1.addSegment("a_REALTIME", buildRows("a_REALTIME"));
+    factory1.addSegment("b_REALTIME", buildRows("b_REALTIME"));
+    factory1.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
+    factory1.addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
+
+    MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2");
+    factory2.registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME");
+    factory2.registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE");
+    factory2.registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
+    factory2.addSegment("a_REALTIME", buildRows("a_REALTIME"));
+    factory2.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
+    factory2.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
+    factory2.addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
+    factory2.addSegment("d_REALTIME", buildRows("d_REALTIME"));
+
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
     QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
 
@@ -127,14 +131,16 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
+    _reducerScheduler = new OpChainSchedulerService(new RoundRobinScheduler(10_000L), REDUCE_EXECUTOR);
     _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
-        new PinotConfiguration(reducerConfig), ignored -> {
-    });
+        new PinotConfiguration(reducerConfig), _reducerScheduler::onDataAvailable);
+    _reducerScheduler.startAsync();
     _mailboxService.start();
 
-    _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(),
-        server2.getPort(), factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(),
-        factory2.buildTableSegmentNameMap());
+    _queryEnvironment =
+        QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
+            factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
+            null);
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
@@ -152,6 +158,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       server.shutDown();
     }
     _mailboxService.shutdown();
+    _reducerScheduler.stopAsync();
   }
 
   /**
@@ -203,8 +210,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
     try {
       QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
-          Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService, null,
-          false);
+          Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
+          _reducerScheduler, null, false);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
       Assert.assertTrue(rte.getMessage().contains(exceptionMsg), "Exception should contain: " + exceptionMsg
@@ -215,6 +222,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
   private Object[][] provideTestSqlAndRowCount() {
     return new Object[][]{
+        // special hint test, the table is not actually partitioned by col1, thus this hint gives wrong result. but
+        // b/c in order to test whether this hint produces the proper optimized plan, we are making this assumption
+        new Object[]{"SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, COUNT(*) FROM a "
+            + " GROUP BY 1 ORDER BY 2", 10},
+
+        // special hint test, we want to try if dynamic broadcast works for just any random table */
         new Object[]{"SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a "
             + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE b.col3 < 10) AND a.col3 > 0", 9},
 
@@ -257,6 +270,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
     return new Object[][]{
+        // query hint with dynamic broadcast pipeline breaker should return error upstream
+        new Object[]{
+            "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a "
+                + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE textMatch(col1, 'f')) AND a.col3 > 0",
+            "without text index"
+        },
         // Timeout exception should occur with this option:
         new Object[]{
             "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",

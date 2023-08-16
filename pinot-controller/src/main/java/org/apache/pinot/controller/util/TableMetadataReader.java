@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -44,10 +44,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class TableMetadataReader {
   private final Executor _executor;
-  private final HttpConnectionManager _connectionManager;
+  private final HttpClientConnectionManager _connectionManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
 
-  public TableMetadataReader(Executor executor, HttpConnectionManager connectionManager,
+  public TableMetadataReader(Executor executor, HttpClientConnectionManager connectionManager,
       PinotHelixResourceManager helixResourceManager) {
     _executor = executor;
     _connectionManager = connectionManager;

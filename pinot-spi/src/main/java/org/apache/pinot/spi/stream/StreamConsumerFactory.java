@@ -51,8 +51,12 @@ public abstract class StreamConsumerFactory {
    * @param groupId consumer group Id
    * @return the stream level consumer
    */
-  public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName,
-      Set<String> fieldsToRead, String groupId);
+  @Deprecated
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName,
+      Set<String> fieldsToRead, String groupId) {
+    throw new UnsupportedOperationException("Apache pinot no longer supports stream level consumer model. Please "
+        + "create partition level consumer only");
+  }
 
   /**
    * Creates a metadata provider which provides partition specific metadata

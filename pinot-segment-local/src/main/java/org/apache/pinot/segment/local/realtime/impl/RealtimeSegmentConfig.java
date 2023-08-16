@@ -61,6 +61,7 @@ public class RealtimeSegmentConfig {
   private final boolean _nullHandlingEnabled;
   private final UpsertConfig.Mode _upsertMode;
   private final List<String> _upsertComparisonColumns;
+  private final String _upsertDeleteRecordColumn;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final String _consumerDir;
@@ -74,7 +75,7 @@ public class RealtimeSegmentConfig {
       PinotDataBufferMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory, String partitionColumn,
       PartitionFunction partitionFunction, int partitionId, boolean aggregateMetrics, boolean nullHandlingEnabled,
       String consumerDir, UpsertConfig.Mode upsertMode, List<String> upsertComparisonColumns,
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      String upsertDeleteRecordColumn, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       PartitionDedupMetadataManager partitionDedupMetadataManager, List<FieldConfig> fieldConfigList,
       List<AggregationConfig> ingestionAggregationConfigs) {
     _tableNameWithType = tableNameWithType;
@@ -97,6 +98,7 @@ public class RealtimeSegmentConfig {
     _consumerDir = consumerDir;
     _upsertMode = upsertMode != null ? upsertMode : UpsertConfig.Mode.NONE;
     _upsertComparisonColumns = upsertComparisonColumns;
+    _upsertDeleteRecordColumn = upsertDeleteRecordColumn;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _fieldConfigList = fieldConfigList;
@@ -188,6 +190,10 @@ public class RealtimeSegmentConfig {
     return _upsertComparisonColumns;
   }
 
+  public String getUpsertDeleteRecordColumn() {
+    return _upsertDeleteRecordColumn;
+  }
+
   public PartitionUpsertMetadataManager getPartitionUpsertMetadataManager() {
     return _partitionUpsertMetadataManager;
   }
@@ -225,6 +231,7 @@ public class RealtimeSegmentConfig {
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
     private List<String> _upsertComparisonColumns;
+    private String _upsertDeleteRecordColumn;
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private List<FieldConfig> _fieldConfigList;
@@ -360,6 +367,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setUpsertDeleteRecordColumn(String upsertDeleteRecordColumn) {
+      _upsertDeleteRecordColumn = upsertDeleteRecordColumn;
+      return this;
+    }
+
     public Builder setPartitionUpsertMetadataManager(PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
       _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
       return this;
@@ -389,8 +401,9 @@ public class RealtimeSegmentConfig {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, Collections.unmodifiableMap(indexConfigByCol), _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumns, _partitionUpsertMetadataManager,
-          _partitionDedupMetadataManager, _fieldConfigList, _ingestionAggregationConfigs);
+          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertComparisonColumns, _upsertDeleteRecordColumn,
+          _partitionUpsertMetadataManager, _partitionDedupMetadataManager, _fieldConfigList,
+          _ingestionAggregationConfigs);
     }
   }
 }

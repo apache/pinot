@@ -76,17 +76,6 @@ public class TableConfigTest {
     offlineTableConfig.getValidationConfig().setReplicasPerPartition("3");
     assertEquals(4, offlineTableConfig.getReplication());
 
-    TableConfig realtimeHLCTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TEST_REALTIME_HLC_TABLE_NAME)
-            .setStreamConfigs(getStreamConfigMap("highlevel")).setNumReplicas(2).build();
-    assertEquals(2, realtimeHLCTableConfig.getReplication());
-
-    realtimeHLCTableConfig.getValidationConfig().setReplication("4");
-    assertEquals(4, realtimeHLCTableConfig.getReplication());
-
-    realtimeHLCTableConfig.getValidationConfig().setReplicasPerPartition("3");
-    assertEquals(4, realtimeHLCTableConfig.getReplication());
-
     TableConfig realtimeLLCTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TEST_REALTIME_LLC_TABLE_NAME)
             .setStreamConfigs(getStreamConfigMap("lowlevel")).setLLC(true).setNumReplicas(2).build();

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -137,6 +138,8 @@ public class AggregationFunctionUtils {
    */
   public static Object getIntermediateResult(DataTable dataTable, ColumnDataType columnDataType, int rowId, int colId) {
     switch (columnDataType) {
+      case INT:
+        return dataTable.getInt(rowId, colId);
       case LONG:
         return dataTable.getLong(rowId, colId);
       case DOUBLE:
@@ -166,7 +169,12 @@ public class AggregationFunctionUtils {
         return dataTable.getDouble(rowId, colId);
       case BIG_DECIMAL:
         return dataTable.getBigDecimal(rowId, colId);
+      case BOOLEAN:
+        return dataTable.getInt(rowId, colId) == 1;
+      case TIMESTAMP:
+        return new Timestamp(dataTable.getLong(rowId, colId));
       case STRING:
+      case JSON:
         return dataTable.getString(rowId, colId);
       case BYTES:
         return dataTable.getBytes(rowId, colId).getBytes();

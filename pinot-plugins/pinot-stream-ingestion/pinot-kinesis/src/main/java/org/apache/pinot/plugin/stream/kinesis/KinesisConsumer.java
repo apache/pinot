@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,7 +43,6 @@ import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
 import software.amazon.awssdk.services.kinesis.model.InvalidArgumentException;
 import software.amazon.awssdk.services.kinesis.model.KinesisException;
 import software.amazon.awssdk.services.kinesis.model.ProvisionedThroughputExceededException;
-import software.amazon.awssdk.services.kinesis.model.Record;
 import software.amazon.awssdk.services.kinesis.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
@@ -85,7 +85,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   @Override
   public KinesisRecordsBatch fetchMessages(StreamPartitionMsgOffset startCheckpoint,
       StreamPartitionMsgOffset endCheckpoint, int timeoutMs) {
-    List<Record> recordList = new ArrayList<>();
+    List<KinesisStreamMessage> recordList = new ArrayList<>();
     Future<KinesisRecordsBatch> kinesisFetchResultFuture =
         _executorService.submit(() -> getResult(startCheckpoint, endCheckpoint, recordList));
 
@@ -100,7 +100,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   }
 
   private KinesisRecordsBatch getResult(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
-      List<Record> recordList) {
+      List<KinesisStreamMessage> recordList) {
     KinesisPartitionGroupOffset kinesisStartCheckpoint = (KinesisPartitionGroupOffset) startOffset;
 
     try {
@@ -138,7 +138,13 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordsRequest);
 
         if (!getRecordsResponse.records().isEmpty()) {
-          recordList.addAll(getRecordsResponse.records());
+          getRecordsResponse.records().forEach(record -> {
+            recordList.add(
+            new KinesisStreamMessage(record.partitionKey().getBytes(StandardCharsets.UTF_8),
+                record.data().asByteArray(), record.sequenceNumber(),
+                (KinesisStreamMessageMetadata) _kinesisMetadataExtractor.extract(record),
+                record.data().asByteArray().length));
+          });
           nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
 
           if (kinesisEndSequenceNumber != null && kinesisEndSequenceNumber.compareTo(nextStartSequenceNumber) <= 0) {
@@ -219,7 +225,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     }
   }
 
-  private KinesisRecordsBatch handleException(KinesisPartitionGroupOffset start, List<Record> recordList) {
+  private KinesisRecordsBatch handleException(KinesisPartitionGroupOffset start,
+      List<KinesisStreamMessage> recordList) {
     String shardId = start.getShardToStartSequenceMap().entrySet().iterator().next().getKey();
 
     if (!recordList.isEmpty()) {

@@ -47,15 +47,24 @@ class HashExchange extends BlockExchange {
   @Override
   protected void route(List<SendingMailbox> destinations, TransferableBlock block)
       throws Exception {
-    List<Object[]>[] destIdxToRows = new List[destinations.size()];
-    for (Object[] row : block.getContainer()) {
-      int partition = _keySelector.computeHash(row) % destinations.size();
-      if (destIdxToRows[partition] == null) {
-        destIdxToRows[partition] = new ArrayList<>();
-      }
-      destIdxToRows[partition].add(row);
+    int numMailboxes = destinations.size();
+    if (numMailboxes == 1) {
+      sendBlock(destinations.get(0), block);
+      return;
     }
-    for (int i = 0; i < destinations.size(); i++) {
+
+    List<Object[]>[] destIdxToRows = new List[numMailboxes];
+    List<Object[]> container = block.getContainer();
+    for (Object[] row : container) {
+      int index = _keySelector.computeHash(row) % numMailboxes;
+      List<Object[]> rows = destIdxToRows[index];
+      if (rows == null) {
+        rows = new ArrayList<>();
+        destIdxToRows[index] = rows;
+      }
+      rows.add(row);
+    }
+    for (int i = 0; i < numMailboxes; i++) {
       if (destIdxToRows[i] != null) {
         sendBlock(destinations.get(i), new TransferableBlock(destIdxToRows[i], block.getDataSchema(), block.getType()));
       }

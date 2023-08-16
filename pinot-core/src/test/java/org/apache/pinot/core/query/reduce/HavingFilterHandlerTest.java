@@ -97,4 +97,35 @@ public class HavingFilterHandlerTest {
       assertFalse(havingFilterHandler.isMatch(new Object[]{11, 11L, 10.5f, 10.5, "11", new byte[]{16}, 5}));
     }
   }
+
+  @Test
+  public void testIsNullWhenNullHandlingEnabled() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT col1, COUNT(col2) FROM testTable GROUP BY col1 HAVING col1 IS NULL OPTION(enableNullHandling=true)");
+    DataSchema dataSchema = new DataSchema(new String[]{"col1", "count(col2)"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT
+    });
+    PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
+    HavingFilterHandler havingFilterHandler =
+        new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler, true);
+    assertTrue(havingFilterHandler.isMatch(new Object[]{null, 1}));
+    assertFalse(havingFilterHandler.isMatch(new Object[]{1, 1}));
+    assertFalse(havingFilterHandler.isMatch(new Object[]{Integer.MIN_VALUE, 1}));
+  }
+
+  @Test
+  public void testIsNotNullWhenNullHandlingEnabled() {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT col1, COUNT(col2) FROM testTable GROUP BY col1 HAVING col1 IS NOT NULL OPTION"
+            + "(enableNullHandling=true)");
+    DataSchema dataSchema = new DataSchema(new String[]{"col1", "count(col2)"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT
+    });
+    PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
+    HavingFilterHandler havingFilterHandler =
+        new HavingFilterHandler(queryContext.getHavingFilter(), postAggregationHandler, true);
+    assertFalse(havingFilterHandler.isMatch(new Object[]{null, 1}));
+    assertTrue(havingFilterHandler.isMatch(new Object[]{1, 1}));
+    assertTrue(havingFilterHandler.isMatch(new Object[]{Integer.MIN_VALUE, 1}));
+  }
 }

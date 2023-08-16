@@ -37,6 +37,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
+import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.glassfish.grizzly.http.server.Request;
 
@@ -98,6 +99,8 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     String tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
     AccessType accessType = extractAccessType(endpointMethod);
     AccessControlUtils.validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);
+
+    FineGrainedAuthUtils.validateFineGrainedAuth(endpointMethod, uriInfo, _httpHeaders, accessControl);
   }
 
   @VisibleForTesting

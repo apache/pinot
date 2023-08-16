@@ -53,6 +53,12 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
   public abstract Map<String, String> getPartitionToCurrentOffset();
 
   /**
+   * Starts the consumption of the underlying realtime segments.
+   * In some cases, it is helpful to not do this inside the constructor itself.
+   */
+  public abstract void startConsumption();
+
+  /**
    * Get the state of the consumer
    */
   public abstract ConsumerState getConsumerState();

@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -71,14 +72,14 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, PhysicalPlanContext context) {
     if (node.isSortOnReceiver()) {
       SortedMailboxReceiveOperator sortedMailboxReceiveOperator =
-          new SortedMailboxReceiveOperator(context.getOpChainExecutionContext(), node.getExchangeType(),
+          new SortedMailboxReceiveOperator(context.getOpChainExecutionContext(), node.getDistributionType(),
               node.getDataSchema(), node.getCollationKeys(), node.getCollationDirections(),
               node.getCollationNullDirections(), node.isSortOnSender(), node.getSenderStageId());
       context.addReceivingMailboxIds(sortedMailboxReceiveOperator.getMailboxIds());
       return sortedMailboxReceiveOperator;
     } else {
       MailboxReceiveOperator mailboxReceiveOperator =
-          new MailboxReceiveOperator(context.getOpChainExecutionContext(), node.getExchangeType(),
+          new MailboxReceiveOperator(context.getOpChainExecutionContext(), node.getDistributionType(),
               node.getSenderStageId());
       context.addReceivingMailboxIds(mailboxReceiveOperator.getMailboxIds());
       return mailboxReceiveOperator;
@@ -88,7 +89,7 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   @Override
   public MultiStageOperator visitMailboxSend(MailboxSendNode node, PhysicalPlanContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    return new MailboxSendOperator(context.getOpChainExecutionContext(), nextOperator, node.getExchangeType(),
+    return new MailboxSendOperator(context.getOpChainExecutionContext(), nextOperator, node.getDistributionType(),
         node.getPartitionKeySelector(), node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(),
         node.getReceiverStageId());
   }
@@ -96,8 +97,11 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   @Override
   public MultiStageOperator visitAggregate(AggregateNode node, PhysicalPlanContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    return new AggregateOperator(context.getOpChainExecutionContext(), nextOperator, node.getDataSchema(),
-        node.getAggCalls(), node.getGroupSet(), node.getInputs().get(0).getDataSchema());
+    DataSchema inputSchema = node.getInputs().get(0).getDataSchema();
+    DataSchema resultSchema = node.getDataSchema();
+
+    return new AggregateOperator(context.getOpChainExecutionContext(), nextOperator, resultSchema, inputSchema,
+        node.getAggCalls(), node.getGroupSet(), node.getAggType(), node.getFilterArgIndices(), node.getNodeHint());
   }
 
   @Override

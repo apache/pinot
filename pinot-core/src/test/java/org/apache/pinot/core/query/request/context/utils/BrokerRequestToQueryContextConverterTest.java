@@ -67,6 +67,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(selectExpressions.size(), 1);
       assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("*"));
       assertEquals(selectExpressions.get(0).toString(), "*");
+      assertFalse(queryContext.isDistinct());
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
       assertNull(queryContext.getFilter());
       assertNull(queryContext.getGroupByExpressions());
@@ -91,6 +92,7 @@ public class BrokerRequestToQueryContextConverterTest {
           new FunctionContext(FunctionContext.Type.AGGREGATION, "count",
               Collections.singletonList(ExpressionContext.forIdentifier("*")))));
       assertEquals(selectExpressions.get(0).toString(), "count(*)");
+      assertFalse(queryContext.isDistinct());
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
       assertNull(queryContext.getFilter());
       assertNull(queryContext.getGroupByExpressions());
@@ -115,6 +117,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(selectExpressions.get(0).toString(), "foo");
       assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
       assertEquals(selectExpressions.get(1).toString(), "bar");
+      assertFalse(queryContext.isDistinct());
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
       assertNull(queryContext.getFilter());
       List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
@@ -139,12 +142,14 @@ public class BrokerRequestToQueryContextConverterTest {
       QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
       assertEquals(queryContext.getTableName(), "testTable");
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-      assertEquals(selectExpressions.size(), 1);
-      assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, "distinct",
-              Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar"),
-                  ExpressionContext.forIdentifier("foobar")))));
-      assertEquals(selectExpressions.get(0).toString(), "distinct(foo,bar,foobar)");
+      assertEquals(selectExpressions.size(), 3);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("foo"));
+      assertEquals(selectExpressions.get(0).toString(), "foo");
+      assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
+      assertEquals(selectExpressions.get(1).toString(), "bar");
+      assertEquals(selectExpressions.get(2), ExpressionContext.forIdentifier("foobar"));
+      assertEquals(selectExpressions.get(2).toString(), "foobar");
+      assertTrue(queryContext.isDistinct());
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
       assertNull(queryContext.getFilter());
       assertNull(queryContext.getGroupByExpressions());
@@ -186,6 +191,7 @@ public class BrokerRequestToQueryContextConverterTest {
               Arrays.asList(ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, "456"),
                   ExpressionContext.forIdentifier("foobar")))));
       assertEquals(selectExpressions.get(1).toString(), "sub('456',foobar)");
+      assertFalse(queryContext.isDistinct());
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
       assertNull(queryContext.getFilter());
       assertNull(queryContext.getGroupByExpressions());
@@ -225,22 +231,19 @@ public class BrokerRequestToQueryContextConverterTest {
       QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
       assertEquals(queryContext.getTableName(), "testTable");
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
-      int numSelectExpressions = selectExpressions.size();
-      assertTrue(numSelectExpressions == 1 || numSelectExpressions == 3);
-      ExpressionContext aggregationExpression = selectExpressions.get(numSelectExpressions - 1);
-      assertEquals(aggregationExpression, ExpressionContext.forFunction(
+      assertEquals(selectExpressions.size(), 3);
+      assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
+              Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar")))));
+      assertEquals(selectExpressions.get(0).toString(), "sub(foo,bar)");
+      assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
+      assertEquals(selectExpressions.get(1).toString(), "bar");
+      assertEquals(selectExpressions.get(2), ExpressionContext.forFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, "sum", Collections.singletonList(
               ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "add",
                   Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar"))))))));
-      assertEquals(aggregationExpression.toString(), "sum(add(foo,bar))");
-      if (numSelectExpressions == 3) {
-        assertEquals(selectExpressions.get(0), ExpressionContext.forFunction(
-            new FunctionContext(FunctionContext.Type.TRANSFORM, "sub",
-                Arrays.asList(ExpressionContext.forIdentifier("foo"), ExpressionContext.forIdentifier("bar")))));
-        assertEquals(selectExpressions.get(0).toString(), "sub(foo,bar)");
-        assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
-        assertEquals(selectExpressions.get(1).toString(), "bar");
-      }
+      assertEquals(selectExpressions.get(2).toString(), "sum(add(foo,bar))");
+      assertFalse(queryContext.isDistinct());
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
       assertNull(queryContext.getFilter());
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
@@ -284,6 +287,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(selectExpressions.size(), 1);
       assertEquals(selectExpressions.get(0), ExpressionContext.forIdentifier("*"));
       assertEquals(selectExpressions.get(0).toString(), "*");
+      assertFalse(queryContext.isDistinct());
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
       FilterContext filter = queryContext.getFilter();
       assertNotNull(filter);
@@ -328,6 +332,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(selectExpressions.get(0).toString(), "sum(foo)");
       assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
       assertEquals(selectExpressions.get(1).toString(), "bar");
+      assertFalse(queryContext.isDistinct());
       List<String> aliasList = queryContext.getAliasList();
       assertEquals(aliasList.size(), 2);
       assertEquals(aliasList.get(0), "a");
@@ -371,6 +376,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(selectExpressions.get(0).toString(), "sum(foo)");
       assertEquals(selectExpressions.get(1), ExpressionContext.forIdentifier("bar"));
       assertEquals(selectExpressions.get(1).toString(), "bar");
+      assertFalse(queryContext.isDistinct());
       assertEquals(getAliasCount(queryContext.getAliasList()), 0);
       assertNull(queryContext.getFilter());
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
@@ -670,7 +676,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertTrue(orderByExpressionContext.isDesc());
+    assertFalse(orderByExpressionContext.isAsc());
     assertTrue(orderByExpressionContext.isNullsLast());
     assertEquals(orderByExpressionContext.getExpression().getFunction().getFunctionName(), "datetrunc");
     assertEquals(orderByExpressionContext.getExpression().getFunction().getArguments().get(0).getIdentifier(), "A");
@@ -756,7 +762,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertTrue(orderByExpressionContext.isDesc());
+    assertFalse(orderByExpressionContext.isAsc());
     assertFalse(orderByExpressionContext.isNullsLast());
   }
 
@@ -770,7 +776,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertTrue(orderByExpressionContext.isDesc());
+    assertFalse(orderByExpressionContext.isAsc());
     assertTrue(orderByExpressionContext.isNullsLast());
   }
 
@@ -784,7 +790,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertFalse(orderByExpressionContext.isDesc());
+    assertTrue(orderByExpressionContext.isAsc());
     assertTrue(orderByExpressionContext.isNullsLast());
   }
 }

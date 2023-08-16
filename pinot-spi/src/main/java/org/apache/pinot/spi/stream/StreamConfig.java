@@ -100,7 +100,7 @@ public class StreamConfig {
    */
   public StreamConfig(String tableNameWithType, Map<String, String> streamConfigMap) {
     _type = streamConfigMap.get(StreamConfigProperties.STREAM_TYPE);
-    Preconditions.checkNotNull(_type, "Stream type cannot be null");
+    Preconditions.checkNotNull(_type, StreamConfigProperties.STREAM_TYPE + " cannot be null");
 
     String topicNameKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_TOPIC_NAME);
@@ -109,19 +109,8 @@ public class StreamConfig {
 
     _tableNameWithType = tableNameWithType;
 
-    String consumerTypesKey =
-        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_TYPES);
-    String consumerTypes = streamConfigMap.get(consumerTypesKey);
-    Preconditions.checkNotNull(consumerTypes, "Must specify at least one consumer type " + consumerTypesKey);
-    for (String consumerType : consumerTypes.split(",")) {
-      if (consumerType.equals(
-          SIMPLE_CONSUMER_TYPE_STRING)) { //For backward compatibility of stream configs which referred to lowlevel
-        // as simple
-        _consumerTypes.add(ConsumerType.LOWLEVEL);
-        continue;
-      }
-      _consumerTypes.add(ConsumerType.valueOf(consumerType.toUpperCase()));
-    }
+    validateConsumerType(_type, streamConfigMap);
+    _consumerTypes.add(ConsumerType.LOWLEVEL);
 
     String consumerFactoryClassKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS);
@@ -223,6 +212,17 @@ public class StreamConfig {
     _streamConfigMap.putAll(streamConfigMap);
   }
 
+  public static void validateConsumerType(String streamType, Map<String, String> streamConfigMap) {
+    String consumerTypesKey =
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES);
+    String consumerTypes = streamConfigMap.get(consumerTypesKey);
+    Preconditions.checkNotNull(consumerTypes, consumerTypesKey + " cannot be null");
+    for (String consumerType : consumerTypes.split(",")) {
+      Preconditions.checkState(ConsumerType.LOWLEVEL.name().equalsIgnoreCase(consumerType)
+              || SIMPLE_CONSUMER_TYPE_STRING.equalsIgnoreCase(consumerType),
+          "Realtime tables with HLC consumer (consumer.type=highlevel) is no longer supported in Apache Pinot");
+    }
+  }
   public boolean isServerUploadToDeepStore() {
     return _serverUploadToDeepStore;
   }

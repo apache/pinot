@@ -63,9 +63,20 @@ public class NativeMutableTextIndex implements MutableTextIndex {
 
   @Override
   public void add(String document) {
-    Iterable<String> tokens;
+    addHelper(document);
+    _nextDocId++;
+  }
 
-    tokens = analyze(document);
+  @Override
+  public void add(String[] documents) {
+    for (String document : documents) {
+      addHelper(document);
+    }
+    _nextDocId++;
+  }
+
+  private void addHelper(String document) {
+    Iterable<String> tokens = analyze(document);
     _writeLock.lock();
     try {
       for (String token : tokens) {
@@ -76,7 +87,6 @@ public class NativeMutableTextIndex implements MutableTextIndex {
         });
         _invertedIndex.add(currentDictId, _nextDocId);
       }
-      _nextDocId++;
     } finally {
       _writeLock.unlock();
     }
@@ -109,8 +119,8 @@ public class NativeMutableTextIndex implements MutableTextIndex {
   private List<String> analyze(String document) {
     List<String> tokens = new ArrayList<>();
     try (TokenStream tokenStream = _analyzer.tokenStream(_column, document)) {
-      tokenStream.reset();
       CharTermAttribute attribute = tokenStream.getAttribute(CharTermAttribute.class);
+      tokenStream.reset();
       while (tokenStream.incrementToken()) {
         tokens.add(attribute.toString());
       }

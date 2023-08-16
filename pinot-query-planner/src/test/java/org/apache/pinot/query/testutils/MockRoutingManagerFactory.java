@@ -21,18 +21,21 @@ package org.apache.pinot.query.testutils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -49,62 +52,52 @@ public class MockRoutingManagerFactory {
   private static final String TIME_BOUNDARY_COLUMN = "ts";
   private static final String HOST_NAME = "localhost";
 
-  private final HashMap<String, String> _tableNameMap;
+  private final Map<String, String> _tableNameMap;
   private final Map<String, Schema> _schemaMap;
-
+  private final Set<String> _hybridTables;
   private final Map<String, ServerInstance> _serverInstances;
-  private final Map<String, RoutingTable> _routingTableMap;
-  private final List<String> _hybridTables;
-
-  private final Map<String, Map<ServerInstance, List<String>>> _tableServerSegmentMap;
+  private final Map<String, Map<ServerInstance, List<String>>> _tableServerSegmentsMap;
 
   public MockRoutingManagerFactory(int... ports) {
-    _hybridTables = new ArrayList<>();
-    _serverInstances = new HashMap<>();
-    _schemaMap = new HashMap<>();
     _tableNameMap = new HashMap<>();
-    _routingTableMap = new HashMap<>();
-
-    _tableServerSegmentMap = new HashMap<>();
+    _schemaMap = new HashMap<>();
+    _hybridTables = new HashSet<>();
+    _serverInstances = new HashMap<>();
+    _tableServerSegmentsMap = new HashMap<>();
     for (int port : ports) {
       _serverInstances.put(toHostname(port), getServerInstance(HOST_NAME, port, port, port, port));
     }
   }
 
-  public MockRoutingManagerFactory registerTable(Schema schema, String tableName) {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType == null) {
-      registerTableNameWithType(schema, TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName));
-      registerTableNameWithType(schema, TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName));
-      _hybridTables.add(tableName);
+  public void registerTable(Schema schema, String tableName) {
+    if (TableNameBuilder.isTableResource(tableName)) {
+      registerTableNameWithType(schema, tableName);
     } else {
-      registerTableNameWithType(schema, TableNameBuilder.forType(tableType).tableNameWithType(tableName));
+      registerTableNameWithType(schema, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      registerTableNameWithType(schema, TableNameBuilder.REALTIME.tableNameWithType(tableName));
+      _hybridTables.add(tableName);
     }
-    return this;
   }
 
-  public MockRoutingManagerFactory registerSegment(int insertToServerPort, String tableNameWithType,
-      String segmentName) {
-    Map<ServerInstance, List<String>> serverSegmentMap =
-        _tableServerSegmentMap.getOrDefault(tableNameWithType, new HashMap<>());
+  private void registerTableNameWithType(Schema schema, String tableNameWithType) {
+    _tableNameMap.put(tableNameWithType, tableNameWithType);
+    _schemaMap.put(TableNameBuilder.extractRawTableName(tableNameWithType), schema);
+  }
+
+  public void registerSegment(int insertToServerPort, String tableNameWithType, String segmentName) {
     ServerInstance serverInstance = _serverInstances.get(toHostname(insertToServerPort));
-
-    List<String> sSegments = serverSegmentMap.getOrDefault(serverInstance, new ArrayList<>());
-    sSegments.add(segmentName);
-    serverSegmentMap.put(serverInstance, sSegments);
-    _tableServerSegmentMap.put(tableNameWithType, serverSegmentMap);
-    return this;
+    _tableServerSegmentsMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>())
+        .computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(segmentName);
   }
 
-  public RoutingManager buildRoutingManager() {
-    // create all the fake routing tables
-    _routingTableMap.clear();
-    for (Map.Entry<String, Map<ServerInstance, List<String>>> tableEntry : _tableServerSegmentMap.entrySet()) {
+  public RoutingManager buildRoutingManager(@Nullable Map<String, TablePartitionInfo> partitionInfoMap) {
+    Map<String, RoutingTable> routingTableMap = new HashMap<>();
+    for (Map.Entry<String, Map<ServerInstance, List<String>>> tableEntry : _tableServerSegmentsMap.entrySet()) {
       String tableNameWithType = tableEntry.getKey();
       RoutingTable fakeRoutingTable = new RoutingTable(tableEntry.getValue(), Collections.emptyList(), 0);
-      _routingTableMap.put(tableNameWithType, fakeRoutingTable);
+      routingTableMap.put(tableNameWithType, fakeRoutingTable);
     }
-    return new FakeRoutingManager(_routingTableMap, _serverInstances, _hybridTables);
+    return new FakeRoutingManager(routingTableMap, _hybridTables, partitionInfoMap, _serverInstances);
   }
 
   public TableCache buildTableCache() {
@@ -117,7 +110,7 @@ public class MockRoutingManagerFactory {
     return mock;
   }
 
-  private static String toHostname(int port) {
+  public static String toHostname(int port) {
     return String.format("%s_%d", HOST_NAME, port);
   }
 
@@ -135,23 +128,18 @@ public class MockRoutingManagerFactory {
     return new ServerInstance(instanceConfig);
   }
 
-  private void registerTableNameWithType(Schema schema, String tableNameWithType) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    _tableNameMap.put(tableNameWithType, rawTableName);
-    _schemaMap.put(rawTableName, schema);
-    _schemaMap.put(tableNameWithType, schema);
-  }
-
   private static class FakeRoutingManager implements RoutingManager {
     private final Map<String, RoutingTable> _routingTableMap;
+    private final Set<String> _hybridTables;
+    private final Map<String, TablePartitionInfo> _partitionInfoMap;
     private final Map<String, ServerInstance> _serverInstances;
-    private final List<String> _hybridTables;
 
-    public FakeRoutingManager(Map<String, RoutingTable> routingTableMap, Map<String, ServerInstance> serverInstances,
-        List<String> hybridTables) {
+    public FakeRoutingManager(Map<String, RoutingTable> routingTableMap, Set<String> hybridTables,
+        @Nullable Map<String, TablePartitionInfo> partitionInfoMap, Map<String, ServerInstance> serverInstances) {
       _routingTableMap = routingTableMap;
-      _serverInstances = serverInstances;
       _hybridTables = hybridTables;
+      _partitionInfoMap = partitionInfoMap;
+      _serverInstances = serverInstances;
     }
 
     @Override
@@ -161,9 +149,8 @@ public class MockRoutingManagerFactory {
 
     @Override
     public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
-      String tableName = brokerRequest.getPinotQuery().getDataSource().getTableName();
-      return _routingTableMap.getOrDefault(tableName,
-          _routingTableMap.get(TableNameBuilder.extractRawTableName(tableName)));
+      String tableNameWithType = brokerRequest.getPinotQuery().getDataSource().getTableName();
+      return _routingTableMap.get(tableNameWithType);
     }
 
     @Override
@@ -171,11 +158,18 @@ public class MockRoutingManagerFactory {
       return _routingTableMap.containsKey(tableNameWithType);
     }
 
+    @Nullable
     @Override
-    public TimeBoundaryInfo getTimeBoundaryInfo(String tableName) {
-      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
+      String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
       return _hybridTables.contains(rawTableName) ? new TimeBoundaryInfo(TIME_BOUNDARY_COLUMN,
           String.valueOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))) : null;
+    }
+
+    @Nullable
+    @Override
+    public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
+      return _partitionInfoMap != null ? _partitionInfoMap.get(tableNameWithType) : null;
     }
 
     @Override

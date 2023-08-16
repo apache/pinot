@@ -46,6 +46,7 @@ public class CommonConstants {
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
+  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.1.0/";
 
   /**
    * The state of the consumer for a given segment
@@ -84,10 +85,9 @@ public class CommonConstants {
     public static final String LEAD_CONTROLLER_RESOURCE_ENABLED_KEY = "RESOURCE_ENABLED";
 
     public static final String ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive";
+    public static final boolean DEFAULT_ENABLE_CASE_INSENSITIVE = true;
     public static final String ALLOW_TABLE_NAME_WITH_DATABASE = "allow.table.name.with.database";
     public static final boolean DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE = false;
-    @Deprecated
-    public static final String DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive.pql";
 
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
@@ -754,6 +754,7 @@ public class CommonConstants {
      */
     public static final String JOB_TYPE = "jobType";
     public static final String TABLE_NAME_WITH_TYPE = "tableName";
+    public static final String TENANT_NAME = "tenantName";
     public static final String JOB_ID = "jobId";
     public static final String SUBMISSION_TIME_MS = "submissionTimeMs";
     public static final String MESSAGE_COUNT = "messageCount";

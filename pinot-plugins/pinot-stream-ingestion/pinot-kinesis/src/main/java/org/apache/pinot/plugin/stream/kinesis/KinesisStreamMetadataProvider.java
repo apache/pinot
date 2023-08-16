@@ -28,11 +28,14 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -189,6 +192,24 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
-  public void close() {
+  public Map<String, PartitionLagState> getCurrentPartitionLagState(
+      Map<String, ConsumerPartitionState> currentPartitionStateMap) {
+    Map<String, PartitionLagState> perPartitionLag = new HashMap<>();
+    for (Map.Entry<String, ConsumerPartitionState> entry: currentPartitionStateMap.entrySet()) {
+      ConsumerPartitionState partitionState = entry.getValue();
+      // Compute record-availability
+      String recordAvailabilityLag = "UNKNOWN";
+      RowMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
+      if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
+        long availabilityLag = partitionState.getLastProcessedTimeMs()
+            - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
+        recordAvailabilityLag = String.valueOf(availabilityLag);
+      }
+      perPartitionLag.put(entry.getKey(), new KinesisConsumerPartitionLag(recordAvailabilityLag));
+    }
+    return perPartitionLag;
   }
+
+  @Override
+  public void close() { }
 }

@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.plannode.DefaultPostOrderTraversalVisitor;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 
 
-public class PipelineBreakerVisitor extends DefaultPostOrderTraversalVisitor<Void, PipelineBreakerContext> {
+class PipelineBreakerVisitor extends DefaultPostOrderTraversalVisitor<Void, PipelineBreakerContext> {
   private static final PlanNodeVisitor<Void, PipelineBreakerContext> INSTANCE = new PipelineBreakerVisitor();
 
   public static void visitPlanRoot(PlanNode root, PipelineBreakerContext context) {
@@ -40,9 +41,7 @@ public class PipelineBreakerVisitor extends DefaultPostOrderTraversalVisitor<Voi
   @Override
   public Void visitMailboxReceive(MailboxReceiveNode node, PipelineBreakerContext context) {
     process(node, context);
-    // TODO: actually implement pipeline breaker attribute in PlanNode
-    // currently all mailbox receive node from leaf stage is considered as pipeline breaker node.
-    if (context.isLeafStage()) {
+    if (node.getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER) {
       context.addPipelineBreaker(node);
     }
     return null;

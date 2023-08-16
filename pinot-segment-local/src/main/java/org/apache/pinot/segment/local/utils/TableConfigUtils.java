@@ -83,6 +83,8 @@ import org.quartz.CronScheduleBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
+
 
 /**
  * Utils related to table config operations
@@ -98,13 +100,14 @@ public final class TableConfigUtils {
 
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
   private static final String REALTIME_TO_OFFLINE_TASK_TYPE = "RealtimeToOfflineSegmentsTask";
+  private static final String UPSERT_COMPACTION_TASK_TYPE = "UpsertCompactionTask";
 
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
   private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
-      EnumSet.of(AggregationFunctionType.SUM, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
-          AggregationFunctionType.COUNT);
+      EnumSet.of(SUM, MIN, MAX, COUNT, DISTINCTCOUNTHLL, SUMPRECISION);
+
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
           RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE);
@@ -134,10 +137,24 @@ public final class TableConfigUtils {
     }
     // Sanitize the table config before validation
     sanitize(tableConfig);
+
     // skip all validation if skip type ALL is selected.
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateValidationConfig(tableConfig, schema);
+
+      StreamConfig streamConfig = null;
       validateIngestionConfig(tableConfig, schema, disableGroovy);
+      // Only allow realtime tables with non-null stream.type and LLC consumer.type
+      if (tableConfig.getTableType() == TableType.REALTIME) {
+        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+        try {
+          // Validate that StreamConfig can be created
+          streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
+        } catch (Exception e) {
+          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
+        }
+        validateDecoder(streamConfig);
+      }
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
       validateFieldConfigList(tableConfig.getFieldConfigList(), tableConfig.getIndexingConfig(), schema);
@@ -306,21 +323,13 @@ public final class TableConfigUtils {
       }
 
       // Stream
+      // stream config map can either be in ingestion config or indexing config. cannot be in both places
       if (ingestionConfig.getStreamIngestionConfig() != null) {
         IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
         Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
             "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
         List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
         Preconditions.checkState(streamConfigMaps.size() == 1, "Only 1 stream is supported in REALTIME table");
-
-        StreamConfig streamConfig;
-        try {
-          // Validate that StreamConfig can be created
-          streamConfig = new StreamConfig(tableNameWithType, streamConfigMaps.get(0));
-        } catch (Exception e) {
-          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
-        }
-        validateDecoder(streamConfig);
       }
 
       // Filter config
@@ -355,8 +364,9 @@ public final class TableConfigUtils {
                 "columnName/aggregationFunction cannot be null in AggregationConfig " + aggregationConfig);
           }
 
+          FieldSpec fieldSpec = null;
           if (schema != null) {
-            FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+            fieldSpec = schema.getFieldSpecFor(columnName);
             Preconditions.checkState(fieldSpec != null, "The destination column '" + columnName
                 + "' of the aggregation function must be present in the schema");
             Preconditions.checkState(fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC,
@@ -377,15 +387,52 @@ public final class TableConfigUtils {
               "aggregation function must be a function for: %s", aggregationConfig);
 
           FunctionContext functionContext = expressionContext.getFunction();
-          validateIngestionAggregation(functionContext.getFunctionName());
-          Preconditions.checkState(functionContext.getArguments().size() == 1,
-              "aggregation function can only have one argument: %s", aggregationConfig);
+          AggregationFunctionType functionType =
+              AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+          validateIngestionAggregation(functionType);
 
-          ExpressionContext argument = functionContext.getArguments().get(0);
-          Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
-              "aggregator function argument must be a identifier: %s", aggregationConfig);
+          List<ExpressionContext> arguments = functionContext.getArguments();
+          int numArguments = arguments.size();
+          if (functionType == DISTINCTCOUNTHLL) {
+            Preconditions.checkState(numArguments >= 1 && numArguments <= 2,
+                "DISTINCT_COUNT_HLL can have at most two arguments: %s", aggregationConfig);
+            if (numArguments == 2) {
+              ExpressionContext secondArgument = arguments.get(1);
+              Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+                  "Second argument of DISTINCT_COUNT_HLL must be literal: %s", aggregationConfig);
+              String literal = secondArgument.getLiteral().getStringValue();
+              Preconditions.checkState(StringUtils.isNumeric(literal),
+                  "Second argument of DISTINCT_COUNT_HLL must be a number: %s", aggregationConfig);
+            }
+            if (fieldSpec != null) {
+              DataType dataType = fieldSpec.getDataType();
+              Preconditions.checkState(dataType == DataType.BYTES,
+                  "Result type for DISTINCT_COUNT_HLL must be BYTES: %s", aggregationConfig);
+            }
+          } else if (functionType == SUMPRECISION) {
+            Preconditions.checkState(numArguments >= 2 && numArguments <= 3,
+                "SUM_PRECISION must specify precision (required), scale (optional): %s", aggregationConfig);
+            ExpressionContext secondArgument = arguments.get(1);
+            Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+                "Second argument of SUM_PRECISION must be literal: %s", aggregationConfig);
+            String literal = secondArgument.getLiteral().getStringValue();
+            Preconditions.checkState(StringUtils.isNumeric(literal),
+                "Second argument of SUM_PRECISION must be a number: %s", aggregationConfig);
+            if (fieldSpec != null) {
+              DataType dataType = fieldSpec.getDataType();
+              Preconditions.checkState(dataType == DataType.BIG_DECIMAL || dataType == DataType.BYTES,
+                  "Result type for DISTINCT_COUNT_HLL must be BIG_DECIMAL or BYTES: %s", aggregationConfig);
+            }
+          } else {
+            Preconditions.checkState(numArguments == 1, "%s can only have one argument: %s", functionType,
+                aggregationConfig);
+          }
+          ExpressionContext firstArgument = arguments.get(0);
+          Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
+              "First argument of aggregation function: %s must be identifier, got: %s", functionType,
+              firstArgument.getType());
 
-          aggregationSourceColumns.add(argument.getIdentifier());
+          aggregationSourceColumns.add(firstArgument.getIdentifier());
         }
         if (schema != null) {
           Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
@@ -453,21 +500,9 @@ public final class TableConfigUtils {
     }
   }
 
-  /**
-   * Currently only, ValueAggregators with fixed width types are allowed, so MIN, MAX, SUM, and COUNT. The reason
-   * is that only the {@link org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex}
-   * supports random inserts and lookups. The
-   * {@link org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex only supports
-   * sequential inserts.
-   */
-  public static void validateIngestionAggregation(String name) {
-    for (AggregationFunctionType functionType : SUPPORTED_INGESTION_AGGREGATIONS) {
-      if (functionType.getName().equals(name)) {
-        return;
-      }
-    }
-    throw new IllegalStateException(
-        String.format("aggregation function %s must be one of %s", name, SUPPORTED_INGESTION_AGGREGATIONS));
+  public static void validateIngestionAggregation(AggregationFunctionType functionType) {
+    Preconditions.checkState(SUPPORTED_INGESTION_AGGREGATIONS.contains(functionType),
+        "Aggregation function: %s must be one of: %s", functionType, SUPPORTED_INGESTION_AGGREGATIONS);
   }
 
   @VisibleForTesting
@@ -482,6 +517,11 @@ public final class TableConfigUtils {
       }
     }
   }
+
+  public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
+      EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
+          DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
+          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH);
 
   @VisibleForTesting
   static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
@@ -523,10 +563,47 @@ public final class TableConfigUtils {
             if (entry.getKey().endsWith(".aggregationType")) {
               Preconditions.checkState(columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
                   String.format("Column \"%s\" not found in schema!", entry.getKey()));
-              Preconditions.checkState(ImmutableSet.of("SUM", "MAX", "MIN").contains(entry.getValue().toUpperCase()),
-                  String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue()));
+              try {
+                // check that it's a valid aggregation function type
+                AggregationFunctionType aft = AggregationFunctionType.getAggregationFunctionType(entry.getValue());
+                // check that a value aggregator is available
+                if (!AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
+                  throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft.toString());
+                }
+              } catch (IllegalArgumentException e) {
+                String err = String.format(
+                    "Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
+                throw new IllegalStateException(err);
+              }
             }
           }
+        } else if (taskTypeConfigName.equals(UPSERT_COMPACTION_TASK_TYPE)) {
+          // check table is realtime
+          Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+              "UpsertCompactionTask only supports realtime tables!");
+          // check upsert enabled
+          Preconditions.checkState(tableConfig.isUpsertEnabled(), "Upsert must be enabled for UpsertCompactionTask");
+
+          // check no malformed period
+          if (taskTypeConfig.containsKey("bufferTimePeriod")) {
+            TimeUtils.convertPeriodToMillis(taskTypeConfig.get("bufferTimePeriod"));
+          }
+          // check maxNumRecordsPerSegment
+          if (taskTypeConfig.containsKey("invalidRecordsThresholdPercent")) {
+            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) > 0
+                    && Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) <= 100,
+                "invalidRecordsThresholdPercent must be > 0 and <= 100");
+          }
+          // check invalidRecordsThresholdCount
+          if (taskTypeConfig.containsKey("invalidRecordsThresholdCount")) {
+            Preconditions.checkState(Long.parseLong(taskTypeConfig.get("invalidRecordsThresholdCount")) >= 1,
+                "invalidRecordsThresholdCount must be >= 1");
+          }
+          // check that either invalidRecordsThresholdPercent or invalidRecordsThresholdCount was provided
+          Preconditions.checkState(
+              taskTypeConfig.containsKey("invalidRecordsThresholdPercent") || taskTypeConfig.containsKey(
+                  "invalidRecordsThresholdCount"),
+              "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
         }
       }
     }
@@ -559,33 +636,66 @@ public final class TableConfigUtils {
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");
-    // consumer type must be low-level
-    Map<String, String> streamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
-    StreamConfig streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigsMap);
-    Preconditions.checkState(streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType(),
-        "Upsert/Dedup table must use low-level streaming consumer type");
     // replica group is configured for routing
-    Preconditions.checkState(tableConfig.getRoutingConfig() != null
-            && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
+    Preconditions.checkState(
+        tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
 
     // specifically for upsert
-    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
-
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig != null) {
       // no startree index
       Preconditions.checkState(CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
               && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(),
           "The upsert table cannot have star-tree index.");
 
       // comparison column exists
-      if (tableConfig.getUpsertConfig().getComparisonColumns() != null) {
-        List<String> comparisonCols = tableConfig.getUpsertConfig().getComparisonColumns();
-        for (String comparisonCol : comparisonCols) {
-          Preconditions.checkState(schema.hasColumn(comparisonCol), "The comparison column does not exist on schema");
+      List<String> comparisonColumns = upsertConfig.getComparisonColumns();
+      if (comparisonColumns != null) {
+        for (String column : comparisonColumns) {
+          Preconditions.checkState(schema.hasColumn(column), "The comparison column does not exist on schema");
         }
+      }
+
+      // Delete record column exist and is a BOOLEAN field
+      String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
+      if (deleteRecordColumn != null) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
+        Preconditions.checkState(
+            fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
+            "The delete record column must be a single-valued BOOLEAN column");
       }
     }
     validateAggregateMetricsForUpsertConfig(tableConfig);
+    validateTTLForUpsertConfig(tableConfig, schema);
+  }
+
+  /**
+   * Validates the upsert config related to TTL.
+   */
+  @VisibleForTesting
+  static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    if (upsertConfig == null || upsertConfig.getMetadataTTL() == 0) {
+      return;
+    }
+
+    List<String> comparisonColumns = upsertConfig.getComparisonColumns();
+    if (CollectionUtils.isNotEmpty(comparisonColumns)) {
+      Preconditions.checkState(comparisonColumns.size() == 1,
+          "Upsert TTL does not work with multiple comparison columns");
+      String comparisonColumn = comparisonColumns.get(0);
+      DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
+      Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+          "Upsert TTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
+    }
+
+    Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
+
+    // TODO: Support deletion for TTL. Need to construct queryableDocIds when adding segments out of TTL.
+    Preconditions.checkState(upsertConfig.getDeleteRecordColumn() == null,
+        "Upsert TTL doesn't work with record deletion");
   }
 
   /**
@@ -595,8 +705,8 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validateInstancePartitionsTypeMapConfig(TableConfig tableConfig) {
-    if (MapUtils.isEmpty(tableConfig.getInstancePartitionsMap())
-        || MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+    if (MapUtils.isEmpty(tableConfig.getInstancePartitionsMap()) || MapUtils.isEmpty(
+        tableConfig.getInstanceAssignmentConfigMap())) {
       return;
     }
     for (InstancePartitionsType instancePartitionsType : tableConfig.getInstancePartitionsMap().keySet()) {
@@ -614,11 +724,11 @@ public final class TableConfigUtils {
    */
   @VisibleForTesting
   static void validatePartitionedReplicaGroupInstance(TableConfig tableConfig) {
-    if (tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() == null
-        || MapUtils.isEmpty(tableConfig.getInstanceAssignmentConfigMap())) {
+    if (tableConfig.getValidationConfig().getReplicaGroupStrategyConfig() == null || MapUtils.isEmpty(
+        tableConfig.getInstanceAssignmentConfigMap())) {
       return;
     }
-    for (Map.Entry<String, InstanceAssignmentConfig> entry: tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
+    for (Map.Entry<String, InstanceAssignmentConfig> entry : tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
       boolean isNullReplicaGroupPartitionConfig = entry.getValue().getReplicaGroupPartitionConfig() == null;
       Preconditions.checkState(isNullReplicaGroupPartitionConfig,
           "Both replicaGroupStrategyConfig and replicaGroupPartitionConfig is provided");
@@ -971,8 +1081,8 @@ public final class TableConfigUtils {
       return;
     }
 
-    boolean forwardIndexDisabled =
-        Boolean.parseBoolean(fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
+    boolean forwardIndexDisabled = Boolean.parseBoolean(
+        fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
             FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
     if (!forwardIndexDisabled) {
       return;
@@ -991,20 +1101,23 @@ public final class TableConfigUtils {
     }
 
     Preconditions.checkState(
-        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(),
-        String.format("Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
-            + " not supported with forward index for column: %s, disabled", columnName));
+        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(), String.format(
+            "Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
+                + " not supported with forward index for column: %s, disabled", columnName));
 
-    boolean hasDictionary = fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY
-        || noDictionaryColumns == null || !noDictionaryColumns.contains(columnName);
-    boolean hasInvertedIndex = indexingConfigs.getInvertedIndexColumns() != null
-        && indexingConfigs.getInvertedIndexColumns().contains(columnName);
+    boolean hasDictionary =
+        fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY || noDictionaryColumns == null
+            || !noDictionaryColumns.contains(columnName);
+    boolean hasInvertedIndex =
+        indexingConfigs.getInvertedIndexColumns() != null && indexingConfigs.getInvertedIndexColumns()
+            .contains(columnName);
 
     if (!hasDictionary || !hasInvertedIndex) {
       LOGGER.warn("Forward index has been disabled for column {}. Either dictionary ({}) and / or inverted index ({}) "
               + "has been disabled. If the forward index needs to be regenerated or another index added please refresh "
               + "or back-fill the forward index as it cannot be rebuilt without dictionary and inverted index.",
-          columnName, hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
+          columnName,
+          hasDictionary ? "enabled" : "disabled", hasInvertedIndex ? "enabled" : "disabled");
     }
   }
 
@@ -1217,9 +1330,7 @@ public final class TableConfigUtils {
     if (clone.getFieldConfigList() != null) {
       List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
       for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
-        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
-            .withIndexTypes(null)
-            .build());
+        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig).withIndexTypes(null).build());
       }
       clone.setFieldConfigList(cleanFieldConfigList);
     }

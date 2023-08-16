@@ -1,0 +1,27 @@
+{
+  "tableName": "nation",
+  "tableType": "OFFLINE",
+  "tenants": {
+  },
+  "segmentsConfig": {
+    "segmentPushType": "REFRESH",
+    "replication": "1",
+    "schemaName": "nation"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "invertedIndexColumns": [
+    ],
+    "noDictionaryColumns": [
+      "n_comment"
+    ]
+  },
+  "ingestionConfig": {
+    "transformConfigs": [
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

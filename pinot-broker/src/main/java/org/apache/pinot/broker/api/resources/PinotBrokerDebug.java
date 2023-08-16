@@ -38,10 +38,17 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -69,9 +76,13 @@ public class PinotBrokerDebug {
   @Inject
   private ServerRoutingStatsManager _serverRoutingStatsManager;
 
+  @Inject
+  AccessControlFactory _accessControlFactory;
+
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/timeBoundary/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TIME_BOUNDARY)
   @ApiOperation(value = "Get the time boundary information for a table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Time boundary information for a table"),
@@ -93,6 +104,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/routingTable/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_ROUTING_TABLE)
   @ApiOperation(value = "Get the routing table for a table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Routing table"),
@@ -129,6 +141,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/routingTable/sql")
+  @ManualAuthorization
   @ApiOperation(value = "Get the routing table for a query")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Routing table"),
@@ -136,9 +149,22 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public Map<ServerInstance, List<String>> getRoutingTableForQuery(
-      @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query) {
-    RoutingTable routingTable = _routingManager.getRoutingTable(CalciteSqlCompiler.compileToBrokerRequest(query),
-        getRequestId());
+      @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query,
+      @Context HttpHeaders httpHeaders) {
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+
+    // TODO: Handle nested queries
+    if (brokerRequest.isSetQuerySource() && brokerRequest.getQuerySource().isSetTableName()) {
+      if (!_accessControlFactory.create()
+          .hasAccess(httpHeaders, TargetType.TABLE, brokerRequest.getQuerySource().getTableName(),
+              Actions.Table.GET_ROUTING_TABLE)) {
+        throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
+      }
+    } else {
+      throw new WebApplicationException("Table name is not set in the query", Response.Status.BAD_REQUEST);
+    }
+
+    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());
     if (routingTable != null) {
       return routingTable.getServerInstanceToSegmentsMap();
     } else {
@@ -153,6 +179,7 @@ public class PinotBrokerDebug {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/serverRoutingStats")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SERVER_ROUTING_STATS)
   @ApiOperation(value = "Get the routing stats for all the servers")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Server routing Stats"),

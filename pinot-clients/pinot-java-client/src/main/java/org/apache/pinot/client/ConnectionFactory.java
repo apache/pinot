@@ -28,7 +28,7 @@ import java.util.Properties;
  * Creates connections to Pinot, given various initialization methods.
  */
 public class ConnectionFactory {
-  private static PinotClientTransport _defaultTransport;
+  private static volatile PinotClientTransport _defaultTransport;
 
   private ConnectionFactory() {
   }
@@ -126,6 +126,23 @@ public class ConnectionFactory {
       throw new PinotClientException(e);
     }
   }
+
+  /**
+   * @param properties
+   * @param controllerUrl url host:port of the controller
+   * @param transport pinot transport
+   * @return A connection that connects to brokers as per the given controller
+   */
+  public static Connection fromController(Properties properties, String controllerUrl, PinotClientTransport transport) {
+    try {
+      return new Connection(properties,
+          new ControllerBasedBrokerSelector(properties, controllerUrl),
+          transport);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
   /**
    * Creates a connection to a Pinot cluster, given its Zookeeper URL
    *

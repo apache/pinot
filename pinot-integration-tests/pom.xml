@@ -35,8 +35,6 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <localstack-utils.version>0.2.19</localstack-utils.version>
-    <awaitility.version>3.0.0</awaitility.version>
-    <aws.sdk.version>2.20.83</aws.sdk.version>
     <testcontainers.version>1.17.3</testcontainers.version>
   </properties>
 
@@ -104,6 +102,90 @@
       </build>
     </profile>
     <profile>
+      <id>integration-tests-set-1</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <includes>
+                <include>**/org/apache/pinot/integration/tests/A*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/B*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/C*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/D*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/E*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/F*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/G*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/H*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/I*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/J*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/K*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/L*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/M*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>integration-tests-set-2</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <includes>
+                <include>**/org/apache/pinot/integration/tests/O*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/P*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/Q*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/R*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/S*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/T*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/U*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/V*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/W*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/X*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/Y*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/Z*Test.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>custom-cluster-integration-test-suite</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <suiteXmlFiles>
+                <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
+              </suiteXmlFiles>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
       <id>no-integration-tests</id>
       <activation>
         <activeByDefault>false</activeByDefault>
@@ -121,73 +203,6 @@
       </build>
     </profile>
   </profiles>
-
-  <!-- cloud.localstack:localstack-utils brings in slightly older versions of all of
-       these libraries, so we have to manage their versions -->
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>http-client-spi</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>protocol-core</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>aws-core</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>sdk-core</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>netty-nio-client</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>aws-json-protocol</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>apache-client</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>auth</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>regions</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>profiles</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>utils</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>annotations</artifactId>
-        <version>${aws.sdk.version}</version>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
 
   <dependencies>
     <dependency>
@@ -223,12 +238,6 @@
     <dependency>
       <groupId>com.101tec</groupId>
       <artifactId>zkclient</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>io.netty</groupId>
-          <artifactId>netty</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.glassfish.hk2</groupId>
@@ -353,12 +362,6 @@
       <artifactId>localstack-utils</artifactId>
       <version>${localstack-utils.version}</version>
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>software.amazon.awssdk</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>

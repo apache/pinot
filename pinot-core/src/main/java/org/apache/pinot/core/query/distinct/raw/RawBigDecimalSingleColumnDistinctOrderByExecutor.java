@@ -39,13 +39,8 @@ public class RawBigDecimalSingleColumnDistinctOrderByExecutor extends BaseRawBig
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;
-    if (nullHandlingEnabled) {
-      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
-          (b1, b2) -> b1 == null ? (b2 == null ? 0 : 1) : (b2 == null ? -1 : b1.compareTo(b2)) * comparisonFactor);
-    } else {
-      _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
-          (b1, b2) -> b1.compareTo(b2) * comparisonFactor);
-    }
+    _priorityQueue = new ObjectHeapPriorityQueue<>(Math.min(limit, MAX_INITIAL_CAPACITY),
+            (b1, b2) -> b1.compareTo(b2) * comparisonFactor);
   }
 
   @Override

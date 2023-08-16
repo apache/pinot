@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -45,9 +45,9 @@ public class ServerSegmentMetadataReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerSegmentMetadataReader.class);
 
   private final Executor _executor;
-  private final HttpConnectionManager _connectionManager;
+  private final HttpClientConnectionManager _connectionManager;
 
-  public ServerSegmentMetadataReader(Executor executor, HttpConnectionManager connectionManager) {
+  public ServerSegmentMetadataReader(Executor executor, HttpClientConnectionManager connectionManager) {
     _executor = executor;
     _connectionManager = connectionManager;
   }

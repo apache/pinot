@@ -22,7 +22,7 @@ import { makeStyles } from '@material-ui/core/styles';
 import { Box, Button, FormControlLabel, Grid, Switch, Tooltip, Typography } from '@material-ui/core';
 import { RouteComponentProps, useHistory, useLocation } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
-import { DISPLAY_SEGMENT_STATUS, TableData, TableSegmentJobs } from 'Models';
+import { DISPLAY_SEGMENT_STATUS, InstanceState, TableData, TableSegmentJobs, TableType } from 'Models';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
 import TableToolbar from '../components/TableToolbar';
@@ -202,7 +202,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     if(result.error){
       setSchemaJSON(null);
       setTableSchema({
-        columns: ['Column', 'Type', 'Field Type'],
+        columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
         records: []
       });
     } else {
@@ -246,19 +246,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   };
 
   const toggleTableState = async () => {
-    const result = await PinotMethodUtils.toggleTableState(tableName, state.enabled ? 'disable' : 'enable', tableType.toLowerCase());
-    if(!result.error && result[0].state){
-      if(result[0].state.successful){
-        dispatch({type: 'success', message: result[0].state.message, show: true});
-        setState({ enabled: !state.enabled });
-        fetchTableData();
-      } else {
-        dispatch({type: 'error', message: result[0].state.message, show: true});
-      }
-      closeDialog();
-    } else {
-      syncResponse(result);
-    }
+    const result = await PinotMethodUtils.toggleTableState(tableName, state.enabled ? InstanceState.DISABLE : InstanceState.ENABLE, tableType.toLowerCase() as TableType);
+    syncResponse(result);
   };
 
   const handleConfigChange = (value: string) => {
@@ -532,13 +521,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           <Grid item xs={4}>
             <strong>Table Name:</strong> {tableSummary.tableName}
           </Grid>
-          <Tooltip title="Uncompressed size of all data segments"  arrow placement="top-start">
+          <Tooltip title="Uncompressed size of all data segments with replication"  arrow placement="top-start">
           <Grid item xs={2}>
             <strong>Reported Size:</strong> {Utils.formatBytes(tableSummary.reportedSize)}
           </Grid>
           </Tooltip>
           <Grid item xs={2}></Grid>
-          <Tooltip title="Estimated size of all data segments, in case any servers are not reachable for actual size" arrow placement="top-start">
+          <Tooltip title="Estimated size of all data segments with replication, in case any servers are not reachable for actual size" arrow placement="top-start">
             <Grid item xs={2}>
               <strong>Estimated Size: </strong>
               {Utils.formatBytes(tableSummary.estimatedSize)}

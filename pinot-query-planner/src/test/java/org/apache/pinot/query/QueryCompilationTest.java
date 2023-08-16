@@ -21,6 +21,7 @@ package org.apache.pinot.query;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +31,7 @@ import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
-import org.apache.pinot.query.planner.ExplainPlanPlanVisitor;
+import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -46,11 +47,22 @@ import org.testng.annotations.Test;
 
 public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
-  @Test(dataProvider = "testQueryPlanDataProvider")
-  public void testQueryPlanExplain(String query, String digest)
+  @Test(dataProvider = "testQueryLogicalPlanDataProvider")
+  public void testQueryPlanExplainLogical(String query, String digest)
       throws Exception {
+    testQueryPlanExplain(query, digest);
+  }
+
+  @Test(dataProvider = "testQueryPhysicalPlanDataProvider")
+  public void testQueryPlanExplainPhysical(String query, String digest)
+      throws Exception {
+    testQueryPlanExplain(query, digest);
+  }
+
+  private void testQueryPlanExplain(String query, String digest) {
     try {
-      String explainedPlan = _queryEnvironment.explainQuery(query);
+      long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+      String explainedPlan = _queryEnvironment.explainQuery(query, requestId);
       Assert.assertEquals(explainedPlan, digest);
     } catch (RuntimeException e) {
       Assert.fail("failed to explain query: " + query, e);
@@ -89,17 +101,17 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             // JOIN is exchanged with hash distribution (data shuffle)
             MailboxReceiveNode left = (MailboxReceiveNode) node.getInputs().get(0);
             MailboxReceiveNode right = (MailboxReceiveNode) node.getInputs().get(1);
-            Assert.assertEquals(left.getExchangeType(), RelDistribution.Type.HASH_DISTRIBUTED);
-            Assert.assertEquals(right.getExchangeType(), RelDistribution.Type.HASH_DISTRIBUTED);
+            Assert.assertEquals(left.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
+            Assert.assertEquals(right.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
             break;
           }
           if (node instanceof AggregateNode && node.getInputs().get(0) instanceof MailboxReceiveNode) {
             // AGG is exchanged with singleton since it has already been distributed by JOIN.
             MailboxReceiveNode input = (MailboxReceiveNode) node.getInputs().get(0);
             if (shouldRewrite) {
-              Assert.assertEquals(input.getExchangeType(), RelDistribution.Type.SINGLETON);
+              Assert.assertEquals(input.getDistributionType(), RelDistribution.Type.SINGLETON);
             } else {
-              Assert.assertNotEquals(input.getExchangeType(), RelDistribution.Type.SINGLETON);
+              Assert.assertNotEquals(input.getDistributionType(), RelDistribution.Type.SINGLETON);
             }
             break;
           }
@@ -122,18 +134,21 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       if (tableName != null) {
         // table scan stages; for tableA it should have 2 hosts, for tableB it should have only 1
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
-                .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry).collect(Collectors.toSet()),
+                .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .collect(Collectors.toSet()),
             tableName.equals("a") ? ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]")
                 : ImmutableList.of("localhost@{1,1}|[0]"));
       } else if (!PlannerUtils.isRootPlanFragment(stageId)) {
         // join stage should have both servers used.
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
-                .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry).collect(Collectors.toSet()),
+                .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .collect(Collectors.toSet()),
             ImmutableSet.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
       } else {
         // reduce stage should have the reducer instance.
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
-                .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry).collect(Collectors.toSet()),
+                .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .collect(Collectors.toSet()),
             ImmutableSet.of("localhost@{3,3}|[0]"));
       }
     }
@@ -233,7 +248,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       throws Exception {
     // Hinting the query to use final stage aggregation makes server directly return final result
     // This is useful when data is already partitioned by col1
-    String query = "SELECT /*+ aggFinalStage */ col1, COUNT(*) FROM b GROUP BY col1";
+    String query = "SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ col1, COUNT(*) FROM b GROUP BY col1";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
     Assert.assertEquals(dispatchableSubPlan.getQueryStageList().size(), 2);
     for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
@@ -242,15 +257,123 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       if (tableName != null) {
         // table scan stages; for tableB it should have only 1
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
-                .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry).collect(Collectors.toSet()),
+                .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .collect(Collectors.toSet()),
             ImmutableList.of("localhost@{1,1}|[0]"));
       } else if (!PlannerUtils.isRootPlanFragment(stageId)) {
         // join stage should have both servers used.
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
-                .map(ExplainPlanPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry).collect(Collectors.toSet()),
+                .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+                .collect(Collectors.toSet()),
             ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
       }
     }
+  }
+
+  @Test
+  public void testGetTableNamesForQuery() {
+    // A simple filter query with one table
+    String query = "Select * from a where col1 = 'a'";
+    List<String> tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 1);
+    Assert.assertEquals(tableNames.get(0), "a");
+
+    // query with IN / NOT IN clause
+    query = "SELECT COUNT(*) FROM a WHERE col1 IN (SELECT col1 FROM b) "
+        + "and col1 NOT IN (SELECT col1 from c)";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 3);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+    Assert.assertEquals(tableNames.get(2), "c");
+
+    // query with JOIN clause
+    query = "SELECT a.col1, b.col2 FROM a JOIN b ON a.col3 = b.col3 WHERE a.col1 = 'a'";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // query with WHERE clause JOIN
+    query = "SELECT a.col1, b.col2 FROM a, b WHERE a.col3 = b.col3 AND a.col1 = 'a'";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // query with JOIN clause and table alias
+    query = "SELECT A.col1, B.col2 FROM a AS A JOIN b AS B ON A.col3 = B.col3 WHERE A.col1 = 'a'";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // query with UNION clause
+    query = "SELECT * FROM a UNION ALL SELECT * FROM b UNION ALL SELECT * FROM c";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 3);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+    Assert.assertEquals(tableNames.get(2), "c");
+
+    // query with UNION clause and table alias
+    query = "SELECT * FROM (SELECT * FROM a) AS t1 UNION SELECT * FROM ( SELECT * FROM b) AS t2";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // query with UNION clause and table alias using WITH clause
+    query = "WITH tmp1 AS (SELECT * FROM a), \n"
+        + "tmp2 AS (SELECT * FROM b) \n"
+        + "SELECT * FROM tmp1 UNION ALL SELECT * FROM tmp2";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Collections.sort(tableNames);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // query with aliases, JOIN, IN/NOT-IN, group-by
+    query = "with tmp as (select col1, sum(col3) as col3, count(*) from a where col1 = 'a' group by col1), "
+        + "tmp2 as (select A.col1, B.col3 from b as A JOIN c AS B on A.col1 = B.col1) "
+        + "select sum(col3) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from d)";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 4);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+    Assert.assertEquals(tableNames.get(2), "c");
+    Assert.assertEquals(tableNames.get(3), "d");
+
+    // query with aliases, JOIN, IN/NOT-IN, group-by and explain
+    query = "explain plan for with tmp as (select col1, sum(col3) as col3, count(*) from a where col1 = 'a' "
+        + "group by col1), tmp2 as (select A.col1, B.col3 from b as A JOIN c AS B on A.col1 = B.col1) "
+        + "select sum(col3) from tmp where col1 in (select col1 from tmp2) and col1 not in (select col1 from d)";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 4);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+    Assert.assertEquals(tableNames.get(2), "c");
+    Assert.assertEquals(tableNames.get(3), "d");
+
+    // lateral join query
+    query = "EXPLAIN PLAN FOR SELECT a.col1, newb.sum_col3 FROM a JOIN LATERAL "
+        + "(SELECT SUM(col3) as sum_col3 FROM b WHERE col2 = a.col2) AS newb ON TRUE";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 2);
+    Assert.assertEquals(tableNames.get(0), "a");
+    Assert.assertEquals(tableNames.get(1), "b");
+
+    // test for self join queries
+    query = "SELECT a.col1 FROM a JOIN(SELECT col2 FROM a) as self ON a.col1=self.col2 ";
+    tableNames = _queryEnvironment.getTableNamesForQuery(query);
+    Assert.assertEquals(tableNames.size(), 1);
+    Assert.assertEquals(tableNames.get(0), "a");
   }
 
   // --------------------------------------------------------------------------
@@ -292,8 +415,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     };
   }
 
-  @DataProvider(name = "testQueryPlanDataProvider")
-  private Object[][] provideQueriesWithExplainedPlan() {
+  @DataProvider(name = "testQueryLogicalPlanDataProvider")
+  private Object[][] provideQueriesWithExplainedLogicalPlan() {
     //@formatter:off
     return new Object[][] {
         new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
@@ -330,21 +453,67 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
               "Execution Plan\n"
             + "digraph {\n"
-            + "\"LogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
-            + "\"LogicalAggregate\\n\" -> \"LogicalExchange\\n\" [label=\"0\"]\n"
+            + "\"PinotLogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
+            + "\"LogicalAggregate\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
             + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
             + "}\n"},
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
               "Execution Plan\n"
             + "LogicalProject(col1=[$0], col3=[$2])\n"
             + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
-            + "    LogicalExchange(distribution=[hash[0]])\n"
+            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0])\n"
             + "        LogicalTableScan(table=[[a]])\n"
-            + "    LogicalExchange(distribution=[hash[0]])\n"
+            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0], col3=[$2])\n"
             + "        LogicalTableScan(table=[[b]])\n"
         },
+    };
+    //@formatter:on
+  }
+
+  @DataProvider(name = "testQueryPhysicalPlanDataProvider")
+  private Object[][] provideQueriesWithExplainedPhysicalPlan() {
+    //@formatter:off
+    return new Object[][] {
+new Object[]{"EXPLAIN IMPLEMENTATION PLAN INCLUDING ALL ATTRIBUTES FOR SELECT col1, col3 FROM a",
+  "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+  + "├── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+  + "│   └── [1]@localhost:1 PROJECT\n"
+  + "│      └── [1]@localhost:1 TABLE SCAN (a) null\n"
+  + "└── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+  + "   └── [1]@localhost:2 PROJECT\n"
+  + "      └── [1]@localhost:2 TABLE SCAN (a) null\n"},
+new Object[]{"EXPLAIN IMPLEMENTATION PLAN EXCLUDING ATTRIBUTES FOR "
+    + "SELECT col1, COUNT(*) FROM a GROUP BY col1",
+  "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+  + "├── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
+  + "└── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+  + "   └── [1]@localhost:2 AGGREGATE_FINAL\n"
+  + "      └── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
+  + "         ├── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
+  + "         │   └── [2]@localhost:1 AGGREGATE_LEAF\n"
+  + "         │      └── [2]@localhost:1 TABLE SCAN (a) null\n"
+  + "         └── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
+  + "            └── [2]@localhost:2 AGGREGATE_LEAF\n"
+  + "               └── [2]@localhost:2 TABLE SCAN (a) null\n"},
+new Object[]{"EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
+  "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
+  + "├── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
+  + "└── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+  + "   └── [1]@localhost:2 PROJECT\n"
+  + "      └── [1]@localhost:2 JOIN\n"
+  + "         ├── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
+  + "         │   ├── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
+  + "         │   │   └── [2]@localhost:1 PROJECT\n"
+  + "         │   │      └── [2]@localhost:1 TABLE SCAN (a) null\n"
+  + "         │   └── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
+  + "         │      └── [2]@localhost:2 PROJECT\n"
+  + "         │         └── [2]@localhost:2 TABLE SCAN (a) null\n"
+  + "         └── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
+  + "            └── [3]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
+  + "               └── [3]@localhost:1 PROJECT\n"
+  + "                  └── [3]@localhost:1 TABLE SCAN (b) null\n"}
     };
     //@formatter:on
   }

@@ -85,6 +85,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables");
   }
 
+  public String forTablesFromTenant(String tenantName, String componentType) {
+    return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables") + "?type=" + componentType;
+  }
+
   // V2 API started
   public String forTenantCreate() {
     return StringUtil.join("/", _baseUrl, "tenants");
@@ -161,6 +165,11 @@ public class ControllerRequestURLBuilder {
       return StringUtil.join("/", _baseUrl, "brokers", "tables");
     }
     return StringUtil.join("/", _baseUrl, "brokers", "tables", "?state=" + state);
+  }
+
+  public String forTenantInstancesToggle(String tenant, String tenantType, String state) {
+    return StringUtil.join("/", _baseUrl, "tenants", tenant)
+        + "?type=" + tenantType + "&state=" + state;
   }
 
   public String forLiveBrokerTablesGet() {
@@ -414,6 +423,14 @@ public class ControllerRequestURLBuilder {
     return url.append(parameter).toString();
   }
 
+  public String forSegmentDeleteWithTimeWindowAPI(String tableName, long startTimeInMilliSeconds,
+      long endTimeInMilliSeconds) {
+    StringBuilder url = new StringBuilder();
+    url.append(StringUtil.join("/", _baseUrl, "segments", tableName,
+        String.format("choose?startTimestamp=%d&endTimestamp=%d", startTimeInMilliSeconds, endTimeInMilliSeconds)));
+    return url.toString();
+  }
+
   private void appendUrlParameter(StringBuilder url, String urlParameterKey, String urlParameterValue) {
     if (url.length() == 0) {
       url.append("?").append(urlParameterKey).append("=").append(urlParameterValue);
@@ -529,6 +546,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "pauseStatus");
   }
 
+  public String forUpdateTagsValidation() {
+    return String.format("%s/instances/updateTags/validate", _baseUrl);
+  }
+
   private static String encode(String s) {
     try {
       return URLEncoder.encode(s, "UTF-8");
@@ -536,5 +557,9 @@ public class ControllerRequestURLBuilder {
       // Should never happen
       throw new RuntimeException(e);
     }
+  }
+
+  public String forSegmentUpload() {
+    return StringUtil.join("/", _baseUrl, "v2/segments");
   }
 }

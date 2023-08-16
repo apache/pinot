@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -42,8 +44,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -173,6 +177,41 @@ public class SegmentProcessorFrameworkTest {
     for (RecordReader recordReader : recordReaders) {
       recordReader.rewind();
     }
+  }
+
+  /**
+   * Test lazy initialization of record readers. Here we create
+   * RecoderReaderFileConfig and the actual reader is initialized during the
+   * map phase.
+   * @throws Exception
+   */
+  @Test
+  public void testRecordReaderFileConfigInit() throws Exception {
+    File workingDir = new File(TEMP_DIR, "segmentOutput");
+    FileUtils.forceMkdir(workingDir);
+    ClassLoader classLoader = getClass().getClassLoader();
+    URL resource = classLoader.getResource("data/dimBaseballTeams.csv");
+    RecordReaderFileConfig reader = new RecordReaderFileConfig(FileFormat.CSV,
+        new File(resource.toURI()),
+        null, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").
+        setTimeColumnName("time").build();
+
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName("mySchema").addSingleValueDimension("teamId",
+                DataType.STRING, "")
+            .addSingleValueDimension("teamName", DataType.STRING, "")
+            .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+
+    SegmentProcessorConfig config =
+        new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema).build();
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(config, workingDir, ImmutableList.of(reader),
+        null);
+    List<File> outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    assertEquals(segmentMetadata.getTotalDocs(), 51);
   }
 
   @Test

@@ -157,9 +157,12 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
         FileChannel bitmapOffsetFileChannel = new RandomAccessFile(_bitmapOffsetFile, "r").getChannel();
         FileChannel bitmapValueFileChannel = new RandomAccessFile(_bitmapValueFile, "r").getChannel()) {
       indexFileChannel.write(headerBuffer);
-      dictionaryFileChannel.transferTo(0, _dictionaryFile.length(), indexFileChannel);
-      bitmapOffsetFileChannel.transferTo(0, _bitmapOffsetFile.length(), indexFileChannel);
-      bitmapValueFileChannel.transferTo(0, _bitmapValueFile.length(), indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(dictionaryFileChannel, 0, _dictionaryFile.length(),
+          indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(bitmapOffsetFileChannel, 0, _bitmapOffsetFile.length(),
+          indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(bitmapValueFileChannel, 0, _bitmapValueFile.length(),
+          indexFileChannel);
     }
   }
 

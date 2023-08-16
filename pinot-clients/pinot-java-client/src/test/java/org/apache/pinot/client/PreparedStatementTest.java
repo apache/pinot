@@ -19,7 +19,7 @@
 package org.apache.pinot.client;
 
 import java.util.Collections;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -79,27 +79,21 @@ public class PreparedStatementTest {
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
+    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
         throws PinotClientException {
-      _lastBrokerAddress = brokerAddress;
-      _lastQuery = query;
-      return null;
+      return CompletableFuture.completedFuture(executeQuery(brokerAddress, query));
     }
 
     @Override
     public BrokerResponse executeQuery(String brokerAddress, Request request)
         throws PinotClientException {
-      _lastBrokerAddress = brokerAddress;
-      _lastQuery = request.getQuery();
-      return BrokerResponse.empty();
+      return executeQuery(brokerAddress, request.getQuery());
     }
 
     @Override
-    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
+    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
         throws PinotClientException {
-      _lastBrokerAddress = brokerAddress;
-      _lastQuery = request.getQuery();
-      return null;
+      return executeQueryAsync(brokerAddress, request.getQuery());
     }
 
     public String getLastQuery() {

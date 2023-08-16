@@ -19,6 +19,7 @@
 package org.apache.pinot.core.routing;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
@@ -50,6 +51,7 @@ public interface RoutingManager {
    * @param brokerRequest the broker request constructed from a query.
    * @return the route table.
    */
+  @Nullable
   RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId);
 
   /**
@@ -66,7 +68,14 @@ public interface RoutingManager {
    * @param offlineTableName offline table name
    * @return time boundary info.
    */
+  @Nullable
   TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName);
+
+  /**
+   * Returns the {@link TablePartitionInfo} for a given table.
+   */
+  @Nullable
+  TablePartitionInfo getTablePartitionInfo(String tableNameWithType);
 
   /**
    * Returns all enabled server instances for a given table's server tenant.

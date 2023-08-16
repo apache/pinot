@@ -24,13 +24,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -43,8 +47,10 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
@@ -54,12 +60,13 @@ import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -72,12 +79,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
   private final String _reducerHostname;
   private final int _reducerPort;
-  private final long _defaultBrokerTimeoutMs;
 
   private final MailboxService _mailboxService;
+  private final OpChainSchedulerService _reducerScheduler;
+
   private final QueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
-  private final MultiStageRequestIdGenerator _multistageRequestIdGenerator;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -97,54 +104,26 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     _reducerHostname = reducerHostname;
     // This config has to be set to a valid port number.
     _reducerPort = Integer.parseInt(config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT));
-    _defaultBrokerTimeoutMs = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
-        CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager(_reducerHostname, _reducerPort, routingManager), _tableCache);
     _queryDispatcher = new QueryDispatcher();
 
-    // it is OK to ignore the onDataAvailable callback because the broker top-level operators
-    // always run in-line (they don't have any scheduler)
-    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, ignored -> {
-    });
+    long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
+        QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
+    _reducerScheduler = new OpChainSchedulerService(new RoundRobinScheduler(releaseMs),
+        Executors.newCachedThreadPool(new NamedThreadFactory("query_broker_reducer_" + _reducerPort + "_port")));
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config, _reducerScheduler::onDataAvailable);
 
     // TODO: move this to a startUp() function.
+    _reducerScheduler.startAsync();
     _mailboxService.start();
-
-    _multistageRequestIdGenerator = new MultiStageRequestIdGenerator(brokerIdFromConfig);
   }
 
   @Override
-  public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
-      throws Exception {
-    long requestId = _multistageRequestIdGenerator.get();
-    requestContext.setRequestId(requestId);
-    requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
-
-    // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
-    // check comes later.
-    boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity);
-    if (!hasAccess) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      LOGGER.info("Access denied for requestId {}", requestId);
-      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
-    }
-
-    JsonNode sql = request.get(CommonConstants.Broker.Request.SQL);
-    if (sql == null) {
-      throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
-    }
-    String query = sql.asText();
-    requestContext.setQuery(query);
-    return handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext);
-  }
-
-  private BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext)
-      throws Exception {
+  protected BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
+      HttpHeaders httpHeaders) {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
     long compilationStartTimeNs;
@@ -154,16 +133,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // Parse the request
       sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
-      queryTimeoutMs = timeoutMsFromQueryOption == null ? _defaultBrokerTimeoutMs : timeoutMsFromQueryOption;
+      queryTimeoutMs = timeoutMsFromQueryOption == null ? _brokerTimeoutMs : timeoutMsFromQueryOption;
       // Compile the request
       compilationStartTimeNs = System.nanoTime();
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions);
+          queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
-          if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {
-            return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+          if (!hasTableAccess(requesterIdentity, tableNames, requestContext)) {
+            throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
           }
 
           return constructMultistageExplainPlan(query, plan);
@@ -188,20 +167,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.REQUEST_COMPILATION, compilationTimeNs);
 
     // Validate table access.
-    if (!hasTableAccess(requesterIdentity, tableNames, requestId, requestContext)) {
-      return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
+    if (!hasTableAccess(requesterIdentity, tableNames, requestContext)) {
+      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
 
     // Validate QPS quota
-    if (hasExceededQPSQuota(tableNames, requestId, requestContext)) {
+    if (hasExceededQPSQuota(tableNames, requestContext)) {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
 
     boolean traceEnabled = Boolean.parseBoolean(
-        request.has(CommonConstants.Broker.Request.TRACE) ? request.get(CommonConstants.Broker.Request.TRACE).asText()
-            : "false");
+        sqlNodeAndOptions.getOptions().getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
 
     ResultTable queryResults;
     Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();
@@ -211,23 +189,28 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long executionStartTimeNs = System.nanoTime();
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestId, dispatchableSubPlan, _mailboxService, queryTimeoutMs,
-          sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
-    } catch (Exception e) {
-      LOGGER.info("query execution failed", e);
-      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
+      queryResults =
+          _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, _mailboxService, _reducerScheduler,
+              queryTimeoutMs, sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
+    } catch (Throwable t) {
+      LOGGER.error("query execution failed", t);
+      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, t));
     }
-
-    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     long executionEndTimeNs = System.nanoTime();
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - executionStartTimeNs);
 
-    // Set total query processing time
-    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
-        sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
-    brokerResponse.setTimeUsedMs(totalTimeMs);
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     brokerResponse.setResultTable(queryResults);
-    brokerResponse.setRequestId(String.valueOf(requestId));
+
+    // Attach unavailable segments
+    int numUnavailableSegments = 0;
+    for (Map.Entry<String, Set<String>> entry : dispatchableSubPlan.getTableToUnavailableSegmentsMap().entrySet()) {
+      String tableName = entry.getKey();
+      Set<String> unavailableSegments = entry.getValue();
+      numUnavailableSegments += unavailableSegments.size();
+      brokerResponse.addToExceptions(new QueryProcessingException(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE,
+          String.format("Find unavailable segments: %s for table: %s", unavailableSegments, tableName)));
+    }
 
     for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
       if (entry.getKey() == 0) {
@@ -248,34 +231,44 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
     }
 
+    // Set total query processing time
+    // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
+        sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
+    brokerResponse.setTimeUsedMs(totalTimeMs);
     requestContext.setQueryProcessingTime(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
+
+    // Log query and stats
+    _queryLogger.log(
+        new QueryLogger.QueryLogParams(requestId, query, requestContext, tableNames.toString(), numUnavailableSegments,
+            null, brokerResponse, totalTimeMs, requesterIdentity));
+
     return brokerResponse;
   }
 
   /**
    * Validates whether the requester has access to all the tables.
    */
-  private boolean hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames, long requestId,
+  private boolean hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
       RequestContext requestContext) {
     boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, tableNames);
     if (!hasAccess) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-      LOGGER.warn("Access denied for requestId {}", requestId);
+      LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       return false;
     }
-
     return true;
   }
 
   /**
    * Returns true if the QPS quota of the tables has exceeded.
    */
-  private boolean hasExceededQPSQuota(Set<String> tableNames, long requestId, RequestContext requestContext) {
+  private boolean hasExceededQPSQuota(Set<String> tableNames, RequestContext requestContext) {
     for (String tableName : tableNames) {
       if (!_queryQuotaManager.acquire(tableName)) {
-        LOGGER.warn("Request {}: query exceeds quota for table: {}", requestId, tableName);
+        LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);
         requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
         String rawTableName = TableNameBuilder.extractRawTableName(tableName);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
@@ -321,35 +314,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
-  }
-
-  /**
-   * OpChains in Multistage queries are identified by the requestId and the stage-id. v1 Engine uses an incrementing
-   * long to generate requestId, so the requestIds are numbered [0, 1, 2, ...]. When running with multiple brokers,
-   * it could be that two brokers end up generating the same requestId which could lead to weird query errors. This
-   * requestId generator addresses that by:
-   * <ol>
-   *   <li>
-   *     Using a mask computed using the hash-code of the broker-id to ensure two brokers don't arrive at the same
-   *     requestId. This mask becomes the most significant 9 digits (in base-10).
-   *   </li>
-   *   <li>
-   *     Using a auto-incrementing counter for the least significant 9 digits (in base-10).
-   *   </li>
-   * </ol>
-   */
-  static class MultiStageRequestIdGenerator {
-    private static final long OFFSET = 1_000_000_000L;
-    private final long _mask;
-    private final AtomicLong _incrementingId = new AtomicLong(0);
-
-    public MultiStageRequestIdGenerator(String brokerId) {
-      _mask = ((long) (brokerId.hashCode() & Integer.MAX_VALUE)) * OFFSET;
-    }
-
-    public long get() {
-      long normalized = (_incrementingId.getAndIncrement() & Long.MAX_VALUE) % OFFSET;
-      return _mask + normalized;
-    }
+    _reducerScheduler.stopAsync();
   }
 }

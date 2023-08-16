@@ -91,6 +91,12 @@ public class EmptyIndexSegment implements ImmutableSegment {
     return null;
   }
 
+  @Nullable
+  @Override
+  public ThreadSafeMutableRoaringBitmap getQueryableDocIds() {
+    return null;
+  }
+
   @Override
   public GenericRow getRecord(int docId, GenericRow reuse) {
     throw new UnsupportedOperationException("Cannot read record from empty segment");

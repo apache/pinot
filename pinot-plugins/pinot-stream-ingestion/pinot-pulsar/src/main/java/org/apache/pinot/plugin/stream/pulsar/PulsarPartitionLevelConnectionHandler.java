@@ -40,6 +40,7 @@ public class PulsarPartitionLevelConnectionHandler {
   protected final PulsarConfig _config;
   protected final String _clientId;
   protected PulsarClient _pulsarClient = null;
+  protected final PulsarMetadataExtractor _pulsarMetadataExtractor;
 
   /**
    * Creates a new instance of {@link PulsarClient} and {@link Reader}
@@ -47,7 +48,7 @@ public class PulsarPartitionLevelConnectionHandler {
   public PulsarPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig) {
     _config = new PulsarConfig(streamConfig, clientId);
     _clientId = clientId;
-
+    _pulsarMetadataExtractor = PulsarMetadataExtractor.build(_config.isPopulateMetadata(), _config.getMetadataFields());
     try {
       ClientBuilder pulsarClientBuilder = PulsarClient.builder().serviceUrl(_config.getBootstrapServers());
       if (_config.getTlsTrustCertsFilePath() != null) {

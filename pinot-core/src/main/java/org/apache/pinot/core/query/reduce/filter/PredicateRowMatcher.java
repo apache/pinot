@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.reduce.filter;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
@@ -32,19 +33,31 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class PredicateRowMatcher implements RowMatcher {
   private final ValueExtractor _valueExtractor;
   private final DataType _valueType;
-  private final PredicateEvaluator _predicateEvaluator;
+  private final Predicate.Type _predicateType;
+  private final @Nullable PredicateEvaluator _predicateEvaluator;
   private final boolean _nullHandlingEnabled;
 
   public PredicateRowMatcher(Predicate predicate, ValueExtractor valueExtractor, boolean nullHandlingEnabled) {
     _valueExtractor = valueExtractor;
     _valueType = _valueExtractor.getColumnDataType().toDataType();
-    _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, _valueType);
+    _predicateType = predicate.getType();
+    if (_predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL) {
+      _predicateEvaluator = null;
+    } else {
+      _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, _valueType);
+    }
     _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
   public boolean isMatch(Object[] row) {
     Object value = _valueExtractor.extract(row);
+    if (_predicateType == Predicate.Type.IS_NULL) {
+      return value == null;
+    } else if (_predicateType == Predicate.Type.IS_NOT_NULL) {
+      return value != null;
+    }
+    assert (_predicateEvaluator != null);
     if (_nullHandlingEnabled && value == null) {
       return false;
     }

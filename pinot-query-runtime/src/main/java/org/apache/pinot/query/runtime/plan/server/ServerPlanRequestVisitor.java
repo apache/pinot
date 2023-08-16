@@ -43,6 +43,7 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -70,8 +71,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         .setGroupByList(CalciteRexExpressionParser.convertGroupByList(node.getGroupSet(), context.getPinotQuery()));
     // set agg list
     context.getPinotQuery().setSelectList(
-        CalciteRexExpressionParser.addSelectList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
-            context.getPinotQuery()));
+        CalciteRexExpressionParser.convertAggregateList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
+            node.getFilterArgIndices(), context.getPinotQuery()));
     return null;
   }
 
@@ -109,8 +110,9 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       staticSide = node.getInputs().get(1);
     }
     staticSide.visit(this, context);
-    int resultMapId = context.getPipelineBreakerResult().getNodeIdMap().get(dynamicSide);
-    List<TransferableBlock> transferableBlocks = context.getPipelineBreakerResult().getResultMap().getOrDefault(
+    PipelineBreakerResult pipelineBreakerResult = context.getPlanContext().getPipelineBreakerResult();
+    int resultMapId = pipelineBreakerResult.getNodeIdMap().get(dynamicSide);
+    List<TransferableBlock> transferableBlocks = pipelineBreakerResult.getResultMap().getOrDefault(
         resultMapId, Collections.emptyList());
     List<Object[]> resultDataContainer = new ArrayList<>();
     DataSchema dataSchema = dynamicSide.getDataSchema();
@@ -147,7 +149,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
     context.getPinotQuery()
-        .setSelectList(CalciteRexExpressionParser.overwriteSelectList(node.getProjects(), context.getPinotQuery()));
+        .setSelectList(CalciteRexExpressionParser.convertProjectList(node.getProjects(), context.getPinotQuery()));
     return null;
   }
 

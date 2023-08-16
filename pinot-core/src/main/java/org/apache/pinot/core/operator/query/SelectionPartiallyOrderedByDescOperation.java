@@ -47,9 +47,9 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
     assert queryContext.getOrderByExpressions() != null;
-    Preconditions.checkArgument(queryContext.getOrderByExpressions().stream()
+    Preconditions.checkArgument(!queryContext.getOrderByExpressions().stream()
             .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER).findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers")).isDesc(),
+            .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers")).isAsc(),
         "%s can only be used when the first column in order by is DESC", EXPLAIN_NAME);
   }
 

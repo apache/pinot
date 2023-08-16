@@ -417,7 +417,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     try (FileChannel srcCh = new RandomAccessFile(srcFile, "r").getChannel();
         FileChannel dstCh = new RandomAccessFile(destFile, "rw").getChannel()) {
       for (IndexEntry index : indicesToCopy.values()) {
-        srcCh.transferTo(index._startOffset, index._size, dstCh);
+        org.apache.pinot.common.utils.FileUtils.transferBytes(srcCh, index._startOffset, index._size, dstCh);
         retained.add(new IndexEntry(index._key, nextOffset, index._size));
         nextOffset += index._size;
       }

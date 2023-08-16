@@ -43,6 +43,7 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -254,12 +255,12 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
     if (resultRows instanceof List) {
       for (Object[] row : resultRows) {
-        extractedRows.add(canonicalizeRow(row, desiredDataSchema, columnIndices));
+        extractedRows.add(TypeUtils.canonicalizeRow(row, desiredDataSchema, columnIndices));
       }
     } else if (resultRows instanceof PriorityQueue) {
       PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
       while (!priorityQueue.isEmpty()) {
-        extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema, columnIndices));
+        extractedRows.add(TypeUtils.canonicalizeRow(priorityQueue.poll(), desiredDataSchema, columnIndices));
       }
     }
     return new TransferableBlock(extractedRows, desiredDataSchema, DataBlock.Type.ROW);
@@ -277,12 +278,12 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
     if (resultRows instanceof List) {
       for (Object[] orgRow : resultRows) {
-        extractedRows.add(canonicalizeRow(orgRow, desiredDataSchema));
+        extractedRows.add(TypeUtils.canonicalizeRow(orgRow, desiredDataSchema));
       }
     } else if (resultRows instanceof PriorityQueue) {
       PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
       while (!priorityQueue.isEmpty()) {
-        extractedRows.add(canonicalizeRow(priorityQueue.poll(), desiredDataSchema));
+        extractedRows.add(TypeUtils.canonicalizeRow(priorityQueue.poll(), desiredDataSchema));
       }
     } else {
       throw new UnsupportedOperationException("Unsupported collection type: " + resultRows.getClass());
@@ -297,41 +298,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       }
     }
     return true;
-  }
-
-  /**
-   * This util is used to canonicalize row generated from V1 engine, which is stored using
-   * {@link DataSchema#getStoredColumnDataTypes()} format. However, the transferable block ser/de stores data in the
-   * {@link DataSchema#getColumnDataTypes()} format.
-   *
-   * @param row un-canonicalize row.
-   * @param dataSchema data schema desired for the row.
-   * @return canonicalize row.
-   */
-  private static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema) {
-    Object[] resultRow = new Object[row.length];
-    for (int colId = 0; colId < row.length; colId++) {
-      Object value = row[colId];
-      if (value != null) {
-        if (dataSchema.getColumnDataType(colId) == DataSchema.ColumnDataType.OBJECT) {
-          resultRow[colId] = value;
-        } else {
-          resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
-        }
-      }
-    }
-    return resultRow;
-  }
-
-  private static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema, int[] columnIndices) {
-    Object[] resultRow = new Object[columnIndices.length];
-    for (int colId = 0; colId < columnIndices.length; colId++) {
-      Object value = row[columnIndices[colId]];
-      if (value != null) {
-        resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
-      }
-    }
-    return resultRow;
   }
 
   private static boolean isDataSchemaColumnTypesCompatible(DataSchema.ColumnDataType[] desiredTypes,

@@ -68,7 +68,7 @@ public class FunctionDefinitionRegistryTest {
     }
     for (TransformFunctionType enumType : TransformFunctionType.values()) {
       if (!isIgnored(enumType.getName().toLowerCase())) {
-        for (String funcName : enumType.getAliases()) {
+        for (String funcName : enumType.getAlternativeNames()) {
           assertTrue(registeredCalciteFunctionNameIgnoreCase.contains(funcName.toLowerCase()),
               "Unable to find transform function signature for: " + funcName);
         }

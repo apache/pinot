@@ -64,14 +64,11 @@ jdk_version() {
 JAVA_VER="$(jdk_version)"
 
 # Build
+echo "Building Pinot to JAVA 11 source code Using JDK ${JAVA_VER}"
 PASS=0
 for i in $(seq 1 2)
 do
-  if [ "$JAVA_VER" -gt 11 ] ; then
-    mvn clean install -B -Dmaven.test.skip=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
-  else
-    mvn clean install -B -Dmaven.test.skip=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=${JAVA_VER}
-  fi
+  mvn clean install -B -T1C -Dmaven.test.skip=true -Pbin-dist -Dmaven.javadoc.skip=true -Djdk.version=11
   if [ $? -eq 0 ]; then
     PASS=1
     break;
@@ -120,6 +117,12 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+bin/pinot-admin.sh AddTable -tableConfigFile examples/batch/dimBaseballTeams/dimBaseballTeams_offline_table_config.json -schemaFile examples/batch/dimBaseballTeams/dimBaseballTeams_schema.json -exec
+if [ $? -ne 0 ]; then
+  echo 'Failed to create table dimBaseballTeams.'
+  exit 1
+fi
+
 # Ingest Data
 d=`pwd`
 INSERT_INTO_RES=`curl -X POST --header 'Content-Type: application/json'  -d "{\"sql\":\"INSERT INTO baseballStats FROM FILE '${d}/examples/batch/baseballStats/rawdata'\",\"trace\":false}" http://localhost:8099/query/sql`
@@ -129,14 +132,55 @@ if [ $? -ne 0 ]; then
 fi
 PASS=0
 
+
+INSERT_INTO_RES=`curl -X POST --header 'Content-Type: application/json'  -d "{\"sql\":\"INSERT INTO dimBaseballTeams FROM FILE '${d}/examples/batch/dimBaseballTeams/rawdata'\",\"trace\":false}" http://localhost:8099/query/sql`
+if [ $? -ne 0 ]; then
+  echo 'Failed to ingest data for table baseballStats.'
+  exit 1
+fi
+PASS=0
+
 # Wait for 10 Seconds for table to be set up, then query the total count.
 sleep 10
+# Validate V1 query count(*) result
 for i in $(seq 1 150)
 do
   QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"select count(*) from baseballStats limit 1","trace":false}' http://localhost:8099/query/sql`
   if [ $? -eq 0 ]; then
     COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
     if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
+      PASS=1
+      break
+    fi
+  fi
+  sleep 2
+done
+
+PASS=0
+
+# Validate V2 query count(*) result
+for i in $(seq 1 150)
+do
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"SET useMultistageEngine=true; select count(*) from baseballStats limit 1","trace":false}' http://localhost:8099/query/sql`
+  if [ $? -eq 0 ]; then
+    COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
+    if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
+      PASS=1
+      break
+    fi
+  fi
+  sleep 2
+done
+
+PASS=0
+
+# Validate V2 join query results
+for i in $(seq 1 150)
+do
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"SET useMultistageEngine=true;SELECT a.playerName, a.teamID, b.teamName FROM baseballStats_OFFLINE AS a JOIN dimBaseballTeams_OFFLINE AS b ON a.teamID = b.teamID LIMIT 10","trace":false}' http://localhost:8099/query/sql`
+  if [ $? -eq 0 ]; then
+    RES_0=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
+    if [[ "${RES_0}" = "\"David Allan\"" ]]; then
       PASS=1
       break
     fi
@@ -151,8 +195,8 @@ if [ "${PASS}" -eq 0 ]; then
   exit 1
 fi
 
-# Test quick-start-batch
-bin/quick-start-batch.sh &
+# Test quick-start-multi-stage
+bin/pinot-admin.sh QuickStart -type MULTI_STAGE &
 PID=$!
 
 # Print the JVM settings
@@ -168,6 +212,38 @@ do
   if [ $? -eq 0 ]; then
     COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
     if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
+      PASS=1
+      break
+    fi
+  fi
+  sleep 2
+done
+
+PASS=0
+
+# Validate V2 query count(*) result
+for i in $(seq 1 150)
+do
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"SET useMultistageEngine=true; select count(*) from baseballStats limit 1","trace":false}' http://localhost:8000/query/sql`
+  if [ $? -eq 0 ]; then
+    COUNT_STAR_RES=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
+    if [[ "${COUNT_STAR_RES}" =~ ^[0-9]+$ ]] && [ "${COUNT_STAR_RES}" -eq 97889 ]; then
+      PASS=1
+      break
+    fi
+  fi
+  sleep 2
+done
+
+PASS=0
+
+# Validate V2 join query results
+for i in $(seq 1 150)
+do
+  QUERY_RES=`curl -X POST --header 'Accept: application/json'  -d '{"sql":"SET useMultistageEngine=true;SELECT a.playerName, a.teamID, b.teamName FROM baseballStats_OFFLINE AS a JOIN dimBaseballTeams_OFFLINE AS b ON a.teamID = b.teamID LIMIT 10","trace":false}' http://localhost:8000/query/sql`
+  if [ $? -eq 0 ]; then
+    RES_0=`echo "${QUERY_RES}" | jq '.resultTable.rows[0][0]'`
+    if [[ ${RES_0} = "\"David Allan\"" ]]; then
       PASS=1
       break
     fi

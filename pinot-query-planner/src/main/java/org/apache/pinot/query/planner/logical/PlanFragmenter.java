@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.PlanFragmentMetadata;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
@@ -132,19 +133,21 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     PlanNode nextPlanFragmentRoot = node.getInputs().get(0).visit(this, context);
 
     List<Integer> distributionKeys = node.getDistributionKeys();
-    RelDistribution.Type exchangeType = node.getDistributionType();
+    RelDistribution.Type distributionType = node.getDistributionType();
+    PinotRelExchangeType exchangeType = node.getExchangeType();
 
     // make an exchange sender and receiver node pair
     // only HASH_DISTRIBUTED requires a partition key selector; so all other types (SINGLETON and BROADCAST)
     // of exchange will not carry a partition key selector.
-    KeySelector<Object[], Object[]> keySelector = exchangeType == RelDistribution.Type.HASH_DISTRIBUTED
+    KeySelector<Object[], Object[]> keySelector = distributionType == RelDistribution.Type.HASH_DISTRIBUTED
         ? new FieldSelectionKeySelector(distributionKeys) : null;
 
     PlanNode mailboxSender =
         new MailboxSendNode(nextPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
-            currentPlanFragmentId, exchangeType, keySelector, node.getCollations(), node.isSortOnSender());
+            currentPlanFragmentId, distributionType, exchangeType, keySelector, node.getCollations(),
+            node.isSortOnSender());
     PlanNode mailboxReceiver = new MailboxReceiveNode(currentPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
-        nextPlanFragmentId, exchangeType, keySelector,
+        nextPlanFragmentId, distributionType, exchangeType, keySelector,
         node.getCollations(), node.isSortOnSender(), node.isSortOnReceiver(), mailboxSender);
     mailboxSender.addInput(nextPlanFragmentRoot);
 
@@ -159,8 +162,7 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   }
 
   private boolean isPlanFragmentSplitter(PlanNode node) {
-    // TODO: always return true for now, we will add more logic here later.
-    return true;
+    return ((ExchangeNode) node).getExchangeType() != PinotRelExchangeType.SUB_PLAN;
   }
 
   public static class Context {

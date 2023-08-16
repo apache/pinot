@@ -257,8 +257,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _serverRoutingStatsManager.init();
     _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
     _routingManager.init(_spectatorHelixManager);
+    final PinotConfiguration factoryConf = _brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX);
+    // Adding cluster name to the config so that it can be used by the AccessControlFactory
+    factoryConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, _brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME));
     _accessControlFactory =
-        AccessControlFactory.loadFactory(_brokerConf.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX), _propertyStore);
+        AccessControlFactory.loadFactory(factoryConf, _propertyStore);
     HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
         new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
     queryQuotaManager.init(_spectatorHelixManager);
@@ -270,8 +273,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Initialize FunctionRegistry before starting the broker request handler
     FunctionRegistry.init();
     boolean caseInsensitive =
-        _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, false) || _brokerConf.getProperty(
-            Helix.DEPRECATED_ENABLE_CASE_INSENSITIVE_KEY, false);
+        _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
     TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
     // Configure TLS for netty connection to server
     TlsConfig tlsDefaults = TlsUtils.extractTlsConfig(_brokerConf, Broker.BROKER_TLS_PREFIX);
@@ -332,7 +334,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Starting broker admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _brokerAdminApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
-            _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory);
+        _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager);
+    registerExtraComponents(_brokerAdminApplication);
     _brokerAdminApplication.start(_listenerConfigs);
 
     LOGGER.info("Initializing cluster change mediator");
@@ -393,6 +396,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     _isStarting = false;
     LOGGER.info("Finish starting Pinot broker");
+  }
+
+  /**
+   * This method is called after initialization of BrokerAdminApiApplication object
+   * and before calling start to allow custom broker starters to register additional
+   * components.
+   * @param brokerAdminApplication is the application
+   */
+  protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {

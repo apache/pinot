@@ -20,17 +20,25 @@ package org.apache.pinot.query.runtime.plan.pipeline;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.operator.OpChainStats;
 
 
+/**
+ * execution result encapsulation for {@link PipelineBreakerExecutor}.
+ */
 public class PipelineBreakerResult {
   private final Map<PlanNode, Integer> _nodeIdMap;
   private final Map<Integer, List<TransferableBlock>> _resultMap;
+  private final OpChainStats _opChainStats;
 
-  public PipelineBreakerResult(Map<PlanNode, Integer> nodeIdMap, Map<Integer, List<TransferableBlock>> resultMap) {
+  public PipelineBreakerResult(Map<PlanNode, Integer> nodeIdMap, Map<Integer, List<TransferableBlock>> resultMap,
+      OpChainStats opChainStats) {
     _nodeIdMap = nodeIdMap;
     _resultMap = resultMap;
+    _opChainStats = opChainStats;
   }
 
   public Map<PlanNode, Integer> getNodeIdMap() {
@@ -39,5 +47,10 @@ public class PipelineBreakerResult {
 
   public Map<Integer, List<TransferableBlock>> getResultMap() {
     return _resultMap;
+  }
+
+  @Nullable
+  public OpChainStats getOpChainStats() {
+    return _opChainStats;
   }
 }

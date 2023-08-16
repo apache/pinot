@@ -271,18 +271,18 @@ const QueryPage = () => {
     setQueryLoader(true);
     queryExecuted.current = true;
     let params;
-    let queryOptions = '';
+    let queryOptions = [];
     if(queryTimeout){
-      queryOptions += `timeoutMs=${queryTimeout}`;
+      queryOptions.push(`timeoutMs=${queryTimeout}`);
     }
     if(checked.useMSE){
-      queryOptions += `useMultistageEngine=true`;
+      queryOptions.push(`useMultistageEngine=true`);
     }
     const finalQuery = `${query || inputQuery.trim()}`;
     params = JSON.stringify({
       sql: `${finalQuery}`,
       trace: checked.tracing,
-      queryOptions: `${queryOptions}`,
+      queryOptions: `${queryOptions.join(";")}`,
     });
 
     if(finalQuery !== ''){
@@ -315,10 +315,6 @@ const QueryPage = () => {
       warnings.push(`There are ${numSegmentsPrunedInvalid} invalid segment/s. This usually means that they were `
          + `created with an older schema. `
          + `Please reload the table in order to refresh these segments to the new schema.`);
-    }
-    if (checked.useMSE) {
-      warnings.push(`Using V2 Multi-Stage Query Engine. This is an experimental feature. Please report any bugs to `
-          + `Apache Pinot Slack channel.`);
     }
     return warnings;
   }
@@ -510,7 +506,7 @@ const QueryPage = () => {
                     onChange={handleChange}
                     checked={checked.useMSE}
                 />
-                Use V2 Engine
+                Use Multi-Stage Engine
               </Grid>
 
               <Grid item xs={3}>

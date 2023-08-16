@@ -202,10 +202,16 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
         // Process server response.
         QueryContext queryContext = QueryContextConverterUtils.getQueryContext(sql);
         DataTableReducer reducer = ResultReducerFactory.getResultReducer(queryContext);
-        BrokerResponseNative brokerResponse = new BrokerResponseNative();
-        reducer.reduceAndSetResults("mytable_OFFLINE", cachedDataSchema, dataTableMap, brokerResponse,
+        BrokerResponseNative streamingBrokerResponse = new BrokerResponseNative();
+        reducer.reduceAndSetResults("mytable_OFFLINE", cachedDataSchema, dataTableMap, streamingBrokerResponse,
             DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
-        assertEquals(brokerResponse.getResultTable().getRows().size(), nonStreamResultDataTable.getNumberOfRows());
+        dataTableMap.clear();
+        dataTableMap.put(mock(ServerRoutingInstance.class), nonStreamResultDataTable);
+        BrokerResponseNative nonStreamBrokerResponse = new BrokerResponseNative();
+        reducer.reduceAndSetResults("mytable_OFFLINE", cachedDataSchema, dataTableMap, nonStreamBrokerResponse,
+            DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
+        assertEquals(streamingBrokerResponse.getResultTable().getRows().size(),
+            nonStreamBrokerResponse.getResultTable().getRows().size());
 
         // validate final metadata return
         assertEquals(responseType, CommonConstants.Query.Response.ResponseType.METADATA);

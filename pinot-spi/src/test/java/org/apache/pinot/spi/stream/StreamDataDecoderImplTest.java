@@ -41,7 +41,7 @@ public class StreamDataDecoderImplTest {
     messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "");
     String value = "Alice";
     StreamMessage<byte[]> message = new StreamMessage(value.getBytes(StandardCharsets.UTF_8),
-        value.getBytes(StandardCharsets.UTF_8).length);
+        value.getBytes(StandardCharsets.UTF_8).length, null);
     StreamDataDecoderResult result = new StreamDataDecoderImpl(messageDecoder).decode(message);
     Assert.assertNotNull(result);
     Assert.assertNull(result.getException());
@@ -87,7 +87,7 @@ public class StreamDataDecoderImplTest {
     messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "");
     String value = "Alice";
     StreamMessage<byte[]> message = new StreamMessage(value.getBytes(StandardCharsets.UTF_8),
-        value.getBytes(StandardCharsets.UTF_8).length);
+        value.getBytes(StandardCharsets.UTF_8).length, null);
     StreamDataDecoderResult result = new StreamDataDecoderImpl(messageDecoder).decode(message);
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getException());

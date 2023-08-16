@@ -20,6 +20,7 @@ package org.apache.pinot.minion;
 
 import java.io.File;
 import javax.net.ssl.SSLContext;
+import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.MinionMetrics;
@@ -43,6 +44,7 @@ public class MinionContext {
   private File _dataDir;
   private MinionMetrics _minionMetrics;
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
+  private HelixManager _helixManager;
 
   // For segment upload
   private SSLContext _sslContext;
@@ -106,5 +108,13 @@ public class MinionContext {
 
   public void setTaskAuthProvider(AuthProvider taskAuthProvider) {
     _taskAuthProvider = taskAuthProvider;
+  }
+
+  public void setHelixManager(HelixManager helixManager) {
+    _helixManager = helixManager;
+  }
+
+  public HelixManager getHelixManager() {
+    return _helixManager;
   }
 }

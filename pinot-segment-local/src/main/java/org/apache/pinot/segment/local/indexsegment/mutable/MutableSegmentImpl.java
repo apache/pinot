@@ -92,7 +92,6 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -102,6 +101,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -159,10 +159,11 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
 
-  private final UpsertConfig.Mode _upsertMode;
-  private final List<String> _upsertComparisonColumns;
-  private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
+
+  private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private final List<String> _upsertComparisonColumns;
+  private final String _deleteRecordColumn;
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
   // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
   //    ids for the consuming segment.
@@ -172,6 +173,7 @@ public class MutableSegmentImpl implements MutableSegment {
   //        consumption with newer timestamp (late event in consuming segment), the record location will be updated, but
   //        the valid doc ids won't be updated.
   private final ThreadSafeMutableRoaringBitmap _validDocIds;
+  private final ThreadSafeMutableRoaringBitmap _queryableDocIds;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config, @Nullable ServerMetrics serverMetrics) {
     _serverMetrics = serverMetrics;
@@ -249,15 +251,27 @@ public class MutableSegmentImpl implements MutableSegment {
       metricsAggregators = getMetricsAggregators(config);
     }
 
-    Set<IndexType> specialIndexes = Sets.newHashSet(
-        StandardIndexes.dictionary(), // dictionaries implement other contract
-        StandardIndexes.nullValueVector()); // null value vector implement other contract
+    Set<IndexType> specialIndexes =
+        Sets.newHashSet(StandardIndexes.dictionary(), // dictionaries implement other contract
+            StandardIndexes.nullValueVector()); // null value vector implement other contract
 
     // Initialize for each column
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
       String column = fieldSpec.getName();
-      FieldIndexConfigs indexConfigs = Optional.ofNullable(config.getIndexConfigByCol().get(column))
-          .orElse(FieldIndexConfigs.EMPTY);
+
+      int fixedByteSize = -1;
+      DataType dataType = fieldSpec.getDataType();
+      DataType storedType = dataType.getStoredType();
+      if (!storedType.isFixedWidth()) {
+        // For aggregated metrics, we need to store values with fixed byte size so that in-place replacement is possible
+        Pair<String, ValueAggregator> aggregatorPair = metricsAggregators.get(column);
+        if (aggregatorPair != null) {
+          fixedByteSize = aggregatorPair.getRight().getMaxAggregatedValueByteSize();
+        }
+      }
+
+      FieldIndexConfigs indexConfigs =
+          Optional.ofNullable(config.getIndexConfigByCol().get(column)).orElse(FieldIndexConfigs.EMPTY);
       boolean isDictionary = !isNoDictionaryColumn(indexConfigs, fieldSpec, column);
       MutableIndexContext context =
           MutableIndexContext.builder().withFieldSpec(fieldSpec).withMemoryManager(_memoryManager)
@@ -266,7 +280,7 @@ public class MutableSegmentImpl implements MutableSegment {
               .withEstimatedColSize(_statsHistory.getEstimatedAvgColSize(column))
               .withAvgNumMultiValues(_statsHistory.getEstimatedAvgColSize(column))
               .withConsumerDir(config.getConsumerDir() != null ? new File(config.getConsumerDir()) : null)
-              .build();
+              .withFixedLengthBytes(fixedByteSize).build();
 
       // Partition info
       PartitionFunction partitionFunction = null;
@@ -304,8 +318,7 @@ public class MutableSegmentImpl implements MutableSegment {
         dictionary = null;
         if (!fieldSpec.isSingleValueField()) {
           // Raw MV columns
-          DataType dataType = fieldSpec.getDataType().getStoredType();
-          switch (dataType) {
+          switch (storedType) {
             case INT:
             case LONG:
             case FLOAT:
@@ -356,22 +369,27 @@ public class MutableSegmentImpl implements MutableSegment {
       realtimeLuceneIndexRefreshState.addRealtimeReadersToQueue(_realtimeLuceneReaders);
     }
 
-    // init upsert-related data structure
-    _upsertMode = config.getUpsertMode();
     _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
 
-    if (isUpsertEnabled()) {
+    _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
+    if (_partitionUpsertMetadataManager != null) {
       Preconditions.checkState(!isAggregateMetricsEnabled(),
           "Metrics aggregation and upsert cannot be enabled together");
-      _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
-      _validDocIds = new ThreadSafeMutableRoaringBitmap();
       List<String> upsertComparisonColumns = config.getUpsertComparisonColumns();
       _upsertComparisonColumns =
           upsertComparisonColumns != null ? upsertComparisonColumns : Collections.singletonList(_timeColumnName);
+      _deleteRecordColumn = config.getUpsertDeleteRecordColumn();
+      _validDocIds = new ThreadSafeMutableRoaringBitmap();
+      if (_deleteRecordColumn != null) {
+        _queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+      } else {
+        _queryableDocIds = null;
+      }
     } else {
-      _partitionUpsertMetadataManager = null;
-      _validDocIds = null;
       _upsertComparisonColumns = null;
+      _deleteRecordColumn = null;
+      _validDocIds = null;
+      _queryableDocIds = null;
     }
   }
 
@@ -409,15 +427,14 @@ public class MutableSegmentImpl implements MutableSegment {
     // if the column is part of noDictionary set from table config
     if (fieldSpec instanceof DimensionFieldSpec && isAggregateMetricsEnabled() && (dataType == STRING
         || dataType == BYTES)) {
-      _logger.info(
-          "Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
+      _logger.info("Aggregate metrics is enabled. Will create dictionary in consuming segment for column {} of type {}",
           column, dataType);
       return false;
     }
     // So don't create dictionary if the column (1) is member of noDictionary, and (2) is single-value or multi-value
     // with a fixed-width field, and (3) doesn't have an inverted index
-    return (fieldSpec.isSingleValueField() || fieldSpec.getDataType().isFixedWidth())
-        && indexConfigs.getConfig(StandardIndexes.inverted()).isDisabled();
+    return (fieldSpec.isSingleValueField() || fieldSpec.getDataType().isFixedWidth()) && indexConfigs.getConfig(
+        StandardIndexes.inverted()).isDisabled();
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
@@ -459,21 +476,18 @@ public class MutableSegmentImpl implements MutableSegment {
     boolean canTakeMore;
     int numDocsIndexed = _numDocsIndexed;
 
-    RecordInfo recordInfo = null;
-
-    if (isDedupEnabled() || isUpsertEnabled()) {
-      recordInfo = getRecordInfo(row, numDocsIndexed);
-    }
-
-    if (isDedupEnabled() && _partitionDedupMetadataManager.checkRecordPresentOrUpdate(recordInfo.getPrimaryKey(),
-        this)) {
-      if (_serverMetrics != null) {
-        _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
+    if (isDedupEnabled()) {
+      PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+      if (_partitionDedupMetadataManager.checkRecordPresentOrUpdate(primaryKey, this)) {
+        if (_serverMetrics != null) {
+          _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
+        }
+        return true;
       }
-      return true;
     }
 
     if (isUpsertEnabled()) {
+      RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
       updateDictionary(updatedRow);
       addNewRow(numDocsIndexed, updatedRow);
@@ -512,7 +526,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private boolean isUpsertEnabled() {
-    return _upsertMode != UpsertConfig.Mode.NONE;
+    return _partitionUpsertMetadataManager != null;
   }
 
   private boolean isDedupEnabled() {
@@ -521,22 +535,18 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
     PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
-
-    if (isUpsertEnabled()) {
-      if (_upsertComparisonColumns.size() > 1) {
-        return multiComparisonRecordInfo(primaryKey, docId, row);
-      }
-      Comparable comparisonValue = (Comparable) row.getValue(_upsertComparisonColumns.get(0));
-      return new RecordInfo(primaryKey, docId, comparisonValue);
-    }
-
-    return new RecordInfo(primaryKey, docId, null);
+    Comparable comparisonValue = getComparisonValue(row);
+    boolean deleteRecord = _deleteRecordColumn != null && BooleanUtils.toBoolean(row.getValue(_deleteRecordColumn));
+    return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
   }
 
-  private RecordInfo multiComparisonRecordInfo(PrimaryKey primaryKey, int docId, GenericRow row) {
+  private Comparable getComparisonValue(GenericRow row) {
     int numComparisonColumns = _upsertComparisonColumns.size();
-    Comparable[] comparisonValues = new Comparable[numComparisonColumns];
+    if (numComparisonColumns == 1) {
+      return (Comparable) row.getValue(_upsertComparisonColumns.get(0));
+    }
 
+    Comparable[] comparisonValues = new Comparable[numComparisonColumns];
     int comparableIndex = -1;
     for (int i = 0; i < numComparisonColumns; i++) {
       String columnName = _upsertComparisonColumns.get(i);
@@ -557,9 +567,8 @@ public class MutableSegmentImpl implements MutableSegment {
         comparisonValues[i] = (Comparable) comparisonValue;
       }
     }
-    Preconditions.checkState(comparableIndex != -1,
-        "Documents must have exactly 1 non-null comparison column value");
-    return new RecordInfo(primaryKey, docId, new ComparisonColumns(comparisonValues, comparableIndex));
+    Preconditions.checkState(comparableIndex != -1, "Documents must have exactly 1 non-null comparison column value");
+    return new ComparisonColumns(comparisonValues, comparableIndex);
   }
 
   private void updateDictionary(GenericRow row) {
@@ -604,10 +613,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
         DataType dataType = fieldSpec.getDataType();
         value = indexContainer._valueAggregator.getInitialAggregatedValue(value);
-        // aggregator value has to be numeric, but can be a different type of Number from the one expected on the column
-        // therefore we need to do some value changes here.
-        // TODO: Precision may change from one value to other, so we may need to study if this is actually what we want
-        //  to do
+        // BIG_DECIMAL is actually stored as byte[] and hence can be supported here.
         switch (dataType.getStoredType()) {
           case INT:
             forwardIndex.add(((Number) value).intValue(), -1, docId);
@@ -620,6 +626,10 @@ public class MutableSegmentImpl implements MutableSegment {
             break;
           case DOUBLE:
             forwardIndex.add(((Number) value).doubleValue(), -1, docId);
+            break;
+          case BIG_DECIMAL:
+          case BYTES:
+            forwardIndex.add(indexContainer._valueAggregator.serializeAggregatedValue(value), -1, docId);
             break;
           default:
             throw new UnsupportedOperationException(
@@ -797,6 +807,11 @@ public class MutableSegmentImpl implements MutableSegment {
                   valueAggregator.getAggregatedValueType(), valueAggregator.getAggregationType(), dataType));
           }
           break;
+        case BYTES:
+          Object oldValue = valueAggregator.deserializeAggregatedValue(forwardIndex.getBytes(docId));
+          Object newValue = valueAggregator.applyRawValue(oldValue, value);
+          forwardIndex.setBytes(docId, valueAggregator.serializeAggregatedValue(newValue));
+          break;
         default:
           throw new UnsupportedOperationException(
               String.format("Aggregation type %s of %s not supported for %s", valueAggregator.getAggregatedValueType(),
@@ -861,6 +876,12 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public ThreadSafeMutableRoaringBitmap getValidDocIds() {
     return _validDocIds;
+  }
+
+  @Nullable
+  @Override
+  public ThreadSafeMutableRoaringBitmap getQueryableDocIds() {
+    return _queryableDocIds;
   }
 
   @Override
@@ -1193,8 +1214,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
     for (String metricName : segmentConfig.getSchema().getMetricNames()) {
-      columnNameToAggregator.put(metricName,
-          Pair.of(metricName, ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM)));
+      columnNameToAggregator.put(metricName, Pair.of(metricName,
+          ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.emptyList())));
     }
     return columnNameToAggregator;
   }
@@ -1210,18 +1231,15 @@ public class MutableSegmentImpl implements MutableSegment {
       Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
           "aggregation function must be a function: %s", config);
       FunctionContext functionContext = expressionContext.getFunction();
-      TableConfigUtils.validateIngestionAggregation(functionContext.getFunctionName());
-      Preconditions.checkState(functionContext.getArguments().size() == 1,
-          "aggregation function can only have one argument: %s", config);
+      AggregationFunctionType functionType =
+          AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
+      TableConfigUtils.validateIngestionAggregation(functionType);
       ExpressionContext argument = functionContext.getArguments().get(0);
       Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
           "aggregator function argument must be a identifier: %s", config);
 
-      AggregationFunctionType functionType =
-          AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
-
-      columnNameToAggregator.put(config.getColumnName(),
-          Pair.of(argument.getIdentifier(), ValueAggregatorFactory.getValueAggregator(functionType)));
+      columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(),
+          ValueAggregatorFactory.getValueAggregator(functionType, functionContext.getArguments())));
     }
 
     return columnNameToAggregator;
@@ -1285,8 +1303,8 @@ public class MutableSegmentImpl implements MutableSegment {
             closeable.close();
           }
         } catch (Exception e) {
-          _logger.error("Caught exception while closing {} index for column: {}, continuing with error",
-              indexType, column, e);
+          _logger.error("Caught exception while closing {} index for column: {}, continuing with error", indexType,
+              column, e);
         }
       };
 

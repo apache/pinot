@@ -6,10 +6,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 FROM a ORDER BY a.col1",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0])",
-          "\n  LogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalProject(col1=[$0])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -19,10 +19,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1 FROM a ORDER BY a.col1",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0])",
-          "\n  LogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalProject(value1=[$0])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -59,23 +59,23 @@
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n      LogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
-          "\n        LogicalExchange(distribution=[hash[0]])",
-          "\n          LogicalAggregate(group=[{0}], EXPR$1=[$SUM0($2)])",
+          "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
       {
         "description": "Order by and group by with hint",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1, SUM(a.col3) FROM a GROUP BY a.col1 ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a GROUP BY a.col1 ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
           "\n      LogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
-          "\n        LogicalExchange(distribution=[hash[0]])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], col3=[$2])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"
@@ -89,23 +89,23 @@
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
-          "\n      LogicalAggregate(group=[{0}], sum=[$SUM0($1)])",
-          "\n        LogicalExchange(distribution=[hash[0]])",
-          "\n          LogicalAggregate(group=[{0}], sum=[$SUM0($2)])",
+          "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
       {
         "description": "Order by and group by with alias with SqlHint",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ skipLeafStageGroupByAggregation */ a.col1 AS value1, SUM(a.col3) AS sum FROM a GROUP BY a.col1 ORDER BY a.col1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1 AS value1, SUM(a.col3) AS sum FROM a GROUP BY a.col1 ORDER BY a.col1",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
           "\n      LogicalAggregate(group=[{0}], sum=[$SUM0($1)])",
-          "\n        LogicalExchange(distribution=[hash[0]])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], col3=[$2])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"

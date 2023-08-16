@@ -32,8 +32,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.Casing;
-import org.apache.calcite.sql.SqlAsOperator;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlExplain;
@@ -48,8 +48,6 @@ import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.SqlSetOption;
-import org.apache.calcite.sql.SqlWith;
-import org.apache.calcite.sql.SqlWithItem;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
@@ -147,67 +145,6 @@ public class CalciteSqlParser {
     }
   }
 
-  public static List<String> extractTableNamesFromNode(SqlNode sqlNode) {
-    List<String> tableNames = new ArrayList<>();
-    if (sqlNode instanceof SqlSelect) {
-      SqlNode fromNode = ((SqlSelect) sqlNode).getFrom();
-      if (fromNode instanceof SqlJoin) {
-        SqlNode left = ((SqlJoin) fromNode).getLeft();
-        SqlNode right = ((SqlJoin) fromNode).getRight();
-        if (left instanceof SqlIdentifier) {
-          tableNames.addAll(((SqlIdentifier) left).names);
-        } else {
-          tableNames.addAll(extractTableNamesFromNode(left));
-        }
-        if (right instanceof SqlIdentifier) {
-          tableNames.addAll(((SqlIdentifier) right).names);
-        } else {
-          tableNames.addAll(extractTableNamesFromNode(right));
-        }
-      } else if ((fromNode instanceof SqlBasicCall)
-          && (((SqlBasicCall) fromNode).getOperator() instanceof SqlAsOperator)) {
-        tableNames.addAll(extractTableNamesFromNode(((SqlBasicCall) fromNode).getOperandList().get(0)));
-      } else {
-        tableNames.addAll(((SqlIdentifier) fromNode).names);
-        tableNames.addAll(extractTableNamesFromNode(((SqlSelect) sqlNode).getWhere()));
-      }
-    } else if (sqlNode instanceof SqlOrderBy) {
-      for (SqlNode node : ((SqlOrderBy) sqlNode).getOperandList()) {
-        tableNames.addAll(extractTableNamesFromNode(node));
-      }
-    } else if (sqlNode instanceof SqlBasicCall) {
-      if (((SqlBasicCall) sqlNode).getOperator() instanceof SqlAsOperator) {
-        SqlNode firstOperand = ((SqlBasicCall) sqlNode).getOperandList().get(0);
-        if (firstOperand instanceof SqlSelect) {
-          tableNames.addAll(extractTableNamesFromNode(firstOperand));
-        } else {
-          tableNames.addAll(((SqlIdentifier) firstOperand).names);
-        }
-      } else {
-        for (SqlNode node : ((SqlBasicCall) sqlNode).getOperandList()) {
-          tableNames.addAll(extractTableNamesFromNode(node));
-        }
-      }
-    } else if (sqlNode instanceof SqlWith) {
-      List<SqlNode> withList = ((SqlWith) sqlNode).withList;
-      Set<String> aliases = new HashSet<>();
-      for (SqlNode withItem : withList) {
-        aliases.addAll(((SqlWithItem) withItem).name.names);
-        tableNames.addAll(extractTableNamesFromNode(((SqlWithItem) withItem).query));
-      }
-      tableNames.addAll(extractTableNamesFromNode(((SqlWith) sqlNode).body));
-      tableNames.removeAll(aliases);
-    } else if (sqlNode instanceof SqlSetOption) {
-      for (SqlNode node : ((SqlSetOption) sqlNode).getOperandList()) {
-        tableNames.addAll(extractTableNamesFromNode(node));
-      }
-    } else if (sqlNode instanceof SqlExplain) {
-      SqlExplain explain = (SqlExplain) sqlNode;
-      tableNames.addAll(extractTableNamesFromNode(explain.getExplicandum()));
-    }
-    return tableNames;
-  }
-
   @VisibleForTesting
   static SqlNodeAndOptions extractSqlNodeAndOptions(String sql, SqlNodeList sqlNodeList) {
     PinotSqlType sqlType = null;
@@ -265,6 +202,9 @@ public class CalciteSqlParser {
       throws SqlCompilationException {
     validateGroupByClause(pinotQuery);
     validateDistinctQuery(pinotQuery);
+    if (pinotQuery.isSetFilterExpression()) {
+      validateFilter(pinotQuery.getFilterExpression());
+    }
   }
 
   private static void validateGroupByClause(PinotQuery pinotQuery)
@@ -326,6 +266,34 @@ public class CalciteSqlParser {
               throw new IllegalStateException("ORDER-BY columns should be included in the DISTINCT columns");
             }
           }
+        }
+      }
+    }
+  }
+
+  /*
+   * Throws an exception if the filter's rhs has NULL because:
+   * - Predicate evaluator and pruning do not have NULL support.
+   * - It is not useful to have NULL in the filter's rhs.
+   *   - For most of the filters (e.g. EQUALS, GREATER_THAN, LIKE), the rhs being NULL leads to no record matched.
+   *   - For IN, adding NULL to the rhs list does not change the matched records.
+   *   - For NOT IN, adding NULL to the rhs list leads to no record matched.
+   */
+  private static void validateFilter(Expression filterExpression) {
+    if (!filterExpression.isSetFunctionCall()) {
+      return;
+    }
+    String operator = filterExpression.getFunctionCall().getOperator();
+    if (operator.equals(FilterKind.AND.name()) || operator.equals(FilterKind.OR.name()) || operator.equals(
+        FilterKind.NOT.name())) {
+      for (Expression filter : filterExpression.getFunctionCall().getOperands()) {
+        validateFilter(filter);
+      }
+    } else {
+      List<Expression> operands = filterExpression.getFunctionCall().getOperands();
+      for (int i = 1; i < operands.size(); i++) {
+        if (operands.get(i).getLiteral().isSetNullValue()) {
+          throw new IllegalStateException(String.format("Using NULL in %s filter is not supported", operator));
         }
       }
     }
@@ -546,6 +514,7 @@ public class CalciteSqlParser {
   private static Join compileToJoin(SqlJoin sqlJoin) {
     Join join = new Join();
     switch (sqlJoin.getJoinType()) {
+      case COMMA:
       case INNER:
         join.setType(JoinType.INNER);
         break;
@@ -747,16 +716,16 @@ public class CalciteSqlParser {
         SqlNode elseOperand = caseSqlNode.getElseOperand();
         Expression caseFuncExpr = RequestUtils.getFunctionExpression("case");
         Preconditions.checkState(whenOperands.size() == thenOperands.size());
-        // TODO: convert this to new format once 0.13 is released
-        for (SqlNode whenSqlNode : whenOperands.getList()) {
+        for (int i = 0; i < whenOperands.size(); i++) {
+          SqlNode whenSqlNode = whenOperands.get(i);
           Expression whenExpression = toExpression(whenSqlNode);
           if (isAggregateExpression(whenExpression)) {
             throw new SqlCompilationException(
                 "Aggregation functions inside WHEN Clause is not supported - " + whenSqlNode);
           }
           caseFuncExpr.getFunctionCall().addToOperands(whenExpression);
-        }
-        for (SqlNode thenSqlNode : thenOperands.getList()) {
+
+          SqlNode thenSqlNode = thenOperands.get(i);
           Expression thenExpression = toExpression(thenSqlNode);
           if (isAggregateExpression(thenExpression)) {
             throw new SqlCompilationException(
@@ -1005,5 +974,24 @@ public class CalciteSqlParser {
       expression = expression.getFunctionCall().getOperands().get(0);
     }
     return expression;
+  }
+
+  @Nullable
+  public static Boolean isNullsLast(Expression expression) {
+    String operator = expression.getFunctionCall().getOperator();
+    if (operator.equals(CalciteSqlParser.NULLS_LAST)) {
+      return true;
+    } else if (operator.equals(CalciteSqlParser.NULLS_FIRST)) {
+      return false;
+    } else {
+      return null;
+    }
+  }
+
+  public static boolean isAsc(Expression expression, Boolean isNullsLast) {
+    if (isNullsLast != null) {
+      expression = expression.getFunctionCall().getOperands().get(0);
+    }
+    return expression.getFunctionCall().getOperator().equals(CalciteSqlParser.ASC);
   }
 }
