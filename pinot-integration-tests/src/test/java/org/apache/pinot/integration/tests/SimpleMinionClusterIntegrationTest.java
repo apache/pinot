@@ -165,11 +165,11 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
           return false;
         }
       }
-      assertTrue(TASK_START_NOTIFIED.get());
       assertFalse(TASK_SUCCESS_NOTIFIED.get());
       assertFalse(TASK_CANCELLED_NOTIFIED.get());
       assertFalse(TASK_ERROR_NOTIFIED.get());
-      return true;
+      // Task start callback is triggered shortly after the task start execution asynchronously
+      return TASK_START_NOTIFIED.get();
     }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks IN_PROGRESS");
 
     // Wait at most 30 seconds for ZK callback to update the controller gauges
@@ -199,9 +199,9 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       }
       assertTrue(TASK_START_NOTIFIED.get());
       assertFalse(TASK_SUCCESS_NOTIFIED.get());
-      assertTrue(TASK_CANCELLED_NOTIFIED.get());
       assertFalse(TASK_ERROR_NOTIFIED.get());
-      return true;
+      // Task cancelled callback is triggered shortly after the task framework cancels the task asynchronously
+      return TASK_CANCELLED_NOTIFIED.get();
     }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks STOPPED");
 
     // Wait at most 30 seconds for ZK callback to update the controller gauges
