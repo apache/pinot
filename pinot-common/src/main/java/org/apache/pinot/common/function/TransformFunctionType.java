@@ -124,6 +124,10 @@ public enum TransformFunctionType {
               SqlTypeFamily.CHARACTER),
           ordinal -> ordinal > 1)),
 
+  FROMDATETIME("fromDateTime", ReturnTypes.TIMESTAMP_NULLABLE,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+          ordinal -> ordinal > 1)),
+
   YEAR("year"),
   YEAR_OF_WEEK("yearOfWeek", "yow"),
   QUARTER("quarter"),
