@@ -57,6 +57,11 @@ public interface TableDataManager {
   void start();
 
   /**
+   * Stops the table data manager. Should be called to signal no more segment operations will be performed on the table.
+   */
+  void stop();
+
+  /**
    * Shuts down the table data manager. Should be called only once. After calling shut down, no other method should be
    * called.
    */

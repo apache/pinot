@@ -184,6 +184,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected abstract void doStart();
 
   @Override
+  public void stop() {
+    _logger.info("Stopping table data manager for table: {}", _tableNameWithType);
+    doStop();
+    _logger.info("Stopped table data manager for table: {}", _tableNameWithType);
+  }
+
+  protected abstract void doStop();
+
+  @Override
   public void shutDown() {
     _logger.info("Shutting down table data manager for table: {}", _tableNameWithType);
     _shutDown = true;
