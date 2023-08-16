@@ -317,13 +317,13 @@ public class AggregationFunctionFactory {
           case BOOLOR:
             return new BooleanOrAggregationFunction(firstArgument, nullHandlingEnabled);
           case VARPOP:
-            return new VarianceAggregationFunction(firstArgument, false, false);
+            return new VarianceAggregationFunction(firstArgument, false, false, nullHandlingEnabled);
           case VARSAMP:
-            return new VarianceAggregationFunction(firstArgument, true, false);
+            return new VarianceAggregationFunction(firstArgument, true, false, nullHandlingEnabled);
           case STDDEVPOP:
-            return new VarianceAggregationFunction(firstArgument, false, true);
+            return new VarianceAggregationFunction(firstArgument, false, true, nullHandlingEnabled);
           case STDDEVSAMP:
-            return new VarianceAggregationFunction(firstArgument, true, true);
+            return new VarianceAggregationFunction(firstArgument, true, true, nullHandlingEnabled);
           case SKEWNESS:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.SKEWNESS);
           case KURTOSIS:

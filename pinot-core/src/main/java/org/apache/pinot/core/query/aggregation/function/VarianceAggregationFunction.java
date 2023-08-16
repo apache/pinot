@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.utils.StatisticalAggregationFunctionUtils;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -41,13 +42,15 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class VarianceAggregationFunction extends BaseSingleInputAggregationFunction<VarianceTuple, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   protected final boolean _isSample;
-
   protected final boolean _isStdDev;
+  protected final boolean _nullHandlingEnabled;
 
-  public VarianceAggregationFunction(ExpressionContext expression, boolean isSample, boolean isStdDev) {
+  public VarianceAggregationFunction(ExpressionContext expression, boolean isSample, boolean isStdDev,
+      boolean nullHandlingEnabled) {
     super(expression);
     _isSample = isSample;
     _isStdDev = isStdDev;
+    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
@@ -72,18 +75,38 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
+    RoaringBitmap nullBitmap = null;
+    if (_nullHandlingEnabled) {
+      nullBitmap = blockValSetMap.get(_expression).getNullBitmap();
+    }
 
     long count = 0;
     double sum = 0.0;
     double variance = 0.0;
-    for (int i = 0; i < length; i++) {
-      count++;
-      sum += values[i];
-      if (count > 1) {
-        variance = computeIntermediateVariance(count, sum, variance, values[i]);
+    if (nullBitmap != null && !nullBitmap.isEmpty()) {
+      for (int i = 0; i < length; i++) {
+        if (!nullBitmap.contains(i)) {
+          count++;
+          sum += values[i];
+          if (count > 1) {
+            variance = computeIntermediateVariance(count, sum, variance, values[i]);
+          }
+        }
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        count++;
+        sum += values[i];
+        if (count > 1) {
+          variance = computeIntermediateVariance(count, sum, variance, values[i]);
+        }
       }
     }
-    setAggregationResult(aggregationResultHolder, length, sum, variance);
+
+    if (_nullHandlingEnabled && count == 0) {
+      return;
+    }
+    setAggregationResult(aggregationResultHolder, count, sum, variance);
   }
 
   private double computeIntermediateVariance(long count, double sum, double m2, double value) {
@@ -116,8 +139,20 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
-    for (int i = 0; i < length; i++) {
-      setGroupByResult(groupKeyArray[i], groupByResultHolder, 1L, values[i], 0.0);
+    RoaringBitmap nullBitmap = null;
+    if (_nullHandlingEnabled) {
+      nullBitmap = blockValSetMap.get(_expression).getNullBitmap();
+    }
+    if (nullBitmap != null && !nullBitmap.isEmpty()) {
+      for (int i = 0; i < length; i++) {
+        if (!nullBitmap.contains(i)) {
+          setGroupByResult(groupKeyArray[i], groupByResultHolder, 1L, values[i], 0.0);
+        }
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        setGroupByResult(groupKeyArray[i], groupByResultHolder, 1L, values[i], 0.0);
+      }
     }
   }
 
@@ -134,12 +169,7 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
 
   @Override
   public VarianceTuple extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    VarianceTuple varianceTuple = aggregationResultHolder.getResult();
-    if (varianceTuple == null) {
-      return new VarianceTuple(0L, 0.0, 0.0);
-    } else {
-      return varianceTuple;
-    }
+    return aggregationResultHolder.getResult();
   }
 
   @Override
@@ -149,6 +179,13 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
 
   @Override
   public VarianceTuple merge(VarianceTuple intermediateResult1, VarianceTuple intermediateResult2) {
+    if (_nullHandlingEnabled) {
+      if (intermediateResult1 == null) {
+        return intermediateResult2;
+      } else if (intermediateResult2 == null) {
+        return intermediateResult1;
+      }
+    }
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
   }
