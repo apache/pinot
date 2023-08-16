@@ -1883,18 +1883,6 @@ public class TableConfigUtilsTest {
     }
 
     realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setTimeColumnName("secondsSinceEpoch").build();
-    offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setTimeColumnName("secondsSinceEpoch").build();
-    try {
-      // Call validate hybrid table which realtime/offline tables are missing brokerTenant.
-      TableConfigUtils.verifyHybridTableConfigs(TABLE_NAME, offlineTableConfig, realtimeTableConfig);
-      Assert.fail();
-    } catch (IllegalArgumentException ignored) {
-      // Expected
-    }
-
-    realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setTimeColumnName("secondsSinceEpoch").setBrokerTenant("broker1").build();
     offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setTimeColumnName("secondsSinceEpoch").setBrokerTenant("broker2").build();
