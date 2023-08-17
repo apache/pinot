@@ -75,7 +75,7 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        testset: [ 1, 2 ]
+        testset: [ 1 ]
         java: [ 11, 17, 20 ]
         distribution: [ "temurin" ]
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})

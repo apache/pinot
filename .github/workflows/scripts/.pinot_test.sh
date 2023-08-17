@@ -46,24 +46,10 @@ else
   #     due to the -am flag (include dependency modules)
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn clean install -DskipTests -am -B -T 16 \
-        -pl 'pinot-spi' \
-        -pl 'pinot-segment-spi' \
-        -pl 'pinot-common' \
-        -pl 'pinot-segment-local' \
-        -pl 'pinot-core' \
-        -pl 'pinot-query-planner' \
-        -pl 'pinot-query-runtime' \
-        -P github-actions,no-integration-tests \
         -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip || exit 1
     mvn test -T 16 \
-        -pl 'pinot-spi' \
-        -pl 'pinot-segment-spi' \
-        -pl 'pinot-common' \
-        -pl 'pinot-segment-local' \
-        -pl 'pinot-core' \
-        -pl 'pinot-query-planner' \
-        -pl 'pinot-query-runtime' \
-        -P github-actions,no-integration-tests && exit 0 || exit 1
+        -P github-actions,no-integration-tests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip \
+        && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
     mvn clean install -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -T 16 || exit 1
