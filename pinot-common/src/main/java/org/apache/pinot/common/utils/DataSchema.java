@@ -356,7 +356,7 @@ public class DataSchema {
           if (value instanceof Timestamp) {
             return (Timestamp) value;
           }
-          return new Timestamp((long) value);
+          return new Timestamp(((Number) value).longValue());
         case STRING:
         case JSON:
           return value.toString();

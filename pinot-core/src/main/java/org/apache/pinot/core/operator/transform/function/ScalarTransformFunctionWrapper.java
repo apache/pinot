@@ -117,6 +117,10 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
                 parameterTypes[i].convert(literalTransformFunction.getDoubleLiteral(), PinotDataType.DOUBLE);
             break;
           case BIG_DECIMAL:
+            if (parameterTypes[i] == PinotDataType.STRING) {
+              _scalarArguments[i] = literalTransformFunction.getStringLiteral();
+              break;
+            }
             _scalarArguments[i] =
                 parameterTypes[i].convert(literalTransformFunction.getBigDecimalLiteral(), PinotDataType.BIG_DECIMAL);
             break;

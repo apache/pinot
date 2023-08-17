@@ -196,8 +196,7 @@ public class CalciteRexExpressionParser {
   private static Expression rexLiteralToExpression(RexExpression.Literal rexLiteral) {
     // TODO: currently literals are encoded as strings for V1, remove this and use directly literal type when it
     // supports strong-type in V1.
-    if (rexLiteral.getDataType() == FieldSpec.DataType.TIMESTAMP
-        && rexLiteral.getValue() instanceof GregorianCalendar) {
+    if (rexLiteral.getDataType() == FieldSpec.DataType.TIMESTAMP) {
       return RequestUtils.getLiteralExpression(((GregorianCalendar) rexLiteral.getValue()).getTimeInMillis());
     }
     return RequestUtils.getLiteralExpression(rexLiteral.getValue());

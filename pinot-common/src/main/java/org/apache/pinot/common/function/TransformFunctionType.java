@@ -39,6 +39,11 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 
 
+/**
+ * The {@code TransformFunctionType} enum represents all the transform functions supported by Calcite SQL parser in
+ * v2 engine.
+ * TODO: Add support for scalar functions auto registration.
+ */
 public enum TransformFunctionType {
   // arithmetic functions for single-valued columns
   ADD("add", "plus"),
@@ -125,8 +130,19 @@ public enum TransformFunctionType {
           ordinal -> ordinal > 1)),
 
   FROMDATETIME("fromDateTime", ReturnTypes.TIMESTAMP_NULLABLE,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+          ordinal -> ordinal > 1)),
+
+  TODATETIME("toDateTime", ReturnTypes.VARCHAR_2000_NULLABLE,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
           ordinal -> ordinal > 1)),
+
+  TIMESTAMPADD("timestampAdd", ReturnTypes.TIMESTAMP_NULLABLE,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.NUMERIC, SqlTypeFamily.ANY)),
+      "dateAdd"),
+
+  TIMESTAMPDIFF("timestampDiff", ReturnTypes.BIGINT_NULLABLE,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY, SqlTypeFamily.ANY)), "dateDiff"),
 
   YEAR("year"),
   YEAR_OF_WEEK("yearOfWeek", "yow"),

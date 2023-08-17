@@ -123,15 +123,13 @@ public class LiteralContext {
             inferLiteralDataTypeAndValue(literal.getFieldValue().toString());
         _type = typeAndValue.getLeft();
         if (_type == FieldSpec.DataType.BIG_DECIMAL) {
-          _value = typeAndValue.getRight();
-          _bigDecimalValue = (BigDecimal) _value;
+          _bigDecimalValue = (BigDecimal) typeAndValue.getRight();
         } else if (_type == FieldSpec.DataType.TIMESTAMP) {
           _bigDecimalValue = PinotDataType.TIMESTAMP.toBigDecimal(typeAndValue.getRight());
-          _value = literal.getFieldValue().toString();
         } else {
           _bigDecimalValue = BigDecimal.ZERO;
-          _value = typeAndValue.getRight();
         }
+        _value = literal.getFieldValue().toString();
         break;
       case NULL_VALUE:
         _type = FieldSpec.DataType.UNKNOWN;

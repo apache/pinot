@@ -148,9 +148,14 @@ public class DataBlockBuilder {
             setColumn(rowBuilder, byteBuffer, (BigDecimal) value);
             break;
           case BOOLEAN:
-            byteBuffer.putInt(((Boolean) value) ? 1 : 0);
+            if (value instanceof Boolean) {
+              byteBuffer.putInt(((Boolean) value) ? 1 : 0);
+            } else {
+              byteBuffer.putInt(((Number) value).intValue() > 0 ? 1 : 0);
+            }
             break;
           case TIMESTAMP:
+            // Certain non strong typed functions in v2 might return long value instead of Timestamp.
             if (value instanceof Long) {
               byteBuffer.putLong((long) value);
             } else {

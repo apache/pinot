@@ -63,6 +63,8 @@ public interface RexExpression {
     switch (rexCall.getKind()) {
       case CAST:
         return RexExpressionUtils.handleCast(rexCall);
+      case REINTERPRET:
+        return RexExpressionUtils.handleReinterpret(rexCall);
       case SEARCH:
         return RexExpressionUtils.handleSearch(rexCall);
       case CASE:
