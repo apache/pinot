@@ -257,7 +257,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
 
   @Override
   public boolean isFixedLengthType() {
-    throw new UnsupportedOperationException();
+    return false;
   }
 
   @Override

@@ -129,7 +129,7 @@ public class VarByteChunkSVForwardIndexReaderV4
 
   @Override
   public boolean isFixedLengthType() {
-    throw new UnsupportedOperationException();
+    return false;
   }
 
   @Override
