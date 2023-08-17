@@ -498,7 +498,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   }
 
   @Test(dataProvider = "NumberTypes")
-  public void testDistinctCountonDictNumberTypes(FieldSpec.DataType dataType)
+  public void testDistinctCountNonDictNumberTypes(FieldSpec.DataType dataType)
       throws Exception {
     initializeRows();
     insertRow(null);
