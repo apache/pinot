@@ -122,14 +122,14 @@ public class LiteralContext {
         Pair<FieldSpec.DataType, Object> typeAndValue =
             inferLiteralDataTypeAndValue(literal.getFieldValue().toString());
         _type = typeAndValue.getLeft();
-        _value = typeAndValue.getRight();
         if (_type == FieldSpec.DataType.BIG_DECIMAL) {
-          _bigDecimalValue = (BigDecimal) _value;
+          _bigDecimalValue = (BigDecimal) typeAndValue.getRight();
         } else if (_type == FieldSpec.DataType.TIMESTAMP) {
-          _bigDecimalValue = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(_value.toString()));
+          _bigDecimalValue = PinotDataType.TIMESTAMP.toBigDecimal(typeAndValue.getRight());
         } else {
           _bigDecimalValue = BigDecimal.ZERO;
         }
+        _value = literal.getFieldValue().toString();
         break;
       case NULL_VALUE:
         _type = FieldSpec.DataType.UNKNOWN;
