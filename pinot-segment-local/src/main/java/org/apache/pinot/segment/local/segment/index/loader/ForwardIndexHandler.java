@@ -221,8 +221,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     for (String column : existingAllColumns) {
       if (_schema != null && !_schema.hasColumn(column)) {
         // _schema will be null only in tests
-        LOGGER.info("Column {} is not in schema, removing forward index", column);
-        columnOperationsMap.put(column, List.of(Operation.DISABLE_FORWARD_INDEX));
+        LOGGER.info("Column {} is not in schema, skipping updating forward index", column);
         continue;
       }
       FieldIndexConfigs newConf = _fieldIndexConfigs.get(column);
