@@ -56,6 +56,7 @@ import org.testng.annotations.BeforeClass;
 
 /**
  * Integration test for heap size based broker query killing, this works only for xmx4G
+ * TODO: re-enable or remove this after we resolve https://github.com/apache/pinot/issues/11099
  */
 public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterIntegrationTestSet {
 
