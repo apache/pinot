@@ -156,6 +156,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         newSegmentPushTimeMap.put(segmentZKMetadata.getSegmentName(), pushTimeMillis);
       }
     }
+    LOGGER.info("Got {} new segments: {} for table: {} by reading ZK metadata, current time: {}",
+        newSegmentPushTimeMap.size(), newSegmentPushTimeMap, _tableNameWithType, nowMillis);
     return newSegmentPushTimeMap;
   }
 
@@ -294,9 +296,9 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         for (SegmentInstanceCandidate candidate : candidates) {
           candidateInstances.add(candidate.getInstance());
         }
-        LOGGER.warn(
-            "Failed to find servers hosting segment: {} for table: {} (all candidate instances: {} are disabled, "
-                + "counting segment as unavailable)", segment, _tableNameWithType, candidateInstances);
+        LOGGER.warn("Failed to find servers hosting old segment: {} for table: {} "
+                + "(all candidate instances: {} are disabled, counting segment as unavailable)", segment,
+            _tableNameWithType, candidateInstances);
         unavailableSegments.add(segment);
         _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
       }
@@ -314,8 +316,16 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       }
       if (!enabledCandidates.isEmpty()) {
         instanceCandidatesMap.put(segment, enabledCandidates);
+      } else {
+        // Do not count new segment as unavailable
+        List<String> candidateInstances = new ArrayList<>(candidates.size());
+        for (SegmentInstanceCandidate candidate : candidates) {
+          candidateInstances.add(candidate.getInstance());
+        }
+        LOGGER.info("Failed to find servers hosting new segment: {} for table: {} "
+                + "(all candidate instances: {} are disabled, but not counting new segment as unavailable)", segment,
+            _tableNameWithType, candidateInstances);
       }
-      // Do not count new segment as unavailable
     }
 
     _segmentStates = new SegmentStates(instanceCandidatesMap, unavailableSegments);
@@ -377,6 +387,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         }
       }
     }
+    LOGGER.info("Got {} new segments: {} for table: {} by processing existing states, current time: {}",
+        newSegmentPushTimeMap.size(), newSegmentPushTimeMap, _tableNameWithType, nowMillis);
     return newSegmentPushTimeMap;
   }
 
