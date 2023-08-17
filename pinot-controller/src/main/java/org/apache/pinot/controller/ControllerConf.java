@@ -928,7 +928,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public boolean isTmpSegmentAsyncDeletionEnabled() {
-    return getProperty(ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION, true);
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION, false);
   }
 
   public int getDeepStoreRetryUploadTimeoutMs() {
