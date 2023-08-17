@@ -1589,7 +1589,7 @@
             <id>report</id>
             <phase>test</phase>
             <goals>
-              <goal>report-aggregate</goal>
+              <goal>report</goal>
             </goals>
           </execution>
         </executions>
