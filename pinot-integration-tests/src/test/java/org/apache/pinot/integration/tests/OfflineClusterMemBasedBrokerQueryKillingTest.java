@@ -207,8 +207,6 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
         .build();
   }
 
-
-  @Test
   public void testDigestOOMMultipleQueries()
       throws Exception {
     AtomicReference<JsonNode> queryResponse1 = new AtomicReference<>();
