@@ -480,12 +480,31 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   }
 
   @Test(dataProvider = "NumberTypes")
-  public void testDistinctCountNumberTypes(FieldSpec.DataType dataType)
+  public void testDistinctCountDictNumberTypes(FieldSpec.DataType dataType)
       throws Exception {
     initializeRows();
     insertRow(null);
     insertRow(1);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTCOUNT(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0)[0], 1);
+  }
+
+  @Test(dataProvider = "NumberTypes")
+  public void testDistinctCountonDictNumberTypes(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(Collections.singletonList(COLUMN1)).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
     setUpSegments(tableConfig, schema);
     String query = String.format("SELECT DISTINCTCOUNT(%s) FROM testTable", COLUMN1);

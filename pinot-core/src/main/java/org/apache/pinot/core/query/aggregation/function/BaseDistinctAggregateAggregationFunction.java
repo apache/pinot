@@ -146,19 +146,31 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void svAggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    RoaringBitmap nullBitmap = null;
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
-    if (dictionary != null && !_nullHandlingEnabled) {
+    if (dictionary != null) {
+      if (_nullHandlingEnabled) {
+        nullBitmap = blockValSet.getNullBitmap();
+      }
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
+      if (nullBitmap != null && !nullBitmap.isEmpty()) {
+        RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
+        for (int i = 0; i < length; i++) {
+          if (!nullBitmap.contains(i)) {
+            dictIdBitmap.add(dictIds[i]);
+          }
+        }
+      } else {
+        getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
+      }
       return;
     }
 
     // For non-dictionary-encoded expression, store values into the value set
     DataType storedType = blockValSet.getValueType().getStoredType();
     Set valueSet = getValueSet(aggregationResultHolder, storedType);
-    RoaringBitmap nullBitmap = null;
     switch (storedType) {
       case INT:
         IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
