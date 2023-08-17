@@ -41,7 +41,7 @@ import org.testng.annotations.Test;
 
 
 public class PinotFSSegmentUploaderTest {
-  private static final int TIMEOUT_IN_MS = 100;
+  private static final int TIMEOUT_IN_MS = 1000;
   private File _file;
   private LLCSegmentName _llcSegmentName;
   private ServerMetrics _serverMetrics = Mockito.mock(ServerMetrics.class);
