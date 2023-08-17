@@ -34,6 +34,8 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -66,6 +68,7 @@ import org.apache.pinot.common.utils.HashUtil;
  * </pre>
  */
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StrictReplicaGroupInstanceSelector.class);
 
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
@@ -122,12 +125,19 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     Map<Set<String>, Set<String>> unavailableInstancesMap = new HashMap<>();
     for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
-      Set<String> instancesInIdealState = idealStateAssignment.get(segment).keySet();
+      Set<String> onlineInstances = entry.getValue();
+      Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Set<String> instancesInIdealState = idealStateInstanceStateMap.keySet();
       Set<String> unavailableInstances =
           unavailableInstancesMap.computeIfAbsent(instancesInIdealState, k -> new HashSet<>());
       for (String instance : instancesInIdealState) {
-        if (!entry.getValue().contains(instance)) {
-          unavailableInstances.add(instance);
+        if (!onlineInstances.contains(instance)) {
+          if (unavailableInstances.add(instance)) {
+            LOGGER.warn(
+                "Found unavailable instance: {} in instance group: {} for segment: {}, table: {} (IS: {}, EV: {})",
+                instance, instancesInIdealState, segment, _tableNameWithType, idealStateInstanceStateMap,
+                externalViewAssignment.get(segment));
+          }
         }
       }
     }
@@ -138,8 +148,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       // NOTE: onlineInstances is either a TreeSet or an EmptySet (sorted)
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
-      Set<String> unavailableInstances =
-          unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Collections.emptySet());
+      Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
       for (String instance : onlineInstances) {
         if (!unavailableInstances.contains(instance)) {
@@ -156,9 +165,8 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       Set<String> unavailableInstances =
           unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Collections.emptySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
-      for (Map.Entry<String, String> instanceStateEntry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
-        String instance = instanceStateEntry.getKey();
-        if (!unavailableInstances.contains(instance) && isOnlineForRouting(instanceStateEntry.getValue())) {
+      for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
+        if (!unavailableInstances.contains(instance)) {
           candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance)));
         }
       }

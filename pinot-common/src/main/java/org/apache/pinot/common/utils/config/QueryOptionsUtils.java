@@ -27,7 +27,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 
 
 /**
@@ -116,11 +115,6 @@ public class QueryOptionsUtils {
 
   public static boolean isSkipStarTree(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
-  }
-
-  public static boolean isRoutingForceHLC(Map<String, String> queryOptions) {
-    String routingOptions = queryOptions.get(QueryOptionKey.ROUTING_OPTIONS);
-    return routingOptions != null && routingOptions.toUpperCase().contains(QueryOptionValue.ROUTING_FORCE_HLC);
   }
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
