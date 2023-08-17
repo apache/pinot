@@ -48,7 +48,7 @@
       <scope>${hadoop.dependencies.scope}</scope>
       <exclusions>
         <exclusion>
-          <groupId>com.fasterxml.woodstox</groupId>
+          <groupId>org.codehaus.woodstox</groupId>
           <artifactId>stax2-api</artifactId>
         </exclusion>
         <exclusion>
