@@ -35,7 +35,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <hadoop.version>2.10.1</hadoop.version>
+    <hadoop.version>3.2.4</hadoop.version>
     <phase.prop>package</phase.prop>
   </properties>
   <dependencies>
