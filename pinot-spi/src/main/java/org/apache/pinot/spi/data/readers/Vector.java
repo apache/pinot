@@ -19,17 +19,25 @@
 package org.apache.pinot.spi.data.readers;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.Arrays;
 
+import java.util.Arrays;
 
 public class Vector implements Comparable<Vector> {
+
   public enum VectorType {
-    FLOAT, INT
+    FLOAT, INT, BYTE
   }
 
   private int _dimension;
   private float[] _floatValues;
   private int[] _intValues;
+  private byte[] _byteValues;
   private VectorType _type;
 
   public Vector(int dimension, float[] values) {
@@ -42,6 +50,12 @@ public class Vector implements Comparable<Vector> {
     _dimension = dimension;
     _intValues = values;
     _type = VectorType.INT;
+  }
+
+  public Vector(int dimension, byte[] values) {
+    _dimension = dimension;
+    _byteValues = values;
+    _type = VectorType.BYTE;
   }
 
   public int getDimension() {
@@ -68,6 +82,14 @@ public class Vector implements Comparable<Vector> {
     return _intValues;
   }
 
+  @JsonIgnore
+  public byte[] getByteValues() {
+    if (_type != VectorType.BYTE) {
+      throw new IllegalStateException("Vector type is not BYTE");
+    }
+    return _byteValues;
+  }
+
   public void setValues(float[] values) {
     _floatValues = values;
     _type = VectorType.FLOAT;
@@ -76,6 +98,11 @@ public class Vector implements Comparable<Vector> {
   public void setValues(int[] values) {
     _intValues = values;
     _type = VectorType.INT;
+  }
+
+  public void setValues(byte[] values) {
+    _byteValues = values;
+    _type = VectorType.BYTE;
   }
 
   public VectorType getType() {
@@ -87,25 +114,30 @@ public class Vector implements Comparable<Vector> {
     VectorType vectorType = VectorType.valueOf(tokens[0].toUpperCase());
     int dimension = Integer.parseInt(tokens[1]);
     switch (vectorType) {
-      case FLOAT: {
-        float[] result = new float[tokens.length - 2];
+      case FLOAT:
+        float[] floatResult = new float[tokens.length - 2];
         for (int i = 2; i < tokens.length; i++) {
-          result[i - 2] = Float.parseFloat(tokens[i]);
+          floatResult[i - 2] = Float.parseFloat(tokens[i]);
         }
-        return new Vector(dimension, result);
-      }
-      case INT: {
-        int[] result = new int[tokens.length - 2];
+        return new Vector(dimension, floatResult);
+      case INT:
+        int[] intResult = new int[tokens.length - 2];
         for (int i = 2; i < tokens.length; i++) {
-          result[i - 2] = Integer.parseInt(tokens[i]);
+          intResult[i - 2] = Integer.parseInt(tokens[i]);
         }
-        return new Vector(dimension, result);
-      }
+        return new Vector(dimension, intResult);
+      case BYTE:
+        byte[] byteResult = new byte[tokens.length - 2];
+        for (int i = 2; i < tokens.length; i++) {
+          byteResult[i - 2] = Byte.parseByte(tokens[i]);
+        }
+        return new Vector(dimension, byteResult);
       default:
         throw new IllegalArgumentException("Unsupported vector type: " + vectorType);
     }
   }
 
+  @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append(_type);
@@ -114,99 +146,91 @@ public class Vector implements Comparable<Vector> {
     sb.append(",");
     switch (_type) {
       case FLOAT:
-        for (int i = 0; i < _floatValues.length; i++) {
-          sb.append(_floatValues[i]);
-          if (i < _floatValues.length - 1) {
-            sb.append(",");
-          }
+        for (float value : _floatValues) {
+          sb.append(value).append(",");
         }
         break;
       case INT:
-        for (int i = 0; i < _intValues.length; i++) {
-          sb.append(_intValues[i]);
-          if (i < _intValues.length - 1) {
-            sb.append(",");
-          }
+        for (int value : _intValues) {
+          sb.append(value).append(",");
+        }
+        break;
+      case BYTE:
+        for (byte value : _byteValues) {
+          sb.append(value).append(",");
         }
         break;
       default:
         throw new IllegalArgumentException("Unsupported vector type: " + _type);
     }
-    return sb.toString();
+    return sb.substring(0, sb.length() - 1); // To remove the last comma
   }
 
   public byte[] toBytes() {
-    int size = _type == VectorType.FLOAT ? _floatValues.length : _intValues.length;
-    byte[] result = new byte[5 + 4 * size]; // 1 byte for type, 4 for dimension
-    int offset = 0;
-    result[offset++] = (byte) (_type == VectorType.FLOAT ? 0 : 1);
-    int intBits = _dimension;
-    result[offset++] = (byte) (intBits >> 24);
-    result[offset++] = (byte) (intBits >> 16);
-    result[offset++] = (byte) (intBits >> 8);
-    result[offset++] = (byte) (intBits);
-    switch (_type) {
-      case FLOAT:
-        for (int i = 0; i < _floatValues.length; i++) {
-          intBits = Float.floatToIntBits(_floatValues[i]);
-          result[offset++] = (byte) (intBits >> 24);
-          result[offset++] = (byte) (intBits >> 16);
-          result[offset++] = (byte) (intBits >> 8);
-          result[offset++] = (byte) (intBits);
-        }
-        break;
-      case INT:
-        for (int i = 0; i < _intValues.length; i++) {
-          intBits = _intValues[i];
-          result[offset++] = (byte) (intBits >> 24);
-          result[offset++] = (byte) (intBits >> 16);
-          result[offset++] = (byte) (intBits >> 8);
-          result[offset++] = (byte) (intBits);
-        }
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported vector type: " + _type);
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    DataOutputStream dos = new DataOutputStream(baos);
+    try {
+      dos.writeByte(_type.ordinal());
+      dos.writeInt(_dimension);
+      switch (_type) {
+        case FLOAT:
+          for (float value : _floatValues) {
+            dos.writeFloat(value);
+          }
+          break;
+        case INT:
+          for (int value : _intValues) {
+            dos.writeInt(value);
+          }
+          break;
+        case BYTE:
+          for (byte value : _byteValues) {
+            dos.writeByte(value);
+          }
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported vector type: " + _type);
+      }
+    } catch (IOException e) {
+      // This is unlikely since we're writing to a byte array stream,
+      // but you may want to handle this differently.
+      throw new RuntimeException(e);
     }
-    return result;
+    return baos.toByteArray();
   }
 
-  public static Vector fromBytes(byte[] bytes) {
-    int offset = 0;
-    byte typeByte = bytes[offset++];
-    VectorType type = typeByte == 0 ? VectorType.FLOAT : VectorType.INT;
-    int intBits = (bytes[offset++] & 0xFF) << 24;
-    intBits |= (bytes[offset++] & 0xFF) << 16;
-    intBits |= (bytes[offset++] & 0xFF) << 8;
-    intBits |= (bytes[offset++] & 0xFF);
-    int dimension = intBits;
-
-    int size = (bytes.length - 5) / 4;
-    float[] floatResult = null;
-    int[] intResult = null;
-
-    switch (type) {
-      case FLOAT:
-        floatResult = new float[size];
-        for (int i = 0; i < floatResult.length; i++) {
-          intBits = (bytes[offset++] & 0xFF) << 24;
-          intBits |= (bytes[offset++] & 0xFF) << 16;
-          intBits |= (bytes[offset++] & 0xFF) << 8;
-          intBits |= (bytes[offset++] & 0xFF);
-          floatResult[i] = Float.intBitsToFloat(intBits);
-        }
-        return new Vector(dimension, floatResult);
-      case INT:
-        intResult = new int[size];
-        for (int i = 0; i < intResult.length; i++) {
-          intBits = (bytes[offset++] & 0xFF) << 24;
-          intBits |= (bytes[offset++] & 0xFF) << 16;
-          intBits |= (bytes[offset++] & 0xFF) << 8;
-          intBits |= (bytes[offset++] & 0xFF);
-          intResult[i] = intBits;
-        }
-        return new Vector(dimension, intResult);
-      default:
-        throw new IllegalArgumentException("Unsupported vector type: " + type);
+  public static Vector fromBytes(byte[] data) {
+    ByteArrayInputStream bais = new ByteArrayInputStream(data);
+    DataInputStream dis = new DataInputStream(bais);
+    try {
+      VectorType type = VectorType.values()[dis.readByte()];
+      int dimension = dis.readInt();
+      switch (type) {
+        case FLOAT:
+          float[] floatValues = new float[dimension];
+          for (int i = 0; i < dimension; i++) {
+            floatValues[i] = dis.readFloat();
+          }
+          return new Vector(dimension, floatValues);
+        case INT:
+          int[] intValues = new int[dimension];
+          for (int i = 0; i < dimension; i++) {
+            intValues[i] = dis.readInt();
+          }
+          return new Vector(dimension, intValues);
+        case BYTE:
+          byte[] byteValues = new byte[dimension];
+          for (int i = 0; i < dimension; i++) {
+            byteValues[i] = dis.readByte();
+          }
+          return new Vector(dimension, byteValues);
+        default:
+          throw new IllegalArgumentException("Unsupported serialized vector type: " + type);
+      }
+    } catch (IOException e) {
+      // This is unlikely since we're reading from a byte array stream,
+      // but you may want to handle this differently.
+      throw new RuntimeException(e);
     }
   }
 
@@ -224,10 +248,16 @@ public class Vector implements Comparable<Vector> {
           return Float.compare(_floatValues[i], other._floatValues[i]);
         }
       }
-    } else {
+    } else if (_type == VectorType.INT) {
       for (int i = 0; i < _intValues.length; i++) {
         if (_intValues[i] != other._intValues[i]) {
           return Integer.compare(_intValues[i], other._intValues[i]);
+        }
+      }
+    } else if (_type == VectorType.BYTE) {
+      for (int i = 0; i < _byteValues.length; i++) {
+        if (_byteValues[i] != other._byteValues[i]) {
+          return Byte.compare(_byteValues[i], other._byteValues[i]);
         }
       }
     }
@@ -236,15 +266,13 @@ public class Vector implements Comparable<Vector> {
 
   @Override
   public boolean equals(Object other) {
-    Vector otherVector = (Vector) other;
-    if (_dimension != otherVector._dimension || _type != otherVector._type) {
-      return false;
-    }
-    if (_type == VectorType.FLOAT) {
-      return Arrays.equals(_floatValues, otherVector._floatValues);
-    } else {
-      return Arrays.equals(_intValues, otherVector._intValues);
-    }
+    if (this == other) return true;
+    if (other == null || getClass() != other.getClass()) return false;
+    Vector vector = (Vector) other;
+    if (_dimension != vector._dimension || _type != vector._type) return false;
+    if (_type == VectorType.FLOAT) return Arrays.equals(_floatValues, vector._floatValues);
+    if (_type == VectorType.INT) return Arrays.equals(_intValues, vector._intValues);
+    return Arrays.equals(_byteValues, vector._byteValues);
   }
 
   @Override
@@ -253,8 +281,10 @@ public class Vector implements Comparable<Vector> {
     result = 31 * result + _dimension;
     if (_type == VectorType.FLOAT) {
       result = 31 * result + Arrays.hashCode(_floatValues);
-    } else {
+    } else if (_type == VectorType.INT) {
       result = 31 * result + Arrays.hashCode(_intValues);
+    } else if (_type == VectorType.BYTE) {
+      result = 31 * result + Arrays.hashCode(_byteValues);
     }
     return result;
   }
