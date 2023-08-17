@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
@@ -126,7 +127,8 @@ public abstract class BlockExchange {
       return block;
     } catch (Exception e) {
       TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(
-          new RuntimeException("Exception while sending data via exchange for opChain: " + _opChainId));
+          new RuntimeException("Exception while sending data via exchange for opChain: " + _opChainId + "\n"
+              + ExceptionUtils.consolidateExceptionMessages(e)));
       setErrorBlock(errorBlock);
       return errorBlock;
     }
