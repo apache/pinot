@@ -44,10 +44,10 @@ public class LiteralTransformFunction implements TransformFunction {
 
   private final Object _literal;
   private final DataType _dataType;
-  private final int _intLiteral;
-  private final long _longLiteral;
-  private final float _floatLiteral;
-  private final double _doubleLiteral;
+  private final Integer _intLiteral;
+  private final Long _longLiteral;
+  private final Float _floatLiteral;
+  private final Double _doubleLiteral;
   private final BigDecimal _bigDecimalLiteral;
 
   // literals may be shared but values are intentionally not volatile as assignment races are benign
@@ -64,29 +64,29 @@ public class LiteralTransformFunction implements TransformFunction {
     _literal = literalContext.getValue();
     _dataType = literalContext.getType();
     _bigDecimalLiteral = literalContext.getBigDecimalValue();
-    _intLiteral = _bigDecimalLiteral.intValue();
-    _longLiteral = _bigDecimalLiteral.longValue();
-    _floatLiteral = _bigDecimalLiteral.floatValue();
-    _doubleLiteral = _bigDecimalLiteral.doubleValue();
+    _intLiteral = _bigDecimalLiteral == null ? null : _bigDecimalLiteral.intValue();
+    _longLiteral = _bigDecimalLiteral == null ? null : _bigDecimalLiteral.longValue();
+    _floatLiteral = _bigDecimalLiteral == null ? null :_bigDecimalLiteral.floatValue();
+    _doubleLiteral = _bigDecimalLiteral == null ? null : _bigDecimalLiteral.doubleValue();
   }
 
   public boolean getBooleanLiteral() {
     return BooleanUtils.toBoolean(_literal);
   }
 
-  public int getIntLiteral() {
+  public Integer getIntLiteral() {
     return _intLiteral;
   }
 
-  public long getLongLiteral() {
+  public Long getLongLiteral() {
     return _longLiteral;
   }
 
-  public float getFloatLiteral() {
+  public Float getFloatLiteral() {
     return _floatLiteral;
   }
 
-  public double getDoubleLiteral() {
+  public Double getDoubleLiteral() {
     return _doubleLiteral;
   }
 
@@ -95,7 +95,10 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   public String getStringLiteral() {
-    return String.valueOf(_literal);
+    if (_literal != null) {
+      return _literal.toString();
+    }
+    return null;
   }
 
   @Override
@@ -134,9 +137,7 @@ public class LiteralTransformFunction implements TransformFunction {
     if (intResult == null || intResult.length < numDocs) {
       intResult = new int[numDocs];
       if (_dataType != DataType.BOOLEAN) {
-        if (_intLiteral != 0) {
           Arrays.fill(intResult, _intLiteral);
-        }
       } else {
         Arrays.fill(intResult, _intLiteral);
       }

@@ -134,7 +134,7 @@ public class LiteralContext {
       case NULL_VALUE:
         _type = FieldSpec.DataType.UNKNOWN;
         _value = null;
-        _bigDecimalValue = BigDecimal.ZERO;
+        _bigDecimalValue = null;
         break;
       default:
         throw new UnsupportedOperationException("Unsupported data type:" + literal.getSetField());

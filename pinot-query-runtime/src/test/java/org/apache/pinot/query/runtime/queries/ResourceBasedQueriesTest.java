@@ -71,7 +71,7 @@ import org.testng.annotations.Test;
 public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern TABLE_NAME_REPLACE_PATTERN = Pattern.compile("\\{([\\w\\d]+)\\}");
-  private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
+  private static final String QUERY_TEST_RESOURCE_FOLDER = "queries1";
   private static final Random RANDOM = new Random(42);
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
   private static final int NUM_PARTITIONS = 4;

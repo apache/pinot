@@ -76,7 +76,7 @@ import org.slf4j.LoggerFactory;
  */
 public class QueryDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
-  private static final long DEFAULT_DISPATCHER_CALLBACK_POLL_TIMEOUT_MS = 100;
+  private static final long DEFAULT_DISPATCHER_CALLBACK_POLL_TIMEOUT_MS = 1000000000;
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
 
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
