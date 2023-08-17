@@ -117,7 +117,7 @@
         </exclusion>
         <exclusion>
           <groupId>com.fasterxml.woodstox</groupId>
-          <artifactId>woodstox-core</artifactId>
+          <artifactId>stax2-api</artifactId>
         </exclusion>
         <exclusion>
           <groupId>com.nimbusds</groupId>
