@@ -207,6 +207,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       _segmentPreloadExecutor.shutdownNow();
     }
     for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+      tableDataManager.stop();
       tableDataManager.shutDown();
     }
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
@@ -264,6 +265,17 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void deleteTable(String tableNameWithType)
       throws Exception {
+
+    _tableDataManagerMap.compute(tableNameWithType, (k, v) -> {
+      if (v != null) {
+        v.stop();
+        LOGGER.info("Stopped table data manager: {}", tableNameWithType);
+      } else {
+        LOGGER.warn("Failed to find table data manager for table: {}, skip removing the table", tableNameWithType);
+      }
+      return null;
+    });
+
     // Wait externalview to converge
     long endTimeMs = System.currentTimeMillis() + _externalViewDroppedMaxWaitMs;
     do {
