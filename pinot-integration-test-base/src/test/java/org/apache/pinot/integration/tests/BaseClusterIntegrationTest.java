@@ -39,6 +39,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -591,8 +592,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected List<File> unpackTarData(String tarFileName, File outputDir)
       throws Exception {
-    InputStream inputStream =
-        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(tarFileName);
+    InputStream inputStream = BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(tarFileName);
     Assert.assertNotNull(inputStream);
     return TarGzCompressionUtils.untar(inputStream, outputDir);
   }
@@ -618,9 +618,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     String kafkaBroker = "localhost:" + getKafkaPort();
     StreamDataProducer producer = null;
     try {
-      producer =
-          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
-              getDefaultKafkaProducerProperties(kafkaBroker));
+      producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+          getDefaultKafkaProducerProperties(kafkaBroker));
       ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, kafkaTopic, partitionColumnIndex, injectTombstones(),
           producer);
     } catch (Exception e) {
@@ -635,9 +634,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     String kafkaBroker = "localhost:" + getKafkaPort();
     StreamDataProducer producer = null;
     try {
-      producer =
-          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
-              getDefaultKafkaProducerProperties(kafkaBroker));
+      producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+          getDefaultKafkaProducerProperties(kafkaBroker));
       ClusterIntegrationTestUtils.pushCsvIntoKafka(csvRecords, kafkaTopic, partitionColumnIndex, injectTombstones(),
           producer);
     } catch (Exception e) {
@@ -734,9 +732,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     final long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(
-        () -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
         "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
+  }
+
+  /**
+   * Wait for servers to remove the table data manager after the table is deleted.
+   */
+  protected void waitForTableDataManagerRemoved(String tableNameWithType) {
+    TestUtils.waitForCondition(aVoid -> {
+      for (BaseServerStarter serverStarter : _serverStarters) {
+        if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType) != null) {
+          return false;
+        }
+      }
+      return true;
+    }, 60_000L, "Failed to remove table data manager for table: " + tableNameWithType);
   }
 
   /**

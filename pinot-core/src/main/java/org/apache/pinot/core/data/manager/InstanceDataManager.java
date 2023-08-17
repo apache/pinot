@@ -75,12 +75,6 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
-   * Adds a segment from local disk into an OFFLINE table.
-   */
-  void addOfflineSegment(String offlineTableName, String segmentName, File indexDir)
-      throws Exception;
-
-  /**
    * Adds a segment into an REALTIME table.
    * <p>The segment might be committed or under consuming.
    */
