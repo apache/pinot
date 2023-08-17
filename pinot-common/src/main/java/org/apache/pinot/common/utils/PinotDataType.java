@@ -1568,6 +1568,11 @@ public enum PinotDataType {
         return fieldSpec.isSingleValueField() ? STRING : STRING_ARRAY;
       case BYTES:
         return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
+      case VECTOR:
+        if (fieldSpec.isSingleValueField()) {
+          return VECTOR;
+        }
+        throw new IllegalStateException("There is no multi-value type for Vector");
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());

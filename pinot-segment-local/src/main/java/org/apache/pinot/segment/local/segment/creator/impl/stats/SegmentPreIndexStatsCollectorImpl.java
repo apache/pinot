@@ -71,6 +71,9 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
         case BYTES:
           _columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
           break;
+        case VECTOR:
+          _columnStatsCollectorMap.put(column, new VectorColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          break;
         default:
           throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
       }

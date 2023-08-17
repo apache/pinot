@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
@@ -242,6 +243,28 @@ public class SegmentDictionaryCreator implements IndexCreator {
             _columnName, numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
         return;
 
+      case VECTOR:
+        Vector[] sortedVectors = (Vector[]) sortedValues;
+        numValues = sortedVectors.length;
+        Preconditions.checkState(numValues > 0);
+        _objectValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+
+        // Get the maximum length of all entries
+        byte[][] sortedVectorBytes = new byte[numValues][];
+        for (int i = 0; i < numValues; i++) {
+          Vector value = sortedVectors[i];
+          _objectValueToIndexMap.put(value, i);
+          byte[] valueBytes = value.toBytes();
+          sortedVectorBytes[i] = valueBytes;
+          _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
+        }
+
+        writeBytesValueDictionary(sortedVectorBytes);
+        LOGGER.info(
+            "Created dictionary for VECTOR column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
+            _columnName, numValues, _numBytesPerEntry, sortedVectors[0], sortedVectors[numValues - 1]);
+        return;
+
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + _storedType);
     }
@@ -296,6 +319,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         return _objectValueToIndexMap.getInt(value);
       case BYTES:
         return _objectValueToIndexMap.getInt(new ByteArray((byte[]) value));
+      case VECTOR:
+        return _objectValueToIndexMap.getInt(value);
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
     }

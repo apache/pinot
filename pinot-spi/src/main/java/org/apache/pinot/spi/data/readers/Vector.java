@@ -31,7 +31,30 @@ import java.util.Arrays;
 public class Vector implements Comparable<Vector> {
 
   public enum VectorType {
-    FLOAT, INT, BYTE
+    FLOAT(0), INT(1), BYTE(2);
+
+    VectorType(int id) {
+      _id = id;
+    }
+
+    public int getId() {
+      return _id;
+    }
+
+    private int _id;
+
+    public static VectorType fromId(int id) {
+      switch (id) {
+        case 0:
+          return FLOAT;
+        case 1:
+          return INT;
+        case 2:
+          return BYTE;
+        default:
+          throw new IllegalArgumentException("Invalid vector type id: " + id);
+      }
+    }
   }
 
   private int _dimension;
@@ -111,7 +134,7 @@ public class Vector implements Comparable<Vector> {
 
   public static Vector fromString(String value) {
     String[] tokens = value.split(",");
-    VectorType vectorType = VectorType.valueOf(tokens[0].toUpperCase());
+    VectorType vectorType = VectorType.fromId(Integer.parseInt(tokens[0].toUpperCase()));
     int dimension = Integer.parseInt(tokens[1]);
     switch (vectorType) {
       case FLOAT:
@@ -140,7 +163,7 @@ public class Vector implements Comparable<Vector> {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append(_type);
+    sb.append(_type.getId());
     sb.append(",");
     sb.append(_dimension);
     sb.append(",");

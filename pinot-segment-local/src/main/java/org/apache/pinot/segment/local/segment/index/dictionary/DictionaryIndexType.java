@@ -310,6 +310,7 @@ public class DictionaryIndexType
         numBytesPerValue = metadata.getColumnMaxLength();
         return loadOnHeap ? new OnHeapStringDictionary(dataBuffer, length, numBytesPerValue)
             : new StringDictionary(dataBuffer, length, numBytesPerValue);
+      case VECTOR:
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();
         return loadOnHeap ? new OnHeapBytesDictionary(dataBuffer, length, numBytesPerValue)

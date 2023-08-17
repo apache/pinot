@@ -48,6 +48,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -287,6 +288,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         case BYTES:
           builder.setMinValue(BytesUtils.toByteArray(minString));
           builder.setMaxValue(BytesUtils.toByteArray(maxString));
+          break;
+        case VECTOR:
+          builder.setMinValue(Vector.fromString(minString));
+          builder.setMaxValue(Vector.fromString(maxString));
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + column);
