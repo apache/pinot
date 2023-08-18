@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.stream.Collectors;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.OpChain;
@@ -87,16 +86,13 @@ public class OpChainSchedulerService {
   public void cancel(long requestId) {
     // simple cancellation. for leaf stage this cannot be a dangling opchain b/c they will eventually be cleared up
     // via query timeout.
-    List<Map.Entry<OpChainId, Future<?>>> entries =
-        _submittedOpChainMap.entrySet().stream().filter(entry -> entry.getKey().getRequestId() == requestId)
-            .collect(Collectors.toList());
-    for (Map.Entry<OpChainId, Future<?>> entry : entries) {
-      OpChainId key = entry.getKey();
-      Future<?> future = entry.getValue();
-      if (future != null) {
-        future.cancel(true);
+    Iterator<Map.Entry<OpChainId, Future<?>>> iterator = _submittedOpChainMap.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<OpChainId, Future<?>> entry = iterator.next();
+      if (entry.getKey().getRequestId() == requestId) {
+        entry.getValue().cancel(true);
+        iterator.remove();
       }
-      _submittedOpChainMap.remove(key);
     }
   }
 }
