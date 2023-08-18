@@ -33,7 +33,7 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 public class TextIndexConfig extends IndexConfig {
   private static final int LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB = 500;
-
+  private static final boolean LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE = true;
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
           LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB);
@@ -65,9 +65,10 @@ public class TextIndexConfig extends IndexConfig {
     _useANDForMultiTermQueries = useANDForMultiTermQueries;
     _stopWordsInclude = stopWordsInclude;
     _stopWordsExclude = stopWordsExclude;
-    _luceneUseCompoundFile = luceneUseCompoundFile == null || luceneUseCompoundFile; // default to useCompoundFile
-    _luceneMaxBufferSizeMB = luceneMaxBufferSizeMB == null ? LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB
-        : luceneMaxBufferSizeMB;
+    _luceneUseCompoundFile =
+        luceneUseCompoundFile == null ? LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE : luceneUseCompoundFile;
+    _luceneMaxBufferSizeMB =
+        luceneMaxBufferSizeMB == null ? LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB : luceneMaxBufferSizeMB;
   }
 
   public FSTType getFstType() {
@@ -123,7 +124,7 @@ public class TextIndexConfig extends IndexConfig {
     protected boolean _useANDForMultiTermQueries = true;
     protected List<String> _stopWordsInclude = new ArrayList<>();
     protected List<String> _stopWordsExclude = new ArrayList<>();
-    protected boolean _luceneUseCompoundFile = true;
+    protected boolean _luceneUseCompoundFile = LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE;
     protected int _luceneMaxBufferSizeMB = LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB;
 
     public AbstractBuilder(@Nullable FSTType fstType) {
