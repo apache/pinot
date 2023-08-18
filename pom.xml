@@ -1520,7 +1520,7 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.6</version>
+        <version>0.8.9</version>
         <executions>
           <execution>
             <goals>
@@ -1533,6 +1533,9 @@
             <goals>
               <goal>report-aggregate</goal>
             </goals>
+            <configuration>
+              <includeCurrentProject>true</includeCurrentProject>
+            </configuration>
           </execution>
         </executions>
         <configuration>
