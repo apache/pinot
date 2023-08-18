@@ -496,7 +496,7 @@ public class DataSchema {
         case BYTES:
           return ((ByteArray) value).toHexString();
         case VECTOR:
-          return ((Vector) value).toString();
+          return Vector.fromBytes(((ByteArray) value).getBytes()).toString();
         case INT_ARRAY:
           return (int[]) value;
         case LONG_ARRAY:

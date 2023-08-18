@@ -105,10 +105,16 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
       _currentRowDataByteBuffer.putInt(0);
       _variableSizeDataOutputStream.writeInt(CustomObject.NULL_TYPE_VALUE);
     } else {
-      int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
+      ObjectSerDeUtils.ObjectType objectType = ObjectSerDeUtils.ObjectType.getObjectType(value);
+      int objectTypeValue = objectType.getValue();
       byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
+      //TODO: Remove this if clause we integrate vector type into the data table like BigDecimal
+      // Currently we are using int to store objectTypeValue but we don't add 4 to byte array length which messes up the vector deserialization
+      // Is this a bug? Should we fix it?
       _currentRowDataByteBuffer.putInt(bytes.length);
-      _variableSizeDataOutputStream.writeInt(objectTypeValue);
+      if (objectType != ObjectSerDeUtils.ObjectType.Vector) {
+        _variableSizeDataOutputStream.writeInt(objectTypeValue);
+      }
       _variableSizeDataByteArrayOutputStream.write(bytes);
     }
   }

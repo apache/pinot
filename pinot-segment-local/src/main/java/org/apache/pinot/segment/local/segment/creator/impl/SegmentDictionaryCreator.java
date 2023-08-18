@@ -320,7 +320,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
       case BYTES:
         return _objectValueToIndexMap.getInt(new ByteArray((byte[]) value));
       case VECTOR:
-        return _objectValueToIndexMap.getInt(value);
+        return _objectValueToIndexMap.getInt(((Vector) value).toBytes());
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
     }

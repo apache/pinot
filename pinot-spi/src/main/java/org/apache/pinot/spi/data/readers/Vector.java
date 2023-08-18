@@ -89,6 +89,19 @@ public class Vector implements Comparable<Vector> {
     _dimension = dimension;
   }
 
+  public Object[] getValues() {
+    switch (_type) {
+      case FLOAT:
+        return new Object[]{_floatValues};
+      case INT:
+        return new Object[]{_intValues};
+      case BYTE:
+        return new Object[]{_byteValues};
+      default:
+        throw new IllegalStateException("Invalid vector type: " + _type);
+    }
+  }
+
   @JsonIgnore
   public float[] getFloatValues() {
     if (_type != VectorType.FLOAT) {
@@ -193,7 +206,7 @@ public class Vector implements Comparable<Vector> {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutputStream dos = new DataOutputStream(baos);
     try {
-      dos.writeByte(_type.ordinal());
+      dos.writeInt(_type.getId());
       dos.writeInt(_dimension);
       switch (_type) {
         case FLOAT:
@@ -226,7 +239,8 @@ public class Vector implements Comparable<Vector> {
     ByteArrayInputStream bais = new ByteArrayInputStream(data);
     DataInputStream dis = new DataInputStream(bais);
     try {
-      VectorType type = VectorType.values()[dis.readByte()];
+      int typeId = dis.readInt();
+      VectorType type = VectorType.fromId(typeId);
       int dimension = dis.readInt();
       switch (type) {
         case FLOAT:

@@ -90,6 +90,7 @@ public class GapfillUtils {
       case STRING:
       case JSON:
       case BYTES:
+      case VECTOR:
         return "";
       case INT_ARRAY:
         return new int[0];

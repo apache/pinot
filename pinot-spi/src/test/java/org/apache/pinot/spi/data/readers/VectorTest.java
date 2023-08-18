@@ -65,7 +65,7 @@ public class VectorTest {
     float[] values = new float[] {1.2f, 3.4f};
     Vector vector = new Vector(dimension, values);
 
-    String expected = "FLOAT,2,1.2,3.4";
+    String expected = "0,2,1.2,3.4";
     Assert.assertEquals(vector.toString(), expected);
 
     Vector fromStringVector = Vector.fromString(expected);
@@ -80,7 +80,7 @@ public class VectorTest {
     int[] values = new int[] {5, 6, 7};
     Vector vector = new Vector(dimension, values);
 
-    String expected = "INT,3,5,6,7";
+    String expected = "1,3,5,6,7";
     Assert.assertEquals(vector.toString(), expected);
 
     Vector fromStringVector = Vector.fromString(expected);
