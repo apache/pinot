@@ -102,6 +102,21 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testSingleValueQuery()
+      throws Exception {
+    String query = "select sum(ActualElapsedTime) from mytable WHERE ActualElapsedTime > "
+        + "(select avg(ActualElapsedTime) as avg_profit from mytable)";
+    JsonNode jsonNode = postQuery(query);
+    long joinResult = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+
+    // The query of `SELECT avg(ActualElapsedTime) FROM mytable` is -1412.435033969449
+    query = "select sum(ActualElapsedTime) as profit from mytable WHERE ActualElapsedTime > -1412.435033969449";
+    jsonNode = postQuery(query);
+    long expectedResult = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+    assertEquals(joinResult, expectedResult);
+  }
+
+  @Test
   @Override
   public void testGeneratedQueries()
       throws Exception {
