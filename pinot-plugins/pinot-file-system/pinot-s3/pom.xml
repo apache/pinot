@@ -39,6 +39,7 @@
     <http.core.version>4.4.13</http.core.version>
     <s3mock.version>2.12.2</s3mock.version>
     <javax.version>3.1.0</javax.version>
+    <logback.version>1.2.3</logback.version>
     <phase.prop>package</phase.prop>
   </properties>
 
@@ -132,6 +133,12 @@
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-core</artifactId>
+      <version>${logback.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.adobe.testing</groupId>
