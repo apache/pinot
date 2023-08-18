@@ -50,6 +50,7 @@
     <module>pinot-segment-writer</module>
     <module>pinot-segment-uploader</module>
     <module>pinot-environment</module>
+    <module>pinot-query-event-listener</module>
   </modules>
 
   <dependencies>
