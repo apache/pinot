@@ -19,5 +19,5 @@
 package org.apache.pinot.common.metadata.controllerjob;
 
 public enum ControllerJobType {
-  RELOAD_SEGMENT, FORCE_COMMIT, TABLE_REBALANCE
+  RELOAD_SEGMENT, FORCE_COMMIT, TABLE_REBALANCE, TENANT_REBALANCE
 }

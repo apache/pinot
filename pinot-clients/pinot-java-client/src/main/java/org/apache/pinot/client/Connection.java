@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
@@ -118,7 +119,7 @@ public class Connection {
     String[] tableNames = (tableName == null) ? resolveTableName(query) : new String[]{tableName};
     String brokerHostPort = _brokerSelector.selectBroker(tableNames);
     if (brokerHostPort == null) {
-      throw new PinotClientException("Could not find broker to query for table: " + tableName);
+      throw new PinotClientException("Could not find broker to query for table(s): " + Arrays.asList(tableNames));
     }
     BrokerResponse response = _transport.executeQuery(brokerHostPort, query);
     if (response.hasExceptions() && _failOnExceptions) {

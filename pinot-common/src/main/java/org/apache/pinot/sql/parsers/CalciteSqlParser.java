@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
@@ -715,16 +716,16 @@ public class CalciteSqlParser {
         SqlNode elseOperand = caseSqlNode.getElseOperand();
         Expression caseFuncExpr = RequestUtils.getFunctionExpression("case");
         Preconditions.checkState(whenOperands.size() == thenOperands.size());
-        // TODO: convert this to new format once 0.13 is released
-        for (SqlNode whenSqlNode : whenOperands.getList()) {
+        for (int i = 0; i < whenOperands.size(); i++) {
+          SqlNode whenSqlNode = whenOperands.get(i);
           Expression whenExpression = toExpression(whenSqlNode);
           if (isAggregateExpression(whenExpression)) {
             throw new SqlCompilationException(
                 "Aggregation functions inside WHEN Clause is not supported - " + whenSqlNode);
           }
           caseFuncExpr.getFunctionCall().addToOperands(whenExpression);
-        }
-        for (SqlNode thenSqlNode : thenOperands.getList()) {
+
+          SqlNode thenSqlNode = thenOperands.get(i);
           Expression thenExpression = toExpression(thenSqlNode);
           if (isAggregateExpression(thenExpression)) {
             throw new SqlCompilationException(
@@ -973,5 +974,24 @@ public class CalciteSqlParser {
       expression = expression.getFunctionCall().getOperands().get(0);
     }
     return expression;
+  }
+
+  @Nullable
+  public static Boolean isNullsLast(Expression expression) {
+    String operator = expression.getFunctionCall().getOperator();
+    if (operator.equals(CalciteSqlParser.NULLS_LAST)) {
+      return true;
+    } else if (operator.equals(CalciteSqlParser.NULLS_FIRST)) {
+      return false;
+    } else {
+      return null;
+    }
+  }
+
+  public static boolean isAsc(Expression expression, Boolean isNullsLast) {
+    if (isNullsLast != null) {
+      expression = expression.getFunctionCall().getOperands().get(0);
+    }
+    return expression.getFunctionCall().getOperator().equals(CalciteSqlParser.ASC);
   }
 }

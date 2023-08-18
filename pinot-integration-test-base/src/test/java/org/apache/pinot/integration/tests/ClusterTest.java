@@ -78,6 +78,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.DataProvider;
 
+import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -447,20 +448,18 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(query, getBrokerBaseApiUrl(), null, getExtraQueryProperties());
+    return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
+        getExtraQueryProperties());
   }
 
   protected Map<String, String> getExtraQueryProperties() {
-    if (!useMultiStageQueryEngine()) {
-      return Collections.emptyMap();
-    }
-    return ImmutableMap.of("queryOptions", "useMultistageEngine=true");
+    return Collections.emptyMap();
   }
 
   /**
-   * Queries the broker's sql query endpoint (/sql)
+   * Queries the broker's sql query endpoint (/query or /query/sql)
    */
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers,
+  public static JsonNode postQuery(String query, String brokerQueryApiUrl, Map<String, String> headers,
       Map<String, String> extraJsonProperties)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
@@ -470,7 +469,7 @@ public abstract class ClusterTest extends ControllerTest {
         payload.put(extraProperty.getKey(), extraProperty.getValue());
       }
     }
-    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString(), headers));
+    return JsonUtils.stringToJsonNode(sendPostRequest(brokerQueryApiUrl, payload.toString(), headers));
   }
 
   /**
@@ -478,7 +477,8 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQueryWithOptions(String query, String queryOptions)
       throws Exception {
-    return postQuery(query, getBrokerBaseApiUrl(), null, ImmutableMap.of("queryOptions", queryOptions));
+    return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
+        ImmutableMap.of("queryOptions", queryOptions));
   }
 
   /**
@@ -486,7 +486,14 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public JsonNode postQueryToController(String query)
       throws Exception {
-    return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryProperties());
+    return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryPropertiesForController());
+  }
+
+  private Map<String, String> getExtraQueryPropertiesForController() {
+    if (!useMultiStageQueryEngine()) {
+      return Collections.emptyMap();
+    }
+    return ImmutableMap.of("queryOptions", "useMultistageEngine=true");
   }
 
   /**

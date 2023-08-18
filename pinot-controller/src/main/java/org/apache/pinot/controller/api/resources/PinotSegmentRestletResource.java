@@ -59,11 +59,11 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -186,7 +186,7 @@ public class PinotSegmentRestletResource {
   Executor _executor;
 
   @Inject
-  HttpConnectionManager _connectionManager;
+  HttpClientConnectionManager _connectionManager;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)

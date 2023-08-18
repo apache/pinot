@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.realtime.impl.fakestream;
 
-import java.util.Set;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -31,7 +30,6 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
-import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -48,12 +46,6 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
     return new FakePartitionLevelConsumer(partition, _streamConfig, FakeStreamConfigUtils.MESSAGE_BATCH_SIZE);
-  }
-
-  @Override
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
-      String groupId) {
-    throw new UnsupportedOperationException("Pinot no longer support stream level consumers!");
   }
 
   @Override

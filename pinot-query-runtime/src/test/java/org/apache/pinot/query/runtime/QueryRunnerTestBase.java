@@ -228,6 +228,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       } else if (l instanceof String) {
         if (r instanceof byte[]) {
           return ((String) l).compareTo(BytesUtils.toHexString((byte[]) r));
+        } else if (r instanceof Timestamp) {
+          return ((String) l).compareTo((r).toString());
         }
         return ((String) l).compareTo((String) r);
       } else if (l instanceof Boolean) {

@@ -202,7 +202,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
     if(result.error){
       setSchemaJSON(null);
       setTableSchema({
-        columns: ['Column', 'Type', 'Field Type'],
+        columns: ['Column', 'Type', 'Field Type', 'Multi Value'],
         records: []
       });
     } else {
@@ -521,13 +521,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           <Grid item xs={4}>
             <strong>Table Name:</strong> {tableSummary.tableName}
           </Grid>
-          <Tooltip title="Uncompressed size of all data segments"  arrow placement="top-start">
+          <Tooltip title="Uncompressed size of all data segments with replication"  arrow placement="top-start">
           <Grid item xs={2}>
             <strong>Reported Size:</strong> {Utils.formatBytes(tableSummary.reportedSize)}
           </Grid>
           </Tooltip>
           <Grid item xs={2}></Grid>
-          <Tooltip title="Estimated size of all data segments, in case any servers are not reachable for actual size" arrow placement="top-start">
+          <Tooltip title="Estimated size of all data segments with replication, in case any servers are not reachable for actual size" arrow placement="top-start">
             <Grid item xs={2}>
               <strong>Estimated Size: </strong>
               {Utils.formatBytes(tableSummary.estimatedSize)}

@@ -65,37 +65,41 @@ public class ReceivingMailbox {
    * Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
    * added. If the block is not added, an error block is added to the mailbox.
    */
-  public boolean offer(TransferableBlock block, long timeoutMs) {
-    if (_errorBlock.get() != null) {
+  public ReceivingMailboxStatus offer(TransferableBlock block, long timeoutMs) {
+    TransferableBlock errorBlock = _errorBlock.get();
+    if (errorBlock != null) {
       LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
-      return false;
+      return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.EARLY_TERMINATED
+          : ReceivingMailboxStatus.ERROR;
     }
-    if (timeoutMs < 0) {
+    if (timeoutMs <= 0) {
       LOGGER.debug("Mailbox: {} is already timed out", _id);
       setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
           new TimeoutException("Timed out while offering data to mailbox: " + _id)));
-      return false;
+      return ReceivingMailboxStatus.TIMEOUT;
     }
     try {
       if (_blocks.offer(block, timeoutMs, TimeUnit.MILLISECONDS)) {
-        if (_errorBlock.get() == null) {
+        errorBlock = _errorBlock.get();
+        if (errorBlock == null) {
           _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
-          return true;
+          return ReceivingMailboxStatus.SUCCESS;
         } else {
           LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
           _blocks.clear();
-          return false;
+          return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.EARLY_TERMINATED
+              : ReceivingMailboxStatus.ERROR;
         }
       } else {
         LOGGER.debug("Failed to offer block into mailbox: {} within: {}ms", _id, timeoutMs);
         setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
             new TimeoutException("Timed out while waiting for receive operator to consume data from mailbox: " + _id)));
-        return false;
+        return ReceivingMailboxStatus.TIMEOUT;
       }
     } catch (InterruptedException e) {
       LOGGER.error("Interrupted while offering block into mailbox: {}", _id);
       setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(e));
-      return false;
+      return ReceivingMailboxStatus.ERROR;
     }
   }
 
@@ -132,5 +136,9 @@ public class ReceivingMailbox {
 
   public int getNumPendingBlocks() {
     return _blocks.size();
+  }
+
+  public enum ReceivingMailboxStatus {
+    SUCCESS, ERROR, TIMEOUT, EARLY_TERMINATED
   }
 }

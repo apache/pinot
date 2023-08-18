@@ -21,7 +21,6 @@ package org.apache.pinot.broker.broker;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -31,7 +30,6 @@ import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
-import org.apache.pinot.spi.stream.StreamLevelConsumer;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
@@ -41,13 +39,6 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
     return new FakePartitionLevelConsumer();
   }
-
-  @Override
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Set<String> fieldsToRead,
-      String groupId) {
-    return null;
-  }
-
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
     return new FakesStreamMetadataProvider();
