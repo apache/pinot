@@ -206,6 +206,7 @@ public class CommonConstants {
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
+    public static final String EVENT_LISTENER_CONFIG_PREFIX = "pinot.broker.event.listener";
     public static final String CONFIG_OF_METRICS_NAME_PREFIX = "pinot.broker.metrics.prefix";
     public static final String DEFAULT_METRICS_NAME_PREFIX = "pinot.broker.";
 

@@ -65,7 +65,6 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
-import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventInfo;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
@@ -315,9 +314,8 @@ public class PinotClientRequest {
     switch (sqlType) {
       case DQL:
         try (RequestScope requestStatistics = Tracing.getTracer().createRequestScope()) {
-          BrokerQueryEventInfo brokerQueryEventInfo = new BrokerQueryEventInfo();
           return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity,
-              requestStatistics, httpHeaders, brokerQueryEventInfo);
+              requestStatistics, httpHeaders);
         }
       case DML:
         Map<String, String> headers = new HashMap<>();

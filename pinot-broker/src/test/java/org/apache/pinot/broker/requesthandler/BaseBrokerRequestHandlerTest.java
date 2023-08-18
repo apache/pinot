@@ -210,7 +210,8 @@ public class BaseBrokerRequestHandlerTest {
     BaseBrokerRequestHandler requestHandler =
         new BaseBrokerRequestHandler(config, "testBrokerId", routingManager, new AllowAllAccessControlFactory(),
             queryQuotaManager, tableCache,
-            new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet())) {
+            new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true,
+                Collections.emptySet()), null) {
           @Override
           public void start() {
           }

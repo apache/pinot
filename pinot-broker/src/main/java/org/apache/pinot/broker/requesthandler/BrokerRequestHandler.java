@@ -27,7 +27,6 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventInfo;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 
@@ -40,14 +39,13 @@ public interface BrokerRequestHandler {
   void shutDown();
 
   BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders,
-                               BrokerQueryEventInfo brokerQueryEventInfo)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws Exception;
 
   default BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestContext requestContext, HttpHeaders httpHeaders)
       throws Exception {
-    return handleRequest(request, null, requesterIdentity, requestContext, httpHeaders, null);
+    return handleRequest(request, null, requesterIdentity, requestContext, httpHeaders);
   }
 
   Map<Long, String> getRunningQueries();

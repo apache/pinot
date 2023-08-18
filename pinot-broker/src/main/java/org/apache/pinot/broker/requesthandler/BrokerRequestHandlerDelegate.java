@@ -31,7 +31,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventInfo;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -83,8 +82,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders,
-                                      BrokerQueryEventInfo brokerQueryEventInfo)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws Exception {
     requestContext.setBrokerId(_brokerId);
     if (sqlNodeAndOptions == null) {
@@ -107,7 +105,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         return _multiStageBrokerRequestHandler.handleRequest(request, requesterIdentity, requestContext, httpHeaders);
     } else {
       return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
-          requestContext, httpHeaders, brokerQueryEventInfo);
+          requestContext, httpHeaders);
     }
   }
 

@@ -91,6 +91,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventInfo;
+import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventListener;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -137,10 +138,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
   private final Map<Long, QueryServers> _queriesById;
+  private final BrokerQueryEventListener _brokerQueryEventListener;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics) {
+      BrokerMetrics brokerMetrics, BrokerQueryEventListener brokerQueryEventListener) {
     _brokerId = brokerId;
     _brokerIdGenerator = new BrokerRequestIdGenerator(brokerId);
     _config = config;
@@ -164,6 +166,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     boolean enableQueryCancellation =
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
     _queriesById = enableQueryCancellation ? new ConcurrentHashMap<>() : null;
+    _brokerQueryEventListener = brokerQueryEventListener;
     LOGGER.info(
         "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps, "
             + "enabling query cancellation: {}", _brokerId, _brokerTimeoutMs, _queryResponseLimit,
@@ -214,8 +217,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         // Unexpected server responses are collected and returned as exception.
         if (status != 200 && status != 404) {
           String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
-          throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,
-              responseString, uri));
+          throw new Exception(
+              String.format("Unexpected status=%d and response='%s' from uri='%s'", status, responseString, uri));
         }
         if (serverResponses != null) {
           serverResponses.put(uri.getHost() + ":" + uri.getPort(), status);
@@ -239,8 +242,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders,
-                                      BrokerQueryEventInfo brokerQueryEventInfo)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws Exception {
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
@@ -250,7 +252,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (!hasAccess) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-      brokerQueryEventInfo.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -258,13 +259,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setRequestId(requestId);
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null) {
-      brokerQueryEventInfo.setErrorCode(QueryException.BROKER_REQUEST_SEND_ERROR_CODE);
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
     String query = sql.asText();
     requestContext.setQuery(query);
-    BrokerResponse brokerResponse = handleRequest(requestId, query, sqlNodeAndOptions, request,
-            requesterIdentity, requestContext, httpHeaders, brokerQueryEventInfo);
+    BrokerResponse brokerResponse =
+        handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders);
 
     if (request.has(Broker.Request.QUERY_OPTIONS)) {
       String queryOptions = request.get(Broker.Request.QUERY_OPTIONS).asText();
@@ -302,7 +302,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
         requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-        brokerQueryEventInfo.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
       }
 
@@ -726,7 +725,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       brokerResponse.setTimeUsedMs(totalTimeMs);
       requestContext.setQueryProcessingTime(totalTimeMs);
       augmentStatistics(requestContext, brokerResponse);
-      augmentStatistics(brokerQueryEventInfo, brokerResponse);
       _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
           TimeUnit.MILLISECONDS);
 
@@ -851,8 +849,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * IN_ID_SET transform function.
    */
   private void handleSubquery(Expression expression, long requestId, JsonNode jsonRequest,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders,
-                              BrokerQueryEventInfo brokerQueryEventInfo)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
       throws Exception {
     Function function = expression.getFunctionCall();
     if (function == null) {
@@ -865,8 +862,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
       String subquery = subqueryLiteral.getStringValue();
       BrokerResponse response =
-          handleRequest(requestId, subquery, null, jsonRequest, requesterIdentity, requestContext,
-                  httpHeaders, brokerQueryEventInfo);
+          handleRequest(requestId, subquery, null, jsonRequest, requesterIdentity, requestContext, httpHeaders);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }
@@ -1656,10 +1652,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
-  protected abstract BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-                                                  JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
-                                                  HttpHeaders httpHeaders, BrokerQueryEventInfo brokerQueryEventInfo);
-
   /**
    * Processes the optimized broker requests for both OFFLINE and REALTIME table.
    * TODO: Directly take PinotQuery
@@ -1713,7 +1705,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     brokerQueryEventInfo.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
     brokerQueryEventInfo.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());
     brokerQueryEventInfo.setRealtimeResponseSerializationCpuTimeNs(
-            response.getRealtimeResponseSerializationCpuTimeNs());
+        response.getRealtimeResponseSerializationCpuTimeNs());
     brokerQueryEventInfo.setOfflineTotalCpuTimeNs(response.getOfflineTotalCpuTimeNs());
     brokerQueryEventInfo.setRealtimeTotalCpuTimeNs(response.getRealtimeTotalCpuTimeNs());
     brokerQueryEventInfo.setNumRowsResultSet(response.getNumRowsResultSet());

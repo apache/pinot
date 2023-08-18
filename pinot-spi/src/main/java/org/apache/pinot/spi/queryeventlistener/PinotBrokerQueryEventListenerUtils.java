@@ -47,9 +47,6 @@ public class PinotBrokerQueryEventListenerUtils {
     public synchronized static void init(PinotConfiguration eventListenerConfiguration) {
         // Initializes PinotQueryEventListenerFactory.
         initializeBrokerQueryEventListenerFactory(eventListenerConfiguration);
-
-        // Initializes event listener using the eventListener configuration.
-        initializeBrokerQueryEventListenerFactory(eventListenerConfiguration);
     }
 
     /**
