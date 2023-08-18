@@ -402,6 +402,25 @@
           "\n            LogicalTableScan(table=[[b]])",
           "\n"
         ]
+      },
+      {
+        "description": "Inner join with limit",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 LIMIT 100",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[100])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[100])",
+          "\n      LogicalProject(col1=[$0], ts=[$1], col3=[$3])",
+          "\n        LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col1=[$0], ts=[$6])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
       }
     ]
   },

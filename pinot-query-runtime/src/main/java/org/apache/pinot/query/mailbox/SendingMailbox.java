@@ -55,4 +55,10 @@ public interface SendingMailbox {
    * No more blocks can be sent after calling this method.
    */
   void cancel(Throwable t);
+
+  /**
+   * Returns whether the {@link ReceivingMailbox} is already closed. There is no need to send more blocks after the
+   * mailbox is terminated.
+   */
+  boolean isTerminated();
 }

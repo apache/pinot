@@ -49,9 +49,15 @@ public class PulsarMessageBatch implements MessageBatch<PulsarStreamMessage> {
     return _messageList.size();
   }
 
+  @Deprecated
   @Override
   public PulsarStreamMessage getMessageAtIndex(int index) {
     return _messageList.get(index);
+  }
+
+  @Override
+  public byte[] getMessageBytesAtIndex(int index) {
+    return getMessageAtIndex(index).getValue();
   }
 
   @Override

@@ -20,11 +20,14 @@ package org.apache.pinot.query.planner.plannode;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.GregorianCalendar;
 import java.util.List;
 import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class ValueNode extends AbstractPlanNode {
@@ -42,6 +45,15 @@ public class ValueNode extends AbstractPlanNode {
     for (List<RexLiteral> literalTuple : literalTuples) {
       List<RexExpression> literalRow = new ArrayList<>();
       for (RexLiteral literal : literalTuple) {
+        if (literal == null) {
+          literalRow.add(null);
+          continue;
+        }
+        if (literal.getTypeName() == SqlTypeName.TIMESTAMP) {
+          GregorianCalendar tsLiteral = (GregorianCalendar) literal.getValue();
+          literalRow.add(new RexExpression.Literal(FieldSpec.DataType.TIMESTAMP, tsLiteral.getTimeInMillis()));
+          continue;
+        }
         literalRow.add(RexExpression.toRexExpression(literal));
       }
       _literalRows.add(literalRow);

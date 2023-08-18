@@ -40,6 +40,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,40 +119,48 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    TransferableBlock transferableBlock;
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("==[SEND]== Enter getNextBlock from: " + _context.getId());
-    }
     try {
-      transferableBlock = _sourceOperator.nextBlock();
-      if (transferableBlock.isSuccessfulEndOfStreamBlock()) {
+      TransferableBlock block = _sourceOperator.nextBlock();
+      if (block.isErrorBlock()) {
+        sendTransferableBlock(block);
+        return block;
+      } else if (block.isSuccessfulEndOfStreamBlock()) {
         // Stats need to be populated here because the block is being sent to the mailbox
         // and the receiving opChain will not be able to access the stats from the previous opChain
         TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
             OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
-        sendTransferableBlock(eosBlockWithStats, false);
+        sendTransferableBlock(eosBlockWithStats);
+        return block;
       } else {
-        sendTransferableBlock(transferableBlock, true);
+        // Data block
+        sendTransferableBlock(block);
+        // Yield if we cannot continue to put transferable block into the sending queue
+        return block;
       }
+    } catch (EarlyTerminationException e) {
+      // TODO: Query stats are not sent when opChain is early terminated
+      LOGGER.debug("Early terminating opChain: " + _context.getId());
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } catch (Exception e) {
-      transferableBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+      TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
       try {
         LOGGER.error("Exception while transferring data on opChain: " + _context.getId(), e);
-        sendTransferableBlock(transferableBlock, false);
+        sendTransferableBlock(errorBlock);
       } catch (Exception e2) {
         LOGGER.error("Exception while sending error block.", e2);
       }
+      return errorBlock;
     }
-    return transferableBlock;
   }
 
-  private void sendTransferableBlock(TransferableBlock block, boolean throwIfTimeout)
+  private void sendTransferableBlock(TransferableBlock block)
       throws Exception {
     long timeoutMs = _context.getDeadlineMs() - System.currentTimeMillis();
     boolean success = false;
     try {
-      if (!_exchange.offerBlock(block, timeoutMs) && throwIfTimeout) {
-        throw new TimeoutException("Timeout while offering data block into the sending queue.");
+      if (!_exchange.offerBlock(block, timeoutMs)) {
+        throw new TimeoutException(
+          String.format("Timed out while offering block into the sending queue after %dms", timeoutMs));
       }
       success = true;
     } finally {
@@ -160,8 +169,8 @@ public class MailboxSendOperator extends MultiStageOperator {
           LOGGER.debug("==[SEND]== Block " + block + " correctly sent from: " + _context.getId());
         }
       } else {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("==[SEND]== Block " + block + " cannot be sent from: " + _context.getId());
+        if (LOGGER.isInfoEnabled()) {
+          LOGGER.info("==[SEND]== Block " + block + " cannot be sent from: " + _context.getId());
         }
       }
     }

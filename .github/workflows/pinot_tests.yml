@@ -256,21 +256,3 @@ jobs:
             ${{ runner.os }}-maven-
       - name: Quickstart on JDK ${{ matrix.java }}
         run: .github/workflows/scripts/.pinot_quickstart.sh
-
-  presto-driver-build:
-    if: github.repository == 'apache/pinot'
-    runs-on: ubuntu-latest
-    name: Build Presto Pinot Driver
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up JDK 8
-        uses: actions/setup-java@v3
-        with:
-          java-version: 8
-          distribution: 'adopt'
-          cache: 'maven'
-      - name: Build presto pinot driver with JDK 8
-        env:
-          MAVEN_OPTS: -Xmx2G -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
-        run: |
-          mvn clean install -Dmaven.test.skip=true -Ppresto-driver -am -B -pl ':pinot-spi-jdk8',':pinot-common-jdk8',':pinot-segment-spi-jdk8' -Djdk.version=8 -T 16 || exit 1

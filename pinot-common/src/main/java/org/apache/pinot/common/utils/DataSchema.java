@@ -353,7 +353,10 @@ public class DataSchema {
         case BOOLEAN:
           return ((Number) value).intValue() == 1;
         case TIMESTAMP:
-          return new Timestamp((long) value);
+          if (value instanceof Timestamp) {
+            return (Timestamp) value;
+          }
+          return new Timestamp(((Number) value).longValue());
         case STRING:
         case JSON:
           return value.toString();
@@ -416,8 +419,14 @@ public class DataSchema {
         case BIG_DECIMAL:
           return (BigDecimal) value;
         case BOOLEAN:
+          if (value instanceof Boolean) {
+            return (boolean) value;
+          }
           return ((Number) value).intValue() == 1;
         case TIMESTAMP:
+          if (value instanceof Timestamp) {
+            return value.toString();
+          }
           return new Timestamp((long) value).toString();
         case STRING:
         case JSON:

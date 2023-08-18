@@ -25,22 +25,16 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.request.BrokerRequest;
 
 
-/**
- * Segment selector for offline table.
- */
-public class OfflineSegmentSelector implements SegmentSelector {
+public class DefaultSegmentSelector implements SegmentSelector {
   private volatile Set<String> _segments;
 
   @Override
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
-    onAssignmentChange(idealState, externalView, onlineSegments);
+    _segments = Collections.unmodifiableSet(onlineSegments);
   }
 
   @Override
   public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
-    // TODO: for new added segments, before all replicas are up, consider not selecting them to avoid causing
-    //       hotspot servers
-
     _segments = Collections.unmodifiableSet(onlineSegments);
   }
 
