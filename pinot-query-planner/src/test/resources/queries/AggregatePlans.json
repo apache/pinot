@@ -3,6 +3,28 @@
     "queries": [
       {
         "description": "Select AVG aggregation for a BIG_DECIMAL column, TODO:(No need to cast in LogicalProject)",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg FROM a WHERE a.col3 >= (SELECT AVG(a.col4) FROM a)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n        LogicalJoin(condition=[>=($0, $2)], joinType=[inner])",
+          "\n          PinotLogicalExchange(distribution=[random])",
+          "\n            LogicalProject(col3=[$2], col4=[$3])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n          PinotLogicalExchange(distribution=[broadcast])",
+          "\n            LogicalProject(EXPR$0=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)])",
+          "\n              LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n                PinotLogicalExchange(distribution=[hash])",
+          "\n                  LogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()])",
+          "\n                    LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select AVG aggregation for a BIG_DECIMAL column, TODO:(No need to cast in LogicalProject)",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col4) as avg FROM a WHERE a.col3 >= 0 AND a.col2 = 'pink floyd'",
         "output": [
           "Execution Plan",

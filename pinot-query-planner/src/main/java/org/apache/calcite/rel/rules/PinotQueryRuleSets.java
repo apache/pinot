@@ -124,6 +124,7 @@ public class PinotQueryRuleSets {
       // copy exchanges down, this must be done after SortExchangeNodeInsertRule
       PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY,
 
+      PinotSingleValueAggregateRemoveRule.INSTANCE,
       PinotJoinExchangeNodeInsertRule.INSTANCE,
       PinotAggregateExchangeNodeInsertRule.INSTANCE,
       PinotWindowExchangeNodeInsertRule.INSTANCE,
