@@ -906,7 +906,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testCommitSegmentMetadata() {
     // Set up a new table with 2 replicas, 5 instances, 4 partition
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
-    setUpNewTable(segmentManager, 2, 5, 4);
+    int intialNumPartitions = 4;
+    setUpNewTable(segmentManager, 2, 5, intialNumPartitions);
 
     // Test case 1: segment location with vip format.
     // Commit a segment for partition group 0
@@ -921,6 +922,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
     Assert.assertEquals(segmentZKMetadata.getDownloadUrl(), segmentLocationVIP);
 
+    Map<String, Map<String, String>> mp = segmentManager.getIdealState(REALTIME_TABLE_NAME).getRecord().getMapFields();
+
     // Test case 2: segment location with peer format: peer://segment1, verify that an empty string is stored in zk.
     committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
     String peerSegmentLocation = CommonConstants.Segment.PEER_SEGMENT_DOWNLOAD_SCHEME + "/segment1";
@@ -931,6 +934,31 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     segmentZKMetadata = segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, committingSegment, null);
     Assert.assertEquals(segmentZKMetadata.getDownloadUrl(), "");
+
+    // Test case 3, Add new partitions
+    segmentManager._numPartitions = 6;
+    committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 2, CURRENT_TIME_MS).getSegmentName();
+    CommittingSegmentDescriptor committingSegmentDescriptor1 = new CommittingSegmentDescriptor(committingSegment,
+        new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString(), 0L, segmentLocationVIP);
+    committingSegmentDescriptor1.setSegmentMetadata(mockSegmentMetadata());
+    segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor1);
+
+    Map<String, Map<String, String>> instanceStatesMap =
+        segmentManager.getIdealState(REALTIME_TABLE_NAME).getRecord().getMapFields();
+
+    Assert.assertEquals(instanceStatesMap.size(),
+        segmentManager._numPartitions + 3); // Since we have committed 3 segments previously
+
+    for (String segmentName : instanceStatesMap.keySet()) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      if (llcSegmentName.getPartitionGroupId() >= intialNumPartitions) {
+        SegmentZKMetadata updatedSegmentZKMetadata =
+            segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentName, null);
+
+        Assert.assertNotNull(updatedSegmentZKMetadata);
+        Assert.assertEquals(updatedSegmentZKMetadata.getStatus(), Status.IN_PROGRESS);
+      }
+    }
   }
 
   /**
