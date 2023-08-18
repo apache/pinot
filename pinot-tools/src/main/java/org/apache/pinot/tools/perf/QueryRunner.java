@@ -44,7 +44,9 @@ import picocli.CommandLine;
 
 
 @SuppressWarnings("FieldCanBeLocal")
-@CommandLine.Command
+@CommandLine.Command(name = "QueryRunner", description = "Run queries from a query file in singleThread, "
+                                                         + "multiThreads, targetQPS or increasingQPS mode.",
+    mixinStandardHelpOptions = true)
 public class QueryRunner extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
   private static final int MILLIS_PER_SECOND = 1000;
@@ -108,24 +110,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   }
 
   @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  @Override
   public String getName() {
     return getClass().getSimpleName();
-  }
-
-  @Override
-  public String description() {
-    return "Run queries from a query file in singleThread, multiThreads, targetQPS or increasingQPS mode. E.g.\n"
-        + "  QueryRunner -mode singleThread -queryFile <queryFile> -numTimesToRunQueries 0 "
-        + "-numIntervalsToReportAndClearStatistics 5\n"
-        + "  QueryRunner -mode multiThreads -queryFile <queryFile> -numThreads 10 -reportIntervalMs 1000\n"
-        + "  QueryRunner -mode targetQPS -queryFile <queryFile> -startQPS 50\n"
-        + "  QueryRunner -mode increasingQPS -queryFile <queryFile> -startQPS 50 -deltaQPS 10 "
-        + "-numIntervalsToIncreaseQPS 20\n";
   }
 
   @Override
@@ -133,27 +119,27 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       throws Exception {
     if (!new File(_queryFile).isFile()) {
       LOGGER.error("Argument queryFile: {} is not a valid file.", _queryFile);
-      printUsage();
+      getDescription();
       return false;
     }
     if (_numTimesToRunQueries < 0) {
       LOGGER.error("Argument numTimesToRunQueries should be a non-negative number.");
-      printUsage();
+      getDescription();
       return false;
     }
     if (_reportIntervalMs <= 0) {
       LOGGER.error("Argument reportIntervalMs should be a positive number.");
-      printUsage();
+      getDescription();
       return false;
     }
     if (_numIntervalsToReportAndClearStatistics < 0) {
       LOGGER.error("Argument numIntervalsToReportAndClearStatistics should be a non-negative number.");
-      printUsage();
+      getDescription();
       return false;
     }
     if (_queueDepth <= 0) {
       LOGGER.error("Argument queueDepth should be a positive number.");
-      printUsage();
+      getDescription();
       return false;
     }
 
@@ -184,7 +170,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       case "multiThreads":
         if (_numThreads <= 0) {
           LOGGER.error("For multiThreads mode, argument numThreads should be a positive number.");
-          printUsage();
+          getDescription();
           break;
         }
         LOGGER.info("MODE multiThreads with queryFile: {}, numTimesToRunQueries: {}, numThreads: {}, "
@@ -197,17 +183,17 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       case "targetQPS":
         if (_numThreads <= 0) {
           LOGGER.error("For targetQPS mode, argument numThreads should be a positive number.");
-          printUsage();
+          getDescription();
           break;
         }
         if (_startQPS <= 0 || _startQPS > 1000000.0) {
           LOGGER.error(
               "For targetQPS mode, argument startQPS should be a positive number that less or equal to 1000000.");
-          printUsage();
+          getDescription();
           break;
         }
         LOGGER.info("MODE targetQPS with queryFile: {}, numTimesToRunQueries: {}, numThreads: {}, startQPS: {}, "
-                + "reportIntervalMs: {}, numIntervalsToReportAndClearStatistics: {}, queueDepth: {}, timeout: {}",
+                    + "reportIntervalMs: {}, numIntervalsToReportAndClearStatistics: {}, queueDepth: {}, timeout: {}",
             _queryFile, _numTimesToRunQueries, _numThreads, _startQPS, _reportIntervalMs,
             _numIntervalsToReportAndClearStatistics, _queueDepth, _timeout);
         targetQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _startQPS,
@@ -216,23 +202,23 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       case "increasingQPS":
         if (_numThreads <= 0) {
           LOGGER.error("For increasingQPS mode, argument numThreads should be a positive number.");
-          printUsage();
+          getDescription();
           break;
         }
         if (_startQPS <= 0 || _startQPS > 1000000.0) {
           LOGGER.error(
               "For increasingQPS mode, argument startQPS should be a positive number that less or equal to 1000000.");
-          printUsage();
+          getDescription();
           break;
         }
         if (_deltaQPS <= 0) {
           LOGGER.error("For increasingQPS mode, argument deltaQPS should be a positive number.");
-          printUsage();
+          getDescription();
           break;
         }
         if (_numIntervalsToIncreaseQPS <= 0) {
           LOGGER.error("For increasingQPS mode, argument numIntervalsToIncreaseQPS should be a positive number.");
-          printUsage();
+          getDescription();
           break;
         }
         LOGGER.info("MODE increasingQPS with queryFile: {}, numTimesToRunQueries: {}, numThreads: {}, startQPS: {}, "
@@ -245,7 +231,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         break;
       default:
         LOGGER.error("Invalid mode: {}", _mode);
-        printUsage();
+        getDescription();
         break;
     }
     return true;
@@ -316,14 +302,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         if (currentTime - reportStartTime >= reportIntervalMs) {
           long timePassed = currentTime - startTime;
           LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, " + "Average "
-                  + "Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecuted, numExceptions,
+                      + "Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecuted, numExceptions,
               numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND),
               totalBrokerTime / (double) numQueriesExecuted, totalClientTime / (double) numQueriesExecuted);
           reportStartTime = currentTime;
           numReportIntervals++;
 
           if ((numIntervalsToReportAndClearStatistics != 0) && (numReportIntervals
-              == numIntervalsToReportAndClearStatistics)) {
+                                                                == numIntervalsToReportAndClearStatistics)) {
             numReportIntervals = 0;
             startTime = currentTime;
             numQueriesExecuted = 0;
@@ -432,16 +418,15 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           long timePassed = currentTime - startTime;
           int numQueriesExecutedInt = numQueriesExecuted.get();
           LOGGER.info("Time Passed: {}ms, Queries Executed: {}, Exceptions: {}, Average QPS: {}, " + "Average "
-                  + "Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecutedInt,
-              numExceptions.get(),
-              numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
+                      + "Broker Time: {}ms, Average Client Time: {}ms.", timePassed, numQueriesExecutedInt,
+              numExceptions.get(), numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
               totalBrokerTime.get() / (double) numQueriesExecutedInt,
               totalClientTime.get() / (double) numQueriesExecutedInt);
           reportStartTime = currentTime;
           numReportIntervals++;
 
           if ((numIntervalsToReportAndClearStatistics != 0) && (numReportIntervals
-              == numIntervalsToReportAndClearStatistics)) {
+                                                                == numIntervalsToReportAndClearStatistics)) {
             numReportIntervals = 0;
             startTime = currentTime;
             reportAndClearStatistics(numQueriesExecuted, numExceptions, totalBrokerTime, totalClientTime,
@@ -977,7 +962,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     CommandLine commandLine = new CommandLine(queryRunner);
     commandLine.parseArgs(args);
     if (queryRunner._help) {
-      queryRunner.printUsage();
+      queryRunner.getDescription();
     } else {
       queryRunner.execute();
     }

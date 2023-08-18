@@ -42,7 +42,8 @@ import picocli.CommandLine;
  * automatically do this, the intention is to get most of the work done by this class, and require any
  * manual editing on top.
  */
-@CommandLine.Command(name = "JsonToPinotSchema")
+@CommandLine.Command(name = "JsonToPinotSchema", description = "Extracting Pinot schema file from JSON data file.",
+    mixinStandardHelpOptions = true)
 public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonToPinotSchema.class);
 
@@ -78,10 +79,6 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
       + "JSON string, can be NONE/NON_PRIMITIVE/ALL")
   String _collectionNotUnnestedToJson;
 
-  @SuppressWarnings("FieldCanBeLocal")
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
-  private boolean _help = false;
-
   @Override
   public boolean execute()
       throws Exception {
@@ -109,16 +106,6 @@ public class JsonToPinotSchema extends AbstractBaseAdminCommand implements Comma
     }
 
     return true;
-  }
-
-  @Override
-  public String description() {
-    return "Extracting Pinot schema file from JSON data file.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

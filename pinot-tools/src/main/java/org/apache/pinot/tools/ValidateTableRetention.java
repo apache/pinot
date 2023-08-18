@@ -23,7 +23,9 @@ import picocli.CommandLine;
 
 
 @SuppressWarnings("FieldCanBeLocal")
-@CommandLine.Command
+@CommandLine.Command(name = "ValidateTableRetention", description = "Check the tables retention setting and segments "
+                                                                    + "metadata for the given cluster",
+    mixinStandardHelpOptions = true)
 public class ValidateTableRetention extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-zkAddress"}, required = true, description = "Address of the Zookeeper (host:port)")
   private String _zkAddress;
@@ -31,32 +33,20 @@ public class ValidateTableRetention extends AbstractBaseCommand implements Comma
   @CommandLine.Option(names = {"-clusterName"}, required = true, description = "Pinot cluster name")
   private String _clusterName;
 
-  @CommandLine.Option(names = {"-tableNamePattern"}, required = false,
-      description = "Optional table name pattern trigger to add inverted index, default: null (match any table name)")
+  @CommandLine.Option(names = {"-tableNamePattern"}, required = false, description = "Optional table name pattern "
+                                                                                     + "trigger to add inverted "
+                                                                                     + "index, default: null (match "
+                                                                                     + "any table name)")
   private String _tableNamePattern = null;
 
-  @CommandLine.Option(names = {"-durationInDaysThreshold"}, required = false,
-      description = "Optional duration in days threshold to log a warning for table with too large retention time,"
-          + " default: " + TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD)
+  @CommandLine.Option(names = {"-durationInDaysThreshold"}, required = false, description =
+      "Optional duration in days threshold to log a warning for table with too large retention time," + " default: "
+      + TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD)
   private long _durationInDaysThreshold = TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
     return getClass().getSimpleName();
-  }
-
-  @Override
-  public String description() {
-    return "Check the tables retention setting and segments metadata for the given cluster";
   }
 
   @Override

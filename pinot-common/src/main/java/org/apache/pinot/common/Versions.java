@@ -16,29 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools;
+package org.apache.pinot.common;
 
-import java.util.concurrent.Callable;
-import picocli.CommandLine;
+import java.util.Map;
 
 
-/**
- * Interface class for pinot-admin commands.
- *
- *
- */
-public interface Command extends Callable<Integer> {
+public class Versions {
 
-  default Integer call()
-      throws Exception {
-    // run execute() and returns 0 if success otherwise return -1.
-    return execute() ? 0 : -1;
-  }
-
-  boolean execute()
-      throws Exception;
-
-  default String getDescription() {
-    return String.join("\n", this.getClass().getAnnotation(CommandLine.Command.class).description());
+  /**
+   * Obtains the version numbers of the Pinot components.
+   *
+   * @return A map of component name to component version.
+   */
+  public Map<String, String> getComponentVersions() {
+    return Utils.getComponentVersions();
   }
 }

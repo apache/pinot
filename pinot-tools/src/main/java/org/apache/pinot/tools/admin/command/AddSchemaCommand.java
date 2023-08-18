@@ -32,7 +32,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "AddSchema")
+@CommandLine.Command(name = "AddSchema", description = "Add schema specified in the schema file to the controller",
+    mixinStandardHelpOptions = true)
 public class AddSchemaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddSchemaCommand.class);
 
@@ -63,21 +64,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
   private AuthProvider _authProvider;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  @Override
-  public String description() {
-    return "Add schema specified in the schema file to the controller";
-  }
 
   @Override
   public String getName() {
@@ -142,7 +129,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
     }
 
     if (!_exec) {
-      LOGGER.warn("Dry Running Command: " + toString());
+      LOGGER.warn("Dry Running Command: " + this);
       LOGGER.warn("Use the -exec option to actually execute the command.");
       return true;
     }

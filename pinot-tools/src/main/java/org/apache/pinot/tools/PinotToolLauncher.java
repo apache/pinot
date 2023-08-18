@@ -43,8 +43,8 @@ public class PinotToolLauncher {
     SUBCOMMAND_MAP.put("SegmentDump", new SegmentDumpTool());
   }
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
-      description = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true, description =
+      "Print this message.")
   boolean _help = false;
 
   public void execute(String[] args)
@@ -54,14 +54,7 @@ public class PinotToolLauncher {
       for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
         commandLine.addSubcommand(subCommand.getKey(), subCommand.getValue());
       }
-      picocli.CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
-      // TODO: Use the natively supported version and usage by picocli
-      // see https://picocli.info/#_mixin_standard_help_options
-      if (!parseResult.hasSubcommand() || _help) {
-        printUsage();
-      } else {
-        commandLine.execute(args);
-      }
+      commandLine.execute(args);
     } catch (Exception e) {
       LOGGER.error("Exception caught: ", e);
     }
@@ -76,13 +69,5 @@ public class PinotToolLauncher {
     PluginManager.get().init();
     PinotToolLauncher pinotToolLauncher = new PinotToolLauncher();
     pinotToolLauncher.execute(args);
-  }
-
-  public void printUsage() {
-    LOGGER.info("Usage: pinot-tools.sh <subCommand>");
-    LOGGER.info("Valid subCommands are:");
-    for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
-      LOGGER.info("\t" + subCommand.getKey() + "\t<" + subCommand.getValue().description() + ">");
-    }
   }
 }

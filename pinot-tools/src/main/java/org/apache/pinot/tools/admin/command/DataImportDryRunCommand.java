@@ -37,7 +37,7 @@ import picocli.CommandLine;
  * Class for command to do a dry run of data ingestion so that we can see how transformation functions and
  * complex config will be applied.
  */
-@CommandLine.Command(name = "DataImportDryRun")
+@CommandLine.Command(name = "DataImportDryRun", description = "Dry run of data import", mixinStandardHelpOptions = true)
 public class DataImportDryRunCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataImportDryRunCommand.class);
 
@@ -46,10 +46,6 @@ public class DataImportDryRunCommand extends AbstractBaseAdminCommand implements
 
   @CommandLine.Option(names = {"-tableConfigFile"}, required = true, description = "Path to table config file.")
   String _tableConfigFile;
-
-  @SuppressWarnings("FieldCanBeLocal")
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
-  private boolean _help = false;
 
   @Override
   public boolean execute() throws Exception {
@@ -77,15 +73,5 @@ public class DataImportDryRunCommand extends AbstractBaseAdminCommand implements
     }
 
     return true;
-  }
-
-  @Override
-  public String description() {
-    return "Dry run of data import";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 }

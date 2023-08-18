@@ -47,7 +47,7 @@ import org.apache.pinot.tools.utils.PinotConfigUtils;
 
 /**
  * Super class for all the commands.
- * Implements the common printUsage method.
+ * Implements the common getDescription method.
  *
  */
 public class AbstractBaseAdminCommand extends AbstractBaseCommand {

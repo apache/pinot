@@ -43,7 +43,13 @@ import picocli.CommandLine;
  * Given a set of input params, output a table of num hosts to num hours and the memory required per host
  *
  */
-@CommandLine.Command(name = "RealtimeProvisioningHelper")
+@CommandLine.Command(name = "RealtimeProvisioningHelper", description =
+    "Given the table config, partitions, retention and a sample completed segment for a realtime table to be "
+    + "setup, "
+    + "this tool will provide memory used by each host and an optimal segment size for various combinations "
+    + "of hours to consume and hosts. "
+    + "Instead of a completed segment, if schema with characteristics of data is provided, a segment will be "
+    + "generated and used for memory estimation.", mixinStandardHelpOptions = true)
 public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand implements Command {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeProvisioningHelperCommand.class);
@@ -99,9 +105,6 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @CommandLine.Option(names = {"-maxUsableHostMemory"}, required = false,
       description = "Maximum memory per host that can be used for pinot data (e.g. 250G, 100M). Default 48g")
   private String _maxUsableHostMemory = "48G";
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, usageHelp = true)
-  private boolean _help = false;
 
   public RealtimeProvisioningHelperCommand setTableConfigFile(String tableConfigFile) {
     _tableConfigFile = tableConfigFile;
@@ -166,38 +169,6 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @Override
   public final String getName() {
     return "RealtimeProvisioningHelperCommand";
-  }
-
-  @Override
-  public String description() {
-    return "Given the table config, partitions, retention and a sample completed segment for a realtime table to be "
-        + "setup, "
-        + "this tool will provide memory used by each host and an optimal segment size for various combinations "
-        + "of hours to consume and hosts. "
-        + "Instead of a completed segment, if schema with characteristics of data is provided, a segment will be "
-        + "generated and used for memory estimation.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  @Override
-  public void printExamples() {
-    StringBuilder builder = new StringBuilder();
-    builder.append("\n\nThis command allows you to estimate the capacity needed for provisioning realtime hosts. ")
-        .append("It assumes that there is no upper limit to the amount of memory you can mmap").append(
-        "\nIf you have a hybrid table, then consult the push frequency setting in your offline table specify it in "
-            + "the -pushFrequency argument").append(
-        "\nIf you have a realtime-only table, then the default behavior is to assume that your queries need all "
-            + "data in memory all the time").append(
-        "\nHowever, if most of your queries are going to be for (say) the last 96 hours, then you can specify "
-            + "that in -retentionHours").append(
-        "\nDoing so will let this program assume that you are willing to take a page hit when querying older data")
-        .append("\nand optimize memory and number of hosts accordingly.")
-        .append("\n See https://docs.pinot.apache.org/operators/operating-pinot/tuning/realtime for details");
-    System.out.println(builder);
   }
 
   @Override
@@ -353,7 +324,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     CommandLine.ParseResult result = cmdLine.parseArgs(args);
     if (result.isUsageHelpRequested() || result.matchedArgs().size() == 0) {
       cmdLine.usage(System.out);
-      rtProvisioningHelper.printUsage();
+      rtProvisioningHelper.getDescription();
       return;
     }
     rtProvisioningHelper.execute();

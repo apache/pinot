@@ -35,7 +35,9 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command
+@CommandLine.Command(usageHelpAutoWidth = true, description =
+    "Audit the IDEALSTATE for the segments of a table (or all tables of a tenant). Optionally update segment "
+    + "state from OFFLINE to ONLINE")
 public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateSegmentState.class);
   private static final String CMD_NAME = "UpdateSegmentState";
@@ -60,17 +62,8 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-fix"}, required = false, description = "Update IDEALSTATE values (OFFLINE->ONLINE).")
   private boolean _fix = false;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
   public UpdateSegmentState() {
     super();
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override
@@ -90,12 +83,6 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
       retString += " -fix";
     }
     return retString;
-  }
-
-  @Override
-  public String description() {
-    return "Audit the IDEALSTATE for the segments of a table (or all tables of a tenant). Optionally update segment "
-        + "state from OFFLINE to ONLINE";
   }
 
   public UpdateSegmentState setZkAddress(String zkAddress) {

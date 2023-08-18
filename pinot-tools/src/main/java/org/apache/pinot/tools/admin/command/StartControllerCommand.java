@@ -38,15 +38,13 @@ import picocli.CommandLine;
  * Class to implement StartController command.
  *
  */
-@CommandLine.Command(name = "StartController")
+@CommandLine.Command(name = "StartController", description = "Start the Pinot Controller Process at the specified "
+                                                             + "port.", mixinStandardHelpOptions = true)
 public class StartControllerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartControllerCommand.class);
 
   @CommandLine.Option(names = {"-controllerMode"}, description = "Pinot controller mode.")
   private ControllerConf.ControllerMode _controllerMode = ControllerConf.ControllerMode.DUAL;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, description = "Print this message.")
-  private boolean _help = false;
 
   @CommandLine.Option(names = {"-controllerHost"}, required = false, description = "host name for controller.")
   private String _controllerHost;
@@ -75,11 +73,6 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
 
   @CommandLine.Option(names = {"-configOverride"}, required = false, split = ",")
   private Map<String, Object> _configOverrides = new HashMap<>();
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   public ControllerConf.ControllerMode getControllerMode() {
     return _controllerMode;
@@ -169,11 +162,6 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
 
   @Override
   public void cleanup() {
-  }
-
-  @Override
-  public String description() {
-    return "Start the Pinot Controller Process at the specified port.";
   }
 
   @Override

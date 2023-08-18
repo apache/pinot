@@ -30,7 +30,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "AddTenant")
+@CommandLine.Command(name = "AddTenant", description = "Add tenant as per the specification provided.",
+    mixinStandardHelpOptions = true)
 public class AddTenantCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTenantCommand.class);
 
@@ -74,10 +75,6 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
 
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
 
   private String _controllerAddress;
 
@@ -167,11 +164,6 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   }
 
   @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  @Override
   public String toString() {
     String retString = ("AddTenant -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
         + " -controllerPort " + _controllerPort + " -name " + _name + " -role " + _role + " -instanceCount "
@@ -179,10 +171,5 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
         + _realtimeInstanceCount);
 
     return ((_exec) ? (retString + " -exec") : retString);
-  }
-
-  @Override
-  public String description() {
-    return "Add tenant as per the specification provided.";
   }
 }

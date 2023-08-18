@@ -41,14 +41,6 @@ public class AbstractBaseCommand {
     return "BaseCommand";
   }
 
-  public void printUsage() {
-    System.out.println("Usage: " + this.getName());
-    printExamples();
-  }
-
-  public void printExamples() {
-  }
-
   public void cleanup() {
   }
 }

@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.tools.admin;
 
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.Versions;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AddSchemaCommand;
@@ -140,56 +142,72 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("FileSystem", new FileSystemCommand());
   }
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
-      description = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, description = "Print this message.")
   private boolean _help = false;
 
-  @CommandLine.Option(names = {"-version", "-v", "--v", "--version"}, required = false,
-      description = "Print the version of Pinot package.")
+  @CommandLine.Option(names = {"-version", "-v", "--v", "--version"}, required = false, description = "Print the "
+                                                                                                      + "version of "
+                                                                                                      + "Pinot "
+                                                                                                      + "package.")
   private boolean _version = false;
 
   private int _status = 1;
 
+  private final Writer _outWriter;
+
+  private final Versions _versions;
+
+  public PinotAdministrator(Writer outWriter, Versions versions) {
+    _outWriter = outWriter;
+    _versions = versions;
+  }
+
   public void execute(String[] args) {
     try {
       CommandLine commandLine = new CommandLine(this);
-      for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
-        commandLine.addSubcommand(subCommand.getKey(), subCommand.getValue());
-      }
+      this.getSubCommands().forEach(commandLine::addSubcommand);
+      commandLine.setOut(new PrintWriter(_outWriter));
       CommandLine.ParseResult parseResult = commandLine.parseArgs(args);
-      // TODO: Use the natively supported version and usage by picocli
-      // see https://picocli.info/#_mixin_standard_help_options
-      if (!parseResult.hasSubcommand()) {
-        if (_version) {
-          printVersion();
-          _status = 0;
-        } else if (_help) {
-          printUsage();
-          _status = 0;
-        }
-      } else {
+      if (parseResult.hasSubcommand()) {
         _status = commandLine.execute(args);
+      } else {
+        handleVersionOrHelp(commandLine);
       }
     } catch (Exception e) {
       LOGGER.error("Exception caught: ", e);
     }
   }
 
-  private void printVersion() {
-    LOGGER.info("List All Pinot Component Versions:");
-    Map<String, String> componentVersions = Utils.getComponentVersions();
-    for (Map.Entry<String, String> entry : componentVersions.entrySet()) {
-      LOGGER.info("Package: {}, Version: {}", entry.getKey(), entry.getValue());
+  private void handleVersionOrHelp(CommandLine commandLine) {
+    if (_version) {
+      printVersion(commandLine.getOut());
+      _status = 0;
+    } else if (_help) {
+      printUsage(commandLine.getOut());
+      _status = 0;
+    } else {
+      _status = -1;
     }
   }
 
-  public void printUsage() {
-    LOGGER.info("Usage: pinot-admin.sh <subCommand>");
-    LOGGER.info("Valid subCommands are:");
-    for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
-      LOGGER.info("\t" + subCommand.getKey() + "\t<" + subCommand.getValue().description() + ">");
+  private void printVersion(PrintWriter printWriter) {
+    printWriter.println("List All Pinot Component Versions:");
+    Map<String, String> componentVersions = _versions.getComponentVersions();
+    for (Map.Entry<String, String> entry : componentVersions.entrySet()) {
+      printWriter.println(String.format("Package: %s, Version: %s", entry.getKey(), entry.getValue()));
     }
-    LOGGER.info("For other crud operations, please refer to ${ControllerAddress}/help.");
+  }
+
+  public void printUsage(PrintWriter printWriter) {
+    printWriter.println("Usage: pinot-admin.sh <subCommand>");
+    printWriter.println("Valid subCommands are:");
+    int maxCommandLength = this.getSubCommands().keySet().stream().mapToInt(String::length).max()
+        .orElseThrow(() -> new IllegalArgumentException("Unable to print usage, missing SubCommand"));
+    for (Map.Entry<String, Command> subCommand : this.getSubCommands().entrySet()) {
+      printWriter.println(String.format("\t%" + maxCommandLength + "s\t:" + subCommand.getValue().getDescription(),
+          subCommand.getKey()));
+    }
+    printWriter.println("For other crud operations, please refer to ${ControllerAddress}/help.");
   }
 
   public Map<String, Command> getSubCommands() {
@@ -198,11 +216,11 @@ public class PinotAdministrator {
 
   public static void main(String[] args) {
     PluginManager.get().init();
-    PinotAdministrator pinotAdministrator = new PinotAdministrator();
+    PinotAdministrator pinotAdministrator = new PinotAdministrator(new PrintWriter(System.out, true), new Versions());
     pinotAdministrator.execute(args);
-    if ((pinotAdministrator._status != 0)
-        && Boolean.parseBoolean(System.getProperties().getProperty("pinot.admin.system.exit"))) {
-        System.exit(pinotAdministrator._status);
+    if ((pinotAdministrator._status != 0) && Boolean.parseBoolean(
+        System.getProperties().getProperty("pinot.admin.system.exit"))) {
+      System.exit(pinotAdministrator._status);
     }
   }
 }

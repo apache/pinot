@@ -25,7 +25,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command
+@CommandLine.Command(name = "PinotFSBenchmarkRunner", description = "Run Filesystem benchmark",
+    mixinStandardHelpOptions = true)
 public class PinotFSBenchmarkRunner extends AbstractBaseCommand implements Command {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSBenchmarkRunner.class);
@@ -57,10 +58,6 @@ public class PinotFSBenchmarkRunner extends AbstractBaseCommand implements Comma
       description = "The number of trials of operations when running a benchmark.")
   private Integer _numOps;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
   @Override
   public boolean execute()
       throws Exception {
@@ -74,15 +71,5 @@ public class PinotFSBenchmarkRunner extends AbstractBaseCommand implements Comma
       LOGGER.error("Error while running benchmark: ", e);
     }
     return true;
-  }
-
-  @Override
-  public String description() {
-    return "Run Filesystem benchmark";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 }

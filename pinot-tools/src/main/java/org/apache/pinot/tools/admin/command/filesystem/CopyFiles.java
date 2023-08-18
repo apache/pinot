@@ -26,7 +26,9 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "cp", aliases = {"copy"}, description = "Copy file from source to destination")
+@CommandLine.Command(name = "cp", aliases = {"copy"}, description = "Copy file from source to destination, copying "
+                                                                    + "from two different remote PinotFS is not "
+                                                                    + "supported.", mixinStandardHelpOptions = true)
 public class CopyFiles extends BaseFileOperation {
   @CommandLine.Parameters(index = "0", description = "Source file")
   private String _source;
@@ -101,13 +103,8 @@ public class CopyFiles extends BaseFileOperation {
     return false;
   }
 
-  @Override
-  public void printUsage() {
-    System.out.println("cp <source-uri> <destination-uri>");
-  }
-
-  @Override
-  public String description() {
-    return "Copy file from source to destination, copying from two different remote PinotFS is not supported.";
-  }
+//  @Override
+//  public void getDescription() {
+//    System.out.println("cp <source-uri> <destination-uri>");
+//  }
 }

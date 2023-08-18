@@ -31,7 +31,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "PostQuery")
+@CommandLine.Command(name = "PostQuery", description = "Query the uploaded Pinot segments.",
+    mixinStandardHelpOptions = true)
 public class PostQueryCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PostQueryCommand.class.getName());
 
@@ -59,19 +60,10 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help = false;
-
   @CommandLine.Option(names = {"-o", "-option"}, required = false, description = "Additional options '-o key=value'")
   private Map<String, String> _additionalOptions = new HashMap<>();
 
   private AuthProvider _authProvider;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
@@ -81,16 +73,11 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @Override
   public String toString() {
     return ("PostQuery -brokerProtocol " + _brokerProtocol + " -brokerHost " + _brokerHost + " -brokerPort "
-        + _brokerPort + " -query " + _query);
+            + _brokerPort + " -query " + _query);
   }
 
   @Override
   public void cleanup() {
-  }
-
-  @Override
-  public String description() {
-    return "Query the uploaded Pinot segments.";
   }
 
   public PostQueryCommand setBrokerHost(String host) {

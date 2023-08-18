@@ -50,9 +50,4 @@ public abstract class BaseFileOperation implements Command {
     PinotFSFactory.init(new PinotConfiguration(configs));
     QuickstartRunner.registerDefaultPinotFS();
   }
-
-  @Override
-  public boolean getHelp() {
-    return _parent.getHelp();
-  }
 }

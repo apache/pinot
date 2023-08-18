@@ -25,7 +25,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "VerifyClusterState")
+@CommandLine.Command(name = "VerifyClusterState", description = "Verify cluster's state after shutting down several "
+                                                                + "nodes randomly.", mixinStandardHelpOptions = true)
 public class VerifyClusterStateCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(VerifyClusterStateCommand.class);
 
@@ -41,10 +42,6 @@ public class VerifyClusterStateCommand extends AbstractBaseAdminCommand implemen
 
   @CommandLine.Option(names = {"-timeoutSec"}, required = false, description = "Maximum timeout in second.")
   private long _timeoutSec = 300L;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
 
   @Override
   public String getName() {
@@ -78,15 +75,5 @@ public class VerifyClusterStateCommand extends AbstractBaseAdminCommand implemen
       LOGGER.info("All Tables are stable. The cluster is stable.");
     }
     return true;
-  }
-
-  @Override
-  public String description() {
-    return "Verify cluster's state after shutting down several nodes randomly.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 }

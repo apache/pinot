@@ -29,7 +29,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "DeleteSchema")
+@CommandLine.Command(name = "DeleteSchema", description = "Delete schema specified via name",
+    mixinStandardHelpOptions = true)
 public class DeleteSchemaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteSchemaCommand.class);
 
@@ -60,21 +61,7 @@ public class DeleteSchemaCommand extends AbstractBaseAdminCommand implements Com
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help = false;
-
   private AuthProvider _authProvider;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  @Override
-  public String description() {
-    return "Delete schema specified via name";
-  }
 
   @Override
   public String getName() {
