@@ -166,7 +166,7 @@
       </build>
     </profile>
     <profile>
-      <id>custom-cluster-integration-test-suite</id>
+      <id>integration-tests-set-3</id>
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
