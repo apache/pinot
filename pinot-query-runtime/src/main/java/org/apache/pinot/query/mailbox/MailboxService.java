@@ -101,6 +101,11 @@ public class MailboxService {
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
 
+  public MailboxService(String hostname, int port, PinotConfiguration config) {
+    this(hostname, port, config, ignoreMe -> {
+    });
+  }
+
   /**
    * Starts the mailbox service.
    */

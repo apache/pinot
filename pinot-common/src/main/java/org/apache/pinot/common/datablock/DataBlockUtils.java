@@ -75,10 +75,6 @@ public final class DataBlockUtils {
     return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS, stats);
   }
 
-  public static MetadataBlock getNoOpBlock() {
-    return new MetadataBlock(MetadataBlock.MetadataBlockType.NOOP);
-  }
-
   public static DataBlock getDataBlock(ByteBuffer byteBuffer)
       throws IOException {
     int versionType = byteBuffer.getInt();

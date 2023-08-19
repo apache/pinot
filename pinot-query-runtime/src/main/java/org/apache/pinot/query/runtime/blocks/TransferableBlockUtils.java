@@ -43,10 +43,6 @@ public final class TransferableBlockUtils {
     return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(statsMap));
   }
 
-  public static TransferableBlock getNoOpTransferableBlock() {
-    return new TransferableBlock(DataBlockUtils.getNoOpBlock());
-  }
-
   public static TransferableBlock getErrorTransferableBlock(Exception e) {
     return new TransferableBlock(DataBlockUtils.getErrorDataBlock(e));
   }
@@ -57,10 +53,6 @@ public final class TransferableBlockUtils {
 
   public static boolean isEndOfStream(TransferableBlock transferableBlock) {
     return transferableBlock.isEndOfStreamBlock();
-  }
-
-  public static boolean isNoOpBlock(TransferableBlock transferableBlock) {
-    return transferableBlock.isNoOpBlock();
   }
 
   /**

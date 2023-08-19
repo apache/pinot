@@ -69,13 +69,7 @@ public class OperatorStats {
       _executeStopwatch.stop();
       _endTimeMs = System.currentTimeMillis();
     }
-    if (!_processingStarted && block.isNoOpBlock()) {
-      _startTimeMs = -1;
-      _endTimeMs = -1;
-      _executeStopwatch.reset();
-    } else {
-      _processingStarted = true;
-    }
+    _processingStarted = true;
   }
 
   public void recordRow(int numBlock, int numRows) {

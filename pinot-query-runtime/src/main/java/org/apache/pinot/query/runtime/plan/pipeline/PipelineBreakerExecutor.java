@@ -34,6 +34,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
 import org.slf4j.Logger;
@@ -63,21 +64,23 @@ public class PipelineBreakerExecutor {
    *   - If exception occurs, exception block will be wrapped in {@link TransferableBlock} and assigned to each PB node.
    *   - Normal stats will be attached to each PB node and downstream execution should return with stats attached.
    */
-  public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
+  public static PipelineBreakerResult executePipelineBreakers(
+      OpChainSchedulerService scheduler,
       MailboxService mailboxService, DistributedStagePlan distributedStagePlan, long deadlineMs,
       long requestId, boolean isTraceEnabled) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(distributedStagePlan.getStageRoot(), pipelineBreakerContext);
-    if (pipelineBreakerContext.getPipelineBreakerMap().size() > 0) {
+    if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
       try {
-      PlanNode stageRoot = distributedStagePlan.getStageRoot();
-      // TODO: This PlanRequestContext needs to indicate it is a pre-stage opChain and only listens to pre-stage OpChain
-      //     receive-mail callbacks.
-      // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
-      PhysicalPlanContext physicalPlanContext =
-          new PhysicalPlanContext(mailboxService, requestId, stageRoot.getPlanFragmentId(), deadlineMs,
-              distributedStagePlan.getServer(), distributedStagePlan.getStageMetadata(), null, isTraceEnabled);
-      return PipelineBreakerExecutor.execute(scheduler, pipelineBreakerContext, physicalPlanContext);
+        PlanNode stageRoot = distributedStagePlan.getStageRoot();
+        // TODO: This PlanRequestContext needs to indicate it is a pre-stage opChain and only listens to pre-stage
+        //     OpChain receive-mail callbacks.
+        // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
+        OpChainExecutionContext opChainContext = new OpChainExecutionContext(mailboxService, requestId,
+            stageRoot.getPlanFragmentId(), distributedStagePlan.getServer(), deadlineMs,
+            distributedStagePlan.getStageMetadata(), null, isTraceEnabled);
+        PhysicalPlanContext physicalPlanContext = new PhysicalPlanContext(opChainContext, null);
+        return PipelineBreakerExecutor.execute(scheduler, pipelineBreakerContext, physicalPlanContext);
       } catch (Exception e) {
         LOGGER.error("Unable to create pipeline breaker results for Req: " + requestId + ", Stage: "
             + distributedStagePlan.getStageId(), e);

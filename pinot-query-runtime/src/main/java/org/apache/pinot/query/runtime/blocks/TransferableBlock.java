@@ -157,11 +157,8 @@ public class TransferableBlock implements Block {
     return isType(MetadataBlock.MetadataBlockType.EOS);
   }
 
-  /**
-   * @return whether this block represents a NOOP block
-   */
-  public boolean isNoOpBlock() {
-    return isType(MetadataBlock.MetadataBlockType.NOOP);
+  public boolean isDataBlock() {
+    return _type != DataBlock.Type.METADATA;
   }
 
   /**
@@ -180,5 +177,11 @@ public class TransferableBlock implements Block {
 
     MetadataBlock metadata = (MetadataBlock) _dataBlock;
     return metadata.getType() == type;
+  }
+
+  @Override
+  public String toString() {
+    String blockType = isErrorBlock() ? "error" : isSuccessfulEndOfStreamBlock() ? "eos" : "data";
+    return "TransferableBlock{blockType=" + blockType + ", _numRows=" + _numRows + '}';
   }
 }

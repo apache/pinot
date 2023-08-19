@@ -34,7 +34,6 @@ import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
@@ -66,7 +65,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       new Object[]{"charlie", "bar", 1},
   };
   public static final Schema.SchemaBuilder SCHEMA_BUILDER;
-
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder()
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -131,10 +129,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _reducerScheduler = new OpChainSchedulerService(new RoundRobinScheduler(10_000L), REDUCE_EXECUTOR);
+    _reducerScheduler = new OpChainSchedulerService(EXECUTOR);
     _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
-        new PinotConfiguration(reducerConfig), _reducerScheduler::onDataAvailable);
-    _reducerScheduler.startAsync();
+        new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
     _queryEnvironment =
@@ -158,7 +155,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       server.shutDown();
     }
     _mailboxService.shutdown();
-    _reducerScheduler.stopAsync();
   }
 
   /**
@@ -214,6 +210,13 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
           _reducerScheduler, null, false);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
+      // TODO: The actual message is (usually) something like:
+      //  Received error query execution result block: {200=QueryExecutionError:
+      //   java.lang.IllegalArgumentException: Illegal Json Path: $['path'] does not match document
+      //     at org.apache.pinot.core.common.evaluators.DefaultJsonPathEvaluator.throwPathNotFoundException(...)
+      //     at org.apache.pinot.core.common.evaluators.DefaultJsonPathEvaluator.processValue(...)
+      //     at org.apache.pinot.core.common.evaluators.DefaultJsonPathEvaluator.evaluateBlock(...)
+      //     at org.apache.pinot.core.common.DataFetcher$ColumnValueReader.readIntValues(DataFetcher.java:489)}
       Assert.assertTrue(rte.getMessage().contains(exceptionMsg), "Exception should contain: " + exceptionMsg
           + "! but found: " + rte.getMessage());
     }

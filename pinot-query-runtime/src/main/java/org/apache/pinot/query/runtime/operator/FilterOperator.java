@@ -93,7 +93,7 @@ public class FilterOperator extends MultiStageOperator {
     } else if (block.isErrorBlock()) {
       _upstreamErrorBlock = block;
       return _upstreamErrorBlock;
-    } else if (TransferableBlockUtils.isEndOfStream(block) || TransferableBlockUtils.isNoOpBlock(block)) {
+    } else if (TransferableBlockUtils.isEndOfStream(block)) {
       return block;
     }
 

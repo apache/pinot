@@ -51,7 +51,6 @@ public class SortOperator extends MultiStageOperator {
   private final ArrayList<Object[]> _rows;
   private final int _numRowsToKeep;
 
-  private boolean _readyToConstruct;
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
 
@@ -122,8 +121,6 @@ public class SortOperator extends MultiStageOperator {
   private TransferableBlock produceSortedBlock() {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
-    } else if (!_readyToConstruct) {
-      return TransferableBlockUtils.getNoOpTransferableBlock();
     }
 
     if (!_isSortedBlockConstructed) {
@@ -155,16 +152,7 @@ public class SortOperator extends MultiStageOperator {
   private void consumeInputBlocks() {
     if (!_isSortedBlockConstructed) {
       TransferableBlock block = _upstreamOperator.nextBlock();
-      while (!block.isNoOpBlock()) {
-        // setting upstream error block
-        if (block.isErrorBlock()) {
-          _upstreamErrorBlock = block;
-          return;
-        } else if (block.isSuccessfulEndOfStreamBlock()) {
-          _readyToConstruct = true;
-          return;
-        }
-
+      while (!block.isSuccessfulEndOfStreamBlock()) {
         List<Object[]> container = block.getContainer();
         if (_priorityQueue == null) {
           // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
@@ -176,8 +164,7 @@ public class SortOperator extends MultiStageOperator {
               _rows.addAll(container.subList(0, _numRowsToKeep - numRows));
               LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
                   _context.getId());
-              _readyToConstruct = true;
-              return;
+              break;
             }
           }
         } else {
@@ -186,6 +173,9 @@ public class SortOperator extends MultiStageOperator {
           }
         }
         block = _upstreamOperator.nextBlock();
+      }
+      if (block.isErrorBlock()) {
+        _upstreamErrorBlock = block;
       }
     }
   }

@@ -112,15 +112,14 @@ public abstract class SetOperator extends MultiStageOperator {
 
   protected TransferableBlock constructResultBlockSet(TransferableBlock leftBlock) {
     List<Object[]> rows = new ArrayList<>();
+    // TODO: Other operators keep the first erroneous block, while this keep the last.
+    //  We should decide what is what we want to do and be consistent with that.
     if (_upstreamErrorBlock != null || leftBlock.isErrorBlock()) {
       _upstreamErrorBlock = leftBlock;
       return _upstreamErrorBlock;
     }
-    if (leftBlock.isNoOpBlock() || leftBlock.isSuccessfulEndOfStreamBlock()) {
-      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      }
-      return leftBlock;
+    if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
     for (Object[] row : leftBlock.getContainer()) {
       if (handleRowMatched(row)) {

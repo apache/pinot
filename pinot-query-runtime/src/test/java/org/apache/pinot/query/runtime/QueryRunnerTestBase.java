@@ -55,6 +55,7 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.service.QueryConfig;
@@ -73,8 +74,16 @@ import org.testng.Assert;
 
 
 public abstract class QueryRunnerTestBase extends QueryTestSet {
-  protected static final ExecutorService REDUCE_EXECUTOR = Executors.newCachedThreadPool(
-      new NamedThreadFactory("TEST_REDUCER_SCHEDULER_EXECUTOR"));
+  // TODO: Find a better way to create the global test executor
+  public static final ExecutorService EXECUTOR =
+      Executors.newCachedThreadPool(new NamedThreadFactory("worker_on_" + OperatorTestUtil.class.getSimpleName()) {
+        @Override
+        public Thread newThread(Runnable r) {
+          Thread thread = super.newThread(r);
+          thread.setDaemon(true);
+          return thread;
+        }
+      });
   protected static final double DOUBLE_CMP_EPSILON = 0.0001d;
   protected static final String SEGMENT_BREAKER_KEY = "__SEGMENT_BREAKER_KEY__";
   protected static final String SEGMENT_BREAKER_STR = "------";

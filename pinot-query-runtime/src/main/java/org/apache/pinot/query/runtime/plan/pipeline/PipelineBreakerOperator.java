@@ -33,15 +33,17 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 class PipelineBreakerOperator extends MultiStageOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerOperator.class);
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
   private final Deque<Map.Entry<Integer, Operator<TransferableBlock>>> _workerEntries;
   private final Map<Integer, List<TransferableBlock>> _resultMap;
   private final ImmutableSet<Integer> _expectedKeySet;
-  private TransferableBlock _errorBlock;
-
+  private TransferableBlock _finalBlock;
 
   public PipelineBreakerOperator(OpChainExecutionContext context,
       Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap) {
@@ -67,46 +69,55 @@ class PipelineBreakerOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (System.currentTimeMillis() > _context.getDeadlineMs()) {
-      _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
-      constructErrorResponse(_errorBlock);
-      return _errorBlock;
-    }
-
-    // Poll from every mailbox operator in round-robin fashion:
+    // Poll from every mailbox operator:
     // - Return the first content block
-    // - If no content block found but there are mailboxes not finished, return no-op block
+    // - If no content block found but there are mailboxes not finished, try again
     // - If all content blocks are already returned, return end-of-stream block
-    int numWorkers = _workerEntries.size();
-    for (int i = 0; i < numWorkers; i++) {
-      Map.Entry<Integer, Operator<TransferableBlock>> worker = _workerEntries.remove();
+    while (!_workerEntries.isEmpty()) {
+      if (_finalBlock != null) {
+        return _finalBlock;
+      }
+      if (System.currentTimeMillis() > _context.getDeadlineMs()) {
+        _finalBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+        constructErrorResponse(_finalBlock);
+        return _finalBlock;
+      }
+
+      Map.Entry<Integer, Operator<TransferableBlock>> worker = _workerEntries.getLast();
       TransferableBlock block = worker.getValue().nextBlock();
 
-      // Release the mailbox worker when the block is end-of-stream
-      if (block != null && !block.isNoOpBlock() && block.isSuccessfulEndOfStreamBlock()) {
+      if (block == null) {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("==[PB]== Null block on " + _context.getId() + " worker " + worker.getKey());
+        }
         continue;
       }
 
-      // Add the worker back to the queue if the block is not end-of-stream
-      _workerEntries.add(worker);
-      if (block != null && !block.isNoOpBlock()) {
-        if (block.isErrorBlock()) {
-          _errorBlock = block;
-          constructErrorResponse(block);
-          return _errorBlock;
-        }
-        if (!block.isEndOfStreamBlock()) {
-          _resultMap.get(worker.getKey()).add(block);
-        }
-        return block;
+      // Release the mailbox worker when the block is end-of-stream
+      if (block.isSuccessfulEndOfStreamBlock()) {
+        _workerEntries.removeLast();
+        continue;
       }
-    }
 
-    if (_workerEntries.isEmpty()) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    } else {
-      return TransferableBlockUtils.getNoOpTransferableBlock();
+      if (block.isErrorBlock()) {
+        _finalBlock = block;
+      }
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace("==[PB]== Returned block from : " + _context.getId() + " block: " + block);
+      }
+      _resultMap.get(worker.getKey()).add(block);
+      return block;
     }
+    if (System.currentTimeMillis() > _context.getDeadlineMs()) {
+      _finalBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
+      return _finalBlock;
+    } else if (_finalBlock == null) {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("==[PB]== Finished : " + _context.getId());
+      }
+      _finalBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    }
+    return _finalBlock;
   }
 
   /**

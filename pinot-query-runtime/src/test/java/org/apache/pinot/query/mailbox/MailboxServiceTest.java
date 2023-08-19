@@ -91,6 +91,8 @@ public class MailboxServiceTest {
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
       TransferableBlock block = receivingMailbox.poll();
@@ -115,6 +117,8 @@ public class MailboxServiceTest {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     assertNull(receivingMailbox.poll());
 
@@ -154,6 +158,8 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
 
     // Send one data block and then cancel
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
@@ -181,6 +187,8 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
 
     // Directly cancel
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -208,6 +216,8 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
 
     // Send one data block and then cancel
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
@@ -250,6 +260,8 @@ public class MailboxServiceTest {
 
     // Data blocks will be cleaned up
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     TransferableBlock block = receivingMailbox.poll();
     assertNotNull(block);
@@ -288,6 +300,8 @@ public class MailboxServiceTest {
 
     // Data blocks will be cleaned up
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     TransferableBlock block = receivingMailbox.poll();
     assertNotNull(block);
@@ -312,6 +326,8 @@ public class MailboxServiceTest {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     assertNull(receivingMailbox.poll());
 
@@ -369,6 +385,8 @@ public class MailboxServiceTest {
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
       TransferableBlock block = receivingMailbox.poll();
@@ -398,6 +416,8 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
 
     // Send one data block and then cancel
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
@@ -433,6 +453,8 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
 
     // Directly cancel
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -467,6 +489,8 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
 
     // Send one data block and then cancel
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
@@ -518,6 +542,8 @@ public class MailboxServiceTest {
 
     // Data blocks will be cleaned up
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     TransferableBlock block = receivingMailbox.poll();
     assertNotNull(block);
@@ -556,6 +582,8 @@ public class MailboxServiceTest {
 
     // Data blocks will be cleaned up
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     TransferableBlock block = receivingMailbox.poll();
     assertNotNull(block);

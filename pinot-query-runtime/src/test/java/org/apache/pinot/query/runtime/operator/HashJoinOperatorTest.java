@@ -99,9 +99,6 @@ public class HashJoinOperatorTest {
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = joinOnString.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = joinOnString.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows =
         Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"}, new Object[]{2, "BB", 3, "BB"});
@@ -136,9 +133,6 @@ public class HashJoinOperatorTest {
     HashJoinOperator joinOnInt =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnInt.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = joinOnInt.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{2, "BB", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
@@ -171,9 +165,6 @@ public class HashJoinOperatorTest {
     HashJoinOperator joinOnInt =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnInt.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = joinOnInt.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows =
         Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{1, "Aa", 2, "BB"}, new Object[]{1, "Aa", 3, "BB"},
@@ -214,9 +205,6 @@ public class HashJoinOperatorTest {
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "CC", null, null});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
@@ -249,9 +237,6 @@ public class HashJoinOperatorTest {
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     Assert.assertTrue(result.isEndOfStreamBlock());
   }
 
@@ -281,9 +266,6 @@ public class HashJoinOperatorTest {
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 1, "BB"}, new Object[]{1, "Aa", 1, "CC"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
@@ -317,9 +299,6 @@ public class HashJoinOperatorTest {
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     Assert.assertTrue(resultRows.isEmpty());
   }
@@ -355,9 +334,6 @@ public class HashJoinOperatorTest {
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     Assert.assertTrue(result.isErrorBlock());
     MetadataBlock errorBlock = (MetadataBlock) result.getDataBlock();
     Assert.assertTrue(errorBlock.getExceptions().get(1000).contains("notEquals"));
@@ -394,9 +370,6 @@ public class HashJoinOperatorTest {
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "BB", 1, "BB"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
@@ -429,9 +402,6 @@ public class HashJoinOperatorTest {
     HashJoinOperator joinOnNum =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnNum.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = joinOnNum.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{2, "BB", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
@@ -439,18 +409,12 @@ public class HashJoinOperatorTest {
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
     // Second block should be non-matched broadcast rows
     result = joinOnNum.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = joinOnNum.nextBlock();
-    }
     resultRows = result.getContainer();
     expectedRows = ImmutableList.of(new Object[]{null, null, 3, "BB"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     // Third block is EOS block.
     result = joinOnNum.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = joinOnNum.nextBlock();
-    }
     Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
   }
 
@@ -479,9 +443,6 @@ public class HashJoinOperatorTest {
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows =
         ImmutableList.of(new Object[]{1, "Aa", null, null}, new Object[]{2, "BB", null, null});
@@ -489,9 +450,6 @@ public class HashJoinOperatorTest {
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
     result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
   }
 
@@ -519,9 +477,6 @@ public class HashJoinOperatorTest {
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = ImmutableList.of(new Object[]{1, "Aa", null, null}, new Object[]{2, "BB", 2, "Aa"},
         new Object[]{2, "BB", 2, "BB"}, new Object[]{4, "CC", null, null});
@@ -532,18 +487,12 @@ public class HashJoinOperatorTest {
     Assert.assertEquals(resultRows.get(3), expectedRows.get(3));
     // Second block should be non-matched broadcast rows
     result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     resultRows = result.getContainer();
     expectedRows = ImmutableList.of(new Object[]{null, null, 3, "BB"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     // Third block is EOS block.
     result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
   }
 
@@ -572,17 +521,11 @@ public class HashJoinOperatorTest {
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = ImmutableList.of(new Object[]{4, "CC", null, null});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
   }
 
@@ -612,9 +555,6 @@ public class HashJoinOperatorTest {
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     Assert.assertTrue(result.isErrorBlock());
     Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
         .contains("testInnerJoinRightError"));
@@ -646,60 +586,9 @@ public class HashJoinOperatorTest {
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
-    while (result.isNoOpBlock()) {
-      result = join.nextBlock();
-    }
     Assert.assertTrue(result.isErrorBlock());
     Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
         .contains("testInnerJoinLeftError"));
-  }
-
-  @Test
-  public void shouldHandleNoOpBlock() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
-    });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
-    });
-    Mockito.when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{2, "BB"}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
-        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{2, "CC"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
-        .thenReturn(OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
-        });
-    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
-
-    TransferableBlock result = join.nextBlock(); // first no-op consumes first right data block.
-    Assert.assertTrue(result.isNoOpBlock());
-    result = join.nextBlock(); // second no-op consumes no-op right block.
-    Assert.assertTrue(result.isNoOpBlock());
-    result = join.nextBlock(); // third no-op consumes two right data blocks and builds result
-    List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = ImmutableList.of(new Object[]{2, "BB", 2, "Aa"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    result = join.nextBlock();     // second left block is no-op
-    Assert.assertTrue(result.isNoOpBlock());
-    result = join.nextBlock(); // third left block consumes some extra data
-    expectedRows = ImmutableList.of(new Object[]{2, "CC", 2, "Aa"});
-    resultRows = result.getContainer();
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    result = join.nextBlock(); // last one is EOS.
-    Assert.assertTrue(result.isEndOfStreamBlock());
   }
 }
 // TODO: Add more inequi join tests.

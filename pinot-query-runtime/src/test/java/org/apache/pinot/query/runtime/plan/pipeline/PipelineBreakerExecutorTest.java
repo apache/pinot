@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -29,6 +30,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -39,8 +41,8 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
@@ -49,7 +51,6 @@ import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -73,8 +74,9 @@ public class PipelineBreakerExecutorTest {
   private ReceivingMailbox _mailbox2;
 
   private VirtualServerAddress _server = new VirtualServerAddress("localhost", 123, 0);
-  private OpChainSchedulerService _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(10_000L),
-      Executors.newCachedThreadPool());
+  private ExecutorService _executor = Executors.newCachedThreadPool(
+      new NamedThreadFactory("worker_on_asd_" + getClass().getSimpleName()));
+  private OpChainSchedulerService _scheduler = new OpChainSchedulerService(_executor);
   private StageMetadata _stageMetadata1 = new StageMetadata.Builder().setWorkerMetadataList(Stream.of(_server).map(
       s -> new WorkerMetadata.Builder().setVirtualServerAddress(s)
           .addMailBoxInfoMap(0, new MailboxMetadata(
@@ -89,14 +91,10 @@ public class PipelineBreakerExecutorTest {
               ImmutableList.of(_server), ImmutableMap.of()))
           .build()).collect(Collectors.toList())).build();
 
-  @BeforeClass
-  public void setUpClass() {
-    _scheduler.startAsync();
-  }
 
   @AfterClass
   public void tearDownClass() {
-    _scheduler.stopAsync();
+    ExecutorServiceUtils.close(_executor);
   }
 
   @BeforeMethod
@@ -104,6 +102,9 @@ public class PipelineBreakerExecutorTest {
     _mocks = MockitoAnnotations.openMocks(this);
     when(_mailboxService.getHostname()).thenReturn("localhost");
     when(_mailboxService.getPort()).thenReturn(123);
+
+    when(_mailbox1.getId()).thenReturn("mailbox1");
+    when(_mailbox2.getId()).thenReturn("mailbox2");
   }
 
   @AfterMethod
@@ -308,10 +309,16 @@ public class PipelineBreakerExecutorTest {
     // should fail even if one of the 2 PB doesn't contain error block from sender.
     Assert.assertNotNull(pipelineBreakerResult);
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 2);
+
+    boolean errorFound = false;
     for (List<TransferableBlock> resultBlocks : pipelineBreakerResult.getResultMap().values()) {
-      Assert.assertEquals(resultBlocks.size(), 1);
-      Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
-      Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
+      if (!resultBlocks.isEmpty()) {
+        TransferableBlock lastBlock = resultBlocks.get(resultBlocks.size() - 1);
+        if (lastBlock.isErrorBlock()) {
+          errorFound = true;
+        }
+      }
     }
+    Assert.assertTrue(errorFound, "An error block should be the last block on at least one of the result map entries");
   }
 }

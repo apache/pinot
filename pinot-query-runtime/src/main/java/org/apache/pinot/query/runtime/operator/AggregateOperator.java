@@ -84,8 +84,6 @@ public class AggregateOperator extends MultiStageOperator {
   private final Map<String, Integer> _colNameToIndexMap;
   private final Map<Integer, Map<Integer, Literal>> _aggCallSignatureMap;
 
-  private TransferableBlock _upstreamErrorBlock;
-  private boolean _readyToConstruct;
   private boolean _hasReturnedAggregateBlock;
 
   private final boolean _isGroupByAggregation;
@@ -118,8 +116,6 @@ public class AggregateOperator extends MultiStageOperator {
       _aggCallSignatureMap = Collections.emptyMap();
     }
 
-    _upstreamErrorBlock = null;
-    _readyToConstruct = false;
     _hasReturnedAggregateBlock = false;
     _colNameToIndexMap = new HashMap<>();
 
@@ -161,12 +157,16 @@ public class AggregateOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      if (!_readyToConstruct && !consumeInputBlocks()) {
-        return TransferableBlockUtils.getNoOpTransferableBlock();
+      TransferableBlock finalBlock;
+      if (_isGroupByAggregation) {
+        finalBlock = consumeGroupBy();
+      } else {
+        finalBlock = consumeAggregation();
       }
 
-      if (_upstreamErrorBlock != null) {
-        return _upstreamErrorBlock;
+      // setting upstream error block
+      if (finalBlock.isErrorBlock()) {
+        return finalBlock;
       }
 
       if (!_hasReturnedAggregateBlock) {
@@ -197,29 +197,29 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   /**
-   * @return whether or not the operator is ready to move on (EOS or ERROR)
+   * Consumes the input blocks as a group by
+   * @return the last block, which must always be either an error or the end of the stream
    */
-  private boolean consumeInputBlocks() {
+  private TransferableBlock consumeGroupBy() {
     TransferableBlock block = _inputOperator.nextBlock();
-    while (!block.isNoOpBlock()) {
-      // setting upstream error block
-      if (block.isErrorBlock()) {
-        _upstreamErrorBlock = block;
-        return true;
-      } else if (block.isEndOfStreamBlock()) {
-        _readyToConstruct = true;
-        return true;
-      }
-
-      if (_isGroupByAggregation) {
-        _groupByExecutor.processBlock(block, _inputSchema);
-      } else {
-        _aggregationExecutor.processBlock(block, _inputSchema);
-      }
-
+    while (block.isDataBlock()) {
+      _groupByExecutor.processBlock(block, _inputSchema);
       block = _inputOperator.nextBlock();
     }
-    return false;
+    return block;
+  }
+
+  /**
+   * Consumes the input blocks as an aggregation
+   * @return the last block, which must always be either an error or the end of the stream
+   */
+  private TransferableBlock consumeAggregation() {
+    TransferableBlock block = _inputOperator.nextBlock();
+    while (block.isDataBlock()) {
+      _aggregationExecutor.processBlock(block, _inputSchema);
+      block = _inputOperator.nextBlock();
+    }
+    return block;
   }
 
   private List<FunctionContext> getFunctionContexts(List<RexExpression> aggCalls) {

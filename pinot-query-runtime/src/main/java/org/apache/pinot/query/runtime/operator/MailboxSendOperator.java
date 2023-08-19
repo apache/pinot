@@ -121,9 +121,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock() {
     try {
       TransferableBlock block = _sourceOperator.nextBlock();
-      if (block.isNoOpBlock()) {
-        return block;
-      } else if (block.isErrorBlock()) {
+      if (block.isErrorBlock()) {
         sendTransferableBlock(block);
         return block;
       } else if (block.isSuccessfulEndOfStreamBlock()) {
@@ -135,18 +133,21 @@ public class MailboxSendOperator extends MultiStageOperator {
         return block;
       } else {
         // Data block
-        boolean canContinue = sendTransferableBlock(block);
+        sendTransferableBlock(block);
         // Yield if we cannot continue to put transferable block into the sending queue
-        return canContinue ? block : TransferableBlockUtils.getNoOpTransferableBlock();
+        return block;
       }
     } catch (EarlyTerminationException e) {
       // TODO: Query stats are not sent when opChain is early terminated
-      LOGGER.debug("Early terminating opChain: " + _context.getId());
+      LOGGER.debug("Early terminating opChain: {}", _context.getId());
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    } catch (TimeoutException e) {
+      LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
+      return TransferableBlockUtils.getErrorTransferableBlock(e);
     } catch (Exception e) {
       TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
       try {
-        LOGGER.error("Exception while transferring data on opChain: " + _context.getId(), e);
+        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
         sendTransferableBlock(errorBlock);
       } catch (Exception e2) {
         LOGGER.error("Exception while sending error block.", e2);
@@ -155,14 +156,26 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
-  private boolean sendTransferableBlock(TransferableBlock block)
+  private void sendTransferableBlock(TransferableBlock block)
       throws Exception {
     long timeoutMs = _context.getDeadlineMs() - System.currentTimeMillis();
-    if (_exchange.offerBlock(block, timeoutMs)) {
-      return _exchange.getRemainingCapacity() > 0;
-    } else {
-      throw new TimeoutException(
-          String.format("Timed out while offering block into the sending queue after %dms", timeoutMs));
+    boolean success = false;
+    try {
+      if (!_exchange.offerBlock(block, timeoutMs)) {
+        throw new TimeoutException(
+            String.format("Timed out while offering block into the sending queue after %dms", timeoutMs));
+      }
+      success = true;
+    } finally {
+      if (success) {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("==[SEND]== Block " + block + " correctly sent from: " + _context.getId());
+        }
+      } else {
+        if (LOGGER.isInfoEnabled()) {
+          LOGGER.info("==[SEND]== Block " + block + " cannot be sent from: " + _context.getId());
+        }
+      }
     }
   }
 

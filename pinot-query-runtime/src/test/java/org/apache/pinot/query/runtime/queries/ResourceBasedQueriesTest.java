@@ -51,7 +51,6 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.QueryRunnerTestBase;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -189,10 +188,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _reducerScheduler = new OpChainSchedulerService(new RoundRobinScheduler(10_000L), REDUCE_EXECUTOR);
+    _reducerScheduler = new OpChainSchedulerService(EXECUTOR);
     _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
-        new PinotConfiguration(reducerConfig), _reducerScheduler::onDataAvailable);
-    _reducerScheduler.startAsync();
+        new PinotConfiguration(reducerConfig), ignoreMe -> {
+    });
     _mailboxService.start();
 
     Map<String, List<String>> tableToSegmentMap1 = factory1.buildTableSegmentNameMap();
@@ -249,7 +248,6 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       server.shutDown();
     }
     _mailboxService.shutdown();
-    _reducerScheduler.stopAsync();
   }
 
   // TODO: name the test using testCaseName for testng reports
