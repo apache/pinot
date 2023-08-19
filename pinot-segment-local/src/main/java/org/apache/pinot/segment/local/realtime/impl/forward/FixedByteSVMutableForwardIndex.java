@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
@@ -44,13 +45,13 @@ import org.slf4j.LoggerFactory;
  *   are not guaranteed to have a deterministic value. </li>
  * </ul>
  */
-// TODO: Fix thread-safety issue for ArrayList
 // TODO: Optimize it
 public class FixedByteSVMutableForwardIndex implements MutableForwardIndex {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSVMutableForwardIndex.class);
 
+  // For single writer multiple readers setup, use ArrayList for writer and CopyOnWriteArrayList for reader
   private final List<WriterWithOffset> _writers = new ArrayList<>();
-  private final List<ReaderWithOffset> _readers = new ArrayList<>();
+  private final List<ReaderWithOffset> _readers = new CopyOnWriteArrayList<>();
 
   private final boolean _dictionaryEncoded;
   private final DataType _storedType;
