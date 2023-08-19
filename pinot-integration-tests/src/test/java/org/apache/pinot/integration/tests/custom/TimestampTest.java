@@ -138,7 +138,10 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         + "WEEK_OF_YEAR(ts1), WEEK_OF_YEAR(ts2),\n"
         + "DAY_OF_YEAR(ts1), DAY_OF_YEAR(ts2),\n"
         + "DAY_OF_MONTH(ts1), DAY_OF_MONTH(ts2),\n"
-        + "DAY_OF_WEEK(ts1), DAY_OF_WEEK(ts2)\n"
+        + "DAY_OF_WEEK(ts1), DAY_OF_WEEK(ts2),\n"
+        + "DOY(ts1), DOY(ts2),\n"
+        + "DOW(ts1), DOW(ts2),\n"
+        + "QUARTER(ts1), QUARTER(ts2)\n"
         + "FROM %s\n"
         + "LIMIT %d\n", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
@@ -165,6 +168,12 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
           jsonNode.get("resultTable").get("rows").get(i).get(19).asInt());
       assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(20).asInt(),
           jsonNode.get("resultTable").get("rows").get(i).get(21).asInt());
+      assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(22).asInt(),
+          jsonNode.get("resultTable").get("rows").get(i).get(23).asInt());
+      assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(24).asInt(),
+          jsonNode.get("resultTable").get("rows").get(i).get(25).asInt());
+      assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(26).asInt(),
+          jsonNode.get("resultTable").get("rows").get(i).get(27).asInt());
     }
   }
 
