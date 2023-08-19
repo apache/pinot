@@ -87,10 +87,12 @@ public class DataSchemaTest {
     // number super type relationship should be in exactly the order in the list above.
     for (int idx = 0; idx < numberTypeToTest.size(); idx++) {
       for (int subTypeIdx = 0; subTypeIdx <= idx; subTypeIdx++) {
-        Assert.assertTrue(numberTypeToTest.get(idx).isSuperTypeOf(numberTypeToTest.get(subTypeIdx)));
+        Assert.assertTrue(numberTypeToTest.get(idx).isSuperTypeOf(numberTypeToTest.get(subTypeIdx)),
+            numberTypeToTest.get(idx) + " should be super type of " + numberTypeToTest.get(subTypeIdx));
       }
       for (int subTypeIdx = idx + 1; subTypeIdx < numberTypeToTest.size(); subTypeIdx++) {
-        Assert.assertFalse(numberTypeToTest.get(idx).isSuperTypeOf(numberTypeToTest.get(subTypeIdx)));
+        Assert.assertFalse(numberTypeToTest.get(idx).isSuperTypeOf(numberTypeToTest.get(subTypeIdx)),
+            numberTypeToTest.get(idx) + " should not be super type of " + numberTypeToTest.get(subTypeIdx));
       }
     }
 
@@ -99,6 +101,17 @@ public class DataSchemaTest {
       Assert.assertTrue(numberTypeToTest.get(idx).isSuperTypeOf(BOOLEAN));
       Assert.assertFalse(BOOLEAN.isSuperTypeOf(numberTypeToTest.get(idx)));
     }
+  }
+
+  @Test
+  public void testNonPrimitiveTypeDerivations() {
+    Assert.assertFalse(TIMESTAMP.isSuperTypeOf(INT));
+    Assert.assertFalse(INT.isSuperTypeOf(TIMESTAMP));
+    Assert.assertTrue(LONG.isSuperTypeOf(TIMESTAMP));
+    Assert.assertFalse(TIMESTAMP.isSuperTypeOf(LONG));
+
+    Assert.assertTrue(STRING.isSuperTypeOf(JSON));
+    Assert.assertFalse(JSON.isSuperTypeOf(STRING));
   }
 
   @Test
