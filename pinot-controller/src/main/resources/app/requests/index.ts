@@ -119,7 +119,7 @@ export const cleanupTasks = (taskType: string): Promise<AxiosResponse<OperationR
 export const deleteTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/tasks/${taskType}`, { headers: { ...headers, Accept: 'application/json' } });
 
-export const sheduleTask = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+export const scheduleTask = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/tasks/schedule?tableName=${tableName}&taskType=${taskType}`, null, { headers: { ...headers, Accept: 'application/json' } });
 
 export const executeTask = (data): Promise<AxiosResponse<OperationResponse>> =>
