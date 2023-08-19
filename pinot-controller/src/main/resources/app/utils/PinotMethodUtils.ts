@@ -39,7 +39,7 @@ import {
   resumeTasks,
   cleanupTasks,
   deleteTasks,
-  sheduleTask,
+  scheduleTask,
   executeTask,
   getJobDetail,
   getMinionMeta,
@@ -1114,7 +1114,7 @@ const getTableData = (params)=>{
 };
 
 const scheduleTaskAction = (tableName, taskType)=>{
-  return sheduleTask(tableName, taskType).then(response=>{
+  return scheduleTask(tableName, taskType).then(response=>{
     return response.data;
   })
 };
