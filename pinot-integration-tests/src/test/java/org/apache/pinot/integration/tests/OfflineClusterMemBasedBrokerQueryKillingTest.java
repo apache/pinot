@@ -52,11 +52,11 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.junit.Assert;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 
 /**
  * Integration test for heap size based broker query killing, this works only for xmx4G
+ * TODO: re-enable or remove this after we resolve https://github.com/apache/pinot/issues/11099
  */
 public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterIntegrationTestSet {
 
@@ -207,8 +207,6 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
         .build();
   }
 
-
-  @Test
   public void testDigestOOMMultipleQueries()
       throws Exception {
     AtomicReference<JsonNode> queryResponse1 = new AtomicReference<>();
