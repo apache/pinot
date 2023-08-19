@@ -253,7 +253,7 @@ public class DataSchema {
     }
 
     public boolean isNumber() {
-      return NUMERIC_TYPES.contains(this);
+      return NUMERIC_TYPES.contains(this.getStoredType());
     }
 
     public boolean isWholeNumber() {
@@ -288,7 +288,7 @@ public class DataSchema {
     public boolean isSuperTypeOf(ColumnDataType subTypeCandidate) {
       if (this.isNumber() && subTypeCandidate.isNumber() && this != BIG_DECIMAL && subTypeCandidate != BIG_DECIMAL) {
         // NUMBER subtype check using type hoisting rules defined in NUMERIC_TYPE_ORDERING
-        return NUMERIC_TYPE_ORDERING.max(this, subTypeCandidate) == this;
+        return NUMERIC_TYPE_ORDERING.max(this.getStoredType(), subTypeCandidate.getStoredType()) == this;
       } else if (subTypeCandidate == BOOLEAN) {
         // BOOLEAN type is sub-type of any number type, checking whether it is equal to 1.
         return this == subTypeCandidate || (this.isNumber() && this != BIG_DECIMAL);
