@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -76,6 +78,7 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
+    setUpH2Connection();
     for (Map.Entry<String, String> tableResource : TPCH_QUICKSTART_TABLE_RESOURCES.entrySet()) {
       File tableSegmentDir = new File(_segmentDir, tableResource.getKey());
       File tarDir = new File(_tarDir, tableResource.getKey());
@@ -105,28 +108,37 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
           tableSegmentDir, tarDir);
       uploadSegments(tableName, tarDir);
+      // H2
+      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
     }
   }
 
   @Test(dataProvider = "QueryDataProvider")
-  public void testTPCHQueries(String query) {
-    testQueriesSucceed(query);
+  public void testTPCHQueries(String[] pinotAndH2Queries) throws Exception {
+    testQueriesSucceed(pinotAndH2Queries[0], pinotAndH2Queries[1]);
   }
 
-  protected void testQueriesSucceed(String query) {
-    ResultSetGroup pinotResultSetGroup = getPinotConnection().execute(query);
+  protected void testQueriesSucceed(String pinotQuery, String h2Query) throws Exception {
+    ResultSetGroup pinotResultSetGroup = getPinotConnection().execute(pinotQuery);
     org.apache.pinot.client.ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
-
     if (CollectionUtils.isNotEmpty(pinotResultSetGroup.getExceptions())) {
       Assert.fail(String.format(
-          "TPC-H query raised exception: %s. query: %s", pinotResultSetGroup.getExceptions().get(0), query));
+          "TPC-H query raised exception: %s. query: %s", pinotResultSetGroup.getExceptions().get(0), pinotQuery));
     }
-    // TODO: Enable the following 2 assertions after fixing the data so each query returns non-zero rows
-    /*
-    Assert.assertTrue(resultTableResultSet.getRowCount() > 0,
-        String.format("Expected non-zero rows for tpc-h query: %s", query));
-    Assert.assertTrue(resultTableResultSet.getColumnCount() > 0,
-        String.format("Expected non-zero columns for tpc-h query: %s", query)); */
+
+    int numRows = resultTableResultSet.getRowCount();
+    int numColumns = resultTableResultSet.getColumnCount();
+
+    // h2 response
+    Assert.assertNotNull(_h2Connection);
+    Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+    h2statement.execute(h2Query);
+    ResultSet h2ResultSet = h2statement.getResultSet();
+    // TODO: fix the query parsing issue in Pinot
+    //  many queries fail due to "ERROR [Connection] [main] Cannot parse table name from query"
+    //  java.lang.ClassCastException:
+    //  class org.apache.calcite.sql.SqlSelect cannot be cast to class org.apache.calcite.sql.SqlBasicCall
+    //  (org.apache.calcite.sql.SqlSelect and org.apache.calcite.sql.SqlBasicCall are in unnamed module of loader 'app')
   }
 
   @Override
@@ -169,11 +181,18 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       if (EXEMPT_QUERIES.contains(query)) {
         continue;
       }
-      String path = String.format("tpch/%s.sql", query);
-      try (InputStream inputStream = TPCHQueryIntegrationTest.class.getClassLoader()
-          .getResourceAsStream(path)) {
-        queries[iter] = new Object[1];
-        queries[iter][0] = IOUtils.toString(Objects.requireNonNull(inputStream), Charset.defaultCharset());
+      String pinotQueryFilePath = String.format("tpch/%s.sql", query);
+      try (InputStream pinotQueryIs = TPCHQueryIntegrationTest.class.getClassLoader()
+          .getResourceAsStream(pinotQueryFilePath)) {
+        queries[iter] = new Object[2];
+        queries[iter][0] = IOUtils.toString(Objects.requireNonNull(pinotQueryIs), Charset.defaultCharset());
+        String h2QueryFilePath = String.format("tpch/%s-h2.sql", query);
+        try (InputStream h2QueryIs = TPCHQueryIntegrationTest.class.getClassLoader()
+            .getResourceAsStream(h2QueryFilePath)) {
+          queries[iter][1] = IOUtils.toString(Objects.requireNonNull(h2QueryIs), Charset.defaultCharset());
+        } catch (Exception e) {
+          queries[iter][1] = queries[iter][0];
+        }
         iter++;
       }
     }

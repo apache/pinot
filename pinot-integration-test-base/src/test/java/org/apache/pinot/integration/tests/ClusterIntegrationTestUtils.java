@@ -132,9 +132,8 @@ public class ClusterIntegrationTestUtils {
               break;
             }
             if (typesInUnion.size() == 2) {
-              Schema.Type type = typesInUnion.get(0).getType();
-              Assert.assertTrue(isSingleValueAvroFieldType(type));
-              Assert.assertEquals(typesInUnion.get(1).getType(), Schema.Type.NULL);
+              Schema.Type type = extractSingleValueAvroFieldTypeFromTwoSizedUnion(typesInUnion.get(0).getType(),
+                  typesInUnion.get(1).getType());
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true));
               break;
             }
@@ -201,6 +200,26 @@ public class ClusterIntegrationTestUtils {
   }
 
   /**
+   * Helper method to extract the single value Avro field type from a two sized UNION Avro field type if the UNION
+   * contains one single-value type and one NULL type; otherwise, fail the test.
+   * @param type1 the first type in the UNION
+   * @param type2 the second type in the UNION
+   * @return the single value Avro field type in the UNION if the UNION contains one single-value type and one NULL type
+   */
+  private static Schema.Type extractSingleValueAvroFieldTypeFromTwoSizedUnion(Schema.Type type1, Schema.Type type2) {
+    if (type1 == Schema.Type.NULL) {
+      Assert.assertTrue(isSingleValueAvroFieldType(type2));
+      return type2;
+    }
+    if (type2 == Schema.Type.NULL) {
+      Assert.assertTrue(isSingleValueAvroFieldType(type1));
+      return type1;
+    }
+    Assert.fail(String.format("Unsupported UNION Avro field with underlying types: %s, %s", type1, type2));
+    return null;
+  }
+
+  /**
    * Helper method to check whether the given Avro field type is a single value type (non-NULL).
    *
    * @param avroFieldType Avro field type
@@ -242,7 +261,7 @@ public class ClusterIntegrationTestUtils {
         h2FieldType = "bigint";
         break;
       case "string":
-        h2FieldType = "varchar(128)";
+        h2FieldType = "varchar(256)";
         break;
       default:
         h2FieldType = avroFieldTypeName;
