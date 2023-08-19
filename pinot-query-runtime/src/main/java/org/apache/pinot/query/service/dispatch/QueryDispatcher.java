@@ -65,7 +65,6 @@ import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -251,6 +250,7 @@ public class QueryDispatcher {
       DataBlock dataBlock = transferableBlock.getDataBlock();
       int numColumns = resultSchema.getColumnNames().length;
       int numRows = dataBlock.getNumberOfRows();
+      DataSchema.ColumnDataType[] columnDataTypes = resultSchema.getColumnDataTypes();
       List<Object[]> rows = new ArrayList<>(dataBlock.getNumberOfRows());
       if (numRows > 0) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
@@ -268,11 +268,8 @@ public class QueryDispatcher {
               row[colId++] = null;
             } else {
               int colRef = field.left;
-              if (rawRow[colRef] instanceof ByteArray) {
-                row[colId++] = ((ByteArray) rawRow[colRef]).toHexString();
-              } else {
-                row[colId++] = rawRow[colRef];
-              }
+              DataSchema.ColumnDataType dataType = columnDataTypes[colId];
+              row[colId++] = dataType.convertAndFormat(rawRow[colRef]);
             }
           }
           rows.add(row);

@@ -360,7 +360,6 @@ public class CommonConstants {
       }
 
       public static class QueryOptionValue {
-        public static final String ROUTING_FORCE_HLC = "FORCE_HLC";
         public static final String DEFAULT_IN_PREDICATE_SORT_THRESHOLD = "1000";
       }
     }
