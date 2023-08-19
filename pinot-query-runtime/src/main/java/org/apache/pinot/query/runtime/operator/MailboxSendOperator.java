@@ -139,12 +139,15 @@ public class MailboxSendOperator extends MultiStageOperator {
       }
     } catch (EarlyTerminationException e) {
       // TODO: Query stats are not sent when opChain is early terminated
-      LOGGER.debug("Early terminating opChain: " + _context.getId());
+      LOGGER.debug("Early terminating opChain: {}", _context.getId());
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    } catch (TimeoutException e) {
+      LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
+      return TransferableBlockUtils.getErrorTransferableBlock(e);
     } catch (Exception e) {
       TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
       try {
-        LOGGER.error("Exception while transferring data on opChain: " + _context.getId(), e);
+        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
         sendTransferableBlock(errorBlock);
       } catch (Exception e2) {
         LOGGER.error("Exception while sending error block.", e2);
@@ -160,7 +163,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     try {
       if (!_exchange.offerBlock(block, timeoutMs)) {
         throw new TimeoutException(
-          String.format("Timed out while offering block into the sending queue after %dms", timeoutMs));
+            String.format("Timed out while offering block into the sending queue after %dms", timeoutMs));
       }
       success = true;
     } finally {
