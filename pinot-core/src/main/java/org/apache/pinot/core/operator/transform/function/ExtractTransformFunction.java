@@ -36,7 +36,7 @@ public class ExtractTransformFunction extends BaseTransformFunction {
   protected Chronology _chronology = ISOChronology.getInstanceUTC();
 
   private enum Field {
-    YEAR, MONTH, DAY, HOUR, MINUTE, SECOND
+    YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, QUARTER
   }
 
   @Override
@@ -75,6 +75,10 @@ public class ExtractTransformFunction extends BaseTransformFunction {
         case YEAR:
           accessor = _chronology.year();
           output[i] = accessor.get(timestamps[i]);
+          break;
+        case QUARTER:
+          accessor = _chronology.monthOfYear();
+          output[i] = (accessor.get(timestamps[i]) - 1) / 3 + 1;
           break;
         case MONTH:
           accessor = _chronology.monthOfYear();
