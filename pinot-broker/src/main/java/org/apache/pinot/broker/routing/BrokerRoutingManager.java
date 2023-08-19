@@ -837,8 +837,12 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
       Map<String, ServerInstance> tenantServerMap = entry.getValue();
 
-      if (!tenantServerMap.containsKey(instanceId) && tags.contains(tableServerTag)) {
+      if (tags.contains(tableServerTag)) {
+        // ServerInstance might got updated for internal fields like queryServicePort, queryMailboxPort, etc,
+        // so always update the tenantServerMap with the latest serverInstance
         tenantServerMap.put(instanceId, serverInstance);
+      } else {
+        tenantServerMap.remove(instanceId);
       }
     }
   }
