@@ -74,10 +74,12 @@ public class DataSchemaTest {
       for (DataSchema.ColumnDataType candidateType : DataSchema.ColumnDataType.values()) {
         if (testType == candidateType) {
           // all type should be sub-type of themselves.
-          Assert.assertTrue(testType.isSuperTypeOf(candidateType));
+          Assert.assertTrue(testType.isSuperTypeOf(candidateType),
+              testType + " should be super type of " + candidateType);
         } else if (!numberTypeToTest.contains(testType)) {
           // other than number type, nothing should be sub-type of another type.
-          Assert.assertFalse(testType.isSuperTypeOf(candidateType));
+          Assert.assertFalse(testType.isSuperTypeOf(candidateType),
+              testType + " should not be super type of " + candidateType);
         }
       }
     }
