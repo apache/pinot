@@ -432,7 +432,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
     waitForNumOfSegmentsBecomeOnline(offlineTableName, 1);
     dropOfflineTable(SEGMENT_UPLOAD_TEST_TABLE);
-    cleanupTestTableDataManager(offlineTableName);
+    waitForTableDataManagerRemoved(offlineTableName);
   }
 
   private void waitForNumOfSegmentsBecomeOnline(String tableNameWithType, int numSegments)
@@ -2386,15 +2386,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     for (int i = 2; i < 20; i++) {
       query = String.format("SELECT distinctCountHLL(FlightNum, %d) FROM mytable ", i);
       assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[i - 2]);
-      assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(),
-          expectedResults[i - 2]);
+      assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[i - 2]);
     }
 
     // Default HLL is set as log2m=12
     query = "SELECT distinctCountHLL(FlightNum) FROM mytable ";
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
-    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(),
-        expectedResults[10]);
+    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
   }
 
   @Test

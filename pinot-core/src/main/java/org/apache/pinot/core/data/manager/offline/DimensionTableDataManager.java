@@ -117,8 +117,10 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   @Override
   public void addSegment(ImmutableSegment immutableSegment) {
-    super.addSegment(immutableSegment);
     String segmentName = immutableSegment.getSegmentName();
+    Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
+        segmentName, _tableNameWithType);
+    super.addSegment(immutableSegment);
     try {
       if (loadLookupTable()) {
         _logger.info("Successfully loaded lookup table after adding segment: {}", segmentName);
@@ -134,6 +136,11 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   @Override
   public void removeSegment(String segmentName) {
+    // Allow removing segment after shutdown so that we can remove the segment when the table is deleted
+    if (_shutDown) {
+      _logger.info("Table data manager is already shut down, skip removing segment: {}", segmentName);
+      return;
+    }
     super.removeSegment(segmentName);
     try {
       if (loadLookupTable()) {
@@ -150,6 +157,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
 
   @Override
   protected void doShutdown() {
+    releaseAndRemoveAllSegments();
     closeDimensionTable(_dimensionTable.get());
   }
 

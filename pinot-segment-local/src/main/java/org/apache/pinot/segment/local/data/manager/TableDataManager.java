@@ -61,8 +61,8 @@ public interface TableDataManager {
   void start();
 
   /**
-   * Shuts down the table data manager. Should be called only once. After calling shut down, no other method should be
-   * called.
+   * Shuts down the table data manager. After calling shut down, no other method should be called.
+   * NOTE: Shut down might be called multiple times. The implementation should be able to handle that.
    */
   void shutDown();
 

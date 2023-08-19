@@ -180,7 +180,7 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
   public void tearDown()
       throws Exception {
     dropRealtimeTable(getTableName());
-    cleanupTestTableDataManager(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+    waitForTableDataManagerRemoved(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
     stopServer();
     stopBroker();
     stopController();

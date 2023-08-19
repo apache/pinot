@@ -36,7 +36,6 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
-import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -80,25 +79,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   protected int getNumQueriesToGenerate() {
     return DEFAULT_NUM_QUERIES_TO_GENERATE;
-  }
-
-  /**
-   * Test server table data manager deletion after the table is dropped
-   */
-  protected void cleanupTestTableDataManager(String tableNameWithType) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        for (BaseServerStarter serverStarter : _serverStarters) {
-          if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType)
-              != null) {
-            return false;
-          }
-        }
-        return true;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 600_000L, "Failed to delete table data managers");
   }
 
   /**
