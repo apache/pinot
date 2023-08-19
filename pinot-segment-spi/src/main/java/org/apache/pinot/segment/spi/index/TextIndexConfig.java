@@ -32,8 +32,11 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public class TextIndexConfig extends IndexConfig {
-  public static final TextIndexConfig DISABLED = new TextIndexConfig(true, null, null, false, false,
-      Collections.emptyList(), Collections.emptyList());
+  private static final int LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB = 500;
+  private static final boolean LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE = true;
+  public static final TextIndexConfig DISABLED =
+      new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
+          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB);
   private final FSTType _fstType;
   @Nullable
   private final Object _rawValueForTextIndex;
@@ -41,6 +44,8 @@ public class TextIndexConfig extends IndexConfig {
   private final boolean _useANDForMultiTermQueries;
   private final List<String> _stopWordsInclude;
   private final List<String> _stopWordsExclude;
+  private final boolean _luceneUseCompoundFile;
+  private final int _luceneMaxBufferSizeMB;
 
   @JsonCreator
   public TextIndexConfig(
@@ -50,7 +55,9 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("queryCache") boolean enableQueryCache,
       @JsonProperty("useANDForMultiTermQueries") boolean useANDForMultiTermQueries,
       @JsonProperty("stopWordsInclude") List<String> stopWordsInclude,
-      @JsonProperty("stopWordsExclude") List<String> stopWordsExclude) {
+      @JsonProperty("stopWordsExclude") List<String> stopWordsExclude,
+      @JsonProperty("luceneUseCompoundFile") Boolean luceneUseCompoundFile,
+      @JsonProperty("luceneMaxBufferSizeMB") Integer luceneMaxBufferSizeMB) {
     super(disabled);
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
@@ -58,6 +65,10 @@ public class TextIndexConfig extends IndexConfig {
     _useANDForMultiTermQueries = useANDForMultiTermQueries;
     _stopWordsInclude = stopWordsInclude;
     _stopWordsExclude = stopWordsExclude;
+    _luceneUseCompoundFile =
+        luceneUseCompoundFile == null ? LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE : luceneUseCompoundFile;
+    _luceneMaxBufferSizeMB =
+        luceneMaxBufferSizeMB == null ? LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB : luceneMaxBufferSizeMB;
   }
 
   public FSTType getFstType() {
@@ -90,6 +101,20 @@ public class TextIndexConfig extends IndexConfig {
     return _stopWordsExclude;
   }
 
+  /**
+   * Whether Lucene IndexWriter uses compound file format. Improves indexing speed but may cause file descriptor issues
+   */
+  public boolean isLuceneUseCompoundFile() {
+    return _luceneUseCompoundFile;
+  }
+
+  /**
+   * Lucene buffer size. Helps with indexing speed but may cause heap issues
+   */
+  public int getLuceneMaxBufferSizeMB() {
+    return _luceneMaxBufferSizeMB;
+  }
+
   public static abstract class AbstractBuilder {
     @Nullable
     protected FSTType _fstType;
@@ -99,6 +124,8 @@ public class TextIndexConfig extends IndexConfig {
     protected boolean _useANDForMultiTermQueries = true;
     protected List<String> _stopWordsInclude = new ArrayList<>();
     protected List<String> _stopWordsExclude = new ArrayList<>();
+    protected boolean _luceneUseCompoundFile = LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE;
+    protected int _luceneMaxBufferSizeMB = LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB;
 
     public AbstractBuilder(@Nullable FSTType fstType) {
       _fstType = fstType;
@@ -110,11 +137,13 @@ public class TextIndexConfig extends IndexConfig {
       _useANDForMultiTermQueries = other._useANDForMultiTermQueries;
       _stopWordsInclude = new ArrayList<>(other._stopWordsInclude);
       _stopWordsExclude = new ArrayList<>(other._stopWordsExclude);
+      _luceneUseCompoundFile = other._luceneUseCompoundFile;
+      _luceneMaxBufferSizeMB = other._luceneMaxBufferSizeMB;
     }
 
     public TextIndexConfig build() {
       return new TextIndexConfig(false, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
-          _stopWordsInclude, _stopWordsExclude);
+          _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile, _luceneMaxBufferSizeMB);
     }
 
     public abstract AbstractBuilder withProperties(@Nullable Map<String, String> textIndexProperties);
@@ -131,6 +160,16 @@ public class TextIndexConfig extends IndexConfig {
 
     public AbstractBuilder withStopWordsExclude(List<String> stopWordsExclude) {
       _stopWordsExclude = stopWordsExclude;
+      return this;
+    }
+
+    public AbstractBuilder withLuceneUseCompoundFile(boolean useCompoundFile) {
+      _luceneUseCompoundFile = useCompoundFile;
+      return this;
+    }
+
+    public AbstractBuilder withLuceneMaxBufferSizeMB(int maxBufferSizeMB) {
+      _luceneMaxBufferSizeMB = maxBufferSizeMB;
       return this;
     }
   }
@@ -150,12 +189,14 @@ public class TextIndexConfig extends IndexConfig {
     return _enableQueryCache == that._enableQueryCache && _useANDForMultiTermQueries == that._useANDForMultiTermQueries
         && _fstType == that._fstType && Objects.equals(_rawValueForTextIndex, that._rawValueForTextIndex)
         && Objects.equals(_stopWordsInclude, that._stopWordsInclude) && Objects.equals(_stopWordsExclude,
-        that._stopWordsExclude);
+        that._stopWordsExclude) && _luceneUseCompoundFile == that._luceneUseCompoundFile
+        && _luceneMaxBufferSizeMB == that._luceneMaxBufferSizeMB;
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), _fstType, _rawValueForTextIndex, _enableQueryCache,
-        _useANDForMultiTermQueries, _stopWordsInclude, _stopWordsExclude);
+        _useANDForMultiTermQueries, _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile,
+        _luceneMaxBufferSizeMB);
   }
 }

@@ -44,7 +44,8 @@ public class LuceneMutableTextIndexTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    _realtimeLuceneTextIndex = new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null, null);
+    _realtimeLuceneTextIndex =
+        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null, null, true, 500);
     String[][] documents = getTextData();
     for (String[] row : documents) {
       _realtimeLuceneTextIndex.add(row);

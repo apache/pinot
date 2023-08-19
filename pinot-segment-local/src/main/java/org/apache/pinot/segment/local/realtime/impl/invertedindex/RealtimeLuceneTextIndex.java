@@ -61,7 +61,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
    * @param stopWordsExclude stop words to exclude from default stop words
    */
   public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName,
-      List<String> stopWordsInclude, List<String> stopWordsExclude) {
+      List<String> stopWordsInclude, List<String> stopWordsExclude, boolean useCompoundFile, int maxBufferSizeMB) {
     _column = column;
     _segmentName = segmentName;
     try {
@@ -75,7 +75,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       // for realtime
       _indexCreator =
           new LuceneTextIndexCreator(column, new File(segmentIndexDir.getAbsolutePath() + "/" + segmentName),
-              false /* commitOnClose */, stopWordsInclude, stopWordsExclude);
+              false /* commitOnClose */, stopWordsInclude, stopWordsExclude, useCompoundFile, maxBufferSizeMB);
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
     } catch (Exception e) {
