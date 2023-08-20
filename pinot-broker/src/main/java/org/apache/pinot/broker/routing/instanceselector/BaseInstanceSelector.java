@@ -284,7 +284,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     for (Map.Entry<String, List<SegmentInstanceCandidate>> entry : _oldSegmentCandidatesMap.entrySet()) {
       String segment = entry.getKey();
       List<SegmentInstanceCandidate> candidates = entry.getValue();
-      List<SegmentInstanceCandidate> enabledCandidates = getEnabledCandidates(candidates, servingInstances);
+      List<SegmentInstanceCandidate> enabledCandidates =
+          getEnabledCandidatesAndAddToServingInstances(candidates, servingInstances);
       if (!enabledCandidates.isEmpty()) {
         instanceCandidatesMap.put(segment, enabledCandidates);
       } else {
@@ -304,7 +305,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       String segment = entry.getKey();
       NewSegmentState newSegmentState = entry.getValue();
       List<SegmentInstanceCandidate> candidates = newSegmentState.getCandidates();
-      List<SegmentInstanceCandidate> enabledCandidates = getEnabledCandidates(candidates, servingInstances);
+      List<SegmentInstanceCandidate> enabledCandidates =
+          getEnabledCandidatesAndAddToServingInstances(candidates, servingInstances);
       if (!enabledCandidates.isEmpty()) {
         instanceCandidatesMap.put(segment, enabledCandidates);
       } else {
@@ -322,8 +324,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _segmentStates = new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments);
   }
 
-  private List<SegmentInstanceCandidate> getEnabledCandidates(List<SegmentInstanceCandidate> candidates,
-      Set<String> servingInstances) {
+  private List<SegmentInstanceCandidate> getEnabledCandidatesAndAddToServingInstances(
+      List<SegmentInstanceCandidate> candidates, Set<String> servingInstances) {
     List<SegmentInstanceCandidate> enabledCandidates = new ArrayList<>(candidates.size());
     for (SegmentInstanceCandidate candidate : candidates) {
       String instance = candidate.getInstance();
