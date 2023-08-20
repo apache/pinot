@@ -59,18 +59,18 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
 
     long requestId = context.getRequestId();
     int workerId = context.getServer().workerId();
-    MailboxMetadata senderMailBoxMetadatas =
+    MailboxMetadata mailboxMetadata =
         context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(senderStageId);
-    if (senderMailBoxMetadatas != null && !senderMailBoxMetadatas.getMailBoxIdList().isEmpty()) {
-      _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, senderMailBoxMetadatas);
+    if (mailboxMetadata != null && !mailboxMetadata.getMailBoxIdList().isEmpty()) {
+      _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, mailboxMetadata);
     } else {
       _mailboxIds = Collections.emptyList();
     }
     List<ReadMailboxAsyncStream> asyncStreams = _mailboxIds.stream()
         .map(mailboxId -> new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this))
         .collect(Collectors.toList());
-    _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(
-        context.getId(), context.getDeadlineMs(), asyncStreams);
+    _multiConsumer =
+        new BlockingMultiStreamConsumer.OfTransferableBlock(context.getId(), context.getDeadlineMs(), asyncStreams);
   }
 
   protected BlockingMultiStreamConsumer.OfTransferableBlock getMultiConsumer() {

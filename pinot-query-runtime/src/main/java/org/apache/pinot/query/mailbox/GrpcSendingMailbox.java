@@ -60,11 +60,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public void send(TransferableBlock block)
       throws IOException {
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("==[GRPC SEND]== sending data to: " + _id);
-    }
     if (isTerminated()) {
       return;
+    }
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[GRPC SEND]== sending data to: " + _id);
     }
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
@@ -91,9 +91,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
     }
     try {
       String msg = t != null ? t.getMessage() : "Unknown";
-        // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
-        _contentObserver.onNext(toMailboxContent(TransferableBlockUtils.getErrorTransferableBlock(
-            new RuntimeException("Cancelled by sender with exception: " + msg, t))));
+      // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
+      _contentObserver.onNext(toMailboxContent(TransferableBlockUtils.getErrorTransferableBlock(
+          new RuntimeException("Cancelled by sender with exception: " + msg, t))));
       _contentObserver.onCompleted();
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it

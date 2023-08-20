@@ -90,8 +90,6 @@ public class QueryRunner {
     _port = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
     _helixManager = helixManager;
     try {
-      long releaseMs = config.getProperty(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS,
-          QueryConfig.DEFAULT_SCHEDULER_RELEASE_TIMEOUT_MS);
       //TODO: make this configurable
       _opChainExecutor = ExecutorServiceUtils.create(config, "pinot.query.runner.opchain",
           "op_chain_worker_on_" + _port + "_port");

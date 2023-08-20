@@ -18,22 +18,19 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -47,8 +44,6 @@ public class MailboxServiceTest {
   private static final DataSchema DATA_SCHEMA =
       new DataSchema(new String[]{"testColumn"}, new ColumnDataType[]{ColumnDataType.INT});
 
-  private final AtomicReference<Consumer<OpChainId>> _receiveMailCallback1 = new AtomicReference<>();
-
   private MailboxService _mailboxService1;
   private MailboxService _mailboxService2;
 
@@ -58,11 +53,9 @@ public class MailboxServiceTest {
   public void setUp() {
     PinotConfiguration config = new PinotConfiguration(
         Collections.singletonMap(QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 4_000_000));
-    _mailboxService1 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config,
-        opChainId -> _receiveMailCallback1.get().accept(opChainId));
+    _mailboxService1 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
     _mailboxService1.start();
-    _mailboxService2 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config, mailboxId -> {
-    });
+    _mailboxService2 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
     _mailboxService2.start();
   }
 
@@ -74,9 +67,7 @@ public class MailboxServiceTest {
 
   @Test
   public void testLocalHappyPathSendFirst()
-      throws IOException {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    _receiveMailCallback1.set(mailboxId -> numCallbacks.getAndIncrement());
+      throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
 
     // Sends are non-blocking as long as channel capacity is not breached
@@ -87,8 +78,6 @@ public class MailboxServiceTest {
     }
     sendingMailbox.send(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     sendingMailbox.complete();
-
-    assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     receivingMailbox.registeredReader(() -> {
@@ -111,14 +100,12 @@ public class MailboxServiceTest {
 
   @Test
   public void testLocalHappyPathReceiveFirst()
-      throws IOException {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    _receiveMailCallback1.set(mailboxId -> numCallbacks.getAndIncrement());
+      throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> {
-    });
+    AtomicInteger numCallbacks = new AtomicInteger();
+    receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     assertNull(receivingMailbox.poll());
 
@@ -151,15 +138,13 @@ public class MailboxServiceTest {
 
   @Test
   public void testLocalCancelledBySender()
-      throws IOException {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    _receiveMailCallback1.set(mailboxId -> numCallbacks.getAndIncrement());
+      throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> {
-    });
+    AtomicInteger numCallbacks = new AtomicInteger();
+    receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
 
     // Send one data block and then cancel
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
@@ -181,14 +166,12 @@ public class MailboxServiceTest {
 
   @Test
   public void testLocalCancelledBySenderBeforeSend() {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    _receiveMailCallback1.set(mailboxId -> numCallbacks.getAndIncrement());
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> {
-    });
+    AtomicInteger numCallbacks = new AtomicInteger();
+    receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
 
     // Directly cancel
     sendingMailbox.cancel(new Exception("TEST ERROR"));
@@ -209,15 +192,13 @@ public class MailboxServiceTest {
 
   @Test
   public void testLocalCancelledByReceiver()
-      throws IOException {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    _receiveMailCallback1.set(mailboxId -> numCallbacks.getAndIncrement());
+      throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> {
-    });
+    AtomicInteger numCallbacks = new AtomicInteger();
+    receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
 
     // Send one data block and then cancel
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
@@ -240,12 +221,13 @@ public class MailboxServiceTest {
   @Test
   public void testLocalTimeOut()
       throws Exception {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    _receiveMailCallback1.set(mailboxId -> numCallbacks.getAndIncrement());
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     long deadlineMs = System.currentTimeMillis() + 1000;
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, deadlineMs);
+    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    AtomicInteger numCallbacks = new AtomicInteger();
+    receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
 
     // Send one data block, sleep until timed out, then send one more block
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
@@ -256,12 +238,9 @@ public class MailboxServiceTest {
     } catch (Exception e) {
       // Expected
     }
-    assertEquals(numCallbacks.get(), 2);
 
     // Data blocks will be cleaned up
-    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> {
-    });
+    assertEquals(numCallbacks.get(), 2);
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     TransferableBlock block = receivingMailbox.poll();
     assertNotNull(block);
@@ -277,12 +256,13 @@ public class MailboxServiceTest {
   @Test
   public void testLocalBufferFull()
       throws Exception {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    _receiveMailCallback1.set(mailboxId -> numCallbacks.getAndIncrement());
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId,
             System.currentTimeMillis() + 1000);
+    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    AtomicInteger numCallbacks = new AtomicInteger();
+    receivingMailbox.registeredReader(numCallbacks::getAndIncrement);
 
     // Sends are non-blocking as long as channel capacity is not breached
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
@@ -296,12 +276,9 @@ public class MailboxServiceTest {
     } catch (Exception e) {
       // Expected
     }
-    assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
 
     // Data blocks will be cleaned up
-    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> {
-    });
+    assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     TransferableBlock block = receivingMailbox.poll();
     assertNotNull(block);
@@ -317,19 +294,7 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteHappyPathSendFirst()
       throws Exception {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    CountDownLatch receiveMailLatch = new CountDownLatch(ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
-    _receiveMailCallback1.set(mailboxId -> {
-      numCallbacks.getAndIncrement();
-      receiveMailLatch.countDown();
-    });
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
-
-    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> {
-    });
-    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
-    assertNull(receivingMailbox.poll());
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
@@ -341,8 +306,12 @@ public class MailboxServiceTest {
     sendingMailbox.complete();
 
     // Wait until all the mails are delivered
-    receiveMailLatch.await();
-    assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
+    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> {
+    });
+    TestUtils.waitForCondition(
+        aVoid -> receivingMailbox.getNumPendingBlocks() == ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS, 1000L,
+        "Failed to deliver mails");
 
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
@@ -363,13 +332,17 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteHappyPathReceiveFirst()
       throws Exception {
+    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+
+    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
     AtomicInteger numCallbacks = new AtomicInteger();
     CountDownLatch receiveMailLatch = new CountDownLatch(ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
-    _receiveMailCallback1.set(mailboxId -> {
+    receivingMailbox.registeredReader(() -> {
       numCallbacks.getAndIncrement();
       receiveMailLatch.countDown();
     });
-    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
+    assertNull(receivingMailbox.poll());
 
     // Sends are non-blocking as long as channel capacity is not breached
     SendingMailbox sendingMailbox =
@@ -384,9 +357,6 @@ public class MailboxServiceTest {
     receiveMailLatch.await();
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
 
-    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> {
-    });
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       assertEquals(receivingMailbox.getNumPendingBlocks(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - i);
       TransferableBlock block = receivingMailbox.poll();
@@ -406,17 +376,15 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteCancelledBySender()
       throws Exception {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    CountDownLatch receiveMailLatch = new CountDownLatch(2);
-    _receiveMailCallback1.set(mailboxId -> {
-      numCallbacks.getAndIncrement();
-      receiveMailLatch.countDown();
-    });
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    AtomicInteger numCallbacks = new AtomicInteger();
+    CountDownLatch receiveMailLatch = new CountDownLatch(2);
     receivingMailbox.registeredReader(() -> {
+      numCallbacks.getAndIncrement();
+      receiveMailLatch.countDown();
     });
 
     // Send one data block and then cancel
@@ -443,17 +411,15 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteCancelledBySenderBeforeSend()
       throws Exception {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    CountDownLatch receiveMailLatch = new CountDownLatch(1);
-    _receiveMailCallback1.set(mailboxId -> {
-      numCallbacks.getAndIncrement();
-      receiveMailLatch.countDown();
-    });
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    AtomicInteger numCallbacks = new AtomicInteger();
+    CountDownLatch receiveMailLatch = new CountDownLatch(1);
     receivingMailbox.registeredReader(() -> {
+      numCallbacks.getAndIncrement();
+      receiveMailLatch.countDown();
     });
 
     // Directly cancel
@@ -479,17 +445,15 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteCancelledByReceiver()
       throws Exception {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    CountDownLatch receiveMailLatch = new CountDownLatch(1);
-    _receiveMailCallback1.set(mailboxId -> {
-      numCallbacks.getAndIncrement();
-      receiveMailLatch.countDown();
-    });
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    AtomicInteger numCallbacks = new AtomicInteger();
+    CountDownLatch receiveMailLatch = new CountDownLatch(1);
     receivingMailbox.registeredReader(() -> {
+      numCallbacks.getAndIncrement();
+      receiveMailLatch.countDown();
     });
 
     // Send one data block and then cancel
@@ -514,16 +478,17 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteTimeOut()
       throws Exception {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    CountDownLatch receiveMailLatch = new CountDownLatch(2);
-    _receiveMailCallback1.set(mailboxId -> {
-      numCallbacks.getAndIncrement();
-      receiveMailLatch.countDown();
-    });
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     long deadlineMs = System.currentTimeMillis() + 1000;
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, deadlineMs);
+    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    AtomicInteger numCallbacks = new AtomicInteger();
+    CountDownLatch receiveMailLatch = new CountDownLatch(2);
+    receivingMailbox.registeredReader(() -> {
+      numCallbacks.getAndIncrement();
+      receiveMailLatch.countDown();
+    });
 
     // Send one data block, RPC will timeout after deadline
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
@@ -541,9 +506,6 @@ public class MailboxServiceTest {
 //    assertEquals(numCallbacks.get(), 2);
 
     // Data blocks will be cleaned up
-    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> {
-    });
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     TransferableBlock block = receivingMailbox.poll();
     assertNotNull(block);
@@ -559,16 +521,17 @@ public class MailboxServiceTest {
   @Test
   public void testRemoteBufferFull()
       throws Exception {
-    AtomicInteger numCallbacks = new AtomicInteger();
-    CountDownLatch receiveMailLatch = new CountDownLatch(ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
-    _receiveMailCallback1.set(mailboxId -> {
-      numCallbacks.getAndIncrement();
-      receiveMailLatch.countDown();
-    });
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId,
             System.currentTimeMillis() + 1000);
+    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    AtomicInteger numCallbacks = new AtomicInteger();
+    CountDownLatch receiveMailLatch = new CountDownLatch(ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
+    receivingMailbox.registeredReader(() -> {
+      numCallbacks.getAndIncrement();
+      receiveMailLatch.countDown();
+    });
 
     // Sends are non-blocking as long as channel capacity is not breached
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS; i++) {
@@ -581,9 +544,6 @@ public class MailboxServiceTest {
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
 
     // Data blocks will be cleaned up
-    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> {
-    });
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
     TransferableBlock block = receivingMailbox.poll();
     assertNotNull(block);

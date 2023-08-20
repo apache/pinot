@@ -57,7 +57,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -108,8 +107,7 @@ public class OpChainTest {
         TransferableBlock arg = invocation.getArgument(0);
         _blockList.add(arg);
         return true;
-      }).when(_exchange).offerBlock(any(TransferableBlock.class), anyLong());
-      when(_exchange.getRemainingCapacity()).thenReturn(1);
+      }).when(_exchange).send(any(TransferableBlock.class));
       when(_mailbox2.poll()).then(x -> {
         if (_blockList.isEmpty()) {
           return TransferableBlockUtils.getEndOfStreamTransferableBlock();

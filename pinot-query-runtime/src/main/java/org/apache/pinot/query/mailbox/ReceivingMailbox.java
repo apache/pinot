@@ -24,11 +24,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +45,6 @@ public class ReceivingMailbox {
       TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by receiver"));
 
   private final String _id;
-  private final Consumer<OpChainId> _receiveMailCallback;
   // TODO: Make the queue size configurable
   // TODO: Revisit if this is the correct way to apply back pressure
   private final BlockingQueue<TransferableBlock> _blocks = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
@@ -55,25 +52,22 @@ public class ReceivingMailbox {
   @Nullable
   private volatile Reader _reader;
 
-  public ReceivingMailbox(String id, Consumer<OpChainId> receiveMailCallback) {
+  public ReceivingMailbox(String id) {
     _id = id;
-    _receiveMailCallback = receiveMailCallback;
   }
 
   public void registeredReader(Reader reader) {
     if (_reader != null) {
       throw new IllegalArgumentException("Only one reader is supported");
     }
-    LOGGER.debug("==[MAILBOX]== Reader registered for mailbox {}", _id);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[MAILBOX]== Reader registered for mailbox: " + _id);
+    }
     _reader = reader;
   }
 
   public String getId() {
     return _id;
-  }
-
-  public OpChainId getOpChainId() {
-    return MailboxIdUtils.toOpChainId(_id);
   }
 
   /**
@@ -100,7 +94,6 @@ public class ReceivingMailbox {
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("==[MAILBOX]== Block " + block + " ready to read from mailbox: " + _id);
           }
-          _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
           notifyReader();
           return ReceivingMailboxStatus.SUCCESS;
         } else {
@@ -128,7 +121,6 @@ public class ReceivingMailbox {
   public void setErrorBlock(TransferableBlock errorBlock) {
     if (_errorBlock.compareAndSet(null, errorBlock)) {
       _blocks.clear();
-      _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
       notifyReader();
     }
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.slf4j.Logger;
@@ -41,7 +42,8 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
-  public void send(TransferableBlock block) {
+  public void send(TransferableBlock block)
+      throws TimeoutException {
     if (_isTerminated) {
       return;
     }
@@ -56,7 +58,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
       case ERROR:
         throw new RuntimeException(String.format("Mailbox: %s already errored out (received error block before)", _id));
       case TIMEOUT:
-        throw new RuntimeException(
+        throw new TimeoutException(
             String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
       case EARLY_TERMINATED:
         _isTerminated = true;

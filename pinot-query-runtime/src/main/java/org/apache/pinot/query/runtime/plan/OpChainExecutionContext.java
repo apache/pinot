@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.plan;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OpChainId;
@@ -70,10 +69,6 @@ public class OpChainExecutionContext {
 
   public MailboxService getMailboxService() {
     return _mailboxService;
-  }
-
-  public Consumer<OpChainId> getCallback() {
-    return _mailboxService.getCallback();
   }
 
   public long getRequestId() {

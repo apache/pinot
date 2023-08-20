@@ -80,7 +80,6 @@ public class QueryServerEnclosure {
       _runnerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
       _runnerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME,
           String.format("Server_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME));
-      _runnerConfig.put(QueryConfig.KEY_OF_SCHEDULER_RELEASE_TIMEOUT_MS, 100);
       _queryRunner = new QueryRunner();
     } catch (Exception e) {
       throw new RuntimeException("Test Failed!", e);

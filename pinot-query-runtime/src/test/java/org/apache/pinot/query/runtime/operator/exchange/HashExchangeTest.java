@@ -27,7 +27,6 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -71,8 +70,7 @@ public class HashExchangeTest {
     ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 
     // When:
-    new HashExchange(new OpChainId(1, 2, 3), destinations, selector, TransferableBlockUtils::splitBlock,
-        (opChainId) -> { }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
+    new HashExchange(destinations, selector, TransferableBlockUtils::splitBlock).route(destinations, _block);
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
