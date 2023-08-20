@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -37,8 +38,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -69,7 +70,6 @@ public class MailboxSendOperatorTest {
     when(_server.hostname()).thenReturn("mock");
     when(_server.port()).thenReturn(0);
     when(_server.workerId()).thenReturn(0);
-    when(_exchange.offerBlock(any(), anyLong())).thenReturn(true);
   }
 
   @AfterMethod
@@ -90,7 +90,7 @@ public class MailboxSendOperatorTest {
 
     // Then:
     assertSame(block, errorBlock, "expected error block to propagate");
-    verify(_exchange).offerBlock(eq(errorBlock), anyLong());
+    verify(_exchange).send(eq(errorBlock));
   }
 
   @Test
@@ -105,7 +105,7 @@ public class MailboxSendOperatorTest {
     // Then:
     assertTrue(block.isErrorBlock(), "expected error block to propagate");
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
-    verify(_exchange).offerBlock(captor.capture(), anyLong());
+    verify(_exchange).send(captor.capture());
     assertTrue(captor.getValue().isErrorBlock(), "expected to send error block to exchange");
   }
 
@@ -116,7 +116,7 @@ public class MailboxSendOperatorTest {
     TransferableBlock dataBlock =
         OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
     when(_sourceOperator.nextBlock()).thenReturn(dataBlock);
-    when(_exchange.offerBlock(any(), anyLong())).thenReturn(false);
+    doThrow(new TimeoutException()).when(_exchange).send(any());
 
     // When:
     TransferableBlock block = getMailboxSendOperator().nextBlock();
@@ -124,7 +124,7 @@ public class MailboxSendOperatorTest {
     // Then:
     assertTrue(block.isErrorBlock(), "expected error block to propagate");
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
-    verify(_exchange).offerBlock(captor.capture(), anyLong());
+    verify(_exchange).send(captor.capture());
     assertSame(captor.getValue(), dataBlock, "expected to send data block to exchange");
   }
 
@@ -141,7 +141,7 @@ public class MailboxSendOperatorTest {
     // Then:
     assertSame(block, eosBlock, "expected EOS block to propagate");
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
-    verify(_exchange).offerBlock(captor.capture(), anyLong());
+    verify(_exchange).send(captor.capture());
     assertTrue(captor.getValue().isSuccessfulEndOfStreamBlock(), "expected to send EOS block to exchange");
   }
 
@@ -155,7 +155,6 @@ public class MailboxSendOperatorTest {
         OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
     TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
     when(_sourceOperator.nextBlock()).thenReturn(dataBlock1, dataBlock2, eosBlock);
-    when(_exchange.offerBlock(any(), anyLong())).thenReturn(true);
 
     // When:
     MailboxSendOperator mailboxSendOperator = getMailboxSendOperator();
@@ -174,7 +173,7 @@ public class MailboxSendOperatorTest {
     assertSame(block, eosBlock, "expected EOS block to propagate");
 
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
-    verify(_exchange, times(3)).offerBlock(captor.capture(), anyLong());
+    verify(_exchange, times(3)).send(captor.capture());
     List<TransferableBlock> blocks = captor.getAllValues();
     assertSame(blocks.get(0), dataBlock1, "expected to send first data block to exchange on first call");
     assertSame(blocks.get(1), dataBlock2, "expected to send second data block to exchange on second call");

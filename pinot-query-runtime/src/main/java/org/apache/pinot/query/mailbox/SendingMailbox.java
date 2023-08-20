@@ -19,6 +19,7 @@
 package org.apache.pinot.query.mailbox;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 
@@ -34,7 +35,7 @@ public interface SendingMailbox {
    * sending the data, since that would allow {@link BlockExchange} to exit early.
    */
   void send(TransferableBlock block)
-      throws IOException;
+      throws IOException, TimeoutException;
 
   /**
    * Called when there is no more data to be sent by the {@link BlockExchange}. This is also a signal for the

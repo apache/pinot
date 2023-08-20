@@ -82,7 +82,6 @@ public class MailboxSendOperator extends MultiStageOperator {
     _collationKeys = collationKeys;
     _collationDirections = collationDirections;
     _isSortOnSender = isSortOnSender;
-    _context.getMailboxService().submitExchangeRequest(context.getId(), exchange);
   }
 
   private static BlockExchange getBlockExchange(OpChainExecutionContext context, RelDistribution.Type exchangeType,
@@ -94,16 +93,15 @@ public class MailboxSendOperator extends MultiStageOperator {
     long deadlineMs = context.getDeadlineMs();
 
     int workerId = context.getServer().workerId();
-    MailboxMetadata receiverMailboxMetadatas =
+    MailboxMetadata mailboxMetadata =
         context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(receiverStageId);
-    List<String> sendingMailboxIds = MailboxIdUtils.toMailboxIds(requestId, receiverMailboxMetadatas);
+    List<String> sendingMailboxIds = MailboxIdUtils.toMailboxIds(requestId, mailboxMetadata);
     List<SendingMailbox> sendingMailboxes = new ArrayList<>(sendingMailboxIds.size());
-    for (int i = 0; i < receiverMailboxMetadatas.getMailBoxIdList().size(); i++) {
-      sendingMailboxes.add(mailboxService.getSendingMailbox(receiverMailboxMetadatas.getVirtualAddress(i).hostname(),
-          receiverMailboxMetadatas.getVirtualAddress(i).port(), sendingMailboxIds.get(i), deadlineMs));
+    for (int i = 0; i < sendingMailboxIds.size(); i++) {
+      sendingMailboxes.add(mailboxService.getSendingMailbox(mailboxMetadata.getVirtualAddress(i).hostname(),
+          mailboxMetadata.getVirtualAddress(i).port(), sendingMailboxIds.get(i), deadlineMs));
     }
-    return BlockExchange.getExchange(context.getId(), sendingMailboxes, exchangeType, keySelector,
-        TransferableBlockUtils::splitBlock, context.getCallback(), context.getDeadlineMs());
+    return BlockExchange.getExchange(sendingMailboxes, exchangeType, keySelector, TransferableBlockUtils::splitBlock);
   }
 
   @Override
@@ -121,22 +119,16 @@ public class MailboxSendOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock() {
     try {
       TransferableBlock block = _sourceOperator.nextBlock();
-      if (block.isErrorBlock()) {
-        sendTransferableBlock(block);
-        return block;
-      } else if (block.isSuccessfulEndOfStreamBlock()) {
+      if (block.isSuccessfulEndOfStreamBlock()) {
         // Stats need to be populated here because the block is being sent to the mailbox
         // and the receiving opChain will not be able to access the stats from the previous opChain
         TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
             OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
         sendTransferableBlock(eosBlockWithStats);
-        return block;
       } else {
-        // Data block
         sendTransferableBlock(block);
-        // Yield if we cannot continue to put transferable block into the sending queue
-        return block;
       }
+      return block;
     } catch (EarlyTerminationException e) {
       // TODO: Query stats are not sent when opChain is early terminated
       LOGGER.debug("Early terminating opChain: {}", _context.getId());
@@ -158,24 +150,9 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   private void sendTransferableBlock(TransferableBlock block)
       throws Exception {
-    long timeoutMs = _context.getDeadlineMs() - System.currentTimeMillis();
-    boolean success = false;
-    try {
-      if (!_exchange.offerBlock(block, timeoutMs)) {
-        throw new TimeoutException(
-            String.format("Timed out while offering block into the sending queue after %dms", timeoutMs));
-      }
-      success = true;
-    } finally {
-      if (success) {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("==[SEND]== Block " + block + " correctly sent from: " + _context.getId());
-        }
-      } else {
-        if (LOGGER.isInfoEnabled()) {
-          LOGGER.info("==[SEND]== Block " + block + " cannot be sent from: " + _context.getId());
-        }
-      }
+    _exchange.send(block);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
   }
 
