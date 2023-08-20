@@ -69,6 +69,8 @@ export const AsyncPinotTables = ({
     Utils.getLoadingTableData(columnHeaders)
   );
 
+  const [currentlySelectedTables, setCurrentlySelectedTables] = useState([])
+
   const fetchTenantData = async (tenants: string[]) => {
     Promise.all(
       tenants.map((tenant) => {
@@ -127,12 +129,14 @@ export const AsyncPinotTables = ({
     );
   };
 
-  const fetchAllTablesData = async () => {
+  const fetchAllTablesData = async (subsets?: string[]) => {
     Promise.all([getQueryTables('realtime'), getQueryTables('offline')]).then(
       (results) => {
         const realtimeTables = results[0].data.tables;
         const offlineTables = results[1].data.tables;
         const allTables = realtimeTables.concat(offlineTables);
+        const subsetTables = subsets ? allTables.filter(tableName => subsets.includes(tableName)) : allTables
+
         setTableData({
           columns: columnHeaders,
           records: allTables.map((tableName) => {
@@ -149,13 +153,16 @@ export const AsyncPinotTables = ({
         if (onTableNamesLoaded) {
           onTableNamesLoaded();
         }
-        fetchAllTableDetails(allTables);
+        // potentially fetch only partial details
+        fetchAllTableDetails(subsetTables);
       }
     );
   };
 
   const fetchAllTableDetails = async (tables: string[]) => {
-    return tables.forEach((tableName) => {
+    // never match more than 10 tables
+    const tableSubsets = tables.slice(0, 10)
+    return tableSubsets.forEach((tableName) => {
       PinotMethodUtils.getSegmentCountAndStatus(tableName).then(
         ({ segment_count, segment_status }) => {
           setTableData((prevState) => {
@@ -204,6 +211,14 @@ export const AsyncPinotTables = ({
     }
   }, [instance, tenants]);
 
+  useEffect(() => {
+    if (currentlySelectedTables.length === 0) return
+    console.log(currentlySelectedTables)
+    const tables = currentlySelectedTables.map(row => row['Table Name#$%0'])
+    fetchAllTablesData(tables)
+  }, [currentlySelectedTables])
+
+  console.log(tableData)
   return (
     <CustomizedTables
       title={title}
@@ -213,6 +228,7 @@ export const AsyncPinotTables = ({
       baseURL={baseUrl}
       showSearchBox={true}
       inAccordionFormat={true}
+      onRowsRendered={(rows) => setCurrentlySelectedTables(rows)}
     />
   );
 };
