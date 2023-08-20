@@ -138,10 +138,8 @@ public class S3PinotFS extends BasePinotFS {
                 .asyncCredentialUpdateEnabled(s3Config.isAsyncSessionUpdateEnabled()).build();
       }
 
-      S3ClientBuilder s3ClientBuilder = S3Client.builder()
-                  .forcePathStyle(true)
-                  .region(Region.of(s3Config.getRegion()))
-                  .credentialsProvider(awsCredentialsProvider);
+      S3ClientBuilder s3ClientBuilder = S3Client.builder().forcePathStyle(true).region(Region.of(s3Config.getRegion()))
+          .credentialsProvider(awsCredentialsProvider);
       if (StringUtils.isNotEmpty(s3Config.getEndpoint())) {
         try {
           s3ClientBuilder.endpointOverride(new URI(s3Config.getEndpoint()));
