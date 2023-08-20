@@ -44,10 +44,10 @@ public class LiteralTransformFunction implements TransformFunction {
 
   private final Object _literal;
   private final DataType _dataType;
-  private final Integer _intLiteral;
-  private final Long _longLiteral;
-  private final Float _floatLiteral;
-  private final Double _doubleLiteral;
+  private final int _intLiteral;
+  private final long _longLiteral;
+  private final float _floatLiteral;
+  private final double _doubleLiteral;
   private final BigDecimal _bigDecimalLiteral;
 
   // literals may be shared but values are intentionally not volatile as assignment races are benign
@@ -64,29 +64,37 @@ public class LiteralTransformFunction implements TransformFunction {
     _literal = literalContext.getValue();
     _dataType = literalContext.getType();
     _bigDecimalLiteral = literalContext.getBigDecimalValue();
-    _intLiteral = _bigDecimalLiteral == null ? null : _bigDecimalLiteral.intValue();
-    _longLiteral = _bigDecimalLiteral == null ? null : _bigDecimalLiteral.longValue();
-    _floatLiteral = _bigDecimalLiteral == null ? null :_bigDecimalLiteral.floatValue();
-    _doubleLiteral = _bigDecimalLiteral == null ? null : _bigDecimalLiteral.doubleValue();
+    _intLiteral = _bigDecimalLiteral.intValue();
+    _longLiteral = _bigDecimalLiteral.longValue();
+    _floatLiteral = _bigDecimalLiteral.floatValue();
+    _doubleLiteral = _bigDecimalLiteral.doubleValue();
+  }
+
+  public Object getLiteral() {
+    return _literal;
+  }
+
+  public DataType getDataType() {
+    return _dataType;
   }
 
   public boolean getBooleanLiteral() {
     return BooleanUtils.toBoolean(_literal);
   }
 
-  public Integer getIntLiteral() {
+  public int getIntLiteral() {
     return _intLiteral;
   }
 
-  public Long getLongLiteral() {
+  public long getLongLiteral() {
     return _longLiteral;
   }
 
-  public Float getFloatLiteral() {
+  public float getFloatLiteral() {
     return _floatLiteral;
   }
 
-  public Double getDoubleLiteral() {
+  public double getDoubleLiteral() {
     return _doubleLiteral;
   }
 
@@ -95,10 +103,7 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   public String getStringLiteral() {
-    if (_literal != null) {
-      return _literal.toString();
-    }
-    return null;
+    return String.valueOf(_literal);
   }
 
   @Override
@@ -137,7 +142,9 @@ public class LiteralTransformFunction implements TransformFunction {
     if (intResult == null || intResult.length < numDocs) {
       intResult = new int[numDocs];
       if (_dataType != DataType.BOOLEAN) {
+        if (_intLiteral != 0) {
           Arrays.fill(intResult, _intLiteral);
+        }
       } else {
         Arrays.fill(intResult, _intLiteral);
       }
@@ -269,5 +276,16 @@ public class LiteralTransformFunction implements TransformFunction {
     RoaringBitmap bitmap = new RoaringBitmap();
     bitmap.add(0L, length);
     return bitmap;
+  }
+
+  /*
+   * Util function to check whether the Literal transform is null or not.
+   */
+  public static boolean isNullLiteralTransform(TransformFunction function) {
+    if (FUNCTION_NAME.equals(function.getName())) {
+      LiteralTransformFunction literalFunction = (LiteralTransformFunction) function;
+      return literalFunction.getLiteral() == null && literalFunction.getDataType() == DataType.UNKNOWN;
+    }
+    return false;
   }
 }

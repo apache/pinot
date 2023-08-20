@@ -109,6 +109,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId));
     requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
         String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true");
     requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
 
     // Putting trace testing here as extra options as it doesn't go along with the rest of the items.
