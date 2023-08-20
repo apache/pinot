@@ -278,17 +278,13 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   void refreshSegmentStates() {
     Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap =
         new HashMap<>(HashUtil.getHashMapCapacity(_oldSegmentCandidatesMap.size() + _newSegmentStateMap.size()));
+    Set<String> servingInstances = new HashSet<>();
     Set<String> unavailableSegments = new HashSet<>();
 
     for (Map.Entry<String, List<SegmentInstanceCandidate>> entry : _oldSegmentCandidatesMap.entrySet()) {
       String segment = entry.getKey();
       List<SegmentInstanceCandidate> candidates = entry.getValue();
-      List<SegmentInstanceCandidate> enabledCandidates = new ArrayList<>(candidates.size());
-      for (SegmentInstanceCandidate candidate : candidates) {
-        if (_enabledInstances.contains(candidate.getInstance())) {
-          enabledCandidates.add(candidate);
-        }
-      }
+      List<SegmentInstanceCandidate> enabledCandidates = getEnabledCandidates(candidates, servingInstances);
       if (!enabledCandidates.isEmpty()) {
         instanceCandidatesMap.put(segment, enabledCandidates);
       } else {
@@ -308,12 +304,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       String segment = entry.getKey();
       NewSegmentState newSegmentState = entry.getValue();
       List<SegmentInstanceCandidate> candidates = newSegmentState.getCandidates();
-      List<SegmentInstanceCandidate> enabledCandidates = new ArrayList<>(candidates.size());
-      for (SegmentInstanceCandidate candidate : candidates) {
-        if (_enabledInstances.contains(candidate.getInstance())) {
-          enabledCandidates.add(candidate);
-        }
-      }
+      List<SegmentInstanceCandidate> enabledCandidates = getEnabledCandidates(candidates, servingInstances);
       if (!enabledCandidates.isEmpty()) {
         instanceCandidatesMap.put(segment, enabledCandidates);
       } else {
@@ -328,7 +319,20 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       }
     }
 
-    _segmentStates = new SegmentStates(instanceCandidatesMap, unavailableSegments);
+    _segmentStates = new SegmentStates(instanceCandidatesMap, servingInstances, unavailableSegments);
+  }
+
+  private List<SegmentInstanceCandidate> getEnabledCandidates(List<SegmentInstanceCandidate> candidates,
+      Set<String> servingInstances) {
+    List<SegmentInstanceCandidate> enabledCandidates = new ArrayList<>(candidates.size());
+    for (SegmentInstanceCandidate candidate : candidates) {
+      String instance = candidate.getInstance();
+      if (_enabledInstances.contains(instance)) {
+        enabledCandidates.add(candidate);
+        servingInstances.add(instance);
+      }
+    }
+    return enabledCandidates;
   }
 
   /**
@@ -414,6 +418,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       }
       return new SelectionResult(segmentToInstanceMap, unavailableSegmentsForRequest);
     }
+  }
+
+  @Override
+  public Set<String> getServingInstances() {
+    return _segmentStates.getServingInstances();
   }
 
   /**

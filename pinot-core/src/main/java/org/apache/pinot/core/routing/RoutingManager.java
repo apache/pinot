@@ -19,6 +19,7 @@
 package org.apache.pinot.core.routing;
 
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -78,10 +79,8 @@ public interface RoutingManager {
   TablePartitionInfo getTablePartitionInfo(String tableNameWithType);
 
   /**
-   * Returns all enabled server instances for a given table's server tenant.
-   *
-   * @param tableNameWithType name of the table with type
-   * @return all enabled servers for a table's server tenant
+   * Returns the enabled server instances currently serving the given table.
    */
-  Map<String, ServerInstance> getEnabledServersForTableTenant(String tableNameWithType);
+  @Nullable
+  Set<String> getServingInstances(String tableNameWithType);
 }

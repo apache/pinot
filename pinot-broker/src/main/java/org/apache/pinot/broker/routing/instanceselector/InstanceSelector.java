@@ -69,6 +69,11 @@ public interface InstanceSelector {
    */
   SelectionResult select(BrokerRequest brokerRequest, List<String> segments, long requestId);
 
+  /**
+   * Returns the enabled server instances currently serving the table.
+   */
+  Set<String> getServingInstances();
+
   class SelectionResult {
     private final Map<String, String> _segmentToInstanceMap;
     private final List<String> _unavailableSegments;
