@@ -173,8 +173,8 @@ public class MockRoutingManagerFactory {
     }
 
     @Override
-    public Map<String, ServerInstance> getEnabledServersForTableTenant(String tableNameWithType) {
-      return _serverInstances;
+    public Set<String> getServingInstances(String tableNameWithType) {
+      return _serverInstances.keySet();
     }
   }
 }

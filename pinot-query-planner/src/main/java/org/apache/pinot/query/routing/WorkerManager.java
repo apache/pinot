@@ -265,14 +265,42 @@ public class WorkerManager {
     // TODO: actually make assignment strategy decisions for intermediate stages
     List<ServerInstance> serverInstances;
     Set<String> tableNames = context.getTableNames();
+    Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
     if (tableNames.size() == 0) {
       // TODO: Short circuit it when no table needs to be scanned
       // This could be the case from queries that don't actually fetch values from the tables. In such cases the
       // routing need not be tenant aware.
       // Eg: SELECT 1 AS one FROM select_having_expression_test_test_having HAVING 1 > 2;
-      serverInstances = new ArrayList<>(_routingManager.getEnabledServerInstanceMap().values());
+      serverInstances = new ArrayList<>(enabledServerInstanceMap.values());
     } else {
-      serverInstances = fetchServersForIntermediateStage(tableNames);
+      Set<String> servers = new HashSet<>();
+      for (String tableName : tableNames) {
+        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+        if (tableType == null) {
+          Set<String> offlineTableServers = _routingManager.getServingInstances(
+              TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName));
+          if (offlineTableServers != null) {
+            servers.addAll(offlineTableServers);
+          }
+          Set<String> realtimeTableServers = _routingManager.getServingInstances(
+              TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName));
+          if (realtimeTableServers != null) {
+            servers.addAll(realtimeTableServers);
+          }
+        } else {
+          Set<String> tableServers = _routingManager.getServingInstances(tableName);
+          if (tableServers != null) {
+            servers.addAll(tableServers);
+          }
+        }
+      }
+      serverInstances = new ArrayList<>(servers.size());
+      for (String server : servers) {
+        ServerInstance serverInstance = enabledServerInstanceMap.get(server);
+        if (serverInstance != null) {
+          serverInstances.add(serverInstance);
+        }
+      }
     }
     if (serverInstances.isEmpty()) {
       LOGGER.error("[RequestId: {}] No server instance found for intermediate stage for tables: {}",
@@ -467,21 +495,5 @@ public class WorkerManager {
       segmentsMap.put(TableType.REALTIME.name(), partitionInfo._realtimeSegments);
     }
     return segmentsMap;
-  }
-
-  private List<ServerInstance> fetchServersForIntermediateStage(Set<String> tableNames) {
-    Set<ServerInstance> serverInstances = new HashSet<>();
-    for (String tableName : tableNames) {
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-      if (tableType == null) {
-        String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
-        serverInstances.addAll(_routingManager.getEnabledServersForTableTenant(offlineTableName).values());
-        String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-        serverInstances.addAll(_routingManager.getEnabledServersForTableTenant(realtimeTableName).values());
-      } else {
-        serverInstances.addAll(_routingManager.getEnabledServersForTableTenant(tableName).values());
-      }
-    }
-    return new ArrayList<>(serverInstances);
   }
 }

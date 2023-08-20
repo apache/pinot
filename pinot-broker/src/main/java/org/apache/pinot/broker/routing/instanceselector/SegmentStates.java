@@ -38,17 +38,23 @@ import javax.annotation.concurrent.Immutable;
 @Immutable
 public class SegmentStates {
   private final Map<String, List<SegmentInstanceCandidate>> _instanceCandidatesMap;
+  private final Set<String> _servingInstances;
   private final Set<String> _unavailableSegments;
 
-  public SegmentStates(Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap,
+  public SegmentStates(Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap, Set<String> servingInstances,
       Set<String> unavailableSegments) {
     _instanceCandidatesMap = instanceCandidatesMap;
+    _servingInstances = servingInstances;
     _unavailableSegments = unavailableSegments;
   }
 
   @Nullable
   public List<SegmentInstanceCandidate> getCandidates(String segment) {
     return _instanceCandidatesMap.get(segment);
+  }
+
+  public Set<String> getServingInstances() {
+    return _servingInstances;
   }
 
   public Set<String> getUnavailableSegments() {
