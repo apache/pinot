@@ -502,8 +502,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
-    boolean exitServerOnIncompleteStartup = _serverConf.getProperty(Server.CONFIG_OF_EXIT_SERVER_ON_INCOMPLETE_STARTUP,
-        Server.DEFAULT_EXIT_SERVER_ON_INCOMPLETE_STARTUP);
+    boolean exitServerOnIncompleteStartup = _serverConf.getProperty(Server.CONFIG_OF_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE,
+        Server.DEFAULT_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE);
     if (exitServerOnIncompleteStartup) {
       String errorMessage = String.format("Service status %s has not turned GOOD within %dms: %s. Exiting server.",
           serviceStatus, System.currentTimeMillis() - startTimeMs, ServiceStatus.getStatusDescription());
