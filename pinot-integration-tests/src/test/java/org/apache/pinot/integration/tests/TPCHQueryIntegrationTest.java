@@ -46,7 +46,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-
+// TODO: extract common functions from TPCHQueryIntegrationTest and SSBQueryIntegrationTest
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
   private static final int NUM_TPCH_QUERIES = 24;
@@ -63,8 +63,10 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     TPCH_QUICKSTART_TABLE_RESOURCES.put("part", "examples/batch/tpch/part");
     TPCH_QUICKSTART_TABLE_RESOURCES.put("supplier", "examples/batch/tpch/supplier");
     EXEMPT_QUERIES = new HashSet<>();
-    // The following queries fail due to lack of support for views.
-    EXEMPT_QUERIES.addAll(ImmutableList.of(15, 16, 17));
+    // Pinot query 6 fails due to mismatch results.
+    // Pinot queries 15, 16, 17 fail due to lack of support for views.
+    // Pinot queries 23, 24 fail due to java heap space problem or timeout.
+    EXEMPT_QUERIES.addAll(ImmutableList.of(6, 15, 16, 17, 23, 24));
   }
 
   @BeforeClass
@@ -134,11 +136,27 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     h2statement.execute(h2Query);
     ResultSet h2ResultSet = h2statement.getResultSet();
-    // TODO: fix the query parsing issue in Pinot
-    //  many queries fail due to "ERROR [Connection] [main] Cannot parse table name from query"
-    //  java.lang.ClassCastException:
-    //  class org.apache.calcite.sql.SqlSelect cannot be cast to class org.apache.calcite.sql.SqlBasicCall
-    //  (org.apache.calcite.sql.SqlSelect and org.apache.calcite.sql.SqlBasicCall are in unnamed module of loader 'app')
+
+    // compare results.
+    Assert.assertEquals(numColumns, h2ResultSet.getMetaData().getColumnCount());
+    if (h2ResultSet.first()) {
+      for (int i = 0; i < numRows; i++) {
+        for (int c = 0; c < numColumns; c++) {
+          String h2Value = h2ResultSet.getString(c + 1);
+          String pinotValue = resultTableResultSet.getString(i, c);
+          boolean error = ClusterIntegrationTestUtils.fuzzyCompare(h2Value, pinotValue, pinotValue);
+          if (error) {
+            throw new RuntimeException("Value: " + c + " does not match at (" + i + ", " + c + "), "
+                + "expected h2 value: " + h2Value + ", actual Pinot value: " + pinotValue);
+          }
+        }
+        if (!h2ResultSet.next() && i != numRows - 1) {
+          throw new RuntimeException("H2 result set is smaller than Pinot result set after: " + i + " rows!");
+        }
+      }
+    }
+    Assert.assertFalse(h2ResultSet.next(), "Pinot result set is smaller than H2 result set after: "
+        + numRows + " rows!");
   }
 
   @Override
@@ -186,6 +204,7 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
           .getResourceAsStream(pinotQueryFilePath)) {
         queries[iter] = new Object[2];
         queries[iter][0] = IOUtils.toString(Objects.requireNonNull(pinotQueryIs), Charset.defaultCharset());
+        // TODO: remove this once we have Pinot support standard sql funtion extract().
         String h2QueryFilePath = String.format("tpch/%s-h2.sql", query);
         try (InputStream h2QueryIs = TPCHQueryIntegrationTest.class.getClassLoader()
             .getResourceAsStream(h2QueryFilePath)) {

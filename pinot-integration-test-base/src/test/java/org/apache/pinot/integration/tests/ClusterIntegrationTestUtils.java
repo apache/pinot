@@ -1026,6 +1026,16 @@ public class ClusterIntegrationTestUtils {
   }
 
   public static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
+    if (("null".equals(h2Value) || h2Value == null)
+        && ("null".equals(brokerValue) || brokerValue == null)
+        && ("null".equals(connectionValue) || connectionValue == null)) {
+      return false;
+    }
+    if ("null".equals(h2Value) || h2Value == null
+        || "null".equals(brokerValue) || brokerValue == null
+        || "null".equals(connectionValue) || connectionValue == null) {
+      return true;
+    }
     // Fuzzy compare expected value and actual value
     boolean error = false;
     if (isParsableDouble(h2Value)) {

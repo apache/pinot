@@ -6,7 +6,7 @@ select
 from
   (
     select
-      FORMATDATETIME(DATEADD('SECOND', o_orderdate, '1970-01-01'), 'yyyy') as o_year,
+      extract(year from o_orderdate) as o_year,
       l_extendedprice * (1 - l_discount) as volume,
       n2.n_name as nation
     from
@@ -27,8 +27,8 @@ from
       and n1.n_regionkey = r_regionkey
       and r_name = 'AMERICA'
       and s_nationkey = n2.n_nationkey
-      and o_orderdate between 788898600
-      and 851970600
+      and o_orderdate between '1995-01-01'
+      and '1997-01-01'
       and p_type = 'ECONOMY ANODIZED STEEL'
   ) as all_nations
 group by
