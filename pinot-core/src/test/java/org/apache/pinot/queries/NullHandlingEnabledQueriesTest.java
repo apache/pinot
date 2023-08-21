@@ -1235,6 +1235,29 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertArrayEquals(rows.get(0), new Object[]{0.5, "key"});
   }
 
+  @Test(dataProvider = "NumberTypes")
+  public void testGroupByMvStddevPop(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, new String[]{"key1", "key2"});
+    insertRowWithTwoColumns(1, new String[]{"key1", "key2"});
+    insertRowWithTwoColumns(2, new String[]{"key1"});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType)
+        .addMultiValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT STDDEV_POP(%s), %s FROM testTable GROUP BY %s ORDER BY %s", COLUMN1, COLUMN2, COLUMN2,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertArrayEquals(rows.get(0), new Object[]{0.5, "key1"});
+    assertArrayEquals(rows.get(1), new Object[]{0.0, "key2"});
+  }
+
   @Test
   public void testAllNullStddevPopReturnsNull()
       throws Exception {
@@ -1246,6 +1269,24 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     String query = String.format("SELECT STDDEV_POP(%s) FROM testTable", COLUMN1);
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], null);
+  }
+
+  @Test
+  public void testNoMatchingRowNullHandlingDisabledStddevPopReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRow(1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.DOUBLE).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT STDDEV_POP(%s) FROM testTable WHERE %s != 1", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
 
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();

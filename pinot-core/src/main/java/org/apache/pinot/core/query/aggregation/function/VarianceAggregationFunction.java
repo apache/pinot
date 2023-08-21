@@ -103,7 +103,7 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
       }
     }
 
-    if (_nullHandlingEnabled && count == 0) {
+    if (count == 0) {
       return;
     }
     setAggregationResult(aggregationResultHolder, count, sum, variance);
@@ -160,9 +160,23 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
-        setGroupByResult(groupKey, groupByResultHolder, 1L, values[i], 0.0);
+    RoaringBitmap nullBitmap = null;
+    if (_nullHandlingEnabled) {
+      nullBitmap = blockValSetMap.get(_expression).getNullBitmap();
+    }
+    if (nullBitmap != null && !nullBitmap.isEmpty()) {
+      for (int i = 0; i < length; i++) {
+        if (!nullBitmap.contains(i)) {
+          for (int groupKey : groupKeysArray[i]) {
+            setGroupByResult(groupKey, groupByResultHolder, 1L, values[i], 0.0);
+          }
+        }
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          setGroupByResult(groupKey, groupByResultHolder, 1L, values[i], 0.0);
+        }
       }
     }
   }
@@ -179,12 +193,10 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
 
   @Override
   public VarianceTuple merge(VarianceTuple intermediateResult1, VarianceTuple intermediateResult2) {
-    if (_nullHandlingEnabled) {
-      if (intermediateResult1 == null) {
-        return intermediateResult2;
-      } else if (intermediateResult2 == null) {
-        return intermediateResult1;
-      }
+    if (intermediateResult1 == null) {
+      return intermediateResult2;
+    } else if (intermediateResult2 == null) {
+      return intermediateResult1;
     }
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
@@ -206,20 +218,16 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
       return null;
     }
     long count = varianceTuple.getCount();
-    if (count == 0L) {
-      return DEFAULT_FINAL_RESULT;
-    } else {
-      double variance = varianceTuple.getM2();
-      if (_isSample) {
-        if (count - 1 == 0L) {
-          return DEFAULT_FINAL_RESULT;
-        }
-        double sampleVar = variance / (count - 1);
-        return (_isStdDev) ? Math.sqrt(sampleVar) : sampleVar;
-      } else {
-        double popVar = variance / count;
-        return (_isStdDev) ? Math.sqrt(popVar) : popVar;
+    double variance = varianceTuple.getM2();
+    if (_isSample) {
+      if (count - 1 == 0L) {
+        return DEFAULT_FINAL_RESULT;
       }
+      double sampleVar = variance / (count - 1);
+      return (_isStdDev) ? Math.sqrt(sampleVar) : sampleVar;
+    } else {
+      double popVar = variance / count;
+      return (_isStdDev) ? Math.sqrt(popVar) : popVar;
     }
   }
 }
