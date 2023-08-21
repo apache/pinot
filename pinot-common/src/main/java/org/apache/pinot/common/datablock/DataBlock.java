@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -60,6 +61,8 @@ public interface DataBlock {
   double getDouble(int rowId, int colId);
 
   BigDecimal getBigDecimal(int rowId, int colId);
+
+  Vector getVector(int rowId, int colId);
 
   String getString(int rowId, int colId);
 

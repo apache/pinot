@@ -34,6 +34,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -210,6 +211,32 @@ public class DataFetcher {
    * @param outValues Buffer for output
    */
   public void fetchBigDecimalValues(String column, int[] inDocIds, int length, BigDecimal[] outValues) {
+    _columnValueReaderMap.get(column).readBigDecimalValues(inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch and transform BigDecimal values from a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchVectorValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
+      Vector[] outValues) {
+    _columnValueReaderMap.get(column).readBigDecimalValues(evaluator, inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch the BigDecimal values for a single-valued column.
+   *
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchVectorValues(String column, int[] inDocIds, int length, java.util.Vector[] outValues) {
     _columnValueReaderMap.get(column).readBigDecimalValues(inDocIds, length, outValues);
   }
 
@@ -557,6 +584,24 @@ public class DataFetcher {
     }
 
     void readBigDecimalValues(TransformEvaluator evaluator, int[] docIds, int length, BigDecimal[] valueBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
+          valueBuffer);
+    }
+
+    void readVectorValues(int[] docIds, int length, Vector[] valueBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
+        _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
+        _dictionary.readBigDecimalValues(dictIdBuffer, length, valueBuffer);
+      } else {
+        _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
+      }
+    }
+
+    void readVectorValues(TransformEvaluator evaluator, int[] docIds, int length, Vector[] valueBuffer) {
       Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       evaluator.evaluateBlock(docIds, length, _reader, getReaderContext(), _dictionary, getSVDictIdsBuffer(),
           valueBuffer);

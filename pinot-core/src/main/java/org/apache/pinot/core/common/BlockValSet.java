@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -98,6 +99,12 @@ public interface BlockValSet {
    * @return Array of BigDecimal values
    */
   BigDecimal[] getBigDecimalValuesSV();
+
+
+  /*
+
+   */
+  Vector[] getVectorValuesSV();
 
   /**
    * Returns the string values for a single-valued column.

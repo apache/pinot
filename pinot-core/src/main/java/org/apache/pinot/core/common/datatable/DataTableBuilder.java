@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -60,6 +61,9 @@ public interface DataTableBuilder {
   void setColumn(int colId, String value);
 
   void setColumn(int colId, ByteArray value)
+      throws IOException;
+
+  void setColumn(int colId, Vector value)
       throws IOException;
 
   // TODO: Move ser/de into AggregationFunction interface

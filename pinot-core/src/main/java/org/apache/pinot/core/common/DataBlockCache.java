@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 /**
@@ -259,6 +260,25 @@ public class DataBlockCache {
    */
   public void fillValues(String column, TransformEvaluator evaluator, BigDecimal[] buffer) {
     _dataFetcher.fetchBigDecimalValues(column, evaluator, _docIds, _length, buffer);
+  }
+
+
+  /**
+   * Get the BigDecimal values for a single-valued column.
+   *
+   * @param column Column name
+   * @return Array of BigDecimal values
+   */
+  public Vector[] getVectorValuesForSVColumn(String column) {
+    Vector[] bigDecimalValues = getValues(FieldSpec.DataType.VECTOR, column);
+    if (markLoaded(FieldSpec.DataType.VECTOR, column)) {
+      if (bigDecimalValues == null) {
+        bigDecimalValues = new Vector[_length];
+        putValues(FieldSpec.DataType.VECTOR, column, bigDecimalValues);
+      }
+      _dataFetcher.fetchBigDecimalValues(column, _docIds, _length, bigDecimalValues);
+    }
+    return bigDecimalValues;
   }
 
   /**
