@@ -717,10 +717,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected long getCurrentCountStarResult(String tableName) {
-     ResultSetGroup resultSetGroup = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName);
-     if (resultSetGroup.getResultSetCount() > 0) {
-       return resultSetGroup.getResultSet(0).getLong(0);
-     }
+    ResultSetGroup resultSetGroup = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName);
+    if (resultSetGroup.getResultSetCount() > 0) {
+      return resultSetGroup.getResultSet(0).getLong(0);
+    }
     return 0;
   }
 
