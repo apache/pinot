@@ -96,7 +96,6 @@ public class CommonConstants {
     // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
     public static final int DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES = 65536;
 
-
     public static final int DEFAULT_TUPLE_SKETCH_LGK = 16;
 
     // Whether to rewrite DistinctCount to DistinctCountBitmap
@@ -250,19 +249,19 @@ public class CommonConstants {
     // By default, Jersey uses the default unbounded thread pool to process queries.
     // By enabling it, BrokerManagedAsyncExecutorProvider will be used to create a bounded thread pool.
     public static final String CONFIG_OF_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR =
-            "pinot.broker.enable.bounded.jersey.threadpool.executor";
+        "pinot.broker.enable.bounded.jersey.threadpool.executor";
     public static final boolean DEFAULT_ENABLE_BOUNDED_JERSEY_THREADPOOL_EXECUTOR = false;
     // Default capacities for the bounded thread pool
     public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE =
-            "pinot.broker.jersey.threadpool.executor.max.pool.size";
+        "pinot.broker.jersey.threadpool.executor.max.pool.size";
     public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_MAX_POOL_SIZE =
-            Runtime.getRuntime().availableProcessors() * 2;
+        Runtime.getRuntime().availableProcessors() * 2;
     public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE =
-            "pinot.broker.jersey.threadpool.executor.core.pool.size";
+        "pinot.broker.jersey.threadpool.executor.core.pool.size";
     public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_CORE_POOL_SIZE =
-            Runtime.getRuntime().availableProcessors() * 2;
+        Runtime.getRuntime().availableProcessors() * 2;
     public static final String CONFIG_OF_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE =
-            "pinot.broker.jersey.threadpool.executor.queue.size";
+        "pinot.broker.jersey.threadpool.executor.queue.size";
     public static final int DEFAULT_JERSEY_THREADPOOL_EXECUTOR_QUEUE_SIZE = Integer.MAX_VALUE;
 
     // used for SQL GROUP BY during broker reduce
@@ -349,6 +348,10 @@ public class CommonConstants {
         public static final String IN_PREDICATE_SORT_THRESHOLD = "inPredicateSortThreshold";
 
         public static final String DROP_RESULTS = "dropResults";
+
+        // Handle JOIN Overflow
+        public static final String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
+        public static final String JOIN_OVERFLOW_MODE = "joinOverflowMode";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated

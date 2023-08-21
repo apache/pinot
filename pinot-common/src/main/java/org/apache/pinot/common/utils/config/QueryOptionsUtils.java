@@ -36,7 +36,6 @@ public class QueryOptionsUtils {
   private QueryOptionsUtils() {
   }
 
-
   private static final Map<String, String> CONFIG_RESOLVER;
   private static final RuntimeException CLASS_LOAD_ERROR;
 
@@ -188,5 +187,16 @@ public class QueryOptionsUtils {
 
   public static boolean shouldDropResults(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.DROP_RESULTS));
+  }
+
+  @Nullable
+  public static Integer getMaxRowsInJoin(Map<String, String> queryOptions) {
+    String maxRowsInJoin = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_JOIN);
+    return maxRowsInJoin != null ? Integer.parseInt(maxRowsInJoin) : null;
+  }
+
+  @Nullable
+  public static String getJoinOverflowMode(Map<String, String> queryOptions) {
+    return queryOptions.get(QueryOptionKey.JOIN_OVERFLOW_MODE);
   }
 }

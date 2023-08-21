@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
@@ -36,6 +39,8 @@ public class JoinNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RexExpression> _joinClause;
   @ProtoProperties
+  private NodeHint _joinHints;
+  @ProtoProperties
   private List<String> _leftColumnNames;
   @ProtoProperties
   private List<String> _rightColumnNames;
@@ -44,14 +49,22 @@ public class JoinNode extends AbstractPlanNode {
     super(planFragmentId);
   }
 
+  @VisibleForTesting
   public JoinNode(int planFragmentId, DataSchema dataSchema, DataSchema leftSchema, DataSchema rightSchema,
       JoinRelType joinRelType, JoinKeys joinKeys, List<RexExpression> joinClause) {
+    this(planFragmentId, dataSchema, leftSchema, rightSchema, joinRelType, joinKeys, joinClause,
+        Collections.emptyList());
+  }
+
+  public JoinNode(int planFragmentId, DataSchema dataSchema, DataSchema leftSchema, DataSchema rightSchema,
+      JoinRelType joinRelType, JoinKeys joinKeys, List<RexExpression> joinClause, List<RelHint> joinHints) {
     super(planFragmentId, dataSchema);
     _leftColumnNames = Arrays.asList(leftSchema.getColumnNames());
     _rightColumnNames = Arrays.asList(rightSchema.getColumnNames());
     _joinRelType = joinRelType;
     _joinKeys = joinKeys;
     _joinClause = joinClause;
+    _joinHints = new NodeHint(joinHints);
   }
 
   public JoinRelType getJoinRelType() {
@@ -64,6 +77,10 @@ public class JoinNode extends AbstractPlanNode {
 
   public List<RexExpression> getJoinClauses() {
     return _joinClause;
+  }
+
+  public NodeHint getJoinHints() {
+    return _joinHints;
   }
 
   public List<String> getLeftColumnNames() {

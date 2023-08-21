@@ -61,6 +61,7 @@ public class QueryException {
   public static final int SERVER_TABLE_MISSING_ERROR_CODE = 230;
   public static final int SERVER_SEGMENT_MISSING_ERROR_CODE = 235;
   public static final int QUERY_SCHEDULING_TIMEOUT_ERROR_CODE = 240;
+  public static final int SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE = 245;
   public static final int EXECUTION_TIMEOUT_ERROR_CODE = 250;
   public static final int DATA_TABLE_SERIALIZATION_ERROR_CODE = 260;
   public static final int BROKER_GATHER_ERROR_CODE = 300;
@@ -105,6 +106,8 @@ public class QueryException {
       new ProcessingException(SERVER_SEGMENT_MISSING_ERROR_CODE);
   public static final ProcessingException QUERY_SCHEDULING_TIMEOUT_ERROR =
       new ProcessingException(QUERY_SCHEDULING_TIMEOUT_ERROR_CODE);
+  public static final ProcessingException SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR =
+      new ProcessingException(SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
   public static final ProcessingException EXECUTION_TIMEOUT_ERROR =
       new ProcessingException(EXECUTION_TIMEOUT_ERROR_CODE);
   public static final ProcessingException DATA_TABLE_SERIALIZATION_ERROR =
@@ -147,6 +150,7 @@ public class QueryException {
     SERVER_TABLE_MISSING_ERROR.setMessage("ServerTableMissing");
     SERVER_SEGMENT_MISSING_ERROR.setMessage("ServerSegmentMissing");
     QUERY_SCHEDULING_TIMEOUT_ERROR.setMessage("QuerySchedulingTimeoutError");
+    SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR.setMessage("ServerResourceLimitExceededError");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
     DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableSerializationError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
