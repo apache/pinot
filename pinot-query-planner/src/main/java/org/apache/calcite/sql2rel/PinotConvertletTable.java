@@ -36,8 +36,9 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
   private PinotConvertletTable() {
   }
 
+  @Nullable
   @Override
-  public @Nullable SqlRexConvertlet get(SqlCall call) {
+  public SqlRexConvertlet get(SqlCall call) {
     switch (call.getKind()) {
       case TIMESTAMP_ADD:
         return TimestampAddConvertlet.INSTANCE;
