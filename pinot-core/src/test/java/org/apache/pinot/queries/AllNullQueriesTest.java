@@ -560,7 +560,7 @@ public class AllNullQueriesTest extends BaseQueriesTest {
           } else if (dataType == DataType.LONG) {
             assertEquals(((Double) row[1]).longValue(), Long.MIN_VALUE);
           }
-          assertEquals(row[2], 1);
+          assertEquals(row[2], 0);
         }
       }
       {

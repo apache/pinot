@@ -34,7 +34,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class DistinctSumMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
   public DistinctSumMVAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTSUMMV);
+    super(expression, AggregationFunctionType.DISTINCTSUMMV, false);
   }
 
   @Override
