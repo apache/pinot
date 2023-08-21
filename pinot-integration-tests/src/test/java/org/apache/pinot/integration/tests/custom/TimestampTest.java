@@ -23,16 +23,21 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.sql.Timestamp;
 import java.util.TimeZone;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.joda.time.chrono.ISOChronology;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.avro.Schema.create;
 import static org.testng.Assert.assertEquals;
 
 
@@ -40,10 +45,20 @@ import static org.testng.Assert.assertEquals;
 public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
 
   private static final String DEFAULT_TABLE_NAME = "TimestampTest";
-  private static final String TIMESTAMP_1 = "ts1";
-  private static final String TIMESTAMP_2 = "ts2";
-  private static final String LONG_1 = "long1";
-  private static final String LONG_2 = "long2";
+  private static final String TIMESTAMP_BASE = "tsBase";
+  private static final String TIMESTAMP_HALF_DAY_AFTER = "tsHalfDayAfter"; // 6 hours after TIMESTAMP_BASE
+  private static final String TIMESTAMP_ONE_DAY_AFTER = "tsOneDayAfter"; // 1 day after TIMESTAMP_BASE
+  private static final String TIMESTAMP_ONE_WEEK_AFTER = "tsOneWeekAfter"; // 1 week after TIMESTAMP_BASE
+  private static final String TIMESTAMP_ONE_MONTH_AFTER = "tsOneMonthAfter"; // 1 month after TIMESTAMP_BASE
+  private static final String TIMESTAMP_ONE_QUARTER_AFTER = "tsOneQuarterAfter"; // 1 quarter after TIMESTAMP_BASE
+  private static final String TIMESTAMP_ONE_YEAR_AFTER = "tsOneYearAfter"; // 1 year after TIMESTAMP_BASE
+  private static final String LONG_BASE = "longBase";
+  private static final String LONG_HALF_DAY_AFTER = "longHalfDayAfter";
+  private static final String LONG_ONE_DAY_AFTER = "longOneDayAfter";
+  private static final String LONG_ONE_WEEK_AFTER = "longOneWeekAfter";
+  private static final String LONG_ONE_MONTH_AFTER = "longOneMonthAfter";
+  private static final String LONG_ONE_QUARTER_AFTER = "longOneQuarterAfter";
+  private static final String LONG_ONE_YEAR_AFTER = "longOneYearAfter";
 
   private static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getDefault();
 
@@ -66,22 +81,24 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
   public void testSelectQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = String.format("SELECT ts1, ts2, long1,long2 FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    String query =
+        String.format("SELECT tsBase, tsHalfDayAfter, longBase,longHalfDayAfter FROM %s LIMIT %d", getTableName(),
+            getCountStarResult());
     JsonNode jsonNode = postQuery(query);
-    long expectedTs1 = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
-    long expectedTs2 = DateTimeFunctions.fromDateTime("2019-01-01 12:00:00", "yyyy-MM-dd HH:mm:ss");
+    long expectedTsBase = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
+    long expectedTsHalfDayAfter = DateTimeFunctions.fromDateTime("2019-01-01 12:00:00", "yyyy-MM-dd HH:mm:ss");
 
     for (int i = 0; i < getCountStarResult(); i++) {
-      String ts1 = jsonNode.get("resultTable").get("rows").get(i).get(0).asText();
-      String ts2 = jsonNode.get("resultTable").get("rows").get(i).get(1).asText();
-      long long1 = jsonNode.get("resultTable").get("rows").get(i).get(2).asLong();
-      long long2 = jsonNode.get("resultTable").get("rows").get(i).get(3).asLong();
-      assertEquals(ts1, new Timestamp(expectedTs1).toString());
-      assertEquals(ts2, new Timestamp(expectedTs2).toString());
-      assertEquals(long1, expectedTs1);
-      assertEquals(long2, expectedTs2);
-      expectedTs1 += 86400000;
-      expectedTs2 += 86400000;
+      String tsBase = jsonNode.get("resultTable").get("rows").get(i).get(0).asText();
+      String tsHalfDayAfter = jsonNode.get("resultTable").get("rows").get(i).get(1).asText();
+      long longBase = jsonNode.get("resultTable").get("rows").get(i).get(2).asLong();
+      long longHalfDayAfter = jsonNode.get("resultTable").get("rows").get(i).get(3).asLong();
+      assertEquals(tsBase, new Timestamp(expectedTsBase).toString());
+      assertEquals(tsHalfDayAfter, new Timestamp(expectedTsHalfDayAfter).toString());
+      assertEquals(longBase, expectedTsBase);
+      assertEquals(longHalfDayAfter, expectedTsHalfDayAfter);
+      expectedTsBase += 86400000;
+      expectedTsHalfDayAfter += 86400000;
     }
   }
 
@@ -90,7 +107,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = String.format("\n"
-        + "SELECT CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(ts1 AS TIMESTAMP) AS "
+        + "SELECT CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(tsBase AS TIMESTAMP) AS "
         + "VARCHAR), 'yyyy-MM-dd HH:mm:ss.S'), 'yyyy-MM-dd'), 'yyyy-MM-dd') AS TIMESTAMP), 'MILLISECONDS') AS "
         + "TIMESTAMP) AS tdy_Calculation_2683863928708153344_ok\n"
         + "FROM %s\n"
@@ -98,11 +115,11 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         + "ORDER BY tdy_Calculation_2683863928708153344_ok ASC\n"
         + "LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
-    long expectedTs1 = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
+    long expectedTsBase = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
     for (int i = 0; i < getCountStarResult(); i++) {
-      String ts1 = jsonNode.get("resultTable").get("rows").get(i).get(0).asText();
-      assertEquals(ts1, new Timestamp(expectedTs1).toString());
-      expectedTs1 += 86400000;
+      String tsBase = jsonNode.get("resultTable").get("rows").get(i).get(0).asText();
+      assertEquals(tsBase, new Timestamp(expectedTsBase).toString());
+      expectedTsBase += 86400000;
     }
   }
 
@@ -111,11 +128,11 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = String.format("\n"
-        + "SELECT CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(ts1 AS TIMESTAMP) AS "
+        + "SELECT CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(tsBase AS TIMESTAMP) AS "
         + "VARCHAR), 'yyyy-MM-dd HH:mm:ss.S'), 'yyyy-MM-dd'), 'yyyy-MM-dd') AS TIMESTAMP), 'MILLISECONDS') AS "
         + "TIMESTAMP) AS tdy_Calculation_2683863928708153344_ok\n"
         + "FROM %s\n"
-        + "WHERE   CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(ts1 AS TIMESTAMP) AS "
+        + "WHERE   CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(tsBase AS TIMESTAMP) AS "
         + "VARCHAR), 'yyyy-MM-dd HH:mm:ss.S'), 'yyyy-MM-dd'), 'yyyy-MM-dd') AS TIMESTAMP), 'MILLISECONDS') AS "
         + "TIMESTAMP) = FROMDATETIME( '2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')\n", getTableName());
     JsonNode jsonNode = postQuery(query);
@@ -128,20 +145,20 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = String.format("\n"
-        + "SELECT HOUR(ts1), HOUR(ts2),\n"
-        + "MINUTE(ts1), MINUTE(ts2),\n"
-        + "SECOND(ts1), SECOND(ts2),\n"
-        + "MILLISECOND(ts1), MILLISECOND(ts2),\n"
-        + "YEAR(ts1), YEAR(ts2),\n"
-        + "YEAR_OF_WEEK(ts1), YEAR_OF_WEEK(ts2),\n"
-        + "MONTH_OF_YEAR(ts1), MONTH_OF_YEAR(ts2),\n"
-        + "WEEK_OF_YEAR(ts1), WEEK_OF_YEAR(ts2),\n"
-        + "DAY_OF_YEAR(ts1), DAY_OF_YEAR(ts2),\n"
-        + "DAY_OF_MONTH(ts1), DAY_OF_MONTH(ts2),\n"
-        + "DAY_OF_WEEK(ts1), DAY_OF_WEEK(ts2),\n"
-        + "DOY(ts1), DOY(ts2),\n"
-        + "DOW(ts1), DOW(ts2),\n"
-        + "QUARTER(ts1), QUARTER(ts2)\n"
+        + "SELECT HOUR(tsBase), HOUR(tsHalfDayAfter),\n"
+        + "MINUTE(tsBase), MINUTE(tsHalfDayAfter),\n"
+        + "SECOND(tsBase), SECOND(tsHalfDayAfter),\n"
+        + "MILLISECOND(tsBase), MILLISECOND(tsHalfDayAfter),\n"
+        + "YEAR(tsBase), YEAR(tsHalfDayAfter),\n"
+        + "YEAR_OF_WEEK(tsBase), YEAR_OF_WEEK(tsHalfDayAfter),\n"
+        + "MONTH_OF_YEAR(tsBase), MONTH_OF_YEAR(tsHalfDayAfter),\n"
+        + "WEEK_OF_YEAR(tsBase), WEEK_OF_YEAR(tsHalfDayAfter),\n"
+        + "DAY_OF_YEAR(tsBase), DAY_OF_YEAR(tsHalfDayAfter),\n"
+        + "DAY_OF_MONTH(tsBase), DAY_OF_MONTH(tsHalfDayAfter),\n"
+        + "DAY_OF_WEEK(tsBase), DAY_OF_WEEK(tsHalfDayAfter),\n"
+        + "DOY(tsBase), DOY(tsHalfDayAfter),\n"
+        + "DOW(tsBase), DOW(tsHalfDayAfter),\n"
+        + "QUARTER(tsBase), QUARTER(tsHalfDayAfter)\n"
         + "FROM %s\n"
         + "LIMIT %d\n", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
@@ -182,7 +199,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = String.format("\n"
-        + "SELECT TIMESTAMPDIFF(second, ts1, ts2)\n"
+        + "SELECT TIMESTAMPDIFF(second, tsBase, tsHalfDayAfter)\n"
         + "FROM %s\n"
         + "LIMIT %d\n", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
@@ -191,7 +208,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
     }
 
     query = String.format("\n"
-        + "SELECT TIMESTAMPDIFF(minute, ts1, ts2)\n"
+        + "SELECT TIMESTAMPDIFF(minute, tsBase, tsHalfDayAfter)\n"
         + "FROM %s\n"
         + "LIMIT %d\n", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
@@ -200,7 +217,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
     }
 
     query = String.format("\n"
-        + "SELECT TIMESTAMPDIFF(hour, ts1, ts2)\n"
+        + "SELECT TIMESTAMPDIFF(hour, tsBase, tsHalfDayAfter)\n"
         + "FROM %s\n"
         + "LIMIT %d\n", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
@@ -213,23 +230,10 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
   public void testTimestampAddQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = String.format("\n"
-        + "SELECT TIMESTAMPADD(MINUTE, 720, ts1), ts2\n"
-        + "FROM %s\n"
-        + "LIMIT %d\n", getTableName(), getCountStarResult());
-    JsonNode jsonNode = postQuery(query);
-    for (int i = 0; i < getCountStarResult(); i++) {
-      if (useMultiStageQueryEngine) {
-        assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(0).asText(),
-            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
-      } else {
-        assertEquals(new Timestamp(jsonNode.get("resultTable").get("rows").get(i).get(0).longValue()).toString(),
-            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
-      }
-    }
-
+    String query;
+    JsonNode jsonNode;
     query = String.format("\n"
-        + "SELECT TIMESTAMPADD(SECOND, 43200, ts1), ts2\n"
+        + "SELECT TIMESTAMPADD(YEAR, 1, tsBase), tsOneYearAfter\n"
         + "FROM %s\n"
         + "LIMIT %d\n", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
@@ -244,7 +248,94 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
     }
 
     query = String.format("\n"
-        + "SELECT TIMESTAMPADD(HOUR, 12, ts1), ts2\n"
+        + "SELECT TIMESTAMPADD(QUARTER, 1, tsBase), tsOneQuarterAfter\n"
+        + "FROM %s\n"
+        + "LIMIT %d\n", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    for (int i = 0; i < getCountStarResult(); i++) {
+      if (useMultiStageQueryEngine) {
+        assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(0).asText(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      } else {
+        assertEquals(new Timestamp(jsonNode.get("resultTable").get("rows").get(i).get(0).longValue()).toString(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      }
+    }
+
+    query = String.format("\n"
+        + "SELECT TIMESTAMPADD(MONTH, 1, tsBase), tsOneMonthAfter\n"
+        + "FROM %s\n"
+        + "LIMIT %d\n", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    for (int i = 0; i < getCountStarResult(); i++) {
+      if (useMultiStageQueryEngine) {
+        assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(0).asText(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      } else {
+        assertEquals(new Timestamp(jsonNode.get("resultTable").get("rows").get(i).get(0).longValue()).toString(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      }
+    }
+    query = String.format("\n"
+        + "SELECT TIMESTAMPADD(WEEK, 1, tsBase), tsOneWeekAfter\n"
+        + "FROM %s\n"
+        + "LIMIT %d\n", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    for (int i = 0; i < getCountStarResult(); i++) {
+      if (useMultiStageQueryEngine) {
+        assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(0).asText(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      } else {
+        assertEquals(new Timestamp(jsonNode.get("resultTable").get("rows").get(i).get(0).longValue()).toString(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      }
+    }
+    query = String.format("\n"
+        + "SELECT TIMESTAMPADD(DAY, 1, tsBase), tsOneDayAfter\n"
+        + "FROM %s\n"
+        + "LIMIT %d\n", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    for (int i = 0; i < getCountStarResult(); i++) {
+      if (useMultiStageQueryEngine) {
+        assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(0).asText(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      } else {
+        assertEquals(new Timestamp(jsonNode.get("resultTable").get("rows").get(i).get(0).longValue()).toString(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      }
+    }
+    query = String.format("\n"
+        + "SELECT TIMESTAMPADD(MINUTE, 720, tsBase), tsHalfDayAfter\n"
+        + "FROM %s\n"
+        + "LIMIT %d\n", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    for (int i = 0; i < getCountStarResult(); i++) {
+      if (useMultiStageQueryEngine) {
+        assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(0).asText(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      } else {
+        assertEquals(new Timestamp(jsonNode.get("resultTable").get("rows").get(i).get(0).longValue()).toString(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      }
+    }
+
+    query = String.format("\n"
+        + "SELECT TIMESTAMPADD(SECOND, 43200, tsBase), tsHalfDayAfter\n"
+        + "FROM %s\n"
+        + "LIMIT %d\n", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    for (int i = 0; i < getCountStarResult(); i++) {
+      if (useMultiStageQueryEngine) {
+        assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(0).asText(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      } else {
+        assertEquals(new Timestamp(jsonNode.get("resultTable").get("rows").get(i).get(0).longValue()).toString(),
+            jsonNode.get("resultTable").get("rows").get(i).get(1).textValue());
+      }
+    }
+
+    query = String.format("\n"
+        + "SELECT TIMESTAMPADD(HOUR, 12, tsBase), tsHalfDayAfter\n"
         + "FROM %s\n"
         + "LIMIT %d\n", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
@@ -267,12 +358,12 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         + "SELECT "
         + (
         useMultiStageQueryEngine
-            ? "TODATETIME(CAST(MIN(ts1) AS BIGINT), 'yyyy-MM-dd HH:mm:ss'),\n"
-            : "TODATETIME(MIN(ts1), 'yyyy-MM-dd HH:mm:ss'),\n")
+            ? "TODATETIME(CAST(MIN(tsBase) AS BIGINT), 'yyyy-MM-dd HH:mm:ss'),\n"
+            : "TODATETIME(MIN(tsBase), 'yyyy-MM-dd HH:mm:ss'),\n")
         + (
         useMultiStageQueryEngine
-            ? "TODATETIME(CAST(MIN(ts2) AS BIGINT), 'yyyy-MM-dd HH:mm:ss')\n"
-            : "TODATETIME(MIN(ts2), 'yyyy-MM-dd HH:mm:ss')\n")
+            ? "TODATETIME(CAST(MIN(tsHalfDayAfter) AS BIGINT), 'yyyy-MM-dd HH:mm:ss')\n"
+            : "TODATETIME(MIN(tsHalfDayAfter), 'yyyy-MM-dd HH:mm:ss')\n")
         + "FROM %s\n", getTableName());
     JsonNode jsonNode = postQuery(query);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "2019-01-01 00:00:00");
@@ -287,10 +378,20 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
   @Override
   public Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
-        .addSingleValueDimension(TIMESTAMP_1, FieldSpec.DataType.TIMESTAMP)
-        .addSingleValueDimension(TIMESTAMP_2, FieldSpec.DataType.TIMESTAMP)
-        .addSingleValueDimension(LONG_1, FieldSpec.DataType.LONG)
-        .addSingleValueDimension(LONG_2, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(TIMESTAMP_BASE, FieldSpec.DataType.TIMESTAMP)
+        .addSingleValueDimension(TIMESTAMP_HALF_DAY_AFTER, FieldSpec.DataType.TIMESTAMP)
+        .addSingleValueDimension(TIMESTAMP_ONE_DAY_AFTER, FieldSpec.DataType.TIMESTAMP)
+        .addSingleValueDimension(TIMESTAMP_ONE_WEEK_AFTER, FieldSpec.DataType.TIMESTAMP)
+        .addSingleValueDimension(TIMESTAMP_ONE_MONTH_AFTER, FieldSpec.DataType.TIMESTAMP)
+        .addSingleValueDimension(TIMESTAMP_ONE_QUARTER_AFTER, FieldSpec.DataType.TIMESTAMP)
+        .addSingleValueDimension(TIMESTAMP_ONE_YEAR_AFTER, FieldSpec.DataType.TIMESTAMP)
+        .addSingleValueDimension(LONG_BASE, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_HALF_DAY_AFTER, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_ONE_DAY_AFTER, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_ONE_WEEK_AFTER, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_ONE_MONTH_AFTER, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_ONE_QUARTER_AFTER, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_ONE_YEAR_AFTER, FieldSpec.DataType.LONG)
         .build();
   }
 
@@ -300,34 +401,57 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(ImmutableList.of(
-        new org.apache.avro.Schema.Field(TIMESTAMP_1, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
-            null, null),
-        new org.apache.avro.Schema.Field(TIMESTAMP_2, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
-            null, null),
-        new org.apache.avro.Schema.Field(LONG_1, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG), null,
-            null),
-        new org.apache.avro.Schema.Field(LONG_2, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG), null,
-            null)
+        new Field(TIMESTAMP_BASE, create(Type.LONG), null, null),
+        new Field(TIMESTAMP_HALF_DAY_AFTER, create(Type.LONG), null, null),
+        new Field(TIMESTAMP_ONE_DAY_AFTER, create(Type.LONG), null, null),
+        new Field(TIMESTAMP_ONE_WEEK_AFTER, create(Type.LONG), null, null),
+        new Field(TIMESTAMP_ONE_MONTH_AFTER, create(Type.LONG), null, null),
+        new Field(TIMESTAMP_ONE_QUARTER_AFTER, create(Type.LONG), null, null),
+        new Field(TIMESTAMP_ONE_YEAR_AFTER, create(Type.LONG), null, null),
+        new Field(LONG_BASE, create(Type.LONG), null, null),
+        new Field(LONG_HALF_DAY_AFTER, create(Type.LONG), null, null),
+        new Field(LONG_ONE_DAY_AFTER, create(Type.LONG), null, null),
+        new Field(LONG_ONE_WEEK_AFTER, create(Type.LONG), null, null),
+        new Field(LONG_ONE_MONTH_AFTER, create(Type.LONG), null, null),
+        new Field(LONG_ONE_QUARTER_AFTER, create(Type.LONG), null, null),
+        new Field(LONG_ONE_YEAR_AFTER, create(Type.LONG), null, null)
     ));
 
     // create avro file
     File avroFile = new File(_tempDir, "data.avro");
+    ISOChronology chronology = ISOChronology.getInstanceUTC();
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, avroFile);
-      long ts1 = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
-      long ts2 = DateTimeFunctions.fromDateTime("2019-01-01 12:00:00", "yyyy-MM-dd HH:mm:ss");
-
+      long tsBaseLong = DateTimeFunctions.fromDateTime("2019-01-01 00:00:00", "yyyy-MM-dd HH:mm:ss");
       for (int i = 0; i < getCountStarResult(); i++) {
+        // Generate data
+        long tsHalfDayAfter = DateTimeUtils.getTimestampField(chronology, "HOUR").add(tsBaseLong, 12);
+        long tsOneDayAfter = DateTimeUtils.getTimestampField(chronology, "DAY").add(tsBaseLong, 1);
+        long tsOneWeekAfter = DateTimeUtils.getTimestampField(chronology, "WEEK").add(tsBaseLong, 1);
+        long tsOneMonthAfter = DateTimeUtils.getTimestampField(chronology, "MONTH").add(tsBaseLong, 1);
+        long tsOneQuarterAfter = DateTimeUtils.getTimestampField(chronology, "QUARTER").add(tsBaseLong, 1);
+        long tsOneYearAfter = DateTimeUtils.getTimestampField(chronology, "YEAR").add(tsBaseLong, 1);
+
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
-        record.put(TIMESTAMP_1, ts1);
-        record.put(TIMESTAMP_2, ts2);
-        record.put(LONG_1, ts1);
-        record.put(LONG_2, ts2);
+        record.put(TIMESTAMP_BASE, tsBaseLong);
+        record.put(TIMESTAMP_HALF_DAY_AFTER, tsHalfDayAfter);
+        record.put(TIMESTAMP_ONE_DAY_AFTER, tsOneDayAfter);
+        record.put(TIMESTAMP_ONE_WEEK_AFTER, tsOneWeekAfter);
+        record.put(TIMESTAMP_ONE_MONTH_AFTER, tsOneMonthAfter);
+        record.put(TIMESTAMP_ONE_QUARTER_AFTER, tsOneQuarterAfter);
+        record.put(TIMESTAMP_ONE_YEAR_AFTER, tsOneYearAfter);
+        record.put(LONG_BASE, tsBaseLong);
+        record.put(LONG_HALF_DAY_AFTER, tsHalfDayAfter);
+        record.put(LONG_ONE_DAY_AFTER, tsOneDayAfter);
+        record.put(LONG_ONE_WEEK_AFTER, tsOneWeekAfter);
+        record.put(LONG_ONE_MONTH_AFTER, tsOneMonthAfter);
+        record.put(LONG_ONE_QUARTER_AFTER, tsOneQuarterAfter);
+        record.put(LONG_ONE_YEAR_AFTER, tsOneYearAfter);
+
         // add avro record to file
         fileWriter.append(record);
-        ts1 += 86400000;
-        ts2 += 86400000;
+        tsBaseLong += 86400000;
       }
     }
     return avroFile;

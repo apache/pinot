@@ -52,9 +52,9 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.PinotOperatorTable;
 import org.apache.calcite.sql.util.PinotChainedSqlOperatorTable;
+import org.apache.calcite.sql2rel.PinotConvertletTable;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
-import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
@@ -326,7 +326,7 @@ public class QueryEnvironment {
     RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
     SqlToRelConverter sqlToRelConverter =
         new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
-            StandardConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
+            PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
     RelRoot relRoot = sqlToRelConverter.convertQuery(parsed, false, true);
     return relRoot.withRel(sqlToRelConverter.trimUnusedFields(false, relRoot.rel));
   }
