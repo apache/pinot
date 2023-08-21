@@ -22,93 +22,102 @@ package org.apache.pinot.core.data.manager.realtime;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class IdleTimerTest {
+
+  private static class StaticIdleTimer extends IdleTimer {
+
+    private long _nowTimeMs = 0;
+
+    public StaticIdleTimer() {
+      super();
+    }
+
+    @Override
+    protected long now() {
+      return _nowTimeMs;
+    }
+
+    public void setNowTimeMs(long nowTimeMs) {
+      _nowTimeMs = nowTimeMs;
+    }
+  }
 
   @Test
   public void testIdleTimerResetNoIdle() {
-    IdleTimer timer = new IdleTimer();
-    timer.markIdle(1000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 0);
-    // same now time should not affect idle time
-    timer.markIdle(1000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 0);
+    StaticIdleTimer timer = new StaticIdleTimer();
+    // idle times are all 0 before init
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 0);
+    // start times are all 1000L
+    timer.setNowTimeMs(1000L);
+    timer.init();
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 0);
     // new now time should affect idle time
-    timer.markIdle(2000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 1000);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 1000);
-    // everything resets to 0
-    timer.reset();
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 0);
+    timer.setNowTimeMs(2000L);
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 1000);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 1000);
+    // everything resets to 2000
+    timer.init();
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 0);
   }
 
   @Test
   public void testOnlyResetStreamIdleTime() {
-    IdleTimer timer = new IdleTimer();
-    timer.markIdle(1000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 0);
-    // same now time should not affect idle time
-    timer.markIdle(1000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 0);
-    // new now time should affect idle time
-    timer.markIdle(2000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 1000);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 1000);
+    StaticIdleTimer timer = new StaticIdleTimer();
+    timer.setNowTimeMs(1000L);
+    timer.init();
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 0);
     // only stream idle time resets
-    timer.markStreamNotIdle();
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 1000);
+    timer.setNowTimeMs(2000L);
+    timer.markStreamCreated();
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 1000);
     // everything resets to 0
-    timer.reset();
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 0);
+    timer.init();
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 0);
   }
 
   @Test
   public void testMultipleIdleResets() {
-    IdleTimer timer = new IdleTimer();
-    timer.markIdle(1000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 0);
+    StaticIdleTimer timer = new StaticIdleTimer();
+    timer.setNowTimeMs(1000L);
+    timer.init();
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 0);
     // new now time should affect idle time
-    timer.markIdle(2000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 1000);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 1000);
+    timer.setNowTimeMs(2000L);
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 1000);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 1000);
     // only stream idle time resets
-    timer.markStreamNotIdle();
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 1000);
+    timer.markStreamCreated();
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 1000);
     // everything resets to 0
-    timer.reset();
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 0);
-    // next now time should not affect idle time
-    timer.markIdle(2000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 0);
-    // later now time should affect idle time
-    timer.markIdle(3000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 1000);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 1000);
+    timer.setNowTimeMs(3000L);
+    timer.markEventConsumed();
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 0);
+    // later now times should affect idle time
+    timer.setNowTimeMs(4000L);
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 1000);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 1000);
     // only stream idle time resets
-    timer.markStreamNotIdle();
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 1000);
-    // later now time should only increase consume idle time
-    timer.markIdle(4000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 2000);
+    timer.setNowTimeMs(5000L);
+    timer.markStreamCreated();
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 2000);
     // later now time should only increase both idle times
-    timer.markIdle(5000);
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 1000);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 3000);
+    timer.setNowTimeMs(6000L);
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 1000);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 3000);
     // everything resets to 0
-    timer.reset();
-    Assert.assertEquals(timer.getStreamIdleTimeMs(), 0);
-    Assert.assertEquals(timer.getConsumeIdleTimeMs(), 0);
+    timer.init();
+    Assert.assertEquals(timer.getTimeSinceStreamLastCreatedOrConsumedMs(), 0);
+    Assert.assertEquals(timer.getTimeSinceEventLastConsumedMs(), 0);
   }
 }

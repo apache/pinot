@@ -90,7 +90,7 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
 
     StreamPartitionMsgOffset earliestStreamOffset = rtSegmentDataManager.fetchEarliestStreamOffset(5000);
 
-    long idleTimeMs = rtSegmentDataManager.getSegmentIdleTime();
+    long idleTimeMs = rtSegmentDataManager.getTimeSinceEventLastConsumedMs();
     if (segmentHasBeenIdleLongerThanThreshold(idleTimeMs)) {
       _logger.warn("Segment {} with freshness {}ms has not caught up within min freshness {}. "
               + "But the current ingested offset {} has been idle for {}ms. At offset {}. Earliest offset {}. "

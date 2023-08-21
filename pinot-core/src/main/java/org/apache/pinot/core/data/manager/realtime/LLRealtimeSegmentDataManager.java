@@ -405,7 +405,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _numRowsErrored = 0;
     final long idlePipeSleepTimeMillis = 100;
     final long idleTimeoutMillis = _partitionLevelStreamConfig.getIdleTimeoutMillis();
-    _idleTimer.reset();
+    _idleTimer.init();
 
     StreamPartitionMsgOffset lastUpdatedOffset = _streamPartitionMsgOffsetFactory
         .create(_currentOffset);  // so that we always update the metric when we enter this method.
@@ -443,7 +443,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       boolean endCriteriaReached = processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
 
       if (_currentOffset.compareTo(lastUpdatedOffset) != 0) {
-        _idleTimer.reset();
+        _idleTimer.markEventConsumed();
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
         if (_currentOffset instanceof LongMsgOffset) {
@@ -462,7 +462,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         }
         // We check this flag again further down
       } else if (messageBatch.getUnfilteredMessageCount() > 0) {
-        _idleTimer.reset();
+        _idleTimer.markEventConsumed();
         // we consumed something from the stream but filtered all the content out,
         // so we need to advance the offsets to avoid getting stuck
         StreamPartitionMsgOffset nextOffset = messageBatch.getOffsetOfNextBatch();
@@ -473,17 +473,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(nextOffset);
       } else {
         // We did not consume any rows.
-        _idleTimer.markIdle(now());
-        long streamIdleTimeMs = _idleTimer.getStreamIdleTimeMs();
+        long timeSinceStreamLastCreatedOrConsumedMs = _idleTimer.getTimeSinceStreamLastCreatedOrConsumedMs();
 
-        if (idleTimeoutMillis >= 0 && (streamIdleTimeMs > idleTimeoutMillis)) {
+        if (idleTimeoutMillis >= 0 && (timeSinceStreamLastCreatedOrConsumedMs > idleTimeoutMillis)) {
           // Update the partition-consuming metric only if we have been idling beyond idle timeout.
           // Create a new stream consumer wrapper, in case we are stuck on something.
           _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
           recreateStreamConsumer(
-              String.format("Total idle time: %d ms exceeded idle timeout: %d ms", streamIdleTimeMs,
-                  idleTimeoutMillis));
-          _idleTimer.markStreamNotIdle();
+              String.format("Total idle time: %d ms exceeded idle timeout: %d ms",
+                  timeSinceStreamLastCreatedOrConsumedMs, idleTimeoutMillis));
+          _idleTimer.markStreamCreated();
         }
       }
 
@@ -1503,8 +1502,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  public long getSegmentIdleTime() {
-    return _idleTimer.getConsumeIdleTimeMs();
+  public long getTimeSinceEventLastConsumedMs() {
+    return _idleTimer.getTimeSinceEventLastConsumedMs();
   }
 
   public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {

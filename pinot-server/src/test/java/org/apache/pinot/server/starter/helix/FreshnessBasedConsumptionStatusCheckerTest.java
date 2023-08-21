@@ -230,9 +230,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     setupLatestIngestionTimestamp(segMngrA1, -1L);
     setupLatestIngestionTimestamp(segMngrB0, 0L);
 
-    when(segMngrA0.getSegmentIdleTime()).thenReturn(0L);
-    when(segMngrA1.getSegmentIdleTime()).thenReturn(0L);
-    when(segMngrB0.getSegmentIdleTime()).thenReturn(0L);
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(0L);
+    when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(0L);
+    when(segMngrB0.getTimeSinceEventLastConsumedMs()).thenReturn(0L);
 
     //              total idle time
     // segA0              0
@@ -240,24 +240,24 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     // segB0              0
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
-    when(segMngrA0.getSegmentIdleTime()).thenReturn(idleTimeoutMs - 1);
-    when(segMngrA1.getSegmentIdleTime()).thenReturn(idleTimeoutMs);
-    when(segMngrB0.getSegmentIdleTime()).thenReturn(idleTimeoutMs + 1);
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs - 1);
+    when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs);
+    when(segMngrB0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs + 1);
     //              total idle time
     // segA0              9
     // segA1              10
     // segB0              11
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 2);
 
-    when(segMngrA0.getSegmentIdleTime()).thenReturn(idleTimeoutMs);
-    when(segMngrA1.getSegmentIdleTime()).thenReturn(idleTimeoutMs + 1);
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs);
+    when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs + 1);
     //              total idle time
     // segA0              10
     // segA1              11
     // segB0              11
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
 
-    when(segMngrA0.getSegmentIdleTime()).thenReturn(idleTimeoutMs + 1);
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(idleTimeoutMs + 1);
     //              total idle time
     // segA0              11
     // segA1              11
@@ -303,14 +303,14 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     setupLatestIngestionTimestamp(segMngrA1, -1L);
     setupLatestIngestionTimestamp(segMngrB0, 0L);
 
-    when(segMngrA0.getSegmentIdleTime()).thenReturn(0L);
-    when(segMngrA1.getSegmentIdleTime()).thenReturn(0L);
-    when(segMngrB0.getSegmentIdleTime()).thenReturn(0L);
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(0L);
+    when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(0L);
+    when(segMngrB0.getTimeSinceEventLastConsumedMs()).thenReturn(0L);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
 
-    when(segMngrA0.getSegmentIdleTime()).thenReturn(10L);
-    when(segMngrA1.getSegmentIdleTime()).thenReturn(100L);
-    when(segMngrB0.getSegmentIdleTime()).thenReturn(1000L);
+    when(segMngrA0.getTimeSinceEventLastConsumedMs()).thenReturn(10L);
+    when(segMngrA1.getTimeSinceEventLastConsumedMs()).thenReturn(100L);
+    when(segMngrB0.getTimeSinceEventLastConsumedMs()).thenReturn(1000L);
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 3);
   }
 

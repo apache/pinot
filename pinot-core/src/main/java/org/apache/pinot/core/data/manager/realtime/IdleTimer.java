@@ -32,54 +32,45 @@ package org.apache.pinot.core.data.manager.realtime;
  */
 public class IdleTimer {
 
-  private volatile long _streamIdleStartTimeMs = 0;
-  private volatile long _streamIdleTimeMs = 0;
-  private long _consumeIdleStartTimeMs = 0;
-  private long _consumeIdleTimeMs = 0;
+  private volatile long _timeWhenStreamLastCreatedOrConsumedMs = 0;
+  private volatile long _timeWhenEventLastConsumedMs = 0;
 
   public IdleTimer() {
   }
 
-  public void markIdle(long nowMs) {
-    if (_streamIdleStartTimeMs == 0) {
-      _streamIdleStartTimeMs = nowMs;
-      _streamIdleTimeMs = 0;
-    } else {
-      _streamIdleTimeMs = nowMs - _streamIdleStartTimeMs;
+  protected long now() {
+    return System.currentTimeMillis();
+  }
+
+  public void init() {
+    long nowMs = now();
+    // When an event is consumed, we consider the stream no longer idle.
+    // Event consumption idleness, should always be greater than stream
+    // idleness since we recreate the stream after some amount of idleness,
+    // but that does not guarantee we'll consume an event.
+    _timeWhenStreamLastCreatedOrConsumedMs = nowMs;
+    _timeWhenEventLastConsumedMs = nowMs;
+  }
+
+  public void markStreamCreated() {
+    _timeWhenStreamLastCreatedOrConsumedMs = now();
+  }
+
+  public void markEventConsumed() {
+    init();
+  }
+
+  public long getTimeSinceStreamLastCreatedOrConsumedMs() {
+    if (_timeWhenStreamLastCreatedOrConsumedMs == 0) {
+      return 0;
     }
+    return now() - _timeWhenStreamLastCreatedOrConsumedMs;
+  }
 
-    if (_consumeIdleStartTimeMs == 0) {
-      _consumeIdleStartTimeMs = nowMs;
-      _streamIdleTimeMs = 0;
-    } else {
-      _consumeIdleTimeMs = nowMs - _consumeIdleStartTimeMs;
+  public long getTimeSinceEventLastConsumedMs() {
+    if (_timeWhenEventLastConsumedMs == 0) {
+      return 0;
     }
-  }
-
-  public void markStreamNotIdle() {
-    _streamIdleStartTimeMs = 0;
-    _streamIdleTimeMs = 0;
-  }
-
-  /**
-   * This should remain private. We never expect to reset the consume idle time
-   * without also resetting the stream idle time.
-   */
-  private void markConsumeNotIdle() {
-    _consumeIdleStartTimeMs = 0;
-    _consumeIdleTimeMs = 0;
-  }
-
-  public void reset() {
-    markStreamNotIdle();
-    markConsumeNotIdle();
-  }
-
-  public long getStreamIdleTimeMs() {
-    return _streamIdleTimeMs;
-  }
-
-  public long getConsumeIdleTimeMs() {
-    return _consumeIdleTimeMs;
+    return now() - _timeWhenEventLastConsumedMs;
   }
 }
