@@ -507,10 +507,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     if (exitServerOnIncompleteStartup) {
       String errorMessage = String.format("Service status %s has not turned GOOD within %dms: %s. Exiting server.",
           serviceStatus, System.currentTimeMillis() - startTimeMs, ServiceStatus.getStatusDescription());
-      LOGGER.error(errorMessage);
-      // If we exit here, only the _adminApiApplication and _helixManager are initialized, so we only stop them
-      _adminApiApplication.stop();
-      _helixManager.disconnect();
       throw new IllegalStateException(errorMessage);
     }
     LOGGER.warn("Service status has not turned GOOD within {}ms: {}", System.currentTimeMillis() - startTimeMs,
@@ -603,7 +599,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK)) {
       long endTimeMs =
           startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_STARTUP_TIMEOUT_MS, Server.DEFAULT_STARTUP_TIMEOUT_MS);
-      startupServiceStatusCheck(endTimeMs);
+      try {
+        startupServiceStatusCheck(endTimeMs);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while checking service status. Stopping server.", e);
+        // If we exit here, only the _adminApiApplication and _helixManager are initialized, so we only stop them
+        _adminApiApplication.stop();
+        _helixManager.disconnect();
+        throw e;
+      }
     }
 
     preServeQueries();
