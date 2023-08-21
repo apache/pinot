@@ -22,6 +22,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.TimeZone;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -29,6 +33,7 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -206,6 +211,42 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
     jsonNode = postQuery(query);
     for (int i = 0; i < getCountStarResult(); i++) {
       assertEquals(jsonNode.get("resultTable").get("rows").get(i).get(0).asLong(), 12);
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTimestampAddQueriesMonth(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("\n" + "SELECT timestampAdd(MONTH, 2, ts1), ts1\n"
+            + "FROM %s\n"
+            + "LIMIT %d\n",
+        getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS");
+    for (int i = 0; i < getCountStarResult(); i++) {
+      LocalDateTime actual;
+      LocalDateTime expected;
+      if (useMultiStageQueryEngine) {
+        String actualStr = jsonNode.get("resultTable").get("rows").get(i).get(0).asText();
+        actual = simpleDateFormat.parse(actualStr).toInstant().atZone(ZoneOffset.UTC).toLocalDateTime();
+        String expectedStr = jsonNode.get("resultTable").get("rows").get(i).get(1).asText();
+        expected = simpleDateFormat.parse(expectedStr).toInstant()
+            .atZone(ZoneOffset.UTC)
+            .toLocalDateTime()
+            .plusMonths(2);
+      } else {
+        long actualMillis = jsonNode.get("resultTable").get("rows").get(i).get(0).asLong();
+        actual = Instant.ofEpochMilli(actualMillis)
+            .atZone(ZoneOffset.UTC)
+            .toLocalDateTime();
+        String expectedStr = jsonNode.get("resultTable").get("rows").get(i).get(1).textValue();
+        expected = simpleDateFormat.parse(expectedStr).toInstant()
+            .atZone(ZoneOffset.UTC)
+            .toLocalDateTime()
+            .plusMonths(2);
+      }
+      Assert.assertEquals(actual, expected);
     }
   }
 
