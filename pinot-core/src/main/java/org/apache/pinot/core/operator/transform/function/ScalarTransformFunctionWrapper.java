@@ -33,6 +33,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -245,7 +246,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _bigDecimalValuesSV[i] = value == null ? null : (BigDecimal) _resultType.toInternal(value);
+      _bigDecimalValuesSV[i] = value == null ? (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder()
+          : (BigDecimal) _resultType.toInternal(value);
     }
     return _bigDecimalValuesSV;
   }
@@ -262,9 +264,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      Object result = _functionInvoker.invoke(_scalarArguments);
-      _stringValuesSV[i] =
-          _resultType == PinotDataType.STRING ? (String) result : (String) _resultType.toInternal(result);
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _stringValuesSV[i] = value == null ? (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder()
+          : (String) _resultType.toInternal(value);
     }
     return _stringValuesSV;
   }
@@ -281,7 +283,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _bytesValuesSV[i] = (byte[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _bytesValuesSV[i] = value == null ? ((ByteArray) DataSchema.ColumnDataType.BYTES.getNullPlaceholder()).getBytes()
+          : (byte[]) _resultType.toInternal(value);
     }
     return _bytesValuesSV;
   }
