@@ -1254,8 +1254,30 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
 
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 2);
     assertArrayEquals(rows.get(0), new Object[]{0.5, "key1"});
     assertArrayEquals(rows.get(1), new Object[]{0.0, "key2"});
+  }
+
+  @Test
+  public void testAllNullGroupByStddevPopReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, "key1");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT STDDEV_POP(%s), %s FROM testTable GROUP BY %s ORDER BY %s", COLUMN1, COLUMN2, COLUMN2,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], null);
   }
 
   @Test
@@ -1291,6 +1313,6 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    assertEquals(rows.get(0)[0], null);
+    assertEquals(rows.get(0)[0], Double.NEGATIVE_INFINITY);
   }
 }

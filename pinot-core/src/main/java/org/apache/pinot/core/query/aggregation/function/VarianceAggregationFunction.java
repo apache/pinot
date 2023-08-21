@@ -103,7 +103,7 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
       }
     }
 
-    if (count == 0) {
+    if (_nullHandlingEnabled && count == 0) {
       return;
     }
     setAggregationResult(aggregationResultHolder, count, sum, variance);
@@ -183,7 +183,12 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
 
   @Override
   public VarianceTuple extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    return aggregationResultHolder.getResult();
+    VarianceTuple varianceTuple = aggregationResultHolder.getResult();
+    if (varianceTuple == null) {
+      return _nullHandlingEnabled ? null : new VarianceTuple(0L, 0.0, 0.0);
+    } else {
+      return varianceTuple;
+    }
   }
 
   @Override
@@ -193,10 +198,12 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
 
   @Override
   public VarianceTuple merge(VarianceTuple intermediateResult1, VarianceTuple intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    } else if (intermediateResult2 == null) {
-      return intermediateResult1;
+    if (_nullHandlingEnabled) {
+      if (intermediateResult1 == null) {
+        return intermediateResult2;
+      } else if (intermediateResult2 == null) {
+        return intermediateResult1;
+      }
     }
     intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
@@ -218,16 +225,20 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
       return null;
     }
     long count = varianceTuple.getCount();
-    double variance = varianceTuple.getM2();
-    if (_isSample) {
-      if (count - 1 == 0L) {
-        return DEFAULT_FINAL_RESULT;
-      }
-      double sampleVar = variance / (count - 1);
-      return (_isStdDev) ? Math.sqrt(sampleVar) : sampleVar;
+    if (count == 0L) {
+      return DEFAULT_FINAL_RESULT;
     } else {
-      double popVar = variance / count;
-      return (_isStdDev) ? Math.sqrt(popVar) : popVar;
+      double variance = varianceTuple.getM2();
+      if (_isSample) {
+        if (count - 1 == 0L) {
+          return DEFAULT_FINAL_RESULT;
+        }
+        double sampleVar = variance / (count - 1);
+        return (_isStdDev) ? Math.sqrt(sampleVar) : sampleVar;
+      } else {
+        double popVar = variance / count;
+        return (_isStdDev) ? Math.sqrt(popVar) : popVar;
+      }
     }
   }
 }
