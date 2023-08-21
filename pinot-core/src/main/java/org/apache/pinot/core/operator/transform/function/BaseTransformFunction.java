@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
@@ -57,6 +58,8 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.JSON, true, false);
   protected static final TransformResultMetadata BYTES_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.BYTES, true, false);
+  protected static final TransformResultMetadata VECTOR_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.VECTOR, true, false);
 
   protected static final TransformResultMetadata INT_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.INT, false, false);
@@ -90,6 +93,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
   protected float[] _floatValuesSV;
   protected double[] _doubleValuesSV;
   protected BigDecimal[] _bigDecimalValuesSV;
+  protected Vector[] _vectorValuesSV;
   protected String[] _stringValuesSV;
   protected byte[][] _bytesValuesSV;
   protected int[][] _intValuesMV;
@@ -488,6 +492,44 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     }
     return _bytesValuesSV;
+  }
+
+  protected void initVectorValuesSV(int length) {
+    if (_vectorValuesSV == null || _vectorValuesSV.length < length) {
+      _vectorValuesSV = new Vector[length];
+    }
+  }
+
+  @Override
+  public Vector[] transformToVectorValuesSV(ValueBlock valueBlock) {
+    int length = valueBlock.getNumDocs();
+    initVectorValuesSV(length);
+    Dictionary dictionary = getDictionary();
+    if (dictionary != null) {
+      int[] dictIds = transformToDictIdsSV(valueBlock);
+      dictionary.readVectorValues(dictIds, length, _vectorValuesSV);
+    } else {
+      DataType resultDataType = getResultMetadata().getDataType();
+      switch (resultDataType.getStoredType()) {
+        case BYTES:
+          byte[][] byteValues = transformToBytesValuesSV(valueBlock);
+          ArrayCopyUtils.copy(byteValues, _vectorValuesSV, length);
+          break;
+        case STRING:
+          String[] stringValues = transformToStringValuesSV(valueBlock);
+          ArrayCopyUtils.copy(stringValues, _vectorValuesSV, length);
+          break;
+        case UNKNOWN:
+          // Copy the values to ensure behaviour consistency with non null-handling.
+          for (int i = 0; i < length; i++) {
+            _vectorValuesSV[i] = (Vector) DataSchema.ColumnDataType.VECTOR.getNullPlaceholder();
+          }
+          break;
+        default:
+          throw new IllegalStateException(String.format("Cannot read SV %s as VECTOR", resultDataType));
+      }
+    }
+    return _vectorValuesSV;
   }
 
   protected void initIntValuesMV(int length) {

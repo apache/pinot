@@ -151,7 +151,7 @@ public class ProjectionBlockValSet implements BlockValSet {
   public Vector[] getVectorValuesSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
       recordReadValues(scope, DataType.VECTOR, true);
-      return _dataBlockCache.getBigDecimalValuesForSVColumn(_column);
+      return _dataBlockCache.getVectorValuesForSVColumn(_column);
     }
   }
 

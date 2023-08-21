@@ -225,7 +225,7 @@ public class DataFetcher {
    */
   public void fetchVectorValues(String column, TransformEvaluator evaluator, int[] inDocIds, int length,
       Vector[] outValues) {
-    _columnValueReaderMap.get(column).readBigDecimalValues(evaluator, inDocIds, length, outValues);
+    _columnValueReaderMap.get(column).readVectorValues(evaluator, inDocIds, length, outValues);
   }
 
   /**
@@ -236,8 +236,8 @@ public class DataFetcher {
    * @param length Number of input document Ids
    * @param outValues Buffer for output
    */
-  public void fetchVectorValues(String column, int[] inDocIds, int length, java.util.Vector[] outValues) {
-    _columnValueReaderMap.get(column).readBigDecimalValues(inDocIds, length, outValues);
+  public void fetchVectorValues(String column, int[] inDocIds, int length, Vector[] outValues) {
+    _columnValueReaderMap.get(column).readVectorValues(inDocIds, length, outValues);
   }
 
   /**
@@ -595,7 +595,7 @@ public class DataFetcher {
       if (_dictionary != null) {
         int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
         _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
-        _dictionary.readBigDecimalValues(dictIdBuffer, length, valueBuffer);
+        _dictionary.readVectorValues(dictIdBuffer, length, valueBuffer);
       } else {
         _reader.readValuesSV(docIds, length, valueBuffer, readerContext);
       }

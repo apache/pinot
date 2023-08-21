@@ -26,6 +26,8 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -102,6 +104,11 @@ public class DataBlockValSet implements BlockValSet {
   @Override
   public BigDecimal[] getBigDecimalValuesSV() {
     return DataBlockExtractUtils.extractBigDecimalColumn(_storedType, _dataBlock, _colId, _nullBitmap);
+  }
+
+  @Override
+  public Vector[] getVectorValuesSV() {
+    return DataBlockExtractUtils.extractVectorValuesForColumn(_storedType, _dataBlock, _colId, _nullBitmap);
   }
 
   @Override

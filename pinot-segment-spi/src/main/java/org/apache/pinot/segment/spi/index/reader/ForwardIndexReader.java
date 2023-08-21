@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
@@ -354,6 +355,23 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
       case BYTES:
         for (int i = 0; i < length; i++) {
           values[i] = BigDecimalUtils.deserialize(getBytes(docIds[i], context));
+        }
+        break;
+      default:
+        throw new IllegalArgumentException();
+    }
+  }
+
+  default void readValuesSV(int[] docIds, int length, Vector[] values, T context) {
+    switch (getStoredType()) {
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = Vector.fromString(getString(docIds[i], context));
+        }
+        break;
+      case BYTES:
+        for (int i = 0; i < length; i++) {
+          values[i] = Vector.fromBytes(getBytes(docIds[i], context));
         }
         break;
       default:

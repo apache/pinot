@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 /**
@@ -88,6 +89,18 @@ public interface TransformEvaluator {
    */
   <T extends ForwardIndexReaderContext> void evaluateBlock(int[] docIds, int length, ForwardIndexReader<T> reader,
       T context, Dictionary dictionary, int[] dictIdBuffer, BigDecimal[] valueBuffer);
+
+  /**
+   * Evaluate the JSON path and fill the value buffer
+   * @param docIds the doc ids to evaluate the JSON path for
+   * @param length the number of doc ids to evaluate for
+   * @param reader the ForwardIndexReader
+   * @param context the reader context
+   * @param valueBuffer the values to fill
+   * @param <T> type of the reader context
+   */
+  <T extends ForwardIndexReaderContext> void evaluateBlock(int[] docIds, int length, ForwardIndexReader<T> reader,
+      T context, Dictionary dictionary, int[] dictIdBuffer, Vector[] vector);
 
   /**
    * Evaluate the JSON path and fill the value buffer

@@ -67,7 +67,7 @@ public class RowBasedBlockValueFetcher {
         case STRING:
           return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
         case VECTOR:
-          return new VectorValueFetcher(blockValSet.getBytesValuesSV());
+          return new VectorValueFetcher(blockValSet.getVectorValuesSV());
         case BYTES:
           return new BytesValueFetcher(blockValSet.getBytesValuesSV());
         case UNKNOWN:

@@ -270,15 +270,15 @@ public class DataBlockCache {
    * @return Array of BigDecimal values
    */
   public Vector[] getVectorValuesForSVColumn(String column) {
-    Vector[] bigDecimalValues = getValues(FieldSpec.DataType.VECTOR, column);
+    Vector[] vectorValues = getValues(FieldSpec.DataType.VECTOR, column);
     if (markLoaded(FieldSpec.DataType.VECTOR, column)) {
-      if (bigDecimalValues == null) {
-        bigDecimalValues = new Vector[_length];
-        putValues(FieldSpec.DataType.VECTOR, column, bigDecimalValues);
+      if (vectorValues == null) {
+        vectorValues = new Vector[_length];
+        putValues(FieldSpec.DataType.VECTOR, column, vectorValues);
       }
-      _dataFetcher.fetchBigDecimalValues(column, _docIds, _length, bigDecimalValues);
+      _dataFetcher.fetchVectorValues(column, _docIds, _length, vectorValues);
     }
-    return bigDecimalValues;
+    return vectorValues;
   }
 
   /**

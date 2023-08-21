@@ -27,7 +27,6 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
-
 public final class DataBlockUtils {
   private DataBlockUtils() {
   }

@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -93,6 +94,14 @@ public interface Dictionary extends IndexReader {
    * Must be implemented for BIG_DECIMAL dictionaries.
    */
   default int indexOf(BigDecimal bigDecimalValue) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the index of the value in the dictionary, or {@link #NULL_VALUE_INDEX} (-1) if the value does not exist.
+   * Must be implemented for VECTOR dictionaries.
+   */
+  default int indexOf(Vector vectorValue) {
     throw new UnsupportedOperationException();
   }
 
@@ -189,6 +198,10 @@ public interface Dictionary extends IndexReader {
 
   String getStringValue(int dictId);
 
+  default Vector getVectorValue(int dictId) {
+    throw new UnsupportedOperationException();
+  }
+
   /**
    * NOTE: Should be overridden for STRING, BIG_DECIMAL and BYTES dictionary.
    */
@@ -229,6 +242,12 @@ public interface Dictionary extends IndexReader {
   default void readBigDecimalValues(int[] dictIds, int length, BigDecimal[] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = getBigDecimalValue(dictIds[i]);
+    }
+  }
+
+  default void readVectorValues(int[] dictIds, int length, Vector[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getVectorValue(dictIds[i]);
     }
   }
 
