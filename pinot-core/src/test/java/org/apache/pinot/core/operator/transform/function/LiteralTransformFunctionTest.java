@@ -78,23 +78,4 @@ public class LiteralTransformFunctionTest {
     }
     Assert.assertEquals(nullLiteral.getNullBitmap(_projectionBlock), expectedBitmap);
   }
-
-  @Test
-  public void testIsNullLiteralTransform() {
-    LiteralTransformFunction nullLiteral =
-        new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, null));
-    Assert.assertTrue(LiteralTransformFunction.isNullLiteralTransform(nullLiteral));
-
-    LiteralTransformFunction nullLiteralWITHBooleanValue =
-        new LiteralTransformFunction(new LiteralContext(DataType.UNKNOWN, true));
-    Assert.assertTrue(LiteralTransformFunction.isNullLiteralTransform(nullLiteralWITHBooleanValue));
-
-    LiteralTransformFunction trueLiteral =
-        new LiteralTransformFunction(new LiteralContext(DataType.BOOLEAN, true));
-    Assert.assertFalse(LiteralTransformFunction.isNullLiteralTransform(trueLiteral));
-
-    LiteralTransformFunction stringNullLiteral =
-        new LiteralTransformFunction(new LiteralContext(DataType.STRING, null));
-    Assert.assertFalse(LiteralTransformFunction.isNullLiteralTransform(stringNullLiteral));
-  }
 }

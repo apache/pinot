@@ -70,14 +70,6 @@ public class LiteralTransformFunction implements TransformFunction {
     _doubleLiteral = _bigDecimalLiteral.doubleValue();
   }
 
-  public Object getLiteral() {
-    return _literal;
-  }
-
-  public DataType getDataType() {
-    return _dataType;
-  }
-
   public boolean getBooleanLiteral() {
     return BooleanUtils.toBoolean(_literal);
   }
@@ -276,16 +268,5 @@ public class LiteralTransformFunction implements TransformFunction {
     RoaringBitmap bitmap = new RoaringBitmap();
     bitmap.add(0L, length);
     return bitmap;
-  }
-
-  /*
-   * Util function to check whether the Literal transform is null or not.
-   */
-  public static boolean isNullLiteralTransform(TransformFunction function) {
-    if (FUNCTION_NAME.equals(function.getName())) {
-      LiteralTransformFunction literalFunction = (LiteralTransformFunction) function;
-      return literalFunction.getLiteral() == null && literalFunction.getDataType() == DataType.UNKNOWN;
-    }
-    return false;
   }
 }
