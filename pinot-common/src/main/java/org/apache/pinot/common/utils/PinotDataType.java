@@ -1111,7 +1111,20 @@ public enum PinotDataType {
   }
 
   public Vector toVector(Object value) {
-    return getSingleValueType().toVector(toObjectArray(value)[0]);
+    if (value instanceof Object[]) {
+      switch (getSingleValueType()) {
+        case FLOAT:
+          return new Vector(((Object[]) value).length, toPrimitiveFloatArray(value));
+        case DOUBLE:
+          return new Vector(((Object[]) value).length, toPrimitiveFloatArray(value));
+        case INTEGER:
+          return new Vector(((Object[]) value).length, toPrimitiveIntArray(value));
+        default:
+          throw new IllegalStateException("Unsupported single value type: " + getSingleValueType());
+      }
+    } else {
+      return getSingleValueType().toVector(toObjectArray(value)[0]);
+    }
   }
 
 
@@ -1437,6 +1450,8 @@ public enum PinotDataType {
         return BOOLEAN;
       case TIMESTAMP_ARRAY:
         return TIMESTAMP;
+      case VECTOR:
+        return VECTOR;
       default:
         throw new IllegalStateException("There is no single-value type for " + this);
     }

@@ -61,11 +61,13 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -558,6 +560,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(getKeyFor(column, DATETIME_GRANULARITY), dateTimeFieldSpec.getGranularity());
     }
 
+    if (fieldSpec.getDataType().equals(DataType.VECTOR)) {
+      DimensionFieldSpec vectorFieldSpec = (DimensionFieldSpec) fieldSpec;
+      properties.setProperty(getKeyFor(column, IS_VECTOR), "true");
+      properties.setProperty(getKeyFor(column, VECTOR_LENGTH), vectorFieldSpec.getVectorLength());
+      properties.setProperty(getKeyFor(column, VECTOR_DATATYPE), vectorFieldSpec.getVectorDataType().toString());
+    }
+
     // NOTE: Min/max could be null for real-time aggregate metrics.
     if (totalDocs > 0) {
       Object min = columnIndexCreationInfo.getMin();
@@ -573,7 +582,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       //       null value changes
       defaultNullValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(defaultNullValue);
     }
-    properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+
+    //TODO: THis is a hack to support vector data type default null. We need to fix this.
+    if (fieldSpec.getDataType().equals(DataType.VECTOR)) {
+      properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), "-1");
+    } else {
+      properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+    }
   }
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
@@ -636,6 +651,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         } else {
           return BytesUtils.toHexString(Arrays.copyOf(BytesUtils.toBytes(value), (METADATA_PROPERTY_LENGTH_LIMIT / 2)));
         }
+      //TODO: This is a hack to support vector data type. We need to fix this. Not sure if trimming the value is the right thing to do.
+      case VECTOR:
+        String trimmedValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
+        int lastComma = trimmedValue.lastIndexOf(",");
+        trimmedValue = trimmedValue.substring(0, lastComma);
+        return trimmedValue;
       default:
         throw new IllegalStateException("Unsupported stored type for property value length reduction: " + storedType);
     }

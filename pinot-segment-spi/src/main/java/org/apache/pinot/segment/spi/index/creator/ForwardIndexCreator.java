@@ -24,6 +24,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 /**
@@ -62,6 +63,9 @@ public interface ForwardIndexCreator extends IndexCreator {
           break;
         case BYTES:
           putBytes((byte[]) cellValue);
+          break;
+        case VECTOR:
+          putVector((Vector) cellValue);
           break;
         case JSON:
           if (cellValue instanceof String) {
@@ -228,6 +232,15 @@ public interface ForwardIndexCreator extends IndexCreator {
    * @param value Value to write
    */
   default void putBigDecimal(BigDecimal value) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Writes the next VECTOR type single-value into the forward index.
+   *
+   * @param value Value to write
+   */
+  default void putVector(Vector value) {
     throw new UnsupportedOperationException();
   }
 

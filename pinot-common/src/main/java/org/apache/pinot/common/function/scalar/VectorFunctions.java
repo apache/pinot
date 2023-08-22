@@ -19,7 +19,9 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 /**
@@ -128,6 +130,17 @@ public class VectorFunctions {
   }
 
   /**
+   * Returns the number of dimensions in a vector
+   * @param vector input vector
+   * @return number of dimensions
+   */
+  @ScalarFunction(names = {"vectordims_vec", "vector_dims_vec"})
+  public static int vectorDims(Vector vector) {
+    validateVector(vector);
+    return vector.getDimension();
+  }
+
+  /**
    * Returns the norm of a vector
    * @param vector input vector
    * @return norm
@@ -142,6 +155,27 @@ public class VectorFunctions {
     return Math.sqrt(norm);
   }
 
+  @ScalarFunction(names = {"vectornorm_vec", "vector_norm_vec"})
+  public static double vectorNorm(Vector vector) {
+    validateVector(vector);
+    double norm = 0.0;
+    switch (vector.getType()) {
+      case FLOAT: {
+        for (int i = 0; i < vector.getDimension(); i++) {
+          norm += Math.pow(vector.getFloatValues()[i], 2);
+        }
+        break;
+      }
+      case INT: {
+        for (int i = 0; i < vector.getDimension(); i++) {
+          norm += Math.pow(vector.getIntValues()[i], 2);
+        }
+        break;
+      }
+    }
+    return Math.sqrt(norm);
+  }
+
   public static void validateVectors(float[] vector1, float[] vector2) {
     Preconditions.checkArgument(vector1 != null && vector2 != null, "Null vector passed");
     Preconditions.checkArgument(vector1.length == vector2.length, "Vector lengths do not match");
@@ -151,4 +185,94 @@ public class VectorFunctions {
     Preconditions.checkArgument(vector != null, "Null vector passed");
     Preconditions.checkArgument(vector.length > 0, "Empty vector passed");
   }
+
+  public static void validateVectors(Vector vector1, Vector vector2) {
+    Preconditions.checkArgument(vector1 != null && vector2 != null, "Null vector passed");
+    Preconditions.checkArgument(vector1.getDimension() == vector2.getDimension(), "Vector lengths do not match");
+  }
+
+  public static void validateVector(Vector vector) {
+    Preconditions.checkArgument(vector != null, "Null vector passed");
+    Preconditions.checkArgument(vector.getDimension() > 0, "Empty vector passed");
+  }
+  @ScalarFunction(names = {"cosinedistance_vec", "cosine_distance_vec"})
+  public static double cosineDistance(Vector vector1, Vector vector2) {
+    return cosineDistance(vector1, vector2, Double.NaN);
+  }
+
+  @ScalarFunction(names = {"cosinedistance_vec", "cosine_distance_vec"})
+  public static double cosineDistance(Vector vector1, Vector vector2, double defaultValue) {
+    if (vector1.getType() != Vector.VectorType.FLOAT || vector2.getType() != Vector.VectorType.FLOAT) {
+      throw new IllegalArgumentException("Vectors must be of FLOAT type.");
+    }
+
+    float[] v1 = vector1.getFloatValues();
+    float[] v2 = vector2.getFloatValues();
+    validateVectors(v1, v2);
+
+    double dotProduct = 0.0;
+    double norm1 = 0.0;
+    double norm2 = 0.0;
+    for (int i = 0; i < v1.length; i++) {
+      dotProduct += v1[i] * v2[i];
+      norm1 += Math.pow(v1[i], 2);
+      norm2 += Math.pow(v2[i], 2);
+    }
+    if (norm1 == 0 || norm2 == 0) {
+      return defaultValue;
+    }
+    return 1 - (dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2)));
+  }
+
+  @ScalarFunction(names = {"innerproduct_vec", "inner_product_vec"})
+  public static double innerProduct(Vector vector1, Vector vector2) {
+    if (vector1.getType() != Vector.VectorType.FLOAT || vector2.getType() != Vector.VectorType.FLOAT) {
+      throw new IllegalArgumentException("Vectors must be of FLOAT type.");
+    }
+
+    float[] v1 = vector1.getFloatValues();
+    float[] v2 = vector2.getFloatValues();
+    validateVectors(v1, v2);
+
+    double dotProduct = 0.0;
+    for (int i = 0; i < v1.length; i++) {
+      dotProduct += v1[i] * v2[i];
+    }
+    return dotProduct;
+  }
+
+  @ScalarFunction(names = {"l2distance_vec", "l2_distance_vec"})
+  public static double l2Distance(Vector vector1, Vector vector2) {
+    if (vector1.getType() != Vector.VectorType.FLOAT || vector2.getType() != Vector.VectorType.FLOAT) {
+      throw new IllegalArgumentException("Vectors must be of FLOAT type.");
+    }
+
+    float[] v1 = vector1.getFloatValues();
+    float[] v2 = vector2.getFloatValues();
+    validateVectors(v1, v2);
+
+    double distance = 0.0;
+    for (int i = 0; i < v1.length; i++) {
+      distance += Math.pow(v1[i] - v2[i], 2);
+    }
+    return Math.sqrt(distance);
+  }
+
+  @ScalarFunction(names = {"l1distance_vec", "l1_distance_vec"})
+  public static double l1Distance(Vector vector1, Vector vector2) {
+    if (vector1.getType() != Vector.VectorType.FLOAT || vector2.getType() != Vector.VectorType.FLOAT) {
+      throw new IllegalArgumentException("Vectors must be of FLOAT type.");
+    }
+
+    float[] v1 = vector1.getFloatValues();
+    float[] v2 = vector2.getFloatValues();
+    validateVectors(v1, v2);
+
+    double distance = 0.0;
+    for (int i = 0; i < v1.length; i++) {
+      distance += Math.abs(v1[i] - v2[i]);
+    }
+    return distance;
+  }
+
 }

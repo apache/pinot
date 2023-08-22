@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 
 
 /**
@@ -103,4 +104,11 @@ public interface DataSource {
    */
   @Nullable
   NullValueVectorReader getNullValueVector();
+
+  /**
+   * Returns the vector index for the column if exists, or {@code null} if not.
+   * @return
+   */
+  @Nullable
+  VectorIndexReader getVectorIndex();
 }

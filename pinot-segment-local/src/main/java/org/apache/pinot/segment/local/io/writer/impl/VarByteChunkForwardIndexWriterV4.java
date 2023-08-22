@@ -33,6 +33,7 @@ import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,6 +120,11 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   @Override
   public void putBigDecimal(BigDecimal bigDecimal) {
     putBytes(BigDecimalUtils.serialize(bigDecimal));
+  }
+
+  @Override
+  public void putVector(Vector value) {
+    putBytes(value.toBytes());
   }
 
   @Override

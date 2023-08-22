@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 /**
@@ -117,6 +118,11 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
   @Override
   public void putBytes(byte[] value) {
     _indexWriter.putBytes(value);
+  }
+
+  @Override
+  public void putVector(Vector value) {
+    _indexWriter.putVector(value);
   }
 
   @Override

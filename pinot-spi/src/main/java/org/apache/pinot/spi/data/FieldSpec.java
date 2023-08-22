@@ -60,7 +60,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
   public static final BigDecimal DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
-  public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_VECTOR = "1,0,0";
+  public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_VECTOR = "-1";
 
 
   public static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
@@ -70,7 +70,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final BigDecimal DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
-  public static final String DEFAULT_METRIC_NULL_VALUE_OF_VECTOR = "0,0";
+  public static final String DEFAULT_METRIC_NULL_VALUE_OF_VECTOR = "-1";
 
   public static final FieldSpecMetadata FIELD_SPEC_METADATA;
 
@@ -145,7 +145,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       @Nullable Object defaultNullValue) {
     _name = name;
     _dataType = DataType.VECTOR;
-    _isSingleValueField = false;
     _vectorLength = vectorLength;
     _vectorDataType = vectorDataType;
     setDefaultNullValue(defaultNullValue);

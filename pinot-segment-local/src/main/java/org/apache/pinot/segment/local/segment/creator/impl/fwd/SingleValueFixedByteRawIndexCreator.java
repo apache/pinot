@@ -27,7 +27,6 @@ import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
-
 /**
  * Raw (non-dictionary-encoded) forward index creator for single-value column of fixed length data type (INT, LONG,
  * FLOAT, DOUBLE).

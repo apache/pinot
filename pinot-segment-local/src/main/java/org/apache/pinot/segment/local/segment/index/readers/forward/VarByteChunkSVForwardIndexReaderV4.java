@@ -33,6 +33,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,6 +107,11 @@ public class VarByteChunkSVForwardIndexReaderV4
   @Override
   public String getString(int docId, ReaderContext context) {
     return new String(context.getValue(docId), StandardCharsets.UTF_8);
+  }
+
+  @Override
+  public Vector getVector(int docId, ReaderContext context) {
+    return Vector.fromBytes(context.getValue(docId));
   }
 
   @Override

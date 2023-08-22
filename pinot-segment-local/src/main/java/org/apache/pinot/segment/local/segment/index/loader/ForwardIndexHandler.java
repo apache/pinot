@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreI
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.VectorColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -65,6 +66,7 @@ import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -629,6 +631,14 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         break;
       }
+      case VECTOR: {
+        Preconditions.checkState(isSVColumn, "Vector is not supported for MV columns");
+        for (int i = 0; i < numDocs; i++) {
+          Vector val = reader.getVector(i, readerContext);
+          creator.putVector(val);
+        }
+        break;
+      }
       default:
         throw new IllegalStateException("Unsupported storedType=" + reader.getStoredType() + " for column=" + column);
     }
@@ -738,6 +748,15 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           int dictId = reader.getDictId(i, readerContext);
           BigDecimal val = dictionaryReader.getBigDecimalValue(dictId);
           creator.putBigDecimal(val);
+        }
+        break;
+      }
+      case VECTOR: {
+        Preconditions.checkState(isSVColumn, "Vector is not supported for MV columns");
+        for (int i = 0; i < numDocs; i++) {
+          int dictId = reader.getDictId(i, readerContext);
+          Vector val = dictionaryReader.getVectorValue(dictId);
+          creator.putVector(val);
         }
         break;
       }
@@ -1026,6 +1045,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         break;
       case BIG_DECIMAL:
         statsCollector = new BigDecimalColumnPreIndexStatsCollector(column, statsCollectorConfig);
+        break;
+      case VECTOR:
+        statsCollector = new VectorColumnPreIndexStatsCollector(column, statsCollectorConfig);
         break;
       default:
         throw new IllegalStateException("Unsupported storedType=" + storedType.toString() + " for column=" + column);

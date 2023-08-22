@@ -364,6 +364,11 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
 
   default void readValuesSV(int[] docIds, int length, Vector[] values, T context) {
     switch (getStoredType()) {
+      case VECTOR:
+        for (int i = 0; i < length; i++) {
+          values[i] = getVector(docIds[i], context);
+        }
+        break;
       case STRING:
         for (int i = 0; i < length; i++) {
           values[i] = Vector.fromString(getString(docIds[i], context));
@@ -375,7 +380,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         }
         break;
       default:
-        throw new IllegalArgumentException();
+        throw new IllegalArgumentException("Unsupported data type: " + getStoredType());
     }
   }
 
@@ -431,6 +436,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * @return BIG_DECIMAL type single-value at the given document id
    */
   default BigDecimal getBigDecimal(int docId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads the VECTOR type single-value at the given document id.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return VECTOR type single-value at the given document id
+   */
+  default Vector getVector(int docId, T context) {
     throw new UnsupportedOperationException();
   }
 

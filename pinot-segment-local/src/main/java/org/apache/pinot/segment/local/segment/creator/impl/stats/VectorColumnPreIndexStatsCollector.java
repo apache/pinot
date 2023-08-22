@@ -47,6 +47,21 @@ public class VectorColumnPreIndexStatsCollector extends AbstractColumnStatistics
     if (_values.add(value)) {
       updatePartition(value);
       int valueLength = value.getDimension();
+      switch(value.getType()) {
+        case INT: {
+          valueLength *= Integer.BYTES;
+          break;
+        }
+        case FLOAT: {
+          valueLength *= Float.BYTES;
+          break;
+        }
+        default: {
+
+        }
+      }
+
+      valueLength += (2 *Integer.BYTES); // for vector type and dimension length
       _minLength = Math.min(_minLength, valueLength);
       _maxLength = Math.max(_maxLength, valueLength);
       _maxRowLength = _maxLength;

@@ -47,6 +47,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreI
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.VectorColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -750,6 +751,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, true, useVarLengthDictionary, true,
               new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
+          break;
+        }
+        case VECTOR: {
+          for (int i = 0; i < numDocs; i++) {
+            Preconditions.checkState(isSingleValue, "MV VECTOR is not supported");
+            outputValues[i] = outputValueType.toVector(outputValues[i]);
+          }
+          VectorColumnPreIndexStatsCollector statsCollector =
+              new VectorColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+          indexCreationInfo =
+              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
           break;
         }
         default:

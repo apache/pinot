@@ -264,10 +264,10 @@ public class DataBlockCache {
 
 
   /**
-   * Get the BigDecimal values for a single-valued column.
+   * Get the Vector values for a single-valued column.
    *
    * @param column Column name
-   * @return Array of BigDecimal values
+   * @return Array of Vector values
    */
   public Vector[] getVectorValuesForSVColumn(String column) {
     Vector[] vectorValues = getValues(FieldSpec.DataType.VECTOR, column);
@@ -279,6 +279,17 @@ public class DataBlockCache {
       _dataFetcher.fetchVectorValues(column, _docIds, _length, vectorValues);
     }
     return vectorValues;
+  }
+
+  /**
+   * Get the Vector values for a column.
+   *
+   * @param column Column name
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, Vector[] buffer) {
+    _dataFetcher.fetchVectorValues(column, evaluator, _docIds, _length, buffer);
   }
 
   /**

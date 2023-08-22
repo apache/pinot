@@ -147,6 +147,12 @@ public class Vector implements Comparable<Vector> {
 
   public static Vector fromString(String value) {
     String[] tokens = value.split(",");
+
+    //TODO: This is a hack to support null vectors.
+    if (Integer.parseInt(tokens[0].toUpperCase()) == -1) {
+      return new Vector(0, new float[0]);
+    }
+
     VectorType vectorType = VectorType.fromId(Integer.parseInt(tokens[0].toUpperCase()));
     int dimension = Integer.parseInt(tokens[1]);
     switch (vectorType) {
