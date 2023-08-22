@@ -47,6 +47,15 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 // TODO: extract common functions from TPCHQueryIntegrationTest and SSBQueryIntegrationTest
+
+/**
+ * Integration test that tests Pinot using TPCH data.
+ * Data is loaded into Pinot and H2 from /resources/examples/batch/tpch. The dataset is very small, please follow
+ * https://dev.mysql.com/doc/heatwave/en/mys-hw-tpch-sample-data.html to generate a larger dataset for better testing.
+ * The generated data is in tbl format, please convert them into avro format first.
+ * Queries are executed against Pinot and H2, and the results are compared.
+ *
+ */
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
   private static final int NUM_TPCH_QUERIES = 24;
