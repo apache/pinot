@@ -313,10 +313,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
       // are accidentally enabled together. The freshness based checker is a stricter version of the offset based
       // checker. But in the end, both checkers are bounded in time by realtimeConsumptionCatchupWaitMs.
       if (isFreshnessStatusCheckerEnabled) {
-        LOGGER.info("Setting up freshness based status checker");
+        int idleTimeoutMs = _serverConf.getProperty(Server.CONFIG_OF_REALTIME_FRESHNESS_IDLE_TIMEOUT_MS,
+            Server.DEFAULT_REALTIME_FRESHNESS_IDLE_TIMEOUT_MS);
+
+        LOGGER.info("Setting up freshness based status checker with min freshness {} and idle timeout {}",
+            realtimeMinFreshnessMs, idleTimeoutMs);
         FreshnessBasedConsumptionStatusChecker freshnessStatusChecker =
             new FreshnessBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments,
-                realtimeMinFreshnessMs);
+                realtimeMinFreshnessMs, idleTimeoutMs);
         Supplier<Integer> getNumConsumingSegmentsNotReachedMinFreshness =
             freshnessStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
         serviceStatusCallbackListBuilder.add(
