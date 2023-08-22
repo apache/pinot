@@ -89,6 +89,7 @@ public abstract class AbstractPlanNode implements PlanNode, ProtoSerializable {
   public static class NodeHint {
     @ProtoProperties
     public Map<String, Map<String, String>> _hintOptions;
+
     public NodeHint() {
     }
 

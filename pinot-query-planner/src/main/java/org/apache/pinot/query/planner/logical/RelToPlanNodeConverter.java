@@ -186,7 +186,7 @@ public final class RelToPlanNodeConverter {
     List<RexExpression> joinClause =
         joinInfo.nonEquiConditions.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
     return new JoinNode(currentStageId, toDataSchema(node.getRowType()), toDataSchema(node.getLeft().getRowType()),
-        toDataSchema(node.getRight().getRowType()), joinType, joinKeys, joinClause);
+        toDataSchema(node.getRight().getRowType()), joinType, joinKeys, joinClause, node.getHints());
   }
 
   private static DataSchema toDataSchema(RelDataType rowType) {

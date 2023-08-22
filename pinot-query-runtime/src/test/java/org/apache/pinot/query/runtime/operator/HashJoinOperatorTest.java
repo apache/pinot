@@ -19,10 +19,15 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
@@ -73,6 +78,12 @@ public class HashJoinOperatorTest {
     return new JoinNode.JoinKeys(leftSelect, rightSelect);
   }
 
+  private static List<RelHint> getJoinHints(Map<String, String> hintsMap) {
+    RelHint.Builder relHintBuilder = RelHint.builder(PinotHintOptions.JOIN_HINT_OPTIONS);
+    hintsMap.forEach(relHintBuilder::hintOption);
+    return ImmutableList.of(relHintBuilder.build());
+  }
+
   @Test
   public void shouldHandleHashJoinKeyCollisionInnerJoin() {
     DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
@@ -94,7 +105,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
+        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
     HashJoinOperator joinOnString =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -129,7 +140,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator joinOnInt =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnInt.nextBlock();
@@ -161,7 +172,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses);
+        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
     HashJoinOperator joinOnInt =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnInt.nextBlock();
@@ -200,7 +211,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.LEFT,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
+        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -232,7 +243,7 @@ public class HashJoinOperatorTest {
         });
     List<RexExpression> joinClauses = new ArrayList<>();
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -261,7 +272,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.LEFT,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -294,7 +305,7 @@ public class HashJoinOperatorTest {
         });
 
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -330,7 +341,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses);
+        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
@@ -366,7 +377,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses);
+        getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
@@ -398,7 +409,7 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.RIGHT,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator joinOnNum =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnNum.nextBlock();
@@ -439,7 +450,7 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.SEMI,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
+        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
@@ -473,7 +484,7 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.FULL,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
@@ -517,7 +528,7 @@ public class HashJoinOperatorTest {
         DataSchema.ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.ANTI,
-        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses);
+        getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
@@ -550,7 +561,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -581,7 +592,7 @@ public class HashJoinOperatorTest {
             DataSchema.ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
-        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses);
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
@@ -589,6 +600,81 @@ public class HashJoinOperatorTest {
     Assert.assertTrue(result.isErrorBlock());
     Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
         .contains("testInnerJoinLeftError"));
+  }
+
+  @Test
+  public void shouldPropagateJoinLimitError() {
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
+    Mockito.when(_leftOperator.nextBlock())
+        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    List<RexExpression> joinClauses = new ArrayList<>();
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.STRING
+        });
+    Map<String, String> hintsMap = ImmutableMap.of(
+        PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "THROW",
+        PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1"
+    );
+    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, getJoinHints(hintsMap));
+    HashJoinOperator join =
+        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+
+    TransferableBlock result = join.nextBlock();
+    Assert.assertTrue(result.isErrorBlock());
+    Assert.assertTrue(
+        result.getDataBlock().getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+            .contains("reach number of rows limit"));
+  }
+
+  @Test
+  public void shouldHandleJoinWithPartialResultsWhenHitDataRowsLimit() {
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
+    Mockito.when(_leftOperator.nextBlock())
+        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    List<RexExpression> joinClauses = new ArrayList<>();
+    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
+            DataSchema.ColumnDataType.STRING
+        });
+    Map<String, String> hintsMap = ImmutableMap.of(
+        PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
+        PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1"
+    );
+    JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
+        getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, getJoinHints(hintsMap));
+    HashJoinOperator join =
+        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+
+    TransferableBlock result = join.nextBlock();
+    Assert.assertFalse(result.isErrorBlock());
+    Assert.assertEquals(result.getNumRows(), 1);
+    Assert.assertTrue(
+        result.getDataBlock().getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+            .contains("reach number of rows limit"));
   }
 }
 // TODO: Add more inequi join tests.

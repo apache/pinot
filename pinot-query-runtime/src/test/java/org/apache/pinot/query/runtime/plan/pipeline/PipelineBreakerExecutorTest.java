@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.plan.pipeline;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -91,7 +92,6 @@ public class PipelineBreakerExecutorTest {
               ImmutableList.of(_server), ImmutableMap.of()))
           .build()).collect(Collectors.toList())).build();
 
-
   @AfterClass
   public void tearDownClass() {
     ExecutorServiceUtils.close(_executor);
@@ -152,7 +152,8 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode mailboxReceiveNode2 =
         new MailboxReceiveNode(0, DATA_SCHEMA, 2, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
             null, null, false, false, null);
-    JoinNode joinNode = new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null);
+    JoinNode joinNode =
+        new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null, Collections.emptyList());
     joinNode.addInput(mailboxReceiveNode1);
     joinNode.addInput(mailboxReceiveNode2);
     DistributedStagePlan distributedStagePlan =
@@ -247,7 +248,8 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode =
         new MailboxReceiveNode(0, DATA_SCHEMA, 3, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
             null, null, false, false, null);
-    JoinNode joinNode = new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null);
+    JoinNode joinNode =
+        new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null, Collections.emptyList());
     joinNode.addInput(mailboxReceiveNode1);
     joinNode.addInput(incorrectlyConfiguredMailboxNode);
     DistributedStagePlan distributedStagePlan =
@@ -285,7 +287,8 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode =
         new MailboxReceiveNode(0, DATA_SCHEMA, 2, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
             null, null, false, false, null);
-    JoinNode joinNode = new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null);
+    JoinNode joinNode =
+        new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null, Collections.emptyList());
     joinNode.addInput(mailboxReceiveNode1);
     joinNode.addInput(incorrectlyConfiguredMailboxNode);
     DistributedStagePlan distributedStagePlan =

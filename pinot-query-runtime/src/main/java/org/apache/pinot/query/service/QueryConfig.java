@@ -58,4 +58,10 @@ public class QueryConfig {
    */
   public static final String KEY_OF_SERVER_RESPONSE_STATUS_ERROR = "ERROR";
   public static final String KEY_OF_SERVER_RESPONSE_STATUS_OK = "OK";
+
+  /**
+   * Configuration for join overflow.
+   */
+  public static final String KEY_OF_JOIN_OVERFLOW_MODE = "pinot.query.join.overflow.mode";
+  public static final String KEY_OF_MAX_ROWS_IN_JOIN = "pinot.query.join.max.rows";
 }
