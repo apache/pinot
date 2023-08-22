@@ -61,6 +61,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * The output is in the format of [left_row, right_row]
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
+// TODO: Support memory size based resource limit.
 public class HashJoinOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final int INITIAL_HEURISTIC_SIZE = 16;
@@ -108,7 +109,7 @@ public class HashJoinOperator extends MultiStageOperator {
   private final JoinOverFlowMode _joinOverflowMode;
 
   private int _currentRowsInHashTable = 0;
-  private ProcessingException _partialResultException = null;
+  private ProcessingException _resourceLimitExceededException = null;
 
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftTableOperator,
       MultiStageOperator rightTableOperator, DataSchema leftSchema, JoinNode node) {
@@ -217,12 +218,13 @@ public class HashJoinOperator extends MultiStageOperator {
       List<Object[]> container = rightBlock.getContainer();
       // Row based overflow check.
       if (container.size() + _currentRowsInHashTable > _maxRowsInHashTable) {
-        _partialResultException = new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
-        _partialResultException.setMessage(
+        _resourceLimitExceededException =
+            new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
+        _resourceLimitExceededException.setMessage(
             "Cannot build in memory hash table for join operator, reach number of rows limit: "
                 + _maxRowsInHashTable);
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          throw _partialResultException;
+          throw _resourceLimitExceededException;
         } else {
           // Just fill up the buffer.
           int remainingRows = _maxRowsInHashTable - _currentRowsInHashTable;
@@ -237,11 +239,12 @@ public class HashJoinOperator extends MultiStageOperator {
         if ((size & size - 1) == 0 && size < _maxRowsInHashTable && size < Integer.MAX_VALUE / 2) { // is power of 2
           hashCollection.ensureCapacity(Math.min(size << 1, _maxRowsInHashTable));
         }
-        // TODO: Support size based overflow.
         hashCollection.add(row);
       }
       _currentRowsInHashTable += container.size();
       if (_currentRowsInHashTable == _maxRowsInHashTable) {
+        // Early terminate right table operator.
+        _rightTableOperator.close();
         break;
       }
       rightBlock = _rightTableOperator.nextBlock();
@@ -306,8 +309,8 @@ public class HashJoinOperator extends MultiStageOperator {
   }
 
   private TransferableBlock setPartialResultExceptionToBlock(TransferableBlock block) {
-    if (_partialResultException != null) {
-      block.getDataBlock().addException(_partialResultException);
+    if (_resourceLimitExceededException != null) {
+      block.getDataBlock().addException(_resourceLimitExceededException);
     }
     return block;
   }

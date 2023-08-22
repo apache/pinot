@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.RelHint;
@@ -47,13 +45,6 @@ public class JoinNode extends AbstractPlanNode {
 
   public JoinNode(int planFragmentId) {
     super(planFragmentId);
-  }
-
-  @VisibleForTesting
-  public JoinNode(int planFragmentId, DataSchema dataSchema, DataSchema leftSchema, DataSchema rightSchema,
-      JoinRelType joinRelType, JoinKeys joinKeys, List<RexExpression> joinClause) {
-    this(planFragmentId, dataSchema, leftSchema, rightSchema, joinRelType, joinKeys, joinClause,
-        Collections.emptyList());
   }
 
   public JoinNode(int planFragmentId, DataSchema dataSchema, DataSchema leftSchema, DataSchema rightSchema,
