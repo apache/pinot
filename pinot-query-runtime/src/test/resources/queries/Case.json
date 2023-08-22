@@ -20,11 +20,19 @@
     },
     "queries": [
       { "sql": "SELECT intCol, CASE WHEN boolCol = true THEN 'Yes' ELSE 'No' END AS boolVal, strCol FROM {tbl1}"},
-      {
-        "ignored": true,
-        "comment": "should return NULL, but returns '' (empty string) when case is not matched",
-        "sql": "SELECT intCol, CASE WHEN boolCol = true THEN 'Yes' END AS boolVal, strCol FROM {tbl1}"
-      },
+      { "sql": "SELECT intCol, CASE WHEN boolCol = true THEN 'Yes' END AS boolVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN intCol % 2 = 0 THEN intCol END AS intVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN longCol % 2 = 0 THEN longCol END AS longVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN longCol % 2 = 0 THEN longCol ELSE longCol * 2 END AS longVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN doubleCol % 2.343 = 0 THEN doubleCol END AS doubleVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN doubleCol % 2.343 = 0 THEN doubleCol ELSE doubleCol * 2 END AS doubleVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN intCol % 2 = 0 THEN intCol ELSE intCol * 4 END AS intVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN floatCol > 4.0 THEN floatCol END AS floatVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN floatCol > 4.0 THEN floatCol ELSE floatCol * 4 END AS floatVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN strCol = 'one' THEN strCol END AS strVal FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN strCol = 'one' THEN strCol ELSE 'TWO' END AS strVal FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN doubleCol > 6.0 THEN doubleCol END AS doubleVal, strCol FROM {tbl1}"},
+      { "sql": "SELECT intCol, CASE WHEN longCol > 10 THEN longCol * 4 END AS longVal, strCol FROM {tbl1}"},
       { "sql": "SELECT intCol FROM {tbl1} WHERE CASE WHEN strCol = 'one' THEN true ELSE boolCol END"},
       { "sql": "SELECT intCol, CASE WHEN strCol = 'one' THEN 'The first one' WHEN strCol = 'two' THEN 'The second one' WHEN strCol = 'three' THEN 'The third one' WHEN strCol = 'four' THEN 'The fourth one' ELSE 'Unknown' END AS stringVal FROM {tbl1}"},
       { "sql": "SELECT intCol, CASE WHEN intCol % 2 = 0 THEN intCol ELSE intCol * 2 END AS intVal, strCol FROM {tbl1}"},
@@ -41,10 +49,7 @@
       { "sql": "SELECT intCol, CASE WHEN intCol > 10 THEN longCol * 4 ELSE intCol * 2 END AS longVal, strCol FROM {tbl1}"},
       { "sql": "SELECT intCol, CASE WHEN longCol > 10 THEN intCol * 4 ELSE longCol * 2 END AS longVal, strCol FROM {tbl1}"},
       { "sql": "SELECT intCol, CASE WHEN longCol > 10 THEN longCol * 4 ELSE longCol * 2 END AS longVal, strCol FROM {tbl1} WHERE longCol < 10 and doubleCol < 1.3 and floatCol < 10"},
-      {
-        "comment": "See https://github.com/apache/pinot/issues/10415 for more details",
-        "sql": "SELECT intCol, CASE WHEN (SELECT SUM(floatCol) FROM {tbl1}) > 16.0 THEN 'Large sum' ELSE 'Small sum' END AS aggVal, strCol FROM {tbl1}"
-      },
+      { "sql": "SELECT intCol, CASE WHEN (SELECT SUM(floatCol) FROM {tbl1}) > 16.0 THEN 'Large sum' ELSE 'Small sum' END AS aggVal, strCol FROM {tbl1}"},
       { "sql": "SELECT intCol, CASE WHEN (SELECT SUM(floatCol) FROM {tbl1} WHERE longCol < 10 and doubleCol < 1.3 and floatCol < 10 ) > 16.0 THEN 'Large sum' ELSE 'Small sum' END AS aggVal, strCol FROM {tbl1}"},
       { "sql": "with tmp as (select sum(floatCol) as float_sum from {tbl1} group by floatCol) select * from tmp where float_sum < 10" }
     ]
