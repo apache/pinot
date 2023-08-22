@@ -67,7 +67,7 @@ abstract class BaseRawStringSingleColumnDistinctExecutor implements DistinctExec
     if (_hasNull) {
       records.add(new Record(new Object[]{null}));
     }
-    assert records.size() <= _limit + 1;
+    assert (records.size() - _limit) <= 1;
     return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
   }
 
