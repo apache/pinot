@@ -99,9 +99,10 @@ public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrati
     }, 100L, timeoutMs, "Failed to load all documents");
   }
 
-  @Test
-  public void testQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT SUM(AirTime), SUM(ArrDelay) FROM mytable";
     testQuery(query);
     query = "SELECT SUM(AirTime), DaysSinceEpoch FROM mytable GROUP BY DaysSinceEpoch ORDER BY SUM(AirTime) DESC";

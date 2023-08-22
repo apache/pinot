@@ -214,7 +214,7 @@ public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterInte
         .build();
   }
 
-  @Test
+  @Test(dataProvider = "useBothQueryEngines")
   public void testDigestTimeoutMultipleQueries()
       throws Exception {
     AtomicReference<JsonNode> queryResponse1 = new AtomicReference<>();

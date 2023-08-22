@@ -34,6 +34,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -89,9 +90,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws IOException {
   }
 
-  @Override
-  protected boolean useMultiStageQueryEngine() {
-    return true;
+  @BeforeTest
+  protected void beforeTest() {
+    setUseMultiStageQueryEngine(true);
   }
 
   @Test

@@ -185,9 +185,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME.tableNameWithType(tableName)));
   }
 
-  @Test
-  public void testBrokerDebugRoutingTableSQL()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testBrokerDebugRoutingTableSQL(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String tableName = getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
@@ -198,9 +199,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertNotNull(getDebugInfo("debug/routingTable/sql?query=" + encodedSQL));
   }
 
-  @Test
-  public void testQueryTracing()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryTracing(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     JsonNode jsonNode = postQuery("SET trace = true; SELECT COUNT(*) FROM " + getTableName());
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
     Assert.assertTrue(jsonNode.get("exceptions").isEmpty());
@@ -210,9 +212,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertTrue(traceInfo.has("localhost_R"));
   }
 
-  @Test
-  public void testQueryTracingWithLiteral()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryTracingWithLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     JsonNode jsonNode =
         postQuery("SET trace = true; SELECT 1, \'test\', ArrDelay FROM " + getTableName() + " LIMIT 10");
     long countStarResult = 10;
@@ -228,9 +231,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertTrue(traceInfo.has("localhost_R"));
   }
 
-  @Test
-  public void testDropResults()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDropResults(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     final String query = String.format("SELECT * FROM %s limit 10", getTableName());
     final String resultTag = "resultTable";
 
@@ -244,31 +248,31 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertTrue(postQueryWithOptions(query, "dropResults=truee").has(resultTag));
   }
 
-  @Test
-  @Override
-  public void testHardcodedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testHardcodedQueries();
   }
 
-  @Test
-  @Override
-  public void testQueriesFromQueryFile()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testQueriesFromQueryFile();
   }
 
-  @Test
-  @Override
-  public void testGeneratedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testGeneratedQueries();
   }
 
-  @Test
-  @Override
-  public void testQueryExceptions()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testQueryExceptions();
   }
 
@@ -286,9 +290,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     super.testBrokerResponseMetadata();
   }
 
-  @Test
-  @Override
-  public void testVirtualColumnQueries() {
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testVirtualColumnQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
     super.testVirtualColumnQueries();
   }
 

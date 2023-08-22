@@ -178,9 +178,10 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
         .setQueryConfig(getQueryConfig()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
-  @Test
-  public void testTextSearchCountQuery()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTextSearchCountQuery(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Keep posting queries until all records are consumed
     long previousResult = 0;
     while (getCurrentCountStarResult() < NUM_RECORDS) {
@@ -201,9 +202,10 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
     }, 10_000L, "Failed to reach expected number of matching records");
   }
 
-  @Test
-  public void testTextSearchCountQueryNative()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTextSearchCountQueryNative(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Keep posting queries until all records are consumed
     long previousResult = 0;
     while (getCurrentCountStarResult() < NUM_RECORDS) {

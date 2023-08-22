@@ -155,18 +155,20 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     return new StarTreeIndexConfig(dimensions, null, functionColumnPairs, maxLeafRecords);
   }
 
-  @Test
-  public void testGeneratedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     for (int i = 0; i < NUM_QUERIES_TO_GENERATE; i += 2) {
       testStarQuery(_starTree1QueryGenerator.nextQuery());
       testStarQuery(_starTree2QueryGenerator.nextQuery());
     }
   }
 
-  @Test
-  public void testHardCodedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testHardCodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // This query can test the case of one predicate matches all the child nodes but star-node cannot be used because
     // the predicate is included as remaining predicate from another branch
     String starQuery = "SELECT DepTimeBlk, COUNT(*) FROM mytable "
