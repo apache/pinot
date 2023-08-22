@@ -35,6 +35,7 @@ import java.util.Properties;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
@@ -716,7 +717,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected long getCurrentCountStarResult(String tableName) {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getResultSet(0).getLong(0);
+    ResultSetGroup resultSetGroup = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName);
+    if (resultSetGroup.getResultSetCount() > 0) {
+      return resultSetGroup.getResultSet(0).getLong(0);
+    }
+    return 0;
   }
 
   /**
