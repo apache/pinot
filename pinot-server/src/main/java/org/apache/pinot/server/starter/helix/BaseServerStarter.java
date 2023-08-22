@@ -478,8 +478,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     long checkIntervalMs = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS,
         Server.DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS);
 
+    Status serviceStatus = null;
     while (System.currentTimeMillis() < endTimeMs) {
-      Status serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
+      serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
       long currentTimeMs = System.currentTimeMillis();
       if (serviceStatus == Status.GOOD) {
         LOGGER.info("Service status is GOOD after {}ms", currentTimeMs - startTimeMs);
@@ -501,6 +502,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
+    boolean exitServerOnIncompleteStartup = _serverConf.getProperty(
+        Server.CONFIG_OF_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE,
+        Server.DEFAULT_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE);
+    if (exitServerOnIncompleteStartup) {
+      String errorMessage = String.format("Service status %s has not turned GOOD within %dms: %s. Exiting server.",
+          serviceStatus, System.currentTimeMillis() - startTimeMs, ServiceStatus.getStatusDescription());
+      throw new IllegalStateException(errorMessage);
+    }
     LOGGER.warn("Service status has not turned GOOD within {}ms: {}", System.currentTimeMillis() - startTimeMs,
         ServiceStatus.getStatusDescription());
   }
@@ -591,7 +600,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK)) {
       long endTimeMs =
           startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_STARTUP_TIMEOUT_MS, Server.DEFAULT_STARTUP_TIMEOUT_MS);
-      startupServiceStatusCheck(endTimeMs);
+      try {
+        startupServiceStatusCheck(endTimeMs);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while checking service status. Stopping server.", e);
+        // If we exit here, only the _adminApiApplication and _helixManager are initialized, so we only stop them
+        _adminApiApplication.stop();
+        _helixManager.disconnect();
+        throw e;
+      }
     }
 
     preServeQueries();
@@ -651,8 +668,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
-    _serverQueriesDisabledTracker.stop();
-    _realtimeLuceneIndexRefreshState.stop();
+    if (_serverQueriesDisabledTracker != null) {
+      _serverQueriesDisabledTracker.stop();
+    }
+    if (_realtimeLuceneIndexRefreshState != null) {
+      _realtimeLuceneIndexRefreshState.stop();
+    }
     try {
       // Close PinotFS after all data managers are shutdown. Otherwise, segments which are being committed will not
       // be uploaded to the deep-store.
