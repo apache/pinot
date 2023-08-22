@@ -24,11 +24,6 @@ package org.apache.pinot.core.data.manager.realtime;
  *  - The stream idle time which resets every time we remake the stream consumer.
  *    This depends on the user configured "idle.timeout.millis" stream config.
  *  - the total idle time which only resets when we consume something.
- *
- * This is not a running timer. It only advances as long as we keep calling "markIdle".
- * This also makes it sightly inaccurate as we don't start counting idle time until
- * we've been idle for the first time. This is fine for our use case as we are using this
- * in a fast moving consumeLoop with iterations taking on the order of milliseconds to seconds.
  */
 public class IdleTimer {
 
