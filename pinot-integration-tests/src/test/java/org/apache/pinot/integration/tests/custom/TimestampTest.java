@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.TimeZone;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
@@ -30,8 +31,15 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TimestampConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.joda.time.chrono.ISOChronology;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -370,9 +378,42 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).textValue(), "2019-01-01 12:00:00");
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDateTruncQueriesWithIndex(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format("\n"
+        + "SELECT "
+        + "DATETRUNC('DAY', tsBase),\n"
+        + "DATETRUNC('DAY', tsHalfDayAfter)\n"
+        + "FROM %s\n"
+        + "LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    for (int i = 0; i < getCountStarResult(); i++) {
+      assertEquals(TimestampUtils.toMillisSinceEpoch(jsonNode.get("resultTable").get("rows").get(i).get(0).asText()),
+          TimestampUtils.toMillisSinceEpoch(jsonNode.get("resultTable").get("rows").get(i).get(1).asText()));
+    }
+  }
+
   @Override
   public String getTableName() {
     return DEFAULT_TABLE_NAME;
+  }
+
+  @Override
+  public TableConfig createOfflineTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
+        .setFieldConfigList(
+            Arrays.asList(
+                new FieldConfig(TIMESTAMP_BASE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TIMESTAMP,
+                    null, null, new TimestampConfig(
+                    Arrays.asList(TimestampIndexGranularity.SECOND, TimestampIndexGranularity.MINUTE,
+                        TimestampIndexGranularity.HOUR, TimestampIndexGranularity.DAY)), null, null, null),
+                new FieldConfig(TIMESTAMP_ONE_DAY_AFTER, FieldConfig.EncodingType.DICTIONARY,
+                    FieldConfig.IndexType.TIMESTAMP, null, null, new TimestampConfig(
+                    Arrays.asList(TimestampIndexGranularity.SECOND, TimestampIndexGranularity.MINUTE,
+                        TimestampIndexGranularity.HOUR, TimestampIndexGranularity.DAY)), null, null, null)))
+        .build();
   }
 
   @Override

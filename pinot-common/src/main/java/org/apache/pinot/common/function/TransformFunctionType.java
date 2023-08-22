@@ -123,7 +123,7 @@ public enum TransformFunctionType {
           SqlTypeFamily.CHARACTER)), "date_time_convert"),
 
   DATETRUNC("dateTrunc",
-      ReturnTypes.BIGINT_FORCE_NULLABLE,
+      ReturnTypes.BIGINT,
       OperandTypes.family(
           ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
               SqlTypeFamily.CHARACTER),

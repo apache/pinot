@@ -3,6 +3,16 @@
     "queries": [
       {
         "description": "Select *",
+        "sql": "EXPLAIN PLAN FOR SELECT col1, col3, ts, dateTrunc('month', ts), dateTrunc('DAY', ts) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$1], col3=[$3], ts=[$7], EXPR$3=[$0], EXPR$4=[DATETRUNC('DAY', $7)])",
+          "\n  LogicalTableScan(table=[[e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select *",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM d",
         "output": [
           "Execution Plan",

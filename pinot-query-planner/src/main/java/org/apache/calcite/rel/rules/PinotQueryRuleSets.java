@@ -119,6 +119,7 @@ public class PinotQueryRuleSets {
       // Expand all SEARCH nodes to simplified filter nodes. SEARCH nodes get created for queries with range
       // predicates, in-clauses, etc.
       PinotFilterExpandSearchRule.INSTANCE,
+      PinotTimestampIndexReplaceRule.INSTANCE,
       // add an extra exchange for sort
       PinotSortExchangeNodeInsertRule.INSTANCE,
       // copy exchanges down, this must be done after SortExchangeNodeInsertRule
