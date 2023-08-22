@@ -217,19 +217,6 @@ public final class RelToPlanNodeConverter {
       case INTEGER:
         return isArray ? DataSchema.ColumnDataType.INT_ARRAY : DataSchema.ColumnDataType.INT;
       case BIGINT:
-      case INTERVAL_DAY:
-      case INTERVAL_DAY_HOUR:
-      case INTERVAL_DAY_MINUTE:
-      case INTERVAL_DAY_SECOND:
-      case INTERVAL_HOUR:
-      case INTERVAL_HOUR_MINUTE:
-      case INTERVAL_HOUR_SECOND:
-      case INTERVAL_MINUTE:
-      case INTERVAL_MINUTE_SECOND:
-      case INTERVAL_SECOND:
-      case INTERVAL_MONTH:
-      case INTERVAL_YEAR:
-      case INTERVAL_YEAR_MONTH:
         return isArray ? DataSchema.ColumnDataType.LONG_ARRAY : DataSchema.ColumnDataType.LONG;
       case DECIMAL:
         return resolveDecimal(relDataType, isArray);
