@@ -1100,8 +1100,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     SegmentZKMetadata segZKMeta = mock(SegmentZKMetadata.class);
     PinotHelixResourceManager helixResourceManager = mock(PinotHelixResourceManager.class);
-    when(helixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
-        .thenReturn(Collections.singletonList(segZKMeta));
     when(helixResourceManager.getTableConfig(REALTIME_TABLE_NAME))
         .thenReturn(new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setLLC(true)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build());
@@ -1112,13 +1110,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // case 1: the segmentMetadata download uri is identical to the uri of the tmp segment. Should not delete
     when(segZKMeta.getStatus()).thenReturn(Status.DONE);
     when(segZKMeta.getDownloadUrl()).thenReturn(SCHEME + tableDir + "/" + segmentFileName);
-    deletedTmpSegCount = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME);
+    deletedTmpSegCount = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME, Collections.singletonList(segZKMeta));
     assertTrue(segmentFile.exists());
     assertEquals(0L, deletedTmpSegCount);
 
     // case 2: download url is empty, indicating the tmp segment is absolutely orphan. Delete the file
     when(segZKMeta.getDownloadUrl()).thenReturn(METADATA_URI_FOR_PEER_DOWNLOAD);
-    deletedTmpSegCount = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME);
+    deletedTmpSegCount = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME, Collections.singletonList(segZKMeta));
     assertFalse(segmentFile.exists());
     assertEquals(1L, deletedTmpSegCount);
   }

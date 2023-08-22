@@ -1469,7 +1469,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  public long deleteTmpSegments(String tableNameWithType) {
+  public long deleteTmpSegments(String tableNameWithType, List<SegmentZKMetadata> segmentsZKMetadata) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
@@ -1489,7 +1489,6 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Delete tmp segments for realtime table with low level consumer, split commit and async deletion is enabled.
-    List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(tableNameWithType);
     Set<String> deepURIs = segmentsZKMetadata.stream().parallel().filter(meta -> meta.getStatus() == Status.DONE
         && !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(meta.getDownloadUrl())).map(
         SegmentZKMetadata::getDownloadUrl).collect(

@@ -120,6 +120,14 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
 
+    // Delete tmp segments
+    try {
+      long numDeleteTmpSegments = _llcRealtimeSegmentManager.deleteTmpSegments(realtimeTableName, segmentsZKMetadata);
+      _validationMetrics.updateTmpSegmentCountGauge(realtimeTableName, numDeleteTmpSegments);
+    } catch (Exception e) {
+      LOGGER.error(String.format("Fail to delete tmp segments for table %s, %s", realtimeTableName, e));
+    }
+
     // Update the total document count gauge
     // Count HLC segments if high level consumer is configured
     boolean countHLCSegments = streamConfig.hasHighLevelConsumerType();
@@ -130,14 +138,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     if (streamConfig.hasLowLevelConsumerType()
         && _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
-    }
-
-    // Delete tmp segments
-    if (streamConfig.hasLowLevelConsumerType()
-        && _llcRealtimeSegmentManager.getIsSplitCommitEnabled()
-        && _llcRealtimeSegmentManager.isTmpSegmentAsyncDeletionEnabled()) {
-      long numDeleteTmpSegments = _llcRealtimeSegmentManager.deleteTmpSegments(realtimeTableName);
-      _validationMetrics.updateTmpSegmentCountGauge(realtimeTableName, numDeleteTmpSegments);
     }
   }
 
