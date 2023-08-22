@@ -44,7 +44,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
-import org.apache.pinot.segment.local.recordtransformer.JsonLogTransformer;
+import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -68,7 +68,7 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.JsonLogTransformerConfig;
+import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -455,9 +455,10 @@ public final class TableConfigUtils {
         }
       }
 
-      JsonLogTransformerConfig jsonLogTransformerConfig = ingestionConfig.getJsonLogTransformerConfig();
-      if (null != jsonLogTransformerConfig && null != schema) {
-        JsonLogTransformer.validateSchema(schema, jsonLogTransformerConfig);
+      SchemaConformingTransformerConfig schemaConformingTransformerConfig =
+          ingestionConfig.getSchemaConformingTransformerConfig();
+      if (null != schemaConformingTransformerConfig && null != schema) {
+        SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
       }
     }
   }

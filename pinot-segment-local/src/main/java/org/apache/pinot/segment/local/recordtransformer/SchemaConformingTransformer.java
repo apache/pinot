@@ -29,7 +29,7 @@ import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.ingestion.JsonLogTransformerConfig;
+import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -41,13 +41,12 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This transformer transforms a record representing a JSON log event such that it can be stored in a table. JSON log
- * events typically have a user-defined schema, so it is impractical to store each field in its own table column. At the
- * same time, most (if not all) fields are important to the user, so we should not drop any field unnecessarily. Thus,
- * this transformer primarily takes record-fields that don't exist in the schema and stores them in a type of catchall
- * field.
+ * This transformer transforms records with varying keys such that they can be stored in a table with a fixed schema.
+ * Since these records have varying keys, it is impractical to store each field in its own table column. At the same
+ * time, most (if not all) fields may be important to the user, so we should not drop any field unnecessarily. So this
+ * transformer primarily takes record-fields that don't exist in the schema and stores them in a type of catchall field.
  * <p>
- * For example, consider this log event:
+ * For example, consider this record:
  * <pre>
  * {
  *   "timestamp": 1687786535928,
@@ -120,13 +119,13 @@ import org.slf4j.LoggerFactory;
  * <p>
  * The "unindexableExtras" field allows the transformer to separate fields which don't need indexing (because they are
  * only retrieved, not searched) from those that do. The transformer also has other configuration options specified in
- * {@link JsonLogTransformerConfig}.
+ * {@link SchemaConformingTransformerConfig}.
  */
-public class JsonLogTransformer implements RecordTransformer {
-  private static final Logger _logger = LoggerFactory.getLogger(JsonLogTransformer.class);
+public class SchemaConformingTransformer implements RecordTransformer {
+  private static final Logger _logger = LoggerFactory.getLogger(SchemaConformingTransformer.class);
 
   private final boolean _continueOnError;
-  private final JsonLogTransformerConfig _transformerConfig;
+  private final SchemaConformingTransformerConfig _transformerConfig;
   private final DataType _indexableExtrasFieldType;
   private final DataType _unindexableExtrasFieldType;
 
@@ -135,7 +134,8 @@ public class JsonLogTransformer implements RecordTransformer {
   /**
    * Validates the schema against the given transformer's configuration.
    */
-  public static void validateSchema(@Nonnull Schema schema, @Nonnull JsonLogTransformerConfig transformerConfig) {
+  public static void validateSchema(@Nonnull Schema schema,
+      @Nonnull SchemaConformingTransformerConfig transformerConfig) {
     validateSchemaFieldNames(schema.getPhysicalColumnNames(), transformerConfig);
 
     String indexableExtrasFieldName = transformerConfig.getIndexableExtrasField();
@@ -151,7 +151,8 @@ public class JsonLogTransformer implements RecordTransformer {
   /**
    * Validates that none of the schema fields have names that conflict with the transformer's configuration.
    */
-  private static void validateSchemaFieldNames(Set<String> schemaFields, JsonLogTransformerConfig transformerConfig) {
+  private static void validateSchemaFieldNames(Set<String> schemaFields,
+      SchemaConformingTransformerConfig transformerConfig) {
     // Validate that none of the columns in the schema end with unindexableFieldSuffix
     String unindexableFieldSuffix = transformerConfig.getUnindexableFieldSuffix();
     if (null != unindexableFieldSuffix) {
@@ -183,8 +184,8 @@ public class JsonLogTransformer implements RecordTransformer {
   }
 
   /**
-   * Validates the schema with a JsonLogTransformerConfig instance and creates a tree representing the fields in the
-   * schema to be used when transforming input records. For instance, the field "a.b" in the schema would be
+   * Validates the schema with a SchemaConformingTransformerConfig instance and creates a tree representing the fields
+   * in the schema to be used when transforming input records. For instance, the field "a.b" in the schema would be
    * un-flattened into "{a: b: null}" in the tree, allowing us to more easily process records containing the latter.
    * @throws IllegalArgumentException if schema validation fails in one of two ways:
    * <ul>
@@ -278,9 +279,9 @@ public class JsonLogTransformer implements RecordTransformer {
     }
   }
 
-  public JsonLogTransformer(TableConfig tableConfig, Schema schema) {
+  public SchemaConformingTransformer(TableConfig tableConfig, Schema schema) {
     if (null == tableConfig.getIngestionConfig() || null == tableConfig.getIngestionConfig()
-        .getJsonLogTransformerConfig()) {
+        .getSchemaConformingTransformerConfig()) {
       _continueOnError = false;
       _transformerConfig = null;
       _indexableExtrasFieldType = null;
@@ -289,7 +290,7 @@ public class JsonLogTransformer implements RecordTransformer {
     }
 
     _continueOnError = tableConfig.getIngestionConfig().isContinueOnError();
-    _transformerConfig = tableConfig.getIngestionConfig().getJsonLogTransformerConfig();
+    _transformerConfig = tableConfig.getIngestionConfig().getSchemaConformingTransformerConfig();
     String indexableExtrasFieldName = _transformerConfig.getIndexableExtrasField();
     _indexableExtrasFieldType = getAndValidateExtrasFieldType(schema, indexableExtrasFieldName);
     String unindexableExtrasFieldName = _transformerConfig.getUnindexableExtrasField();

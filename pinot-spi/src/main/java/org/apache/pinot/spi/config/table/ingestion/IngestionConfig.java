@@ -45,8 +45,8 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Config related to handling complex type")
   private ComplexTypeConfig _complexTypeConfig;
 
-  @JsonPropertyDescription("Config related to handling JSON log transformations")
-  private JsonLogTransformerConfig _jsonLogTransformerConfig;
+  @JsonPropertyDescription("Config related to the SchemaConformingTransformer")
+  private SchemaConformingTransformerConfig _schemaConformingTransformerConfig;
 
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
   private List<AggregationConfig> _aggregationConfigs;
@@ -64,14 +64,14 @@ public class IngestionConfig extends BaseJsonConfig {
   public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
       @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
       @Nullable List<TransformConfig> transformConfigs, @Nullable ComplexTypeConfig complexTypeConfig,
-      @Nullable JsonLogTransformerConfig jsonLogTransformerConfig,
+      @Nullable SchemaConformingTransformerConfig schemaConformingTransformerConfig,
       @Nullable List<AggregationConfig> aggregationConfigs) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;
     _transformConfigs = transformConfigs;
     _complexTypeConfig = complexTypeConfig;
-    _jsonLogTransformerConfig = jsonLogTransformerConfig;
+    _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
     _aggregationConfigs = aggregationConfigs;
   }
 
@@ -104,8 +104,8 @@ public class IngestionConfig extends BaseJsonConfig {
   }
 
   @Nullable
-  public JsonLogTransformerConfig getJsonLogTransformerConfig() {
-    return _jsonLogTransformerConfig;
+  public SchemaConformingTransformerConfig getSchemaConformingTransformerConfig() {
+    return _schemaConformingTransformerConfig;
   }
 
   @Nullable
@@ -145,8 +145,9 @@ public class IngestionConfig extends BaseJsonConfig {
     _complexTypeConfig = complexTypeConfig;
   }
 
-  public void setJsonLogTransformerConfig(JsonLogTransformerConfig jsonLogTransformerConfig) {
-    _jsonLogTransformerConfig = jsonLogTransformerConfig;
+  public void setSchemaConformingTransformerConfig(
+      SchemaConformingTransformerConfig schemaConformingTransformerConfig) {
+    _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
   }
 
   public void setAggregationConfigs(List<AggregationConfig> aggregationConfigs) {

@@ -29,7 +29,7 @@ import javax.annotation.Nonnull;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.JsonLogTransformerConfig;
+import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -40,7 +40,7 @@ import org.testng.annotations.Test;
 import static org.testng.AssertJUnit.fail;
 
 
-public class JsonLogTransformerTest {
+public class SchemaConformingTransformerTest {
   static final private String INDEXABLE_EXTRAS_FIELD_NAME = "indexableExtras";
   static final private String UNINDEXABLE_EXTRAS_FIELD_NAME = "unindexableExtras";
   static final private String UNINDEXABLE_FIELD_SUFFIX = "_noIndex";
@@ -50,10 +50,10 @@ public class JsonLogTransformerTest {
   private TableConfig createDefaultTableConfig(String indexableExtrasField, String unindexableExtrasField,
       String unindexableFieldSuffix, Set<String> fieldPathsToDrop) {
     IngestionConfig ingestionConfig = new IngestionConfig();
-    JsonLogTransformerConfig jsonLogTransformerConfig =
-        new JsonLogTransformerConfig(indexableExtrasField, unindexableExtrasField, unindexableFieldSuffix,
+    SchemaConformingTransformerConfig schemaConformingTransformerConfig =
+        new SchemaConformingTransformerConfig(indexableExtrasField, unindexableExtrasField, unindexableFieldSuffix,
             fieldPathsToDrop);
-    ingestionConfig.setJsonLogTransformerConfig(jsonLogTransformerConfig);
+    ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
         .build();
   }
@@ -550,16 +550,16 @@ public class JsonLogTransformerTest {
     Assert.assertThrows(IllegalArgumentException.class, () -> {
       Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("a.b", DataType.STRING)
           .addSingleValueDimension("a.b.c", DataType.INT).build();
-      JsonLogTransformer.validateSchema(schema,
-          new JsonLogTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, null, null));
+      SchemaConformingTransformer.validateSchema(schema,
+          new SchemaConformingTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, null, null));
     });
 
     // This is a repeat of the previous test but with fields reversed just in case they are processed in order
     Assert.assertThrows(IllegalArgumentException.class, () -> {
       Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("a.b.c", DataType.INT)
           .addSingleValueDimension("a.b", DataType.STRING).build();
-      JsonLogTransformer.validateSchema(schema,
-          new JsonLogTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, null, null));
+      SchemaConformingTransformer.validateSchema(schema,
+          new SchemaConformingTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, null, null));
     });
   }
 
@@ -570,8 +570,8 @@ public class JsonLogTransformerTest {
       Schema schema =
           createDefaultSchemaBuilder().addSingleValueDimension("a" + UNINDEXABLE_FIELD_SUFFIX, DataType.STRING)
               .addSingleValueDimension("a.b" + UNINDEXABLE_FIELD_SUFFIX, DataType.INT).build();
-      JsonLogTransformer.validateSchema(schema,
-          new JsonLogTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, UNINDEXABLE_FIELD_SUFFIX, null));
+      SchemaConformingTransformer.validateSchema(schema,
+          new SchemaConformingTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, UNINDEXABLE_FIELD_SUFFIX, null));
     });
 
     // Ensure schema fields which are in fieldPathsToDrop are caught as invalid
@@ -579,8 +579,8 @@ public class JsonLogTransformerTest {
       Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("a", DataType.STRING)
           .addSingleValueDimension("b.c", DataType.INT).build();
       Set<String> fieldPathsToDrop = new HashSet<>(Arrays.asList("a", "b.c"));
-      JsonLogTransformer.validateSchema(schema,
-          new JsonLogTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, null, fieldPathsToDrop));
+      SchemaConformingTransformer.validateSchema(schema,
+          new SchemaConformingTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, null, null, fieldPathsToDrop));
     });
   }
 
@@ -666,8 +666,8 @@ public class JsonLogTransformerTest {
   private GenericRow transformRow(TableConfig tableConfig, Schema schema, String inputRecordJSONString) {
     Map<String, Object> inputRecordMap = jsonStringToMap(inputRecordJSONString);
     GenericRow inputRecord = createRowFromMap(inputRecordMap);
-    JsonLogTransformer jsonLogTransformer = new JsonLogTransformer(tableConfig, schema);
-    return jsonLogTransformer.transform(inputRecord);
+    SchemaConformingTransformer schemaConformingTransformer = new SchemaConformingTransformer(tableConfig, schema);
+    return schemaConformingTransformer.transform(inputRecord);
   }
 
   /**
