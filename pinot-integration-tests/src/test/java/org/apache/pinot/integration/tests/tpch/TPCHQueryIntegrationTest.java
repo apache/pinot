@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.tpch;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,15 +27,14 @@ import java.nio.charset.Charset;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
+import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.utils.JarUtils;
@@ -47,36 +46,19 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 // TODO: extract common functions from TPCHQueryIntegrationTest and SSBQueryIntegrationTest
-
 /**
  * Integration test that tests Pinot using TPCH data.
- * Data is loaded into Pinot and H2 from /resources/examples/batch/tpch. The dataset is very small, please follow
- * https://dev.mysql.com/doc/heatwave/en/mys-hw-tpch-sample-data.html to generate a larger dataset for better testing.
- * The generated data is in tbl format, please convert them into avro format first.
+ * Data is loaded into Pinot and H2 from /resources/examples/batch/tpch. The dataset size is very small, please follow
+ * REAME.md to generate a larger dataset for better testing.
  * Queries are executed against Pinot and H2, and the results are compared.
- *
  */
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
   private static final int NUM_TPCH_QUERIES = 24;
-  private static final Set<Integer> EXEMPT_QUERIES;
 
-  static {
-    TPCH_QUICKSTART_TABLE_RESOURCES = new HashMap<>();
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("orders", "examples/batch/tpch/orders");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("lineitem", "examples/batch/tpch/lineitem");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("region", "examples/batch/tpch/region");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("partsupp", "examples/batch/tpch/partsupp");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("customer", "examples/batch/tpch/customer");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("nation", "examples/batch/tpch/nation");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("part", "examples/batch/tpch/part");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("supplier", "examples/batch/tpch/supplier");
-    EXEMPT_QUERIES = new HashSet<>();
-    // Pinot query 6 fails due to mismatch results.
-    // Pinot queries 15, 16, 17 fail due to lack of support for views.
-    // Pinot queries 23, 24 fail due to java heap space problem or timeout.
-    EXEMPT_QUERIES.addAll(ImmutableList.of(6, 15, 16, 17, 23, 24));
-  }
+  // Pinot query 6 fails due to mismatch results.
+  // Pinot queries 15, 16, 17 fail due to lack of support for views.
+  // Pinot queries 23, 24 fail due to java heap space problem or timeout.
+  private static final Set<Integer> EXEMPT_QUERIES = ImmutableSet.of(6, 15, 16, 17, 23, 24);
 
   @BeforeClass
   public void setUp()
@@ -90,12 +72,12 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     startServer();
 
     setUpH2Connection();
-    for (Map.Entry<String, String> tableResource : TPCH_QUICKSTART_TABLE_RESOURCES.entrySet()) {
-      File tableSegmentDir = new File(_segmentDir, tableResource.getKey());
-      File tarDir = new File(_tarDir, tableResource.getKey());
-      String tableName = tableResource.getKey();
-      URL resourceUrl = getClass().getClassLoader().getResource(tableResource.getValue());
-      Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResource.getValue());
+    for (String tableName : Constants.TPCH_TABLE_NAMES) {
+      File tableSegmentDir = new File(_segmentDir, tableName);
+      File tarDir = new File(_tarDir, tableName);
+      String tableResourceFolder = Constants.getTableResourceFolder(tableName);
+      URL resourceUrl = getClass().getClassLoader().getResource(tableResourceFolder);
+      Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResourceFolder);
       File resourceFile;
       if ("jar".equals(resourceUrl.getProtocol())) {
         String[] splits = resourceUrl.getFile().split("!");
@@ -106,7 +88,8 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       } else {
         resourceFile = new File(resourceUrl.getFile());
       }
-      File dataFile = new File(resourceFile.getAbsolutePath(), "rawdata" + File.separator + tableName + ".avro");
+      File dataFile =
+          new File(getClass().getClassLoader().getResource(Constants.getTableAvroFilePath(tableName)).getFile());
       Assert.assertTrue(dataFile.exists(), "Unable to load resource file from URL: " + dataFile);
       File schemaFile = new File(resourceFile.getPath(), tableName + "_schema.json");
       File tableFile = new File(resourceFile.getPath(), tableName + "_offline_table_config.json");
@@ -145,6 +128,7 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     h2statement.execute(h2Query);
     ResultSet h2ResultSet = h2statement.getResultSet();
+    System.out.println(h2ResultSet);
 
     // compare results.
     Assert.assertEquals(numColumns, h2ResultSet.getMetaData().getColumnCount());
@@ -187,7 +171,7 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   public void tearDown()
       throws Exception {
     // unload all TPCH tables.
-    for (String table : TPCH_QUICKSTART_TABLE_RESOURCES.keySet()) {
+    for (String table : Constants.TPCH_TABLE_NAMES) {
       dropOfflineTable(table);
     }
 
