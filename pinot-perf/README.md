@@ -19,7 +19,7 @@
 
 -->
 
-Pint Perf Package
+Pinot Perf Package
 ===
 Pinot perf package contains a set of performance benchmark for Pinot components.
 
