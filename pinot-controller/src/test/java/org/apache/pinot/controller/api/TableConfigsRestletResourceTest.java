@@ -73,20 +73,20 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
   }
 
   private TableConfig createOfflineTableConfig(String tableName) {
-    return getBaseTableConfigBuilder(tableName, TableType.OFFLINE).setBrokerTenant("DefaultTenant").build();
+    return getBaseTableConfigBuilder(tableName, TableType.OFFLINE).build();
   }
 
   private TableConfig createRealtimeTableConfig(String tableName) {
-    return getBaseTableConfigBuilder(tableName, TableType.REALTIME).setBrokerTenant("DefaultTenant").build();
+    return getBaseTableConfigBuilder(tableName, TableType.REALTIME).build();
   }
 
   private TableConfig createOfflineTunerTableConfig(String tableName) {
-    return getBaseTableConfigBuilder(tableName, TableType.OFFLINE).setBrokerTenant("DefaultTenant").setTunerConfigList(
+    return getBaseTableConfigBuilder(tableName, TableType.OFFLINE).setTunerConfigList(
         Lists.newArrayList(new TunerConfig("realtimeAutoIndexTuner", null))).build();
   }
 
   private TableConfig createRealtimeTunerTableConfig(String tableName) {
-    return getBaseTableConfigBuilder(tableName, TableType.REALTIME).setBrokerTenant("DefaultTenant").setTunerConfigList(
+    return getBaseTableConfigBuilder(tableName, TableType.REALTIME).setTunerConfigList(
         Lists.newArrayList(new TunerConfig("realtimeAutoIndexTuner", null))).build();
   }
 
