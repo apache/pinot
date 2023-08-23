@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OpChainId;
@@ -42,7 +41,6 @@ public class OpChainExecutionContext {
   private final OpChainStats _stats;
   private final boolean _traceEnabled;
 
-  @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
       VirtualServerAddress server, long deadlineMs, StageMetadata stageMetadata,
       PipelineBreakerResult pipelineBreakerResult, boolean traceEnabled) {
@@ -55,8 +53,7 @@ public class OpChainExecutionContext {
     _id = new OpChainId(requestId, server.workerId(), stageId);
     _stats = new OpChainStats(_id.toString());
     if (pipelineBreakerResult != null && pipelineBreakerResult.getOpChainStats() != null) {
-      _stats.getOperatorStatsMap().putAll(
-          pipelineBreakerResult.getOpChainStats().getOperatorStatsMap());
+      _stats.getOperatorStatsMap().putAll(pipelineBreakerResult.getOpChainStats().getOperatorStatsMap());
     }
     _traceEnabled = traceEnabled;
   }
