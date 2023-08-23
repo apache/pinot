@@ -62,7 +62,6 @@ import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
@@ -93,7 +92,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     super(config, brokerIdFromConfig, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         brokerMetrics);
     LOGGER.info("Using Multi-stage BrokerRequestHandler.");
-    String reducerHostname = config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME);
+    String reducerHostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (reducerHostname == null) {
       // use broker ID as host name, but remove the
       String brokerId = brokerIdFromConfig;
@@ -104,7 +103,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
     _reducerHostname = reducerHostname;
     // This config has to be set to a valid port number.
-    _reducerPort = Integer.parseInt(config.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT));
+    _reducerPort = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
         new WorkerManager(_reducerHostname, _reducerPort, routingManager), _tableCache);

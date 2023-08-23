@@ -21,7 +21,6 @@ package org.apache.pinot.server.conf;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -91,11 +90,13 @@ public class ServerConf {
   }
 
   public int getMultiStageServicePort() {
-    return _serverConf.getProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT);
+    return _serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
   }
 
   public int getMultiStageMailboxPort() {
-    return _serverConf.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT);
+    return _serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
   }
 
   public String getInstanceDataManagerClassName() {

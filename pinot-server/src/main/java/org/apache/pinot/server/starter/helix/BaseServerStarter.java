@@ -68,7 +68,6 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -172,11 +171,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
       // NOTE: Need to add the instance id to the config because it is required in HelixInstanceDataManagerConfig
       _serverConf.addProperty(Server.CONFIG_OF_INSTANCE_ID, _instanceId);
     }
-    if (_serverConf.getProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT) == 0) {
-      _serverConf.setProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, NetUtils.findOpenPort());
+    if (_serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT) == 0) {
+      _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, NetUtils.findOpenPort());
     }
-    if (_serverConf.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT) == 0) {
-      _serverConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, NetUtils.findOpenPort());
+    if (_serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT) == 0) {
+      _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, NetUtils.findOpenPort());
     }
 
     _instanceConfigScope =
@@ -196,7 +197,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Enable/disable thread memory allocation tracking through instance config
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
-        Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
+            Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
 
     // Set data table version send to broker.
     int dataTableVersion =

@@ -987,6 +987,14 @@ public class CommonConstants {
         // For non-streaming response
         public static final String NON_STREAMING = "nonStreaming";
       }
+
+      /**
+       * Configuration keys for {@link org.apache.pinot.common.proto.Worker.QueryResponse} extra metadata.
+       */
+      public static class ServerResponseStatus {
+        public static final String STATUS_ERROR = "ERROR";
+        public static final String STATUS_OK = "OK";
+      }
     }
 
     public static class OptimizationConstants {
@@ -1014,5 +1022,38 @@ public class CommonConstants {
     public static final String CHILD_AGGREGATION_NAME_PREFIX = "child";
     public static final String CHILD_AGGREGATION_SEPERATOR = "@";
     public static final String CHILD_KEY_SEPERATOR = "_";
+  }
+
+  /**
+   * Configuration for setting up multi-stage query runner, this service could be running on either broker or server.
+   */
+  public static class MultiStageQueryRunner {
+    /**
+     * Configuration for mailbox data block size
+     */
+    public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
+    public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
+
+    /**
+     * Configuration for server port, port that opens and accepts
+     * {@link org.apache.pinot.query.runtime.plan.DistributedStagePlan} and start executing query stages.
+     */
+    public static final String KEY_OF_QUERY_SERVER_PORT = "pinot.query.server.port";
+    public static final int DEFAULT_QUERY_SERVER_PORT = 0;
+
+    /**
+     * Configuration for mailbox hostname and port, this hostname and port opens streaming channel to receive
+     * {@link org.apache.pinot.common.datablock.DataBlock}.
+     */
+    public static final String KEY_OF_QUERY_RUNNER_HOSTNAME = "pinot.query.runner.hostname";
+    public static final String DEFAULT_QUERY_RUNNER_HOSTNAME = "localhost";
+    public static final String KEY_OF_QUERY_RUNNER_PORT = "pinot.query.runner.port";
+    public static final int DEFAULT_QUERY_RUNNER_PORT = 0;
+
+    /**
+     * Configuration for join overflow.
+     */
+    public static final String KEY_OF_JOIN_OVERFLOW_MODE = "pinot.query.join.overflow.mode";
+    public static final String KEY_OF_MAX_ROWS_IN_JOIN = "pinot.query.join.max.rows";
   }
 }
