@@ -19,14 +19,15 @@
 package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -44,6 +45,8 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -188,12 +191,18 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    */
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
   public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
-    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
-    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
-    Map<String, String> requestMetadataMap =
-        ImmutableMap.of(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId),
-            CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
-            String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
+    QueryEnvironment.QueryPlannerResult queryPlannerResult =
+        _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
+    DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
+    Map<String, String> requestMetadataMap = new HashMap<>();
+    requestMetadataMap.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId));
+    Long timeoutMs = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
+    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
+        String.valueOf(timeoutMs != null ? timeoutMs : CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
     int reducerStageId = -1;
     for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
       if (dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
@@ -210,17 +219,16 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
           Long.parseLong(requestMetadataMap.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS)),
           _mailboxService,
           _reducerScheduler, null, false);
-    } catch (RuntimeException rte) {
-      Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
-      // TODO: The actual message is (usually) something like:
-      //  Received error query execution result block: {200=QueryExecutionError:
-      //   java.lang.IllegalArgumentException: Illegal Json Path: $['path'] does not match document
-      //     at org.apache.pinot.core.common.evaluators.DefaultJsonPathEvaluator.throwPathNotFoundException(...)
-      //     at org.apache.pinot.core.common.evaluators.DefaultJsonPathEvaluator.processValue(...)
-      //     at org.apache.pinot.core.common.evaluators.DefaultJsonPathEvaluator.evaluateBlock(...)
-      //     at org.apache.pinot.core.common.DataFetcher$ColumnValueReader.readIntValues(DataFetcher.java:489)}
-      Assert.assertTrue(rte.getMessage().contains(exceptionMsg), "Exception should contain: " + exceptionMsg
-          + "! but found: " + rte.getMessage());
+      Assert.fail("Should have thrown exception!");
+    } catch (RuntimeException e) {
+      // NOTE: The actual message is (usually) something like:
+      //   Received error query execution result block: {200=QueryExecutionError:
+      //   Query execution error on: Server_localhost_12345
+      //     java.lang.IllegalArgumentException: Illegal Json Path: $['path'] does not match document
+      String exceptionMessage = e.getMessage();
+      Assert.assertTrue(exceptionMessage.startsWith("Received error query execution result block: "));
+      Assert.assertTrue(exceptionMessage.contains(exceptionMsg),
+          "Exception should contain: " + exceptionMsg + ", but found: " + exceptionMessage);
     }
   }
 
@@ -288,7 +296,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // Timeout exception should occur with this option:
         new Object[]{
             "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
-            "timeout"
+            "Timeout"
         },
 
         // Function with incorrect argument signature should throw runtime exception when casting string to numeric

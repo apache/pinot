@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -45,10 +45,10 @@ import org.slf4j.LoggerFactory;
  * Utility class to run pipeline breaker execution and collects the results.
  */
 public class PipelineBreakerExecutor {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerExecutor.class);
   private PipelineBreakerExecutor() {
-    // do not instantiate.
   }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerExecutor.class);
 
   /**
    * Execute a pipeline breaker and collect the results (synchronously). Currently, pipeline breaker executor can only
@@ -64,10 +64,10 @@ public class PipelineBreakerExecutor {
    *   - If exception occurs, exception block will be wrapped in {@link TransferableBlock} and assigned to each PB node.
    *   - Normal stats will be attached to each PB node and downstream execution should return with stats attached.
    */
-  public static PipelineBreakerResult executePipelineBreakers(
-      OpChainSchedulerService scheduler,
-      MailboxService mailboxService, DistributedStagePlan distributedStagePlan, long deadlineMs,
-      long requestId, boolean isTraceEnabled) {
+  @Nullable
+  public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
+      MailboxService mailboxService, DistributedStagePlan distributedStagePlan, long deadlineMs, long requestId,
+      boolean isTraceEnabled) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(distributedStagePlan.getStageRoot(), pipelineBreakerContext);
     if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
@@ -76,31 +76,25 @@ public class PipelineBreakerExecutor {
         // TODO: This PlanRequestContext needs to indicate it is a pre-stage opChain and only listens to pre-stage
         //     OpChain receive-mail callbacks.
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
-        OpChainExecutionContext opChainContext = new OpChainExecutionContext(mailboxService, requestId,
-            stageRoot.getPlanFragmentId(), distributedStagePlan.getServer(), deadlineMs,
-            distributedStagePlan.getStageMetadata(), null, isTraceEnabled);
+        OpChainExecutionContext opChainContext =
+            new OpChainExecutionContext(mailboxService, requestId, stageRoot.getPlanFragmentId(),
+                distributedStagePlan.getServer(), deadlineMs, distributedStagePlan.getStageMetadata(), null,
+                isTraceEnabled);
         PhysicalPlanContext physicalPlanContext = new PhysicalPlanContext(opChainContext, null);
         return PipelineBreakerExecutor.execute(scheduler, pipelineBreakerContext, physicalPlanContext);
       } catch (Exception e) {
-        LOGGER.error("Unable to create pipeline breaker results for Req: " + requestId + ", Stage: "
-            + distributedStagePlan.getStageId(), e);
-        // Create all error blocks for all pipeline breaker nodes.
-        TransferableBlock errorBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
-        Map<Integer, List<TransferableBlock>> resultMap = new HashMap<>();
-        for (int key : pipelineBreakerContext.getNodeIdMap().values()) {
-          if (pipelineBreakerContext.getPipelineBreakerMap().containsKey(key)) {
-            resultMap.put(key, Collections.singletonList(errorBlock));
-          }
-        }
-        return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), resultMap, null);
+        LOGGER.error("Caught exception executing pipeline breaker for request: {}, stage: {}", requestId,
+            distributedStagePlan.getStageId(), e);
+        return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), Collections.emptyMap(),
+            TransferableBlockUtils.getErrorTransferableBlock(e), null);
       }
     } else {
       return null;
     }
   }
 
-  private static PipelineBreakerResult execute(OpChainSchedulerService scheduler,
-      PipelineBreakerContext context, PhysicalPlanContext physicalPlanContext)
+  private static PipelineBreakerResult execute(OpChainSchedulerService scheduler, PipelineBreakerContext context,
+      PhysicalPlanContext physicalPlanContext)
       throws Exception {
     Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap = new HashMap<>();
     for (Map.Entry<Integer, PlanNode> e : context.getPipelineBreakerMap().entrySet()) {
@@ -119,18 +113,20 @@ public class PipelineBreakerExecutor {
       PipelineBreakerContext context, Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap,
       PhysicalPlanContext physicalPlanContext)
       throws Exception {
-    PipelineBreakerOperator pipelineBreakerOperator = new PipelineBreakerOperator(
-        physicalPlanContext.getOpChainExecutionContext(), pipelineWorkerMap);
+    PipelineBreakerOperator pipelineBreakerOperator =
+        new PipelineBreakerOperator(physicalPlanContext.getOpChainExecutionContext(), pipelineWorkerMap);
     CountDownLatch latch = new CountDownLatch(1);
-    OpChain pipelineBreakerOpChain = new OpChain(physicalPlanContext.getOpChainExecutionContext(),
-        pipelineBreakerOperator, physicalPlanContext.getReceivingMailboxIds(), (id) -> latch.countDown());
+    OpChain pipelineBreakerOpChain =
+        new OpChain(physicalPlanContext.getOpChainExecutionContext(), pipelineBreakerOperator,
+            physicalPlanContext.getReceivingMailboxIds(), (id) -> latch.countDown());
     scheduler.register(pipelineBreakerOpChain);
     long timeoutMs = physicalPlanContext.getDeadlineMs() - System.currentTimeMillis();
     if (latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
       return new PipelineBreakerResult(context.getNodeIdMap(), pipelineBreakerOperator.getResultMap(),
-          pipelineBreakerOpChain.getStats());
+          pipelineBreakerOperator.getErrorBlock(), pipelineBreakerOpChain.getStats());
     } else {
-      throw new IOException("Exception occur when awaiting breaker results!");
+      throw new TimeoutException(
+          String.format("Timed out waiting for pipeline breaker results after: %dms", timeoutMs));
     }
   }
 }

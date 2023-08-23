@@ -19,6 +19,7 @@
 package org.apache.pinot.query.service.dispatch;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import io.grpc.Deadline;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -211,8 +212,11 @@ public class QueryDispatcher {
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(scheduler, mailboxService, reducerStagePlan,
             System.currentTimeMillis() + timeoutMs, requestId, traceEnabled);
-    if (pipelineBreakerResult == null) {
-      throw new RuntimeException("Broker reducer error during query execution!");
+    Preconditions.checkState(pipelineBreakerResult != null, "Pipeline breaker result should not be null");
+    if (pipelineBreakerResult.getErrorBlock() != null) {
+      throw new RuntimeException(
+          "Received error query execution result block: " + pipelineBreakerResult.getErrorBlock().getDataBlock()
+              .getExceptions());
     }
     collectStats(dispatchableSubPlan, pipelineBreakerResult.getOpChainStats(), statsAggregatorMap);
     List<TransferableBlock> resultDataBlocks = pipelineBreakerResult.getResultMap().get(0);
@@ -245,10 +249,6 @@ public class QueryDispatcher {
     List<Object[]> resultRows = new ArrayList<>();
     DataSchema resultSchema = toResultSchema(sourceSchema, fields);
     for (TransferableBlock transferableBlock : queryResult) {
-      if (transferableBlock.isErrorBlock()) {
-        throw new RuntimeException(
-            "Received error query execution result block: " + transferableBlock.getDataBlock().getExceptions());
-      }
       DataBlock dataBlock = transferableBlock.getDataBlock();
       int numColumns = resultSchema.getColumnNames().length;
       int numRows = dataBlock.getNumberOfRows();

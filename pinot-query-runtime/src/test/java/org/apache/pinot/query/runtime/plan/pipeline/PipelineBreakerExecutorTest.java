@@ -136,6 +136,7 @@ public class PipelineBreakerExecutorTest {
     // then
     // should have single PB result, receive 2 data blocks, EOS block shouldn't be included
     Assert.assertNotNull(pipelineBreakerResult);
+    Assert.assertNull(pipelineBreakerResult.getErrorBlock());
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 1);
     Assert.assertEquals(pipelineBreakerResult.getResultMap().values().iterator().next().size(), 2);
 
@@ -176,6 +177,7 @@ public class PipelineBreakerExecutorTest {
     // then
     // should have two PB result, receive 2 data blocks, one each, EOS block shouldn't be included
     Assert.assertNotNull(pipelineBreakerResult);
+    Assert.assertNull(pipelineBreakerResult.getErrorBlock());
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 2);
     Iterator<List<TransferableBlock>> it = pipelineBreakerResult.getResultMap().values().iterator();
     Assert.assertEquals(it.next().size(), 1);
@@ -201,8 +203,9 @@ public class PipelineBreakerExecutorTest {
             System.currentTimeMillis() + 10_000L, 0, false);
 
     // then
-    // should contain only failure error blocks
+    // should return empty block list
     Assert.assertNotNull(pipelineBreakerResult);
+    Assert.assertNull(pipelineBreakerResult.getErrorBlock());
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 1);
     List<TransferableBlock> resultBlocks = pipelineBreakerResult.getResultMap().values().iterator().next();
     Assert.assertEquals(resultBlocks.size(), 0);
@@ -233,11 +236,9 @@ public class PipelineBreakerExecutorTest {
     // then
     // should contain only failure error blocks
     Assert.assertNotNull(pipelineBreakerResult);
-    Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 1);
-    List<TransferableBlock> resultBlocks = pipelineBreakerResult.getResultMap().values().iterator().next();
-    Assert.assertEquals(resultBlocks.size(), 1);
-    Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
-    Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
+    TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+    Assert.assertNotNull(errorBlock);
+    Assert.assertTrue(errorBlock.isErrorBlock());
   }
 
   @Test
@@ -311,17 +312,8 @@ public class PipelineBreakerExecutorTest {
     // then
     // should fail even if one of the 2 PB doesn't contain error block from sender.
     Assert.assertNotNull(pipelineBreakerResult);
-    Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 2);
-
-    boolean errorFound = false;
-    for (List<TransferableBlock> resultBlocks : pipelineBreakerResult.getResultMap().values()) {
-      if (!resultBlocks.isEmpty()) {
-        TransferableBlock lastBlock = resultBlocks.get(resultBlocks.size() - 1);
-        if (lastBlock.isErrorBlock()) {
-          errorFound = true;
-        }
-      }
-    }
-    Assert.assertTrue(errorFound, "An error block should be the last block on at least one of the result map entries");
+    TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+    Assert.assertNotNull(errorBlock);
+    Assert.assertTrue(errorBlock.isErrorBlock());
   }
 }
