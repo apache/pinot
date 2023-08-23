@@ -21,9 +21,9 @@
 # How to run advanced TPCHQueryIntegrationTest
 ## enrich data
 1. Follow https://dev.mysql.com/doc/heatwave/en/mys-hw-tpch-sample-data.html to generate tpch data.
-The current tpch dataset in the `resource` folder was generated using scale factor 0.001, which is too small for the advanced query test.
+The current tpch dataset in the `resource` folder was generated using scale factor 0.0001, which is too small for the advanced query test.
 ```
-./dbgen -vf -s 0.001
+./dbgen -vf -s 0.0001
 ```
 If your encounter `fatal error: 'malloc.h' file not found` while building `dbgen` binary, please replace `malloc.h` with
 `stdlib.h` in files having this problem.
