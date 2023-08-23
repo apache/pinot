@@ -1648,12 +1648,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _lastUpdatedRowsIndexed.set(_numRowsIndexed);
     final long now = now();
     final int rowsConsumed = _numRowsConsumed - _lastConsumedCount;
-    final long prevTime = _lastConsumedCount == 0 ? _consumeStartTime : _lastLogTime;
+    final long prevTime = _lastLogTime == 0 ? _consumeStartTime : _lastLogTime;
     // Log every minute or 100k events
     if (now - prevTime > TimeUnit.MINUTES.toMillis(TIME_THRESHOLD_FOR_LOG_MINUTES)
         || rowsConsumed >= MSG_COUNT_THRESHOLD_FOR_LOG) {
       _segmentLogger.info(
           "Consumed {} events from (rate:{}/s), currentOffset={}, numRowsConsumedSoFar={}, numRowsIndexedSoFar={}",
+          // multiply by 1000 to get events/sec. now and prevTime are in milliseconds.
           rowsConsumed, (float) (rowsConsumed) * 1000 / (now - prevTime), _currentOffset, _numRowsConsumed,
           _numRowsIndexed);
       _lastConsumedCount = _numRowsConsumed;
