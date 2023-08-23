@@ -38,6 +38,7 @@ public final class Constants {
   }
 
   static String getTableAvroFilePath(String tableName) {
-    return getTableResourceFolder(tableName) + File.separator + "rawdata" + File.separator + tableName + AVRO_FILE_SUFFIX;
+    return getTableResourceFolder(tableName) + File.separator
+        + "rawdata" + File.separator + tableName + AVRO_FILE_SUFFIX;
   }
 }
