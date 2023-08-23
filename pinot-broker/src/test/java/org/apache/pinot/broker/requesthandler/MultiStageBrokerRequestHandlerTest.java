@@ -28,7 +28,6 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -62,7 +61,7 @@ public class MultiStageBrokerRequestHandlerTest {
     MockitoAnnotations.openMocks(this);
     _config = new PinotConfiguration();
     _config.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, "10000");
-    _config.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, "12345");
+    _config.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, "12345");
     _accessControlFactory = new AllowAllAccessControlFactory();
     _requestHandler =
         new MultiStageBrokerRequestHandler(_config, "testBrokerId", _routingManager, _accessControlFactory,

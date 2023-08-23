@@ -34,7 +34,6 @@ import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -65,6 +64,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       new Object[]{"charlie", "bar", 1},
   };
   public static final Schema.SchemaBuilder SCHEMA_BUILDER;
+
   static {
     SCHEMA_BUILDER = new Schema.SchemaBuilder()
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -125,13 +125,14 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     }
 
     _reducerGrpcPort = QueryTestUtils.getAvailablePort();
-    _reducerHostname = String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME);
+    _reducerHostname = String.format("Broker_%s", CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_HOSTNAME);
     Map<String, Object> reducerConfig = new HashMap<>();
-    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
-    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
+    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
+    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
     _reducerScheduler = new OpChainSchedulerService(EXECUTOR);
-    _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
-        new PinotConfiguration(reducerConfig));
+    _mailboxService =
+        new MailboxService(CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
+            new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
     _queryEnvironment =
@@ -190,8 +191,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     Map<String, String> requestMetadataMap =
-        ImmutableMap.of(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId),
-            QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
+        ImmutableMap.of(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId),
+            CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
             String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
     int reducerStageId = -1;
     for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
@@ -206,7 +207,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
     try {
       QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
-          Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
+          Long.parseLong(requestMetadataMap.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS)),
+          _mailboxService,
           _reducerScheduler, null, false);
     } catch (RuntimeException rte) {
       Assert.assertTrue(rte.getMessage().contains("Received error query execution result block"));
@@ -227,12 +229,16 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     return new Object[][]{
         // special hint test, the table is not actually partitioned by col1, thus this hint gives wrong result. but
         // b/c in order to test whether this hint produces the proper optimized plan, we are making this assumption
-        new Object[]{"SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, COUNT(*) FROM a "
-            + " GROUP BY 1 ORDER BY 2", 10},
+        new Object[]{
+            "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ col1, COUNT(*) FROM a "
+                + " GROUP BY 1 ORDER BY 2", 10
+        },
 
         // special hint test, we want to try if dynamic broadcast works for just any random table */
-        new Object[]{"SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a "
-            + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE b.col3 < 10) AND a.col3 > 0", 9},
+        new Object[]{
+            "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a "
+                + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE b.col3 < 10) AND a.col3 > 0", 9
+        },
 
         // using join clause
         new Object[]{"SELECT * FROM a JOIN b USING (col1)", 15},

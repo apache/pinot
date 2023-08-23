@@ -27,9 +27,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -52,7 +52,8 @@ public class MailboxServiceTest {
   @BeforeClass
   public void setUp() {
     PinotConfiguration config = new PinotConfiguration(
-        Collections.singletonMap(QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 4_000_000));
+        Collections.singletonMap(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+            4_000_000));
     _mailboxService1 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);
     _mailboxService1.start();
     _mailboxService2 = new MailboxService("localhost", QueryTestUtils.getAvailablePort(), config);

@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
@@ -54,7 +53,7 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
 
   @CommandLine.Option(names = {"-brokerMultiStageRunnerPort"}, required = false,
       description = "Broker port number to use for query.")
-  private int _brokerMultiStageRunnerPort = QueryConfig.DEFAULT_QUERY_RUNNER_PORT;
+  private int _brokerMultiStageRunnerPort = CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT;
 
   @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "HTTP address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
