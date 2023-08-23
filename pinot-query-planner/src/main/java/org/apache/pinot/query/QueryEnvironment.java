@@ -104,7 +104,7 @@ public class QueryEnvironment {
 
     // catalog
     Properties catalogReaderConfigProperties = new Properties();
-    catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
+    catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "false");
     _catalogReader = new PinotCalciteCatalogReader(_rootSchema, _rootSchema.path(null), _typeFactory,
         new CalciteConnectionConfigImpl(catalogReaderConfigProperties));
 
