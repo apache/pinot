@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.PinotDataType;
@@ -475,6 +476,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         ByteArray bytesDefaultValue = new ByteArray((byte[]) defaultValue);
         defaultValue = bytesDefaultValue;
         sortedArray = new ByteArray[]{bytesDefaultValue};
+        break;
+      case VECTOR:
+        Preconditions.checkState(defaultValue instanceof Vector);
+        sortedArray = new Vector[]{(Vector) defaultValue};
         break;
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for column: " + column);

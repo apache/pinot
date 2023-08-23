@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.vec;
 
 import com.clearspring.analytics.util.Preconditions;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.realtime.impl.vec.MutableVectorIndex;
@@ -47,6 +48,7 @@ import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.VectorIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -83,9 +85,18 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
   @Override
   public ColumnConfigDeserializer<VectorIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass()).withExclusiveAlternative(
-        IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.VECTOR,
-            ((tableConfig, fieldConfig) -> new VectorIndexConfig(fieldConfig.getProperties()))));
+
+    // reads tableConfig.indexingConfig.jsonIndexColumns
+    ColumnConfigDeserializer<VectorIndexConfig> fromVectorIndexCols =
+        IndexConfigDeserializer.fromCollection(
+            tableConfig -> tableConfig.getIndexingConfig().getVectorIndexColumns(),
+            (accum, column) -> accum.put(column, new VectorIndexConfig(new HashMap<>())));
+//    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass()).withExclusiveAlternative(
+//        IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.VECTOR,
+//            ((tableConfig, fieldConfig) -> new VectorIndexConfig(fieldConfig.getProperties()))));
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
+        .withExclusiveAlternative(
+            IndexConfigDeserializer.ifIndexingConfig(fromVectorIndexCols));
   }
 
   @Override

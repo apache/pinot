@@ -44,6 +44,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private List<String> _h3IndexColumns;
   private List<String> _sortedColumn;
   private List<String> _bloomFilterColumns;
+  private List<String> _vectorIndexColumns;
   private Map<String, BloomFilterConfig> _bloomFilterConfigs;
   private String _loadMode;
   @Deprecated // Moved to {@link IngestionConfig#getStreamIngestionConfig}
@@ -180,6 +181,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
     _bloomFilterConfigs = bloomFilterConfigs;
+  }
+
+  public List<String> getVectorIndexColumns() {
+    return _vectorIndexColumns;
+  }
+
+  public void setVectorIndexColumns(List<String> vectorIndexColumns) {
+    _vectorIndexColumns = vectorIndexColumns;
   }
 
   @Nullable

@@ -106,7 +106,7 @@ public abstract class BaseVectorIndexCreator implements VectorIndexCreator {
 
     ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);
     headerBuffer.putInt(VERSION);
-    headerBuffer.putInt(_dictionaryStream.size());  // Adjusted based on the serialized vector length
+    headerBuffer.putInt(_dictionaryStream.size() / (_vectorLength * _vectorValueSize ));  // Adjusted based on the serialized vector length
     headerBuffer.putInt(_vectorLength);
     headerBuffer.putInt(_vectorValueSize);
     headerBuffer.position(0);

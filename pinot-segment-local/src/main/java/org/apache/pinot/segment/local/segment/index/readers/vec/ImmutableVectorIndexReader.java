@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.vec;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.BaseH3IndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.vec.BaseVectorIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.BytesDictionary;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
@@ -48,10 +50,13 @@ public class ImmutableVectorIndexReader implements VectorIndexReader {
    * @param dataBuffer data buffer for the inverted index.
    */
   public ImmutableVectorIndexReader(PinotDataBuffer dataBuffer, int vectorSize, int vectorValueSize) {
+    int version = dataBuffer.getInt(0);
+    Preconditions.checkArgument(version == BaseVectorIndexCreator.VERSION, "Unsupported Vector index version: %s",
+        version);
     int numValues = dataBuffer.getInt(Integer.BYTES);
 
     long dictionaryOffset = 4 * Integer.BYTES;
-    long invertedIndexOffset = dictionaryOffset + (long) numValues * Long.BYTES;
+    long invertedIndexOffset = dictionaryOffset + (long) numValues * vectorSize * vectorValueSize;
     PinotDataBuffer dictionaryBuffer = dataBuffer.view(dictionaryOffset, invertedIndexOffset, ByteOrder.BIG_ENDIAN);
     PinotDataBuffer invertedIndexBuffer = dataBuffer.view(invertedIndexOffset, dataBuffer.size(), ByteOrder.BIG_ENDIAN);
 
