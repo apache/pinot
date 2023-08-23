@@ -291,6 +291,25 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  public void testIncorrectBase64()
+      throws Exception {
+    String sqlQuery = "SELECT AirlineID as originalCol, toBase64(toUtf8(AirlineID)) as encoded, "
+        + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) as decoded FROM mytable "
+        + "GROUP BY AirlineID, toBase64(toUtf8(AirlineID)), fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) "
+        + "ORDER BY fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) LIMIT 10";
+
+    setUseMultiStageQueryEngine(false);
+    JsonNode jsonNode = postQuery(sqlQuery);
+    JsonNode exceptions = jsonNode.get("exceptions");
+    Assert.assertTrue(exceptions.isEmpty());
+
+    setUseMultiStageQueryEngine(true);
+    jsonNode = postQuery(sqlQuery);
+    exceptions = jsonNode.get("exceptions");
+    Assert.assertTrue(exceptions.isEmpty());
+  }
+
+  @Test
   public void testRefreshTableConfigAndQueryTimeout()
       throws Exception {
     // Set timeout as 5ms so that query will timeout
