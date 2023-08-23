@@ -164,9 +164,10 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     return 600;
   }
 
-  @Test
-  public void testSegmentAssignment()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testSegmentAssignment(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     verifyIdealState();
 
     // Run the real-time segment validation and check again

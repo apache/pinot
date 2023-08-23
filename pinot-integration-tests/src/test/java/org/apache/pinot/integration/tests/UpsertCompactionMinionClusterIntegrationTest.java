@@ -187,9 +187,10 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  @Test
-  public void testCompaction()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCompaction(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     waitForAllDocsLoaded(600_000L, 283);
     assertEquals(getSalary(), 9747108);
 
@@ -199,9 +200,10 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     assertEquals(getSalary(), 9747108);
   }
 
-  @Test
-  public void testCompactionDeletesSegments()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCompactionDeletesSegments(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     pushAvroIntoKafka(_avroFiles);
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L, 566);

@@ -168,9 +168,10 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
   }
 
-  @Test
-  protected void testDeleteWithFullUpsert()
+  @Test(dataProvider = "useBothQueryEngines")
+  protected void testDeleteWithFullUpsert(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
 
@@ -265,9 +266,10 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     dropRealtimeTable(tableName);
   }
 
-  @Test
-  public void testDeleteWithPartialUpsert()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDeleteWithPartialUpsert(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
 
