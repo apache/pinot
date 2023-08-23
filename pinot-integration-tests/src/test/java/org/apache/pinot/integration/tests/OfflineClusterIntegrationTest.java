@@ -2498,7 +2498,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   /**
    * Test queries that can be solved with {@link NonScanBasedAggregationOperator}.
    */
-  @Test
+  @Test(dataProvider = "useBothQueryEngines")
   public void testNonScanAggregationQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
