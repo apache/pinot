@@ -194,29 +194,29 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
   // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
   @Test(enabled = false)
-  @Override
-  public void testStarTreeTriggering() {
+  public void testStarTreeTriggering(boolean useMultiStageQueryEngine) {
     // Ignored
   }
 
   // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
   @Test(enabled = false)
   @Override
-  public void testDefaultColumns() {
+  public void testDefaultColumns(boolean useMultiStageQueryEngineg) {
     // Ignored
   }
 
   // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
   @Test(enabled = false)
   @Override
-  public void testBloomFilterTriggering() {
+  public void testBloomFilterTriggering(boolean useMultiStageQueryEngine) {
     // Ignored
   }
 
   // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
   @Test(enabled = false)
   @Override
-  public void testRangeIndexTriggering() {
+  public void testRangeIndexTriggering(boolean useMultiStageQueryEngine)
+      throws Exception {
     // Ignored
   }
 

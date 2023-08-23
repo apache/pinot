@@ -567,9 +567,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
   }
 
-  @Test
-  public void testTimeFunc()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTimeFunc(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String sqlQuery = "SELECT toDateTime(now(), 'yyyy-MM-dd z'), toDateTime(ago('PT1H'), 'yyyy-MM-dd z') FROM mytable";
     JsonNode response = postQuery(sqlQuery);
     String todayStr = response.get("resultTable").get("rows").get(0).get(0).asText();
@@ -583,9 +584,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(oneHourAgoTodayStr, expectedOneHourAgoTodayStr);
   }
 
-  @Test
-  public void testRegexpReplace()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testRegexpReplace(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Correctness tests of regexpReplace.
 
     // Test replace all.
@@ -700,9 +702,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(count1, count2);
   }
 
-  @Test
-  public void testCastMV()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCastMV(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // simple cast
     String sqlQuery = "SELECT DivLongestGTimes, CAST(DivLongestGTimes as DOUBLE) from myTable LIMIT 100";
@@ -764,9 +767,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testUrlFunc()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testUrlFunc(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String sqlQuery = "SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3'), "
         + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') FROM myTable";
     JsonNode response = postQuery(sqlQuery);
@@ -779,9 +783,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(decodedString, expectedUrlStr);
   }
 
-  @Test
-  public void testBase64Func()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testBase64Func(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // string literal
     String sqlQuery = "SELECT toBase64(toUtf8('hello!')), " + "fromUtf8(fromBase64('aGVsbG8h')) FROM myTable";
@@ -942,9 +947,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testLiteralOnlyFunc()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testLiteralOnlyFunc(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     long queryStartTimeMs = System.currentTimeMillis();
     String sqlQuery =
         "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
@@ -1005,9 +1011,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(results.get(10).asText(), "hello!");
   }
 
-  @Test(dependsOnMethods = "testBloomFilterTriggering")
-  public void testRangeIndexTriggering()
+  @Test(dependsOnMethods = "testBloomFilterTriggering", dataProvider = "useBothQueryEngines")
+  public void testRangeIndexTriggering(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     long numTotalDocs = getCountStarResult();
     assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
 
@@ -1045,9 +1052,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
 
-  @Test(dependsOnMethods = "testDefaultColumns")
-  public void testBloomFilterTriggering()
+  @Test(dependsOnMethods = "testDefaultColumns", dataProvider = "useBothQueryEngines")
+  public void testBloomFilterTriggering(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     long numTotalDocs = getCountStarResult();
     assertEquals(postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY).get("numSegmentsProcessed").asLong(), NUM_SEGMENTS);
 
@@ -1089,9 +1097,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   /**
    * Check if server returns error response quickly without timing out Broker.
    */
-  @Test
-  public void testServerErrorWithBrokerTimeout()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testServerErrorWithBrokerTimeout(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     long startTimeMs = System.currentTimeMillis();
     // The query below will fail execution due to JSON_MATCH on column without json index
     JsonNode queryResponse = postQuery("SELECT count(*) FROM mytable WHERE JSON_MATCH(Dest, '$=123')");
@@ -1100,9 +1109,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(queryResponse.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
   }
 
-  @Test
-  public void testStarTreeTriggering()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStarTreeTriggering(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     long numTotalDocs = getCountStarResult();
     long tableSizeWithDefaultIndex = getTableSize(getTableName());
 
@@ -1269,9 +1279,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    *   <li>"NewAddedDerivedMVStringDimension", DATE_TIME, STRING, multi-value</li>
    * </ul>
    */
-  @Test(dependsOnMethods = "testAggregateMetadataAPI")
-  public void testDefaultColumns()
+  @Test(dependsOnMethods = "testAggregateMetadataAPI", dataProvider = "useBothQueryEngines")
+  public void testDefaultColumns(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     long numTotalDocs = getCountStarResult();
 
     reloadWithExtraColumns();
@@ -1295,9 +1306,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _tableSizeAfterRemovingIndex = getTableSize(getTableName());
   }
 
-  @Test
-  public void testDisableGroovyQueryTableConfigOverride()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDisableGroovyQueryTableConfigOverride(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
         + "'arg0 + arg1', FlightNum, Origin) FROM myTable";
     TableConfig tableConfig = getOfflineTableConfig();
@@ -1612,16 +1624,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 60_000L, "Failed to remove expression override");
   }
 
-  @Test
-  @Override
-  public void testBrokerResponseMetadata()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testBrokerResponseMetadata(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     super.testBrokerResponseMetadata();
   }
 
-  @Test
-  public void testInBuiltVirtualColumns()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testInBuiltVirtualColumns(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT $docId, $HOSTNAME, $segmentname FROM mytable";
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
@@ -1640,9 +1653,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testGroupByUDF()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGroupByUDF(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS'), COUNT(*) FROM mytable "
         + "GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS') ORDER BY COUNT(*) DESC";
     JsonNode response = postQuery(query);
@@ -1786,9 +1800,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.get(1).asLong(), 316);
   }
 
-  @Test
-  public void testAggregationUDF()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAggregationUDF(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable";
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
@@ -1814,9 +1829,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.get(0).asDouble(), 16071.0 / 2);
   }
 
-  @Test
-  public void testSelectionUDF()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testSelectionUDF(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable";
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
@@ -1871,9 +1887,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testFilterUDF()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterUDF(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     int daysSinceEpoch = 16138;
     long secondsSinceEpoch = 16138 * 24 * 60 * 60;
 
@@ -1906,9 +1923,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResult);
   }
 
-  @Test
-  public void testCaseStatementInSelection()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseStatementInSelection(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     List<String> origins =
         Arrays.asList("ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA",
             "MSP", "CLT", "LGA", "DTW", "JFK", "BWI");
@@ -1936,9 +1954,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testCaseStatementInSelectionWithTransformFunctionInThen()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseStatementInSelectionWithTransformFunctionInThen(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String sqlQuery =
         "SELECT ArrDelay, CASE WHEN ArrDelay > 0 THEN ArrDelay WHEN ArrDelay < 0 THEN ArrDelay * -1 ELSE 0 END AS "
             + "ArrTimeDiff FROM mytable LIMIT 1000";
@@ -1956,9 +1975,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testCaseStatementWithLogicalTransformFunction()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseStatementWithLogicalTransformFunction(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String sqlQuery = "SELECT ArrDelay" + ", CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END"
         + ", CASE WHEN ArrDelay < 50 AND ArrDelay >= 10 THEN 10 ELSE 0 END" + " FROM mytable LIMIT 1000";
     JsonNode response = postQuery(sqlQuery);
@@ -1981,9 +2001,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testCaseStatementWithInAggregation()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseStatementWithInAggregation(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     testCountVsCaseQuery("origin = 'ATL'");
     testCountVsCaseQuery("origin <> 'ATL'");
 
@@ -2006,9 +2027,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(caseSum, countValue);
   }
 
-  @Test
-  public void testFilterWithInvertedIndexUDF()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilterWithInvertedIndexUDF(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     int daysSinceEpoch = 16138;
     long secondsSinceEpoch = 16138 * 24 * 60 * 60;
 
@@ -2031,9 +2053,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testQueryWithRepeatedColumns()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryWithRepeatedColumns(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     //test repeated columns in selection query
     String query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testQuery(query);
@@ -2052,9 +2075,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(query);
   }
 
-  @Test
-  public void testQueryWithOrderby()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryWithOrderby(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     //test repeated columns in selection query
     String query = "SELECT ArrTime, Carrier, DaysSinceEpoch FROM mytable ORDER BY DaysSinceEpoch DESC";
     testQuery(query);
@@ -2068,9 +2092,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(query);
   }
 
-  @Test
-  public void testQueryWithAlias()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryWithAlias(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     {
       //test same alias name with column name
       String query = "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable "
@@ -2216,9 +2241,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertFalse(_propertyStore.exists(configPath, 0));
   }
 
-  @Test
-  public void testDistinctQuery()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctQuery(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // by default 10 rows will be returned, so use high limit
     String pinotQuery = "SELECT DISTINCT Carrier FROM mytable LIMIT 1000000";
     String h2Query = "SELECT DISTINCT Carrier FROM mytable";
@@ -2237,9 +2263,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
   }
 
-  @Test
-  public void testNonAggregationGroupByQuery()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testNonAggregationGroupByQuery(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // by default 10 rows will be returned, so use high limit
     String pinotQuery = "SELECT Carrier FROM mytable GROUP BY Carrier LIMIT 1000000";
     String h2Query = "SELECT Carrier FROM mytable GROUP BY Carrier";
@@ -2269,9 +2296,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
   }
 
-  @Test
-  public void testCaseInsensitivity()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseInsensitivity(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     int daysSinceEpoch = 16138;
     int hoursSinceEpoch = 16138 * 24;
     int secondsSinceEpoch = 16138 * 24 * 60 * 60;
@@ -2298,9 +2326,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testColumnNameContainsTableName()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testColumnNameContainsTableName(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     int daysSinceEpoch = 16138;
     int hoursSinceEpoch = 16138 * 24;
     int secondsSinceEpoch = 16138 * 24 * 60 * 60;
@@ -2326,9 +2355,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testCaseInsensitivityWithColumnNameContainsTableName()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseInsensitivityWithColumnNameContainsTableName(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     int daysSinceEpoch = 16138;
     int hoursSinceEpoch = 16138 * 24;
     int secondsSinceEpoch = 16138 * 24 * 60 * 60;
@@ -2357,9 +2387,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testQuerySourceWithDatabaseName()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQuerySourceWithDatabaseName(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // by default 10 rows will be returned, so use high limit
     String pinotQuery = "SELECT DISTINCT(Carrier) FROM mytable LIMIT 1000000";
     String h2Query = "SELECT DISTINCT Carrier FROM mytable";
@@ -2368,9 +2399,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
   }
 
-  @Test
-  public void testDistinctCountHll()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctCountHll(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query;
 
     // The Accurate value is 6538.
@@ -2395,9 +2427,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
   }
 
-  @Test
-  public void testAggregationFunctionsWithUnderscore()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAggregationFunctionsWithUnderscore(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query;
 
     // The Accurate value is 6538.
@@ -2409,9 +2442,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asInt(), 115545);
   }
 
-  @Test
-  public void testExplainPlanQuery()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testExplainPlanQuery(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query1 = "EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1";
     String response1 = postQuery(query1).get("resultTable").toString();
 
@@ -2438,9 +2472,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   /** Test to make sure we are properly handling string comparisons in predicates. */
-  @Test
-  public void testStringComparisonInFilter()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStringComparisonInFilter(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // compare two string columns.
     String query1 = "SELECT count(*) FROM mytable WHERE OriginState = DestState";
     String response1 = postQuery(query1).get("resultTable").toString();
@@ -2463,9 +2498,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   /**
    * Test queries that can be solved with {@link NonScanBasedAggregationOperator}.
    */
-  @Test
-  public void testNonScanAggregationQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testNonScanAggregationQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String tableName = getTableName();
 
     // Test queries with COUNT, MIN, MAX, MIN_MAX_RANGE
