@@ -32,12 +32,14 @@ import org.apache.pinot.query.runtime.operator.OpChainStats;
 public class PipelineBreakerResult {
   private final Map<PlanNode, Integer> _nodeIdMap;
   private final Map<Integer, List<TransferableBlock>> _resultMap;
+  private final TransferableBlock _errorBlock;
   private final OpChainStats _opChainStats;
 
   public PipelineBreakerResult(Map<PlanNode, Integer> nodeIdMap, Map<Integer, List<TransferableBlock>> resultMap,
-      OpChainStats opChainStats) {
+      @Nullable TransferableBlock errorBlock, @Nullable OpChainStats opChainStats) {
     _nodeIdMap = nodeIdMap;
     _resultMap = resultMap;
+    _errorBlock = errorBlock;
     _opChainStats = opChainStats;
   }
 
@@ -47,6 +49,11 @@ public class PipelineBreakerResult {
 
   public Map<Integer, List<TransferableBlock>> getResultMap() {
     return _resultMap;
+  }
+
+  @Nullable
+  public TransferableBlock getErrorBlock() {
+    return _errorBlock;
   }
 
   @Nullable

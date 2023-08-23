@@ -36,9 +36,12 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
@@ -144,34 +147,47 @@ public class QueryRunner {
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
     // run pre-stage execution for all pipeline breakers
-    PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(_scheduler,
-        _mailboxService, distributedStagePlan, deadlineMs, requestId, isTraceEnabled);
+    PipelineBreakerResult pipelineBreakerResult =
+        PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan, deadlineMs,
+            requestId, isTraceEnabled);
+
+    // Send error block to all the receivers if pipeline breaker fails
+    if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
+      TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+      LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
+          distributedStagePlan.getStageId(), errorBlock.getDataBlock().getExceptions());
+      int receiverStageId = ((MailboxSendNode) distributedStagePlan.getStageRoot()).getReceiverStageId();
+      MailboxMetadata mailboxMetadata = distributedStagePlan.getStageMetadata().getWorkerMetadataList()
+          .get(distributedStagePlan.getServer().workerId()).getMailBoxInfosMap().get(receiverStageId);
+      List<String> mailboxIds = MailboxIdUtils.toMailboxIds(requestId, mailboxMetadata);
+      for (int i = 0; i < mailboxIds.size(); i++) {
+        try {
+          _mailboxService.getSendingMailbox(mailboxMetadata.getVirtualAddress(i).hostname(),
+              mailboxMetadata.getVirtualAddress(i).port(), mailboxIds.get(i), deadlineMs).send(errorBlock);
+        } catch (TimeoutException e) {
+          LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}", mailboxIds.get(i),
+              requestId, distributedStagePlan.getStageId(), e);
+        } catch (Exception e) {
+          LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
+              mailboxIds.get(i), requestId, distributedStagePlan.getStageId(), e);
+        }
+      }
+      return;
+    }
 
     // Set Join Overflow configs to StageMetadata from request
     setJoinOverflowConfigs(distributedStagePlan, requestMetadataMap);
 
     // run OpChain
+    OpChain opChain;
     if (DistributedStagePlan.isLeafStage(distributedStagePlan)) {
-      try {
-        OpChain rootOperator = compileLeafStage(requestId, distributedStagePlan, requestMetadataMap,
-            pipelineBreakerResult, deadlineMs, isTraceEnabled);
-        _scheduler.register(rootOperator);
-      } catch (Exception e) {
-        LOGGER.error("Error executing leaf stage for: {}:{}", requestId, distributedStagePlan.getStageId(), e);
-        _scheduler.cancel(requestId);
-        throw e;
-      }
+      opChain = compileLeafStage(requestId, distributedStagePlan, requestMetadataMap, pipelineBreakerResult, deadlineMs,
+          isTraceEnabled);
     } else {
-      try {
-        OpChain rootOperator = compileIntermediateStage(requestId, distributedStagePlan, requestMetadataMap,
-            pipelineBreakerResult, deadlineMs, isTraceEnabled);
-        _scheduler.register(rootOperator);
-      } catch (Exception e) {
-        LOGGER.error("Error executing intermediate stage for: {}:{}", requestId, distributedStagePlan.getStageId(), e);
-        _scheduler.cancel(requestId);
-        throw e;
-      }
+      opChain = compileIntermediateStage(requestId, distributedStagePlan, requestMetadataMap, pipelineBreakerResult,
+          deadlineMs, isTraceEnabled);
     }
+    _scheduler.register(opChain);
   }
 
   private void setJoinOverflowConfigs(DistributedStagePlan distributedStagePlan,

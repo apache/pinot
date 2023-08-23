@@ -37,14 +37,15 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -87,7 +88,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected static final String SEGMENT_BREAKER_KEY = "__SEGMENT_BREAKER_KEY__";
   protected static final String SEGMENT_BREAKER_STR = "------";
   protected static final GenericRow SEGMENT_BREAKER_ROW = new GenericRow();
-  protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
+  protected static final AtomicLong REQUEST_ID_GEN = new AtomicLong();
   protected QueryEnvironment _queryEnvironment;
   protected String _reducerHostname;
   protected int _reducerGrpcPort;
@@ -108,15 +109,16 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
    * ser/de dispatches.
    */
   protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
-    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     QueryEnvironment.QueryPlannerResult queryPlannerResult =
         _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
     DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
     Map<String, String> requestMetadataMap = new HashMap<>();
     requestMetadataMap.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId));
+    Long timeoutMs = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
     requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
-        String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+        String.valueOf(timeoutMs != null ? timeoutMs : CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
     requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true");
     requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
 

@@ -18,41 +18,34 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 class PipelineBreakerOperator extends MultiStageOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerOperator.class);
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
-  private final Deque<Map.Entry<Integer, Operator<TransferableBlock>>> _workerEntries;
-  private final Map<Integer, List<TransferableBlock>> _resultMap;
-  private final ImmutableSet<Integer> _expectedKeySet;
-  private TransferableBlock _finalBlock;
 
-  public PipelineBreakerOperator(OpChainExecutionContext context,
-      Map<Integer, Operator<TransferableBlock>> pipelineWorkerMap) {
+  private final Map<Integer, Operator<TransferableBlock>> _workerMap;
+
+  private Map<Integer, List<TransferableBlock>> _resultMap;
+  private TransferableBlock _errorBlock;
+
+  public PipelineBreakerOperator(OpChainExecutionContext context, Map<Integer, Operator<TransferableBlock>> workerMap) {
     super(context);
+    _workerMap = workerMap;
     _resultMap = new HashMap<>();
-    _expectedKeySet = ImmutableSet.copyOf(pipelineWorkerMap.keySet());
-    _workerEntries = new ArrayDeque<>();
-    _workerEntries.addAll(pipelineWorkerMap.entrySet());
-    for (int workerKey : _expectedKeySet) {
+    for (int workerKey : workerMap.keySet()) {
       _resultMap.put(workerKey, new ArrayList<>());
     }
   }
@@ -62,6 +55,10 @@ class PipelineBreakerOperator extends MultiStageOperator {
   }
 
   @Nullable
+  public TransferableBlock getErrorBlock() {
+    return _errorBlock;
+  }
+
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
@@ -69,63 +66,44 @@ class PipelineBreakerOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    // Poll from every mailbox operator:
-    // - Return the first content block
-    // - If no content block found but there are mailboxes not finished, try again
-    // - If all content blocks are already returned, return end-of-stream block
-    while (!_workerEntries.isEmpty()) {
-      if (_finalBlock != null) {
-        return _finalBlock;
-      }
-      if (System.currentTimeMillis() > _context.getDeadlineMs()) {
-        _finalBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
-        constructErrorResponse(_finalBlock);
-        return _finalBlock;
-      }
-
-      Map.Entry<Integer, Operator<TransferableBlock>> worker = _workerEntries.getLast();
-      TransferableBlock block = worker.getValue().nextBlock();
-
-      if (block == null) {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("==[PB]== Null block on " + _context.getId() + " worker " + worker.getKey());
+    if (_errorBlock != null) {
+      return _errorBlock;
+    }
+    // NOTE: Put an empty list for each worker in case there is no data block returned from that worker
+    if (_workerMap.size() == 1) {
+      Map.Entry<Integer, Operator<TransferableBlock>> entry = _workerMap.entrySet().iterator().next();
+      List<TransferableBlock> dataBlocks = new ArrayList<>();
+      _resultMap = Collections.singletonMap(entry.getKey(), dataBlocks);
+      Operator<TransferableBlock> operator = entry.getValue();
+      TransferableBlock block = operator.nextBlock();
+      while (!block.isSuccessfulEndOfStreamBlock()) {
+        if (block.isErrorBlock()) {
+          _errorBlock = block;
+          return block;
         }
-        continue;
+        dataBlocks.add(block);
+        block = operator.nextBlock();
       }
-
-      // Release the mailbox worker when the block is end-of-stream
-      if (block.isSuccessfulEndOfStreamBlock()) {
-        _workerEntries.removeLast();
-        continue;
+    } else {
+      _resultMap = new HashMap<>();
+      for (int workerKey : _workerMap.keySet()) {
+        _resultMap.put(workerKey, new ArrayList<>());
       }
-
-      if (block.isErrorBlock()) {
-        _finalBlock = block;
+      // Keep polling from every operator in round-robin fashion
+      Queue<Map.Entry<Integer, Operator<TransferableBlock>>> entries = new ArrayDeque<>(_workerMap.entrySet());
+      while (!entries.isEmpty()) {
+        Map.Entry<Integer, Operator<TransferableBlock>> entry = entries.poll();
+        TransferableBlock block = entry.getValue().nextBlock();
+        if (block.isErrorBlock()) {
+          _errorBlock = block;
+          return block;
+        }
+        if (block.isDataBlock()) {
+          _resultMap.get(entry.getKey()).add(block);
+          entries.offer(entry);
+        }
       }
-      if (LOGGER.isTraceEnabled()) {
-        LOGGER.trace("==[PB]== Returned block from : " + _context.getId() + " block: " + block);
-      }
-      _resultMap.get(worker.getKey()).add(block);
-      return block;
     }
-    if (System.currentTimeMillis() > _context.getDeadlineMs()) {
-      _finalBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
-      return _finalBlock;
-    } else if (_finalBlock == null) {
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("==[PB]== Finished : " + _context.getId());
-      }
-      _finalBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    }
-    return _finalBlock;
-  }
-
-  /**
-   * Setting all result map to error if any of the pipeline breaker returns an ERROR.
-   */
-  private void constructErrorResponse(TransferableBlock errorBlock) {
-    for (int key : _expectedKeySet) {
-      _resultMap.put(key, Collections.singletonList(errorBlock));
-    }
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
   }
 }
