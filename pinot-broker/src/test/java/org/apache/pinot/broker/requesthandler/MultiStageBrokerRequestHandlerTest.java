@@ -29,6 +29,7 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.queryeventlistener.PinotBrokerQueryEventListenerUtils;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -65,8 +66,9 @@ public class MultiStageBrokerRequestHandlerTest {
     _config.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, "12345");
     _accessControlFactory = new AllowAllAccessControlFactory();
     _requestHandler =
-        new MultiStageBrokerRequestHandler(_config, "Broker_localhost", _routingManager, _accessControlFactory,
-            _queryQuotaManager, _tableCache, _brokerMetrics, null);
+        new MultiStageBrokerRequestHandler(_config, "Broker_localhost", _routingManager,
+                _accessControlFactory, _queryQuotaManager, _tableCache, _brokerMetrics,
+                PinotBrokerQueryEventListenerUtils.getBrokerQueryEventListener());
   }
 
   @Test
