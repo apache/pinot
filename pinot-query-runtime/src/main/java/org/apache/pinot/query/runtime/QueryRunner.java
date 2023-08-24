@@ -59,6 +59,8 @@ import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,11 +84,17 @@ public class QueryRunner {
 
   private OpChainSchedulerService _scheduler;
 
-  // Join Overflow configs
+  // Group-by settings
+  @Nullable
+  private Integer _numGroupsLimit;
+  @Nullable
+  private Integer _maxInitialResultHolderCapacity;
+
+  // Join overflow settings
   @Nullable
   private Integer _maxRowsInJoin;
   @Nullable
-  private String _joinOverflowMode;
+  private JoinOverFlowMode _joinOverflowMode;
 
   /**
    * Initializes the query executor.
@@ -100,11 +108,18 @@ public class QueryRunner {
     _port = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
     _helixManager = helixManager;
-    // Set Join Overflow configs
-    _joinOverflowMode = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
-    _maxRowsInJoin =
-        config.containsKey(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN) ? Integer.parseInt(
-            config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN)) : null;
+
+    // TODO: Consider using separate config for intermediate stage and leaf stage
+    String numGroupsLimitStr = config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
+    _numGroupsLimit = numGroupsLimitStr != null ? Integer.parseInt(numGroupsLimitStr) : null;
+    String maxInitialGroupHolderCapacity =
+        config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    _maxInitialResultHolderCapacity =
+        maxInitialGroupHolderCapacity != null ? Integer.parseInt(maxInitialGroupHolderCapacity) : null;
+    String maxRowsInJoinStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN);
+    _maxRowsInJoin = maxRowsInJoinStr != null ? Integer.parseInt(maxRowsInJoinStr) : null;
+    String joinOverflowModeStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
+    _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
     try {
       //TODO: make this configurable
@@ -139,12 +154,14 @@ public class QueryRunner {
    * <p>This execution entry point should be asynchronously called by the request handler and caller should not wait
    * for results/exceptions.</p>
    */
-  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
-    long requestId = Long.parseLong(requestMetadataMap.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
-    long timeoutMs = Long.parseLong(requestMetadataMap.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadata) {
+    long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
+    long timeoutMs = Long.parseLong(requestMetadata.get(QueryOptionKey.TIMEOUT_MS));
     boolean isTraceEnabled =
-        Boolean.parseBoolean(requestMetadataMap.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
+        Boolean.parseBoolean(requestMetadata.getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
+
+    setStageCustomProperties(distributedStagePlan.getStageMetadata().getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
@@ -175,39 +192,50 @@ public class QueryRunner {
       return;
     }
 
-    // Set Join Overflow configs to StageMetadata from request
-    setJoinOverflowConfigs(distributedStagePlan, requestMetadataMap);
-
     // run OpChain
     OpChain opChain;
     if (DistributedStagePlan.isLeafStage(distributedStagePlan)) {
-      opChain = compileLeafStage(requestId, distributedStagePlan, requestMetadataMap, pipelineBreakerResult, deadlineMs,
+      opChain = compileLeafStage(requestId, distributedStagePlan, requestMetadata, pipelineBreakerResult, deadlineMs,
           isTraceEnabled);
     } else {
-      opChain = compileIntermediateStage(requestId, distributedStagePlan, requestMetadataMap, pipelineBreakerResult,
+      opChain = compileIntermediateStage(requestId, distributedStagePlan, requestMetadata, pipelineBreakerResult,
           deadlineMs, isTraceEnabled);
     }
     _scheduler.register(opChain);
   }
 
-  private void setJoinOverflowConfigs(DistributedStagePlan distributedStagePlan,
-      Map<String, String> requestMetadataMap) {
-    String joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(requestMetadataMap);
-    if (joinOverflowMode != null) {
-      distributedStagePlan.getStageMetadata().getCustomProperties()
-          .put(CommonConstants.Broker.Request.QueryOptionKey.JOIN_OVERFLOW_MODE, joinOverflowMode);
-    } else if (_joinOverflowMode != null) {
-      distributedStagePlan.getStageMetadata().getCustomProperties()
-          .put(CommonConstants.Broker.Request.QueryOptionKey.JOIN_OVERFLOW_MODE, _joinOverflowMode);
+  private void setStageCustomProperties(Map<String, String> customProperties, Map<String, String> requestMetadata) {
+    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(requestMetadata);
+    if (numGroupsLimit == null) {
+      numGroupsLimit = _numGroupsLimit;
+    }
+    if (numGroupsLimit != null) {
+      customProperties.put(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(numGroupsLimit));
     }
 
-    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(requestMetadataMap);
+    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(requestMetadata);
+    if (maxInitialResultHolderCapacity == null) {
+      maxInitialResultHolderCapacity = _maxInitialResultHolderCapacity;
+    }
+    if (maxInitialResultHolderCapacity != null) {
+      customProperties.put(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+          Integer.toString(maxInitialResultHolderCapacity));
+    }
+
+    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(requestMetadata);
+    if (maxRowsInJoin == null) {
+      maxRowsInJoin = _maxRowsInJoin;
+    }
     if (maxRowsInJoin != null) {
-      distributedStagePlan.getStageMetadata().getCustomProperties()
-          .put(CommonConstants.Broker.Request.QueryOptionKey.MAX_ROWS_IN_JOIN, String.valueOf(maxRowsInJoin));
-    } else if (_maxRowsInJoin != null) {
-      distributedStagePlan.getStageMetadata().getCustomProperties()
-          .put(CommonConstants.Broker.Request.QueryOptionKey.MAX_ROWS_IN_JOIN, String.valueOf(_maxRowsInJoin));
+      customProperties.put(QueryOptionKey.MAX_ROWS_IN_JOIN, Integer.toString(maxRowsInJoin));
+    }
+
+    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(requestMetadata);
+    if (joinOverflowMode == null) {
+      joinOverflowMode = _joinOverflowMode;
+    }
+    if (joinOverflowMode != null) {
+      customProperties.put(QueryOptionKey.JOIN_OVERFLOW_MODE, joinOverflowMode.name());
     }
   }
 
