@@ -83,6 +83,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -256,6 +257,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
               instance, resourcesToMonitor, 100.0))));
     }
+  }
+
+  @BeforeMethod
+  public void resetMultiStageMode() {
+    setUseMultiStageQueryEngine(false);
   }
 
   @Override
@@ -1100,9 +1106,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(queryResponse.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
   }
 
-  @Test
-  public void testStarTreeTriggering()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStarTreeTriggering(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     long numTotalDocs = getCountStarResult();
     long tableSizeWithDefaultIndex = getTableSize(getTableName());
 

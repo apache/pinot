@@ -195,7 +195,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   // Disabled because with multiple replicas, there is no guarantee that all replicas are reloaded
   @Test(enabled = false)
   @Override
-  public void testStarTreeTriggering() {
+  public void testStarTreeTriggering(boolean useMultiStageQueryEngine) {
     // Ignored
   }
 
