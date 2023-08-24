@@ -271,6 +271,19 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // test queries with special query options attached
         //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.
         new Object[]{"SET multiStageLeafLimit = 1; SELECT * FROM a", 2},
+
+        // test groups limit in both leaf and intermediate stage
+        new Object[]{"SET numGroupsLimit = 1; SELECT col1, COUNT(*) FROM a GROUP BY col1", 1},
+        new Object[]{"SET numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2},
+        new Object[]{"SET numGroupsLimit = 1; "
+            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1},
+        new Object[]{"SET numGroupsLimit = 2; "
+            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2},
+        // TODO: Consider pushing down hint to the leaf stage
+        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+            + "col1, COUNT(*) FROM a GROUP BY col1", 2},
+        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+            + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1}
     };
   }
 

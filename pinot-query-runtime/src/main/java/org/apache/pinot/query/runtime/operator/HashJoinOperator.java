@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
@@ -45,7 +47,7 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 
 
 /**
@@ -68,8 +70,9 @@ public class HashJoinOperator extends MultiStageOperator {
   private static final int DEFAULT_MAX_ROWS_IN_JOIN = 1024 * 1024; // 2^20, around 1MM rows
   private static final JoinOverFlowMode DEFAULT_JOIN_OVERFLOW_MODE = JoinOverFlowMode.THROW;
 
-  private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES = ImmutableSet.of(
-      JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL, JoinRelType.SEMI, JoinRelType.ANTI);
+  private static final Set<JoinRelType> SUPPORTED_JOIN_TYPES =
+      ImmutableSet.of(JoinRelType.INNER, JoinRelType.LEFT, JoinRelType.RIGHT, JoinRelType.FULL, JoinRelType.SEMI,
+          JoinRelType.ANTI);
 
   private final HashMap<Key, ArrayList<Object[]>> _broadcastRightTable;
 
@@ -116,8 +119,6 @@ public class HashJoinOperator extends MultiStageOperator {
     super(context);
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
-    _maxRowsInHashTable = getMaxRowInJoin(context.getStageMetadata(), node.getJoinHints());
-    _joinOverflowMode = getJoinOverflowMode(context.getStageMetadata(), node.getJoinHints());
     _joinType = node.getJoinRelType();
     _leftKeySelector = node.getJoinKeys().getLeftJoinKeySelector();
     _rightKeySelector = node.getJoinKeys().getRightJoinKeySelector();
@@ -143,39 +144,40 @@ public class HashJoinOperator extends MultiStageOperator {
     } else {
       _matchedRightRows = null;
     }
-    _upstreamErrorBlock = null;
+    StageMetadata stageMetadata = context.getStageMetadata();
+    Map<String, String> customProperties =
+        stageMetadata != null ? stageMetadata.getCustomProperties() : Collections.emptyMap();
+    _maxRowsInHashTable = getMaxRowInJoin(customProperties, node.getJoinHints());
+    _joinOverflowMode = getJoinOverflowMode(customProperties, node.getJoinHints());
   }
 
-  private JoinOverFlowMode getJoinOverflowMode(StageMetadata stageMetadata, AbstractPlanNode.NodeHint joinHints) {
-    if (joinHints != null && joinHints._hintOptions != null && joinHints._hintOptions
-        .containsKey(PinotHintOptions.JOIN_HINT_OPTIONS) && joinHints._hintOptions.get(
-            PinotHintOptions.JOIN_HINT_OPTIONS)
-        .containsKey(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE)) {
-      return JoinOverFlowMode.valueOf(joinHints._hintOptions.get(PinotHintOptions.JOIN_HINT_OPTIONS)
-          .get(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE));
+  private int getMaxRowInJoin(Map<String, String> customProperties, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+    if (nodeHint != null) {
+      Map<String, String> joinOptions = nodeHint._hintOptions.get(PinotHintOptions.JOIN_HINT_OPTIONS);
+      if (joinOptions != null) {
+        String maxRowsInJoinStr = joinOptions.get(PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN);
+        if (maxRowsInJoinStr != null) {
+          return Integer.parseInt(maxRowsInJoinStr);
+        }
+      }
     }
-    if (stageMetadata != null && stageMetadata.getCustomProperties() != null && stageMetadata.getCustomProperties()
-        .containsKey(CommonConstants.Broker.Request.QueryOptionKey.JOIN_OVERFLOW_MODE)) {
-      return JoinOverFlowMode.valueOf(
-          stageMetadata.getCustomProperties().get(CommonConstants.Broker.Request.QueryOptionKey.JOIN_OVERFLOW_MODE));
-    }
-    return DEFAULT_JOIN_OVERFLOW_MODE;
+    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(customProperties);
+    return maxRowsInJoin != null ? maxRowsInJoin : DEFAULT_MAX_ROWS_IN_JOIN;
   }
 
-  private int getMaxRowInJoin(StageMetadata stageMetadata, AbstractPlanNode.NodeHint joinHints) {
-    if (joinHints != null && joinHints._hintOptions != null && joinHints._hintOptions
-        .containsKey(PinotHintOptions.JOIN_HINT_OPTIONS) && joinHints._hintOptions.get(
-            PinotHintOptions.JOIN_HINT_OPTIONS)
-        .containsKey(PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN)) {
-      return Integer.parseInt(joinHints._hintOptions.get(PinotHintOptions.JOIN_HINT_OPTIONS)
-          .get(PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN));
+  private JoinOverFlowMode getJoinOverflowMode(Map<String, String> customProperties,
+      @Nullable AbstractPlanNode.NodeHint nodeHint) {
+    if (nodeHint != null) {
+      Map<String, String> joinOptions = nodeHint._hintOptions.get(PinotHintOptions.JOIN_HINT_OPTIONS);
+      if (joinOptions != null) {
+        String joinOverflowModeStr = joinOptions.get(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE);
+        if (joinOverflowModeStr != null) {
+          return JoinOverFlowMode.valueOf(joinOverflowModeStr);
+        }
+      }
     }
-    if (stageMetadata != null && stageMetadata.getCustomProperties() != null && stageMetadata.getCustomProperties()
-        .containsKey(CommonConstants.Broker.Request.QueryOptionKey.MAX_ROWS_IN_JOIN)) {
-      return Integer.parseInt(
-          stageMetadata.getCustomProperties().get(CommonConstants.Broker.Request.QueryOptionKey.MAX_ROWS_IN_JOIN));
-    }
-    return DEFAULT_MAX_ROWS_IN_JOIN;
+    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(customProperties);
+    return joinOverflowMode != null ? joinOverflowMode : DEFAULT_JOIN_OVERFLOW_MODE;
   }
 
   // TODO: Separate left and right table operator.
@@ -221,8 +223,7 @@ public class HashJoinOperator extends MultiStageOperator {
         _resourceLimitExceededException =
             new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
         _resourceLimitExceededException.setMessage(
-            "Cannot build in memory hash table for join operator, reach number of rows limit: "
-                + _maxRowsInHashTable);
+            "Cannot build in memory hash table for join operator, reach number of rows limit: " + _maxRowsInHashTable);
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
           throw _resourceLimitExceededException;
         } else {
@@ -233,8 +234,9 @@ public class HashJoinOperator extends MultiStageOperator {
       }
       // put all the rows into corresponding hash collections keyed by the key selector function.
       for (Object[] row : container) {
-        ArrayList<Object[]> hashCollection = _broadcastRightTable.computeIfAbsent(
-            new Key(_rightKeySelector.getKey(row)), k -> new ArrayList<>(INITIAL_HEURISTIC_SIZE));
+        ArrayList<Object[]> hashCollection =
+            _broadcastRightTable.computeIfAbsent(new Key(_rightKeySelector.getKey(row)),
+                k -> new ArrayList<>(INITIAL_HEURISTIC_SIZE));
         int size = hashCollection.size();
         if ((size & size - 1) == 0 && size < _maxRowsInHashTable && size < Integer.MAX_VALUE / 2) { // is power of 2
           hashCollection.ensureCapacity(Math.min(size << 1, _maxRowsInHashTable));
@@ -351,8 +353,7 @@ public class HashJoinOperator extends MultiStageOperator {
         // TODO: Optimize this to avoid unnecessary object copy.
         Object[] resultRow = joinRow(leftRow, rightRow);
         if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
-            evaluator -> (Boolean) TypeUtils.convert(evaluator.apply(resultRow),
-                DataSchema.ColumnDataType.BOOLEAN))) {
+            evaluator -> (Boolean) TypeUtils.convert(evaluator.apply(resultRow), DataSchema.ColumnDataType.BOOLEAN))) {
           rows.add(resultRow);
           hasMatchForLeftRow = true;
           if (_matchedRightRows != null) {
@@ -407,9 +408,5 @@ public class HashJoinOperator extends MultiStageOperator {
 
   private boolean needUnmatchedLeftRows() {
     return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL;
-  }
-
-  enum JoinOverFlowMode {
-    THROW, BREAK
   }
 }

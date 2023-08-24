@@ -27,6 +27,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 
 
 /**
@@ -196,7 +197,8 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static String getJoinOverflowMode(Map<String, String> queryOptions) {
-    return queryOptions.get(QueryOptionKey.JOIN_OVERFLOW_MODE);
+  public static JoinOverFlowMode getJoinOverflowMode(Map<String, String> queryOptions) {
+    String joinOverflowModeStr = queryOptions.get(QueryOptionKey.JOIN_OVERFLOW_MODE);
+    return joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
   }
 }

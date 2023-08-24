@@ -498,6 +498,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_PLAN_MAKER_CLASS =
         "pinot.server.query.executor.plan.maker.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT =
+        "pinot.server.query.executor.num.groups.limit";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
+        "pinot.server.query.executor.max.init.group.holder.capacity";
     public static final String CONFIG_OF_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
     public static final String CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES = "pinot.server.query.rewriter.class.names";
     public static final String CONFIG_OF_ENABLE_QUERY_CANCELLATION = "pinot.server.enable.query.cancellation";
@@ -1053,7 +1057,11 @@ public class CommonConstants {
     /**
      * Configuration for join overflow.
      */
-    public static final String KEY_OF_JOIN_OVERFLOW_MODE = "pinot.query.join.overflow.mode";
     public static final String KEY_OF_MAX_ROWS_IN_JOIN = "pinot.query.join.max.rows";
+    public static final String KEY_OF_JOIN_OVERFLOW_MODE = "pinot.query.join.overflow.mode";
+
+    public enum JoinOverFlowMode {
+      THROW, BREAK
+    }
   }
 }
