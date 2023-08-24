@@ -46,7 +46,7 @@ public class CommonConstants {
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
   public static final String DEFAULT_EVENT_LISTENER_FACTORY_CLASS_NAME =
-      "org.apache.pinot.plugin.event.listener.broker.NoOpBrokerQueryEventListenerFactory";
+      "org.apache.pinot.plugin.query.event.listener.broker.NoOpBrokerQueryEventListenerFactory";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.1.0/";

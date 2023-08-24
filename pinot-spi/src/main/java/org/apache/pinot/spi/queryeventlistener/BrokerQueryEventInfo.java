@@ -19,11 +19,13 @@
 package org.apache.pinot.spi.queryeventlistener;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.spi.trace.RequestContext;
 
 public class BrokerQueryEventInfo {
     private String _requestId;
-    private String _brokerHostPort;
+    private String _brokerId;
     private String _query;
     private String _queryStatus;
     private String _failureJson;
@@ -64,8 +66,41 @@ public class BrokerQueryEventInfo {
     private long _explainPlanNumMatchAllFilterSegments = 0L;
     private int _numRowsResultSet = 0;
     private List<String> _tableNames = new ArrayList<>();
+    private String _offlineServerTenant;
+    private String _realtimeServerTenant;
 
     public BrokerQueryEventInfo() {
+    }
+
+    public BrokerQueryEventInfo(RequestContext requestContext) {
+        _requestId = String.valueOf(requestContext.getRequestId());
+        _brokerId = requestContext.getBrokerId();
+        _query = requestContext.getQuery();
+        _errorCode = requestContext.getErrorCode();
+        _requestArrivalTimeMillis = requestContext.getRequestArrivalTimeMillis();
+        _numServersQueried = requestContext.getNumServersQueried();
+        _numServersResponded = requestContext.getNumServersResponded();
+        _numDocsScanned = requestContext.getNumDocsScanned();
+        _numEntriesScannedPostFilter = requestContext.getNumEntriesScannedInFilter();
+        _numEntriesScannedPostFilter = requestContext.getNumEntriesScannedPostFilter();
+        _numSegmentsQueried = requestContext.getNumSegmentsQueried();
+        _numSegmentsProcessed = requestContext.getNumSegmentsProcessed();
+        _numSegmentsMatched = requestContext.getNumSegmentsMatched();
+        // TODO add consuming segments stats, timeUsedMs
+        _totalDocs = requestContext.getTotalDocs();
+        _numGroupsLimitReached = requestContext.isNumGroupsLimitReached();
+        _offlineThreadCpuTimeNs = requestContext.getOfflineThreadCpuTimeNs();
+        _realtimeThreadCpuTimeNs = requestContext.getRealtimeThreadCpuTimeNs();
+        _offlineSystemActivitiesCpuTimeNs = requestContext.getOfflineSystemActivitiesCpuTimeNs();
+        _realtimeSystemActivitiesCpuTimeNs = requestContext.getRealtimeSystemActivitiesCpuTimeNs();
+        _offlineResponseSerializationCpuTimeNs = requestContext.getOfflineResponseSerializationCpuTimeNs();
+        _realtimeSystemActivitiesCpuTimeNs = requestContext.getRealtimeResponseSerializationCpuTimeNs();
+        _offlineTotalCpuTimeNs = requestContext.getOfflineTotalCpuTimeNs();
+        _realtimeTotalCpuTimeNs = requestContext.getRealtimeTotalCpuTimeNs();
+        _numRowsResultSet = requestContext.getNumRowsResultSet();
+        _tableNames = new ArrayList<>(Collections.singleton(requestContext.getTableName()));
+        _offlineServerTenant = requestContext.getOfflineServerTenant();
+        _realtimeServerTenant = requestContext.getRealtimeServerTenant();
     }
 
     public String getRequestId() {
@@ -76,12 +111,12 @@ public class BrokerQueryEventInfo {
         _requestId = requestId;
     }
 
-    public String getBrokerHostPort() {
-        return _brokerHostPort;
+    public String getBrokerId() {
+        return _brokerId;
     }
 
-    public void setBrokerHostPort(String brokerHostPort) {
-        _brokerHostPort = brokerHostPort;
+    public void setBrokerId(String brokerId) {
+        _brokerId = brokerId;
     }
 
     public String getQuery() {
@@ -378,5 +413,52 @@ public class BrokerQueryEventInfo {
 
     public void setTableNames(List<String> tableNames) {
         _tableNames = tableNames;
+    }
+
+    public String getOfflineServerTenant() {
+        return _offlineServerTenant;
+    }
+
+    public void setOffLineServerTenant(String offLineServerTenant) {
+        _offlineServerTenant = offLineServerTenant;
+    }
+
+    public String getRealtimeServerTenant() {
+        return _realtimeServerTenant;
+    }
+
+    public void setRealtimeServerTenant(String realtimeServerTenant) {
+        _realtimeServerTenant = realtimeServerTenant;
+    }
+
+    @Override
+    public String toString() {
+        return "BrokerQueryEventInfo{" + "_requestId='" + _requestId + '\'' + ", _brokerId='" + _brokerId + '\''
+                + ", _query='" + _query + '\'' + ", _queryStatus='" + _queryStatus + '\'' + ", _failureJson='"
+                + _failureJson + '\'' + ", _errorCode=" + _errorCode + ", _requestArrivalTimeMillis="
+                + _requestArrivalTimeMillis + ", _numServersQueried=" + _numServersQueried
+                + ", _numServersResponded=" + _numServersResponded + ", _numDocsScanned=" + _numDocsScanned
+                + ", _numEntriesScannedInFilter=" + _numEntriesScannedInFilter + ", _numEntriesScannedPostFilter="
+                + _numEntriesScannedPostFilter + ", _numSegmentsQueried=" + _numSegmentsQueried
+                + ", _numSegmentsProcessed=" + _numSegmentsProcessed + ", _numSegmentsMatched=" + _numSegmentsMatched
+                + ", _numConsumingSegmentsQueried=" + _numConsumingSegmentsQueried
+                + ", _numConsumingSegmentsProcessed=" + _numConsumingSegmentsProcessed
+                + ", _numConsumingSegmentsMatched=" + _numConsumingSegmentsMatched + ", _minConsumingFreshnessTimeMs="
+                + _minConsumingFreshnessTimeMs + ", _totalDocs=" + _totalDocs + ", _numGroupsLimitReached="
+                + _numGroupsLimitReached + ", _timeUsedMs=" + _timeUsedMs + ", _offlineThreadCpuTimeNs="
+                + _offlineThreadCpuTimeNs + ", _realtimeThreadCpuTimeNs=" + _realtimeThreadCpuTimeNs
+                + ", _offlineSystemActivitiesCpuTimeNs=" + _offlineSystemActivitiesCpuTimeNs
+                + ", _realtimeSystemActivitiesCpuTimeNs=" + _realtimeSystemActivitiesCpuTimeNs
+                + ", _offlineResponseSerializationCpuTimeNs=" + _offlineResponseSerializationCpuTimeNs
+                + ", _realtimeResponseSerializationCpuTimeNs=" + _realtimeResponseSerializationCpuTimeNs
+                + ", _offlineTotalCpuTimeNs=" + _offlineTotalCpuTimeNs + ", _realtimeTotalCpuTimeNs="
+                + _realtimeTotalCpuTimeNs + ", _numSegmentsPrunedByBroker=" + _numSegmentsPrunedByBroker
+                + ", _numSegmentsPrunedByServer=" + _numSegmentsPrunedByServer + ", _numSegmentsPrunedInvalid="
+                + _numSegmentsPrunedInvalid + ", _numSegmentsPrunedByLimit=" + _numSegmentsPrunedByLimit
+                + ", _numSegmentsPrunedByValue=" + _numSegmentsPrunedByValue + ", _explainPlanNumEmptyFilterSegments="
+                + _explainPlanNumEmptyFilterSegments + ", _explainPlanNumMatchAllFilterSegments="
+                + _explainPlanNumMatchAllFilterSegments + ", _numRowsResultSet=" + _numRowsResultSet + ", _tableNames="
+                + _tableNames + ", _offlineServerTenant='" + _offlineServerTenant + '\'' + ", _realtimeServerTenant='"
+                + _realtimeServerTenant + '\'' + '}';
     }
 }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.event.listener.broker;
+package org.apache.pinot.plugin.query.event.listener.broker;
 
 import org.apache.pinot.spi.annotations.queryeventlistener.BrokerEventListenerFactory;
 import org.apache.pinot.spi.annotations.queryeventlistener.BrokerQueryEventListenerFactory;

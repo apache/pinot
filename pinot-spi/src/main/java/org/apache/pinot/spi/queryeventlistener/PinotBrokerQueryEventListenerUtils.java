@@ -30,7 +30,8 @@ import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.*;
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_EVENT_LISTENER_FACTORY_CLASS_NAME;
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_EVENT_LISTENER_FACTORY_CLASS_NAME;
 
 public class PinotBrokerQueryEventListenerUtils {
     private PinotBrokerQueryEventListenerUtils() {
@@ -41,7 +42,7 @@ public class PinotBrokerQueryEventListenerUtils {
     private static BrokerQueryEventListenerFactory _brokerQueryEventListenerFactory = null;
 
     /**
-     * Initialize the metricsFactory ad registers the metricsRegistry
+     * Initialize the eventListenerFactory and registers the eventListener
      */
     @VisibleForTesting
     public synchronized static void init(PinotConfiguration eventListenerConfiguration) {
@@ -50,7 +51,7 @@ public class PinotBrokerQueryEventListenerUtils {
     }
 
     /**
-     * Initializes PinotQueryEventListenerFactory with metrics configurations.
+     * Initializes PinotQueryEventListenerFactory with event-listener configurations.
      * @param eventListenerConfiguration The subset of the configuration containing the event-listener-related keys
      */
     private static void initializeBrokerQueryEventListenerFactory(PinotConfiguration eventListenerConfiguration) {

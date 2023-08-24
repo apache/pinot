@@ -16,19 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.event.listener.broker;
+package org.apache.pinot.plugin.query.event.listener.broker;
 
 import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventInfo;
 import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class NoOpBrokerQueryEventListener implements BrokerQueryEventListener {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(NoOpBrokerQueryEventListener.class);
   @Override
   public void onQueryCompletion(BrokerQueryEventInfo brokerQueryEventInfo) {
-    LOGGER.info(brokerQueryEventInfo.toString());
+    // Not implemented method
   }
 }

@@ -131,6 +131,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final long _brokerTimeoutMs;
   protected final int _queryResponseLimit;
   protected final QueryLogger _queryLogger;
+  protected final BrokerQueryEventListener _brokerQueryEventListener;
 
   private final boolean _disableGroovy;
   private final boolean _useApproximateFunction;
@@ -138,7 +139,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private final boolean _enableQueryLimitOverride;
   private final boolean _enableDistinctCountBitmapOverride;
   private final Map<Long, QueryServers> _queriesById;
-  private final BrokerQueryEventListener _brokerQueryEventListener;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -252,6 +252,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (!hasAccess) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      _brokerQueryEventListener.onQueryCompletion(new BrokerQueryEventInfo(requestContext));
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -259,6 +260,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setRequestId(requestId);
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null) {
+      _brokerQueryEventListener.onQueryCompletion(new BrokerQueryEventInfo(requestContext));
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
     String query = sql.asText();
@@ -277,6 +279,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     brokerResponse.setRequestId(String.valueOf(requestId));
     brokerResponse.setBrokerId(_brokerId);
     brokerResponse.setBrokerReduceTimeMs(requestContext.getReduceTimeMillis());
+    _brokerQueryEventListener.onQueryCompletion(new BrokerQueryEventInfo(requestContext));
     return brokerResponse;
   }
 
@@ -1685,30 +1688,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setOfflineTotalCpuTimeNs(response.getOfflineTotalCpuTimeNs());
     statistics.setRealtimeTotalCpuTimeNs(response.getRealtimeTotalCpuTimeNs());
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());
-  }
-
-  protected static void augmentStatistics(BrokerQueryEventInfo brokerQueryEventInfo, BrokerResponse response) {
-    brokerQueryEventInfo.setTotalDocs(response.getTotalDocs());
-    brokerQueryEventInfo.setNumDocsScanned(response.getNumDocsScanned());
-    brokerQueryEventInfo.setNumEntriesScannedInFilter(response.getNumEntriesScannedInFilter());
-    brokerQueryEventInfo.setNumEntriesScannedPostFilter(response.getNumEntriesScannedPostFilter());
-    brokerQueryEventInfo.setNumSegmentsQueried(response.getNumSegmentsQueried());
-    brokerQueryEventInfo.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
-    brokerQueryEventInfo.setNumSegmentsMatched(response.getNumSegmentsMatched());
-    brokerQueryEventInfo.setNumServersQueried(response.getNumServersQueried());
-    brokerQueryEventInfo.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
-    brokerQueryEventInfo.setNumServersResponded(response.getNumServersResponded());
-    brokerQueryEventInfo.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
-    brokerQueryEventInfo.setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
-    brokerQueryEventInfo.setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
-    brokerQueryEventInfo.setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
-    brokerQueryEventInfo.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
-    brokerQueryEventInfo.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());
-    brokerQueryEventInfo.setRealtimeResponseSerializationCpuTimeNs(
-        response.getRealtimeResponseSerializationCpuTimeNs());
-    brokerQueryEventInfo.setOfflineTotalCpuTimeNs(response.getOfflineTotalCpuTimeNs());
-    brokerQueryEventInfo.setRealtimeTotalCpuTimeNs(response.getRealtimeTotalCpuTimeNs());
-    brokerQueryEventInfo.setNumRowsResultSet(response.getNumRowsResultSet());
   }
 
   private String getGlobalQueryId(long requestId) {
