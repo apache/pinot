@@ -23,11 +23,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -543,6 +547,34 @@ public class SchemaConformingTransformerTest {
             + ".boolField\":false,\"indexableExtras\":{\"boolField\":false,\"nestedFields\":{\"nullField\":null}}}";
     testTransform(UNINDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_FIELD_SUFFIX, schema, fieldPathsToDrop,
         inputRecordJSONString, expectedOutputRecordJSONString);
+  }
+
+  @Test
+  public void testIgnoringSpecialRowKeys() {
+    // Configure a FilterTransformer and a SchemaConformingTransformer such that the filter will introduce a special
+    // key $(SKIP_RECORD_KEY$) that the SchemaConformingTransformer should ignore
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setFilterConfig(new FilterConfig("intField = 1"));
+    SchemaConformingTransformerConfig schemaConformingTransformerConfig =
+        new SchemaConformingTransformerConfig(INDEXABLE_EXTRAS_FIELD_NAME, UNINDEXABLE_EXTRAS_FIELD_NAME,
+            UNINDEXABLE_FIELD_SUFFIX, null);
+    ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig).build();
+
+    // Create a series of transformers: FilterTransformer -> SchemaConformingTransformer
+    List<RecordTransformer> transformers = new LinkedList<>();
+    transformers.add(new FilterTransformer(tableConfig));
+    Schema schema = createDefaultSchemaBuilder().addSingleValueDimension("intField", DataType.INT).build();
+    transformers.add(new SchemaConformingTransformer(tableConfig, schema));
+    CompositeTransformer compositeTransformer = new CompositeTransformer(transformers);
+
+    Map<String, Object> inputRecordMap = jsonStringToMap("{\"intField\":1}");
+    GenericRow inputRecord = createRowFromMap(inputRecordMap);
+    GenericRow outputRecord = compositeTransformer.transform(inputRecord);
+    Assert.assertNotNull(outputRecord);
+    // Check that the transformed record has $SKIP_RECORD_KEY$
+    Assert.assertFalse(IngestionUtils.shouldIngestRow(outputRecord));
   }
 
   @Test

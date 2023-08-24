@@ -370,7 +370,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
   private void processField(Map<String, Object> schemaNode, String keyJsonPath, String key, Object value,
       ExtraFieldsContainer extraFieldsContainer, GenericRow outputRecord) {
 
-    if (StreamDataDecoderImpl.isSpecialKeyType(key)) {
+    if (StreamDataDecoderImpl.isSpecialKeyType(key) || GenericRow.isSpecialKeyType(key)) {
       outputRecord.putValue(key, value);
       return;
     }
