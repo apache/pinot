@@ -277,12 +277,19 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
     return new Object[][]{
-        // query hint with dynamic broadcast pipeline breaker should return error upstream
+        // Missing index
+        new Object[]{
+            "SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10",
+            "without text index"
+        },
+
+        // Query hint with dynamic broadcast pipeline breaker should return error upstream
         new Object[]{
             "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a "
                 + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE textMatch(col1, 'f')) AND a.col3 > 0",
             "without text index"
         },
+
         // Timeout exception should occur with this option:
         new Object[]{
             "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",

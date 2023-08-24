@@ -152,7 +152,7 @@ public class SortOperator extends MultiStageOperator {
   private void consumeInputBlocks() {
     if (!_isSortedBlockConstructed) {
       TransferableBlock block = _upstreamOperator.nextBlock();
-      while (!block.isSuccessfulEndOfStreamBlock()) {
+      while (block.isDataBlock()) {
         List<Object[]> container = block.getContainer();
         if (_priorityQueue == null) {
           // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
