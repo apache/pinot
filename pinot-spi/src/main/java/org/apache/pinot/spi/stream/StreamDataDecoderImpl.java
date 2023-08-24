@@ -34,6 +34,13 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
   private final StreamMessageDecoder _valueDecoder;
   private final GenericRow _reuse = new GenericRow();
 
+  /**
+   * @return Whether the given key is one of the special types of keys (__key, __header$, etc.)
+   */
+  public static boolean isSpecialKeyType(String key) {
+    return key.equals(KEY) || key.startsWith(HEADER_KEY_PREFIX) || key.startsWith(METADATA_KEY_PREFIX);
+  }
+
   public StreamDataDecoderImpl(StreamMessageDecoder valueDecoder) {
     _valueDecoder = valueDecoder;
   }

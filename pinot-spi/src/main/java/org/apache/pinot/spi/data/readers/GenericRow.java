@@ -79,6 +79,13 @@ public class GenericRow implements Serializable {
   private final Set<String> _nullValueFields = new HashSet<>();
 
   /**
+   * @return Whether the given key is one of the special types of keys ($SKIP_RECORD_KEY$, etc.)
+   */
+  public static boolean isSpecialKeyType(String key) {
+    return key.equals(SKIP_RECORD_KEY) || key.equals(INCOMPLETE_RECORD_KEY) || key.equals(MULTIPLE_RECORDS_KEY);
+  }
+
+  /**
    * Initializes the generic row from the given generic row (shallow copy). The row should be new created or cleared
    * before calling this method.
    */
