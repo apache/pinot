@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
 import com.google.common.math.DoubleMath;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -51,8 +50,8 @@ import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
@@ -116,9 +115,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
     Map<String, String> requestMetadataMap = new HashMap<>();
     requestMetadataMap.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId));
-    Long timeoutMs = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
-    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
-        String.valueOf(timeoutMs != null ? timeoutMs : CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    Long timeoutMsInQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
+    long timeoutMs =
+        timeoutMsInQueryOption != null ? timeoutMsInQueryOption : CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS;
+    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, String.valueOf(timeoutMs));
     requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true");
     requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
 
@@ -127,23 +127,18 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
     }
 
-    int reducerStageId = -1;
-    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
-      if (dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
-          .getFragmentRoot() instanceof MailboxReceiveNode) {
-        reducerStageId = stageId;
-      } else {
+    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+    for (int stageId = 0; stageId < stagePlans.size(); stageId++) {
+      if (stageId != 0) {
         processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
       }
       if (executionStatsAggregatorMap != null) {
         executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
-    Preconditions.checkState(reducerStageId != -1);
-    ResultTable resultTable = QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
-        Long.parseLong(requestMetadataMap.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS)),
-        _mailboxService,
-        _reducerScheduler, executionStatsAggregatorMap, true);
+    ResultTable resultTable =
+        QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, executionStatsAggregatorMap, true,
+            _mailboxService);
     return resultTable.getRows();
   }
 

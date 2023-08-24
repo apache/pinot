@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -60,8 +59,6 @@ import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
-import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
@@ -76,15 +73,10 @@ import org.slf4j.LoggerFactory;
 
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
-  private final String _reducerHostname;
-  private final int _reducerPort;
-
-  private final MailboxService _mailboxService;
-  private final OpChainSchedulerService _reducerScheduler;
 
   private final QueryEnvironment _queryEnvironment;
+  private final MailboxService _mailboxService;
   private final QueryDispatcher _queryDispatcher;
-  private final ExecutorService _opChainExecutor;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -101,19 +93,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerId = StringUtils.split(brokerId, "_").length > 1 ? StringUtils.split(brokerId, "_")[0] : brokerId;
       reducerHostname = brokerId;
     }
-    _reducerHostname = reducerHostname;
     // This config has to be set to a valid port number.
-    _reducerPort = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+    int reducerPort =
+        Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
-        new WorkerManager(_reducerHostname, _reducerPort, routingManager), _tableCache);
-    _queryDispatcher = new QueryDispatcher();
-
-    String opChainExecConfigPrefix = "pinot.query.runner.opchain";
-    String opChainExecNamePrefix = "query_broker_reducer_" + _reducerPort + "port";
-    _opChainExecutor = ExecutorServiceUtils.create(config, opChainExecConfigPrefix, opChainExecNamePrefix);
-    _reducerScheduler = new OpChainSchedulerService(_opChainExecutor);
-    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, config);
+        new WorkerManager(reducerHostname, reducerPort, routingManager), _tableCache);
+    _mailboxService = new MailboxService(reducerHostname, reducerPort, config);
+    _queryDispatcher = new QueryDispatcher(_mailboxService);
 
     // TODO: move this to a startUp() function.
     _mailboxService.start();
@@ -151,12 +138,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           break;
       }
     } catch (Exception e) {
-      LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query,
-          ExceptionUtils.consolidateExceptionMessages(e));
+      String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(e);
+      LOGGER.info("Caught exception compiling request {}: {}, {}", requestId, query, consolidatedMessage);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-      return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
-          ExceptionUtils.consolidateExceptionMessages(e)));
+      return new BrokerResponseNative(
+          QueryException.getException(QueryException.SQL_PARSING_ERROR, consolidatedMessage));
     }
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
@@ -190,12 +177,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long executionStartTimeNs = System.nanoTime();
     try {
-      queryResults =
-          _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, _mailboxService, _reducerScheduler,
-              queryTimeoutMs, sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
+      queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimeoutMs,
+          sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
     } catch (Throwable t) {
-      LOGGER.error("query execution failed", t);
-      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, t));
+      String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
+      LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
+      requestContext.setErrorCode(QueryException.QUERY_EXECUTION_ERROR_CODE);
+      return new BrokerResponseNative(
+          QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, consolidatedMessage));
     }
     long executionEndTimeNs = System.nanoTime();
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - executionStartTimeNs);
@@ -301,8 +290,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
       @Nullable Map<ServerInstance, List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest,
       @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
-      RequestContext requestContext)
-      throws Exception {
+      RequestContext requestContext) {
     throw new UnsupportedOperationException();
   }
 
@@ -315,6 +303,5 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
-    ExecutorServiceUtils.close(_opChainExecutor);
   }
 }
