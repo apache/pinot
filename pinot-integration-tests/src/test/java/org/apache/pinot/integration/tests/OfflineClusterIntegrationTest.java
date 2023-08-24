@@ -83,6 +83,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -256,6 +257,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
               instance, resourcesToMonitor, 100.0))));
     }
+  }
+
+  @BeforeMethod
+  public void resetMultiStageMode() {
+    setUseMultiStageQueryEngine(false);
   }
 
   @Override
@@ -2458,6 +2464,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String response3 = postQuery(query3).get("resultTable").toString();
     assertEquals(response3,
         "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]}," + "\"rows\":[[19755]]}");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDifferentSchema(boolean useMultiStageQueryEngine)
+      throws Exception {
+    // This query is one of the ones used on testNonScanAggregationQueries
+    String tableName = getTableName();
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT MIN_MAX_RANGE(ArrTime) FROM " + tableName;
+    String h2Query = "SELECT MAX(ArrTime)-MIN(ArrTime) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
   }
 
   /**
