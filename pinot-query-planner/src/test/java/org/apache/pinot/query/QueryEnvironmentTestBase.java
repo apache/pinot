@@ -210,7 +210,7 @@ public class QueryEnvironmentTestBase {
     TableCache tableCache = factory.buildTableCache();
     return new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
-        new WorkerManager("localhost", reducerPort, routingManager), tableCache);
+        new WorkerManager("localhost", reducerPort, routingManager), tableCache, null);
   }
 
   /**

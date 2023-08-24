@@ -83,6 +83,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -256,6 +257,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
               instance, resourcesToMonitor, 100.0))));
     }
+  }
+
+  @BeforeMethod
+  public void resetMultiStageMode() {
+    setUseMultiStageQueryEngine(false);
   }
 
   @Override
@@ -2368,9 +2374,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
   }
 
-  @Test
-  public void testDistinctCountHll()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctCountHll(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query;
 
     // The Accurate value is 6538.
@@ -2383,6 +2390,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         3504, 6347, 8877, 9729, 9046, 7672, 7538, 6993, 6649, 6651, 6553, 6525, 6459, 6523, 6532, 6544, 6538, 6539
     };
 
+    JsonNode jsonNode;
+
     for (int i = 2; i < 20; i++) {
       query = String.format("SELECT distinctCountHLL(FlightNum, %d) FROM mytable ", i);
       assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[i - 2]);
@@ -2393,6 +2402,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     query = "SELECT distinctCountHLL(FlightNum) FROM mytable ";
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
+
+    // Default HLL is set as log2m=12
+    query = "SELECT distinctCountHLL(FlightNum), count(*) FROM mytable ";
+    jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
+
+    // Default HLL is set as log2m=12
+    query = "SELECT distinctCountHLL(FlightNum), distinctCountHLL(FlightNum, 2) FROM mytable ";
+    jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).asLong(), expectedResults[0]);
+    jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).asLong(), expectedResults[0]);
   }
 
   @Test

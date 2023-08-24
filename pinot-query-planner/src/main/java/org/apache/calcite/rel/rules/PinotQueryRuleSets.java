@@ -21,8 +21,10 @@ package org.apache.calcite.rel.rules;
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collection;
+import javax.annotation.Nullable;
 import org.apache.calcite.adapter.enumerable.EnumerableRules;
 import org.apache.calcite.plan.RelOptRule;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -110,6 +112,17 @@ public class PinotQueryRuleSets {
   public static final Collection<RelOptRule> PINOT_PRE_RULES = ImmutableList.of(
       PinotAggregateLiteralAttachmentRule.INSTANCE
   );
+
+  public static Collection<RelOptRule> getPinotPreRules(@Nullable PinotConfiguration config) {
+    ImmutableList.Builder<RelOptRule> builder = new ImmutableList.Builder<>();
+    builder.addAll(PINOT_PRE_RULES);
+    if (config == null) {
+      builder.add(ImmutableDefaultHllLog2mRule.Config.builder().build().toRule());
+    } else {
+      builder.add(DefaultHllLog2mRule.Config.fromPinotConfig(config).toRule());
+    }
+    return builder.build();
+  }
 
 
   // Pinot specific rules that should be run AFTER all other rules

@@ -202,7 +202,8 @@ public class PinotQueryResource {
     }
 
     QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
+        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null,
+        null);
     List<String> tableNames = queryEnvironment.getTableNamesForQuery(query);
     List<String> instanceIds;
     if (tableNames.size() != 0) {
@@ -244,7 +245,7 @@ public class PinotQueryResource {
         LOGGER.info("Trying to compile query {} using multi-stage engine", query);
         QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
             CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null,
-            null);
+            null, null);
         queryEnvironment.getTableNamesForQuery(query);
         LOGGER.info("Successfully compiled query using multi-stage engine: {}", query);
         return QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
