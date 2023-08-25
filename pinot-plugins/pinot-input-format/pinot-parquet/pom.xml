@@ -56,5 +56,9 @@
       <artifactId>hadoop-mapreduce-client-core</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
+    <dependency>
+      <groupId>org.codehaus.woodstox</groupId>
+      <artifactId>stax2-api</artifactId>
+    </dependency>
   </dependencies>
 </project>
