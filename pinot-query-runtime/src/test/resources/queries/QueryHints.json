@@ -66,8 +66,20 @@
         "sql": "SELECT {tbl1}.num, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ GROUP BY {tbl1}.num"
       },
       {
+        "description": "Group by partition column with partition parallelism",
+        "sql": "SELECT {tbl1}.num, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4', partition_parallelism='2') */ GROUP BY {tbl1}.num"
+      },
+      {
         "description": "Colocated JOIN with partition column",
         "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Colocated JOIN with partition column with partition parallelism",
+        "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4', partition_parallelism='2') */ ON {tbl1}.num = {tbl2}.num"
+      },
+      {
+        "description": "Colocated JOIN with partition column with partition parallelism in first table",
+        "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num"
       },
       {
         "description": "Colocated JOIN with partition column and group by partition column",

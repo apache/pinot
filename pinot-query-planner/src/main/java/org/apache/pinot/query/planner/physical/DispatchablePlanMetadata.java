@@ -70,6 +70,7 @@ public class DispatchablePlanMetadata implements Serializable {
 
   // whether a stage is partitioned table scan
   private boolean _isPartitionedTableScan;
+  private int _partitionParallelism;
 
   public DispatchablePlanMetadata() {
     _scannedTables = new ArrayList<>();
@@ -141,6 +142,14 @@ public class DispatchablePlanMetadata implements Serializable {
 
   public void setPartitionedTableScan(boolean isPartitionedTableScan) {
     _isPartitionedTableScan = isPartitionedTableScan;
+  }
+
+  public int getPartitionParallelism() {
+    return _partitionParallelism;
+  }
+
+  public void setPartitionParallelism(int partitionParallelism) {
+    _partitionParallelism = partitionParallelism;
   }
 
   public Map<String, Set<String>> getTableToUnavailableSegmentsMap() {

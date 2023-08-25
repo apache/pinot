@@ -69,23 +69,49 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
         }
       } else if (senderMetadata.isPartitionedTableScan()) {
         // For partitioned table scan, send the data to the worker with the same worker id (not necessary the same
-        // instance)
-        // TODO: Support further split the single partition into multiple workers
-        Preconditions.checkState(numSenders == numReceivers,
-            "Got different number of workers for partitioned table scan, sender: %s, receiver: %s", numSenders,
-            numReceivers);
-        for (int workerId = 0; workerId < numSenders; workerId++) {
-          String mailboxId = MailboxIdUtils.toPlanMailboxId(senderFragmentId, workerId, receiverFragmentId, workerId);
-          MailboxMetadata serderMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
-              Collections.singletonList(new VirtualServerAddress(receiverServerMap.get(workerId), workerId)),
-              Collections.emptyMap());
-          MailboxMetadata receiverMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
-              Collections.singletonList(new VirtualServerAddress(senderServerMap.get(workerId), workerId)),
-              Collections.emptyMap());
-          senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
-              .put(receiverFragmentId, serderMailboxMetadata);
-          receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
-              .put(senderFragmentId, receiverMailboxMetadata);
+        // instance). When partition parallelism is configured, send the data to the corresponding workers.
+        // NOTE: Do not use partitionParallelism from the metadata because it might be configured only in the first
+        //       child. Re-compute it based on the number of receivers.
+        int partitionParallelism = numReceivers / numSenders;
+        if (partitionParallelism == 1) {
+          for (int workerId = 0; workerId < numSenders; workerId++) {
+            String mailboxId = MailboxIdUtils.toPlanMailboxId(senderFragmentId, workerId, receiverFragmentId, workerId);
+            MailboxMetadata serderMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
+                Collections.singletonList(new VirtualServerAddress(receiverServerMap.get(workerId), workerId)),
+                Collections.emptyMap());
+            MailboxMetadata receiverMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
+                Collections.singletonList(new VirtualServerAddress(senderServerMap.get(workerId), workerId)),
+                Collections.emptyMap());
+            senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
+                .put(receiverFragmentId, serderMailboxMetadata);
+            receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
+                .put(senderFragmentId, receiverMailboxMetadata);
+          }
+        } else {
+          int receiverWorkerId = 0;
+          for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
+            VirtualServerAddress senderAddress =
+                new VirtualServerAddress(senderServerMap.get(senderWorkerId), senderWorkerId);
+            MailboxMetadata senderMailboxMetadata = new MailboxMetadata();
+            senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>())
+                .put(receiverFragmentId, senderMailboxMetadata);
+            for (int i = 0; i < partitionParallelism; i++) {
+              VirtualServerAddress receiverAddress =
+                  new VirtualServerAddress(receiverServerMap.get(receiverWorkerId), receiverWorkerId);
+              String mailboxId = MailboxIdUtils.toPlanMailboxId(senderFragmentId, senderWorkerId, receiverFragmentId,
+                  receiverWorkerId);
+              senderMailboxMetadata.getMailBoxIdList().add(mailboxId);
+              senderMailboxMetadata.getVirtualAddressList().add(receiverAddress);
+
+              MailboxMetadata receiverMailboxMetadata =
+                  receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
+                      .computeIfAbsent(senderFragmentId, k -> new MailboxMetadata());
+              receiverMailboxMetadata.getMailBoxIdList().add(mailboxId);
+              receiverMailboxMetadata.getVirtualAddressList().add(senderAddress);
+
+              receiverWorkerId++;
+            }
+          }
         }
       } else {
         // For other exchange types, send the data to all the instances in the receiver fragment
