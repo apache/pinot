@@ -46,16 +46,6 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.codehaus.woodstox</groupId>
-          <artifactId>stax2-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.nimbusds</groupId>
-          <artifactId>nimbus-jose-jwt</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -77,11 +67,6 @@
       <groupId>xml-apis</groupId>
       <artifactId>xml-apis</artifactId>
       <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.codehaus.woodstox</groupId>
-      <artifactId>stax2-api</artifactId>
-      <version>4.1</version>
     </dependency>
   </dependencies>
 </project>

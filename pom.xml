@@ -669,6 +669,18 @@
         <scope>provided</scope>
         <exclusions>
           <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
           </exclusion>
@@ -696,6 +708,14 @@
             <groupId>org.apache.yetus</groupId>
             <artifactId>audience-annotations</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.woodstox</groupId>
+            <artifactId>stax2-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -704,6 +724,22 @@
         <version>${hadoop.version}</version>
         <scope>provided</scope>
         <exclusions>
+          <exclusion>
+            <groupId>xml-apis</groupId>
+            <artifactId>xml-apis</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util-ajax</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
@@ -763,6 +799,40 @@
         <artifactId>hadoop-mapreduce-client-core</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-core-asl</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-jaxrs</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-mapper-asl</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-xc</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-servlet</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -1204,6 +1274,12 @@
         <groupId>com.yscope.clp</groupId>
         <artifactId>clp-ffi</artifactId>
         <version>${clp-ffi.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.codehaus.woodstox</groupId>
+        <artifactId>stax2-api</artifactId>
+        <version>4.1</version>
       </dependency>
 
       <!-- This configures all aws sdk dependencies. -->
