@@ -22,21 +22,21 @@
         ]
       },
       {
-        "description": "Select two level functions",
+        "description": "Select two level function to one literal",
         "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('MONTH', FROMDATETIME( '1997-02-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')) FROM d",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[854755200000:BIGINT])",
+          "\nLogicalProject(EXPR$0=[CAST(854755200000:BIGINT):BIGINT])",
           "\n  LogicalTableScan(table=[[d]])",
           "\n"
         ]
       },
       {
-        "description": "Select two level functions",
+        "description": "Eval inner function to literal",
         "sql": "EXPLAIN PLAN FOR SELECT timestampDiff(DAY, CAST(ts as TIMESTAMP), CAST(dateTrunc('MONTH', FROMDATETIME('1997-02-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')) as TIMESTAMP)) FROM d",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($6):TIMESTAMP(0) NOT NULL, CAST(854755200000:BIGINT):TIMESTAMP(0) NOT NULL)])",
+          "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($6):TIMESTAMP(0) NOT NULL, CAST(854755200000:BIGINT):TIMESTAMP(0))])",
           "\n  LogicalTableScan(table=[[d]])",
           "\n"
         ]
@@ -52,14 +52,109 @@
         ]
       },
       {
-        "description": "Select with transform and select alias",
+        "description": "Select with dateTrunc literal function",
         "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('MONTH', 854755200000) AS day FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(day=[854755200000:BIGINT])",
+          "\nLogicalProject(day=[CAST(854755200000:BIGINT):BIGINT])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]
+      },
+      {
+        "description": "Eval Filter literal function",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a WHERE  dateTrunc('MONTH', ts) =  dateTrunc('MONTH', FROMDATETIME('2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss'))",
+        "output": [
+          "Execution Plan",
+          "\nLogicalFilter(condition=[=(DATETRUNC('MONTH', $6), 1546300800000)])",
+          "\n  LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "upper case literal function",
+        "sql": "EXPLAIN PLAN FOR SELECT upper('month') FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=['MONTH'])",
+          "\n  LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "concat literal function",
+        "sql": "EXPLAIN PLAN FOR SELECT concat('month', ' 1') FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST('month 1':VARCHAR):VARCHAR])",
+          "\n  LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "substr literal function",
+        "sql": "EXPLAIN PLAN FOR SELECT substr('month',2) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST('nth':VARCHAR):VARCHAR])",
+          "\n  LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "chained string functions on literal",
+        "sql": "EXPLAIN PLAN FOR SELECT upper(lower(upper(substr('month',2)))) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CAST('NTH':VARCHAR):VARCHAR])",
+          "\n  LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "geoToH3 functions",
+        "sql": "EXPLAIN PLAN FOR Select geoToH3(ST_point(20,102),5) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[599041711439609855:BIGINT])",
+          "\n  LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "geoToH3 functions",
+        "sql": "EXPLAIN PLAN FOR Select ST_Point(20, 10, 1) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[X'8040340000000000004024000000000000':VARBINARY])",
+          "\n  LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "St distance with two bytes literals",
+        "sql": "EXPLAIN PLAN FOR Select ST_Distance(X'8040340000000000004024000000000000', ST_Point(-122, 37.5, 1)) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[13416951.966757335:DOUBLE])",
+          "\n  LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "select literal with always true condition",
+        "sql": "EXPLAIN PLAN FOR Select 1 FROM a WHERE true=true",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[1])",
+          "\n  LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "select non-exist literal function",
+        "sql": "EXPLAIN PLAN FOR Select nonExistFun(1,2) FROM a",
+        "expectedException": "Error explain query plan for.*"
       }
     ]
   }

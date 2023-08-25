@@ -136,6 +136,11 @@ public class LiteralContext {
         }
         _value = literal.getFieldValue().toString();
         break;
+      case BINARY_VALUE:
+        _type = FieldSpec.DataType.BYTES;
+        _value = literal.getBinaryValue();
+        _bigDecimalValue = BigDecimal.ZERO;
+        break;
       case NULL_VALUE:
         _type = FieldSpec.DataType.UNKNOWN;
         _value = null;

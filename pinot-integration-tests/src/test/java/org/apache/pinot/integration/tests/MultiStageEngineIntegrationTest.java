@@ -455,7 +455,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("Illegal base64 character"));
 
     // string literal used in a filter
     sqlQuery = "SELECT * FROM mytable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND "

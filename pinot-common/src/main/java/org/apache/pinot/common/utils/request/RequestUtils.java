@@ -174,7 +174,14 @@ public class RequestUtils {
 
   public static Expression getLiteralExpression(byte[] value) {
     Expression expression = createNewLiteralExpression();
+    // TODO: Set the binary value directly instead of converting it to hex string.
     expression.getLiteral().setStringValue(BytesUtils.toHexString(value));
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(com.google.protobuf.ByteString value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setBinaryValue(value.toByteArray());
     return expression;
   }
 
@@ -203,6 +210,9 @@ public class RequestUtils {
     }
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
+    }
+    if (object instanceof com.google.protobuf.ByteString) {
+      return RequestUtils.getLiteralExpression((com.google.protobuf.ByteString) object);
     }
     if (object instanceof Boolean) {
       return RequestUtils.getLiteralExpression(((Boolean) object).booleanValue());
