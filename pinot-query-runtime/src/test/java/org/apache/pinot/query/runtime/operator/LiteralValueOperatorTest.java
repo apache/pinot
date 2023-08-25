@@ -25,7 +25,6 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -39,9 +38,6 @@ import org.testng.annotations.Test;
 public class LiteralValueOperatorTest {
 
   private AutoCloseable _mocks;
-
-  @Mock
-  private PhysicalPlanContext _context;
 
   @Mock
   private VirtualServerAddress _serverAddress;

@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.runtime.executor;
 
-import com.google.common.collect.ImmutableList;
+import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -68,8 +68,9 @@ public class OpChainSchedulerServiceTest {
 
   private OpChain getChain(MultiStageOperator operator) {
     VirtualServerAddress address = new VirtualServerAddress("localhost", 1234, 1);
-    OpChainExecutionContext context = new OpChainExecutionContext(null, 123L, 1, address, 0, null, null, true);
-    return new OpChain(context, operator, ImmutableList.of());
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(null, 123L, 1, address, Long.MAX_VALUE, Collections.emptyMap(), null, null);
+    return new OpChain(context, operator);
   }
 
   @Test
@@ -131,8 +132,8 @@ public class OpChainSchedulerServiceTest {
     OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
 
     CountDownLatch latch = new CountDownLatch(1);
-    Mockito.when(_operatorA.nextBlock()).thenReturn(
-        TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("foo")));
+    Mockito.when(_operatorA.nextBlock())
+        .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("foo")));
     Mockito.doAnswer(inv -> {
       latch.countDown();
       return null;

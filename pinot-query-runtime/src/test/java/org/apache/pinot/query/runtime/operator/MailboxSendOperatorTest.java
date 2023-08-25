@@ -189,8 +189,8 @@ public class MailboxSendOperatorTest {
     StageMetadata stageMetadata = new StageMetadata.Builder().setWorkerMetadataList(
         Collections.singletonList(new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE, stageMetadata, null,
-            false);
+        new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE,
+            Collections.emptyMap(), stageMetadata, null);
     return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }

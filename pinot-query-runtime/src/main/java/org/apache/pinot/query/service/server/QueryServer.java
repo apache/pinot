@@ -98,10 +98,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
     // Deserialize the request
     List<DistributedStagePlan> distributedStagePlans;
-    Map<String, String> requestMetadataMap;
-    requestMetadataMap = request.getMetadataMap();
-    long requestId = Long.parseLong(requestMetadataMap.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
-    long timeoutMs = Long.parseLong(requestMetadataMap.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    Map<String, String> requestMetadata;
+    requestMetadata = request.getMetadataMap();
+    long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
+    long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
     // 1. Deserialized request
     try {
@@ -114,7 +114,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     // 2. Submit distributed stage plans
     SubmissionService submissionService = new SubmissionService(_querySubmissionExecutorService);
     distributedStagePlans.forEach(distributedStagePlan -> submissionService.submit(() -> {
-      _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+      _queryRunner.processQuery(distributedStagePlan, requestMetadata);
     }));
     // 3. await response successful or any failure which cancels all other tasks.
     try {
@@ -123,8 +123,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       LOGGER.error("error occurred during stage submission for {}:\n{}", requestId, t);
       responseObserver.onNext(Worker.QueryResponse.newBuilder()
           .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
-              QueryException.getTruncatedStackTrace(t))
-          .build());
+              QueryException.getTruncatedStackTrace(t)).build());
       responseObserver.onCompleted();
       return;
     }

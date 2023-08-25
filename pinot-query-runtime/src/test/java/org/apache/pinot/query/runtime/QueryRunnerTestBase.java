@@ -137,8 +137,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       }
     }
     ResultTable resultTable =
-        QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, executionStatsAggregatorMap, true,
-            _mailboxService);
+        QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
+            executionStatsAggregatorMap, _mailboxService);
     return resultTable.getRows();
   }
 

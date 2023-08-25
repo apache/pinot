@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -131,7 +132,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            Collections.emptyMap(), 0, Long.MAX_VALUE);
 
     // then
     // should have single PB result, receive 2 data blocks, EOS block shouldn't be included
@@ -172,7 +173,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            Collections.emptyMap(), 0, Long.MAX_VALUE);
 
     // then
     // should have two PB result, receive 2 data blocks, one each, EOS block shouldn't be included
@@ -200,7 +201,7 @@ public class PipelineBreakerExecutorTest {
     // when
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            Collections.emptyMap(), 0, Long.MAX_VALUE);
 
     // then
     // should return empty block list
@@ -215,23 +216,23 @@ public class PipelineBreakerExecutorTest {
 
   @Test
   public void shouldReturnErrorBlocksFailureWhenPBTimeout() {
-    MailboxReceiveNode incorrectlyConfiguredMailboxNode =
+    MailboxReceiveNode mailboxReceiveNode =
         new MailboxReceiveNode(0, DATA_SCHEMA, 1, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
             null, null, false, false, null);
     DistributedStagePlan distributedStagePlan =
-        new DistributedStagePlan(0, RECEIVER_ADDRESS, incorrectlyConfiguredMailboxNode, _stageMetadata1);
+        new DistributedStagePlan(0, RECEIVER_ADDRESS, mailboxReceiveNode, _stageMetadata1);
 
     // when
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
-    Object[] row1 = new Object[]{1, 1};
-    Object[] row2 = new Object[]{2, 3};
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    CountDownLatch latch = new CountDownLatch(1);
+    when(_mailbox1.poll()).thenAnswer(invocation -> {
+      latch.await();
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    });
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() - 10_000L, 0, false);
+            Collections.emptyMap(), 0, System.currentTimeMillis() + 100);
 
     // then
     // should contain only failure error blocks
@@ -239,6 +240,8 @@ public class PipelineBreakerExecutorTest {
     TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
     Assert.assertNotNull(errorBlock);
     Assert.assertTrue(errorBlock.isErrorBlock());
+
+    latch.countDown();
   }
 
   @Test
@@ -268,7 +271,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            Collections.emptyMap(), 0, Long.MAX_VALUE);
 
     // then
     // should pass when one PB returns result, the other returns empty.
@@ -307,7 +310,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            Collections.emptyMap(), 0, Long.MAX_VALUE);
 
     // then
     // should fail even if one of the 2 PB doesn't contain error block from sender.
