@@ -83,6 +83,29 @@ public final class Schema implements Serializable {
   // queries or not).
   private boolean _hasJSONColumn;
 
+  public Schema() {
+  }
+
+  private Schema(Schema other) {
+    _schemaName = other._schemaName;
+    _dimensionFieldSpecs.addAll(other._dimensionFieldSpecs);
+    _metricFieldSpecs.addAll(other._metricFieldSpecs);
+    if (other._timeFieldSpec != null) {
+      _timeFieldSpec = new TimeFieldSpec(
+          other._timeFieldSpec.getIncomingGranularitySpec(), other._timeFieldSpec.getOutgoingGranularitySpec());
+    }
+    _dateTimeFieldSpecs.addAll(other._dateTimeFieldSpecs);
+    _complexFieldSpecs.addAll(other._complexFieldSpecs);
+    if (other._primaryKeyColumns != null) {
+      _primaryKeyColumns = new ArrayList<>(other._primaryKeyColumns);
+    }
+    _fieldSpecMap.putAll(other._fieldSpecMap);
+    _dimensionNames.addAll(other._dimensionNames);
+    _metricNames.addAll(other._metricNames);
+    _dateTimeNames.addAll(other._dateTimeNames);
+    _hasJSONColumn = other._hasJSONColumn;
+  }
+
   public static Schema fromFile(File schemaFile)
       throws IOException {
     return JsonUtils.fileToObject(schemaFile, Schema.class);
@@ -648,7 +671,7 @@ public final class Schema implements Serializable {
       } catch (Exception e) {
         throw new RuntimeException("Invalid schema", e);
       }
-      return _schema;
+      return new Schema(_schema);
     }
   }
 

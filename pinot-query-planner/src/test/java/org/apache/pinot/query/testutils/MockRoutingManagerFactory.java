@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -80,8 +81,12 @@ public class MockRoutingManagerFactory {
   }
 
   private void registerTableNameWithType(Schema schema, String tableNameWithType) {
-    _tableNameMap.put(tableNameWithType, tableNameWithType);
-    _schemaMap.put(TableNameBuilder.extractRawTableName(tableNameWithType), schema);
+    _tableNameMap.put(tableNameWithType.toLowerCase(Locale.US), tableNameWithType);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    if (!rawTableName.equals(tableNameWithType)) {
+      _tableNameMap.put(rawTableName.toLowerCase(Locale.US), tableNameWithType);
+    }
+    _schemaMap.put(rawTableName, schema);
   }
 
   public void registerSegment(int insertToServerPort, String tableNameWithType, String segmentName) {
