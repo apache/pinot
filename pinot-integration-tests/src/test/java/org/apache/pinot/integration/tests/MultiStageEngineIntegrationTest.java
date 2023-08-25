@@ -127,9 +127,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testQueryOptions()
       throws Exception {
-    String pinotQuery = "SET multistageLeafLimit = 1; SELECT * FROM mytable;";
-    String h2Query = "SELECT * FROM mytable limit 1";
-    testQueryWithMatchingRowCount(pinotQuery, h2Query);
+    String query = "SET multistageLeafLimit = 1; SELECT * FROM mytable a JOIN mytable b on a.AirlineID= b.AirlineID;";
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
   }
 
   @Test

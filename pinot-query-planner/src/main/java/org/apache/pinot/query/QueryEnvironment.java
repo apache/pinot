@@ -40,10 +40,15 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalCorrelate;
+import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
@@ -51,6 +56,8 @@ import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.PinotOperatorTable;
+import org.apache.calcite.sql.type.BasicSqlType;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.util.PinotChainedSqlOperatorTable;
 import org.apache.calcite.sql2rel.PinotConvertletTable;
 import org.apache.calcite.sql2rel.RelDecorrelator;
@@ -282,7 +289,39 @@ public class QueryEnvironment {
     RelRoot relation = toRelation(validated, plannerContext);
     RelRoot decorrelated = decorrelateIfNeeded(relation);
     RelNode optimized = optimize(decorrelated, plannerContext);
-    return relation.withRel(optimized);
+    RelNode appliedRelation = applyDefaultLimitIfNeeded(optimized);
+    return relation.withRel(appliedRelation);
+  }
+
+  private RelNode applyDefaultLimitIfNeeded(RelNode relNode) {
+    if (relNode instanceof LogicalAggregate) {
+      LogicalAggregate logicalAggregate = (LogicalAggregate) relNode;
+      if (logicalAggregate.getGroupSets().size() == 1 && logicalAggregate.getGroupSets().get(0).isEmpty()) {
+        // Don't apply default limit if the query is aggregation only.
+        return relNode;
+      }
+    }
+    if (relNode instanceof LogicalProject) {
+      LogicalProject logicalProject = (LogicalProject) relNode;
+      if (logicalProject.getProjects().size() == 1) {
+        RexNode project = logicalProject.getProjects().get(0);
+        if (project.getKind().equals(SqlKind.AGGREGATE)) {
+          // Don't apply default limit if the query is aggregation only.
+          return relNode;
+        }
+      }
+    }
+    if (!(relNode instanceof LogicalSort)) {
+      relNode = RelBuilder.create(_config).push(relNode).limit(0, 10).build();
+    } else {
+      LogicalSort logicalSort = (LogicalSort) relNode;
+      if (logicalSort.fetch == null) {
+        RexLiteral fetch = new RexBuilder(_typeFactory).makeLiteral(10,
+            new BasicSqlType(_typeFactory.getTypeSystem(), SqlTypeName.INTEGER));
+        relNode = LogicalSort.create(logicalSort.getInput(), logicalSort.getCollation(), logicalSort.offset, fetch);
+      }
+    }
+    return relNode;
   }
 
   private RelRoot decorrelateIfNeeded(RelRoot relRoot) {

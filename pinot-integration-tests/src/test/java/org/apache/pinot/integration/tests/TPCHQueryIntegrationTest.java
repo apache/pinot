@@ -34,6 +34,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.query.runtime.QueryRunnerTestBase;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.utils.JarUtils;
@@ -173,7 +174,8 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       try (InputStream inputStream = TPCHQueryIntegrationTest.class.getClassLoader()
           .getResourceAsStream(path)) {
         queries[iter] = new Object[1];
-        queries[iter][0] = IOUtils.toString(Objects.requireNonNull(inputStream), Charset.defaultCharset());
+        queries[iter][0] = QueryRunnerTestBase.appendLargeLimitClause(
+            IOUtils.toString(Objects.requireNonNull(inputStream), Charset.defaultCharset()));
         iter++;
       }
     }

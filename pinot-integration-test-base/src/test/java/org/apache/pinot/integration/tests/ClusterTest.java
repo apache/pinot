@@ -61,6 +61,7 @@ import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.query.runtime.QueryRunnerTestBase;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
@@ -448,6 +449,9 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQuery(String query)
       throws Exception {
+    if (useMultiStageQueryEngine()) {
+      query = QueryRunnerTestBase.appendLargeLimitClause(query);
+    }
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         getExtraQueryProperties());
   }

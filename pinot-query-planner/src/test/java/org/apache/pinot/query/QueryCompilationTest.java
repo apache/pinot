@@ -28,16 +28,12 @@ import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
-import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
-import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.testng.Assert;
@@ -90,43 +86,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
-  private static void assertGroupBySingletonAfterJoin(DispatchableSubPlan dispatchableSubPlan, boolean shouldRewrite)
-      throws Exception {
-
-    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
-      if (dispatchableSubPlan.getTableNames().size() == 0 && !PlannerUtils.isRootPlanFragment(stageId)) {
-        PlanNode node = dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment().getFragmentRoot();
-        while (node != null) {
-          if (node instanceof JoinNode) {
-            // JOIN is exchanged with hash distribution (data shuffle)
-            MailboxReceiveNode left = (MailboxReceiveNode) node.getInputs().get(0);
-            MailboxReceiveNode right = (MailboxReceiveNode) node.getInputs().get(1);
-            Assert.assertEquals(left.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
-            Assert.assertEquals(right.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED);
-            break;
-          }
-          if (node instanceof AggregateNode && node.getInputs().get(0) instanceof MailboxReceiveNode) {
-            // AGG is exchanged with singleton since it has already been distributed by JOIN.
-            MailboxReceiveNode input = (MailboxReceiveNode) node.getInputs().get(0);
-            if (shouldRewrite) {
-              Assert.assertEquals(input.getDistributionType(), RelDistribution.Type.SINGLETON);
-            } else {
-              Assert.assertNotEquals(input.getDistributionType(), RelDistribution.Type.SINGLETON);
-            }
-            break;
-          }
-          node = node.getInputs().get(0);
-        }
-      }
-    }
-  }
-
   @Test
   public void testQueryAndAssertStageContentForJoin()
       throws Exception {
-    String query = "SELECT * FROM a JOIN b ON a.col1 = b.col2";
+    String query = "SELECT * FROM a JOIN b ON a.col1 = b.col2 LIMIT 10";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
-    Assert.assertEquals(dispatchableSubPlan.getQueryStageList().size(), 4);
+    Assert.assertEquals(dispatchableSubPlan.getQueryStageList().size(), 5);
 
     for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
       DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
@@ -248,9 +213,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
       throws Exception {
     // Hinting the query to use final stage aggregation makes server directly return final result
     // This is useful when data is already partitioned by col1
-    String query = "SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ col1, COUNT(*) FROM b GROUP BY col1";
+    String query = "SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ col1, COUNT(*) FROM b GROUP BY col1 LIMIT 10";
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
-    Assert.assertEquals(dispatchableSubPlan.getQueryStageList().size(), 2);
+    Assert.assertEquals(dispatchableSubPlan.getQueryStageList().size(), 3);
     for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
       DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
       String tableName = dispatchablePlanFragment.getTableName();
@@ -376,10 +341,6 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     Assert.assertEquals(tableNames.get(0), "a");
   }
 
-  // --------------------------------------------------------------------------
-  // Test Utils.
-  // --------------------------------------------------------------------------
-
   private static void assertNodeTypeNotIn(PlanNode node, List<Class<? extends AbstractPlanNode>> bannedNodeType) {
     Assert.assertFalse(isOneOf(bannedNodeType, node));
     for (PlanNode child : node.getInputs()) {
@@ -442,26 +403,40 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "          \"name\": \"$2\"\n"
             + "        }\n"
             + "      ]\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"id\": \"2\",\n"
+            + "      \"relOp\": \"LogicalSort\",\n"
+            + "      \"collation\": [],\n"
+            + "      \"fetch\": {\n"
+            + "        \"literal\": 10,\n"
+            + "        \"type\": {\n"
+            + "          \"type\": \"INTEGER\",\n"
+            + "          \"nullable\": false\n"
+            + "        }\n"
+            + "      }\n"
             + "    }\n"
             + "  ]\n"
             + "}"},
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
-              "Execution Plan\n"
+            "Execution Plan\n"
             + "digraph {\n"
+            + "\"LogicalAggregate\\n\" -> \"LogicalSort\\n\" [label=\"0\"]\n"
             + "\"PinotLogicalExchange\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
             + "\"LogicalAggregate\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
             + "\"LogicalTableScan\\n\" -> \"LogicalAggregate\\n\" [label=\"0\"]\n"
             + "}\n"},
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
               "Execution Plan\n"
-            + "LogicalProject(col1=[$0], col3=[$2])\n"
-            + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
-            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
-            + "      LogicalProject(col1=[$0])\n"
-            + "        LogicalTableScan(table=[[a]])\n"
-            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
-            + "      LogicalProject(col1=[$0], col3=[$2])\n"
-            + "        LogicalTableScan(table=[[b]])\n"
+            + "LogicalSort(fetch=[10])\n"
+            + "  LogicalProject(col1=[$0], col3=[$2])\n"
+            + "    LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+            + "      PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        LogicalProject(col1=[$0])\n"
+            + "          LogicalTableScan(table=[[a]])\n"
+            + "      PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "        LogicalProject(col1=[$0], col3=[$2])\n"
+            + "          LogicalTableScan(table=[[b]])\n"
         },
     };
     //@formatter:on
@@ -472,42 +447,51 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     //@formatter:off
     return new Object[][] {
 new Object[]{"EXPLAIN IMPLEMENTATION PLAN INCLUDING ALL ATTRIBUTES FOR SELECT col1, col3 FROM a",
-  "[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
-+ "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-+ "│   └── [1]@localhost:1 PROJECT\n"
-+ "│       └── [1]@localhost:1 TABLE SCAN (a) null\n"
-+ "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-+ "    └── [1]@localhost:2 PROJECT\n"
-+ "        └── [1]@localhost:2 TABLE SCAN (a) null\n"},
+    "[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
+    + "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+    + "│   └── [1]@localhost:1 SORT LIMIT 10\n"
+    + "│       └── [1]@localhost:1 PROJECT\n"
+    + "│           └── [1]@localhost:1 TABLE SCAN (a) null\n"
+    + "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+    + "    └── [1]@localhost:2 SORT LIMIT 10\n"
+    + "        └── [1]@localhost:2 PROJECT\n"
+    + "            └── [1]@localhost:2 TABLE SCAN (a) null\n"},
 new Object[]{"EXPLAIN IMPLEMENTATION PLAN EXCLUDING ATTRIBUTES FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
-"[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
-+ "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
-+ "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-+ "    └── [1]@localhost:2 AGGREGATE_FINAL\n"
-+ "        └── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
-+ "            ├── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
-+ "            │   └── [2]@localhost:1 AGGREGATE_LEAF\n"
-+ "            │       └── [2]@localhost:1 TABLE SCAN (a) null\n"
-+ "            └── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
-+ "                └── [2]@localhost:2 AGGREGATE_LEAF\n"
-+ "                    └── [2]@localhost:2 TABLE SCAN (a) null\n"},
+    "[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
+    + "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
+    + "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+    + "    └── [1]@localhost:2 SORT LIMIT 10\n"
+    + "        └── [1]@localhost:2 AGGREGATE_FINAL\n"
+    + "            └── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
+    + "                ├── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->"
+        + "{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
+    + "                │   └── [2]@localhost:1 AGGREGATE_LEAF\n"
+    + "                │       └── [2]@localhost:1 TABLE SCAN (a) null\n"
+    + "                └── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->"
+        + "{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
+    + "                    └── [2]@localhost:2 AGGREGATE_LEAF\n"
+    + "                        └── [2]@localhost:2 TABLE SCAN (a) null\n"},
 new Object[]{"EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
-  "[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
-+ "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
-+ "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-+ "    └── [1]@localhost:2 PROJECT\n"
-+ "        └── [1]@localhost:2 JOIN\n"
-+ "            ├── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
-+ "            │   ├── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
-+ "            │   │   └── [2]@localhost:1 PROJECT\n"
-+ "            │   │       └── [2]@localhost:1 TABLE SCAN (a) null\n"
-+ "            │   └── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
-+ "            │       └── [2]@localhost:2 PROJECT\n"
-+ "            │           └── [2]@localhost:2 TABLE SCAN (a) null\n"
-+ "            └── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
-+ "                └── [3]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
-+ "                    └── [3]@localhost:1 PROJECT\n"
-+ "                        └── [3]@localhost:1 TABLE SCAN (b) null\n"}
+    "[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
+    + "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
+    + "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
+    + "    └── [1]@localhost:2 SORT LIMIT 10\n"
+    + "        └── [1]@localhost:2 PROJECT\n"
+    + "            └── [1]@localhost:2 JOIN\n"
+    + "                ├── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
+    + "                │   ├── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->"
+        + "{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
+    + "                │   │   └── [2]@localhost:1 PROJECT\n"
+    + "                │   │       └── [2]@localhost:1 TABLE SCAN (a) null\n"
+    + "                │   └── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->"
+        + "{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
+    + "                │       └── [2]@localhost:2 PROJECT\n"
+    + "                │           └── [2]@localhost:2 TABLE SCAN (a) null\n"
+    + "                └── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
+    + "                    └── [3]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->"
+        + "{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
+    + "                        └── [3]@localhost:1 PROJECT\n"
+    + "                            └── [3]@localhost:1 TABLE SCAN (b) null\n"}
     };
     //@formatter:on
   }

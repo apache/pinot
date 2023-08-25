@@ -71,6 +71,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.query.runtime.QueryRunnerTestBase;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
@@ -700,6 +701,9 @@ public class ClusterIntegrationTestUtils {
       throws Exception {
     // broker response
     JsonNode pinotResponse;
+    if (useMultiStageQueryEngine) {
+      pinotQuery = QueryRunnerTestBase.appendLargeLimitClause(pinotQuery);
+    }
     if (viaController) {
       pinotResponse = ClusterTest.postQueryToController(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
     } else {

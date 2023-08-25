@@ -486,6 +486,19 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
   }
 
+  public static String appendLargeLimitClause(String sql) {
+    String upperCaseSql = sql.toUpperCase();
+    if (upperCaseSql.contains("OFFSET ") || upperCaseSql.contains("SET MULTISTAGELEAFLIMIT") || upperCaseSql.contains(
+        "LIMIT ")) {
+      return sql;
+    }
+    while (sql.endsWith(";") || sql.endsWith("\n") || sql.endsWith("\t")) {
+      sql = sql.substring(0, sql.length() - 1).trim();
+    }
+    sql += " LIMIT 2147483647;";
+    return sql;
+  }
+
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class QueryTestCase {
     public static final String BLOCK_SIZE_KEY = "blockSize";

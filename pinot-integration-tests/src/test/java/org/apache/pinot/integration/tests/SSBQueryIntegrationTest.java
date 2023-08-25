@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.query.runtime.QueryRunnerTestBase;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.utils.JarUtils;
@@ -178,6 +179,7 @@ public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
         .getResourceAsStream(SSB_QUERY_SET_RESOURCE_NAME);
     Map<String, List<String>> ssbQuerySet = yaml.load(inputStream);
     List<String> ssbQueryList = ssbQuerySet.get("sqls");
-    return ssbQueryList.stream().map(s -> new Object[]{s}).toArray(Object[][]::new);
+    return ssbQueryList.stream().map(s -> new Object[]{QueryRunnerTestBase.appendLargeLimitClause(s)})
+        .toArray(Object[][]::new);
   }
 }

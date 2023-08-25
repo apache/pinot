@@ -255,8 +255,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void testQueryTestCasesWithH2(String testCaseName, String sql, String h2Sql, String expect,
       boolean keepOutputRowOrder)
       throws Exception {
-    // query pinot
-    runQuery(sql, expect, null).ifPresent(rows -> {
+    runQuery(appendLargeLimitClause(sql), expect, null).ifPresent(rows -> {
       try {
         compareRowEquals(rows, queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
@@ -269,7 +268,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void testQueryTestCasesWithOutput(String testCaseName, String sql, String h2Sql, List<Object[]> expectedRows,
       String expect, boolean keepOutputRowOrder)
       throws Exception {
-    runQuery(sql, expect, null).ifPresent(rows -> compareRowEquals(rows, expectedRows, keepOutputRowOrder));
+    runQuery(appendLargeLimitClause(sql), expect, null).ifPresent(
+        rows -> compareRowEquals(rows, expectedRows, keepOutputRowOrder));
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")

@@ -167,7 +167,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows)
       throws Exception {
-    List<Object[]> resultRows = queryRunner(sql, null);
+    List<Object[]> resultRows = queryRunner(appendLargeLimitClause(sql), null);
     Assert.assertEquals(resultRows.size(), expectedRows);
   }
 
@@ -180,7 +180,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
-    List<Object[]> resultRows = queryRunner(sql, null);
+    List<Object[]> resultRows = queryRunner(appendLargeLimitClause(sql), null);
     // query H2 for data
     List<Object[]> expectedRows = queryH2(sql);
     compareRowEquals(resultRows, expectedRows);
@@ -272,20 +272,29 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // test queries with special query options attached
         //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.
-        new Object[]{"SET multiStageLeafLimit = 1; SELECT * FROM a", 2},
+        // Due to default limit 10, so the leaf limit only take effect when query has multi-stages.
+        new Object[]{"SET multiStageLeafLimit = 1; SELECT * FROM a JOIN b ON a.col3 = b.col3", 2},
 
         // test groups limit in both leaf and intermediate stage
         new Object[]{"SET numGroupsLimit = 1; SELECT col1, COUNT(*) FROM a GROUP BY col1", 1},
         new Object[]{"SET numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2},
-        new Object[]{"SET numGroupsLimit = 1; "
-            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1},
-        new Object[]{"SET numGroupsLimit = 2; "
-            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2},
+        new Object[]{
+            "SET numGroupsLimit = 1; "
+                + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1
+        },
+        new Object[]{
+            "SET numGroupsLimit = 2; "
+                + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2
+        },
         // TODO: Consider pushing down hint to the leaf stage
-        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
-            + "col1, COUNT(*) FROM a GROUP BY col1", 2},
-        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
-            + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1}
+        new Object[]{
+            "SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+                + "col1, COUNT(*) FROM a GROUP BY col1", 2
+        },
+        new Object[]{
+            "SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+                + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1
+        }
     };
   }
 
