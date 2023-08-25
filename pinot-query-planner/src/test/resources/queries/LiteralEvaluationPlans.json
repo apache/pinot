@@ -1,0 +1,66 @@
+{
+  "literal_evaluation_tests": {
+    "queries": [
+      {
+        "description": "Select arithmetic expression",
+        "sql": "EXPLAIN PLAN FOR SELECT 5*6,5+6 FROM d",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[30.0], EXPR$1=[11.0])",
+          "\n  LogicalTableScan(table=[[d]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select fromdatetime function",
+        "sql": "EXPLAIN PLAN FOR SELECT FROMDATETIME( '1997-02-01 00:00:00', 'yyyy-MM-dd HH:mm:ss') FROM d",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[1997-02-01 00:00:00])",
+          "\n  LogicalTableScan(table=[[d]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select two level functions",
+        "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('MONTH', FROMDATETIME( '1997-02-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')) FROM d",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[854755200000:BIGINT])",
+          "\n  LogicalTableScan(table=[[d]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select two level functions",
+        "sql": "EXPLAIN PLAN FOR SELECT timestampDiff(DAY, CAST(ts as TIMESTAMP), CAST(dateTrunc('MONTH', FROMDATETIME('1997-02-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')) as TIMESTAMP)) FROM d",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($6):TIMESTAMP(0) NOT NULL, CAST(854755200000:BIGINT):TIMESTAMP(0) NOT NULL)])",
+          "\n  LogicalTableScan(table=[[d]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select fromdatetime function in where clause",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d WHERE CAST(ts AS TIMESTAMP) = FROMDATETIME('2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalFilter(condition=[=(CAST($6):TIMESTAMP(0) NOT NULL, 2019-01-01 00:00:00)])",
+          "\n  LogicalTableScan(table=[[d]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select with transform and select alias",
+        "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('MONTH', 854755200000) AS day FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(day=[854755200000:BIGINT])",
+          "\n  LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      }
+    ]
+  }
+}
