@@ -26,6 +26,7 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataSchema;
@@ -113,7 +114,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
       _whenStatements.add(arguments.get(i * 2));
       _thenStatements.add(arguments.get(i * 2 + 1));
     }
-    if (arguments.size() % 2 != 0) {
+    if (arguments.size() % 2 != 0 && isNotNullLiteralTransformation(arguments.get(arguments.size() - 1))) {
       _elseStatement = arguments.get(arguments.size() - 1);
     }
   }
@@ -128,7 +129,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     for (int i = numWhenStatements; i < numWhenStatements * 2; i++) {
       _thenStatements.add(arguments.get(i));
     }
-    if (arguments.size() % 2 != 0) {
+    if (arguments.size() % 2 != 0 && isNotNullLiteralTransformation(arguments.get(arguments.size() - 1))) {
       _elseStatement = arguments.get(arguments.size() - 1);
     }
   }
@@ -255,6 +256,14 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   @Override
   public TransformResultMetadata getResultMetadata() {
     return _resultMetadata;
+  }
+
+  private boolean isNotNullLiteralTransformation(TransformFunction function) {
+    if (Objects.equals(function.getName(), LiteralTransformFunction.FUNCTION_NAME)) {
+      LiteralTransformFunction literalFUnction = (LiteralTransformFunction) function;
+      return !literalFUnction.isNull();
+    }
+    return true;
   }
 
   /**
