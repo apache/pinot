@@ -159,7 +159,7 @@
     <jmh.version>1.26</jmh.version>
     <audienceannotations.version>0.13.0</audienceannotations.version>
     <clp-ffi.version>0.4.3</clp-ffi.version>
-    <stax2-api>4.1</stax2-api>
+    <stax2-api.version>4.1</stax2-api.version>
     <aws.sdk.version>2.20.94</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
@@ -1284,7 +1284,7 @@
       <dependency>
         <groupId>org.codehaus.woodstox</groupId>
         <artifactId>stax2-api</artifactId>
-        <version>${stax2-api}</version>
+        <version>${stax2-api.version}</version>
       </dependency>
 
       <!-- This configures all aws sdk dependencies. -->
