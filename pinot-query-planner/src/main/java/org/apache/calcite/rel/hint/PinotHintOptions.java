@@ -83,5 +83,6 @@ public class PinotHintOptions {
   public static class TableHintOptions {
     public static final String PARTITION_KEY = "partition_key";
     public static final String PARTITION_SIZE = "partition_size";
+    public static final String PARTITION_PARALLELISM = "partition_parallelism";
   }
 }
