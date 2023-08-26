@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.List;
 import java.util.function.Consumer;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -34,31 +33,21 @@ import org.slf4j.LoggerFactory;
 public class OpChain implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChain.class);
 
-  private final MultiStageOperator _root;
-  private final List<String> _receivingMailboxIds;
   private final OpChainId _id;
   private final OpChainStats _stats;
-  private final Consumer<OpChainId> _opChainFinishCallback;
+  private final MultiStageOperator _root;
+  private final Consumer<OpChainId> _finishCallback;
 
-  public OpChain(OpChainExecutionContext context, MultiStageOperator root, List<String> receivingMailboxIds) {
-    this(context, root, receivingMailboxIds, (id) -> { });
+  public OpChain(OpChainExecutionContext context, MultiStageOperator root) {
+    this(context, root, (id) -> {
+    });
   }
 
-  public OpChain(OpChainExecutionContext context, MultiStageOperator root, List<String> receivingMailboxIds,
-      Consumer<OpChainId> opChainFinishCallback) {
-    _root = root;
-    _receivingMailboxIds = receivingMailboxIds;
+  public OpChain(OpChainExecutionContext context, MultiStageOperator root, Consumer<OpChainId> finishCallback) {
     _id = context.getId();
     _stats = context.getStats();
-    _opChainFinishCallback = opChainFinishCallback;
-  }
-
-  public Operator<TransferableBlock> getRoot() {
-    return _root;
-  }
-
-  public List<String> getReceivingMailboxIds() {
-    return _receivingMailboxIds;
+    _root = root;
+    _finishCallback = finishCallback;
   }
 
   public OpChainId getId() {
@@ -68,6 +57,10 @@ public class OpChain implements AutoCloseable {
   // TODO: Move OperatorStats here.
   public OpChainStats getStats() {
     return _stats;
+  }
+
+  public Operator<TransferableBlock> getRoot() {
+    return _root;
   }
 
   @Override
@@ -86,7 +79,7 @@ public class OpChain implements AutoCloseable {
     try {
       _root.close();
     } finally {
-      _opChainFinishCallback.accept(getId());
+      _finishCallback.accept(getId());
       LOGGER.trace("OpChain callback called");
     }
   }
@@ -102,7 +95,7 @@ public class OpChain implements AutoCloseable {
     try {
       _root.cancel(e);
     } finally {
-      _opChainFinishCallback.accept(getId());
+      _finishCallback.accept(getId());
       LOGGER.trace("OpChain callback called");
     }
   }

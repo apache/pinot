@@ -166,8 +166,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
 
-    boolean traceEnabled = Boolean.parseBoolean(
-        sqlNodeAndOptions.getOptions().getOrDefault(CommonConstants.Broker.Request.TRACE, "false"));
+    Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+    boolean traceEnabled = Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
 
     ResultTable queryResults;
     Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();
@@ -177,8 +177,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     long executionStartTimeNs = System.nanoTime();
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimeoutMs,
-          sqlNodeAndOptions.getOptions(), stageIdStatsMap, traceEnabled);
+      queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimeoutMs, queryOptions,
+          stageIdStatsMap);
     } catch (Throwable t) {
       String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
       LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);

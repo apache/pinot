@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -208,7 +209,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
     }
     try {
-      QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, null, false, _mailboxService);
+      QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(), null,
+          _mailboxService);
       Assert.fail("Should have thrown exception!");
     } catch (RuntimeException e) {
       // NOTE: The actual message is (usually) something like:

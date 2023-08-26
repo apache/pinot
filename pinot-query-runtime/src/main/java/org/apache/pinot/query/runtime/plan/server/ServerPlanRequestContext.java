@@ -20,7 +20,7 @@ package org.apache.pinot.query.runtime.plan.server;
 
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.config.table.TableType;
 
 
@@ -29,20 +29,21 @@ import org.apache.pinot.spi.config.table.TableType;
  * {@link PinotQuery} to execute on server.
  */
 public class ServerPlanRequestContext {
-  private final PhysicalPlanContext _planContext;
+  private final OpChainExecutionContext _executionContext;
   private final TableType _tableType;
 
   private PinotQuery _pinotQuery;
   private InstanceRequest _instanceRequest;
 
-  public ServerPlanRequestContext(PhysicalPlanContext planContext, PinotQuery pinotQuery, TableType tableType) {
-    _planContext = planContext;
+  public ServerPlanRequestContext(OpChainExecutionContext executionContext, PinotQuery pinotQuery,
+      TableType tableType) {
+    _executionContext = executionContext;
     _pinotQuery = pinotQuery;
     _tableType = tableType;
   }
 
-  public PhysicalPlanContext getPlanContext() {
-    return _planContext;
+  public OpChainExecutionContext getExecutionContext() {
+    return _executionContext;
   }
 
   public TableType getTableType() {
