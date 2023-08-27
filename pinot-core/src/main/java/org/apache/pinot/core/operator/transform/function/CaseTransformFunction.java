@@ -135,10 +135,16 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   private TransformResultMetadata calculateResultMetadata() {
-    TransformResultMetadata elseStatementResultMetadata = _elseStatement.getResultMetadata();
-    DataType dataType = elseStatementResultMetadata.getDataType();
-    Preconditions.checkState(elseStatementResultMetadata.isSingleValue(),
-        "Unsupported multi-value expression in the ELSE clause");
+    DataType dataType;
+    if (_elseStatement == null) {
+      // only possible in case of Null Literal transformation.
+      dataType = DataType.UNKNOWN;
+    } else {
+      TransformResultMetadata elseStatementResultMetadata = _elseStatement.getResultMetadata();
+      dataType = elseStatementResultMetadata.getDataType();
+      Preconditions.checkState(elseStatementResultMetadata.isSingleValue(),
+          "Unsupported multi-value expression in the ELSE clause");
+    }
     int numThenStatements = _thenStatements.size();
     for (int i = 0; i < numThenStatements; i++) {
       TransformFunction thenStatement = _thenStatements.get(i);
