@@ -26,7 +26,6 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.DataSchema;
@@ -137,7 +136,6 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   private TransformResultMetadata calculateResultMetadata() {
     DataType dataType;
     if (_elseStatement == null) {
-      // only possible in case of Null Literal transformation.
       dataType = DataType.UNKNOWN;
     } else {
       TransformResultMetadata elseStatementResultMetadata = _elseStatement.getResultMetadata();
@@ -265,9 +263,9 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   }
 
   private boolean isNotNullLiteralTransformation(TransformFunction function) {
-    if (Objects.equals(function.getName(), LiteralTransformFunction.FUNCTION_NAME)) {
-      LiteralTransformFunction literalFUnction = (LiteralTransformFunction) function;
-      return !literalFUnction.isNull();
+    if (function instanceof LiteralTransformFunction) {
+      LiteralTransformFunction literalFunction = (LiteralTransformFunction) function;
+      return !literalFunction.isNull();
     }
     return true;
   }
