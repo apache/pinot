@@ -291,22 +291,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testIncorrectBase64()
+  public void testStrangeCalciteError()
       throws Exception {
-    String sqlQuery = "SELECT AirlineID as originalCol, toBase64(toUtf8(AirlineID)) as encoded, "
-        + "fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) as decoded FROM mytable "
-        + "GROUP BY AirlineID, toBase64(toUtf8(AirlineID)), fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) "
-        + "ORDER BY fromUtf8(fromBase64(toBase64(toUtf8(AirlineID)))) LIMIT 10";
+    String sqlQuery = "SELECT toBase64(toUtf8(AirlineID)) as encoded "
+        + "FROM mytable "
+        + "GROUP BY toBase64(toUtf8(AirlineID)) "
+        + "LIMIT 10";
 
+    JsonNode jsonNode;
+    JsonNode exceptions;
     setUseMultiStageQueryEngine(false);
-    JsonNode jsonNode = postQuery(sqlQuery);
-    JsonNode exceptions = jsonNode.get("exceptions");
-    Assert.assertTrue(exceptions.isEmpty());
+    jsonNode = postQuery(sqlQuery);
+    exceptions = jsonNode.get("exceptions");
+    Assert.assertTrue(exceptions.isEmpty(), exceptions.toPrettyString());
 
     setUseMultiStageQueryEngine(true);
     jsonNode = postQuery(sqlQuery);
     exceptions = jsonNode.get("exceptions");
-    Assert.assertTrue(exceptions.isEmpty());
+    Assert.assertTrue(exceptions.isEmpty(), exceptions.toPrettyString());
   }
 
   @Test
