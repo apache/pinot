@@ -22,6 +22,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertFalse;
 
 
 public class SegmentCompletionUtilsTest {
@@ -37,5 +38,13 @@ public class SegmentCompletionUtilsTest {
     String segmentName = "segment";
     String segmentNamePrefix = SegmentCompletionUtils.getSegmentNamePrefix(segmentName);
     assertTrue(SegmentCompletionUtils.generateSegmentFileName(segmentName).startsWith(segmentNamePrefix));
+  }
+
+  @Test
+  public void testIsTmpFile() {
+    assertTrue(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.550e8400-e29b-41d4-a716-446655440000"));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp."));
+    assertFalse(SegmentCompletionUtils.isTmpFile(".tmp.550e8400-e29b-41d4-a716-446655440000"));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.55"));
   }
 }

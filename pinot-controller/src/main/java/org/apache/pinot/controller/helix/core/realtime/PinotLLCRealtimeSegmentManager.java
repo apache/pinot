@@ -1489,7 +1489,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Delete tmp segments for realtime table with low level consumer, split commit and async deletion is enabled.
-    Set<String> deepURIs = segmentsZKMetadata.stream().parallel().filter(meta -> meta.getStatus() == Status.DONE
+    Set<String> deepURIs = segmentsZKMetadata.stream().filter(meta -> meta.getStatus() == Status.DONE
         && !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(meta.getDownloadUrl())).map(
         SegmentZKMetadata::getDownloadUrl).collect(
         Collectors.toSet());
@@ -1497,21 +1497,25 @@ public class PinotLLCRealtimeSegmentManager {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
     PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
-    long orphanTmpSegments = 0;
+    long deletedTmpSegments = 0;
     try {
       for (String filePath : pinotFS.listFiles(tableDirURI, false)) {
         // prepend scheme
         URI uri = URIUtils.getUri(filePath);
         if (isTmpAndCanDelete(uri, deepURIs, pinotFS)) {
           LOGGER.info("Deleting temporary segment file: {}", uri);
-          Preconditions.checkState(pinotFS.delete(uri, true), "Failed to delete file: %s", uri);
-          orphanTmpSegments++;
+          if (pinotFS.delete(uri, true)) {
+            LOGGER.info(String.format("Succeed to delete file: %s", uri));
+            deletedTmpSegments++;
+          } else {
+            LOGGER.warn(String.format("Failed to delete file: %s", uri));
+          }
         }
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while deleting temporary files for table: {}", rawTableName, e);
     }
-    return orphanTmpSegments;
+    return deletedTmpSegments;
   }
 
   private boolean isTmpAndCanDelete(URI uri, Set<String> deepURIs, PinotFS pinotFS) throws Exception {
