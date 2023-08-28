@@ -217,7 +217,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
       try {
         if (isForceCommitJobCompleted(jobId)) {
           assertTrue(_controllerStarter.getHelixResourceManager()
-              .getOnlineSegmentsFromIdealState(getTableName() + "_REALTIME", false)
+              .getOnlineSegmentsFromExternalView(getTableName() + "_REALTIME")
               .containsAll(finalConsumingSegments));
 
           int snapshotFileCount = 0;
@@ -246,7 +246,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
       } catch (Exception e) {
         return false;
       }
-    }, 120000L, "Error verifying force commit operation on table!");
+    }, 5000L, 120000L, "Error verifying force commit operation on table!");
   }
 
   protected void verifyIdealState(int numSegmentsExpected) {
