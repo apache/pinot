@@ -41,6 +41,14 @@
         ]
       },
       {
+        "description": "test scalar function with STD SQL operator, and scalar function exactly match should be found properly",
+        "sql": "SELECT upper(col1), roundDecimal(col3_r), add(plus(CAST(col3_l AS DOUBLE), cast(col3_r AS DOUBLE)), cast(10 AS DOUBLE)) FROM (SELECT {tbl1}.col1 AS col1, {tbl1}.col3 AS col3_l, {tbl2}.col3 AS col3_r FROM {tbl1} JOIN {tbl2} USING (col2))",
+        "outputs": [
+          ["BAR", 3, 15.0],
+          ["FOO", 4, 15.0]
+        ]
+      },
+      {
         "description": "test scalar function with STD SQL operator, and scalar function without STD SQL operator can be found properly",
         "sql": "SELECT UpPeR(col1), round_deCiMal(col3_r), aDD(pluS(CAST(col3_l AS DOUBLE), CAST(col3_r AS DOUBLE)), CAST(10 AS DOUBLE)) FROM (SELECT {tbl1}.col1 AS col1, {tbl1}.col3 AS col3_l, {tbl2}.col3 AS col3_r FROM {tbl1} JOIN {tbl2} USING (col2))",
         "outputs": [

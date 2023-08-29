@@ -99,9 +99,9 @@ public class QueryGenerator {
   private final List<PredicateGenerator> _multistageSingleValuePredicateGenerators =
       Arrays.asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
           new SingleValueBetweenPredicateGenerator());
+  // TODO: add MultiValueBetweenPredicateGenerator back once the BETWEEEN AND operator is supported in multistage engine
   private final List<PredicateGenerator> _multiValuePredicateGenerators =
-      Arrays.asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
-          new MultiValueBetweenPredicateGenerator());
+      Arrays.asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator());
 
   private final String _pinotTableName;
   private final String _h2TableName;
@@ -351,10 +351,12 @@ public class QueryGenerator {
       if (!_columnToValueList.get(columnName).isEmpty()) {
         if (!_multiValueColumnMaxNumElements.containsKey(columnName)) {
           // Single-value column.
-          predicates.add(pickRandom(getSingleValuePredicateGenerators()).generatePredicate(columnName));
+          predicates.add(pickRandom(getSingleValuePredicateGenerators()).generatePredicate(columnName,
+              _useMultistageEngine));
         } else if (!_skipMultiValuePredicates) {
           // Multi-value column.
-          predicates.add(pickRandom(_multiValuePredicateGenerators).generatePredicate(columnName));
+          predicates.add(
+              pickRandom(_multiValuePredicateGenerators).generatePredicate(columnName, _useMultistageEngine));
         }
       }
     }
@@ -407,10 +409,11 @@ public class QueryGenerator {
     /**
      * Generate a predicate query fragment on a column.
      *
-     * @param columnName column name.
+     * @param columnName          column name.
+     * @param useMultistageEngine
      * @return generated predicate query fragment.
      */
-    QueryFragment generatePredicate(String columnName);
+    QueryFragment generatePredicate(String columnName, boolean useMultistageEngine);
   }
 
   /**
@@ -485,14 +488,45 @@ public class QueryGenerator {
 
     @Override
     public String generatePinotQuery() {
+      List<String> pinotAggregateColumnAndFunctions =
+          (_useMultistageEngine && !_skipMultiValuePredicates) ? generatePinotMultistageQuery()
+              : _aggregateColumnsAndFunctions;
       if (_groupColumns.isEmpty()) {
-        return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
-            _predicate.generatePinotQuery());
+        return joinWithSpaces("SELECT", StringUtils.join(pinotAggregateColumnAndFunctions, ", "), "FROM",
+            _pinotTableName, _predicate.generatePinotQuery());
       } else {
-        return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
-            _predicate.generatePinotQuery(), "GROUP BY", StringUtils.join(_groupColumns, ", "),
+        return joinWithSpaces("SELECT", StringUtils.join(pinotAggregateColumnAndFunctions, ", "), "FROM",
+            _pinotTableName, _predicate.generatePinotQuery(), "GROUP BY", StringUtils.join(_groupColumns, ", "),
             _havingPredicate.generatePinotQuery(), _limit.generatePinotQuery());
       }
+    }
+
+    public List<String> generatePinotMultistageQuery() {
+      List<String> pinotAggregateColumnAndFunctions = new ArrayList<>();
+      for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
+        String pinotAggregateFunction = aggregateColumnAndFunction;
+        String pinotAggregateColumnAndFunction = pinotAggregateFunction;
+        if (!pinotAggregateFunction.equals("COUNT(*)")) {
+          pinotAggregateFunction = pinotAggregateFunction.replace("(", "(`").replace(")", "`)");
+        }
+        if (!pinotAggregateFunction.contains("(")) {
+          pinotAggregateFunction = String.format("`%s`", pinotAggregateFunction);
+        }
+        if (AGGREGATION_FUNCTIONS.contains(pinotAggregateFunction.substring(0, 3))) {
+          // For multistage query, we need to explicit hoist the data type to avoid overflow.
+          String aggFunctionName = pinotAggregateFunction.substring(0, 3);
+          String replacedPinotAggregationFunction =
+              pinotAggregateFunction.replace(aggFunctionName + "(", aggFunctionName + "(CAST(");
+          if ("SUM".equalsIgnoreCase(aggFunctionName)) {
+            pinotAggregateColumnAndFunction = replacedPinotAggregationFunction.replace(")", " AS BIGINT))");
+          }
+          if ("AVG".equalsIgnoreCase(aggFunctionName)) {
+            pinotAggregateColumnAndFunction = replacedPinotAggregationFunction.replace(")", " AS DOUBLE))");
+          }
+        }
+        pinotAggregateColumnAndFunctions.add(pinotAggregateColumnAndFunction);
+      }
+      return pinotAggregateColumnAndFunctions;
     }
 
     @Override
@@ -923,7 +957,7 @@ public class QueryGenerator {
   private class SingleValueComparisonPredicateGenerator implements PredicateGenerator {
 
     @Override
-    public QueryFragment generatePredicate(String columnName) {
+    public QueryFragment generatePredicate(String columnName, boolean useMultistageEngine) {
       String columnValue = pickRandom(_columnToValueList.get(columnName));
       String comparisonOperator = pickRandom(COMPARISON_OPERATORS);
       return new StringQueryFragment(joinWithSpaces(columnName, comparisonOperator, columnValue),
@@ -937,7 +971,7 @@ public class QueryGenerator {
   private class SingleValueInPredicateGenerator implements PredicateGenerator {
 
     @Override
-    public QueryFragment generatePredicate(String columnName) {
+    public QueryFragment generatePredicate(String columnName, boolean useMultistageEngine) {
       List<String> columnValues = _columnToValueList.get(columnName);
 
       int numValues = Math.min(RANDOM.nextInt(MAX_NUM_IN_CLAUSE_VALUES) + 1, columnValues.size());
@@ -964,7 +998,7 @@ public class QueryGenerator {
   private class SingleValueBetweenPredicateGenerator implements PredicateGenerator {
 
     @Override
-    public QueryFragment generatePredicate(String columnName) {
+    public QueryFragment generatePredicate(String columnName, boolean useMultistageEngine) {
       List<String> columnValues = _columnToValueList.get(columnName);
       String leftValue = pickRandom(columnValues);
       String rightValue = pickRandom(columnValues);
@@ -981,7 +1015,7 @@ public class QueryGenerator {
     Random _random = new Random();
 
     @Override
-    public QueryFragment generatePredicate(String columnName) {
+    public QueryFragment generatePredicate(String columnName, boolean useMultistageEngine) {
       List<String> columnValues = _columnToValueList.get(columnName);
       String value = pickRandom(columnValues);
       // do regex only for string type
@@ -1008,7 +1042,7 @@ public class QueryGenerator {
   private class MultiValueComparisonPredicateGenerator implements PredicateGenerator {
 
     @Override
-    public QueryFragment generatePredicate(String columnName) {
+    public QueryFragment generatePredicate(String columnName, boolean useMultistageEngine) {
       String columnValue = pickRandom(_columnToValueList.get(columnName));
       String comparisonOperator = pickRandom(COMPARISON_OPERATORS);
 
@@ -1024,7 +1058,8 @@ public class QueryGenerator {
             joinWithSpaces(String.format("%s[%d]", columnName, i), comparisonOperator, columnValue));
       }
 
-      return new StringQueryFragment(joinWithSpaces(columnName, comparisonOperator, columnValue),
+      return new StringQueryFragment(
+          joinWithSpaces(generateMultiValueColumn(columnName, useMultistageEngine), comparisonOperator, columnValue),
           generateH2QueryConditionPredicate(h2ComparisonClauses));
     }
   }
@@ -1036,7 +1071,7 @@ public class QueryGenerator {
   private class MultiValueInPredicateGenerator implements PredicateGenerator {
 
     @Override
-    public QueryFragment generatePredicate(String columnName) {
+    public QueryFragment generatePredicate(String columnName, boolean useMultistageEngine) {
       List<String> columnValues = _columnToValueList.get(columnName);
 
       int numValues = Math.min(RANDOM.nextInt(MAX_NUM_IN_CLAUSE_VALUES) + 1, columnValues.size());
@@ -1052,7 +1087,8 @@ public class QueryGenerator {
         h2InClauses.add(String.format("%s[%d] IN (%s)", columnName, i, inValues));
       }
 
-      return new StringQueryFragment(String.format("%s IN (%s)", columnName, inValues),
+      return new StringQueryFragment(
+          String.format("%s IN (%s)", generateMultiValueColumn(columnName, useMultistageEngine), inValues),
           generateH2QueryConditionPredicate(h2InClauses));
     }
   }
@@ -1063,7 +1099,7 @@ public class QueryGenerator {
   private class MultiValueBetweenPredicateGenerator implements PredicateGenerator {
 
     @Override
-    public QueryFragment generatePredicate(String columnName) {
+    public QueryFragment generatePredicate(String columnName, boolean useMultistageEngine) {
       List<String> columnValues = _columnToValueList.get(columnName);
       String leftValue = pickRandom(columnValues);
       String rightValue = pickRandom(columnValues);
@@ -1074,13 +1110,24 @@ public class QueryGenerator {
         h2ComparisonClauses.add(String.format("%s[%d] BETWEEN %s AND %s", columnName, i, leftValue, rightValue));
       }
 
-      return new StringQueryFragment(String.format("%s BETWEEN %s AND %s", columnName, leftValue, rightValue),
+      return new StringQueryFragment(
+          String.format("%s BETWEEN %s AND %s", generateMultiValueColumn(columnName, useMultistageEngine), leftValue,
+              rightValue),
           generateH2QueryConditionPredicate(h2ComparisonClauses));
     }
   }
+
+  private String generateMultiValueColumn(String columnName, boolean useMultistageEngine) {
+    if (useMultistageEngine) {
+      return String.format("ARRAY_TO_MV(%s)", columnName);
+    }
+    return columnName;
+  }
+
   private static String generateH2QueryConditionPredicate(List<String> conditionList) {
     return generateH2QueryConditionPredicate(conditionList, " OR ");
   }
+
   private static String generateH2QueryConditionPredicate(List<String> conditionList, String separator) {
     return String.format("( %s )", StringUtils.join(conditionList, separator));
   }

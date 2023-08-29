@@ -34,7 +34,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class DistinctAvgMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
   public DistinctAvgMVAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTAVGMV);
+    super(expression, AggregationFunctionType.DISTINCTAVGMV, false);
   }
 
   @Override

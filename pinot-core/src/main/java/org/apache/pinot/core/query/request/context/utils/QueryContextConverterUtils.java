@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -116,8 +115,8 @@ public class QueryContextConverterUtils {
       orderByExpressions = new ArrayList<>(orderByList.size());
       Set<Expression> seen = new HashSet<>();
       for (Expression orderBy : orderByList) {
-        boolean isAsc = isAsc(orderBy);
-        Boolean isNullsLast = isNullsLast(orderBy);
+        Boolean isNullsLast = CalciteSqlParser.isNullsLast(orderBy);
+        boolean isAsc = CalciteSqlParser.isAsc(orderBy, isNullsLast);
         Expression orderByFunctionsRemoved = CalciteSqlParser.removeOrderByFunctions(orderBy);
         // Deduplicate the order-by expressions
         if (seen.add(orderByFunctionsRemoved)) {
@@ -154,29 +153,5 @@ public class QueryContextConverterUtils {
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setExpressionOverrideHints(expressionContextOverrideHints)
         .setExplain(pinotQuery.isExplain()).build();
-  }
-
-  private static boolean isAsc(Expression expression) {
-    while (expression != null && expression.isSetFunctionCall()) {
-      if (expression.getFunctionCall().getOperator().equals(CalciteSqlParser.ASC)) {
-        return true;
-      }
-      expression = expression.getFunctionCall().getOperands().get(0);
-    }
-    return false;
-  }
-
-  @Nullable
-  private static Boolean isNullsLast(Expression expression) {
-    while (expression != null && expression.isSetFunctionCall()) {
-      String operator = expression.getFunctionCall().getOperator();
-      if (operator.equals(CalciteSqlParser.NULLS_LAST)) {
-        return true;
-      } else if (operator.equals(CalciteSqlParser.NULLS_FIRST)) {
-        return false;
-      }
-      expression = expression.getFunctionCall().getOperands().get(0);
-    }
-    return null;
   }
 }

@@ -36,7 +36,6 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
-import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -83,43 +82,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   /**
-   * Test server table data manager deletion after the table is dropped
-   */
-  protected void cleanupTestTableDataManager(String tableNameWithType) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        for (BaseServerStarter serverStarter : _serverStarters) {
-          if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType)
-              != null) {
-            return false;
-          }
-        }
-        return true;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 600_000L, "Failed to delete table data managers");
-  }
-
-  /**
-   * Test features supported in V2 Multi-stage Engine.
-   * - Some V1 features will not be supported.
-   * - Some V1 features will be added as V2 engine feature development progresses.
-   * @throws Exception
-   */
-  public void testHardcodedQueriesMultiStage()
-      throws Exception {
-    testHardcodedQueriesCommon();
-  }
-
-  /**
    * Test hard-coded queries.
    * @throws Exception
    */
   public void testHardcodedQueries()
       throws Exception {
     testHardcodedQueriesCommon();
-    testHardCodedQueriesV1();
+    if (useMultiStageQueryEngine()) {
+      testHardcodedQueriesV2();
+    } else {
+      testHardCodedQueriesV1();
+    }
   }
 
   /**
@@ -146,6 +119,15 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String query;
     String h2Query;
 
+    // SUM INTEGER result will be BIGINT
+    query = "SELECT SUM(ActualElapsedTime) FROM mytable";
+    testQuery(query);
+    // SUM FLOAT result will be FLOAT
+    query = "SELECT SUM(CAST(ActualElapsedTime AS FLOAT)) FROM mytable";
+    testQuery(query);
+    // SUM DOUBLE result will be DOUBLE
+    query = "SELECT SUM(CAST(ActualElapsedTime AS DOUBLE)) FROM mytable";
+    testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
     query = "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND "
@@ -282,6 +264,29 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query, h2Query);
   }
 
+  private void testHardcodedQueriesV2()
+      throws Exception {
+    String query;
+    String h2Query;
+
+    query =
+        "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND arrayToMV(DivAirportSeqIDs) IN "
+            + "(1078102, 1142303, 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
+    h2Query =
+        "SELECT DistanceGroup FROM mytable WHERE `Month` BETWEEN 1 AND 1 AND (DivAirportSeqIDs[1] IN (1078102, "
+            + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[2] IN (1078102, 1142303, 1530402, 1172102, "
+            + "1291503) OR DivAirportSeqIDs[3] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
+            + "DivAirportSeqIDs[4] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[5] IN "
+            + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
+    testQuery(query, h2Query);
+
+    query = "SELECT MIN(ArrDelayMinutes), AVG(CAST(DestCityMarketID AS DOUBLE)) FROM mytable WHERE DivArrDelay < 196";
+    h2Query =
+        "SELECT MIN(CAST(`ArrDelayMinutes` AS DOUBLE)), AVG(CAST(`DestCityMarketID` AS DOUBLE)) FROM mytable WHERE "
+            + "`DivArrDelay` < 196";
+    testQuery(query, h2Query);
+  }
+
   private void testHardCodedQueriesV1()
       throws Exception {
     String query;
@@ -295,17 +300,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
             + "ORDER BY ArrTime DESC";
     testQuery(query);
-    // TODO: move to common when multistage support MV columns
-    query =
-        "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303,"
-            + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
-    h2Query =
-        "SELECT DistanceGroup FROM mytable WHERE `Month` BETWEEN 1 AND 1 AND (DivAirportSeqIDs[1] IN (1078102, "
-            + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[2] IN (1078102, 1142303, 1530402, 1172102, "
-            + "1291503) OR DivAirportSeqIDs[3] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
-            + "DivAirportSeqIDs[4] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[5] IN "
-            + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
-    testQuery(query, h2Query);
 
     // Non-Standard SQL syntax:
     // IN_ID_SET
@@ -472,8 +466,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     for (int i = 0; i < numQueriesToGenerate; i++) {
       QueryGenerator.Query query = queryGenerator.generateQuery();
       if (useMultistageEngine) {
-        // multistage engine follows standard SQL thus should use H2 query string for testing.
-        testQuery(query.generateH2Query().replace("`", "\""), query.generateH2Query());
+        if (withMultiValues) {
+          // For multistage query with MV columns, we need to use Pinot query string for testing.
+          testQuery(query.generatePinotQuery().replace("`", "\""), query.generateH2Query());
+        } else {
+          // multistage engine follows standard SQL thus should use H2 query string for testing.
+          testQuery(query.generateH2Query().replace("`", "\""), query.generateH2Query());
+        }
       } else {
         testQuery(query.generatePinotQuery(), query.generateH2Query());
       }

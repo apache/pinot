@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.forward;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
@@ -89,7 +90,6 @@ import org.slf4j.LoggerFactory;
  * </code>
  *
  */
-// TODO: Fix thread-safety issue for ArrayList
 // TODO: Optimize it
 public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteMVMutableForwardIndex.class);
@@ -104,10 +104,11 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private static final int INCREMENT_PERCENTAGE = 100;
   //Increments the Initial size by 100% of initial capacity every time we runs out of capacity
 
+  // For single writer multiple readers setup, use ArrayList for writer and CopyOnWriteArrayList for reader
   private final List<FixedByteSingleValueMultiColWriter> _headerWriters = new ArrayList<>();
-  private final List<FixedByteSingleValueMultiColReader> _headerReaders = new ArrayList<>();
+  private final List<FixedByteSingleValueMultiColReader> _headerReaders = new CopyOnWriteArrayList<>();
   private final List<FixedByteSingleValueMultiColWriter> _dataWriters = new ArrayList<>();
-  private final List<FixedByteSingleValueMultiColReader> _dataReaders = new ArrayList<>();
+  private final List<FixedByteSingleValueMultiColReader> _dataReaders = new CopyOnWriteArrayList<>();
   private final int _headerSize;
   private final int _incrementalCapacity;
   private final int _columnSizeInBytes;
@@ -163,7 +164,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
    */
   private void addDataBuffer(int rowCapacity) {
     try {
-      long size = rowCapacity * _columnSizeInBytes;
+      long size = (long) rowCapacity * (long) _columnSizeInBytes;
       LOGGER.info("Allocating data buffer of size {} for column {}", size, _context);
       // NOTE: PinotDataBuffer is tracked in PinotDataBufferMemoryManager. No need to track and close inside the class.
       PinotDataBuffer dataBuffer = _memoryManager.allocate(size, _context);

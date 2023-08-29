@@ -40,6 +40,7 @@ import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.transform.TransformOperator;
@@ -263,7 +264,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
     }
     ProjectionOperator projectionOperator =
-        new ProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows));
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows));
     TransformOperator transformOperator =
         new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
 

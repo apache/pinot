@@ -68,7 +68,6 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -172,11 +171,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
       // NOTE: Need to add the instance id to the config because it is required in HelixInstanceDataManagerConfig
       _serverConf.addProperty(Server.CONFIG_OF_INSTANCE_ID, _instanceId);
     }
-    if (_serverConf.getProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, QueryConfig.DEFAULT_QUERY_SERVER_PORT) == 0) {
-      _serverConf.setProperty(QueryConfig.KEY_OF_QUERY_SERVER_PORT, NetUtils.findOpenPort());
+    if (_serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT) == 0) {
+      _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, NetUtils.findOpenPort());
     }
-    if (_serverConf.getProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, QueryConfig.DEFAULT_QUERY_RUNNER_PORT) == 0) {
-      _serverConf.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, NetUtils.findOpenPort());
+    if (_serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT) == 0) {
+      _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, NetUtils.findOpenPort());
     }
 
     _instanceConfigScope =
@@ -196,7 +197,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Enable/disable thread memory allocation tracking through instance config
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
-        Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
+            Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
 
     // Set data table version send to broker.
     int dataTableVersion =
@@ -313,10 +314,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
       // are accidentally enabled together. The freshness based checker is a stricter version of the offset based
       // checker. But in the end, both checkers are bounded in time by realtimeConsumptionCatchupWaitMs.
       if (isFreshnessStatusCheckerEnabled) {
-        LOGGER.info("Setting up freshness based status checker");
+        int idleTimeoutMs = _serverConf.getProperty(Server.CONFIG_OF_REALTIME_FRESHNESS_IDLE_TIMEOUT_MS,
+            Server.DEFAULT_REALTIME_FRESHNESS_IDLE_TIMEOUT_MS);
+
+        LOGGER.info("Setting up freshness based status checker with min freshness {} and idle timeout {}",
+            realtimeMinFreshnessMs, idleTimeoutMs);
         FreshnessBasedConsumptionStatusChecker freshnessStatusChecker =
             new FreshnessBasedConsumptionStatusChecker(_serverInstance.getInstanceDataManager(), consumingSegments,
-                realtimeMinFreshnessMs);
+                realtimeMinFreshnessMs, idleTimeoutMs);
         Supplier<Integer> getNumConsumingSegmentsNotReachedMinFreshness =
             freshnessStatusChecker::getNumConsumingSegmentsNotReachedIngestionCriteria;
         serviceStatusCallbackListBuilder.add(
@@ -478,8 +483,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     long checkIntervalMs = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS,
         Server.DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS);
 
+    Status serviceStatus = null;
     while (System.currentTimeMillis() < endTimeMs) {
-      Status serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
+      serviceStatus = ServiceStatus.getServiceStatus(_instanceId);
       long currentTimeMs = System.currentTimeMillis();
       if (serviceStatus == Status.GOOD) {
         LOGGER.info("Service status is GOOD after {}ms", currentTimeMs - startTimeMs);
@@ -501,6 +507,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
+    boolean exitServerOnIncompleteStartup = _serverConf.getProperty(
+        Server.CONFIG_OF_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE,
+        Server.DEFAULT_EXIT_ON_SERVICE_STATUS_CHECK_FAILURE);
+    if (exitServerOnIncompleteStartup) {
+      String errorMessage = String.format("Service status %s has not turned GOOD within %dms: %s. Exiting server.",
+          serviceStatus, System.currentTimeMillis() - startTimeMs, ServiceStatus.getStatusDescription());
+      throw new IllegalStateException(errorMessage);
+    }
     LOGGER.warn("Service status has not turned GOOD within {}ms: {}", System.currentTimeMillis() - startTimeMs,
         ServiceStatus.getStatusDescription());
   }
@@ -591,8 +605,18 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK)) {
       long endTimeMs =
           startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_STARTUP_TIMEOUT_MS, Server.DEFAULT_STARTUP_TIMEOUT_MS);
-      startupServiceStatusCheck(endTimeMs);
+      try {
+        startupServiceStatusCheck(endTimeMs);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while checking service status. Stopping server.", e);
+        // If we exit here, only the _adminApiApplication and _helixManager are initialized, so we only stop them
+        _adminApiApplication.stop();
+        _helixManager.disconnect();
+        throw e;
+      }
     }
+
+    preServeQueries();
 
     // Start the query server after finishing the service status check. If the query server is started before all the
     // segments are loaded, broker might not have finished processing the callback of routing table update, and start
@@ -622,6 +646,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _realtimeLuceneIndexRefreshState.start();
   }
 
+  /**
+   * Can be overridden to perform operations before server starts serving queries.
+   */
+  protected void preServeQueries() {
+  }
+
   @Override
   public void stop() {
     LOGGER.info("Shutting down Pinot server");
@@ -643,8 +673,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Server.DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK)) {
       shutdownResourceCheck(endTimeMs);
     }
-    _serverQueriesDisabledTracker.stop();
-    _realtimeLuceneIndexRefreshState.stop();
+    if (_serverQueriesDisabledTracker != null) {
+      _serverQueriesDisabledTracker.stop();
+    }
+    if (_realtimeLuceneIndexRefreshState != null) {
+      _realtimeLuceneIndexRefreshState.stop();
+    }
     try {
       // Close PinotFS after all data managers are shutdown. Otherwise, segments which are being committed will not
       // be uploaded to the deep-store.

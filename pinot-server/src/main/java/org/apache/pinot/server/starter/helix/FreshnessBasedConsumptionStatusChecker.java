@@ -35,11 +35,13 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
  */
 public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsumptionStatusChecker {
   private final long _minFreshnessMs;
+  private final long _idleTimeoutMs;
 
   public FreshnessBasedConsumptionStatusChecker(InstanceDataManager instanceDataManager, Set<String> consumingSegments,
-      long minFreshnessMs) {
+      long minFreshnessMs, long idleTimeoutMs) {
     super(instanceDataManager, consumingSegments);
     _minFreshnessMs = minFreshnessMs;
+    _idleTimeoutMs = idleTimeoutMs;
   }
 
   private boolean isOffsetCaughtUp(StreamPartitionMsgOffset currentOffset, StreamPartitionMsgOffset latestOffset) {
@@ -50,6 +52,10 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
       return currentOffset.compareTo(latestOffset) >= 0;
     }
     return false;
+  }
+
+  private boolean segmentHasBeenIdleLongerThanThreshold(long segmentIdleTime) {
+    return _idleTimeoutMs > 0 && segmentIdleTime > _idleTimeoutMs;
   }
 
   protected long now() {
@@ -76,15 +82,27 @@ public class FreshnessBasedConsumptionStatusChecker extends IngestionBasedConsum
     StreamPartitionMsgOffset currentOffset = rtSegmentDataManager.getCurrentOffset();
     StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.fetchLatestStreamOffset(5000);
     if (isOffsetCaughtUp(currentOffset, latestStreamOffset)) {
-      _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}."
+      _logger.info("Segment {} with freshness {}ms has not caught up within min freshness {}. "
               + "But the current ingested offset is equal to the latest available offset {}.", segmentName, freshnessMs,
           _minFreshnessMs, currentOffset);
       return true;
     }
 
+    StreamPartitionMsgOffset earliestStreamOffset = rtSegmentDataManager.fetchEarliestStreamOffset(5000);
+
+    long idleTimeMs = rtSegmentDataManager.getTimeSinceEventLastConsumedMs();
+    if (segmentHasBeenIdleLongerThanThreshold(idleTimeMs)) {
+      _logger.warn("Segment {} with freshness {}ms has not caught up within min freshness {}. "
+              + "But the current ingested offset {} has been idle for {}ms. At offset {}. Earliest offset {}. "
+              + "Latest offset {}.", segmentName, freshnessMs, _minFreshnessMs, currentOffset, idleTimeMs,
+          currentOffset,
+          earliestStreamOffset, latestStreamOffset);
+      return true;
+    }
+
     _logger.info("Segment {} with freshness {}ms has not caught up within "
-            + "min freshness {}. At offset {}. Latest offset {}.",
-        segmentName, freshnessMs, _minFreshnessMs, currentOffset, latestStreamOffset);
+            + "min freshness {}. At offset {}. Earliest offset {}. Latest offset {}.", segmentName, freshnessMs,
+        _minFreshnessMs, currentOffset, earliestStreamOffset, latestStreamOffset);
     return false;
   }
 }

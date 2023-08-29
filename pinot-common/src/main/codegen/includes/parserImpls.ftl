@@ -125,22 +125,11 @@ SqlNode SqlPhysicalExplain() :
     SqlNode stmt;
     SqlExplainLevel detailLevel = SqlExplainLevel.EXPPLAN_ATTRIBUTES;
     SqlExplain.Depth depth = SqlExplain.Depth.PHYSICAL;
-    final SqlExplainFormat format;
+    final SqlExplainFormat format = SqlExplainFormat.TEXT;
 }
 {
     <EXPLAIN> <IMPLEMENTATION> <PLAN>
     [ detailLevel = ExplainDetailLevel() ]
-    (
-        LOOKAHEAD(2)
-        <AS> <XML> { format = SqlExplainFormat.XML; }
-    |
-        LOOKAHEAD(2)
-        <AS> <JSON> { format = SqlExplainFormat.JSON; }
-    |
-        <AS> <DOT_FORMAT> { format = SqlExplainFormat.DOT; }
-    |
-        { format = SqlExplainFormat.TEXT; }
-    )
     <FOR> stmt = SqlQueryOrDml() {
         return new SqlPhysicalExplain(getPos(),
             stmt,

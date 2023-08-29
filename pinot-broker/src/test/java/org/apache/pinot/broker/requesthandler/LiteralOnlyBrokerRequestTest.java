@@ -191,7 +191,7 @@ public class LiteralOnlyBrokerRequestTest {
     String ranStr = BytesUtils.toHexString(randBytes);
     JsonNode request = JsonUtils.stringToJsonNode(String.format("{\"sql\":\"SELECT %d, '%s'\"}", randNum, ranStr));
     RequestContext requestStats = Tracing.getTracer().createRequestScope();
-    BrokerResponse brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    BrokerResponse brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), String.format("%d", randNum));
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
         DataSchema.ColumnDataType.LONG);
@@ -216,7 +216,7 @@ public class LiteralOnlyBrokerRequestTest {
     JsonNode request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT now() as currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");
     RequestContext requestStats = Tracing.getTracer().createRequestScope();
-    BrokerResponse brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    BrokerResponse brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     long currentTsMax = System.currentTimeMillis();
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "currentTs");
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
@@ -236,7 +236,7 @@ public class LiteralOnlyBrokerRequestTest {
         "{\"sql\":\"SELECT ago('PT1H') as oneHourAgoTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as "
             + "firstDayOf2020\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     long oneHourAgoTsMax = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "oneHourAgoTs");
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
@@ -257,7 +257,7 @@ public class LiteralOnlyBrokerRequestTest {
         "{\"sql\":\"SELECT encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') AS encoded, "
             + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') AS decoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     System.out.println(brokerResponse.getResultTable());
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnName(0), "encoded");
     Assert.assertEquals(brokerResponse.getResultTable().getDataSchema().getColumnDataType(0),
@@ -276,7 +276,7 @@ public class LiteralOnlyBrokerRequestTest {
     request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT toBase64(toUtf8('hello!')) AS encoded, " + "fromUtf8(fromBase64('aGVsbG8h')) AS decoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     ResultTable resultTable = brokerResponse.getResultTable();
     DataSchema dataSchema = resultTable.getDataSchema();
     List<Object[]> rows = resultTable.getRows();
@@ -293,7 +293,7 @@ public class LiteralOnlyBrokerRequestTest {
     request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT fromUtf8(fromBase64(toBase64(toUtf8('nested')))) AS output\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     resultTable = brokerResponse.getResultTable();
     dataSchema = resultTable.getDataSchema();
     rows = resultTable.getRows();
@@ -309,7 +309,7 @@ public class LiteralOnlyBrokerRequestTest {
             + "base64'))"
             + " AS encoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     resultTable = brokerResponse.getResultTable();
     dataSchema = resultTable.getDataSchema();
     rows = resultTable.getRows();
@@ -325,7 +325,7 @@ public class LiteralOnlyBrokerRequestTest {
         + "('dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0"
         + "')) AS decoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     resultTable = brokerResponse.getResultTable();
     dataSchema = resultTable.getDataSchema();
     rows = resultTable.getRows();
@@ -339,7 +339,7 @@ public class LiteralOnlyBrokerRequestTest {
 
     request = JsonUtils.stringToJsonNode("{\"sql\":\"SELECT fromBase64" + "(0) AS decoded\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     Assert.assertTrue(
         brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
 
@@ -347,7 +347,7 @@ public class LiteralOnlyBrokerRequestTest {
         "{\"sql\":\"SELECT isSubnetOf('2001:db8:85a3::8a2e:370:7334/62', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff')"
             + " as booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     resultTable = brokerResponse.getResultTable();
     dataSchema = resultTable.getDataSchema();
     rows = resultTable.getRows();
@@ -363,7 +363,7 @@ public class LiteralOnlyBrokerRequestTest {
         "{\"sql\":\"SELECT isSubnetOf('2001:db8:85a3::8a2e:370:7334', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') as"
             + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     Assert.assertTrue(
         brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
 
@@ -371,7 +371,7 @@ public class LiteralOnlyBrokerRequestTest {
     request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT isSubnetOf('105.25.245.115', '105.25.245.115') as" + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     Assert.assertTrue(
         brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
 
@@ -379,7 +379,7 @@ public class LiteralOnlyBrokerRequestTest {
     request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT isSubnetOf('1.2.3.128/26', '3.175.47.239/26') as" + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     Assert.assertTrue(
         brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
 
@@ -389,7 +389,7 @@ public class LiteralOnlyBrokerRequestTest {
             + "'4275:386f:b2b5:0664:04aa:d7bd:0589:6909/64') as"
             + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     Assert.assertTrue(
         brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
 
@@ -398,7 +398,7 @@ public class LiteralOnlyBrokerRequestTest {
         "{\"sql\":\"SELECT isSubnetOf('2001:4801:7825:103:be76:4eff::/129', '2001:4801:7825:103:be76:4eff::') as"
             + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     Assert.assertTrue(
         brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
 
@@ -406,7 +406,7 @@ public class LiteralOnlyBrokerRequestTest {
     request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT isSubnetOf('170.189.0.175/33', '170.189.0.175') as" + " booleanCol\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
     Assert.assertTrue(
         brokerResponse.getProcessingExceptions().get(0).getMessage().contains("IllegalArgumentException"));
   }
@@ -423,7 +423,7 @@ public class LiteralOnlyBrokerRequestTest {
     // Test 1: select constant
     JsonNode request = JsonUtils.stringToJsonNode("{\"sql\":\"EXPLAIN PLAN FOR SELECT 1.5, 'test'\"}");
     RequestContext requestStats = Tracing.getTracer().createRequestScope();
-    BrokerResponse brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    BrokerResponse brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
 
     checkExplainResultSchema(brokerResponse.getResultTable().getDataSchema(),
         new String[]{"Operator", "Operator_Id", "Parent_Id"},
@@ -443,7 +443,7 @@ public class LiteralOnlyBrokerRequestTest {
         "{\"sql\":\"EXPLAIN PLAN FOR SELECT 6+8 as addition, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as "
             + "firstDayOf2020\"}");
     requestStats = Tracing.getTracer().createRequestScope();
-    brokerResponse = requestHandler.handleRequest(request, null, requestStats);
+    brokerResponse = requestHandler.handleRequest(request, null, requestStats, null);
 
     checkExplainResultSchema(brokerResponse.getResultTable().getDataSchema(),
         new String[]{"Operator", "Operator_Id", "Parent_Id"},

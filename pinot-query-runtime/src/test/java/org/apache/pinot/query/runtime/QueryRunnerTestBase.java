@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
 import com.google.common.math.DoubleMath;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -37,27 +36,28 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
+import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -73,13 +73,21 @@ import org.testng.Assert;
 
 
 public abstract class QueryRunnerTestBase extends QueryTestSet {
-  protected static final ExecutorService REDUCE_EXECUTOR = Executors.newCachedThreadPool(
-      new NamedThreadFactory("TEST_REDUCER_SCHEDULER_EXECUTOR"));
+  // TODO: Find a better way to create the global test executor
+  public static final ExecutorService EXECUTOR =
+      Executors.newCachedThreadPool(new NamedThreadFactory("worker_on_" + OperatorTestUtil.class.getSimpleName()) {
+        @Override
+        public Thread newThread(Runnable r) {
+          Thread thread = super.newThread(r);
+          thread.setDaemon(true);
+          return thread;
+        }
+      });
   protected static final double DOUBLE_CMP_EPSILON = 0.0001d;
   protected static final String SEGMENT_BREAKER_KEY = "__SEGMENT_BREAKER_KEY__";
   protected static final String SEGMENT_BREAKER_STR = "------";
   protected static final GenericRow SEGMENT_BREAKER_ROW = new GenericRow();
-  protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
+  protected static final AtomicLong REQUEST_ID_GEN = new AtomicLong();
   protected QueryEnvironment _queryEnvironment;
   protected String _reducerHostname;
   protected int _reducerGrpcPort;
@@ -100,15 +108,18 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
    * ser/de dispatches.
    */
   protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
-    long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     QueryEnvironment.QueryPlannerResult queryPlannerResult =
         _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
     DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
     Map<String, String> requestMetadataMap = new HashMap<>();
-    requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_ID, String.valueOf(requestId));
-    requestMetadataMap.put(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS,
-        String.valueOf(CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS));
+    requestMetadataMap.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId));
+    Long timeoutMsInQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
+    long timeoutMs =
+        timeoutMsInQueryOption != null ? timeoutMsInQueryOption : CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS;
+    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, String.valueOf(timeoutMs));
+    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true");
     requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
 
     // Putting trace testing here as extra options as it doesn't go along with the rest of the items.
@@ -116,22 +127,18 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
     }
 
-    int reducerStageId = -1;
-    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
-      if (dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
-          .getFragmentRoot() instanceof MailboxReceiveNode) {
-        reducerStageId = stageId;
-      } else {
+    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+    for (int stageId = 0; stageId < stagePlans.size(); stageId++) {
+      if (stageId != 0) {
         processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
       }
       if (executionStatsAggregatorMap != null) {
         executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
-    Preconditions.checkState(reducerStageId != -1);
-    ResultTable resultTable = QueryDispatcher.runReducer(requestId, dispatchableSubPlan, reducerStageId,
-        Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS)), _mailboxService,
-        _reducerScheduler, executionStatsAggregatorMap, true);
+    ResultTable resultTable =
+        QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
+            executionStatsAggregatorMap, _mailboxService);
     return resultTable.getRows();
   }
 
@@ -228,6 +235,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       } else if (l instanceof String) {
         if (r instanceof byte[]) {
           return ((String) l).compareTo(BytesUtils.toHexString((byte[]) r));
+        } else if (r instanceof Timestamp) {
+          return ((String) l).compareTo((r).toString());
         }
         return ((String) l).compareTo((String) r);
       } else if (l instanceof Boolean) {

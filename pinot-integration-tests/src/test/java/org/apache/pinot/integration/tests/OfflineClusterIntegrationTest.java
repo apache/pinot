@@ -140,7 +140,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String COLUMN_LENGTH_MAP_KEY = "columnLengthMap";
   private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
   private static final String MAX_NUM_MULTI_VALUES_MAP_KEY = "maxNumMultiValuesMap";
-  private static final int DISK_SIZE_IN_BYTES = 20797324;
+  private static final int DISK_SIZE_IN_BYTES = 20798784;
   private static final int NUM_ROWS = 115545;
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
@@ -432,7 +432,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
     waitForNumOfSegmentsBecomeOnline(offlineTableName, 1);
     dropOfflineTable(SEGMENT_UPLOAD_TEST_TABLE);
-    cleanupTestTableDataManager(offlineTableName);
+    waitForTableDataManagerRemoved(offlineTableName);
   }
 
   private void waitForNumOfSegmentsBecomeOnline(String tableNameWithType, int numSegments)
@@ -2386,15 +2386,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     for (int i = 2; i < 20; i++) {
       query = String.format("SELECT distinctCountHLL(FlightNum, %d) FROM mytable ", i);
       assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[i - 2]);
-      assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(),
-          expectedResults[i - 2]);
+      assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[i - 2]);
     }
 
     // Default HLL is set as log2m=12
     query = "SELECT distinctCountHLL(FlightNum) FROM mytable ";
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
-    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(),
-        expectedResults[10]);
+    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
   }
 
   @Test

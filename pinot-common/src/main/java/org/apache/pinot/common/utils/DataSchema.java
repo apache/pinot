@@ -24,6 +24,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.google.common.collect.Ordering;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -351,18 +353,21 @@ public class DataSchema {
         case BOOLEAN:
           return ((Number) value).intValue() == 1;
         case TIMESTAMP:
-          return new Timestamp((long) value);
+          if (value instanceof Timestamp) {
+            return (Timestamp) value;
+          }
+          return new Timestamp(((Number) value).longValue());
         case STRING:
         case JSON:
           return value.toString();
         case BYTES:
           return ((ByteArray) value).getBytes();
         case INT_ARRAY:
-          return (int[]) value;
+          return toIntArray(value);
         case LONG_ARRAY:
           return toLongArray(value);
         case FLOAT_ARRAY:
-          return (float[]) value;
+          return toFloatArray(value);
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
         case STRING_ARRAY:
@@ -414,8 +419,14 @@ public class DataSchema {
         case BIG_DECIMAL:
           return (BigDecimal) value;
         case BOOLEAN:
+          if (value instanceof Boolean) {
+            return (boolean) value;
+          }
           return ((Number) value).intValue() == 1;
         case TIMESTAMP:
+          if (value instanceof Timestamp) {
+            return value.toString();
+          }
           return new Timestamp((long) value).toString();
         case STRING:
         case JSON:
@@ -475,6 +486,38 @@ public class DataSchema {
       }
     }
 
+    private static float[] toFloatArray(Object value) {
+      if (value instanceof float[]) {
+        return (float[]) value;
+      } else if (value instanceof FloatArrayList) {
+        return ((FloatArrayList) value).elements();
+      } else if (value instanceof int[]) {
+        int[] intValues = (int[]) value;
+        int length = intValues.length;
+        float[] floatValues = new float[length];
+        for (int i = 0; i < length; i++) {
+          floatValues[i] = intValues[i];
+        }
+        return floatValues;
+      } else if (value instanceof long[]) {
+        long[] longValues = (long[]) value;
+        int length = longValues.length;
+        float[] floatValues = new float[length];
+        for (int i = 0; i < length; i++) {
+          floatValues[i] = longValues[i];
+        }
+        return floatValues;
+      } else {
+        double[] doubleValues = (double[]) value;
+        int length = doubleValues.length;
+        float[] floatValues = new float[length];
+        for (int i = 0; i < length; i++) {
+          floatValues[i] = (float) doubleValues[i];
+        }
+        return floatValues;
+      }
+    }
+
     private static long[] toLongArray(Object value) {
       if (value instanceof long[]) {
         return (long[]) value;
@@ -488,6 +531,22 @@ public class DataSchema {
           longValues[i] = intValues[i];
         }
         return longValues;
+      }
+    }
+
+    private static int[] toIntArray(Object value) {
+      if (value instanceof int[]) {
+        return (int[]) value;
+      } else if (value instanceof IntArrayList) {
+        return ((IntArrayList) value).elements();
+      } else {
+        long[] longValues = (long[]) value;
+        int length = longValues.length;
+        int[] intValues = new int[length];
+        for (int i = 0; i < length; i++) {
+          intValues[i] = (int) longValues[i];
+        }
+        return intValues;
       }
     }
 

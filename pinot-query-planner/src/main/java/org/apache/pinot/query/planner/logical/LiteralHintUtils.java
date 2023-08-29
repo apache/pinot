@@ -46,13 +46,13 @@ public class LiteralHintUtils {
           e.getValue().getDataType().name(), e.getValue().getValue()));
     }
     // semi-colon is used to separate between encoded literals
-    return "{" + StringUtils.join(literalStrings, ";") + "}";
+    return "{" + StringUtils.join(literalStrings, ";:;") + "}";
   }
 
   public static Map<Integer, Map<Integer, Literal>> hintStringToLiteralMap(String literalString) {
     Map<Integer, Map<Integer, Literal>> aggCallToLiteralArgsMap = new HashMap<>();
     if (StringUtils.isNotEmpty(literalString) && !"{}".equals(literalString)) {
-      String[] literalStringArr = literalString.substring(1, literalString.length() - 1).split(";");
+      String[] literalStringArr = literalString.substring(1, literalString.length() - 1).split(";:;");
       for (String literalStr : literalStringArr) {
         String[] literalStrParts = literalStr.split("\\|", 4);
         int aggIdx = Integer.parseInt(literalStrParts[0]);

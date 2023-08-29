@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -28,11 +29,15 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class RebalanceResult {
   private final String _jobId;
   private final Status _status;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Map<InstancePartitionsType, InstancePartitions> _instanceAssignment;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Map<String, InstancePartitions> _tierInstanceAssignment;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final Map<String, Map<String, String>> _segmentAssignment;
   private final String _description;
 

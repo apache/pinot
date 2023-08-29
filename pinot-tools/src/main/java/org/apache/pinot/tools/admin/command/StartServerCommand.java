@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
@@ -62,11 +61,11 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   @CommandLine.Option(names = {"-serverMultiStageServerPort"}, required = false,
       description = "Port number to multi-stage query engine service entrypoint.")
-  private int _serverMultiStageServerPort = QueryConfig.DEFAULT_QUERY_SERVER_PORT;
+  private int _serverMultiStageServerPort = CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT;
 
   @CommandLine.Option(names = {"-serverMultiStageRunnerPort"}, required = false,
       description = "Port number to multi-stage query engine runner communication.")
-  private int _serverMultiStageRunnerPort = QueryConfig.DEFAULT_QUERY_RUNNER_PORT;
+  private int _serverMultiStageRunnerPort = CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT;
 
   @CommandLine.Option(names = {"-dataDir"}, required = false, description = "Path to directory containing data.")
   private String _dataDir = PinotConfigUtils.TMP_DIR + "data/pinotServerData";

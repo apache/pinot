@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -179,7 +180,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected abstract void doInit();
 
   @Override
-  public void start() {
+  public synchronized void start() {
     _logger.info("Starting table data manager for table: {}", _tableNameWithType);
     doStart();
     _logger.info("Started table data manager for table: {}", _tableNameWithType);
@@ -188,7 +189,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected abstract void doStart();
 
   @Override
-  public void shutDown() {
+  public synchronized void shutDown() {
+    if (_shutDown) {
+      _logger.info("Table data manager for table: {} is already shut down", _tableNameWithType);
+      return;
+    }
     _logger.info("Shutting down table data manager for table: {}", _tableNameWithType);
     _shutDown = true;
     doShutdown();
@@ -196,6 +201,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   protected abstract void doShutdown();
+
+  /**
+   * Releases and removes all segments tracked by the table data manager.
+   */
+  protected void releaseAndRemoveAllSegments() {
+    Iterator<SegmentDataManager> iterator = _segmentDataManagerMap.values().iterator();
+    while (iterator.hasNext()) {
+      SegmentDataManager segmentDataManager = iterator.next();
+      iterator.remove();
+      releaseSegment(segmentDataManager);
+    }
+  }
 
   @Override
   public boolean isShutDown() {
@@ -214,6 +231,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void addSegment(ImmutableSegment immutableSegment) {
     String segmentName = immutableSegment.getSegmentName();
+    Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
+        segmentName, _tableNameWithType);
     _logger.info("Adding immutable segment: {} to table: {}", segmentName, _tableNameWithType);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
         immutableSegment.getSegmentMetadata().getTotalDocs());
@@ -232,7 +251,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
+    Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
+        indexDir.getName(), _tableNameWithType);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
+    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, indexLoadingConfig.getSchema()));
   }
 
@@ -250,6 +272,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
    */
   @Override
   public void removeSegment(String segmentName) {
+    // Allow removing segment after shutdown so that we can remove the segment when the table is deleted
+    if (_shutDown) {
+      _logger.info("Table data manager is already shut down, skip removing segment: {} from table: {}", segmentName,
+          _tableNameWithType);
+      return;
+    }
     _logger.info("Removing segment: {} from table: {}", segmentName, _tableNameWithType);
     SegmentDataManager segmentDataManager = unregisterSegment(segmentName);
     if (segmentDataManager != null) {
@@ -363,6 +391,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
       SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
       throws Exception {
+    Preconditions.checkState(!_shutDown,
+        "Table data manager is already shut down, cannot reload segment: %s of table: %s", segmentName,
+        _tableNameWithType);
     String segmentTier = getSegmentCurrentTier(segmentName);
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
@@ -389,8 +420,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         SegmentDirectory segmentDirectory =
             initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
         // We should first try to reuse existing segment directory
-        if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig,
-            schema)) {
+        if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig, schema)) {
           LOGGER.info("Reloading segment: {} of table: {} using existing segment directory as no reprocessing needed",
               segmentName, _tableNameWithType);
           // No reprocessing needed, reuse the same segment
@@ -431,9 +461,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata,
-      String currentSegmentTier, SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
-      Schema schema)
+  private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
+      SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig, Schema schema)
       throws Exception {
     SegmentDirectoryLoader segmentDirectoryLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(indexLoadingConfig.getSegmentDirectoryLoader());
@@ -445,6 +474,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
       SegmentZKMetadata zkMetadata, @Nullable SegmentMetadata localMetadata)
       throws Exception {
+    Preconditions.checkState(!_shutDown,
+        "Table data manager is already shut down, cannot add/replace segment: %s of table: %s", segmentName,
+        _tableNameWithType);
     if (localMetadata != null && hasSameCRC(zkMetadata, localMetadata)) {
       LOGGER.info("Segment: {} of table: {} has crc: {} same as before, already loaded, do nothing", segmentName,
           _tableNameWithType, localMetadata.getCrc());
@@ -594,12 +626,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   // not thread safe. Caller should invoke it with safe concurrency control.
-  protected void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata,
-      File destTarFile) throws Exception {
+  protected void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata, File destTarFile)
+      throws Exception {
     Preconditions.checkArgument(_tableDataManagerConfig.getTablePeerDownloadScheme() != null,
-            "Download peers require non null peer download scheme");
-    List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName,
-        _tableDataManagerConfig.getTablePeerDownloadScheme(), _helixManager, _tableNameWithType);
+        "Download peers require non null peer download scheme");
+    List<URI> peerSegmentURIs =
+        PeerServerSegmentFinder.getPeerServerURIs(segmentName, _tableDataManagerConfig.getTablePeerDownloadScheme(),
+            _helixManager, _tableNameWithType);
     if (peerSegmentURIs.isEmpty()) {
       String msg = String.format("segment %s doesn't have any peers", segmentName);
       LOGGER.warn(msg);
@@ -610,10 +643,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // Next download the segment from a randomly chosen server using configured scheme.
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(peerSegmentURIs, destTarFile, zkMetadata.getCrypterName());
       LOGGER.info("Fetched segment {} from peers: {} to: {} of size: {}", segmentName, peerSegmentURIs, destTarFile,
-              destTarFile.length());
+          destTarFile.length());
     } catch (AttemptsExceededException e) {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from peers {} to: {}", segmentName,
-              _tableNameWithType, peerSegmentURIs, destTarFile);
+          _tableNameWithType, peerSegmentURIs, destTarFile);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1L);
       throw e;
     }
@@ -635,12 +668,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String uri = zkMetadata.getDownloadUrl();
     AtomicInteger attempts = new AtomicInteger(0);
     try {
-        File ret = SegmentFetcherFactory.fetchAndStreamUntarToLocal(uri, tempRootDir, maxStreamRateInByte, attempts);
-        _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
-            attempts.get());
-        LOGGER.info("Downloaded and untarred segment: {} for table: {} from: {} attempts: {}", segmentName,
-            _tableNameWithType, uri, attempts.get());
-        return ret;
+      File ret = SegmentFetcherFactory.fetchAndStreamUntarToLocal(uri, tempRootDir, maxStreamRateInByte, attempts);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
+          attempts.get());
+      LOGGER.info("Downloaded and untarred segment: {} for table: {} from: {} attempts: {}", segmentName,
+          _tableNameWithType, uri, attempts.get());
+      return ret;
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES,
           attempts.get());
@@ -770,6 +803,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
       SegmentZKMetadata zkMetadata) {
+    Preconditions.checkState(!_shutDown,
+        "Table data manager is already shut down, cannot load existing segment: %s of table: %s", segmentName,
+        _tableNameWithType);
+
     // Try to recover the segment from potential segment reloading failure.
     String segmentTier = zkMetadata.getTier();
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());

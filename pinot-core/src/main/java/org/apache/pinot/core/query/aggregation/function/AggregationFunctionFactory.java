@@ -257,7 +257,7 @@ public class AggregationFunctionFactory {
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(firstArgument);
           case DISTINCTCOUNT:
-            return new DistinctCountAggregationFunction(firstArgument);
+            return new DistinctCountAggregationFunction(firstArgument, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
             return new DistinctCountBitmapAggregationFunction(firstArgument);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
@@ -275,9 +275,9 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTRAWTHETASKETCH:
             return new DistinctCountRawThetaSketchAggregationFunction(arguments);
           case DISTINCTSUM:
-            return new DistinctSumAggregationFunction(firstArgument);
+            return new DistinctSumAggregationFunction(firstArgument, nullHandlingEnabled);
           case DISTINCTAVG:
-            return new DistinctAvgAggregationFunction(firstArgument);
+            return new DistinctAvgAggregationFunction(firstArgument, nullHandlingEnabled);
           case IDSET:
             return new IdSetAggregationFunction(arguments);
           case COUNTMV:
@@ -317,13 +317,13 @@ public class AggregationFunctionFactory {
           case BOOLOR:
             return new BooleanOrAggregationFunction(firstArgument, nullHandlingEnabled);
           case VARPOP:
-            return new VarianceAggregationFunction(firstArgument, false, false);
+            return new VarianceAggregationFunction(firstArgument, false, false, nullHandlingEnabled);
           case VARSAMP:
-            return new VarianceAggregationFunction(firstArgument, true, false);
+            return new VarianceAggregationFunction(firstArgument, true, false, nullHandlingEnabled);
           case STDDEVPOP:
-            return new VarianceAggregationFunction(firstArgument, false, true);
+            return new VarianceAggregationFunction(firstArgument, false, true, nullHandlingEnabled);
           case STDDEVSAMP:
-            return new VarianceAggregationFunction(firstArgument, true, true);
+            return new VarianceAggregationFunction(firstArgument, true, true, nullHandlingEnabled);
           case SKEWNESS:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.SKEWNESS);
           case KURTOSIS:
@@ -339,16 +339,16 @@ public class AggregationFunctionFactory {
             return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
             return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
-          case PARENTARGMAX:
-            return new ParentArgMinMaxAggregationFunction(arguments, true);
-          case PARENTARGMIN:
-            return new ParentArgMinMaxAggregationFunction(arguments, false);
-          case CHILDARGMAX:
-            return new ChildArgMinMaxAggregationFunction(arguments, true);
-          case CHILDARGMIN:
-            return new ChildArgMinMaxAggregationFunction(arguments, false);
-          case ARGMAX:
-          case ARGMIN:
+          case PARENTEXPRMAX:
+            return new ParentExprMinMaxAggregationFunction(arguments, true);
+          case PARENTEXPRMIN:
+            return new ParentExprMinMaxAggregationFunction(arguments, false);
+          case CHILDEXPRMAX:
+            return new ChildExprMinMaxAggregationFunction(arguments, true);
+          case CHILDEXPRMIN:
+            return new ChildExprMinMaxAggregationFunction(arguments, false);
+          case EXPRMAX:
+          case EXPRMIN:
             throw new IllegalArgumentException(
                 "Aggregation function: " + function + " is only supported in selection without alias.");
           case FUNNELCOUNT:

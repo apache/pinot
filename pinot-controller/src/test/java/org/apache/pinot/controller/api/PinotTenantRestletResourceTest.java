@@ -62,22 +62,63 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     JsonNode tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
     assertEquals(tableList.get("tables").size(), 0);
 
+    // Add some non default tag broker instances, UNTAGGED_BROKER_INSTANCE
+    String brokerTag2 = "brokerTag2";
+    TEST_INSTANCE.addFakeBrokerInstanceToAutoJoinHelixCluster("broker_999", false);
+    TEST_INSTANCE.addFakeBrokerInstanceToAutoJoinHelixCluster("broker_1000", false);
+    TEST_INSTANCE.updateBrokerTenant("brokerTag2", 2);
+
     // Add a table
     ControllerTest.sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build().toJsonString());
 
-    // There should be 1 table on the tenant
+    // Add a second table with a different broker tag
+    String table2 = "restletTable2_OFFLINE";
+    ControllerTest.sendPostRequest(TEST_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(table2).setBrokerTenant(
+                brokerTag2)
+            .build().toJsonString());
+
+    // There should be 2 tables on the tenant when querying default Tenant for servers w/o specifying ?type=server
     tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
     JsonNode tables = tableList.get("tables");
-    assertEquals(tables.size(), 1);
+    assertEquals(tables.size(), 2);
 
-    // Check to make sure that test table exists.
-    boolean found = false;
-    for (int i = 0; !found && i < tables.size(); i++) {
-      found = tables.get(i).asText().equals(TABLE_NAME);
+    // There should be 2 tables even when specifying ?type=server as that is the default
+    listTablesUrl =
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME,
+            "server");
+    tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
+    tables = tableList.get("tables");
+
+    // Check to make sure that test tables exists.
+    boolean found1 = false;
+    boolean found2 = false;
+    for (int i = 0; i < tables.size(); i++) {
+      found1 = found1 || tables.get(i).asText().equals(TABLE_NAME);
+      found2 = found2 || tables.get(i).asText().equals(table2);
     }
 
-    assertTrue(found);
+    // There should be only 1 table when specifying ?type=broker for the default tenant
+    listTablesUrl =
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTablesFromTenant(TagNameUtils.DEFAULT_TENANT_NAME,
+            "broker");
+    tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
+    tables = tableList.get("tables");
+    assertEquals(tables.size(), 1);
+
+    String defaultTenantTable = tables.get(0).asText();
+
+    // There should be only 1 table when specifying ?type=broker for the broker_untagged tenant
+    listTablesUrl =
+        TEST_INSTANCE.getControllerRequestURLBuilder().forTablesFromTenant(brokerTag2,
+            "broker");
+    tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
+    tables = tableList.get("tables");
+    assertEquals(tables.size(), 1);
+
+    // This second table should not be the same as the one from the default tenant
+    assertTrue(!defaultTenantTable.equals(tables.get(0).asText()));
 
     // reset the ZK node to simulate corruption
     ZkHelixPropertyStore<ZNRecord> propertyStore = TEST_INSTANCE.getPropertyStore();
@@ -85,10 +126,21 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     ZNRecord znRecord = propertyStore.get(zkPath, null, 0);
     propertyStore.set(zkPath, new ZNRecord(znRecord.getId()), 1);
 
+    // corrupt the other one also
+    zkPath = "/CONFIGS/TABLE/" + table2;
+    znRecord = propertyStore.get(zkPath, null, 0);
+    propertyStore.set(zkPath, new ZNRecord(znRecord.getId()), 1);
+
     // Now there should be no tables
     tableList = JsonUtils.stringToJsonNode(ControllerTest.sendGetRequest(listTablesUrl));
     tables = tableList.get("tables");
     assertEquals(tables.size(), 0);
+
+    // remove the additional, non-default table and broker instances
+    TEST_INSTANCE.dropOfflineTable(table2);
+    TEST_INSTANCE.stopAndDropFakeInstance("broker_999");
+    TEST_INSTANCE.stopAndDropFakeInstance("broker_1000");
+    TEST_INSTANCE.deleteBrokerTenant(brokerTag2);
   }
 
   @Test

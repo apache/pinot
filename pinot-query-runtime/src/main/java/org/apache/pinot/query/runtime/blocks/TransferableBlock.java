@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,12 +46,6 @@ public class TransferableBlock implements Block {
   private List<Object[]> _container;
 
   public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType) {
-    this(container, dataSchema, containerType, false);
-  }
-
-  @VisibleForTesting
-  TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType,
-      boolean isErrorBlock) {
     _container = container;
     _dataSchema = dataSchema;
     _type = containerType;
@@ -164,11 +157,8 @@ public class TransferableBlock implements Block {
     return isType(MetadataBlock.MetadataBlockType.EOS);
   }
 
-  /**
-   * @return whether this block represents a NOOP block
-   */
-  public boolean isNoOpBlock() {
-    return isType(MetadataBlock.MetadataBlockType.NOOP);
+  public boolean isDataBlock() {
+    return _type != DataBlock.Type.METADATA;
   }
 
   /**
@@ -187,5 +177,11 @@ public class TransferableBlock implements Block {
 
     MetadataBlock metadata = (MetadataBlock) _dataBlock;
     return metadata.getType() == type;
+  }
+
+  @Override
+  public String toString() {
+    String blockType = isErrorBlock() ? "error" : isSuccessfulEndOfStreamBlock() ? "eos" : "data";
+    return "TransferableBlock{blockType=" + blockType + ", _numRows=" + _numRows + '}';
   }
 }

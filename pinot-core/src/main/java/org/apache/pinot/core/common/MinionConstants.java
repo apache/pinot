@@ -52,12 +52,18 @@ public class MinionConstants {
    */
   public static final String TIMEOUT_MS_KEY_SUFFIX = ".timeoutMs";
   public static final String NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX = ".numConcurrentTasksPerInstance";
+  public static final String MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX = ".maxAttemptsPerTask";
 
   /**
    * Table level configs
    */
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
   public static final String ENABLE_REPLACE_SEGMENTS_KEY = "enableReplaceSegments";
+
+  /**
+   * Job configs
+   */
+  public static final int DEFAULT_MAX_ATTEMPTS_PER_TASK = 1;
 
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
@@ -138,5 +144,24 @@ public class MinionConstants {
     public static final String TASK_TYPE = "SegmentGenerationAndPushTask";
     public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
         "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
+  }
+
+  public static class UpsertCompactionTask {
+    public static final String TASK_TYPE = "UpsertCompactionTask";
+    /**
+     * The time period to wait before picking segments for this task
+     * e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
+     */
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+    /**
+     * The maximum percent of old records allowed for a completed segment.
+     * e.g. if the percent surpasses 30, then the segment may be compacted
+     */
+    public static final String INVALID_RECORDS_THRESHOLD_PERCENT = "invalidRecordsThresholdPercent";
+    /**
+     * The maximum count of old records for a completed segment
+     * e.g. if the count surpasses 100k, then the segment may be compacted
+     */
+    public static final String INVALID_RECORDS_THRESHOLD_COUNT = "invalidRecordsThresholdCount";
   }
 }

@@ -26,8 +26,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -46,8 +46,8 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     _mailboxService = mailboxService;
     int port = mailboxService.getPort();
     _server = ServerBuilder.forPort(port).addService(this).maxInboundMessageSize(
-        config.getProperty(QueryConfig.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-            QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
+        config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+            CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
   }
 
   public void start() {

@@ -107,7 +107,7 @@ const TaskQueueTable = (props) => {
 
   const handleScheduleNow = async () => {
     const res = await PinotMethodUtils.scheduleTaskAction(tableName, taskType);
-    if (get(res, `data.${taskType}`, null) === null) {
+    if (get(res, `${taskType}`, null) === null) {
       dispatch({
         type: 'error',
         message: `Could not schedule task`,
@@ -116,7 +116,7 @@ const TaskQueueTable = (props) => {
     } else {
       dispatch({
         type: 'success',
-        message: `${get(res, `data.${taskType}`, null)} scheduled successfully`,
+        message: `${get(res, `${taskType}`, null)} scheduled successfully`,
         show: true
       });
     }

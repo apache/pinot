@@ -20,7 +20,10 @@ package org.apache.pinot.segment.local.aggregator;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
+import org.apache.pinot.segment.local.utils.HyperLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -28,10 +31,20 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, HyperLogLog> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
-  private static final int DEFAULT_LOG2M_BYTE_SIZE = 180;
+
+  private final int _log2m;
 
   // Byte size won't change once we get the initial aggregated value
   private int _maxByteSize;
+
+  public DistinctCountHLLValueAggregator(List<ExpressionContext> arguments) {
+    // length 1 means we use the default _log2m of 8
+    if (arguments.size() <= 1) {
+      _log2m = CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
+    } else {
+      _log2m = arguments.get(1).getLiteral().getIntValue();
+    }
+  }
 
   @Override
   public AggregationFunctionType getAggregationType() {
@@ -49,12 +62,11 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
       initialValue = deserializeAggregatedValue(bytes);
-      _maxByteSize = Math.max(_maxByteSize, bytes.length);
+      _maxByteSize = bytes.length;
     } else {
-      // TODO: Handle configurable log2m for StarTreeBuilder
-      initialValue = new HyperLogLog(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
+      initialValue = new HyperLogLog(_log2m);
       initialValue.offer(rawValue);
-      _maxByteSize = Math.max(_maxByteSize, DEFAULT_LOG2M_BYTE_SIZE);
+      _maxByteSize = HyperLogLogUtils.byteSize(initialValue);
     }
     return initialValue;
   }
@@ -90,7 +102,9 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
 
   @Override
   public int getMaxAggregatedValueByteSize() {
-    return _maxByteSize;
+    // NOTE: For aggregated metrics, initial aggregated value might have not been generated. Returns the byte size
+    //       based on log2m.
+    return _maxByteSize > 0 ? _maxByteSize : HyperLogLogUtils.byteSize(_log2m);
   }
 
   @Override

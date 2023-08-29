@@ -61,7 +61,10 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
@@ -109,6 +112,7 @@ public class TableConfigsRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tableConfigs")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_CONFIG)
   @Authenticate(AccessType.READ)
   @ApiOperation(value = "Lists all TableConfigs in cluster", notes = "Lists all TableConfigs in cluster")
   public String listConfigs() {
@@ -134,6 +138,7 @@ public class TableConfigsRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tableConfigs/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIGS)
   @Authenticate(AccessType.READ)
   @ApiOperation(value = "Get the TableConfigs for a given raw tableName",
       notes = "Get the TableConfigs for a given raw tableName")
@@ -211,6 +216,10 @@ public class TableConfigsRestletResource {
                 accessControl);
       }
 
+      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.CREATE_TABLE)) {
+        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+      }
+
       try {
         _pinotHelixResourceManager.addSchema(schema, false, false);
         LOGGER.info("Added schema: {}", schema.getSchemaName());
@@ -253,6 +262,7 @@ public class TableConfigsRestletResource {
    */
   @DELETE
   @Path("/tableConfigs/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_TABLE)
   @Authenticate(AccessType.DELETE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete the TableConfigs", notes = "Delete the TableConfigs")
@@ -294,6 +304,7 @@ public class TableConfigsRestletResource {
    */
   @PUT
   @Path("/tableConfigs/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIGS)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json",
@@ -418,6 +429,11 @@ public class TableConfigsRestletResource {
       AccessControlUtils
           .validatePermission(realtimeTableConfig.getTableName(), AccessType.READ, httpHeaders, endpointUrl,
               accessControl);
+    }
+
+    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(),
+        Actions.Table.VALIDATE_TABLE_CONFIGS)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
     TableConfigs validatedTableConfigs = validateConfig(tableConfigs, typesToSkip);

@@ -62,6 +62,15 @@ public class RexExpressionUtils {
         "CAST", operands);
   }
 
+  /**
+   * Reinterpret is a pass-through function that does not change the type of the input.
+   */
+  static RexExpression handleReinterpret(RexCall rexCall) {
+    List<RexNode> operands = rexCall.getOperands();
+    Preconditions.checkState(operands.size() == 1, "REINTERPRET takes only 1 argument");
+    return RexExpression.toRexExpression(operands.get(0));
+  }
+
   // TODO: Add support for range filter expressions (e.g. a > 0 and a < 30)
   static RexExpression handleSearch(RexCall rexCall) {
     List<RexNode> operands = rexCall.getOperands();

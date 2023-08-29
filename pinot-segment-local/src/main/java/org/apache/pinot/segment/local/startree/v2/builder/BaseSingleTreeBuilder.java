@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -142,7 +143,9 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     for (AggregationFunctionColumnPair functionColumnPair : functionColumnPairs) {
       _metrics[index] = functionColumnPair.toColumnName();
       _functionColumnPairs[index] = functionColumnPair;
-      _valueAggregators[index] = ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType());
+      // TODO: Allow extra arguments in star-tree (e.g. log2m, precision)
+      _valueAggregators[index] =
+          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.emptyList());
 
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {

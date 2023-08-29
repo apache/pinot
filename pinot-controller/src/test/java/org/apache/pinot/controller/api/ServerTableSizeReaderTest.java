@@ -32,8 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
@@ -58,7 +57,7 @@ public class ServerTableSizeReaderTest {
   private static final int SERVER_COUNT = 6;
 
   private final ExecutorService _executor = Executors.newFixedThreadPool(3);
-  private final HttpConnectionManager _httpConnectionManager = new MultiThreadedHttpConnectionManager();
+  private final PoolingHttpClientConnectionManager _httpConnectionManager = new PoolingHttpClientConnectionManager();
   private final List<HttpServer> _servers = new ArrayList<>();
   private final List<String> _serverList = new ArrayList<>();
   private final List<String> _endpointList = new ArrayList<>();

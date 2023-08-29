@@ -34,9 +34,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
@@ -48,8 +51,6 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.QueryRunnerTestBase;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.table.TableType;
@@ -57,6 +58,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -71,12 +73,20 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
   private static final Random RANDOM = new Random(42);
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
+  private static final int NUM_PARTITIONS = 4;
 
   private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
+  private TimeZone _currentSystemTimeZone;
 
   @BeforeClass
   public void setUp()
       throws Exception {
+    // Save the original default timezone
+    _currentSystemTimeZone = TimeZone.getDefault();
+
+    // Change the default timezone
+    TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"));
+
     // Setting up mock server factories.
     // All test data are loaded upfront b/c the mock server and brokers needs to be in sync.
     MockInstanceDataManagerFactory factory1 = new MockInstanceDataManagerFactory("server1");
@@ -85,6 +95,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     setH2Connection();
 
     // Scan through all the test cases.
+    Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap = new HashMap<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : getTestCases().entrySet()) {
       String testCaseName = testCaseEntry.getKey();
       QueryTestCase testCase = testCaseEntry.getValue();
@@ -98,51 +109,54 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         boolean allowEmptySegment = !BooleanUtils.toBoolean(extractExtraProps(testCase._extraProps, "noEmptySegment"));
         String tableName = testCaseName + "_" + tableEntry.getKey();
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
-        String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
-        org.apache.pinot.spi.data.Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
+        String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+        Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
         schemaMap.put(tableName, pinotSchema);
-        factory1.registerTable(pinotSchema, tableNameWithType);
-        factory2.registerTable(pinotSchema, tableNameWithType);
+        factory1.registerTable(pinotSchema, offlineTableName);
+        factory2.registerTable(pinotSchema, offlineTableName);
         List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
         List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
 
         // generate segments and dump into server1 and server2
         List<String> partitionColumns = tableEntry.getValue()._partitionColumns;
+        String partitionColumn = null;
+        List<List<String>> partitionIdToSegmentsMap = null;
+        if (partitionColumns != null && partitionColumns.size() == 1) {
+          partitionColumn = partitionColumns.get(0);
+          partitionIdToSegmentsMap = new ArrayList<>();
+          for (int i = 0; i < NUM_PARTITIONS; i++) {
+            partitionIdToSegmentsMap.add(new ArrayList<>());
+          }
+        }
 
-        List<GenericRow> rows1 = new ArrayList<>();
-        List<GenericRow> rows2 = new ArrayList<>();
+        List<List<GenericRow>> partitionIdToRowsMap = new ArrayList<>();
+        for (int i = 0; i < NUM_PARTITIONS; i++) {
+          partitionIdToRowsMap.add(new ArrayList<>());
+        }
 
         for (GenericRow row : genericRows) {
           if (row == SEGMENT_BREAKER_ROW) {
-            if (allowEmptySegment || rows1.size() > 0) {
-              factory1.addSegment(tableNameWithType, rows1);
-              rows1 = new ArrayList<>();
-            }
-            if (allowEmptySegment || rows2.size() > 0) {
-              factory2.addSegment(tableNameWithType, rows2);
-              rows2 = new ArrayList<>();
-            }
+            addSegments(factory1, factory2, offlineTableName, allowEmptySegment, partitionIdToRowsMap,
+                partitionIdToSegmentsMap);
           } else {
-            long partition = 0;
+            int partitionId;
             if (partitionColumns == null) {
-              partition = RANDOM.nextInt(2);
+              partitionId = RANDOM.nextInt(NUM_PARTITIONS);
             } else {
+              int hashCode = 0;
               for (String field : partitionColumns) {
-                partition = (partition + row.getValue(field).hashCode()) % 42;
+                hashCode += row.getValue(field).hashCode();
               }
+              partitionId = (hashCode & Integer.MAX_VALUE) % NUM_PARTITIONS;
             }
-            if (partition % 2 == 0) {
-              rows1.add(row);
-            } else {
-              rows2.add(row);
-            }
+            partitionIdToRowsMap.get(partitionId).add(row);
           }
         }
-        if (allowEmptySegment || rows1.size() > 0) {
-          factory1.addSegment(tableNameWithType, rows1);
-        }
-        if (allowEmptySegment || rows2.size() > 0) {
-          factory2.addSegment(tableNameWithType, rows2);
+        addSegments(factory1, factory2, offlineTableName, allowEmptySegment, partitionIdToRowsMap,
+            partitionIdToSegmentsMap);
+
+        if (partitionColumn != null) {
+          partitionedSegmentsMap.put(offlineTableName, Pair.of(partitionColumn, partitionIdToSegmentsMap));
         }
       }
 
@@ -170,14 +184,14 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
 
     _reducerGrpcPort = QueryTestUtils.getAvailablePort();
-    _reducerHostname = String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME);
+    _reducerHostname = String.format("Broker_%s", CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_HOSTNAME);
     Map<String, Object> reducerConfig = new HashMap<>();
-    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
-    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _reducerScheduler = new OpChainSchedulerService(new RoundRobinScheduler(10_000L), REDUCE_EXECUTOR);
-    _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
-        new PinotConfiguration(reducerConfig), _reducerScheduler::onDataAvailable);
-    _reducerScheduler.startAsync();
+    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
+    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
+    _reducerScheduler = new OpChainSchedulerService(EXECUTOR);
+    _mailboxService =
+        new MailboxService(CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
+            new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
     Map<String, List<String>> tableToSegmentMap1 = factory1.buildTableSegmentNameMap();
@@ -197,7 +211,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
     _queryEnvironment =
         QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
-            factory1.buildSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap());
+            factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
+            partitionedSegmentsMap);
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
@@ -208,14 +223,31 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     _servers.put(new QueryServerInstance("localhost", port2, port2), server2);
   }
 
+  private void addSegments(MockInstanceDataManagerFactory factory1, MockInstanceDataManagerFactory factory2,
+      String offlineTableName, boolean allowEmptySegment, List<List<GenericRow>> partitionIdToRowsMap,
+      @Nullable List<List<String>> partitionIdToSegmentsMap) {
+    for (int i = 0; i < NUM_PARTITIONS; i++) {
+      MockInstanceDataManagerFactory factory = i < (NUM_PARTITIONS / 2) ? factory1 : factory2;
+      List<GenericRow> rows = partitionIdToRowsMap.get(i);
+      if (allowEmptySegment || !rows.isEmpty()) {
+        String segmentName = factory.addSegment(offlineTableName, rows);
+        if (partitionIdToSegmentsMap != null) {
+          partitionIdToSegmentsMap.get(i).add(segmentName);
+        }
+        rows.clear();
+      }
+    }
+  }
+
   @AfterClass
   public void tearDown() {
+    // Restore the original default timezone
+    TimeZone.setDefault(_currentSystemTimeZone);
     DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
     for (QueryServerEnclosure server : _servers.values()) {
       server.shutDown();
     }
     _mailboxService.shutdown();
-    _reducerScheduler.stopAsync();
   }
 
   // TODO: name the test using testCaseName for testng reports

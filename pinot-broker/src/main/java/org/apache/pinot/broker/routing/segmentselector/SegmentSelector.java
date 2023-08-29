@@ -28,18 +28,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 /**
  * The segment selector selects the segments for the query. The segments selected should cover the whole dataset (table)
  * without overlap.
- * <p>Segment selector examples:
- * <ul>
- *   <li>
- *     For real-time table, when HLC and LLC segments coexist (during LLC migration), select only HLC segments or LLC
- *     segments
- *   </li>
- *   <li>For HLC real-time table, select segments in one group</li>
- *   <li>
- *     For table with segment merge/rollup enabled, select the merged segments over the original segments with the same
- *     data
- *   </li>
- * </ul>
  */
 public interface SegmentSelector {
 

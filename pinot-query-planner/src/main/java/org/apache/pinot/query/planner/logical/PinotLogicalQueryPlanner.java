@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.query.planner.logical;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,26 +88,22 @@ public class PinotLogicalQueryPlanner {
           new PlanFragment(1, subPlanRoot, new PlanFragmentMetadata(), new ArrayList<>()));
       subPlanRoot = subPlanRoot.visit(PlanFragmenter.INSTANCE, planFragmentContext);
 
-      // Sub plan root needs to send results back to the Broker ROOT, a.k.a. the client response node. the last stage
-      // only has one
-      // receiver so doesn't matter what the exchange type is. setting it to SINGLETON by default.
+      // Sub plan root needs to send final results back to the Broker
+      // TODO: Should be SINGLETON (currently SINGLETON has to be local, so use BROADCAST_DISTRIBUTED instead)
       PlanNode subPlanRootSenderNode =
-          new MailboxSendNode(subPlanRoot.getPlanFragmentId(), subPlanRoot.getDataSchema(),
-              0, RelDistribution.Type.RANDOM_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
+          new MailboxSendNode(subPlanRoot.getPlanFragmentId(), subPlanRoot.getDataSchema(), 0,
+              RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
               false);
       subPlanRootSenderNode.addInput(subPlanRoot);
-
-      PlanNode subPlanRootReceiverNode =
-          new MailboxReceiveNode(0, subPlanRoot.getDataSchema(), subPlanRoot.getPlanFragmentId(),
-              RelDistribution.Type.RANDOM_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
-              false, false, subPlanRootSenderNode);
-      subPlanRoot = subPlanRootReceiverNode;
+      subPlanRoot = new MailboxReceiveNode(0, subPlanRoot.getDataSchema(), subPlanRoot.getPlanFragmentId(),
+          RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null, false,
+          false, subPlanRootSenderNode);
       PlanFragment planFragment1 = planFragmentContext._planFragmentIdToRootNodeMap.get(1);
       planFragmentContext._planFragmentIdToRootNodeMap.put(1,
           new PlanFragment(1, subPlanRootSenderNode, planFragment1.getFragmentMetadata(), planFragment1.getChildren()));
-      PlanFragment rootPlanFragment
-          = new PlanFragment(subPlanRoot.getPlanFragmentId(), subPlanRoot, new PlanFragmentMetadata(),
-          ImmutableList.of(planFragmentContext._planFragmentIdToRootNodeMap.get(1)));
+      PlanFragment rootPlanFragment =
+          new PlanFragment(subPlanRoot.getPlanFragmentId(), subPlanRoot, new PlanFragmentMetadata(),
+              Collections.singletonList(planFragmentContext._planFragmentIdToRootNodeMap.get(1)));
       planFragmentContext._planFragmentIdToRootNodeMap.put(0, rootPlanFragment);
       for (Map.Entry<Integer, List<Integer>> planFragmentToChildrenEntry
           : planFragmentContext._planFragmentIdToChildrenMap.entrySet()) {

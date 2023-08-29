@@ -33,8 +33,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 public class DistinctAvgAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
-  public DistinctAvgAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTAVG);
+  public DistinctAvgAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+    super(expression, AggregationFunctionType.DISTINCTAVG, nullHandlingEnabled);
   }
 
   @Override

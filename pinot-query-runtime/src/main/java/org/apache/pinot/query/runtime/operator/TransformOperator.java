@@ -86,13 +86,14 @@ public class TransformOperator extends MultiStageOperator {
     try {
       TransferableBlock block = _upstreamOperator.nextBlock();
       return transform(block);
-    } catch (Exception e) {
+    } catch (RuntimeException e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
   }
 
-  private TransferableBlock transform(TransferableBlock block)
-      throws Exception {
+  private TransferableBlock transform(TransferableBlock block) {
+    // TODO: Other operators keep the first erroneous block, while this keep the last.
+    //  We should decide what is what we want to do and be consistent with that.
     if (block.isErrorBlock()) {
       _upstreamErrorBlock = block;
     }
@@ -101,10 +102,6 @@ public class TransformOperator extends MultiStageOperator {
     }
 
     if (TransferableBlockUtils.isEndOfStream(block)) {
-      return block;
-    }
-
-    if (TransferableBlockUtils.isNoOpBlock(block)) {
       return block;
     }
 

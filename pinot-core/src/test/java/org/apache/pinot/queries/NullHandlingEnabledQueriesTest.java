@@ -22,10 +22,12 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -110,6 +112,170 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     row.putValue(COLUMN1, column1Value);
     row.putValue(COLUMN2, column2Value);
     _rows.add(row);
+  }
+
+  @Test
+  public void testGroupByOrderByNullsLastUsingOrdinal()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(null);
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    insertRow(2);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, COUNT(*) FROM testTable GROUP BY %s ORDER BY 1 DESC NULLS LAST", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 3);
+    assertArrayEquals(rows.get(0), new Object[]{2, (long) 2 * NUM_OF_SEGMENT_COPIES});
+    assertArrayEquals(rows.get(1), new Object[]{1, (long) NUM_OF_SEGMENT_COPIES});
+    assertArrayEquals(rows.get(2), new Object[]{null, (long) 3 * NUM_OF_SEGMENT_COPIES});
+  }
+
+  @Test
+  public void testHavingFilterIsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(1, 1);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, COUNT(%s) FROM testTable GROUP BY %s HAVING %s IS NULL LIMIT 100", COLUMN1, COLUMN2,
+            COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertArrayEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
+  }
+
+  @Test
+  public void testHavingFilterIsNotNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(1, 1);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, COUNT(%s) FROM testTable GROUP BY %s HAVING %s IS NOT NULL LIMIT 100", COLUMN1,
+            COLUMN2, COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertArrayEquals(rows.get(0), new Object[]{1, (long) NUM_OF_SEGMENT_COPIES});
+  }
+
+  @Test
+  public void testHavingFilterNotOfColumnIsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(true, 1);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, COUNT(%s) FROM testTable GROUP BY %s HAVING (NOT %s) IS NULL LIMIT 100", COLUMN1,
+            COLUMN2, COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertArrayEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
+  }
+
+  @Test
+  public void testHavingFilterNotColumnIsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(true, 1);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, COUNT(%s) FROM testTable GROUP BY %s HAVING NOT (%s IS NULL) LIMIT 100", COLUMN1,
+            COLUMN2, COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertArrayEquals(rows.get(0), new Object[]{true, (long) NUM_OF_SEGMENT_COPIES});
+  }
+
+  @Test
+  public void testHavingFilterIsNullAndIsNotNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(1, 1);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format(
+        "SELECT %s, COUNT(%s) FROM testTable GROUP BY %s HAVING (%s IS NULL) AND (COUNT(%s) is NOT NULL) LIMIT 100",
+        COLUMN1, COLUMN2, COLUMN1, COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertArrayEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
+  }
+
+  @Test
+  public void testHavingFilterIsNullOrIsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(1, 1);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format(
+        "SELECT %s, COUNT(%s) FROM testTable GROUP BY %s HAVING (%s IS NULL) OR (COUNT(%s) is NULL) LIMIT 100", COLUMN1,
+        COLUMN2, COLUMN1, COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertArrayEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
   }
 
   @Test
@@ -313,6 +479,213 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     assertNotNull(resultTable.getRows().get(0)[0]);
   }
 
+  @Test(dataProvider = "NumberTypes")
+  public void testDistinctCountDictNumberTypes(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTCOUNT(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0)[0], 1);
+  }
+
+  @Test(dataProvider = "NumberTypes")
+  public void testDistinctCountNonDictNumberTypes(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(Collections.singletonList(COLUMN1)).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTCOUNT(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0)[0], 1);
+  }
+
+  @Test(dataProvider = "NumberTypes")
+  public void testGroupByDistinctCountDictNumberTypes(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, "key");
+    insertRowWithTwoColumns(1, "key");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTCOUNT(%s), %s FROM testTable GROUP BY %s", COLUMN1, COLUMN2, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertArrayEquals(resultTable.getRows().get(0), new Object[]{1, "key"});
+  }
+
+  @Test(dataProvider = "NumberTypes")
+  public void testGroupByDistinctCountNonDictNumberTypes(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, "key");
+    insertRowWithTwoColumns(1, "key");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(Collections.singletonList(COLUMN1)).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTCOUNT(%s), %s FROM testTable GROUP BY %s", COLUMN1, COLUMN2, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertArrayEquals(resultTable.getRows().get(0), new Object[]{1, "key"});
+  }
+
+  @Test(dataProvider = "NumberTypes")
+  public void testGroupByMvDistinctCountNonDictNumberTypes(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, new String[]{"key1", "key2"});
+    insertRowWithTwoColumns(1, new String[]{"key1", "key2"});
+    insertRowWithTwoColumns(2, new String[]{"key2"});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(Collections.singletonList(COLUMN1)).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType)
+        .addMultiValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT DISTINCTCOUNT(%s), %s FROM testTable GROUP BY %s ORDER BY %s", COLUMN1, COLUMN2, COLUMN2,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().get(0), new Object[]{1, "key1"});
+    assertEquals(resultTable.getRows().get(1), new Object[]{2, "key2"});
+  }
+
+  @Test(dataProvider = "NumberTypes")
+  public void testGroupByMvDistinctCountDictNumberTypes(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, new String[]{"key1", "key2"});
+    insertRowWithTwoColumns(1, new String[]{"key1", "key2"});
+    insertRowWithTwoColumns(2, new String[]{"key2"});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType)
+        .addMultiValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT DISTINCTCOUNT(%s), %s FROM testTable GROUP BY %s ORDER BY %s", COLUMN1, COLUMN2, COLUMN2,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().get(0), new Object[]{1, "key1"});
+    assertEquals(resultTable.getRows().get(1), new Object[]{2, "key2"});
+  }
+
+  @DataProvider(name = "DistinctCountObjectTypes")
+  public static Object[][] getDistinctAggregationObjectTypes() {
+    return new Object[][]{
+        {FieldSpec.DataType.STRING, "a"}, {
+        FieldSpec.DataType.BYTES, "a string".getBytes()
+    }
+    };
+  }
+
+  @Test(dataProvider = "DistinctCountObjectTypes")
+  public void testObjectDistinctCountObjectTypes(FieldSpec.DataType dataType, Object value)
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(value);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTCOUNT(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0)[0], 1);
+  }
+
+  @Test(dataProvider = "DistinctCountObjectTypes")
+  public void testGroupByDistinctCountObjectTypes(FieldSpec.DataType dataType, Object value)
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, "key");
+    insertRowWithTwoColumns(value, "key");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTCOUNT(%s), %s FROM testTable GROUP BY %s", COLUMN1, COLUMN2, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertArrayEquals(resultTable.getRows().get(0), new Object[]{1, "key"});
+  }
+
+  @Test
+  public void testDistinctSum()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    insertRow(2);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTSUM(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0)[0], (double) 3);
+  }
+
+  @Test
+  public void testDistinctAvg()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    insertRow(2);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT DISTINCTAVG(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().size(), 1);
+    assertEquals(resultTable.getRows().get(0)[0], 1.5);
+  }
+
   @Test
   public void testTransformBlockValSetGetNullBitmap()
       throws Exception {
@@ -463,5 +836,690 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertArrayEquals(rows.get(0), new Object[]{(double) 2});
+  }
+
+  @Test
+  public void testFilteringOnInvertedIndexColumn()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(false);
+    insertRow(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(Collections.singletonList(COLUMN1)).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT * FROM testTable WHERE %s = false", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{false});
+  }
+
+  @Test
+  public void testFilteringOnSortedColumn()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(false);
+    insertRow(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setSortedColumn(COLUMN1).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT * FROM testTable WHERE %s = false", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{false});
+  }
+
+  @Test
+  public void testRangeFiltering()
+      throws Exception {
+    initializeRows();
+    insertRow(-1);
+    insertRow(null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSortedColumn(COLUMN1).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE %s < 0", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{-1});
+  }
+
+  @Test
+  public void testEqualFiltering()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(Integer.MIN_VALUE);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSortedColumn(COLUMN1).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE %s = %d", COLUMN1, Integer.MIN_VALUE);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
+  }
+
+  @Test
+  public void testOrFiltering()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, -1);
+    insertRowWithTwoColumns(-1, null);
+    insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(null, -1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE OR(%s > 0, %s < 0) LIMIT 100", COLUMN1, COLUMN2, COLUMN1,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 3);
+  }
+
+  @Test
+  public void testNotFiltering()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(-1);
+    insertRow(1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT %s FROM testTable WHERE NOT(%s = 1) LIMIT 100", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{-1});
+  }
+
+  @Test
+  public void testNotAndFiltering()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, -1);
+    insertRowWithTwoColumns(-1, null);
+    insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(null, -1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE NOT(AND(%s > 0, %s < 0)) LIMIT 100", COLUMN1, COLUMN2,
+            COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 3 * NUM_OF_SEGMENT_COPIES);
+  }
+
+  @Test
+  public void testNotOrFiltering()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, -1);
+    insertRowWithTwoColumns(-1, null);
+    insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(null, -1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE NOT(OR(%s > 0, %s < 0)) LIMIT 100", COLUMN1, COLUMN2, COLUMN1,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{-1, 1});
+  }
+
+  @Test
+  public void testBaseColumnFilterOperatorGetNullBitmapIsNull()
+      throws Exception {
+    initializeRows();
+    insertRow(false);
+    insertRow(true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(Collections.singletonList(COLUMN1)).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE NOT(%s = false)", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{true});
+  }
+
+  @Test
+  public void testAdditionExpressionFilterOperator()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(Integer.MIN_VALUE);
+    insertRow(1);
+    insertRow(-1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT %s FROM testTable WHERE add(%s, 0) < 0", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 2);
+  }
+
+  @Test
+  public void testAdditionExpressionFilterOperatorInsideNotFilterOperator()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(Integer.MIN_VALUE);
+    insertRow(1);
+    insertRow(-1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT %s FROM testTable WHERE NOT(add(%s, 0) > 0)", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 2);
+  }
+
+  @Test
+  public void testGreatestExpressionFilterOperator()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    insertRowWithTwoColumns(Integer.MIN_VALUE, Integer.MIN_VALUE);
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(-1, -1);
+    insertRowWithTwoColumns(-1, null);
+    insertRowWithTwoColumns(null, -1);
+    insertRowWithTwoColumns(1, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE GREATEST(%s, %s) < 0 LIMIT 100", COLUMN1, COLUMN2, COLUMN1,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES * 2);
+  }
+
+  @Test
+  public void testExpressionFilterOperatorResultIsInSecondProjectionBlock()
+      throws Exception {
+    initializeRows();
+    for (int i = 0; i < DocIdSetPlanNode.MAX_DOC_PER_CALL; i++) {
+      insertRowWithTwoColumns(null, i);
+    }
+    insertRowWithTwoColumns(1, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE add(%s, 0) > 0 LIMIT 10", COLUMN1, COLUMN2, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{1, DocIdSetPlanNode.MAX_DOC_PER_CALL});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorApplyAndForGetFalses()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(Integer.MIN_VALUE, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s FROM testTable WHERE NOT(add(%s, 0) > 0) AND %s IS NULL", COLUMN1, COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorNotFilterOnMultiValue()
+      throws Exception {
+    initializeRows();
+    insertRow(new Integer[]{1, 2, 3});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE NOT(VALUEIN(%s, 2, 3) > 2) LIMIT 100", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 0);
+  }
+
+  @Test
+  public void testExpressionFilterOperatoIsNullPredicate()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(1, 2);
+    insertRowWithTwoColumns(-1, 3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE ADD(%s, 0) IS NULL LIMIT 100", COLUMN1, COLUMN2, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{null, 1});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorIsNotNullPredicate()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(1, 3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE ADD(%s, 0) IS NOT NULL LIMIT 100", COLUMN1, COLUMN2, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{1, 3});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorIsNullPredicateInsideNotFilterOperator()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(1, 3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE NOT(ADD(%s, 0) IS NULL) LIMIT 100", COLUMN1, COLUMN2,
+            COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{1, 3});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorIsNotNullPredicateInsideNotFilterOperator()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, 1);
+    insertRowWithTwoColumns(2, 3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE NOT(ADD(%s, 0) IS NOT NULL) LIMIT 100", COLUMN1, COLUMN2,
+            COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{null, 1});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorApplyIsNullPredicateToNotOfColumn()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(true, 1);
+    insertRowWithTwoColumns(null, 2);
+    insertRowWithTwoColumns(false, 3);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE (NOT %s) IS NULL LIMIT 100", COLUMN1, COLUMN2, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{null, 2});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorApplyAndForGetNulls()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(Integer.MIN_VALUE, null);
+    insertRowWithTwoColumns(1, null);
+    insertRowWithTwoColumns(-1, 1);
+    insertRowWithTwoColumns(null, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT %s, %s FROM testTable WHERE (add(%s, 0) IS NULL) AND (%s IS NULL)", COLUMN1, COLUMN2,
+            COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{null, null});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorOnMultiValue()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(new Integer[]{1, 2, 3}, 1);
+    insertRowWithTwoColumns(new Integer[]{2, 3, 4}, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT * FROM testTable WHERE (VALUEIN(%s, 2, 3) IN (2, 3)) AND (%s = 1)", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}, 1});
+  }
+
+  @Test
+  public void testExpressionFilterOperatorMultiValueIsNull()
+      throws Exception {
+    initializeRows();
+    insertRow(new Integer[]{1, 2, 3});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE (VALUEIN(%s, 2, 3) IS NULL)", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 0);
+  }
+
+  @Test
+  public void testExpressionFilterOperatorMultiValueIsNotNull()
+      throws Exception {
+    initializeRows();
+    insertRow(new Integer[]{1, 2, 3});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addMultiValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT * FROM testTable WHERE (VALUEIN(%s, 2, 3) IS NOT NULL)", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}});
+  }
+
+  @Test
+  public void testScalarFunctionStringNullLiteral()
+      throws Exception {
+    initializeRows();
+    insertRow("abc");
+    insertRow(null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT STARTSWITH(%s, NULL) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 2 * NUM_OF_SEGMENT_COPIES);
+    for (int i = 0; i < 2 * NUM_OF_SEGMENT_COPIES; i++) {
+      assertArrayEquals(rows.get(i), new Object[]{null});
+    }
+  }
+
+  @Test
+  public void testScalarFunctionIntNullLiteral()
+      throws Exception {
+    initializeRows();
+    insertRow(1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT between(%s, NULL, 2) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
+    assertArrayEquals(rows.get(0), new Object[]{null});
+  }
+
+  @Test(dataProvider = "NumberTypes")
+  public void testStddevPop(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    insertRow(1);
+    insertRow(2);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT STDDEV_POP(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], 0.5);
+  }
+
+  @Test(dataProvider = "NumberTypes")
+  public void testGroupByStddevPop(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, "key");
+    insertRowWithTwoColumns(1, "key");
+    insertRowWithTwoColumns(2, "key");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT STDDEV_POP(%s), %s FROM testTable GROUP BY %s", COLUMN1, COLUMN2, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertArrayEquals(rows.get(0), new Object[]{0.5, "key"});
+  }
+
+  @Test(dataProvider = "NumberTypes")
+  public void testGroupByMvStddevPop(FieldSpec.DataType dataType)
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, new String[]{"key1", "key2"});
+    insertRowWithTwoColumns(1, new String[]{"key1", "key2"});
+    insertRowWithTwoColumns(2, new String[]{"key1"});
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, dataType)
+        .addMultiValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT STDDEV_POP(%s), %s FROM testTable GROUP BY %s ORDER BY %s", COLUMN1, COLUMN2, COLUMN2,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 2);
+    assertArrayEquals(rows.get(0), new Object[]{0.5, "key1"});
+    assertArrayEquals(rows.get(1), new Object[]{0.0, "key2"});
+  }
+
+  @Test
+  public void testAllNullGroupByStddevPopReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, "key1");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.INT)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.STRING).build();
+    setUpSegments(tableConfig, schema);
+    String query =
+        String.format("SELECT STDDEV_POP(%s), %s FROM testTable GROUP BY %s ORDER BY %s", COLUMN1, COLUMN2, COLUMN2,
+            COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], null);
+  }
+
+  @Test
+  public void testAllNullStddevPopReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRow(null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.DOUBLE).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT STDDEV_POP(%s) FROM testTable", COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], null);
+  }
+
+  @Test
+  public void testNoMatchingRowNullHandlingDisabledStddevPopReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRow(1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.DOUBLE).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT STDDEV_POP(%s) FROM testTable WHERE %s != 1", COLUMN1, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], Double.NEGATIVE_INFINITY);
   }
 }

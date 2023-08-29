@@ -220,7 +220,6 @@ public class PinotHelixResourceManager {
   private final String _dataDir;
   private final boolean _isSingleTenantCluster;
   private final boolean _enableBatchMessageMode;
-  private final boolean _allowHLCTables;
   private final int _deletedSegmentsRetentionInDays;
   private final boolean _enableTieredSegmentAssignment;
 
@@ -235,7 +234,7 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
-      boolean isSingleTenantCluster, boolean enableBatchMessageMode, boolean allowHLCTables,
+      boolean isSingleTenantCluster, boolean enableBatchMessageMode,
       int deletedSegmentsRetentionInDays, boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
@@ -243,7 +242,6 @@ public class PinotHelixResourceManager {
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
-    _allowHLCTables = allowHLCTables;
     _enableTieredSegmentAssignment = enableTieredSegmentAssignment;
     _instanceAdminEndpointCache =
         CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
@@ -265,8 +263,8 @@ public class PinotHelixResourceManager {
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
-        controllerConf.getHLCTablesAllowed(), controllerConf.getDeletedSegmentsRetentionInDays(),
-        controllerConf.tieredSegmentAssignmentEnabled(), LineageManagerFactory.create(controllerConf));
+        controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
+        LineageManagerFactory.create(controllerConf));
   }
 
   /**
@@ -467,6 +465,16 @@ public class PinotHelixResourceManager {
     }
     return HelixHelper.getInstancesConfigsWithTag(HelixHelper.getInstanceConfigs(_helixZkManager),
         TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+  }
+
+  public List<String> getAllBrokerInstances() {
+    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream()
+        .filter(InstanceTypeUtils::isBroker).collect(Collectors.toList());
+  }
+
+  public List<InstanceConfig> getAllBrokerInstanceConfigs() {
+    return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
+        .filter(instance -> InstanceTypeUtils.isBroker(instance.getId())).collect(Collectors.toList());
   }
 
   public List<InstanceConfig> getAllControllerInstanceConfigs() {
@@ -1225,7 +1233,7 @@ public class PinotHelixResourceManager {
     return tenantSet;
   }
 
-  private List<String> getTagsForInstance(String instanceName) {
+  public List<String> getTagsForInstance(String instanceName) {
     InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
     return config.getTags();
   }
@@ -1753,7 +1761,7 @@ public class PinotHelixResourceManager {
     // Check if HLC table is allowed.
     StreamConfig streamConfig =
         new StreamConfig(tableNameWithType, IngestionConfigUtils.getStreamConfigMap(tableConfig));
-    if (streamConfig.hasHighLevelConsumerType() && !_allowHLCTables) {
+    if (streamConfig.hasHighLevelConsumerType()) {
       throw new InvalidTableConfigException(
           "Creating HLC realtime table is not allowed for Table: " + tableNameWithType);
     }
@@ -1976,62 +1984,7 @@ public class PinotHelixResourceManager {
   }
 
   public void deleteOfflineTable(String tableName, @Nullable String retentionPeriod) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    LOGGER.info("Deleting table {}: Start", offlineTableName);
-
-    // Remove the table from brokerResource
-    HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed from broker resource", offlineTableName);
-
-    // Drop the table on servers
-    // TODO: Make this api idempotent and blocking by waiting for externalview to converge on controllers
-    //      instead of servers. This is because if externalview gets updated with significant delay,
-    //      we may have the race condition for table recreation that the new table will use the old states
-    //      (old table data manager) on the servers.
-    //      Steps needed:
-    //      1. Drop the helix resource first (set idealstate as null)
-    //      2. Wait for the externalview to converge
-    //      3. Get servers for the tenant, and send delete table message to these servers
-    deleteTableOnServer(offlineTableName);
-
-    // Drop the table
-    if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(offlineTableName)) {
-      _helixAdmin.dropResource(_helixClusterName, offlineTableName);
-      LOGGER.info("Deleting table {}: Removed helix table resource", offlineTableName);
-    }
-
-    // Remove all stored segments for the table
-    Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
-    _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFromPropertyStore(offlineTableName),
-        retentionPeriodMs);
-    LOGGER.info("Deleting table {}: Removed stored segments", offlineTableName);
-
-    // Remove segment metadata
-    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed segment metadata", offlineTableName);
-
-    // Remove instance partitions
-    InstancePartitionsUtils.removeInstancePartitions(_propertyStore, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed instance partitions", offlineTableName);
-
-    // Remove tier instance partitions
-    InstancePartitionsUtils.removeTierInstancePartitions(_propertyStore, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed tier instance partitions", offlineTableName);
-
-    // Remove segment lineage
-    SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed segment lineage", offlineTableName);
-
-    // Remove task related metadata
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed all minion task metadata", offlineTableName);
-
-    // Remove table config
-    // this should always be the last step for deletion to avoid race condition in table re-create.
-    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, offlineTableName);
-    LOGGER.info("Deleting table {}: Removed table config", offlineTableName);
-
-    LOGGER.info("Deleting table {}: Finish", offlineTableName);
+    deleteTable(tableName, TableType.OFFLINE, retentionPeriod);
   }
 
   public void deleteRealtimeTable(String tableName) {
@@ -2039,73 +1992,64 @@ public class PinotHelixResourceManager {
   }
 
   public void deleteRealtimeTable(String tableName, @Nullable String retentionPeriod) {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    LOGGER.info("Deleting table {}: Start", realtimeTableName);
+    deleteTable(tableName, TableType.REALTIME, retentionPeriod);
+  }
+
+  public void deleteTable(String tableName, TableType tableType, @Nullable String retentionPeriod) {
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+    LOGGER.info("Deleting table {}: Start", tableNameWithType);
 
     // Remove the table from brokerResource
-    HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed from broker resource", realtimeTableName);
+    HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, tableNameWithType);
+    LOGGER.info("Deleting table {}: Removed from broker resource", tableNameWithType);
 
-    // Drop the table on servers
-    // TODO: Make this api idempotent and blocking by waiting for externalview to converge on controllers
-    //      instead of servers. Follow the same steps for offline tables.
-    deleteTableOnServer(realtimeTableName);
+    // Delete the table on servers
+    deleteTableOnServers(tableNameWithType);
 
-    // Cache the state and drop the table
-    Set<String> instancesForTable = null;
-    if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(realtimeTableName)) {
-      instancesForTable = getAllInstancesForTable(realtimeTableName);
-      _helixAdmin.dropResource(_helixClusterName, realtimeTableName);
-      LOGGER.info("Deleting table {}: Removed helix table resource", realtimeTableName);
-    }
+    // Remove ideal state
+    _helixDataAccessor.removeProperty(_keyBuilder.idealStates(tableNameWithType));
+    LOGGER.info("Deleting table {}: Removed ideal state", tableNameWithType);
 
     // Remove all stored segments for the table
     Long retentionPeriodMs = retentionPeriod != null ? TimeUtils.convertPeriodToMillis(retentionPeriod) : null;
-    _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFromPropertyStore(realtimeTableName),
+    _segmentDeletionManager.removeSegmentsFromStore(tableNameWithType, getSegmentsFromPropertyStore(tableNameWithType),
         retentionPeriodMs);
-    LOGGER.info("Deleting table {}: Removed stored segments", realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed stored segments", tableNameWithType);
 
     // Remove segment metadata
-    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed segment metadata", realtimeTableName);
+    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, tableNameWithType);
+    LOGGER.info("Deleting table {}: Removed segment metadata", tableNameWithType);
 
     // Remove instance partitions
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
-        InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
-    InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
-        InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
-    LOGGER.info("Deleting table {}: Removed instance partitions", realtimeTableName);
+    if (tableType == TableType.OFFLINE) {
+      InstancePartitionsUtils.removeInstancePartitions(_propertyStore, tableNameWithType);
+    } else {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
+          InstancePartitionsType.CONSUMING.getInstancePartitionsName(rawTableName));
+      InstancePartitionsUtils.removeInstancePartitions(_propertyStore,
+          InstancePartitionsType.COMPLETED.getInstancePartitionsName(rawTableName));
+    }
+    LOGGER.info("Deleting table {}: Removed instance partitions", tableNameWithType);
 
-    InstancePartitionsUtils.removeTierInstancePartitions(_propertyStore, rawTableName);
-    LOGGER.info("Deleting table {}: Removed tier instance partitions", realtimeTableName);
+    // Remove tier instance partitions
+    InstancePartitionsUtils.removeTierInstancePartitions(_propertyStore, tableNameWithType);
+    LOGGER.info("Deleting table {}: Removed tier instance partitions", tableNameWithType);
 
     // Remove segment lineage
-    SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed segment lineage", realtimeTableName);
+    SegmentLineageAccessHelper.deleteSegmentLineage(_propertyStore, tableNameWithType);
+    LOGGER.info("Deleting table {}: Removed segment lineage", tableNameWithType);
 
     // Remove task related metadata
-    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed all minion task metadata", realtimeTableName);
-
-    // Remove groupId/partitionId mapping for HLC table
-    if (instancesForTable != null) {
-      for (String instance : instancesForTable) {
-        InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, instance);
-        if (instanceZKMetadata != null) {
-          instanceZKMetadata.removeResource(realtimeTableName);
-          ZKMetadataProvider.setInstanceZKMetadata(_propertyStore, instanceZKMetadata);
-        }
-      }
-    }
-    LOGGER.info("Deleting table {}: Removed groupId/partitionId mapping for HLC table", realtimeTableName);
+    MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, tableNameWithType);
+    LOGGER.info("Deleting table {}: Removed all minion task metadata", tableNameWithType);
 
     // Remove table config
-    // this should always be the last step for deletion to avoid race condition in table re-create.
-    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, realtimeTableName);
-    LOGGER.info("Deleting table {}: Removed table config", realtimeTableName);
+    // NOTE: This should always be the last step for deletion to avoid race condition in table re-create
+    ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, tableNameWithType);
+    LOGGER.info("Deleting table {}: Removed table config", tableNameWithType);
 
-    LOGGER.info("Deleting table {}: Finish", realtimeTableName);
+    LOGGER.info("Deleting table {}: Finish", tableNameWithType);
   }
 
   /**
@@ -2142,15 +2086,6 @@ public class PinotHelixResourceManager {
       default:
         throw new IllegalStateException();
     }
-  }
-
-  private Set<String> getAllInstancesForTable(String tableNameWithType) {
-    Set<String> instanceSet = new HashSet<>();
-    IdealState tableIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-    for (String partition : tableIdealState.getPartitionSet()) {
-      instanceSet.addAll(tableIdealState.getInstanceSet(partition));
-    }
-    return instanceSet;
   }
 
   /**
@@ -2435,10 +2370,16 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Delete the table on servers by sending table deletion message
+   * Delete the table on servers by sending table deletion messages.
    */
-  private void deleteTableOnServer(String tableNameWithType) {
-    LOGGER.info("Sending delete table message for table: {}", tableNameWithType);
+  private void deleteTableOnServers(String tableNameWithType) {
+    // External view can be null for newly created table, skip sending messages
+    if (_helixDataAccessor.getProperty(_keyBuilder.externalView(tableNameWithType)) == null) {
+      LOGGER.warn("No delete table message sent for newly created table: {} without external view", tableNameWithType);
+      return;
+    }
+
+    LOGGER.info("Sending delete table messages for table: {}", tableNameWithType);
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
@@ -2447,13 +2388,6 @@ public class PinotHelixResourceManager {
     TableDeletionMessage tableDeletionMessage = new TableDeletionMessage(tableNameWithType);
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
 
-    // Externalview can be null for newly created table, skip sending the message
-    if (_helixZkManager.getHelixDataAccessor()
-        .getProperty(_helixZkManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType)) == null) {
-      LOGGER.warn("No delete table message sent for newly created table: {} as the externalview is null.",
-          tableNameWithType);
-      return;
-    }
     // Infinite timeout on the recipient
     int timeoutMs = -1;
     int numMessagesSent = messagingService.send(recipientCriteria, tableDeletionMessage, null, timeoutMs);
@@ -3021,6 +2955,15 @@ public class PinotHelixResourceManager {
   @Nullable
   public TableConfig getTableConfig(String tableNameWithType) {
     return ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+  }
+
+  /**
+   * Get all table configs.
+   *
+   * @return List of table configs. Empty list in case of tables configs does not exist.
+   */
+  public List<TableConfig> getAllTableConfigs() {
+    return ZKMetadataProvider.getAllTableConfigs(_propertyStore);
   }
 
   /**
@@ -4126,6 +4069,31 @@ public class PinotHelixResourceManager {
     LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
         messageCount);
     return new PeriodicTaskInvocationResponse(periodicTaskRequestId, messageCount > 0);
+  }
+
+  /**
+   * Construct a map of all the tags and their respective minimum instance requirements.
+   * The minimum instance requirement is computed by
+   * - for BROKER tenant tag set it to 1 if it hosts any table else set it to 0
+   * - for SERVER tenant tag iterate over all the tables of that tenant and find the maximum table replication.
+   * - for rest of the tags just set it to 0
+   * @return map of tags and their minimum instance requirements
+   */
+  public Map<String, Integer> minimumInstancesRequiredForTags() {
+    Map<String, Integer> tagMinInstanceMap = new HashMap<>();
+    for (InstanceConfig instanceConfig : getAllHelixInstanceConfigs()) {
+      for (String tag : instanceConfig.getTags()) {
+        tagMinInstanceMap.put(tag, 0);
+      }
+    }
+    for (TableConfig tableConfig : getAllTableConfigs()) {
+      String tag = TagNameUtils.getServerTagForTenant(tableConfig.getTenantConfig().getServer(),
+          tableConfig.getTableType());
+      tagMinInstanceMap.put(tag, Math.max(tagMinInstanceMap.getOrDefault(tag, 0), tableConfig.getReplication()));
+      String brokerTag = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
+      tagMinInstanceMap.put(brokerTag, 1);
+    }
+    return tagMinInstanceMap;
   }
 
   /*

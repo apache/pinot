@@ -52,9 +52,9 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.fun.PinotOperatorTable;
 import org.apache.calcite.sql.util.PinotChainedSqlOperatorTable;
+import org.apache.calcite.sql2rel.PinotConvertletTable;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
-import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
@@ -177,8 +177,7 @@ public class QueryEnvironment {
       DispatchableSubPlan dispatchableSubPlan = toDispatchableSubPlan(relRoot, plannerContext, requestId);
       return new QueryPlannerResult(dispatchableSubPlan, null, dispatchableSubPlan.getTableNames());
     } catch (CalciteContextException e) {
-      throw new RuntimeException("Error composing query plan for '" + sqlQuery
-          + "': " + e.getMessage() + "'", e);
+      throw new RuntimeException("Error composing query plan for '" + sqlQuery + "': " + e.getMessage() + "'", e);
     } catch (Throwable t) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
     }
@@ -288,7 +287,12 @@ public class QueryEnvironment {
 
   private RelRoot decorrelateIfNeeded(RelRoot relRoot) {
     if (hasCorrelateNode(relRoot.rel)) {
-      relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, RelBuilder.create(_config)));
+      try {
+        relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, RelBuilder.create(_config)));
+      } catch (Throwable e) {
+        throw new UnsupportedOperationException(
+            "Failed to de-correlate the given query to a valid execution plan: " + RelOptUtil.toString(relRoot.rel), e);
+      }
     }
     return relRoot;
   }
@@ -322,7 +326,7 @@ public class QueryEnvironment {
     RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
     SqlToRelConverter sqlToRelConverter =
         new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
-            StandardConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
+            PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
     RelRoot relRoot = sqlToRelConverter.convertQuery(parsed, false, true);
     return relRoot.withRel(sqlToRelConverter.trimUnusedFields(false, relRoot.rel));
   }
@@ -345,13 +349,11 @@ public class QueryEnvironment {
     QueryPlan queryPlan = pinotLogicalQueryPlanner.planQuery(relRoot);
     return pinotLogicalQueryPlanner.makePlan(queryPlan);
   }
-  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext,
-      long requestId) {
-    SubPlan subPlanRoot = toSubPlan(relRoot);
 
+  private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
+    SubPlan subPlanRoot = toSubPlan(relRoot);
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
-    pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
     return pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
   }
 

@@ -21,6 +21,7 @@ package org.apache.pinot.broker.api.resources;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -50,7 +51,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.exception.QueryException;
@@ -59,7 +60,10 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -94,7 +98,7 @@ public class PinotClientRequest {
   private Executor _executor;
 
   @Inject
-  private HttpConnectionManager _httpConnMgr;
+  private HttpClientConnectionManager _httpConnMgr;
 
   @GET
   @ManagedAsync
@@ -109,7 +113,8 @@ public class PinotClientRequest {
   public void processSqlQueryGet(@ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
       @ApiParam(value = "Debug options") @QueryParam(Request.DEBUG_OPTIONS) String debugOptions,
-      @Suspended AsyncResponse asyncResponse, @Context org.glassfish.grizzly.http.server.Request requestContext) {
+      @Suspended AsyncResponse asyncResponse, @Context org.glassfish.grizzly.http.server.Request requestContext,
+      @Context HttpHeaders httpHeaders) {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
@@ -119,7 +124,7 @@ public class PinotClientRequest {
       if (debugOptions != null) {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
-      BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true);
+      BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
@@ -141,14 +146,79 @@ public class PinotClientRequest {
   })
   @ManualAuthorization
   public void processSqlQueryPost(String query, @Suspended AsyncResponse asyncResponse,
-      @Context org.glassfish.grizzly.http.server.Request requestContext) {
+      @Context org.glassfish.grizzly.http.server.Request requestContext,
+      @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
       BrokerResponse brokerResponse =
-          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false);
+          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders);
+      asyncResponse.resume(brokerResponse.toJsonString());
+    } catch (WebApplicationException wae) {
+      asyncResponse.resume(wae);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing POST request", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      asyncResponse.resume(
+          new WebApplicationException(e,
+              Response
+                  .status(Response.Status.INTERNAL_SERVER_ERROR)
+                  .entity(e.getMessage())
+                  .build()));
+    }
+  }
+
+  @GET
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query")
+  @ApiOperation(value = "Querying pinot using MultiStage Query Engine")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  @ManualAuthorization
+  public void processSqlWithMultiStageQueryEngineGet(
+      @ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
+      @Suspended AsyncResponse asyncResponse, @Context org.glassfish.grizzly.http.server.Request requestContext,
+      @Context HttpHeaders httpHeaders) {
+    try {
+      ObjectNode requestJson = JsonUtils.newObjectNode();
+      requestJson.put(Request.SQL, query);
+      BrokerResponse brokerResponse =
+          executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
+      asyncResponse.resume(brokerResponse.toJsonString());
+    } catch (WebApplicationException wae) {
+      asyncResponse.resume(wae);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing GET request", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
+      asyncResponse.resume(new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR));
+    }
+  }
+
+  @POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query")
+  @ApiOperation(value = "Querying pinot using MultiStage Query Engine")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  @ManualAuthorization
+  public void processSqlWithMultiStageQueryEnginePost(String query, @Suspended AsyncResponse asyncResponse,
+      @Context org.glassfish.grizzly.http.server.Request requestContext,
+      @Context HttpHeaders httpHeaders) {
+    try {
+      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      if (!requestJson.has(Request.SQL)) {
+        throw new IllegalStateException("Payload is missing the query string field 'sql'");
+      }
+      BrokerResponse brokerResponse =
+          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true);
       asyncResponse.resume(brokerResponse.toJsonString());
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
@@ -166,6 +236,7 @@ public class PinotClientRequest {
 
   @DELETE
   @Path("query/{queryId}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Cancel a query as identified by the queryId", notes = "No effect if no query exists for the "
       + "given queryId on the requested broker. Query may continue to run for a short while after calling cancel as "
@@ -179,7 +250,7 @@ public class PinotClientRequest {
       @ApiParam(value = "Timeout for servers to respond the cancel request") @QueryParam("timeoutMs")
       @DefaultValue("3000") int timeoutMs,
       @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
-          boolean verbose) {
+      boolean verbose) {
     try {
       Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
       if (_requestHandler.cancelQuery(queryId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
@@ -201,6 +272,7 @@ public class PinotClientRequest {
 
   @GET
   @Path("queries")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get running queries submitted via the requested broker", notes = "The id is assigned by the "
       + "requested broker and only unique at the scope of this broker")
@@ -217,13 +289,22 @@ public class PinotClientRequest {
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql)
+      boolean onlyDql, HttpHeaders httpHeaders)
+      throws Exception {
+    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, false);
+  }
+
+  private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
+      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage)
       throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
     } catch (Exception e) {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+    }
+    if (forceUseMultiStage) {
+      sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
     }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (onlyDql && sqlType != PinotSqlType.DQL) {
@@ -234,7 +315,7 @@ public class PinotClientRequest {
       case DQL:
         try (RequestScope requestStatistics = Tracing.getTracer().createRequestScope()) {
           return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity,
-              requestStatistics);
+              requestStatistics, httpHeaders);
         }
       case DML:
         Map<String, String> headers = new HashMap<>();

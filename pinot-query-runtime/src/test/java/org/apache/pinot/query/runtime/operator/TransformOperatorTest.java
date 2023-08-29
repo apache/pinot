@@ -192,7 +192,6 @@ public class TransformOperatorTest {
     });
     Mockito.when(_upstreamOp.nextBlock())
         .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{"a", "a"}, new Object[]{"b", "b"}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
         .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{"c", "c"}, new Object[]{"d", "d"}, new Object[]{
             "e", "e"
         }));
@@ -211,10 +210,7 @@ public class TransformOperatorTest {
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
-    // Second row is NoOp
-    result = op.nextBlock();
-    Assert.assertTrue(result.isNoOpBlock());
-    // Third block has one row.
+    // Second block has one row.
     result = op.nextBlock();
     Assert.assertFalse(result.isErrorBlock());
     resultRows = result.getContainer();

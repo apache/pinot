@@ -476,44 +476,43 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   private Object[][] provideQueriesWithExplainedPhysicalPlan() {
     //@formatter:off
     return new Object[][] {
-new Object[]{"EXPLAIN IMPLEMENTATION PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
-  "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
-  + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-  + "│   └── [1]@localhost:2 PROJECT\n"
-  + "│      └── [1]@localhost:2 TABLE SCAN (a) null\n"
-  + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-  + "   └── [1]@localhost:1 PROJECT\n"
-  + "      └── [1]@localhost:1 TABLE SCAN (a) null\n"},
-new Object[]{"EXPLAIN IMPLEMENTATION PLAN EXCLUDING ATTRIBUTES AS DOT FOR "
-    + "SELECT col1, COUNT(*) FROM a GROUP BY col1",
-  "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
-  + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
-  + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-  + "   └── [1]@localhost:1 AGGREGATE_FINAL\n"
-  + "      └── [1]@localhost:1 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
-  + "         ├── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
-  + "         │   └── [2]@localhost:2 AGGREGATE_LEAF\n"
-  + "         │      └── [2]@localhost:2 TABLE SCAN (a) null\n"
-  + "         └── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
-  + "            └── [2]@localhost:1 AGGREGATE_LEAF\n"
-  + "               └── [2]@localhost:1 TABLE SCAN (a) null\n"},
+new Object[]{"EXPLAIN IMPLEMENTATION PLAN INCLUDING ALL ATTRIBUTES FOR SELECT col1, col3 FROM a",
+  "[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
++ "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
++ "│   └── [1]@localhost:1 PROJECT\n"
++ "│       └── [1]@localhost:1 TABLE SCAN (a) null\n"
++ "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
++ "    └── [1]@localhost:2 PROJECT\n"
++ "        └── [1]@localhost:2 TABLE SCAN (a) null\n"},
+new Object[]{"EXPLAIN IMPLEMENTATION PLAN EXCLUDING ATTRIBUTES FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
+"[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
++ "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
++ "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
++ "    └── [1]@localhost:2 AGGREGATE_FINAL\n"
++ "        └── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
++ "            ├── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
++ "            │   └── [2]@localhost:1 AGGREGATE_LEAF\n"
++ "            │       └── [2]@localhost:1 TABLE SCAN (a) null\n"
++ "            └── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
++ "                └── [2]@localhost:2 AGGREGATE_LEAF\n"
++ "                    └── [2]@localhost:2 TABLE SCAN (a) null\n"},
 new Object[]{"EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
-  "[0]@localhost:3 MAIL_RECEIVE(RANDOM_DISTRIBUTED)\n"
-  + "├── [1]@localhost:2 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
-  + "└── [1]@localhost:1 MAIL_SEND(RANDOM_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-  + "   └── [1]@localhost:1 PROJECT\n"
-  + "      └── [1]@localhost:1 JOIN\n"
-  + "         ├── [1]@localhost:1 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
-  + "         │   ├── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
-  + "         │   │   └── [2]@localhost:2 PROJECT\n"
-  + "         │   │      └── [2]@localhost:2 TABLE SCAN (a) null\n"
-  + "         │   └── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
-  + "         │      └── [2]@localhost:1 PROJECT\n"
-  + "         │         └── [2]@localhost:1 TABLE SCAN (a) null\n"
-  + "         └── [1]@localhost:1 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
-  + "            └── [3]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{2,2}|[0],[1]@localhost@{1,1}|[1]}\n"
-  + "               └── [3]@localhost:1 PROJECT\n"
-  + "                  └── [3]@localhost:1 TABLE SCAN (b) null\n"}
+  "[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
++ "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
++ "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
++ "    └── [1]@localhost:2 PROJECT\n"
++ "        └── [1]@localhost:2 JOIN\n"
++ "            ├── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
++ "            │   ├── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
++ "            │   │   └── [2]@localhost:1 PROJECT\n"
++ "            │   │       └── [2]@localhost:1 TABLE SCAN (a) null\n"
++ "            │   └── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
++ "            │       └── [2]@localhost:2 PROJECT\n"
++ "            │           └── [2]@localhost:2 TABLE SCAN (a) null\n"
++ "            └── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
++ "                └── [3]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
++ "                    └── [3]@localhost:1 PROJECT\n"
++ "                        └── [3]@localhost:1 TABLE SCAN (b) null\n"}
     };
     //@formatter:on
   }

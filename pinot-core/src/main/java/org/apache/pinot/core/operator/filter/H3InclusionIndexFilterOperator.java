@@ -26,8 +26,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -53,17 +53,16 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   private final IndexSegment _segment;
   private final QueryContext _queryContext;
   private final Predicate _predicate;
-  private final int _numDocs;
   private final H3IndexReader _h3IndexReader;
   private final Geometry _geometry;
   private final boolean _isPositiveCheck;
 
   public H3InclusionIndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate,
       int numDocs) {
+    super(numDocs, false);
     _segment = segment;
     _queryContext = queryContext;
     _predicate = predicate;
-    _numDocs = numDocs;
 
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
     EqPredicate eqPredicate = (EqPredicate) predicate;
@@ -81,7 +80,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
+  protected BlockDocIdSet getTrues() {
     // get the set of H3 cells at the specified resolution which completely cover the input shape and potential cover.
     Pair<LongSet, LongSet> fullCoverAndPotentialCoverCells = _queryContext
         .getOrComputeSharedValue(Pair.class, LITERAL_H3_CELLS_CACHE_NAME,
@@ -121,21 +120,20 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
   }
 
   /**
-   * Returns the filter block based on the given the partial match doc ids.
+   * Returns the filter block document IDs based on the given the partial match doc ids.
    */
-  private FilterBlock getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
+  private BlockDocIdSet getFilterBlock(MutableRoaringBitmap fullMatchDocIds, MutableRoaringBitmap partialMatchDocIds) {
     ExpressionFilterOperator expressionFilterOperator =
         new ExpressionFilterOperator(_segment, _queryContext, _predicate, _numDocs);
-    ScanBasedDocIdIterator docIdIterator =
-        (ScanBasedDocIdIterator) expressionFilterOperator.getNextBlock().getBlockDocIdSet().iterator();
+    ScanBasedDocIdIterator docIdIterator = (ScanBasedDocIdIterator) expressionFilterOperator.getTrues().iterator();
     MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);
     result.or(fullMatchDocIds);
-    return new FilterBlock(new BitmapDocIdSet(result, _numDocs) {
+    return new BitmapDocIdSet(result, _numDocs) {
       @Override
       public long getNumEntriesScannedInFilter() {
         return docIdIterator.getNumEntriesScanned();
       }
-    });
+    };
   }
 
   @Override

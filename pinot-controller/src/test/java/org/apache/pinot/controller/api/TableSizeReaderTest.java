@@ -31,10 +31,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -74,7 +74,7 @@ public class TableSizeReaderTest {
   private static final int NUM_REPLICAS = 2;
 
   private final Executor _executor = Executors.newFixedThreadPool(1);
-  private final HttpConnectionManager _connectionManager = new MultiThreadedHttpConnectionManager();
+  private final HttpClientConnectionManager _connectionManager = new PoolingHttpClientConnectionManager();
   private final ControllerMetrics _controllerMetrics =
       new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
   private final Map<String, FakeSizeServer> _serverMap = new HashMap<>();

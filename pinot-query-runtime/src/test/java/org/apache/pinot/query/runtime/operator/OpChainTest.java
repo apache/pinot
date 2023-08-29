@@ -50,6 +50,7 @@ import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -57,7 +58,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -108,11 +108,10 @@ public class OpChainTest {
         TransferableBlock arg = invocation.getArgument(0);
         _blockList.add(arg);
         return true;
-      }).when(_exchange).offerBlock(any(TransferableBlock.class), anyLong());
-      when(_exchange.getRemainingCapacity()).thenReturn(1);
+      }).when(_exchange).send(any(TransferableBlock.class));
       when(_mailbox2.poll()).then(x -> {
         if (_blockList.isEmpty()) {
-          return TransferableBlockUtils.getNoOpTransferableBlock();
+          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
         }
         return _blockList.remove(0);
       });
@@ -125,6 +124,7 @@ public class OpChainTest {
   public void tearDown()
       throws Exception {
     _mocks.close();
+    _exchange.close();
   }
 
   @Test
@@ -133,7 +133,7 @@ public class OpChainTest {
       Thread.sleep(100);
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     });
-    OpChain opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator, new ArrayList<>());
+    OpChain opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator);
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
@@ -143,7 +143,7 @@ public class OpChainTest {
       Thread.sleep(20);
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     });
-    opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator, new ArrayList<>());
+    opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator);
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
@@ -156,7 +156,7 @@ public class OpChainTest {
     OpChainExecutionContext context = OperatorTestUtil.getDefaultContext();
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
-    OpChain opChain = new OpChain(context, dummyMultiStageOperator, new ArrayList<>());
+    OpChain opChain = new OpChain(context, dummyMultiStageOperator);
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
@@ -167,8 +167,10 @@ public class OpChainTest {
 
     Map<String, String> executionStats =
         opChain.getStats().getOperatorStatsMap().get(dummyMultiStageOperator.getOperatorId()).getExecutionStats();
-    assertTrue(Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) >= 1000);
-    assertTrue(Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) <= 2000);
+
+    long time = Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName()));
+    assertTrue(time >= 1000 && time <= 2000,
+        "Expected " + DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS + " to be in [1000, 2000] but found " + time);
   }
 
   @Test
@@ -176,7 +178,7 @@ public class OpChainTest {
     OpChainExecutionContext context = OperatorTestUtil.getDefaultContextWithTracingDisabled();
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
-    OpChain opChain = new OpChain(context, dummyMultiStageOperator, new ArrayList<>());
+    OpChain opChain = new OpChain(context, dummyMultiStageOperator);
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
@@ -191,13 +193,14 @@ public class OpChainTest {
 
     int receivedStageId = 2;
     int senderStageId = 1;
-    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress,
-        System.currentTimeMillis() + 1000, _receivingStageMetadata, null, true);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, Long.MAX_VALUE,
+            Collections.singletonMap(CommonConstants.Broker.Request.TRACE, "true"), _receivingStageMetadata, null);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
 
-    OpChain opChain = new OpChain(context, operators.peek(), new ArrayList<>());
+    OpChain opChain = new OpChain(context, operators.peek());
     opChain.getStats().executing();
     while (!opChain.getRoot().nextBlock().isEndOfStreamBlock()) {
       // Drain the opchain
@@ -205,8 +208,8 @@ public class OpChainTest {
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, null, true);
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, Long.MAX_VALUE,
+            Collections.singletonMap(CommonConstants.Broker.Request.TRACE, "true"), _receivingStageMetadata, null);
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId + 1);
@@ -230,20 +233,21 @@ public class OpChainTest {
 
     int receivedStageId = 2;
     int senderStageId = 1;
-    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress,
-        System.currentTimeMillis() + 1000, _receivingStageMetadata, null, false);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, Long.MAX_VALUE,
+            Collections.emptyMap(), _receivingStageMetadata, null);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
 
-    OpChain opChain = new OpChain(context, operators.peek(), new ArrayList<>());
+    OpChain opChain = new OpChain(context, operators.peek());
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, null, false);
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, Long.MAX_VALUE,
+            Collections.emptyMap(), _receivingStageMetadata, null);
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId);
 

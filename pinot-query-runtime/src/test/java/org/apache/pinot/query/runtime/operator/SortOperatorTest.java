@@ -86,26 +86,6 @@ public class SortOperatorTest {
   }
 
   @Test
-  public void shouldHandleUpstreamNoOpBlock() {
-    // Given:
-    List<RexExpression> collation = collation(0);
-    List<Direction> directions = ImmutableList.of(Direction.ASCENDING);
-    List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
-    DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
-    SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
-            schema, false);
-
-    Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getNoOpTransferableBlock());
-
-    // When:
-    TransferableBlock block = op.nextBlock();
-
-    // Then:
-    Assert.assertTrue(block.isNoOpBlock(), "expected noop block to propagate");
-  }
-
-  @Test
   public void shouldCreateEmptyBlockOnUpstreamEOS() {
     // Given:
     List<RexExpression> collation = collation(0);
@@ -518,11 +498,10 @@ public class SortOperatorTest {
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock()).thenReturn(block(schema, new Object[]{1}))
+        .thenReturn(block(schema, new Object[]{1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume up until NOOP, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 
@@ -546,11 +525,10 @@ public class SortOperatorTest {
 
     // Set input rows as sorted since input is expected to be sorted
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock()).thenReturn(block(schema, new Object[]{2}))
+        .thenReturn(block(schema, new Object[]{2}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // When:
-    op.nextBlock(); // consume up until NOOP, create NOOP
     TransferableBlock block = op.nextBlock(); // construct
     TransferableBlock block2 = op.nextBlock(); // eos
 

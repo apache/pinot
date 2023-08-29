@@ -85,6 +85,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables");
   }
 
+  public String forTablesFromTenant(String tenantName, String componentType) {
+    return StringUtil.join("/", _baseUrl, "tenants", tenantName, "tables") + "?type=" + componentType;
+  }
+
   // V2 API started
   public String forTenantCreate() {
     return StringUtil.join("/", _baseUrl, "tenants");
@@ -540,6 +544,10 @@ public class ControllerRequestURLBuilder {
 
   public String forPauseStatus(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "pauseStatus");
+  }
+
+  public String forUpdateTagsValidation() {
+    return String.format("%s/instances/updateTags/validate", _baseUrl);
   }
 
   private static String encode(String s) {
