@@ -322,10 +322,9 @@ public class WorkerManager {
       }
     }
     if (serverInstances.isEmpty()) {
-      LOGGER.error("[RequestId: {}] No server instance found for intermediate stage for tables: {}",
+      LOGGER.info("[RequestId: {}] No server instance found for intermediate stage for tables: {}, fall back to all",
           context.getRequestId(), tableNames);
-      throw new IllegalStateException(
-          "No server instance found for intermediate stage for tables: " + Arrays.toString(tableNames.toArray()));
+      serverInstances = new ArrayList<>(enabledServerInstanceMap.values());
     }
     if (metadata.isRequiresSingletonInstance()) {
       // require singleton should return a single global worker ID with 0;
