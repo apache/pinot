@@ -99,7 +99,7 @@ public class TransferableBlockUtilsTest {
         TransferableBlockUtils.splitBlock(new TransferableBlock(nonSplittableBlock), DataBlock.Type.METADATA,
             4 * 1024 * 1024);
     Assert.assertTrue(transferableBlocks.hasNext());
-    Assert.assertEquals(transferableBlocks.next().getDataBlock(), nonSplittableBlock);
+    Assert.assertSame(transferableBlocks.next().getDataBlock(), nonSplittableBlock);
     Assert.assertFalse(transferableBlocks.hasNext());
   }
 

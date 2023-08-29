@@ -28,7 +28,6 @@ import java.util.stream.Stream;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
@@ -143,10 +142,9 @@ public class SortedMailboxReceiveOperatorTest {
         RelDistribution.Type.SINGLETON, DATA_SCHEMA, COLLATION_KEYS, COLLATION_DIRECTIONS, COLLATION_NULL_DIRECTIONS,
         false, 1)) {
       Thread.sleep(100L);
-      TransferableBlock mailbox = receiveOp.nextBlock();
-      assertTrue(mailbox.isErrorBlock());
-      MetadataBlock errorBlock = (MetadataBlock) mailbox.getDataBlock();
-      assertTrue(errorBlock.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
+      TransferableBlock block = receiveOp.nextBlock();
+      assertTrue(block.isErrorBlock());
+      assertTrue(block.getExceptions().containsKey(QueryException.EXECUTION_TIMEOUT_ERROR_CODE));
     }
   }
 
@@ -194,7 +192,7 @@ public class SortedMailboxReceiveOperatorTest {
         false, 1)) {
       TransferableBlock block = receiveOp.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+      assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
     }
   }
 
@@ -238,7 +236,7 @@ public class SortedMailboxReceiveOperatorTest {
         COLLATION_NULL_DIRECTIONS, false, 1)) {
       TransferableBlock block = receiveOp.nextBlock();
       assertTrue(block.isErrorBlock());
-      assertTrue(block.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+      assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
     }
   }
 

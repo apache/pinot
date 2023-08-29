@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -161,8 +160,7 @@ public class TransformOperatorTest {
 
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    DataBlock data = result.getDataBlock();
-    Assert.assertTrue(data.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("ArithmeticFunctions"));
+    Assert.assertTrue(result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("ArithmeticFunctions"));
   }
 
   @Test
@@ -181,8 +179,7 @@ public class TransformOperatorTest {
             _upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    DataBlock data = result.getDataBlock();
-    Assert.assertTrue(data.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("transformError"));
+    Assert.assertTrue(result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("transformError"));
   }
 
   @Test

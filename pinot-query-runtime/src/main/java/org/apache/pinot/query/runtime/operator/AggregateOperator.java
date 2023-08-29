@@ -34,7 +34,6 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -194,12 +193,9 @@ public class AggregateOperator extends MultiStageOperator {
       } else {
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
-          ProcessingException resourceLimitExceededException =
-              new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
-          resourceLimitExceededException.setMessage(
+          dataBlock.addException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE,
               String.format("Reached numGroupsLimit of: %d for group-by, ignoring the extra groups",
                   _groupByExecutor.getNumGroupsLimit()));
-          dataBlock.getDataBlock().addException(resourceLimitExceededException);
         }
         return dataBlock;
       }
