@@ -113,7 +113,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
       _whenStatements.add(arguments.get(i * 2));
       _thenStatements.add(arguments.get(i * 2 + 1));
     }
-    if (arguments.size() % 2 != 0 && isNotNullLiteralTransformation(arguments.get(arguments.size() - 1))) {
+    if (arguments.size() % 2 != 0 && !isNullLiteralTransformation(arguments.get(arguments.size() - 1))) {
       _elseStatement = arguments.get(arguments.size() - 1);
     }
   }
@@ -128,7 +128,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     for (int i = numWhenStatements; i < numWhenStatements * 2; i++) {
       _thenStatements.add(arguments.get(i));
     }
-    if (arguments.size() % 2 != 0 && isNotNullLiteralTransformation(arguments.get(arguments.size() - 1))) {
+    if (arguments.size() % 2 != 0 && !isNullLiteralTransformation(arguments.get(arguments.size() - 1))) {
       _elseStatement = arguments.get(arguments.size() - 1);
     }
   }
@@ -262,12 +262,12 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     return _resultMetadata;
   }
 
-  private boolean isNotNullLiteralTransformation(TransformFunction function) {
+  private boolean isNullLiteralTransformation(TransformFunction function) {
     if (function instanceof LiteralTransformFunction) {
       LiteralTransformFunction literalFunction = (LiteralTransformFunction) function;
-      return !literalFunction.isNull();
+      return literalFunction.isNull();
     }
-    return true;
+    return false;
   }
 
   /**

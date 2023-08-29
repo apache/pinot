@@ -270,7 +270,6 @@ public class LiteralTransformFunction implements TransformFunction {
     return bitmap;
   }
 
-  // checks whether the literal is null or not.
   public boolean isNull() {
     return _dataType == DataType.UNKNOWN;
   }
