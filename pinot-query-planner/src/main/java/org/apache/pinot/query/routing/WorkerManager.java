@@ -313,11 +313,16 @@ public class WorkerManager {
           }
         }
       }
-      serverInstances = new ArrayList<>(servers.size());
-      for (String server : servers) {
-        ServerInstance serverInstance = enabledServerInstanceMap.get(server);
-        if (serverInstance != null) {
-          serverInstances.add(serverInstance);
+      if (servers.isEmpty()) {
+        // fall back to use all enabled servers if no server is found for the tables
+        serverInstances = new ArrayList<>(enabledServerInstanceMap.values());
+      } else {
+        serverInstances = new ArrayList<>(servers.size());
+        for (String server : servers) {
+          ServerInstance serverInstance = enabledServerInstanceMap.get(server);
+          if (serverInstance != null) {
+            serverInstances.add(serverInstance);
+          }
         }
       }
     }
