@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -65,8 +64,7 @@ public class FilterOperatorTest {
         new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock errorBlock = op.getNextBlock();
     Assert.assertTrue(errorBlock.isErrorBlock());
-    DataBlock error = errorBlock.getDataBlock();
-    Assert.assertTrue(error.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("filterError"));
+    Assert.assertTrue(errorBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("filterError"));
   }
 
   @Test
@@ -132,8 +130,7 @@ public class FilterOperatorTest {
         new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock errorBlock = op.getNextBlock();
     Assert.assertTrue(errorBlock.isErrorBlock());
-    DataBlock data = errorBlock.getDataBlock();
-    Assert.assertTrue(data.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("cast"));
+    Assert.assertTrue(errorBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("cast"));
   }
 
   @Test
@@ -147,8 +144,7 @@ public class FilterOperatorTest {
     FilterOperator op = new FilterOperator(OperatorTestUtil.getDefaultContext(), _upstreamOperator, inputSchema, ref0);
     TransferableBlock errorBlock = op.getNextBlock();
     Assert.assertTrue(errorBlock.isErrorBlock());
-    DataBlock data = errorBlock.getDataBlock();
-    Assert.assertTrue(data.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("cast"));
+    Assert.assertTrue(errorBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("cast"));
   }
 
   @Test
