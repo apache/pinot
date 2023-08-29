@@ -58,7 +58,7 @@ public enum TransformFunctionType {
   FLOOR("floor"),
   LOG("log", "ln"),
   LOG2("log2"),
-  LOG10("log10"),
+  LOG10("log10", "log1"),
   SIGN("sign"),
   ROUND_DECIMAL("roundDecimal"),
   TRUNCATE("truncate"),
