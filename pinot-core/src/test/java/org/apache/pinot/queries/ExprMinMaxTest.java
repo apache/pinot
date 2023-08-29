@@ -58,7 +58,6 @@ import static org.testng.Assert.fail;
 /**
  * Queries test for argMin/argMax functions.
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
 public class ExprMinMaxTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ExprMinMaxTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -257,8 +256,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(1)[4], new String[]{"a0", "a01", "a02"});
     assertEquals(rows.get(0)[5], 0);
     assertEquals(rows.get(1)[5], 0);
-    assertEquals(rows.get(0)[6], "360000");
-    assertEquals(rows.get(1)[6], "360000");
+    assertEquals(rows.get(0)[6], new BigDecimal(360000));
+    assertEquals(rows.get(1)[6], new BigDecimal(360000));
     assertEquals(rows.get(0)[7], 600D);
     assertEquals(rows.get(1)[7], 600D);
     assertEquals(rows.get(0)[8], 1683138373879L - 1999L);
@@ -362,11 +361,10 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     query = "SELECT expr_min(mvBytesColumn, intColumn) FROM testTable";
 
     try {
-      brokerResponse = getBrokerResponse(query);
+      getBrokerResponse(query);
       fail("remove this test case, now mvBytesColumn works correctly in serialization");
     } catch (Exception e) {
-      assertTrue(e.getMessage()
-          .contains("java.lang.IllegalArgumentException: Unsupported type of value: byte[][]"));
+      assertTrue(e.getMessage().contains("Unsupported stored type: BYTES_ARRAY"));
     }
   }
 

@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -34,6 +31,7 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -56,7 +54,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * <ul>
  *   <li>The leaf-stage result is split into data payload block and metadata payload block.</li>
  *   <li>In case the leaf-stage result contains error or only metadata, we skip the data payload block.</li>
- *   <li>Leaf-stage result blocks are in the {@link DataSchema.ColumnDataType#getStoredColumnDataTypes()} format
+ *   <li>Leaf-stage result blocks are in the {@link ColumnDataType#getStoredColumnDataTypes()} format
  *       thus requires canonicalization.</li>
  * </ul>
  */
@@ -70,8 +68,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private InstanceResponseBlock _errorBlock;
 
   public LeafStageTransferableBlockOperator(OpChainExecutionContext context,
-      Function<ServerQueryRequest, InstanceResponseBlock> processCall,
-      List<ServerQueryRequest> serverQueryRequestList, DataSchema dataSchema) {
+      Function<ServerQueryRequest, InstanceResponseBlock> processCall, List<ServerQueryRequest> serverQueryRequestList,
+      DataSchema dataSchema) {
     super(context);
     _processCall = processCall;
     _serverQueryRequestQueue = new LinkedList<>(serverQueryRequestList);
@@ -86,7 +84,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   @Nullable
   @Override
   public String toExplainString() {
-      return EXPLAIN_NAME;
+    return EXPLAIN_NAME;
   }
 
   @Override
@@ -115,7 +113,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     }
   }
 
-  private @Nullable InstanceResponseBlock getNextBlockFromLeafStage() {
+  @Nullable
+  private InstanceResponseBlock getNextBlockFromLeafStage() {
     if (!_serverQueryRequestQueue.isEmpty()) {
       ServerQueryRequest request = _serverQueryRequestQueue.pop();
       return _processCall.apply(request);
@@ -174,10 +173,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeDistinctTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
-    DataSchema resultSchema = responseBlock.getDataSchema();
-    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
-        resultSchema.getColumnDataTypes()), "Incompatible selection result data schema: "
-        + " Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
@@ -191,13 +186,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeGroupByTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
-    DataSchema resultSchema = responseBlock.getDataSchema();
-    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
-        resultSchema.getColumnDataTypes()), "Incompatible selection result data schema: "
-        + " Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
-
 
   /**
    * Calcite generated {@link DataSchema} should conform with Pinot's agg result schema thus we only need to check
@@ -209,10 +199,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeAggregationTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
-    DataSchema resultSchema = responseBlock.getDataSchema();
-    Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
-        resultSchema.getColumnDataTypes()), "Incompatible selection result data schema: "
-        + " Expected: " + desiredDataSchema + ". Actual: " + resultSchema);
     return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
   }
 
@@ -226,66 +212,14 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private static TransferableBlock composeSelectTransferableBlock(InstanceResponseBlock responseBlock,
       DataSchema desiredDataSchema) {
     DataSchema resultSchema = responseBlock.getDataSchema();
-    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(responseBlock.getQueryContext(),
-        resultSchema);
+    List<String> selectionColumns =
+        SelectionOperatorUtils.getSelectionColumns(responseBlock.getQueryContext(), resultSchema);
     int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
     if (!inOrder(columnIndices)) {
-      DataSchema adjustedResultSchema = SelectionOperatorUtils.getSchemaForProjection(resultSchema, columnIndices);
-      Preconditions.checkState(isDataSchemaColumnTypesCompatible(desiredDataSchema.getColumnDataTypes(),
-          adjustedResultSchema.getColumnDataTypes()), "Incompatible selection result data schema: "
-          + " Expected: " + desiredDataSchema + ". Actual: " + adjustedResultSchema
-          + " Column Ordering: " + Arrays.toString(columnIndices));
-      return composeColumnIndexedTransferableBlock(responseBlock, adjustedResultSchema, columnIndices);
+      return composeColumnIndexedTransferableBlock(responseBlock, desiredDataSchema, columnIndices);
     } else {
       return composeDirectTransferableBlock(responseBlock, desiredDataSchema);
     }
-  }
-
-  /**
-   * Created {@link TransferableBlock} using column indices.
-   *
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  private static TransferableBlock composeColumnIndexedTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema, int[] columnIndices) {
-    Collection<Object[]> resultRows = responseBlock.getRows();
-    List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
-    if (resultRows instanceof List) {
-      for (Object[] row : resultRows) {
-        extractedRows.add(TypeUtils.canonicalizeRow(row, desiredDataSchema, columnIndices));
-      }
-    } else if (resultRows instanceof PriorityQueue) {
-      PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
-      while (!priorityQueue.isEmpty()) {
-        extractedRows.add(TypeUtils.canonicalizeRow(priorityQueue.poll(), desiredDataSchema, columnIndices));
-      }
-    }
-    return new TransferableBlock(extractedRows, desiredDataSchema, DataBlock.Type.ROW);
-  }
-
-  /**
-   * Fallback mechanism for {@link TransferableBlock}, used when no special handling is necessary. This method only
-   * performs {@link DataSchema.ColumnDataType} canonicalization.
-   *
-   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
-   */
-  private static TransferableBlock composeDirectTransferableBlock(InstanceResponseBlock responseBlock,
-      DataSchema desiredDataSchema) {
-    Collection<Object[]> resultRows = responseBlock.getRows();
-    List<Object[]> extractedRows = new ArrayList<>(resultRows.size());
-    if (resultRows instanceof List) {
-      for (Object[] orgRow : resultRows) {
-        extractedRows.add(TypeUtils.canonicalizeRow(orgRow, desiredDataSchema));
-      }
-    } else if (resultRows instanceof PriorityQueue) {
-      PriorityQueue<Object[]> priorityQueue = (PriorityQueue<Object[]>) resultRows;
-      while (!priorityQueue.isEmpty()) {
-        extractedRows.add(TypeUtils.canonicalizeRow(priorityQueue.poll(), desiredDataSchema));
-      }
-    } else {
-      throw new UnsupportedOperationException("Unsupported collection type: " + resultRows.getClass());
-    }
-    return new TransferableBlock(extractedRows, desiredDataSchema, DataBlock.Type.ROW);
   }
 
   private static boolean inOrder(int[] columnIndices) {
@@ -297,16 +231,94 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     return true;
   }
 
-  private static boolean isDataSchemaColumnTypesCompatible(DataSchema.ColumnDataType[] desiredTypes,
-      DataSchema.ColumnDataType[] givenTypes) {
-    if (desiredTypes.length != givenTypes.length) {
-      return false;
-    }
-    for (int i = 0; i < desiredTypes.length; i++) {
-      if (desiredTypes[i] != givenTypes[i] && !givenTypes[i].isSuperTypeOf(desiredTypes[i])) {
-        return false;
+  /**
+   * Created {@link TransferableBlock} using column indices.
+   *
+   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
+   */
+  private static TransferableBlock composeColumnIndexedTransferableBlock(InstanceResponseBlock responseBlock,
+      DataSchema outputDataSchema, int[] columnIndices) {
+    List<Object[]> resultRows = responseBlock.getRows();
+    DataSchema inputDataSchema = responseBlock.getDataSchema();
+    assert resultRows != null && inputDataSchema != null;
+    ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
+    ColumnDataType[] outputStoredTypes = outputDataSchema.getStoredColumnDataTypes();
+    List<Object[]> convertedRows = new ArrayList<>(resultRows.size());
+    boolean needConvert = false;
+    int numColumns = columnIndices.length;
+    for (int colId = 0; colId < numColumns; colId++) {
+      if (inputStoredTypes[columnIndices[colId]] != outputStoredTypes[colId]) {
+        needConvert = true;
+        break;
       }
     }
-    return true;
+    if (needConvert) {
+      for (Object[] row : resultRows) {
+        convertedRows.add(reorderAndConvertRow(row, inputStoredTypes, outputStoredTypes, columnIndices));
+      }
+    } else {
+      for (Object[] row : resultRows) {
+        convertedRows.add(reorderRow(row, columnIndices));
+      }
+    }
+    return new TransferableBlock(convertedRows, outputDataSchema, DataBlock.Type.ROW);
+  }
+
+  private static Object[] reorderAndConvertRow(Object[] row, ColumnDataType[] inputStoredTypes,
+      ColumnDataType[] outputStoredTypes, int[] columnIndices) {
+    int numColumns = columnIndices.length;
+    Object[] resultRow = new Object[numColumns];
+    for (int colId = 0; colId < numColumns; colId++) {
+      int inputColId = columnIndices[colId];
+      Object value = row[inputColId];
+      if (value != null) {
+        if (inputStoredTypes[inputColId] != outputStoredTypes[colId]) {
+          resultRow[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
+        } else {
+          resultRow[colId] = value;
+        }
+      }
+    }
+    return resultRow;
+  }
+
+  private static Object[] reorderRow(Object[] row, int[] columnIndices) {
+    int numColumns = columnIndices.length;
+    Object[] resultRow = new Object[numColumns];
+    for (int colId = 0; colId < numColumns; colId++) {
+      resultRow[colId] = row[columnIndices[colId]];
+    }
+    return resultRow;
+  }
+
+  /**
+   * Fallback mechanism for {@link TransferableBlock}, used when no special handling is necessary. This method only
+   * performs {@link ColumnDataType} canonicalization.
+   *
+   * @see LeafStageTransferableBlockOperator#composeTransferableBlock(InstanceResponseBlock, DataSchema).
+   */
+  private static TransferableBlock composeDirectTransferableBlock(InstanceResponseBlock responseBlock,
+      DataSchema outputDataSchema) {
+    List<Object[]> resultRows = responseBlock.getRows();
+    DataSchema inputDataSchema = responseBlock.getDataSchema();
+    assert resultRows != null && inputDataSchema != null;
+    ColumnDataType[] inputStoredTypes = inputDataSchema.getStoredColumnDataTypes();
+    ColumnDataType[] outputStoredTypes = outputDataSchema.getStoredColumnDataTypes();
+    if (!Arrays.equals(inputStoredTypes, outputStoredTypes)) {
+      for (Object[] row : resultRows) {
+        convertRow(row, inputStoredTypes, outputStoredTypes);
+      }
+    }
+    return new TransferableBlock(resultRows, outputDataSchema, DataBlock.Type.ROW);
+  }
+
+  public static void convertRow(Object[] row, ColumnDataType[] inputStoredTypes, ColumnDataType[] outputStoredTypes) {
+    int numColumns = row.length;
+    for (int colId = 0; colId < numColumns; colId++) {
+      Object value = row[colId];
+      if (value != null && inputStoredTypes[colId] != outputStoredTypes[colId]) {
+        row[colId] = TypeUtils.convert(value, outputStoredTypes[colId]);
+      }
+    }
   }
 }

@@ -36,12 +36,14 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
+import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,7 +116,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
       DataSchema resultSchema, DataSchema inputSchema,
-      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers) {
+      Map<String, Function<ColumnDataType, AggregationUtils.Merger>> mergers) {
     super(context);
 
     _inputOperator = inputOperator;
@@ -180,14 +182,14 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   private void validateAggregationCalls(String functionName,
-      Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> mergers) {
+      Map<String, Function<ColumnDataType, AggregationUtils.Merger>> mergers) {
     if (!mergers.containsKey(functionName)) {
       throw new IllegalStateException("Unexpected aggregation function name: " + functionName);
     }
 
     if (ROWS_ONLY_FUNCTION_NAMES.contains(functionName)) {
-      Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.ROWS
-              && _windowFrame.isUpperBoundCurrentRow(),
+      Preconditions.checkState(
+          _windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.ROWS && _windowFrame.isUpperBoundCurrentRow(),
           String.format("%s must be of ROW frame type and have CURRENT ROW as the upper bound", functionName));
     } else {
       Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE,
@@ -217,6 +219,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
   private TransferableBlock produceWindowAggregatedBlock() {
     Key emptyOrderKey = AggregationUtils.extractEmptyKey();
+    ColumnDataType[] storedTypes = _resultSchema.getStoredColumnDataTypes();
     List<Object[]> rows = new ArrayList<>(_numRows);
     if (_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE) {
       // All aggregation window functions only support RANGE type today (SUM/AVG/MIN/MAX/COUNT/BOOL_AND/BOOL_OR)
@@ -232,6 +235,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
           for (int i = 0; i < _windowAccumulators.length; i++) {
             row[i + existingRow.length] = _windowAccumulators[i].getRangeResultForKeys(partitionKey, orderKey);
           }
+          TypeUtils.convertRow(row, storedTypes);
           rows.add(row);
         }
       }
@@ -242,7 +246,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
       for (int i = 0; i < _windowAccumulators.length; i++) {
         previousRowValues[i] = null;
       }
-
       for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
         Key partitionKey = e.getKey();
         List<Object[]> rowList = e.getValue();
@@ -250,12 +253,14 @@ public class WindowAggregateOperator extends MultiStageOperator {
           Object[] row = new Object[existingRow.length + _aggCalls.size()];
           System.arraycopy(existingRow, 0, row, 0, existingRow.length);
           for (int i = 0; i < _windowAccumulators.length; i++) {
-            row[i + existingRow.length] = _windowAccumulators[i].computeRowResultForCurrentRow(partitionKey,
-                previousPartitionKey, row, previousRowValues[i]);
+            row[i + existingRow.length] =
+                _windowAccumulators[i].computeRowResultForCurrentRow(partitionKey, previousPartitionKey, row,
+                    previousRowValues[i]);
             previousRowValues[i] = row[i + existingRow.length];
           }
-          previousPartitionKey = partitionKey;
+          TypeUtils.convertRow(row, storedTypes);
           rows.add(row);
+          previousPartitionKey = partitionKey;
         }
       }
     }
@@ -389,7 +394,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private static class MergeRowNumber implements AggregationUtils.Merger {
 
     @Override
-    public Long init(@Nullable Object value, DataSchema.ColumnDataType dataType) {
+    public Long init(@Nullable Object value, ColumnDataType dataType) {
       return 1L;
     }
 
@@ -402,7 +407,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private static class MergeRank implements AggregationUtils.Merger {
 
     @Override
-    public Long init(Object other, DataSchema.ColumnDataType dataType) {
+    public Long init(Object other, ColumnDataType dataType) {
       return 1L;
     }
 
@@ -416,7 +421,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private static class MergeDenseRank implements AggregationUtils.Merger {
 
     @Override
-    public Long init(Object other, DataSchema.ColumnDataType dataType) {
+    public Long init(Object other, ColumnDataType dataType) {
       return 1L;
     }
 
@@ -429,13 +434,10 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   private static class WindowAggregateAccumulator extends AggregationUtils.Accumulator {
-    private static final Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> WIN_AGG_MERGERS =
-        ImmutableMap.<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>>builder()
-            .putAll(AggregationUtils.Accumulator.MERGERS)
-            .put("ROW_NUMBER", cdt -> new MergeRowNumber())
-            .put("RANK", cdt -> new MergeRank())
-            .put("DENSE_RANK", cdt -> new MergeDenseRank())
-            .build();
+    private static final Map<String, Function<ColumnDataType, AggregationUtils.Merger>> WIN_AGG_MERGERS =
+        ImmutableMap.<String, Function<ColumnDataType, AggregationUtils.Merger>>builder()
+            .putAll(AggregationUtils.Accumulator.MERGERS).put("ROW_NUMBER", cdt -> new MergeRowNumber())
+            .put("RANK", cdt -> new MergeRank()).put("DENSE_RANK", cdt -> new MergeDenseRank()).build();
 
     private final boolean _isPartitionByOnly;
     private final boolean _isRankingWindowFunction;
@@ -443,8 +445,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
     // Fields needed only for RANGE frame type queries (ORDER BY)
     private final Map<Key, OrderKeyResult> _orderByResults = new HashMap<>();
 
-    WindowAggregateAccumulator(RexExpression.FunctionCall aggCall, Map<String,
-        Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> merger, String functionName,
+    WindowAggregateAccumulator(RexExpression.FunctionCall aggCall,
+        Map<String, Function<ColumnDataType, AggregationUtils.Merger>> merger, String functionName,
         DataSchema inputSchema, OrderSetInfo orderSetInfo) {
       super(aggCall, merger, functionName, inputSchema);
       _isPartitionByOnly = CollectionUtils.isEmpty(orderSetInfo.getOrderSet()) || orderSetInfo.isPartitionByOnly();
@@ -479,8 +481,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
       }
 
       // TODO: fix that single agg result (original type) has different type from multiple agg results (double).
-      Key previousOrderKeyIfPresent = _orderByResults.get(key) == null ? null
-          : _orderByResults.get(key).getPreviousOrderByKey();
+      Key previousOrderKeyIfPresent =
+          _orderByResults.get(key) == null ? null : _orderByResults.get(key).getPreviousOrderByKey();
       Object currentRes = previousOrderKeyIfPresent == null ? null
           : _orderByResults.get(key).getOrderByResults().get(previousOrderKeyIfPresent);
       Object value = _inputRef == -1 ? _literal : row[_inputRef];
@@ -534,8 +536,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
         // We expect to get the rows in order based on the ORDER BY key so it is safe to blindly assign the
         // current key as the previous key
         _orderByResults.put(orderByKey, value);
-        _countOfDuplicateOrderByKeys = (_previousOrderByKey != null && _previousOrderByKey.equals(orderByKey))
-            ? _countOfDuplicateOrderByKeys + 1 : 1;
+        _countOfDuplicateOrderByKeys =
+            (_previousOrderByKey != null && _previousOrderByKey.equals(orderByKey)) ? _countOfDuplicateOrderByKeys + 1
+                : 1;
         _previousOrderByKey = orderByKey;
       }
 

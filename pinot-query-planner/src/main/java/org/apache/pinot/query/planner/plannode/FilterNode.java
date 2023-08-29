@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.plannode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -34,7 +35,7 @@ public class FilterNode extends AbstractPlanNode {
 
   public FilterNode(int currentStageId, DataSchema dataSchema, RexNode condition) {
     super(currentStageId, dataSchema);
-    _condition = RexExpression.toRexExpression(condition);
+    _condition = RexExpressionUtils.fromRexNode(condition);
   }
 
   public RexExpression getCondition() {

@@ -21,59 +21,62 @@ package org.apache.pinot.query.runtime.operator.operands;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
-import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+
 
 /*
  * FunctionOperands are generated from {@link RexExpression}s.
  */
-public class FunctionOperand extends TransformOperand {
-  private final List<TransformOperand> _childOperandList;
+public class FunctionOperand implements TransformOperand {
+  private final ColumnDataType _resultType;
   private final FunctionInvoker _functionInvoker;
+  private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
 
-  public FunctionOperand(RexExpression.FunctionCall functionCall, DataSchema dataSchema) {
-    // iteratively resolve child operands.
-    List<RexExpression> operandExpressions = functionCall.getFunctionOperands();
-    _childOperandList = new ArrayList<>(operandExpressions.size());
-    for (RexExpression childRexExpression : operandExpressions) {
-      _childOperandList.add(toTransformOperand(childRexExpression, dataSchema));
-    }
-    FunctionInfo functionInfo =
-        FunctionRegistry.getFunctionInfo(OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName()),
-            operandExpressions.size());
-    Preconditions.checkNotNull(functionInfo, "Cannot find function with Name: " + functionCall.getFunctionName());
+  public FunctionOperand(RexExpression.FunctionCall functionCall, String canonicalName, DataSchema dataSchema) {
+    _resultType = functionCall.getDataType();
+    List<RexExpression> operands = functionCall.getFunctionOperands();
+    int numOperands = operands.size();
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(canonicalName, numOperands);
+    Preconditions.checkState(functionInfo != null, "Cannot find function with name: %s", canonicalName);
     _functionInvoker = new FunctionInvoker(functionInfo);
-    _resultName = computeColumnName(functionCall.getFunctionName(), _childOperandList);
-    _resultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
-    if (functionCall.getDataType() != FunctionUtils.getDataType(_functionInvoker.getResultClass())) {
-      _resultType = DataSchema.ColumnDataType.fromDataType(functionCall.getDataType(), true);
+    Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
+    PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
+    for (int i = 0; i < numOperands; i++) {
+      Preconditions.checkState(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
+          parameterClasses[i], functionInfo.getMethod());
     }
-    _reusableOperandHolder = new Object[operandExpressions.size()];
+    _operands = new ArrayList<>(numOperands);
+    for (RexExpression operand : operands) {
+      _operands.add(TransformOperandFactory.getTransformOperand(operand, dataSchema));
+    }
+    _reusableOperandHolder = new Object[numOperands];
   }
 
   @Override
-  public Object apply(Object[] row) {
-    for (int i = 0; i < _childOperandList.size(); i++) {
-      _reusableOperandHolder[i] = _childOperandList.get(i).apply(row);
-    }
-    return _functionInvoker.invoke(_reusableOperandHolder);
+  public ColumnDataType getResultType() {
+    return _resultType;
   }
 
-  private static String computeColumnName(String functionName, List<TransformOperand> childOperands) {
-    StringBuilder sb = new StringBuilder();
-    sb.append(functionName);
-    sb.append("(");
-    for (TransformOperand operands : childOperands) {
-      sb.append(operands.getResultName());
-      sb.append(",");
+  @Nullable
+  @Override
+  public Object apply(Object[] row) {
+    for (int i = 0; i < _operands.size(); i++) {
+      TransformOperand operand = _operands.get(i);
+      Object value = operand.apply(row);
+      _reusableOperandHolder[i] = value != null ? operand.getResultType().toExternal(value) : null;
     }
-    sb.append(")");
-    return sb.toString();
+    // TODO: Optimize per record conversion
+    _functionInvoker.convertTypes(_reusableOperandHolder);
+    Object result = _functionInvoker.invoke(_reusableOperandHolder);
+    return result != null ? _resultType.toInternal(TypeUtils.convert(result, _resultType)) : null;
   }
 }

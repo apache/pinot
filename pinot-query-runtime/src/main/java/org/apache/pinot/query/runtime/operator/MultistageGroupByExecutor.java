@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Key;
@@ -145,6 +146,7 @@ public class MultistageGroupByExecutor {
     int numKeys = _groupSet.size();
     int numFunctions = _aggFunctions.length;
     int numColumns = numKeys + numFunctions;
+    ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     for (Map.Entry<Key, Integer> entry : _groupKeyToIdMap.entrySet()) {
       Object[] row = new Object[numColumns];
       Object[] keyValues = entry.getKey().getValues();
@@ -173,7 +175,8 @@ public class MultistageGroupByExecutor {
         }
         row[index] = value;
       }
-      rows.add(TypeUtils.canonicalizeRow(row, _resultSchema));
+      TypeUtils.convertRow(row, resultStoredTypes);
+      rows.add(row);
     }
     return rows;
   }
@@ -283,7 +286,7 @@ public class MultistageGroupByExecutor {
       int outRowId = 0;
       for (int inRowId = 0; inRowId < numRows; inRowId++) {
         Object[] row = rows.get(inRowId);
-        if ((Boolean) row[filterArgIndex]) {
+        if (((int) row[filterArgIndex]) == 1) {
           Object[] keyValues = new Object[numKeys];
           for (int j = 0; j < numKeys; j++) {
             keyValues[j] = row[_colNameToIndexMap.get(_groupSet.get(j).getIdentifier())];

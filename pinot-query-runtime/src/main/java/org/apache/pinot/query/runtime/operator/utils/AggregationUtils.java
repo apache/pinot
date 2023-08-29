@@ -26,9 +26,9 @@ import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -90,31 +90,31 @@ public class AggregationUtils {
   }
 
   @Nullable
-  private static Boolean mergeBoolAnd(@Nullable Object agg, @Nullable Object value) {
+  private static Object mergeBoolAnd(@Nullable Object agg, @Nullable Object value) {
     if (agg == null) {
-      return (Boolean) value;
+      return value;
     }
     if (value == null) {
-      return (Boolean) agg;
+      return agg;
     }
-    return ((Boolean) agg) & ((Boolean) value);
+    return ((int) agg == 1) & ((int) value == 1) ? 1 : 0;
   }
 
   @Nullable
-  private static Boolean mergeBoolOr(@Nullable Object agg, @Nullable Object value) {
+  private static Object mergeBoolOr(@Nullable Object agg, @Nullable Object value) {
     if (agg == null) {
-      return (Boolean) value;
+      return value;
     }
     if (value == null) {
-      return (Boolean) agg;
+      return agg;
     }
-    return ((Boolean) agg) | ((Boolean) value);
+    return ((int) agg == 1) | ((int) value == 1) ? 1 : 0;
   }
 
   private static class MergeCounts implements AggregationUtils.Merger {
 
     @Override
-    public Long init(@Nullable Object value, DataSchema.ColumnDataType dataType) {
+    public Long init(@Nullable Object value, ColumnDataType dataType) {
       return value == null ? 0L : 1L;
     }
 
@@ -130,12 +130,12 @@ public class AggregationUtils {
      * Initializes the merger based on the column data type and first value.
      */
     @Nullable
-    default Object init(@Nullable Object value, DataSchema.ColumnDataType dataType) {
+    default Object init(@Nullable Object value, ColumnDataType dataType) {
       return value;
     }
 
     /**
-     * Merges the existing aggregate (the result of {@link #init(Object, DataSchema.ColumnDataType)}) with
+     * Merges the existing aggregate (the result of {@link #init(Object, ColumnDataType)}) with
      * the new value coming in (which may be an aggregate in and of itself).
      */
     @Nullable
@@ -146,6 +146,7 @@ public class AggregationUtils {
    * Accumulator class which accumulates the aggregated results into the group sets if any
    */
   public static class Accumulator {
+    //@formatter:off
     public static final Map<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> MERGERS =
         ImmutableMap.<String, Function<DataSchema.ColumnDataType, AggregationUtils.Merger>>builder()
             .put("SUM", cdt -> AggregationUtils::mergeSum)
@@ -165,12 +166,13 @@ public class AggregationUtils {
             .put("$BOOL_OR", cdt -> AggregationUtils::mergeBoolOr)
             .put("$BOOL_OR0", cdt -> AggregationUtils::mergeBoolOr)
             .build();
+    //@formatter:on
 
     protected final int _inputRef;
     protected final Object _literal;
     protected final Map<Key, Object> _results = new HashMap<>();
     protected final Merger _merger;
-    protected final DataSchema.ColumnDataType _dataType;
+    protected final ColumnDataType _dataType;
 
     public Map<Key, Object> getResults() {
       return _results;
@@ -180,12 +182,12 @@ public class AggregationUtils {
       return _merger;
     }
 
-    public DataSchema.ColumnDataType getDataType() {
+    public ColumnDataType getDataType() {
       return _dataType;
     }
 
-    public Accumulator(RexExpression.FunctionCall aggCall, Map<String,
-        Function<DataSchema.ColumnDataType, AggregationUtils.Merger>> merger, String functionName,
+    public Accumulator(RexExpression.FunctionCall aggCall,
+        Map<String, Function<ColumnDataType, AggregationUtils.Merger>> merger, String functionName,
         DataSchema inputSchema) {
       // agg function operand should either be a InputRef or a Literal
       RexExpression rexExpression = toAggregationFunctionOperand(aggCall);
@@ -196,7 +198,7 @@ public class AggregationUtils {
       } else {
         _inputRef = -1;
         _literal = ((RexExpression.Literal) rexExpression).getValue();
-        _dataType = DataSchema.ColumnDataType.fromDataType(rexExpression.getDataType(), true);
+        _dataType = rexExpression.getDataType();
       }
       _merger = merger.get(functionName).apply(_dataType);
     }
@@ -217,8 +219,7 @@ public class AggregationUtils {
     private RexExpression toAggregationFunctionOperand(RexExpression.FunctionCall rexExpression) {
       List<RexExpression> functionOperands = rexExpression.getFunctionOperands();
       Preconditions.checkState(functionOperands.size() < 2, "aggregate functions cannot have more than one operand");
-      return functionOperands.size() > 0 ? functionOperands.get(0)
-          : new RexExpression.Literal(FieldSpec.DataType.INT, 1);
+      return functionOperands.size() > 0 ? functionOperands.get(0) : new RexExpression.Literal(ColumnDataType.INT, 1);
     }
   }
 }

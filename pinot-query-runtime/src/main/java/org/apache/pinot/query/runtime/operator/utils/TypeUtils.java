@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
 public class TypeUtils {
@@ -28,61 +26,38 @@ public class TypeUtils {
   }
 
   /**
-   * Convert result to the appropriate column data type according to the desired {@link DataSchema.ColumnDataType}
-   * of the {@link org.apache.pinot.core.common.Operator}.
-   *
-   * @param inputObj input entry
-   * @param columnDataType desired column data type
-   * @return converted entry
+   * Converts value to the desired stored {@link ColumnDataType}. This is used to convert rows generated from
+   * single-stage engine to be used in multi-stage engine.
    */
-  @Nullable
-  public static Object convert(@Nullable Object inputObj, DataSchema.ColumnDataType columnDataType) {
-    if (columnDataType.isNumber() && columnDataType != DataSchema.ColumnDataType.BIG_DECIMAL) {
-      return inputObj == null ? null : columnDataType.convert(inputObj);
-    } else {
-      return inputObj;
+  public static Object convert(Object value, ColumnDataType storedType) {
+    switch (storedType) {
+      case INT:
+        return ((Number) value).intValue();
+      case LONG:
+        return ((Number) value).longValue();
+      case FLOAT:
+        return ((Number) value).floatValue();
+      case DOUBLE:
+        return ((Number) value).doubleValue();
+      case STRING:
+        return value.toString();
+      // TODO: Add more conversions
+      default:
+        return value;
     }
   }
 
   /**
-   * This util is used to canonicalize row generated from V1 engine, which is stored using
-   * {@link DataSchema#getStoredColumnDataTypes()} format. However, the transferable block ser/de stores data in the
-   * {@link DataSchema#getColumnDataTypes()} format.
-   *
-   * @param row un-canonicalize row.
-   * @param dataSchema data schema desired for the row.
-   * @return canonicalize row.
+   * Converts row to the desired stored {@link ColumnDataType}s in-place. This is used to convert rows generated from
+   * single-stage engine to be used in multi-stage engine.
    */
-  public static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema) {
-    Object[] resultRow = new Object[row.length];
-    for (int colId = 0; colId < row.length; colId++) {
+  public static void convertRow(Object[] row, ColumnDataType[] outputStoredTypes) {
+    int numColumns = row.length;
+    for (int colId = 0; colId < numColumns; colId++) {
       Object value = row[colId];
       if (value != null) {
-        if (dataSchema.getColumnDataType(colId) == DataSchema.ColumnDataType.OBJECT) {
-          resultRow[colId] = value;
-        } else if (dataSchema.getColumnDataType(colId) == DataSchema.ColumnDataType.BOOLEAN) {
-          resultRow[colId] = BooleanUtils.toBoolean(value);
-        } else {
-          resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
-        }
+        row[colId] = convert(value, outputStoredTypes[colId]);
       }
     }
-    return resultRow;
-  }
-
-  /**
-   * Canonicalize rows with column indices not matching calcite order.
-   *
-   * see: {@link TypeUtils#canonicalizeRow(Object[], DataSchema)}
-   */
-  public static Object[] canonicalizeRow(Object[] row, DataSchema dataSchema, int[] columnIndices) {
-    Object[] resultRow = new Object[columnIndices.length];
-    for (int colId = 0; colId < columnIndices.length; colId++) {
-      Object value = row[columnIndices[colId]];
-      if (value != null) {
-        resultRow[colId] = dataSchema.getColumnDataType(colId).convert(value);
-      }
-    }
-    return resultRow;
   }
 }
