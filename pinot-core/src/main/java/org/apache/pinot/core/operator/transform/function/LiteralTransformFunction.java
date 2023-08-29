@@ -269,4 +269,8 @@ public class LiteralTransformFunction implements TransformFunction {
     bitmap.add(0L, length);
     return bitmap;
   }
+
+  public boolean isNull() {
+    return _dataType == DataType.UNKNOWN;
+  }
 }
