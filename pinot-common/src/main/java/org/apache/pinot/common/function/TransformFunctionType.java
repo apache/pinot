@@ -168,7 +168,7 @@ public enum TransformFunctionType {
       SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(SqlTypeFamily.ARRAY)),
   ARRAYMAX("arrayMax", ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0),
       SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(SqlTypeFamily.ARRAY)),
-  ARRAYSUM("arraySum", ReturnTypes.DECIMAL_SUM_NULLABLE, OperandTypes.family(SqlTypeFamily.ARRAY)),
+  ARRAYSUM("arraySum", ReturnTypes.DOUBLE, OperandTypes.family(SqlTypeFamily.ARRAY)),
   VALUEIN("valueIn"),
   MAPVALUE("mapValue", ReturnTypes.cascade(opBinding ->
       opBinding.getOperandType(2).getComponentType(), SqlTypeTransforms.FORCE_NULLABLE),
