@@ -20,6 +20,7 @@ package org.apache.pinot.query.routing;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -312,18 +313,24 @@ public class WorkerManager {
           }
         }
       }
-      serverInstances = new ArrayList<>(servers.size());
-      for (String server : servers) {
-        ServerInstance serverInstance = enabledServerInstanceMap.get(server);
-        if (serverInstance != null) {
-          serverInstances.add(serverInstance);
+      if (servers.isEmpty()) {
+        // fall back to use all enabled servers if no server is found for the tables
+        serverInstances = new ArrayList<>(enabledServerInstanceMap.values());
+      } else {
+        serverInstances = new ArrayList<>(servers.size());
+        for (String server : servers) {
+          ServerInstance serverInstance = enabledServerInstanceMap.get(server);
+          if (serverInstance != null) {
+            serverInstances.add(serverInstance);
+          }
         }
       }
     }
     if (serverInstances.isEmpty()) {
-      LOGGER.info("[RequestId: {}] No server instance found for intermediate stage for tables: {}, fall back to all",
+      LOGGER.error("[RequestId: {}] No server instance found for intermediate stage for tables: {}",
           context.getRequestId(), tableNames);
-      serverInstances = new ArrayList<>(enabledServerInstanceMap.values());
+      throw new IllegalStateException(
+          "No server instance found for intermediate stage for tables: " + Arrays.toString(tableNames.toArray()));
     }
     if (metadata.isRequiresSingletonInstance()) {
       // require singleton should return a single global worker ID with 0;
