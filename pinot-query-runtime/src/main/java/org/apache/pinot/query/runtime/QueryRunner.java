@@ -161,7 +161,7 @@ public class QueryRunner {
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
       TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
       LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
-          distributedStagePlan.getStageId(), errorBlock.getDataBlock().getExceptions());
+          distributedStagePlan.getStageId(), errorBlock.getExceptions());
       int receiverStageId = ((MailboxSendNode) distributedStagePlan.getStageRoot()).getReceiverStageId();
       MailboxMetadata mailboxMetadata = distributedStagePlan.getStageMetadata().getWorkerMetadataList()
           .get(distributedStagePlan.getServer().workerId()).getMailBoxInfosMap().get(receiverStageId);

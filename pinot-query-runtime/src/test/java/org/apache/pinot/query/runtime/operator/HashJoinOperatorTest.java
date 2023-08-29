@@ -29,7 +29,6 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -346,8 +345,7 @@ public class HashJoinOperatorTest {
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    MetadataBlock errorBlock = (MetadataBlock) result.getDataBlock();
-    Assert.assertTrue(errorBlock.getExceptions().get(1000).contains("notEquals"));
+    Assert.assertTrue(result.getExceptions().get(1000).contains("notEquals"));
   }
 
   @Test
@@ -567,8 +565,8 @@ public class HashJoinOperatorTest {
 
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
-        .contains("testInnerJoinRightError"));
+    Assert.assertTrue(
+        result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinRightError"));
   }
 
   @Test
@@ -598,8 +596,7 @@ public class HashJoinOperatorTest {
 
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
-        .contains("testInnerJoinLeftError"));
+    Assert.assertTrue(result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinLeftError"));
   }
 
   @Test
@@ -634,9 +631,8 @@ public class HashJoinOperatorTest {
 
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(
-        result.getDataBlock().getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
-            .contains("reach number of rows limit"));
+    Assert.assertTrue(result.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+        .contains("reach number of rows limit"));
   }
 
   @Test
@@ -672,9 +668,8 @@ public class HashJoinOperatorTest {
     TransferableBlock result = join.nextBlock();
     Assert.assertFalse(result.isErrorBlock());
     Assert.assertEquals(result.getNumRows(), 1);
-    Assert.assertTrue(
-        result.getDataBlock().getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
-            .contains("reach number of rows limit"));
+    Assert.assertTrue(result.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+        .contains("reach number of rows limit"));
   }
 }
 // TODO: Add more inequi join tests.

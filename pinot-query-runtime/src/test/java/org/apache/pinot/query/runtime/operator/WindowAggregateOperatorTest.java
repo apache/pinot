@@ -638,7 +638,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     Assert.assertTrue(block.isErrorBlock(), "expected ERROR block from invalid computation");
-    Assert.assertTrue(block.getDataBlock().getExceptions().get(1000).contains("String cannot be cast to class"),
+    Assert.assertTrue(block.getExceptions().get(1000).contains("String cannot be cast to class"),
         "expected it to fail with class cast exception");
   }
 

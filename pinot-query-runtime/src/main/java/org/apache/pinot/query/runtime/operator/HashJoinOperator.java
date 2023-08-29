@@ -312,7 +312,7 @@ public class HashJoinOperator extends MultiStageOperator {
 
   private TransferableBlock setPartialResultExceptionToBlock(TransferableBlock block) {
     if (_resourceLimitExceededException != null) {
-      block.getDataBlock().addException(_resourceLimitExceededException);
+      block.addException(_resourceLimitExceededException);
     }
     return block;
   }

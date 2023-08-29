@@ -60,7 +60,7 @@ public class OpChainSchedulerService {
           if (result.isErrorBlock()) {
             returnedErrorBlock = result;
             LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
-                result.getDataBlock().getExceptions());
+                result.getExceptions());
           } else {
             LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
           }
@@ -71,7 +71,7 @@ public class OpChainSchedulerService {
           _submittedOpChainMap.remove(operatorChain.getId());
           if (returnedErrorBlock != null || thrown != null) {
             if (thrown == null) {
-              thrown = new RuntimeException("Error block " + returnedErrorBlock.getDataBlock().getExceptions());
+              thrown = new RuntimeException("Error block " + returnedErrorBlock.getExceptions());
             }
             operatorChain.cancel(thrown);
           } else if (isFinished) {
