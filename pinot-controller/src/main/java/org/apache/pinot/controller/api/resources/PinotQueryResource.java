@@ -239,6 +239,21 @@ public class PinotQueryResource {
       tableName = _pinotHelixResourceManager.getActualTableName(inputTableName);
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
+      try {
+        // try to compile the query using multi-stage engine and suggest using it if it succeeds.
+        LOGGER.info("Trying to compile query {} using multi-stage engine", query);
+        QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
+            CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null,
+            null);
+        queryEnvironment.getTableNamesForQuery(query);
+        LOGGER.info("Successfully compiled query using multi-stage engine: {}", query);
+        return QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
+            "It seems that the query is only supported by the multi-stage engine, please try it by checking the "
+                + "\"Use Multi-Stage Engine\" box above")).toString();
+      } catch (Exception multipleTablesPassingException) {
+        LOGGER.error("Caught exception while compiling query using multi-stage engine: {}",
+            query, multipleTablesPassingException);
+      }
       return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
     }
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
