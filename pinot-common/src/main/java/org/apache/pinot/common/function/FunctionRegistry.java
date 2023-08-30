@@ -217,5 +217,30 @@ public class FunctionRegistry {
     public static String arrayToMV(Object multiValue) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
+
+    @ScalarFunction(names = "arrayMin", isPlaceholder = true)
+    public static String arrayMin(Object multiValue) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction(names = "arrayMax", isPlaceholder = true)
+    public static String arrayMax(Object multiValue) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction(names = "arrayLength", isPlaceholder = true)
+    public static String arrayLength(Object multiValue) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction(names = "arrayAverage", isPlaceholder = true)
+    public static String arrayAverage(Object multiValue) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+
+    @ScalarFunction(names = "arraySum", isPlaceholder = true)
+    public static String arraySum(Object multiValue) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
   }
 }
