@@ -32,6 +32,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -49,7 +50,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -271,8 +271,7 @@ public class OpChainTest {
   private Stack<MultiStageOperator> getFullOpchain(int receivedStageId, int senderStageId,
       OpChainExecutionContext context, long waitTimeInMillis) {
     Stack<MultiStageOperator> operators = new Stack<>();
-    DataSchema upStreamSchema =
-        new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    DataSchema upStreamSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT});
     //Mailbox Receive Operator
     try {
       when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1}),
@@ -294,7 +293,7 @@ public class OpChainTest {
         new TransformOperator(context, leafOp, upStreamSchema, Collections.singletonList(ref0), upStreamSchema);
 
     //Filter operator
-    RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
+    RexExpression booleanLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
     FilterOperator filterOp = new FilterOperator(context, transformOp, upStreamSchema, booleanLiteral);
 
     // Dummy operator

@@ -29,7 +29,6 @@ import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -43,6 +42,7 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.DOUBLE;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.LONG;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
+
 
 public class AggregateOperatorTest {
 
@@ -140,7 +140,7 @@ public class AggregateOperatorTest {
   @Test
   public void shouldAggregateSingleInputBlockWithLiteralInput() {
     // Given:
-    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.Literal(FieldSpec.DataType.DOUBLE, 1.0)));
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.Literal(ColumnDataType.DOUBLE, 1.0)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
@@ -171,9 +171,10 @@ public class AggregateOperatorTest {
     RexExpression.FunctionCall agg = getSum(new RexExpression.InputRef(0));
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{STRING, INT});
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{STRING, DOUBLE});
-    AggregateOperator sum0GroupBy1 = new AggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator,
-        outSchema, inSchema, Collections.singletonList(agg),
-        Collections.singletonList(new RexExpression.InputRef(1)), AggType.LEAF, null, null);
+    AggregateOperator sum0GroupBy1 =
+        new AggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator, outSchema, inSchema,
+            Collections.singletonList(agg), Collections.singletonList(new RexExpression.InputRef(1)), AggType.LEAF,
+            null, null);
     TransferableBlock result = sum0GroupBy1.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
     Assert.assertEquals(resultRows.size(), 2);
@@ -190,7 +191,7 @@ public class AggregateOperatorTest {
   public void shouldThrowOnUnknownAggFunction() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(
-        new RexExpression.FunctionCall(SqlKind.AVG, FieldSpec.DataType.INT, "AVERAGE", ImmutableList.of()));
+        new RexExpression.FunctionCall(SqlKind.AVG, ColumnDataType.INT, "AVERAGE", ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
     DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
@@ -229,6 +230,6 @@ public class AggregateOperatorTest {
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {
-    return new RexExpression.FunctionCall(SqlKind.SUM, FieldSpec.DataType.INT, "SUM", ImmutableList.of(arg));
+    return new RexExpression.FunctionCall(SqlKind.SUM, ColumnDataType.INT, "SUM", ImmutableList.of(arg));
   }
 }

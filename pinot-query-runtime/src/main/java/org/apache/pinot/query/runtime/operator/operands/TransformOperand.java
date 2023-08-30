@@ -18,75 +18,14 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
-import com.google.common.base.Preconditions;
-import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-public abstract class TransformOperand {
-  protected String _resultName;
-  protected DataSchema.ColumnDataType _resultType;
+public interface TransformOperand {
 
-  public static TransformOperand toTransformOperand(RexExpression rexExpression, DataSchema inputDataSchema) {
-    if (rexExpression instanceof RexExpression.InputRef) {
-      return new ReferenceOperand((RexExpression.InputRef) rexExpression, inputDataSchema);
-    } else if (rexExpression instanceof RexExpression.FunctionCall) {
-      return toTransformOperand((RexExpression.FunctionCall) rexExpression, inputDataSchema);
-    } else if (rexExpression instanceof RexExpression.Literal) {
-      return new LiteralOperand((RexExpression.Literal) rexExpression);
-    } else {
-      throw new UnsupportedOperationException("Unsupported RexExpression: " + rexExpression);
-    }
-  }
-
-  private static TransformOperand toTransformOperand(RexExpression.FunctionCall functionCall,
-      DataSchema inputDataSchema) {
-    final List<RexExpression> functionOperands = functionCall.getFunctionOperands();
-    int operandSize = functionOperands.size();
-    switch (OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName())) {
-      case "AND":
-        Preconditions.checkState(operandSize >= 2, "AND takes >=2 argument, passed in argument size:" + operandSize);
-        return new FilterOperand.And(functionOperands, inputDataSchema);
-      case "OR":
-        Preconditions.checkState(operandSize >= 2, "OR takes >=2 argument, passed in argument size:" + operandSize);
-        return new FilterOperand.Or(functionOperands, inputDataSchema);
-      case "ISNOTTRUE":
-      case "NOT":
-        Preconditions.checkState(operandSize == 1,
-            "NOT / IS_NOT_TRUE takes one argument, passed in argument size:" + operandSize);
-        return new FilterOperand.Not(functionOperands.get(0), inputDataSchema);
-      case "ISTRUE":
-        Preconditions.checkState(operandSize == 1,
-            "BOOL / IS_TRUE takes one argument, passed in argument size:" + operandSize);
-        return new FilterOperand.True(functionOperands.get(0), inputDataSchema);
-      case "equals":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v == 0);
-      case "notEquals":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v != 0);
-      case "greaterThan":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v > 0);
-      case "greaterThanOrEqual":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v >= 0);
-      case "lessThan":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v < 0);
-      case "lessThanOrEqual":
-        return new FilterOperand.Predicate(functionOperands, inputDataSchema, v -> v <= 0);
-      default:
-        return new FunctionOperand(functionCall, inputDataSchema);
-    }
-  }
-
-  public String getResultName() {
-    return _resultName;
-  }
-
-  public DataSchema.ColumnDataType getResultType() {
-    return _resultType;
-  }
+  ColumnDataType getResultType();
 
   @Nullable
-  public abstract Object apply(Object[] row);
+  Object apply(Object[] row);
 }

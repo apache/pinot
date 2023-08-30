@@ -29,10 +29,8 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,8 +45,8 @@ import org.slf4j.LoggerFactory;
  */
 public class TransformOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "TRANSFORM";
+
   private final MultiStageOperator _upstreamOperator;
-  private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
@@ -65,7 +63,7 @@ public class TransformOperator extends MultiStageOperator {
     _resultColumnSize = transforms.size();
     _transformOperandsList = new ArrayList<>(_resultColumnSize);
     for (RexExpression rexExpression : transforms) {
-      _transformOperandsList.add(TransformOperand.toTransformOperand(rexExpression, upstreamDataSchema));
+      _transformOperandsList.add(TransformOperandFactory.getTransformOperand(rexExpression, upstreamDataSchema));
     }
     _resultSchema = resultSchema;
   }
@@ -110,7 +108,7 @@ public class TransformOperator extends MultiStageOperator {
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
       for (int i = 0; i < _resultColumnSize; i++) {
-        resultRow[i] = TypeUtils.convert(_transformOperandsList.get(i).apply(row), _resultSchema.getColumnDataType(i));
+        resultRow[i] = _transformOperandsList.get(i).apply(row);
       }
       resultRows.add(resultRow);
     }

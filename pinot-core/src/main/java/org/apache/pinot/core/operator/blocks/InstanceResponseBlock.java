@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.blocks;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -112,7 +111,7 @@ public class InstanceResponseBlock implements Block {
   }
 
   @Nullable
-  public Collection<Object[]> getRows() {
+  public List<Object[]> getRows() {
     return _resultsBlock != null ? _resultsBlock.getRows(_queryContext) : null;
   }
 

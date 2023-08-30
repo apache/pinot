@@ -18,9 +18,15 @@
  */
 package org.apache.pinot.spi.utils;
 
+import javax.annotation.Nullable;
+
+
 public class BooleanUtils {
   private BooleanUtils() {
   }
+
+  public static final int INTERNAL_TRUE = 1;
+  public static final int INTERNAL_FALSE = 0;
 
   /**
    * Returns the boolean value for the given boolean string.
@@ -39,7 +45,7 @@ public class BooleanUtils {
     } else if (booleanObject instanceof String) {
       return BooleanUtils.toBoolean((String) booleanObject);
     } else if (booleanObject instanceof Number) {
-      return ((Number) booleanObject).intValue() == 1;
+      return ((Number) booleanObject).intValue() == INTERNAL_TRUE;
     } else if (booleanObject instanceof Boolean) {
       return (boolean) booleanObject;
     } else {
@@ -55,6 +61,27 @@ public class BooleanUtils {
    * </ul>
    */
   public static int toInt(String booleanString) {
-    return toBoolean(booleanString) ? 1 : 0;
+    return toBoolean(booleanString) ? INTERNAL_TRUE : INTERNAL_FALSE;
+  }
+
+  /**
+   * Returns the boolean value for the given non-null Integer object (internal value for BOOLEAN).
+   */
+  public static boolean fromNonNullInternalValue(Object value) {
+    return (int) value == INTERNAL_TRUE;
+  }
+
+  /**
+   * Returns whether the given nullable Integer object (internal value for BOOLEAN) represents true.
+   */
+  public static boolean isTrueInternalValue(@Nullable Object value) {
+    return value != null && (int) value == INTERNAL_TRUE;
+  }
+
+  /**
+   * Returns whether the given nullable Integer object (internal value for BOOLEAN) represents false.
+   */
+  public static boolean isFalseInternalValue(@Nullable Object value) {
+    return value != null && (int) value == INTERNAL_FALSE;
   }
 }

@@ -95,6 +95,11 @@ public class LiteralContext {
         _value = literal.getFieldValue();
         _bigDecimalValue = PinotDataType.BOOLEAN.toBigDecimal(_value);
         break;
+      case INT_VALUE:
+        _type = FieldSpec.DataType.INT;
+        _value = literal.getIntValue();
+        _bigDecimalValue = new BigDecimal((int) _value);
+        break;
       case LONG_VALUE:
         long longValue = literal.getLongValue();
         if (longValue == (int) longValue) {

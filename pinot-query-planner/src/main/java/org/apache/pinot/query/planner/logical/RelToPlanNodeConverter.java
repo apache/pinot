@@ -47,7 +47,7 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -60,7 +60,6 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 
 
@@ -158,7 +157,7 @@ public final class RelToPlanNodeConverter {
 
   private static PlanNode convertLogicalAggregate(LogicalAggregate node, int currentStageId) {
     return new AggregateNode(currentStageId, toDataSchema(node.getRowType()), node.getAggCallList(),
-        RexExpression.toRexInputRefs(node.getGroupSet()), node.getHints());
+        RexExpressionUtils.fromInputRefs(node.getGroupSet()), node.getHints());
   }
 
   private static PlanNode convertLogicalProject(LogicalProject node, int currentStageId) {
@@ -184,7 +183,7 @@ public final class RelToPlanNodeConverter {
     JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(new FieldSelectionKeySelector(joinInfo.leftKeys),
         new FieldSelectionKeySelector(joinInfo.rightKeys));
     List<RexExpression> joinClause =
-        joinInfo.nonEquiConditions.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+        joinInfo.nonEquiConditions.stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
     return new JoinNode(currentStageId, toDataSchema(node.getRowType()), toDataSchema(node.getLeft().getRowType()),
         toDataSchema(node.getRight().getRowType()), joinType, joinKeys, joinClause, node.getHints());
   }
@@ -193,7 +192,7 @@ public final class RelToPlanNodeConverter {
     if (rowType instanceof RelRecordType) {
       RelRecordType recordType = (RelRecordType) rowType;
       String[] columnNames = recordType.getFieldNames().toArray(new String[]{});
-      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[columnNames.length];
+      ColumnDataType[] columnDataTypes = new ColumnDataType[columnNames.length];
       for (int i = 0; i < columnNames.length; i++) {
         columnDataTypes[i] = convertToColumnDataType(recordType.getFieldList().get(i).getType());
       }
@@ -203,7 +202,7 @@ public final class RelToPlanNodeConverter {
     }
   }
 
-  public static DataSchema.ColumnDataType convertToColumnDataType(RelDataType relDataType) {
+  public static ColumnDataType convertToColumnDataType(RelDataType relDataType) {
     SqlTypeName sqlTypeName = relDataType.getSqlTypeName();
     boolean isArray = (sqlTypeName == SqlTypeName.ARRAY);
     if (isArray) {
@@ -211,51 +210,40 @@ public final class RelToPlanNodeConverter {
     }
     switch (sqlTypeName) {
       case BOOLEAN:
-        return isArray ? DataSchema.ColumnDataType.BOOLEAN_ARRAY : DataSchema.ColumnDataType.BOOLEAN;
+        return isArray ? ColumnDataType.BOOLEAN_ARRAY : ColumnDataType.BOOLEAN;
       case TINYINT:
       case SMALLINT:
       case INTEGER:
-        return isArray ? DataSchema.ColumnDataType.INT_ARRAY : DataSchema.ColumnDataType.INT;
+        return isArray ? ColumnDataType.INT_ARRAY : ColumnDataType.INT;
       case BIGINT:
-        return isArray ? DataSchema.ColumnDataType.LONG_ARRAY : DataSchema.ColumnDataType.LONG;
+        return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
       case DECIMAL:
         return resolveDecimal(relDataType, isArray);
       case FLOAT:
       case REAL:
-        return isArray ? DataSchema.ColumnDataType.FLOAT_ARRAY : DataSchema.ColumnDataType.FLOAT;
+        return isArray ? ColumnDataType.FLOAT_ARRAY : ColumnDataType.FLOAT;
       case DOUBLE:
-        return isArray ? DataSchema.ColumnDataType.DOUBLE_ARRAY : DataSchema.ColumnDataType.DOUBLE;
+        return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
       case DATE:
       case TIME:
       case TIMESTAMP:
-        return isArray ? DataSchema.ColumnDataType.TIMESTAMP_ARRAY : DataSchema.ColumnDataType.TIMESTAMP;
+        return isArray ? ColumnDataType.TIMESTAMP_ARRAY : ColumnDataType.TIMESTAMP;
       case CHAR:
       case VARCHAR:
-        return isArray ? DataSchema.ColumnDataType.STRING_ARRAY : DataSchema.ColumnDataType.STRING;
-      case OTHER:
-        return DataSchema.ColumnDataType.OBJECT;
+        return isArray ? ColumnDataType.STRING_ARRAY : ColumnDataType.STRING;
       case BINARY:
       case VARBINARY:
-        return isArray ? DataSchema.ColumnDataType.BYTES_ARRAY : DataSchema.ColumnDataType.BYTES;
+        return isArray ? ColumnDataType.BYTES_ARRAY : ColumnDataType.BYTES;
+      case OTHER:
+      case ANY:
+        return ColumnDataType.OBJECT;
       default:
         if (relDataType.getComponentType() != null) {
           throw new IllegalArgumentException("Unsupported collection type: " + relDataType);
         }
-        LOGGER.warn("Unexpected SQL type: {}, use BYTES instead", sqlTypeName);
-        return DataSchema.ColumnDataType.BYTES;
+        LOGGER.warn("Unexpected SQL type: {}, use OBJECT instead", sqlTypeName);
+        return ColumnDataType.OBJECT;
     }
-  }
-
-  public static FieldSpec.DataType convertToFieldSpecDataType(RelDataType relDataType) {
-    DataSchema.ColumnDataType columnDataType = convertToColumnDataType(relDataType);
-    if (columnDataType == DataSchema.ColumnDataType.OBJECT) {
-      return FieldSpec.DataType.BYTES;
-    }
-    return columnDataType.toDataType();
-  }
-
-  public static PinotDataType convertToPinotDataType(RelDataType relDataType) {
-    return PinotDataType.getPinotDataTypeForExecution(convertToColumnDataType(relDataType));
   }
 
   /**
@@ -264,27 +252,27 @@ public final class RelToPlanNodeConverter {
    *
    * @param relDataType the DECIMAL rel data type.
    * @param isArray
-   * @return proper {@link DataSchema.ColumnDataType}.
+   * @return proper {@link ColumnDataType}.
    * @see {@link org.apache.calcite.rel.type.RelDataTypeFactoryImpl#decimalOf}.
    */
-  private static DataSchema.ColumnDataType resolveDecimal(RelDataType relDataType, boolean isArray) {
+  private static ColumnDataType resolveDecimal(RelDataType relDataType, boolean isArray) {
     int precision = relDataType.getPrecision();
     int scale = relDataType.getScale();
     if (scale == 0) {
       if (precision <= 10) {
-        return isArray ? DataSchema.ColumnDataType.INT_ARRAY : DataSchema.ColumnDataType.INT;
+        return isArray ? ColumnDataType.INT_ARRAY : ColumnDataType.INT;
       } else if (precision <= 38) {
-        return isArray ? DataSchema.ColumnDataType.LONG_ARRAY : DataSchema.ColumnDataType.LONG;
+        return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
       } else {
-        return isArray ? DataSchema.ColumnDataType.DOUBLE_ARRAY : DataSchema.ColumnDataType.BIG_DECIMAL;
+        return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
       }
     } else {
       if (precision <= 14) {
-        return isArray ? DataSchema.ColumnDataType.FLOAT_ARRAY : DataSchema.ColumnDataType.FLOAT;
+        return isArray ? ColumnDataType.FLOAT_ARRAY : ColumnDataType.FLOAT;
       } else if (precision <= 30) {
-        return isArray ? DataSchema.ColumnDataType.DOUBLE_ARRAY : DataSchema.ColumnDataType.DOUBLE;
+        return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
       } else {
-        return isArray ? DataSchema.ColumnDataType.DOUBLE_ARRAY : DataSchema.ColumnDataType.BIG_DECIMAL;
+        return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
       }
     }
   }

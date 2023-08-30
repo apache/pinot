@@ -19,13 +19,13 @@
 package org.apache.pinot.core.common.datablock;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -40,7 +40,7 @@ public class DataBlockTestUtils {
 
   public static Object[] getRandomRow(DataSchema dataSchema, int nullPercentile) {
     final int numColumns = dataSchema.getColumnNames().length;
-    DataSchema.ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     Object[] row = new Object[numColumns];
     for (int colId = 0; colId < numColumns; colId++) {
       switch (columnDataTypes[colId]) {
@@ -60,10 +60,10 @@ public class DataBlockTestUtils {
           row[colId] = BigDecimal.valueOf(RANDOM.nextDouble());
           break;
         case BOOLEAN:
-          row[colId] = RANDOM.nextBoolean();
+          row[colId] = RANDOM.nextBoolean() ? 1 : 0;
           break;
         case TIMESTAMP:
-          row[colId] = new Timestamp(RANDOM.nextLong());
+          row[colId] = RANDOM.nextLong();
           break;
         case STRING:
           row[colId] = RandomStringUtils.random(RANDOM.nextInt(20));
@@ -113,17 +113,17 @@ public class DataBlockTestUtils {
           break;
         case BOOLEAN_ARRAY:
           length = RANDOM.nextInt(ARRAY_SIZE);
-          boolean[] booleanArray = new boolean[length];
+          int[] booleanArray = new int[length];
           for (int i = 0; i < length; i++) {
-            booleanArray[i] = RANDOM.nextBoolean();
+            booleanArray[i] = RANDOM.nextBoolean() ? 1 : 0;
           }
           row[colId] = booleanArray;
           break;
         case TIMESTAMP_ARRAY:
           length = RANDOM.nextInt(ARRAY_SIZE);
-          Timestamp[] timestampArray = new Timestamp[length];
+          long[] timestampArray = new long[length];
           for (int i = 0; i < length; i++) {
-            timestampArray[i] = new Timestamp(RANDOM.nextLong());
+            timestampArray[i] = RANDOM.nextLong();
           }
           row[colId] = timestampArray;
           break;
@@ -134,15 +134,14 @@ public class DataBlockTestUtils {
           throw new UnsupportedOperationException("Can't fill random data for column type: " + columnDataTypes[colId]);
       }
       // randomly set some entry to null
-      if (columnDataTypes[colId].getStoredType() != DataSchema.ColumnDataType.OBJECT) {
+      if (columnDataTypes[colId].getStoredType() != ColumnDataType.OBJECT) {
         row[colId] = randomlySettingNull(nullPercentile) ? null : row[colId];
       }
     }
     return row;
   }
 
-  public static Object getElement(DataBlock dataBlock, int rowId, int colId,
-      DataSchema.ColumnDataType columnDataType) {
+  public static Object getElement(DataBlock dataBlock, int rowId, int colId, ColumnDataType columnDataType) {
     RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
     if (nullBitmap != null) {
       if (nullBitmap.contains(rowId)) {
@@ -164,10 +163,8 @@ public class DataBlockTestUtils {
         return dataBlock.getString(rowId, colId);
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
-      case BOOLEAN_ARRAY:
       case INT_ARRAY:
         return dataBlock.getIntArray(rowId, colId);
-      case TIMESTAMP_ARRAY:
       case LONG_ARRAY:
         return dataBlock.getLongArray(rowId, colId);
       case FLOAT_ARRAY:

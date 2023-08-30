@@ -44,9 +44,10 @@ import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 
 
@@ -135,7 +136,7 @@ public class HashJoinOperator extends MultiStageOperator {
     _rightTableOperator = rightTableOperator;
     _joinClauseEvaluators = new ArrayList<>(node.getJoinClauses().size());
     for (RexExpression joinClause : node.getJoinClauses()) {
-      _joinClauseEvaluators.add(TransformOperand.toTransformOperand(joinClause, _resultSchema));
+      _joinClauseEvaluators.add(TransformOperandFactory.getTransformOperand(joinClause, _resultSchema));
     }
     _isHashTableBuilt = false;
     _broadcastRightTable = new HashMap<>();
@@ -263,14 +264,11 @@ public class HashJoinOperator extends MultiStageOperator {
       _upstreamErrorBlock = leftBlock;
       return _upstreamErrorBlock;
     }
-    if (leftBlock.isSuccessfulEndOfStreamBlock() && !needUnmatchedRightRows()) {
-      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+      if (!needUnmatchedRightRows()) {
+        return leftBlock;
       }
-      return leftBlock;
-    }
-    // TODO: Moved to a different function.
-    if (leftBlock.isSuccessfulEndOfStreamBlock() && needUnmatchedRightRows()) {
+      // TODO: Moved to a different function.
       // Return remaining non-matched rows for non-inner join.
       List<Object[]> returnRows = new ArrayList<>();
       for (Map.Entry<Key, ArrayList<Object[]>> entry : _broadcastRightTable.entrySet()) {
@@ -289,24 +287,21 @@ public class HashJoinOperator extends MultiStageOperator {
       return new TransferableBlock(returnRows, _resultSchema, DataBlock.Type.ROW);
     }
     List<Object[]> rows;
-    if (leftBlock.isEndOfStreamBlock()) {
-      rows = new ArrayList<>();
-    } else {
-      switch (_joinType) {
-        case SEMI: {
-          rows = buildJoinedDataBlockSemi(leftBlock);
-          break;
-        }
-        case ANTI: {
-          rows = buildJoinedDataBlockAnti(leftBlock);
-          break;
-        }
-        default: { // INNER, LEFT, RIGHT, FULL
-          rows = buildJoinedDataBlockDefault(leftBlock);
-          break;
-        }
+    switch (_joinType) {
+      case SEMI: {
+        rows = buildJoinedDataBlockSemi(leftBlock);
+        break;
+      }
+      case ANTI: {
+        rows = buildJoinedDataBlockAnti(leftBlock);
+        break;
+      }
+      default: { // INNER, LEFT, RIGHT, FULL
+        rows = buildJoinedDataBlockDefault(leftBlock);
+        break;
       }
     }
+    // TODO: Rows can be empty here. Consider fetching another left block instead of returning empty block.
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
   }
 
@@ -352,8 +347,8 @@ public class HashJoinOperator extends MultiStageOperator {
         Object[] rightRow = matchedRightRows.get(i);
         // TODO: Optimize this to avoid unnecessary object copy.
         Object[] resultRow = joinRow(leftRow, rightRow);
-        if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream().allMatch(
-            evaluator -> (Boolean) TypeUtils.convert(evaluator.apply(resultRow), DataSchema.ColumnDataType.BOOLEAN))) {
+        if (_joinClauseEvaluators.isEmpty() || _joinClauseEvaluators.stream()
+            .allMatch(evaluator -> BooleanUtils.isTrueInternalValue(evaluator.apply(resultRow)))) {
           rows.add(resultRow);
           hasMatchForLeftRow = true;
           if (_matchedRightRows != null) {

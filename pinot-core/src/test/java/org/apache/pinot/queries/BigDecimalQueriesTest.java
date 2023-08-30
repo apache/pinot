@@ -329,7 +329,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           // Null values are inserted at: index % 4 == 3. All null values are grouped into a single null.
           i++;
         }
-        assertEquals(row[1], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)).toPlainString());
+        assertEquals(row[1], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)));
         i++;
       }
     }
