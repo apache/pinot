@@ -185,7 +185,11 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
     SERVICE_LOADER {
       @Override
       protected Stream<PinotMetricsFactory> streamInstances(PinotConfiguration metricsConfiguration) {
-        return ServiceLoader.load(PinotMetricsFactory.class).stream().map(ServiceLoader.Provider::get);
+        ArrayList<PinotMetricsFactory> result = new ArrayList<>();
+        for (PinotMetricsFactory factory : ServiceLoader.load(PinotMetricsFactory.class)) {
+          result.add(factory);
+        }
+        return result.stream();
       }
     },
     /**
