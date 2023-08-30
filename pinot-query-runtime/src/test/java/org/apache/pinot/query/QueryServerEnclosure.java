@@ -68,9 +68,8 @@ public class QueryServerEnclosure {
   private final HelixManager _helixManager;
 
   private final QueryRunner _queryRunner;
-  private final ExecutorService _executor = Executors.newCachedThreadPool(
-      new NamedThreadFactory("QueryServerTest_Server"));
-
+  private final ExecutorService _executor =
+      Executors.newCachedThreadPool(new NamedThreadFactory("QueryServerTest_Server"));
 
   public QueryServerEnclosure(MockInstanceDataManagerFactory factory) {
     try {
@@ -133,6 +132,9 @@ public class QueryServerEnclosure {
       try {
         _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
       } catch (Exception e) {
+        // TODO: Find a way to propagate the exception and fail the test
+        System.err.println("Caught exception while executing query");
+        e.printStackTrace(System.err);
         throw new RuntimeException("Error executing query!", e);
       }
     });

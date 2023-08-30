@@ -18,16 +18,11 @@
  */
 package org.apache.pinot.query.planner.logical;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Pair;
-import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -35,15 +30,15 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 public class LiteralHintUtils {
   private LiteralHintUtils() {
-    // do not instantiate.
   }
 
   public static String literalMapToHintString(Map<Pair<Integer, Integer>, RexExpression.Literal> literals) {
     List<String> literalStrings = new ArrayList<>(literals.size());
     for (Map.Entry<Pair<Integer, Integer>, RexExpression.Literal> e : literals.entrySet()) {
       // individual literal parts are joined with `|`
-      literalStrings.add(String.format("%d|%d|%s|%s", e.getKey().left, e.getKey().right,
-          e.getValue().getDataType().name(), e.getValue().getValue()));
+      literalStrings.add(
+          String.format("%d|%d|%s|%s", e.getKey().left, e.getKey().right, e.getValue().getDataType().name(),
+              e.getValue().getValue()));
     }
     // semi-colon is used to separate between encoded literals
     return "{" + StringUtils.join(literalStrings, ";:;") + "}";
@@ -69,43 +64,19 @@ public class LiteralHintUtils {
   private static Literal stringToLiteral(String dataTypeStr, String valueStr) {
     FieldSpec.DataType dataType = FieldSpec.DataType.valueOf(dataTypeStr);
     switch (dataType) {
-      case FLOAT:
-      case DOUBLE:
-        return Literal.doubleValue(Double.parseDouble(valueStr));
+      case BOOLEAN:
+        return Literal.boolValue(valueStr.equals("1"));
       case INT:
         return Literal.intValue(Integer.parseInt(valueStr));
       case LONG:
         return Literal.longValue(Long.parseLong(valueStr));
+      case FLOAT:
+      case DOUBLE:
+        return Literal.doubleValue(Double.parseDouble(valueStr));
       case STRING:
         return Literal.stringValue(valueStr);
-      case BOOLEAN:
-        return Literal.boolValue(BooleanUtils.toBoolean(valueStr));
       default:
         throw new UnsupportedOperationException("Unsupported RexLiteral type: " + dataTypeStr);
-    }
-  }
-
-  public static RexExpression.Literal rexLiteralToLiteral(RexLiteral rexLiteral) {
-    SqlTypeName sqlTypeName = rexLiteral.getTypeName();
-    Object value = rexLiteral.getValue();
-    switch (sqlTypeName) {
-      case DECIMAL:
-      case REAL:
-      case DOUBLE:
-        return new RexExpression.Literal(FieldSpec.DataType.DOUBLE, value == null ? null
-            : ((BigDecimal) value).doubleValue());
-      case INTEGER:
-      case BIGINT:
-        return new RexExpression.Literal(FieldSpec.DataType.LONG, value == null ? null
-            : ((BigDecimal) value).longValue());
-      case BOOLEAN:
-        return new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, value);
-      case CHAR:
-      case VARCHAR:
-        return new RexExpression.Literal(FieldSpec.DataType.STRING, value == null ? null
-            : (value instanceof NlsString ? ((NlsString) value).getValue() : value.toString()));
-      default:
-        throw new UnsupportedOperationException("Unsupported RexLiteral type: " + rexLiteral.getTypeName());
     }
   }
 }

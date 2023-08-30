@@ -64,7 +64,6 @@ import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -249,21 +248,17 @@ public class QueryDispatcher {
       int numRows = dataBlock.getNumberOfRows();
       if (numRows > 0) {
         resultRows.ensureCapacity(resultRows.size() + numRows);
-        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-          nullBitmaps[i] = dataBlock.getNullRowIds(resultFields.get(i).left);
-        }
         List<Object[]> rawRows = DataBlockUtils.extractRows(dataBlock, ObjectSerDeUtils::deserialize);
-        int rowId = 0;
         for (Object[] rawRow : rawRows) {
           Object[] row = new Object[numColumns];
           for (int i = 0; i < numColumns; i++) {
-            if (nullBitmaps[i] == null || !nullBitmaps[i].contains(rowId)) {
-              row[i] = columnTypes[i].convertAndFormat(rawRow[resultFields.get(i).left]);
+            Object rawValue = rawRow[resultFields.get(i).left];
+            if (rawValue != null) {
+              ColumnDataType dataType = columnTypes[i];
+              row[i] = dataType.format(dataType.toExternal(rawValue));
             }
           }
           resultRows.add(row);
-          rowId++;
         }
       }
       block = receiveOperator.nextBlock();

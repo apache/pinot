@@ -27,7 +27,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionUtils;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -42,7 +42,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private final String _name;
   private final FunctionInvoker _functionInvoker;
-  private final PinotDataType _resultType;
+  private final ColumnDataType _resultType;
   private final TransformResultMetadata _resultMetadata;
 
   private Object[] _scalarArguments;
@@ -62,14 +62,13 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           parameterClasses[i], functionInfo.getMethod());
     }
     Class<?> resultClass = _functionInvoker.getResultClass();
-    PinotDataType resultType = FunctionUtils.getParameterType(resultClass);
+    ColumnDataType resultType = FunctionUtils.getColumnDataType(resultClass);
     if (resultType != null) {
       _resultType = resultType;
-      _resultMetadata =
-          new TransformResultMetadata(FunctionUtils.getDataType(resultClass), _resultType.isSingleValue(), false);
+      _resultMetadata = new TransformResultMetadata(resultType.toDataType(), !_resultType.isArray(), false);
     } else {
       // Handle unrecognized result class with STRING
-      _resultType = PinotDataType.STRING;
+      _resultType = ColumnDataType.STRING;
       _resultMetadata = new TransformResultMetadata(DataType.STRING, true, false);
     }
   }
@@ -170,8 +169,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _intValuesSV[i] = value == null ? (int) DataSchema.ColumnDataType.INT.getNullPlaceholder()
-          : (int) _resultType.toInternal(value);
+      _intValuesSV[i] = value != null ? (int) _resultType.toInternal(value) : (int) _resultType.getNullPlaceholder();
     }
     return _intValuesSV;
   }
@@ -189,8 +187,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _longValuesSV[i] = value == null ? (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder()
-          : (long) _resultType.toInternal(value);
+      _longValuesSV[i] = value != null ? (long) _resultType.toInternal(value) : (long) _resultType.getNullPlaceholder();
     }
     return _longValuesSV;
   }
@@ -208,8 +205,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _floatValuesSV[i] = value == null ? (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder()
-          : (float) _resultType.toInternal(value);
+      _floatValuesSV[i] =
+          value != null ? (float) _resultType.toInternal(value) : (float) _resultType.getNullPlaceholder();
     }
     return _floatValuesSV;
   }
@@ -226,9 +223,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      Object value = _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
-      _doubleValuesSV[i] = value == null ? (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder()
-          : (double) _resultType.toInternal(value);
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _doubleValuesSV[i] =
+          value != null ? (double) _resultType.toInternal(value) : (double) _resultType.getNullPlaceholder();
     }
     return _doubleValuesSV;
   }
@@ -246,8 +243,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _bigDecimalValuesSV[i] = value == null ? (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder()
-          : (BigDecimal) _resultType.toInternal(value);
+      _bigDecimalValuesSV[i] =
+          value != null ? (BigDecimal) _resultType.toInternal(value) : (BigDecimal) _resultType.getNullPlaceholder();
     }
     return _bigDecimalValuesSV;
   }
@@ -265,8 +262,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _stringValuesSV[i] = value == null ? (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder()
-          : (String) _resultType.toInternal(value);
+      _stringValuesSV[i] =
+          value != null ? (String) _resultType.toInternal(value) : (String) _resultType.getNullPlaceholder();
     }
     return _stringValuesSV;
   }
@@ -284,8 +281,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _bytesValuesSV[i] = value == null ? ((ByteArray) DataSchema.ColumnDataType.BYTES.getNullPlaceholder()).getBytes()
-          : (byte[]) _resultType.toInternal(value);
+      ByteArray byteArray =
+          value != null ? (ByteArray) _resultType.toInternal(value) : (ByteArray) _resultType.getNullPlaceholder();
+      _bytesValuesSV[i] = byteArray.getBytes();
     }
     return _bytesValuesSV;
   }

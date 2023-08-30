@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -113,31 +112,8 @@ public class LeafStageTransferableBlockOperatorTest {
     TransferableBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{true, new Timestamp(1660000000000L), true});
-    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{false, new Timestamp(1600000000000L), false});
-    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
-  }
-
-  @Test
-  public void shouldHandleCanonicalizationCorrectly() {
-    // TODO: not all stored types are supported, add additional datatype when they are supported.
-    // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT boolCol, tsCol FROM tbl");
-    DataSchema schema = new DataSchema(new String[]{"boolCol", "tsCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP});
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new SelectionResultsBlock(schema,
-            Arrays.asList(new Object[]{1, 1660000000000L}, new Object[]{0, 1600000000000L})), queryContext));
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()), schema);
-
-    // When:
-    TransferableBlock resultBlock = operator.nextBlock();
-
-    // Then:
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{true, new Timestamp(1660000000000L)});
-    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{false, new Timestamp(1600000000000L)});
+    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, 1660000000000L, 1});
+    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{0, 1600000000000L, 0});
     Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
   }
 

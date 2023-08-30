@@ -21,12 +21,9 @@ package org.apache.pinot.query.service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -34,8 +31,6 @@ import org.slf4j.LoggerFactory;
  * or any failure occurs.
  */
 public class SubmissionService {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SubmissionService.class);
-
   private final ExecutorService _executor;
   private final List<CompletableFuture<Void>> _futures = new ArrayList<>();
 
@@ -47,13 +42,11 @@ public class SubmissionService {
     _futures.add(CompletableFuture.runAsync(runnable, _executor));
   }
 
-  public void awaitFinish(long deadlineMs) throws ExecutionException {
+  public void awaitFinish(long deadlineMs)
+      throws Exception {
     CompletableFuture<Void> completableFuture = CompletableFuture.allOf(_futures.toArray(new CompletableFuture[]{}));
     try {
       completableFuture.get(deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-    } catch (Throwable t) {
-      LOGGER.error("error occurred during submission", t);
-      throw new ExecutionException("error occurred during submission", t);
     } finally {
       // Cancel all ongoing submission
       for (CompletableFuture<Void> future : _futures) {

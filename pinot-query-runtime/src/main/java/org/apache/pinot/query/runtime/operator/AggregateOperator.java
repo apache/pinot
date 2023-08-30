@@ -35,6 +35,7 @@ import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
@@ -317,7 +318,7 @@ public class AggregateOperator extends MultiStageOperator {
       case LITERAL: {
         RexExpression.Literal literalRexExp = (RexExpression.Literal) rexExpr;
         Object value = literalRexExp.getValue();
-        exprContext = ExpressionContext.forLiteralContext(literalRexExp.getDataType(), value);
+        exprContext = ExpressionContext.forLiteralContext(literalRexExp.getDataType().toDataType(), value);
         break;
       }
       default:
@@ -343,7 +344,7 @@ public class AggregateOperator extends MultiStageOperator {
       if (expression.getType().equals(ExpressionContext.Type.IDENTIFIER) && !"__PLACEHOLDER__".equals(
           expression.getIdentifier())) {
         int index = colNameToIndexMap.get(expression.getIdentifier());
-        DataSchema.ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
+        ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
         Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
         if (filterArgIdx == -1) {
           blockValSetMap.put(expression, new DataBlockValSet(dataType, block.getDataBlock(), index));
@@ -362,7 +363,8 @@ public class AggregateOperator extends MultiStageOperator {
     } else {
       int rowCount = 0;
       for (int rowId = 0; rowId < block.getNumRows(); rowId++) {
-        rowCount += block.getDataBlock().getInt(rowId, filterArgIdx) == 1 ? 1 : 0;
+        // NOTE: The value of filterArgIdx is 0 (FALSE) or 1 (TRUE), so we can directly add them up
+        rowCount += block.getDataBlock().getInt(rowId, filterArgIdx);
       }
       return rowCount;
     }

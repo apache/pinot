@@ -115,7 +115,9 @@ public class MultistageAggregationExecutor {
       }
       row[i] = value;
     }
-    return Collections.singletonList(TypeUtils.canonicalizeRow(row, _resultSchema));
+    // Convert the results from AggregationFunction to the desired type
+    TypeUtils.convertRow(row, _resultSchema.getStoredColumnDataTypes());
+    return Collections.singletonList(row);
   }
 
   private void processAggregate(TransferableBlock block, DataSchema inputDataSchema) {

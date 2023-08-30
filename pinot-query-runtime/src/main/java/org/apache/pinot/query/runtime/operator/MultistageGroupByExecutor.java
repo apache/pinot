@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Key;
@@ -38,6 +40,7 @@ import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 /**
@@ -141,10 +144,14 @@ public class MultistageGroupByExecutor {
    * Fetches the result.
    */
   public List<Object[]> getResult() {
+    if (_groupKeyToIdMap.isEmpty()) {
+      return Collections.emptyList();
+    }
     List<Object[]> rows = new ArrayList<>(_groupKeyToIdMap.size());
     int numKeys = _groupSet.size();
     int numFunctions = _aggFunctions.length;
     int numColumns = numKeys + numFunctions;
+    ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     for (Map.Entry<Key, Integer> entry : _groupKeyToIdMap.entrySet()) {
       Object[] row = new Object[numColumns];
       Object[] keyValues = entry.getKey().getValues();
@@ -173,7 +180,9 @@ public class MultistageGroupByExecutor {
         }
         row[index] = value;
       }
-      rows.add(TypeUtils.canonicalizeRow(row, _resultSchema));
+      // Convert the results from AggregationFunction to the desired type
+      TypeUtils.convertRow(row, resultStoredTypes);
+      rows.add(row);
     }
     return rows;
   }
@@ -283,7 +292,7 @@ public class MultistageGroupByExecutor {
       int outRowId = 0;
       for (int inRowId = 0; inRowId < numRows; inRowId++) {
         Object[] row = rows.get(inRowId);
-        if ((Boolean) row[filterArgIndex]) {
+        if (BooleanUtils.fromNonNullInternalValue(row[filterArgIndex])) {
           Object[] keyValues = new Object[numKeys];
           for (int j = 0; j < numKeys; j++) {
             keyValues[j] = row[_colNameToIndexMap.get(_groupSet.get(j).getIdentifier())];

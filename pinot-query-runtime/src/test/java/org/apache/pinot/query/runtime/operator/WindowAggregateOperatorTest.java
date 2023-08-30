@@ -29,13 +29,13 @@ import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -81,9 +81,8 @@ public class WindowAggregateOperatorTest {
     Mockito.when(_input.nextBlock())
         .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!")));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
-    DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
@@ -105,9 +104,8 @@ public class WindowAggregateOperatorTest {
 
     Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
-    DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
@@ -127,12 +125,11 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
@@ -144,7 +141,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
-    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1.0},
         "Expected three columns (original two columns, agg value)");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
@@ -156,12 +153,11 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(0));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
@@ -174,7 +170,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
-    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1.0},
         "Expected three columns (original two columns, agg value)");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
@@ -184,12 +180,11 @@ public class WindowAggregateOperatorTest {
     // Given:
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE,
@@ -201,7 +196,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
-    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 1, 1.0},
         "Expected three columns (original two columns, agg value)");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
@@ -209,15 +204,14 @@ public class WindowAggregateOperatorTest {
   @Test
   public void testShouldWindowAggregateOverSingleInputBlockWithLiteralInput() {
     // Given:
-    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.Literal(FieldSpec.DataType.INT, 42)));
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.Literal(ColumnDataType.INT, 42)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 3}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
@@ -230,7 +224,7 @@ public class WindowAggregateOperatorTest {
     // Then:
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
     // second value is 1 (the literal) instead of 3 (the col val)
-    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 3, 42},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, 3, 42.0},
         "Expected three columns (original two columns, agg literal value)");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
@@ -241,7 +235,7 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     Mockito.when(_input.nextBlock())
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 1}, new Object[]{1, 2}))
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, 3}))
@@ -250,8 +244,7 @@ public class WindowAggregateOperatorTest {
     AggregationUtils.Merger merger = Mockito.mock(AggregationUtils.Merger.class);
     Mockito.when(merger.merge(Mockito.any(), Mockito.any())).thenReturn(12d);
     Mockito.when(merger.init(Mockito.any(), Mockito.any())).thenReturn(1d);
-    DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
+    DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
@@ -278,20 +271,20 @@ public class WindowAggregateOperatorTest {
   public void testPartitionByWindowAggregateWithHashCollision() {
     MultiStageOperator upstreamOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
     // Create an aggregation call with sum for first column and group by second column.
-    RexExpression.FunctionCall agg = getSum(new RexExpression.InputRef(0));
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, INT});
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(0)));
+    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(1));
+    DataSchema inSchema = new DataSchema(new String[]{"arg", "group"}, new ColumnDataType[]{INT, STRING});
     DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, INT, DOUBLE});
+        new DataSchema(new String[]{"arg", "group", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator sum0PartitionBy1 =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator,
-            Arrays.asList(new RexExpression.InputRef(1)), Collections.emptyList(), Collections.emptyList(),
-            Collections.emptyList(), Arrays.asList(agg), Integer.MIN_VALUE, Integer.MAX_VALUE,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator, group,
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE,
+            Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
     TransferableBlock result = sum0PartitionBy1.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows =
-        Arrays.asList(new Object[]{2, "BB", 5.0}, new Object[]{3, "BB", 5.0}, new Object[]{1, "Aa", 1});
+        Arrays.asList(new Object[]{2, "BB", 5.0}, new Object[]{3, "BB", 5.0}, new Object[]{1, "Aa", 1.0});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
@@ -303,10 +296,10 @@ public class WindowAggregateOperatorTest {
   public void testShouldThrowOnUnknownAggFunction() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(
-        new RexExpression.FunctionCall(SqlKind.AVG, FieldSpec.DataType.INT, "AVERAGE", ImmutableList.of()));
+        new RexExpression.FunctionCall(SqlKind.AVG, ColumnDataType.INT, "AVERAGE", ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
-    DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new DataSchema.ColumnDataType[]{DOUBLE});
-    DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new DataSchema.ColumnDataType[]{DOUBLE});
+    DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
+    DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
 
     // When:
     WindowAggregateOperator operator =
@@ -320,11 +313,11 @@ public class WindowAggregateOperatorTest {
   public void testShouldThrowOnUnknownRankAggFunction() {
     // TODO: Remove this test when support is added for NTILE function
     // Given:
-    List<RexExpression> calls = ImmutableList.of(
-        new RexExpression.FunctionCall(SqlKind.RANK, FieldSpec.DataType.INT, "NTILE", ImmutableList.of()));
+    List<RexExpression> calls =
+        ImmutableList.of(new RexExpression.FunctionCall(SqlKind.RANK, ColumnDataType.INT, "NTILE", ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
-    DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new DataSchema.ColumnDataType[]{DOUBLE});
-    DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new DataSchema.ColumnDataType[]{DOUBLE});
+    DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
+    DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
 
     // When:
     WindowAggregateOperator operator =
@@ -336,38 +329,39 @@ public class WindowAggregateOperatorTest {
   @Test
   public void testRankDenseRankRankingFunctions() {
     // Given:
-    List<RexExpression> calls = ImmutableList.of(
-        new RexExpression.FunctionCall(SqlKind.RANK, FieldSpec.DataType.INT, "RANK", ImmutableList.of()),
-        new RexExpression.FunctionCall(SqlKind.DENSE_RANK, FieldSpec.DataType.INT, "DENSE_RANK", ImmutableList.of()));
+    List<RexExpression> calls =
+        ImmutableList.of(new RexExpression.FunctionCall(SqlKind.RANK, ColumnDataType.INT, "RANK", ImmutableList.of()),
+            new RexExpression.FunctionCall(SqlKind.DENSE_RANK, ColumnDataType.INT, "DENSE_RANK", ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
-    Mockito.when(_input.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, "and"}, new Object[]{2, "bar"},
-            new Object[]{2, "foo"}, new Object[]{1, "foo"}))
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"},
-            new Object[]{1, "numb"}, new Object[]{2, "the"}, new Object[]{3, "true"}))
+    Mockito.when(_input.nextBlock()).thenReturn(
+            OperatorTestUtil.block(inSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"},
+                new Object[]{1, "foo"})).thenReturn(
+            OperatorTestUtil.block(inSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{1, "numb"},
+                new Object[]{2, "the"}, new Object[]{3, "true"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "rank", "dense_rank"},
-        new DataSchema.ColumnDataType[]{INT, STRING, LONG, LONG});
+        new ColumnDataType[]{INT, STRING, LONG, LONG});
 
     // When:
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
-            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, 0,
-            WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order, Collections.emptyList(),
+            Collections.emptyList(), calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.RANGE,
+            Collections.emptyList(), outSchema, inSchema);
 
     TransferableBlock result = operator.getNextBlock();
     TransferableBlock eosBlock = operator.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
     Map<Integer, List<Object[]>> expectedPartitionToRowsMap = new HashMap<>();
-    expectedPartitionToRowsMap.put(1, Arrays.asList(new Object[]{1, "foo", 1L, 1L}, new Object[]{1, "foo", 1L, 1L},
-        new Object[]{1, "numb", 3L, 2L}));
-    expectedPartitionToRowsMap.put(2, Arrays.asList(new Object[]{2, "bar", 1L, 1L}, new Object[]{2, "foo", 2L, 2L},
-        new Object[]{2, "foo", 2L, 2L}, new Object[]{2, "the", 4L, 3L}));
+    expectedPartitionToRowsMap.put(1,
+        Arrays.asList(new Object[]{1, "foo", 1L, 1L}, new Object[]{1, "foo", 1L, 1L}, new Object[]{1, "numb", 3L, 2L}));
+    expectedPartitionToRowsMap.put(2,
+        Arrays.asList(new Object[]{2, "bar", 1L, 1L}, new Object[]{2, "foo", 2L, 2L}, new Object[]{2, "foo", 2L, 2L},
+            new Object[]{2, "the", 4L, 3L}));
     expectedPartitionToRowsMap.put(3, Arrays.asList(new Object[]{3, "and", 1L, 1L}, new Object[]{3, "true", 2L, 2L}));
 
     Integer previousPartitionKey = null;
@@ -395,35 +389,35 @@ public class WindowAggregateOperatorTest {
   public void testRowNumberRankingFunction() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(
-        new RexExpression.FunctionCall(SqlKind.ROW_NUMBER, FieldSpec.DataType.INT, "ROW_NUMBER", ImmutableList.of()));
+        new RexExpression.FunctionCall(SqlKind.ROW_NUMBER, ColumnDataType.INT, "ROW_NUMBER", ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
-    Mockito.when(_input.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, "and"}, new Object[]{2, "bar"},
-            new Object[]{2, "foo"}))
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"},
-            new Object[]{2, "the"}, new Object[]{3, "true"}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    Mockito.when(_input.nextBlock()).thenReturn(
+            OperatorTestUtil.block(inSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"}))
+        .thenReturn(
+            OperatorTestUtil.block(inSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{2, "the"},
+                new Object[]{3, "true"})).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "row_number"}, new DataSchema.ColumnDataType[]{INT, STRING, LONG});
+        new DataSchema(new String[]{"group", "arg", "row_number"}, new ColumnDataType[]{INT, STRING, LONG});
 
     // When:
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
-            Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, 0,
-            WindowNode.WindowFrameType.ROWS, Collections.emptyList(), outSchema, inSchema);
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order, Collections.emptyList(),
+            Collections.emptyList(), calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.ROWS,
+            Collections.emptyList(), outSchema, inSchema);
 
     TransferableBlock result = operator.getNextBlock();
     TransferableBlock eosBlock = operator.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
     Map<Integer, List<Object[]>> expectedPartitionToRowsMap = new HashMap<>();
     expectedPartitionToRowsMap.put(1, Collections.singletonList(new Object[]{1, "foo", 1L}));
-    expectedPartitionToRowsMap.put(2, Arrays.asList(new Object[]{2, "bar", 1L}, new Object[]{2, "foo", 2L},
-        new Object[]{2, "foo", 3L}, new Object[]{2, "the", 4L}));
+    expectedPartitionToRowsMap.put(2,
+        Arrays.asList(new Object[]{2, "bar", 1L}, new Object[]{2, "foo", 2L}, new Object[]{2, "foo", 3L},
+            new Object[]{2, "the", 4L}));
     expectedPartitionToRowsMap.put(3, Arrays.asList(new Object[]{3, "and", 1L}, new Object[]{3, "true", 2L}));
 
     Integer previousPartitionKey = null;
@@ -454,17 +448,16 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
-    Mockito.when(_input.nextBlock())
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, "and"}, new Object[]{2, "bar"},
-            new Object[]{2, "foo"}))
-        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"},
-            new Object[]{3, "true"}))
+    Mockito.when(_input.nextBlock()).thenReturn(
+            OperatorTestUtil.block(inSchema, new Object[]{3, "and"}, new Object[]{2, "bar"}, new Object[]{2, "foo"}))
+        .thenReturn(
+            OperatorTestUtil.block(inSchema, new Object[]{1, "foo"}, new Object[]{2, "foo"}, new Object[]{3, "true"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
@@ -474,9 +467,9 @@ public class WindowAggregateOperatorTest {
     TransferableBlock result = operator.getNextBlock();
     TransferableBlock eosBlock = operator.getNextBlock();
     List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "foo", 1}, new Object[]{2, "bar", 2},
-        new Object[]{2, "foo", 6.0}, new Object[]{2, "foo", 6.0}, new Object[]{3, "and", 3},
-        new Object[]{3, "true", 6.0});
+    List<Object[]> expectedRows =
+        Arrays.asList(new Object[]{1, "foo", 1.0}, new Object[]{2, "bar", 2.0}, new Object[]{2, "foo", 6.0},
+            new Object[]{2, "foo", 6.0}, new Object[]{3, "and", 3.0}, new Object[]{3, "true", 6.0});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
@@ -497,14 +490,14 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(1));
     List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}))
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "bar"}))
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, "foo"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.DESCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
@@ -515,7 +508,7 @@ public class WindowAggregateOperatorTest {
     TransferableBlock resultBlock = operator.nextBlock(); // (output result)
 
     // Then:
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{2, "bar", 2},
+    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{2, "bar", 2.0},
         "Expected three columns (original two columns, agg literal value)");
     Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{2, "foo", 5.0},
         "Expected three columns (original two columns, agg literal value)");
@@ -531,12 +524,12 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
@@ -550,12 +543,12 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(1));
     List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(1));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
@@ -568,7 +561,7 @@ public class WindowAggregateOperatorTest {
 
     // Then:
     Assert.assertTrue(block1.getNumRows() > 0, "First block is the result");
-    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, "foo", 2},
+    Assert.assertEquals(block1.getContainer().get(0), new Object[]{2, "foo", 2.0},
         "Expected three columns (original two columns, agg value)");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
@@ -581,12 +574,12 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, 5, Integer.MAX_VALUE,
@@ -601,12 +594,12 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, 5,
@@ -619,7 +612,7 @@ public class WindowAggregateOperatorTest {
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new DataSchema.ColumnDataType[]{INT, STRING});
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
     // TODO: it is necessary to produce two values here, the operator only throws on second
     // (see the comment in WindowAggregate operator)
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "metallica"}))
@@ -627,7 +620,7 @@ public class WindowAggregateOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema =
-        new DataSchema(new String[]{"group", "arg", "sum"}, new DataSchema.ColumnDataType[]{INT, STRING, DOUBLE});
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
         new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
@@ -643,6 +636,6 @@ public class WindowAggregateOperatorTest {
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {
-    return new RexExpression.FunctionCall(SqlKind.SUM, FieldSpec.DataType.INT, "SUM", ImmutableList.of(arg));
+    return new RexExpression.FunctionCall(SqlKind.SUM, ColumnDataType.INT, "SUM", ImmutableList.of(arg));
   }
 }
