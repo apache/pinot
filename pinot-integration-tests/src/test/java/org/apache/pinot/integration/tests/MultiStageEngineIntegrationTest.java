@@ -529,6 +529,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       assertEquals(encoded, toBase64(toUtf8(original)));
       assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
     }
+
+    // Test select with group by order by limit
+    sqlQuery = "SELECT toBase64(toUtf8(AirlineID)) "
+        + "FROM mytable "
+        + "GROUP BY toBase64(toUtf8(AirlineID)) "
+        + "ORDER BY toBase64(toUtf8(AirlineID)) DESC "
+        + "LIMIT 10";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\"]");
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asText(), "MjExNzE=");
+    assertEquals(rows.get(1).get(0).asText(), "MjAzOTg=");
+    assertEquals(rows.get(2).get(0).asText(), "MjAzNjY=");
+    assertEquals(rows.get(3).get(0).asText(), "MjAzNTU=");
+    assertEquals(rows.get(4).get(0).asText(), "MjAzMDQ=");
+    assertEquals(rows.get(5).get(0).asText(), "MjA0Mzc=");
+    assertEquals(rows.get(6).get(0).asText(), "MjA0MzY=");
+    assertEquals(rows.get(7).get(0).asText(), "MjA0MDk=");
+    assertEquals(rows.get(8).get(0).asText(), "MTkzOTM=");
+    assertEquals(rows.get(9).get(0).asText(), "MTk5Nzc=");
   }
 
   @Test
