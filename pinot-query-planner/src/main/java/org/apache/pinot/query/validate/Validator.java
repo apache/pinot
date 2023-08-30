@@ -40,7 +40,8 @@ public class Validator extends SqlValidatorImpl {
 
   public Validator(SqlOperatorTable opTab, SqlValidatorCatalogReader catalogReader, RelDataTypeFactory typeFactory) {
     // TODO: support BABEL validator. Currently parser conformance is set to use BABEL.
-    super(opTab, catalogReader, typeFactory, Config.DEFAULT.withSqlConformance(SqlConformanceEnum.LENIENT));
+    super(opTab, catalogReader, typeFactory,
+        Config.DEFAULT.withSqlConformance(SqlConformanceEnum.LENIENT).withIdentifierExpansion(true));
   }
 
   /**
