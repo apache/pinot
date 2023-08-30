@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.client;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -127,10 +125,9 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
                   "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
             }
 
-            String responseBody = httpResponse.getResponseBody(StandardCharsets.UTF_8);
             try {
-              return BrokerResponse.fromJson(OBJECT_READER.readTree(responseBody));
-            } catch (JsonProcessingException e) {
+              return BrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
+            } catch (IOException e) {
               throw new CompletionException(e);
             }
           });
