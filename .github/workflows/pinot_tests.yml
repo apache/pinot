@@ -70,7 +70,7 @@ jobs:
         run: .github/workflows/scripts/.pinot_linter.sh
   unit-test:
     if: github.repository == 'apache/pinot'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8core
     strategy:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
@@ -122,7 +122,7 @@ jobs:
 
   integration-test:
     if: github.repository == 'apache/pinot'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8core
     strategy:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
@@ -174,7 +174,7 @@ jobs:
 
   compatibility-verifier:
     if: github.repository == 'apache/pinot'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8core
     strategy:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
@@ -229,7 +229,7 @@ jobs:
 
   quickstarts:
     if: github.repository == 'apache/pinot'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8core
     strategy:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
