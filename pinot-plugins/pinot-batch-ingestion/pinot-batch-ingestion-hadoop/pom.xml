@@ -35,7 +35,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <hadoop.version>2.10.1</hadoop.version>
     <phase.prop>package</phase.prop>
   </properties>
   <dependencies>
@@ -47,12 +46,10 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-client</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>com.zaxxer</groupId>
-          <artifactId>HikariCP-java7</artifactId>
-        </exclusion>
-      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.woodstox</groupId>
+      <artifactId>stax2-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.yaml</groupId>
