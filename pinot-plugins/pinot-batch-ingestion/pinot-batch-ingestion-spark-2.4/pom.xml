@@ -168,6 +168,10 @@
       </exclusions>
     </dependency>
     <dependency>
+      <groupId>org.codehaus.woodstox</groupId>
+      <artifactId>stax2-api</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
       <version>${project.version}</version>
