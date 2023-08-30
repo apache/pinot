@@ -115,7 +115,8 @@ public class MultistageAggregationExecutor {
       }
       row[i] = value;
     }
-    TypeUtils.convertRow(row, _resultSchema.getColumnDataTypes());
+    // Convert the results from AggregationFunction to the desired type
+    TypeUtils.convertRow(row, _resultSchema.getStoredColumnDataTypes());
     return Collections.singletonList(row);
   }
 

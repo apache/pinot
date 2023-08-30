@@ -31,6 +31,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 /*
@@ -83,7 +84,7 @@ public class FilterOperator extends MultiStageOperator {
     List<Object[]> resultRows = new ArrayList<>();
     for (Object[] row : block.getContainer()) {
       Object filterResult = _filterOperand.apply(row);
-      if (filterResult != null && (int) filterResult == 1) {
+      if (BooleanUtils.isTrueInternalValue(filterResult)) {
         resultRows.add(row);
       }
     }

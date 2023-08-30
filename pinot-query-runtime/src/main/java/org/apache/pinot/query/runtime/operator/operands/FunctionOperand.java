@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
@@ -38,6 +39,7 @@ import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 public class FunctionOperand implements TransformOperand {
   private final ColumnDataType _resultType;
   private final FunctionInvoker _functionInvoker;
+  private final ColumnDataType _functionInvokerResultType;
   private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
 
@@ -54,6 +56,9 @@ public class FunctionOperand implements TransformOperand {
       Preconditions.checkState(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
           parameterClasses[i], functionInfo.getMethod());
     }
+    ColumnDataType functionInvokerResultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
+    // Handle unrecognized result class with STRING
+    _functionInvokerResultType = functionInvokerResultType != null ? functionInvokerResultType : ColumnDataType.STRING;
     _operands = new ArrayList<>(numOperands);
     for (RexExpression operand : operands) {
       _operands.add(TransformOperandFactory.getTransformOperand(operand, dataSchema));
@@ -77,6 +82,7 @@ public class FunctionOperand implements TransformOperand {
     // TODO: Optimize per record conversion
     _functionInvoker.convertTypes(_reusableOperandHolder);
     Object result = _functionInvoker.invoke(_reusableOperandHolder);
-    return result != null ? _resultType.toInternal(TypeUtils.convert(result, _resultType)) : null;
+    return result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
+        _resultType.getStoredType()) : null;
   }
 }

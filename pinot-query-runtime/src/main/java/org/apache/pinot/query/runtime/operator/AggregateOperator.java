@@ -47,7 +47,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.block.DataBlockValSet;
 import org.apache.pinot.query.runtime.operator.block.FilteredDataBlockValSet;
-import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -193,8 +192,6 @@ public class AggregateOperator extends MultiStageOperator {
       if (rows.isEmpty()) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       } else {
-        ColumnDataType[] storedTypes = _resultSchema.getStoredColumnDataTypes();
-        rows.forEach(row -> TypeUtils.convertRow(row, storedTypes));
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
           dataBlock.addException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE,
@@ -204,10 +201,7 @@ public class AggregateOperator extends MultiStageOperator {
         return dataBlock;
       }
     } else {
-      ColumnDataType[] storedTypes = _resultSchema.getStoredColumnDataTypes();
-      List<Object[]> rows = _aggregationExecutor.getResult();
-      rows.forEach(row -> TypeUtils.convertRow(row, storedTypes));
-      return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+      return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
     }
   }
 
@@ -369,7 +363,8 @@ public class AggregateOperator extends MultiStageOperator {
     } else {
       int rowCount = 0;
       for (int rowId = 0; rowId < block.getNumRows(); rowId++) {
-        rowCount += block.getDataBlock().getInt(rowId, filterArgIdx) == 1 ? 1 : 0;
+        // NOTE: The value of filterArgIdx is 0 (FALSE) or 1 (TRUE), so we can directly add them up
+        rowCount += block.getDataBlock().getInt(rowId, filterArgIdx);
       }
       return rowCount;
     }

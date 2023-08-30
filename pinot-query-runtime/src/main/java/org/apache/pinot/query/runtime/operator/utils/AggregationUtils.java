@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 /**
@@ -89,26 +90,48 @@ public class AggregationUtils {
     return Math.max(((Number) agg).doubleValue(), ((Number) value).doubleValue());
   }
 
+  /**
+   * NOTE: Arguments are in internal type. See {@link ColumnDataType#toInternal} for more details.
+   *
+   * <p>Null handling:
+   * <ul>
+   *   <li>Null & Null/True -> Null</li>
+   *   <li>Null & False -> False</li>
+   * </ul>
+   */
   @Nullable
   private static Object mergeBoolAnd(@Nullable Object agg, @Nullable Object value) {
-    if (agg == null) {
-      return value;
+    // Return FALSE when any argument is FALSE
+    if (BooleanUtils.isFalseInternalValue(agg) || BooleanUtils.isFalseInternalValue(value)) {
+      return BooleanUtils.INTERNAL_FALSE;
     }
-    if (value == null) {
-      return agg;
+    // Otherwise, return NULL when any argument is NULL
+    if (agg == null || value == null) {
+      return null;
     }
-    return ((int) agg == 1) & ((int) value == 1) ? 1 : 0;
+    return BooleanUtils.INTERNAL_TRUE;
   }
 
+  /**
+   * NOTE: Arguments are in internal type. See {@link ColumnDataType#toInternal} for more details.
+   *
+   * <p>Null handling:
+   * <ul>
+   *   <li>Null | Null/False -> Null</li>
+   *   <li>Null | True -> True</li>
+   * </ul>
+   */
   @Nullable
   private static Object mergeBoolOr(@Nullable Object agg, @Nullable Object value) {
-    if (agg == null) {
-      return value;
+    // Return TRUE when any argument is TRUE
+    if (BooleanUtils.isTrueInternalValue(agg) || BooleanUtils.isTrueInternalValue(value)) {
+      return BooleanUtils.INTERNAL_TRUE;
     }
-    if (value == null) {
-      return agg;
+    // Otherwise, return NULL when any argument is NULL
+    if (agg == null || value == null) {
+      return null;
     }
-    return ((int) agg == 1) | ((int) value == 1) ? 1 : 0;
+    return BooleanUtils.INTERNAL_FALSE;
   }
 
   private static class MergeCounts implements AggregationUtils.Merger {

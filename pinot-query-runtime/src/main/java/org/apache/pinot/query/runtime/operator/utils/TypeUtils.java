@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
@@ -28,6 +30,7 @@ public class TypeUtils {
   /**
    * Converts value to the desired stored {@link ColumnDataType}. This is used to convert rows generated from
    * single-stage engine to be used in multi-stage engine.
+   * TODO: Revisit to see if we should use original type instead of stored type
    */
   public static Object convert(Object value, ColumnDataType storedType) {
     switch (storedType) {
@@ -39,8 +42,23 @@ public class TypeUtils {
         return ((Number) value).floatValue();
       case DOUBLE:
         return ((Number) value).doubleValue();
+      // For AggregationFunctions that return serialized custom object, e.g. DistinctCountRawHLLAggregationFunction
       case STRING:
         return value.toString();
+      case LONG_ARRAY:
+        if (value instanceof LongArrayList) {
+          // For FunnelCountAggregationFunction
+          return ((LongArrayList) value).elements();
+        } else {
+          return value;
+        }
+      case DOUBLE_ARRAY:
+        if (value instanceof DoubleArrayList) {
+          // For HistogramAggregationFunction
+          return ((DoubleArrayList) value).elements();
+        } else {
+          return value;
+        }
       // TODO: Add more conversions
       default:
         return value;

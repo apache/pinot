@@ -312,7 +312,19 @@ public class DataSchema {
     }
 
     /**
-     * Converts to the internal representation of the value.
+     * Converts the value from external value type to the internal value type.
+     *
+     * <p>External value type is used in the following places:
+     * <ul>
+     *   <li>Data ingestion</li>
+     *   <li>Scalar function arguments (UDF)</li>
+     *   <li>Query response</li>
+     * </ul>
+     *
+     * <p>Internal value type is used within the storage and query engine, where value is always of the stored type. For
+     * BYTES type, we use a wrapper class {@link ByteArray} to make it comparable.
+     *
+     * <p>The conversion applies to the following types:
      * <ul>
      *   <li>BOOLEAN: boolean -> int</li>
      *   <li>TIMESTAMP: Timestamp -> long</li>
@@ -340,7 +352,9 @@ public class DataSchema {
     }
 
     /**
-     * Converts to the external representation of the value.
+     * Converts the value from internal value type to the external value type.
+     *
+     * <p>The conversion applies to the following types:
      * <ul>
      *   <li>BOOLEAN: int -> boolean</li>
      *   <li>TIMESTAMP: long -> Timestamp</li>

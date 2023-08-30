@@ -27,9 +27,11 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 
 
+/**
+ * NOTE: All BOOLEAN values are represented as 0 (FALSE) and 1 (TRUE) internally.
+ */
 public abstract class FilterOperand implements TransformOperand {
 
   @Override
@@ -118,7 +120,7 @@ public abstract class FilterOperand implements TransformOperand {
     @Override
     public Integer apply(Object[] row) {
       Object result = _childOperand.apply(row);
-      return result != null ? (int) result : 0;
+      return result != null ? (Integer) result : 0;
     }
   }
 
@@ -192,10 +194,25 @@ public abstract class FilterOperand implements TransformOperand {
         return null;
       }
       if (_requireCasting) {
-        v1 = (Comparable) TypeUtils.convert(v1, _commonCastType);
-        v2 = (Comparable) TypeUtils.convert(v2, _commonCastType);
+        v1 = cast(v1, _commonCastType);
+        v2 = cast(v2, _commonCastType);
       }
       return _comparisonResultPredicate.test(v1.compareTo(v2)) ? 1 : 0;
+    }
+
+    private static Comparable<?> cast(Object value, ColumnDataType type) {
+      switch (type) {
+        case INT:
+          return ((Number) value).intValue();
+        case LONG:
+          return ((Number) value).longValue();
+        case FLOAT:
+          return ((Number) value).floatValue();
+        case DOUBLE:
+          return ((Number) value).doubleValue();
+        default:
+          throw new IllegalStateException(String.format("Cannot cast value: %s to type: %s", value, type));
+      }
     }
   }
 }

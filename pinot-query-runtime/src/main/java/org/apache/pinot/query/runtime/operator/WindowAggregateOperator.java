@@ -219,7 +219,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
   private TransferableBlock produceWindowAggregatedBlock() {
     Key emptyOrderKey = AggregationUtils.extractEmptyKey();
-    ColumnDataType[] storedTypes = _resultSchema.getStoredColumnDataTypes();
+    ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     List<Object[]> rows = new ArrayList<>(_numRows);
     if (_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE) {
       // All aggregation window functions only support RANGE type today (SUM/AVG/MIN/MAX/COUNT/BOOL_AND/BOOL_OR)
@@ -235,7 +235,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
           for (int i = 0; i < _windowAccumulators.length; i++) {
             row[i + existingRow.length] = _windowAccumulators[i].getRangeResultForKeys(partitionKey, orderKey);
           }
-          TypeUtils.convertRow(row, storedTypes);
+          // Convert the results from Accumulator to the desired type
+          TypeUtils.convertRow(row, resultStoredTypes);
           rows.add(row);
         }
       }
@@ -258,7 +259,8 @@ public class WindowAggregateOperator extends MultiStageOperator {
                     previousRowValues[i]);
             previousRowValues[i] = row[i + existingRow.length];
           }
-          TypeUtils.convertRow(row, storedTypes);
+          // Convert the results from Accumulator to the desired type
+          TypeUtils.convertRow(row, resultStoredTypes);
           rows.add(row);
           previousPartitionKey = partitionKey;
         }

@@ -30,7 +30,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
-import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -109,10 +108,7 @@ public class TransformOperator extends MultiStageOperator {
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
       for (int i = 0; i < _resultColumnSize; i++) {
-        Object value = _transformOperandsList.get(i).apply(row);
-        if (value != null) {
-          resultRow[i] = TypeUtils.convert(value, _resultSchema.getColumnDataType(i));
-        }
+        resultRow[i] = _transformOperandsList.get(i).apply(row);
       }
       resultRows.add(resultRow);
     }

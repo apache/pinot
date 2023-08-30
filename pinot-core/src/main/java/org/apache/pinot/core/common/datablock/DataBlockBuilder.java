@@ -126,6 +126,10 @@ public class DataBlockBuilder {
           nullBitmaps[colId].add(rowId);
           value = nullPlaceholders[colId];
         }
+
+        // NOTE:
+        // We intentionally make the type casting very strict here (e.g. only accepting Integer for INT) to ensure the
+        // rows conform to the data schema. This can help catch the unexpected data type issues early.
         switch (storedTypes[colId]) {
           // Single-value column
           case INT:
@@ -210,6 +214,10 @@ public class DataBlockBuilder {
       Object[] column = columns.get(colId);
       ByteBuffer byteBuffer = ByteBuffer.allocate(numRows * columnarBuilder._columnSizeInBytes[colId]);
       Object value;
+
+      // NOTE:
+      // We intentionally make the type casting very strict here (e.g. only accepting Integer for INT) to ensure the
+      // rows conform to the data schema. This can help catch the unexpected data type issues early.
       switch (storedTypes[colId]) {
         // Single-value column
         case INT:

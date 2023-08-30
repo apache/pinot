@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 /**
@@ -142,6 +144,9 @@ public class MultistageGroupByExecutor {
    * Fetches the result.
    */
   public List<Object[]> getResult() {
+    if (_groupKeyToIdMap.isEmpty()) {
+      return Collections.emptyList();
+    }
     List<Object[]> rows = new ArrayList<>(_groupKeyToIdMap.size());
     int numKeys = _groupSet.size();
     int numFunctions = _aggFunctions.length;
@@ -175,6 +180,7 @@ public class MultistageGroupByExecutor {
         }
         row[index] = value;
       }
+      // Convert the results from AggregationFunction to the desired type
       TypeUtils.convertRow(row, resultStoredTypes);
       rows.add(row);
     }
@@ -286,7 +292,7 @@ public class MultistageGroupByExecutor {
       int outRowId = 0;
       for (int inRowId = 0; inRowId < numRows; inRowId++) {
         Object[] row = rows.get(inRowId);
-        if (((int) row[filterArgIndex]) == 1) {
+        if (BooleanUtils.fromNonNullInternalValue(row[filterArgIndex])) {
           Object[] keyValues = new Object[numKeys];
           for (int j = 0; j < numKeys; j++) {
             keyValues[j] = row[_colNameToIndexMap.get(_groupSet.get(j).getIdentifier())];
