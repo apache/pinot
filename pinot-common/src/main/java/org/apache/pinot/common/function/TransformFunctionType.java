@@ -163,10 +163,12 @@ public enum TransformFunctionType {
   // The only column accepted by "cardinality" function is multi-value array, thus putting "cardinality" as alias.
   // TODO: once we support other types of multiset, we should make CARDINALITY its own function
   ARRAYLENGTH("arrayLength", "cardinality"),
-  ARRAYAVERAGE("arrayAverage"),
-  ARRAYMIN("arrayMin"),
-  ARRAYMAX("arrayMax"),
-  ARRAYSUM("arraySum"),
+  ARRAYAVERAGE("arrayAverage", ReturnTypes.DOUBLE, OperandTypes.family(SqlTypeFamily.ARRAY)),
+  ARRAYMIN("arrayMin", ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0),
+      SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(SqlTypeFamily.ARRAY)),
+  ARRAYMAX("arrayMax", ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0),
+      SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(SqlTypeFamily.ARRAY)),
+  ARRAYSUM("arraySum", ReturnTypes.DOUBLE, OperandTypes.family(SqlTypeFamily.ARRAY)),
   VALUEIN("valueIn"),
   MAPVALUE("mapValue", ReturnTypes.cascade(opBinding ->
       opBinding.getOperandType(2).getComponentType(), SqlTypeTransforms.FORCE_NULLABLE),
