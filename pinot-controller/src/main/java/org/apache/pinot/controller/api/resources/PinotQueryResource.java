@@ -248,7 +248,7 @@ public class PinotQueryResource {
         queryEnvironment.getTableNamesForQuery(query);
         LOGGER.info("Successfully compiled query using multi-stage engine: {}", query);
         return QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
-            "It seems that the query contains join, please try the multi-stage engine by checking the "
+            "It seems that the query is only supported by the multi-stage engine, please try it by checking the "
                 + "\"Use Multi-Stage Engine\" box above")).toString();
       } catch (Exception multipleTablesPassingException) {
         LOGGER.error("Caught exception while compiling query using multi-stage engine: {}",
