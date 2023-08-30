@@ -209,7 +209,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       //   - Failed to copy segment tar file to final location due to the same segment pushed twice concurrently.
       // In such cases we upload all the segments again to ensure that the data is setup correctly.
       assertTrue(e.getMessage().contains("Another segment upload is in progress for segment") || e.getMessage()
-          .contains("Failed to update ZK metadata for segment") || e.getMessage()
+          .contains("Failed to create ZK metadata for segment") || e.getMessage()
           .contains("java.nio.file.FileAlreadyExistsException"), e.getMessage());
       uploadSegments(getTableName(), _tarDir);
     }
@@ -238,7 +238,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       // If enableParallelPushProtection is enabled and the same segment is uploaded concurrently, we could get one
       // of the three exception:
       //   - 409 conflict of the second call enters ProcessExistingSegment ;
-      //   - segmentZkMetadata creation failure if both calls entered ProcessNewSegment.
+      //   - segmentZkMetadata update failure if both calls entered ProcessNewSegment.
       //   - Failed to copy segment tar file to final location due to the same segment pushed twice concurrently.
       // In such cases we upload all the segments again to ensure that the data is setup correctly.
       assertTrue(e.getMessage().contains("Another segment upload is in progress for segment") || e.getMessage()
@@ -1133,6 +1133,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Update table config and trigger reload
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setRangeIndexColumns(UPDATED_RANGE_INDEX_COLUMNS);
+    updateTableConfig(tableConfig);
     reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, false, numTotalDocs);
     assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
 
@@ -1140,7 +1141,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setRangeIndexColumns(getRangeIndexColumns());
     updateTableConfig(tableConfig);
-    reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, false, numTotalDocs);
+    reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, true, numTotalDocs);
     assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
@@ -1163,7 +1164,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setBloomFilterColumns(getBloomFilterColumns());
     updateTableConfig(tableConfig);
-    reloadAllSegments(TEST_UPDATED_BLOOM_FILTER_QUERY, false, numTotalDocs);
+    reloadAllSegments(TEST_UPDATED_BLOOM_FILTER_QUERY, true, numTotalDocs);
     assertEquals(postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY).get("numSegmentsProcessed").asLong(), NUM_SEGMENTS);
     assertEquals(getTableSize(getTableName()), _tableSizeAfterRemovingIndex);
   }
