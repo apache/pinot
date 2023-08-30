@@ -343,9 +343,27 @@ public class DataSchema {
           return new ByteArray((byte[]) value);
         case BOOLEAN_ARRAY:
           return fromBooleanArray((boolean[]) value);
-        case TIMESTAMP_ARRAY: {
+        case TIMESTAMP_ARRAY:
           return fromTimestampArray((Timestamp[]) value);
-        }
+        case OBJECT:
+          // For OBJECT type, we need to convert based on the actual type of the value. This can happen when the scalar
+          // function returns Object type, e.g. cast function.
+          if (value instanceof Boolean) {
+            return ((boolean) value) ? 1 : 0;
+          }
+          if (value instanceof Timestamp) {
+            return ((Timestamp) value).getTime();
+          }
+          if (value instanceof byte[]) {
+            return new ByteArray((byte[]) value);
+          }
+          if (value instanceof boolean[]) {
+            return fromBooleanArray((boolean[]) value);
+          }
+          if (value instanceof Timestamp[]) {
+            return fromTimestampArray((Timestamp[]) value);
+          }
+          return value;
         default:
           return value;
       }
