@@ -436,9 +436,8 @@
       </dependency>
       <dependency>
         <groupId>com.google.auto.service</groupId>
-        <artifactId>auto-service</artifactId>
+        <artifactId>auto-service-annotations</artifactId>
         <version>1.0.1</version>
-        <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
       </dependency>
       <dependency>
         <groupId>commons-cli</groupId>
@@ -1432,6 +1431,13 @@
             <target>${jdk.version}</target>
             <fork>true</fork>
             <encoding>${project.build.sourceEncoding}</encoding>
+            <annotationProcessorPaths>
+              <path>
+                <groupId>com.google.auto.service</groupId>
+                <artifactId>auto-service</artifactId>
+                <version>1.0.1</version>
+              </path>
+            </annotationProcessorPaths>
           </configuration>
         </plugin>
       </plugins>
