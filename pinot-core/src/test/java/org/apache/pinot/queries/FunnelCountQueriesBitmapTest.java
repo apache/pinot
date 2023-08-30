@@ -25,17 +25,31 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.roaringbitmap.RoaringBitmap;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /**
  * Queries test for FUNNEL_COUNT queries.
  */
 @SuppressWarnings("rawtypes")
-public class FunnelCountQueriesNonSortedTest extends BaseFunnelCountQueriesTest {
+public class FunnelCountQueriesBitmapTest extends BaseFunnelCountQueriesTest {
+
+  @Override
+  protected String getSettings() {
+    return "SETTINGS('bitmap')";
+  }
 
   @Override
   protected int getExpectedNumEntriesScannedInFilter() {
     return NUM_RECORDS;
+  }
+
+  @Override
+  protected int getExpectedInterSegmentMultiplier() {
+    return 1;
   }
 
   @Override
@@ -46,12 +60,24 @@ public class FunnelCountQueriesNonSortedTest extends BaseFunnelCountQueriesTest 
   @Override
   protected IndexSegment buildSegment(List<GenericRow> records)
       throws Exception {
-    MutableSegment mutableSegment = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            false);
+    MutableSegment mutableSegment =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, Collections.emptySet(), Collections.emptySet(),
+            Collections.emptySet(), false);
     for (GenericRow record : records) {
       mutableSegment.index(record, null);
     }
     return mutableSegment;
+  }
+
+  @Override
+  protected void assertIntermediateResult(Object intermediateResult, long[] expectedCounts) {
+    assertTrue(intermediateResult instanceof List);
+    List<RoaringBitmap> bitmaps = (List<RoaringBitmap>) intermediateResult;
+    // First step should match
+    assertEquals(Math.round(bitmaps.get(0).getCardinality()), expectedCounts[0]);
+    for (int i = 1; i < bitmaps.size(); i++) {
+      // Sets are yet to be intersected, we check that they are at least the size of the expected counts at this stage.
+      assertTrue(Math.round(bitmaps.get(i).getCardinality()) >= expectedCounts[i]);
+    }
   }
 }
