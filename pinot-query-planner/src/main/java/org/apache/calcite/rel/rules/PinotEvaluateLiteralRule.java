@@ -24,10 +24,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.calcite.avatica.util.ByteString;
@@ -74,14 +72,12 @@ public class PinotEvaluateLiteralRule extends RelOptRule {
     call.rel(0).accept(new RexShuttle() {
       @Override
       public RexNode visitCall(RexCall call) {
-        // Early terminate
-        if (hasLiteralOnlyCall.get()) {
-          return call;
-        }
         // Check if all operands are RexLiteral
         if (call.operands.stream().allMatch(operand -> (operand instanceof RexLiteral))) {
           // If all operands are literals, this call can be evaluated
           hasLiteralOnlyCall.set(true);
+          // early terminate if we found one evaluate call
+          return call;
         }
         call.operands.forEach(operand -> {
           if (hasLiteralOnlyCall.get()) {
@@ -105,35 +101,26 @@ public class PinotEvaluateLiteralRule extends RelOptRule {
     RelNode rootRelNode = call.rel(0);
     RexBuilder rexBuilder = rootRelNode.getCluster().getRexBuilder();
     Map<RexNode, RexNode> evaluatedResults = new HashMap<>();
-    Set<RexNode> callsToEval = new HashSet<>();
 
     // Recursively evaluate all the calls with Literal only operands from bottom up
-    do {
-      callsToEval.clear();
-      // Traverse the relational expression using a RexShuttle visitor
-      rootRelNode.accept(new RexShuttle() {
-        @Override
-        public RexNode visitCall(RexCall call) {
-          call.operands.forEach(operand -> {
-            if (operand instanceof RexCall) {
-              visitCall((RexCall) operand);
-            }
-          });
-          // Check if all operands are RexLiteral
-          if (call.operands.stream().allMatch(operand -> operand instanceof RexLiteral)) {
-            // If all operands are literals or already evaluated, this call can be evaluated
-            if (!evaluatedResults.containsKey(call)) {
-              callsToEval.add(call);
-            }
+    // Traverse the relational expression using a RexShuttle visitor
+    rootRelNode.accept(new RexShuttle() {
+      @Override
+      public RexNode visitCall(RexCall call) {
+        call.operands.forEach(operand -> {
+          if (operand instanceof RexCall) {
+            visitCall((RexCall) operand);
           }
-          // Return the call to continue traversal
-          return call;
+        });
+        // Check if all operands are RexLiteral
+        if (call.operands.stream().allMatch(operand -> operand instanceof RexLiteral)) {
+          // If all operands are literals or already evaluated, this call can be evaluated
+          return evaluateLiteralOnlyFunction(rexBuilder, call, evaluatedResults);
         }
-      });
-      for (RexNode rexNode : callsToEval) {
-        evaluateCall((RexCall) rexNode, rexBuilder, evaluatedResults);
+        // Return the call to continue traversal
+        return call;
       }
-    } while (!callsToEval.isEmpty());
+    });
 
     RelNode newRelNode = null;
     if (rootRelNode instanceof Project) {
@@ -179,19 +166,6 @@ public class PinotEvaluateLiteralRule extends RelOptRule {
       return rexCall.clone(rexCall.getType(), newOperands);
     }
     return rexNode;
-  }
-
-  private void evaluateCall(RexCall rexCall, RexBuilder rexBuilder, Map<RexNode, RexNode> evaluatedResults) {
-    // Same rexCall may be referenced in multiple places, so we need to check if it is already evaluated.
-    if (evaluatedResults.containsKey(rexCall)) {
-      return;
-    }
-    //List<RexNode> newOperands = rexCall.getOperands().stream()
-    //    .map(operand -> evaluatedResults.getOrDefault(operand, operand))
-    //    .collect(Collectors.toList());
-    // rexCall = rexCall.clone(rexCall.getType(), newOperands);
-    RexNode result = evaluateLiteralOnlyFunction(rexBuilder, rexCall, evaluatedResults);
-    evaluatedResults.put(rexCall, result);
   }
 
   /**
