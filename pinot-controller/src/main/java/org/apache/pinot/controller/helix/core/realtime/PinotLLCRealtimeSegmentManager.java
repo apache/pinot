@@ -721,9 +721,10 @@ public class PinotLLCRealtimeSegmentManager {
       Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
       ColumnPartitionConfig columnPartitionConfig = entry.getValue();
       if (numPartitionGroups != columnPartitionConfig.getNumPartitions()) {
-        LOGGER.warn("Number of partition groups fetched from the stream is different than "
-            + "columnPartitionConfig.numPartitions in the table config. The stream partition count is used. "
-            + "Please update the table config accordingly.");
+        LOGGER.warn("Number of partition groups fetched from the stream '{}' is different than "
+                + "columnPartitionConfig.numPartitions '{}' in the table config. The stream partition count is used. "
+                + "Please update the table config accordingly.", numPartitionGroups,
+            columnPartitionConfig.getNumPartitions());
       }
       ColumnPartitionMetadata columnPartitionMetadata =
           new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), numPartitionGroups,
