@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.spi.trace.RequestContext;
 
+
 public class BrokerQueryEventInfo {
     private String _requestId;
     private String _brokerId;

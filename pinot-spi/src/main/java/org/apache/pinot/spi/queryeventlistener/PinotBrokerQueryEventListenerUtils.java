@@ -22,106 +22,90 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Optional;
-import java.util.Set;
-import org.apache.pinot.spi.annotations.queryeventlistener.BrokerEventListenerFactory;
-import org.apache.pinot.spi.annotations.queryeventlistener.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_EVENT_LISTENER_FACTORY_CLASS_NAME;
-import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_EVENT_LISTENER_FACTORY_CLASS_NAME;
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME;
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME;
+
 
 public class PinotBrokerQueryEventListenerUtils {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PinotBrokerQueryEventListenerUtils.class);
+    private static BrokerQueryEventListener _brokerQueryEventListener = null;
+
     private PinotBrokerQueryEventListenerUtils() {
     }
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(PinotBrokerQueryEventListenerUtils.class);
-    private static final String EVENT_LISTENER_PACKAGE_REGEX_PATTERN = ".*\\.plugin\\.query.event.listener\\..*";
-    private static BrokerQueryEventListenerFactory _brokerQueryEventListenerFactory = null;
-
     /**
-     * Initialize the eventListenerFactory and registers the eventListener
+     * Initialize the BrokerQueryEventListener and registers the eventListener
      */
     @VisibleForTesting
     public synchronized static void init(PinotConfiguration eventListenerConfiguration) {
-        // Initializes PinotQueryEventListenerFactory.
-        initializeBrokerQueryEventListenerFactory(eventListenerConfiguration);
+        // Initializes BrokerQueryEventListener.
+        initializeBrokerQueryEventListener(eventListenerConfiguration);
     }
 
     /**
-     * Initializes PinotQueryEventListenerFactory with event-listener configurations.
+     * Initializes PinotBrokerQueryEventListener with event-listener configurations.
      * @param eventListenerConfiguration The subset of the configuration containing the event-listener-related keys
      */
-    private static void initializeBrokerQueryEventListenerFactory(PinotConfiguration eventListenerConfiguration) {
-        Set<Class<?>> classes = getPinotBrokerQueryEventListenerFactoryClasses();
-        if (classes.size() > 1) {
-            LOGGER.warn("More than one BrokerQueryEventListenerFactory was found: {}", classes);
+    private static void initializeBrokerQueryEventListener(PinotConfiguration eventListenerConfiguration) {
+        String brokerQueryEventListenerClassName = eventListenerConfiguration.getProperty(
+                CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME, DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME);
+        LOGGER.info("{} will be initialized as the PinotBrokerQueryEventListener",
+                brokerQueryEventListenerClassName);
+
+        Optional<Class<?>> clazzFound;
+        try {
+            clazzFound = Optional.of(Class.forName(brokerQueryEventListenerClassName));
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Failed to initialize BrokerQueryEventListener. "
+                    + "Please check if any pinot-event-listener related jar is actually added to the classpath.");
         }
 
-        String brokerQueryEventFactoryClassName = eventListenerConfiguration.getProperty(
-                CONFIG_OF_EVENT_LISTENER_FACTORY_CLASS_NAME, DEFAULT_EVENT_LISTENER_FACTORY_CLASS_NAME);
-        LOGGER.info("{} will be initialized as the PinotBrokerQueryEventListenerFactory",
-                brokerQueryEventFactoryClassName);
-
-        Optional<Class<?>> clazzFound = classes.stream().filter(c -> c.getName()
-                        .equals(brokerQueryEventFactoryClassName)).findFirst();
-
         clazzFound.ifPresent(clazz -> {
-                    BrokerEventListenerFactory annotation = clazz.getAnnotation(BrokerEventListenerFactory.class);
-                    LOGGER.info("Trying to init PinotBrokerQueryEventListenerFactory: {} "
-                            + "and BrokerQueryEventListenerFactory: {}", clazz, annotation);
-                    if (annotation.enabled()) {
-                        try {
-                            BrokerQueryEventListenerFactory brokerQueryEventListenerFactory =
-                                    (BrokerQueryEventListenerFactory) clazz.newInstance();
-                            brokerQueryEventListenerFactory.init(eventListenerConfiguration);
-                            registerBrokerEventListenerFactory(brokerQueryEventListenerFactory);
-                        } catch (Exception e) {
-                            LOGGER.error("Caught exception while initializing event listener registry: {}, skipping it",
-                                    clazz, e);
-                        }
+                    try {
+                        BrokerQueryEventListener brokerQueryEventListener =
+                                (BrokerQueryEventListener) clazz.newInstance();
+                        registerBrokerEventListener(brokerQueryEventListener);
+                    } catch (Exception e) {
+                        LOGGER.error("Caught exception while initializing event listener registry: {}, skipping it",
+                                clazz, e);
                     }
                 }
         );
 
-        Preconditions.checkState(_brokerQueryEventListenerFactory != null,
-                "Failed to initialize BrokerQueryEventListenerFactory. "
+        Preconditions.checkState(_brokerQueryEventListener != null,
+                "Failed to initialize BrokerQueryEventListener. "
                         + "Please check if any pinot-event-listener related jar is actually added to the classpath.");
     }
 
     /**
-     * Registers an broker event listener factory.
+     * Registers an broker event listener.
      */
-    private static void registerBrokerEventListenerFactory(
-            BrokerQueryEventListenerFactory brokerQueryEventListenerFactory) {
-        LOGGER.info("Registering broker event listener factory: {}",
-                brokerQueryEventListenerFactory.getEventListenerFactoryName());
-        _brokerQueryEventListenerFactory = brokerQueryEventListenerFactory;
+    private static void registerBrokerEventListener(
+            BrokerQueryEventListener brokerQueryEventListener) {
+        LOGGER.info("Registering broker event listener : {}",
+                brokerQueryEventListener.getClass().getName());
+        _brokerQueryEventListener = brokerQueryEventListener;
     }
 
     /**
-     * Returns the brokerQueryEventListener from the initialised BrokerQueryEventListenerFactory.
-     * If the BrokerQueryEventListenerFactory is null, first creates and initializes the
-     * BrokerQueryEventListenerFactory and registers the BrokerQueryEventListener.
+     * Returns the brokerQueryEventListener. If the BrokerQueryEventListener is null,
+     * first creates and initializes the BrokerQueryEventListener.
      * @param eventListenerConfiguration event-listener configs
      */
     public static synchronized BrokerQueryEventListener getBrokerQueryEventListener(
             PinotConfiguration eventListenerConfiguration) {
-        if (_brokerQueryEventListenerFactory == null) {
+        if (_brokerQueryEventListener == null) {
             init(eventListenerConfiguration);
         }
-        return _brokerQueryEventListenerFactory.getBrokerQueryEventListener();
+        return _brokerQueryEventListener;
     }
 
     @VisibleForTesting
     public static BrokerQueryEventListener getBrokerQueryEventListener() {
         return getBrokerQueryEventListener(new PinotConfiguration(Collections.emptyMap()));
-    }
-
-    private static Set<Class<?>> getPinotBrokerQueryEventListenerFactoryClasses() {
-        return PinotReflectionUtils.getClassesThroughReflection(EVENT_LISTENER_PACKAGE_REGEX_PATTERN,
-                BrokerEventListenerFactory.class);
     }
 }

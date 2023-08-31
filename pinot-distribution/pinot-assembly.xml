@@ -209,13 +209,6 @@
       <destName>plugins/pinot-metrics/pinot-dropwizard/pinot-dropwizard-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Metrics Plugins-->
-    <!-- Start Include Pinot Query Event Listener Plugins-->
-    <file>
-      <source>${pinot.root}/pinot-plugins/pinot-query-event-listener/target/pinot-query-event-listener-${project.version}.jar
-      </source>
-      <destName>plugins/pinot-query-event-listener/pinot-query-event-listener-${project.version}.jar</destName>
-    </file>
-    <!-- End Include Pinot Query Event Listener Plugins-->
     <!-- Start Include Pinot Segment Writer Plugins-->
     <file>
       <source>

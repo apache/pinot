@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.queryeventlistener;
 
+
 public interface BrokerQueryEventListener {
 
     void onQueryCompletion(BrokerQueryEventInfo brokerQueryEventInfo);

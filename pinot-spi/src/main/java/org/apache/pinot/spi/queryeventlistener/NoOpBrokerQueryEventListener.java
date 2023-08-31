@@ -16,23 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.annotations.queryeventlistener;
+package org.apache.pinot.spi.queryeventlistener;
 
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventListener;
 
-public interface BrokerQueryEventListenerFactory {
+public class NoOpBrokerQueryEventListener implements BrokerQueryEventListener {
 
-    /**
-     * Initializes the broker query event listener factory
-     */
-    void init(PinotConfiguration eventListenerConfiguration);
-
-    /**
-     * Gets {@link BrokerQueryEventListener}. There should be only one such instance in every
-     * {@link BrokerQueryEventListener}.
-     */
-    BrokerQueryEventListener getBrokerQueryEventListener();
-
-    String getEventListenerFactoryName();
+    @Override
+    public void onQueryCompletion(BrokerQueryEventInfo brokerQueryEventInfo) {
+        // Not implemented method
+    }
 }
