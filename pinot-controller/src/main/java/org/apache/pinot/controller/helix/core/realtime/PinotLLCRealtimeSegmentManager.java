@@ -1520,6 +1520,10 @@ public class PinotLLCRealtimeSegmentManager {
 
   private boolean isTmpAndCanDelete(URI uri, Set<String> deepURIs, PinotFS pinotFS) throws Exception {
     long lastModified = pinotFS.lastModified(uri);
+    if (lastModified <= 0) {
+      LOGGER.warn("file {} modification time {} is not positive, ineligible for delete", uri.toString(), lastModified);
+      return false;
+    }
     String uriString = uri.toString();
     return SegmentCompletionUtils.isTmpFile(uriString) && !deepURIs.contains(uriString)
         && getCurrentTimeMs() - lastModified > _controllerConf.getTmpSegmentRetentionInSeconds() * 1000L;
