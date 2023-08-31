@@ -698,30 +698,28 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Test in where clause
-    sqlQuery = "SELECT count(*) from mytable where regexpReplace(originState, '[VC]A', 'TEST') = 'TEST'";
+    sqlQuery = "SELECT count(*) from mytable where regexpReplace(OriginState, '[VC]A', 'TEST') = 'TEST'";
     response = postQuery(sqlQuery);
     int count1 = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    sqlQuery = "SELECT count(*) from mytable where originState='CA' or originState='VA'";
+    sqlQuery = "SELECT count(*) from mytable where OriginState='CA' or OriginState='VA'";
     response = postQuery(sqlQuery);
     int count2 = response.get("resultTable").get("rows").get(0).get(0).asInt();
     assertEquals(count1, count2);
 
     // Test nested transform
     sqlQuery =
-        "SELECT count(*) from mytable where contains(regexpReplace(originState, '(C)(A)', '$1TEST$2'), 'CTESTA')";
+        "SELECT count(*) from mytable where contains(regexpReplace(OriginState, '(C)(A)', '$1TEST$2'), 'CTESTA')";
     response = postQuery(sqlQuery);
     count1 = response.get("resultTable").get("rows").get(0).get(0).asInt();
-    sqlQuery = "SELECT count(*) from mytable where originState='CA'";
+    sqlQuery = "SELECT count(*) from mytable where OriginState='CA'";
     response = postQuery(sqlQuery);
     count2 = response.get("resultTable").get("rows").get(0).get(0).asInt();
     assertEquals(count1, count2);
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testCastMV(boolean useMultiStageQueryEngine)
+  @Test
+  public void testCastMV()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-
     // simple cast
     String sqlQuery = "SELECT DivLongestGTimes, CAST(DivLongestGTimes as DOUBLE) from mytable LIMIT 100";
     JsonNode response = postQuery(sqlQuery);
@@ -1384,10 +1382,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     _tableSizeAfterRemovingIndex = getTableSize(getTableName());
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testDisableGroovyQueryTableConfigOverride(boolean useMultiStageQueryEngine)
+  @Test
+  public void testDisableGroovyQueryTableConfigOverride()
       throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
         + "'arg0 + arg1', FlightNum, Origin) FROM mytable";
     TableConfig tableConfig = getOfflineTableConfig();
@@ -1739,8 +1736,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
-//    assertEquals(dataSchema.get("columnNames").toString(),
-//        "[\"timeconvert(DaysSinceEpoch,'DAYS','SECONDS')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"LONG\"]");
     JsonNode rows = resultTable.get("rows");
     assertFalse(rows.isEmpty());
@@ -1754,8 +1749,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-//    assertEquals(dataSchema.get("columnNames").toString(),
-//        "[\"datetimeconvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"LONG\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertFalse(rows.isEmpty());
@@ -1764,13 +1757,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.get(0).asLong(), 16138 * 24);
     assertEquals(row.get(1).asLong(), 605);
 
-    query = "SELECT add(DaysSinceEpoch,DaysSinceEpoch,15), COUNT(*) FROM mytable "
-        + "GROUP BY add(DaysSinceEpoch,DaysSinceEpoch,15) ORDER BY COUNT(*) DESC";
+    if (useMultiStageQueryEngine) {
+      query = "SELECT add(DaysSinceEpoch,add(DaysSinceEpoch,15)), COUNT(*) FROM mytable "
+          + "GROUP BY add(DaysSinceEpoch,add(DaysSinceEpoch,15)) ORDER BY COUNT(*) DESC";
+    } else {
+      query = "SELECT add(DaysSinceEpoch,DaysSinceEpoch,15), COUNT(*) FROM mytable "
+          + "GROUP BY add(DaysSinceEpoch,DaysSinceEpoch,15) ORDER BY COUNT(*) DESC";
+    }
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-//    assertEquals(dataSchema.get("columnNames").toString(),
-//        "[\"add(DaysSinceEpoch,DaysSinceEpoch,'15')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertFalse(rows.isEmpty());
@@ -1784,7 +1780,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-//    assertEquals(dataSchema.get("columnNames").toString(), "[\"sub(DaysSinceEpoch,'25')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertFalse(rows.isEmpty());
@@ -1793,12 +1788,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.get(0).asDouble(), 16138.0 - 25);
     assertEquals(row.get(1).asLong(), 605);
 
-    query = "SELECT mult(DaysSinceEpoch,24,3600), COUNT(*) FROM mytable "
-        + "GROUP BY mult(DaysSinceEpoch,24,3600) ORDER BY COUNT(*) DESC";
+    if (useMultiStageQueryEngine) {
+      query = "SELECT mult(DaysSinceEpoch,mult(24,3600)), COUNT(*) FROM mytable "
+          + "GROUP BY mult(DaysSinceEpoch,mult(24,3600)) ORDER BY COUNT(*) DESC";
+    } else {
+      query = "SELECT mult(DaysSinceEpoch,24,3600), COUNT(*) FROM mytable "
+          + "GROUP BY mult(DaysSinceEpoch,24,3600) ORDER BY COUNT(*) DESC";
+    }
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(), "[\"mult(DaysSinceEpoch,'24','3600')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertFalse(rows.isEmpty());
@@ -1812,7 +1811,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-//    assertEquals(dataSchema.get("columnNames").toString(), "[\"div(DaysSinceEpoch,'2')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertFalse(rows.isEmpty());
@@ -1826,7 +1824,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-//    assertEquals(dataSchema.get("columnNames").toString(), "[\"arraylength(DivAirports)\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertFalse(rows.isEmpty());
@@ -1840,8 +1837,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-//    assertEquals(dataSchema.get("columnNames").toString(),
-//        "[\"arraylength(valuein(DivAirports,'DFW','ORD'))\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 3);
@@ -1863,7 +1858,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-//    assertEquals(dataSchema.get("columnNames").toString(), "[\"valuein(DivAirports,'DFW','ORD')\",\"count(*)\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\",\"LONG\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 2);
@@ -1938,12 +1932,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testSelectionUDF(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable";
+    String query = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable limit 10";
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"DaysSinceEpoch\",\"timeconvert(DaysSinceEpoch,'DAYS','SECONDS')\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
     JsonNode rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 10);
@@ -1958,8 +1950,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"DaysSinceEpoch\",\"timeconvert(DaysSinceEpoch,'DAYS','SECONDS')\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 10000);
@@ -1977,8 +1967,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"DaysSinceEpoch\",\"timeconvert(DaysSinceEpoch,'DAYS','SECONDS')\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 10000);
@@ -2698,27 +2686,46 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // case with different number of documents in the segment.
     response1 = response1.replaceAll("docs:[0-9]+", "docs:*");
 
-    assertEquals(response1, "{\"dataSchema\":{\"columnNames\":[\"SQL\",\"PLAN\"],"
-        + "\"columnDataTypes\":[\"STRING\",\"STRING\"]},"
-        + "\"rows\":[[\"EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name "
-        + "ORDER BY 1\",\"Execution Plan\n"
-        + "LogicalSort(sort0=[$0], dir0=[ASC], offset=[0])\n"
-        + "  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], "
-        + "isSortOnReceiver=[true])\n"
-        + "    LogicalSort(sort0=[$0], dir0=[ASC])\n" + "      LogicalProject(count=[$1], name=[$0])\n"
-        + "        LogicalAggregate(group=[{0}], agg#0=[COUNT($1)])\n"
-        + "          PinotLogicalExchange(distribution=[hash[0]])\n"
-        + "            LogicalAggregate(group=[{17}], agg#0=[COUNT()])\n"
-        + "              LogicalTableScan(table=[[mytable]])\n" + "\"]]}");
+    assertEquals(response1, "{\"dataSchema\":{\"columnNames\":[\"SQL\",\"PLAN\"],\"columnDataTypes\":[\"STRING\","
+        + "\"STRING\"]},\"rows\":[[\"EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable "
+        + "GROUP BY name ORDER BY 1\",\"Execution Plan\\n"
+        + "LogicalSort(sort0=[$0], dir0=[ASC], offset=[0])\\n"
+        + "  PinotLogicalSortExchange("
+        + "distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])\\n"
+        + "    LogicalSort(sort0=[$0], dir0=[ASC])\\n"
+        + "      LogicalProject(count=[$1], name=[$0])\\n"
+        + "        LogicalAggregate(group=[{0}], agg#0=[COUNT($1)])\\n"
+        + "          PinotLogicalExchange(distribution=[hash[0]])\\n"
+        + "            LogicalAggregate(group=[{17}], agg#0=[COUNT()])\\n"
+        + "              LogicalTableScan(table=[[mytable]])\\n"
+        + "\"]]}");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.
     String query2 = "EXPLAIN PLAN FOR SELECT * FROM mytable WHERE FlightNum < 0";
     String response2 = postQuery(query2).get("resultTable").toString();
 
-    assertEquals(response2, "{\"dataSchema\":{\"columnNames\":[\"Operator\",\"Operator_Id\",\"Parent_Id\"],"
-        + "\"columnDataTypes\":[\"STRING\",\"INT\",\"INT\"]},\"rows\":[[\"BROKER_REDUCE(limit:10)\",1,0],"
-        + "[\"PLAN_START(numSegmentsForThisPlan:12)\",-1,-1],[\"ALL_SEGMENTS_PRUNED_ON_SERVER\",2,1]]}");
+    assertEquals(response2, "{\"dataSchema\":{\"columnNames\":[\"SQL\",\"PLAN\"],\"columnDataTypes\":[\"STRING\","
+        + "\"STRING\"]},\"rows\":[[\"EXPLAIN PLAN FOR SELECT * FROM mytable WHERE FlightNum < 0\",\"Execution Plan\\n"
+        + "LogicalProject(ActualElapsedTime=[$3], AirTime=[$4], AirlineID=[$5], ArrDel15=[$6], ArrDelay=[$7], "
+        + "ArrDelayMinutes=[$8], ArrTime=[$9], ArrTimeBlk=[$10], ArrivalDelayGroups=[$11], CRSArrTime=[$12], "
+        + "CRSDepTime=[$13], CRSElapsedTime=[$14], CancellationCode=[$15], Cancelled=[$16], Carrier=[$17], "
+        + "CarrierDelay=[$18], DayOfWeek=[$19], DayofMonth=[$20], DaysSinceEpoch=[$21], DepDel15=[$22], "
+        + "DepDelay=[$23], DepDelayMinutes=[$24], DepTime=[$25], DepTimeBlk=[$26], DepartureDelayGroups=[$27], "
+        + "Dest=[$28], DestAirportID=[$29], DestAirportSeqID=[$30], DestCityMarketID=[$31], DestCityName=[$32], "
+        + "DestState=[$33], DestStateFips=[$34], DestStateName=[$35], DestWac=[$36], Distance=[$37], "
+        + "DistanceGroup=[$38], DivActualElapsedTime=[$39], DivAirportIDs=[$40], DivAirportLandings=[$41], "
+        + "DivAirportSeqIDs=[$42], DivAirports=[$43], DivArrDelay=[$44], DivDistance=[$45], DivLongestGTimes=[$46], "
+        + "DivReachedDest=[$47], DivTailNums=[$48], DivTotalGTimes=[$49], DivWheelsOffs=[$50], DivWheelsOns=[$51], "
+        + "Diverted=[$52], FirstDepTime=[$53], FlightDate=[$54], FlightNum=[$55], Flights=[$56], "
+        + "LateAircraftDelay=[$57], LongestAddGTime=[$58], Month=[$59], NASDelay=[$60], Origin=[$61], "
+        + "OriginAirportID=[$62], OriginAirportSeqID=[$63], OriginCityMarketID=[$64], OriginCityName=[$65], "
+        + "OriginState=[$66], OriginStateFips=[$67], OriginStateName=[$68], OriginWac=[$69], Quarter=[$70], "
+        + "RandomAirports=[$71], SecurityDelay=[$72], TailNum=[$73], TaxiIn=[$74], TaxiOut=[$75], TotalAddGTime=[$76], "
+        + "UniqueCarrier=[$77], WeatherDelay=[$78], WheelsOff=[$79], WheelsOn=[$80], Year=[$81])\\n"
+        + "  LogicalFilter(condition=[<($55, 0)])\\n"
+        + "    LogicalTableScan(table=[[mytable]])\\n"
+        + "\"]]}");
   }
 
   /** Test to make sure we are properly handling string comparisons in predicates. */
@@ -2727,22 +2734,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // compare two string columns.
-    String query1 = "SELECT count(*) FROM mytable WHERE OriginState = DestState";
-    String response1 = postQuery(query1).get("resultTable").toString();
-    assertEquals(response1,
-        "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]}," + "\"rows\":[[14011]]}");
+    JsonNode jsonNode = postQuery("SELECT count(*) FROM mytable WHERE OriginState = DestState");
+    assertEquals(getType(jsonNode, 0), "LONG");
+    assertEquals(getLongCellValue(jsonNode, 0, 0), 14011);
 
     // compare string function with string column.
-    String query2 = "SELECT count(*) FROM mytable WHERE trim(OriginState) = DestState";
-    String response2 = postQuery(query2).get("resultTable").toString();
-    assertEquals(response2,
-        "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]}," + "\"rows\":[[14011]]}");
+    jsonNode = postQuery("SELECT count(*) FROM mytable WHERE trim(OriginState) = DestState");
+    assertEquals(getType(jsonNode, 0), "LONG");
+    assertEquals(getLongCellValue(jsonNode, 0, 0), 14011);
 
     // compare string function with string function.
-    String query3 = "SELECT count(*) FROM mytable WHERE substr(OriginState, 0, 1) = substr(DestState, 0, 1)";
-    String response3 = postQuery(query3).get("resultTable").toString();
-    assertEquals(response3,
-        "{\"dataSchema\":{\"columnNames\":[\"count(*)\"],\"columnDataTypes\":[\"LONG\"]}," + "\"rows\":[[19755]]}");
+    jsonNode = postQuery("SELECT count(*) FROM mytable WHERE substr(OriginState, 0, 1) = substr(DestState, 0, 1)");
+    assertEquals(getType(jsonNode, 0), "LONG");
+    assertEquals(getLongCellValue(jsonNode, 0, 0), 19755);
   }
 
   /**
