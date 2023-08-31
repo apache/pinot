@@ -192,7 +192,7 @@ public class RequestUtils {
       return RequestUtils.getLiteralExpression(((Number) object).longValue());
     }
     if (object instanceof Float || object instanceof Double) {
-      return RequestUtils.getLiteralExpression(((Number) object).doubleValue());
+      return RequestUtils.getLiteralExpression(Double.parseDouble(object.toString()));
     }
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
