@@ -142,11 +142,11 @@
         ]
       },
       {
-        "description": "select literal with always true condition",
-        "sql": "EXPLAIN PLAN FOR Select 1 FROM a WHERE true=true",
+        "description": "select literal with big decimal",
+        "sql": "EXPLAIN PLAN FOR SELECT CAST('12345678901234567890123456789.1234567890123456789' AS DECIMAL) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[1])",
+          "\nLogicalProject(EXPR$0=[12345678901234567890123456789.1234567890123456789:DECIMAL(1000, 0)])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]

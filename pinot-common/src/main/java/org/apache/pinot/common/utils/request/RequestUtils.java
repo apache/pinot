@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +37,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.FilterKind;
@@ -182,6 +184,12 @@ public class RequestUtils {
   public static Expression getLiteralExpression(com.google.protobuf.ByteString value) {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setBinaryValue(value.toByteArray());
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(BigDecimal value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setBigDecimalValue(BigDecimalUtils.serialize(value));
     return expression;
   }
 

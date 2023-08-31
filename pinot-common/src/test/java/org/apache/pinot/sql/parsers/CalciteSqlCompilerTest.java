@@ -2978,10 +2978,10 @@ public class CalciteSqlCompilerTest {
     // Then:
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
     Function fun = pinotQuery.getSelectList().get(0).getFunctionCall();
-    Assert.assertEquals(fun.operator, "attimezone");
-    Assert.assertEquals(fun.operands.size(), 2);
-    Assert.assertEquals(fun.operands.get(0).getIdentifier().name, "ts");
-    Assert.assertEquals(fun.operands.get(1).getLiteral().getStringValue(), "pst");
+    Assert.assertEquals(fun.getOperator(), "attimezone");
+    Assert.assertEquals(fun.getOperands().size(), 2);
+    Assert.assertEquals(fun.getOperands().get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(fun.getOperands().get(1).getLiteral().getStringValue(), "pst");
   }
 
   @Test
@@ -2995,13 +2995,15 @@ public class CalciteSqlCompilerTest {
     // Then:
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
     Function fun = pinotQuery.getSelectList().get(0).getFunctionCall();
-    Assert.assertEquals(fun.operator, "attimezone");
-    Assert.assertEquals(fun.operands.size(), 2);
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operator, "plus");
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.size(), 2);
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(0).getIdentifier().getName(), "ts");
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(1).getLiteral().getLongValue(), 123L);
-    Assert.assertEquals(fun.operands.get(1).getLiteral().getStringValue(), "pst");
+    Assert.assertEquals(fun.getOperator(), "attimezone");
+    Assert.assertEquals(fun.getOperands().size(), 2);
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperator(), "plus");
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "ts");
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(),
+        123L);
+    Assert.assertEquals(fun.getOperands().get(1).getLiteral().getStringValue(), "pst");
   }
 
   @Test
@@ -3015,12 +3017,14 @@ public class CalciteSqlCompilerTest {
     // Then:
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
     Function fun = pinotQuery.getSelectList().get(0).getFunctionCall();
-    Assert.assertEquals(fun.operator, "GREATER_THAN");
-    Assert.assertEquals(fun.operands.size(), 2);
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operator, "attimezone");
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.size(), 2);
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(0).getIdentifier().getName(), "ts");
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(1).getLiteral().getStringValue(), "pst");
+    Assert.assertEquals(fun.getOperator(), "GREATER_THAN");
+    Assert.assertEquals(fun.getOperands().size(), 2);
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperator(), "attimezone");
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "ts");
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
+        "pst");
   }
 
   @Test
@@ -3143,49 +3147,49 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
-  + "filter is not supported")
+      + "filter is not supported")
   public void testAndFilterWithNullFails() {
     CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2, NULL) AND column2 = 1");
   }
 
   @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in NOT_IN "
-  + "filter is not supported")
+      + "filter is not supported")
   public void testOrFilterWithNullFails() {
     CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 NOT IN (1, 2, NULL) OR column2 = 1");
   }
 
   @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
-  + "filter is not supported")
+      + "filter is not supported")
   public void testNotFilterWithNullFails() {
     CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE NOT(column1 IN (NULL, 1, 2))");
   }
 
   @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
-  + "GREATER_THAN filter is not supported")
+      + "GREATER_THAN filter is not supported")
   public void testGreaterThanNullFilterFails() {
     CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 > null");
   }
 
   @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
-  + "LESS_THAN_OR_EQUAL filter is not supported")
+      + "LESS_THAN_OR_EQUAL filter is not supported")
   public void testLessThanOrEqualNullFilterFails() {
     CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 <= null");
   }
 
   @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in LIKE "
-  + "filter is not supported")
+      + "filter is not supported")
   public void testLikeFilterWithNullFails() {
     CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 LIKE null");
   }
 
   @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in EQUALS "
-  + "filter is not supported")
+      + "filter is not supported")
   public void testEqualFilterWithNullFails() {
     CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 = null");
   }
 
   @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
-  + "NOT_EQUALS filter is not supported")
+      + "NOT_EQUALS filter is not supported")
   public void testInEqualFilterWithNullFails() {
     CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 != null");
   }

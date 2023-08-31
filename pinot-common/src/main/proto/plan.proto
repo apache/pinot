@@ -64,6 +64,7 @@ message LiteralField {
     double doubleField = 5;
     string stringField = 6;
     bytes bytesField = 7;
+    bytes bigDecimalField = 8;
   }
 }
 
