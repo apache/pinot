@@ -24,6 +24,7 @@ import org.testng.annotations.Test;
 
 
 public class RequestUtilsTest {
+  // please check comments inside RequestUtils.getLiteralExpression() for why we need this test
   @Test
   public void testGetLiteralExpressionForObject() {
     Expression literalExpression = RequestUtils.getLiteralExpression(Float.valueOf(0.06f));
