@@ -20,6 +20,7 @@ package org.apache.pinot.client.controller.response;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -74,16 +75,13 @@ public class ControllerTenantBrokerResponse {
     @Override
     public ControllerTenantBrokerResponse get(long timeout, TimeUnit unit)
         throws ExecutionException {
-      String response = getStringResponse(timeout, unit);
       try {
-        JsonNode jsonResponse = JsonUtils.stringToJsonNode(response);
-        ControllerTenantBrokerResponse tableResponse = ControllerTenantBrokerResponse.fromJson(jsonResponse);
-        return tableResponse;
+        InputStream response = getStreamResponse(timeout, unit);
+        JsonNode jsonResponse = JsonUtils.inputStreamToJsonNode(response);
+        return ControllerTenantBrokerResponse.fromJson(jsonResponse);
       } catch (IOException e) {
-        new ExecutionException(e);
+        throw new ExecutionException(e);
       }
-
-      return null;
     }
   }
 }
