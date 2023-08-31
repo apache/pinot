@@ -1,0 +1,16 @@
+{
+  "validation_tests": {
+    "queries": [
+      {
+        "description": "arrayToMV validation error 1",
+        "sql": "EXPLAIN PLAN FOR SELECT sum(sumCol3), arrayToMv(mcol1) FROM (SELECT SUM(a.col3) as sumCol3, e.mcol1, a.col2  FROM a JOIN e on a.col1=e.col1 GROUP BY e.mcol1, a.col2) GROUP BY arrayToMv(mcol1)",
+        "expectedException": "Error composing query plan for.*"
+      },
+      {
+        "description": "arrayToMV validation error 2",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) as sumCol3, arrayToMv(e.mcol1), a.col2  FROM a JOIN e on a.col1=e.col1 GROUP BY arrayToMv(e.mcol1), a.col2",
+        "expectedException": "Error composing query plan for.*"
+      }
+    ]
+  }
+}

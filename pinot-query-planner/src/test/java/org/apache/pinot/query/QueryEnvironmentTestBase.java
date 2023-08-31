@@ -51,14 +51,24 @@ public class QueryEnvironmentTestBase {
   protected static final Random RANDOM_REQUEST_ID_GEN = new Random();
   public static final Map<String, List<String>> SERVER1_SEGMENTS =
       ImmutableMap.of("a_REALTIME", ImmutableList.of("a1", "a2"), "b_REALTIME", ImmutableList.of("b1"), "c_OFFLINE",
-          ImmutableList.of("c1"), "d_OFFLINE", ImmutableList.of("d1"));
+          ImmutableList.of("c1"), "d_OFFLINE", ImmutableList.of("d1"), "e_OFFLINE", ImmutableList.of("e1"));
   public static final Map<String, List<String>> SERVER2_SEGMENTS =
       ImmutableMap.of("a_REALTIME", ImmutableList.of("a3"), "c_OFFLINE", ImmutableList.of("c2", "c3"),
-          "d_REALTIME", ImmutableList.of("d2"), "d_OFFLINE", ImmutableList.of("d3"));
+          "d_REALTIME", ImmutableList.of("d2"), "d_OFFLINE", ImmutableList.of("d3"), "e_REALTIME",
+          ImmutableList.of("e2"), "e_OFFLINE", ImmutableList.of("e3"));
   public static final Map<String, Schema> TABLE_SCHEMAS = new HashMap<>();
-  private static final Schema.SchemaBuilder SCHEMA_BUILDER;
+
   static {
-    SCHEMA_BUILDER = new Schema.SchemaBuilder()
+    TABLE_SCHEMAS.put("a_REALTIME", getSchemaBuilder("a").build());
+    TABLE_SCHEMAS.put("b_REALTIME", getSchemaBuilder("b").build());
+    TABLE_SCHEMAS.put("c_OFFLINE", getSchemaBuilder("c").build());
+    TABLE_SCHEMAS.put("d", getSchemaBuilder("d").build());
+    TABLE_SCHEMAS.put("e", getSchemaBuilder("e")
+        .addMultiValueDimension("mcol1", FieldSpec.DataType.STRING).build());
+  }
+
+  static Schema.SchemaBuilder getSchemaBuilder(String schemaName) {
+    return new Schema.SchemaBuilder()
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col5", FieldSpec.DataType.BOOLEAN, false)
@@ -66,11 +76,7 @@ public class QueryEnvironmentTestBase {
         .addMetric("col3", FieldSpec.DataType.INT, 0)
         .addMetric("col4", FieldSpec.DataType.BIG_DECIMAL, 0)
         .addMetric("col6", FieldSpec.DataType.INT, 0)
-        .setSchemaName("defaultSchemaName");
-    TABLE_SCHEMAS.put("a_REALTIME", SCHEMA_BUILDER.setSchemaName("a").build());
-    TABLE_SCHEMAS.put("b_REALTIME", SCHEMA_BUILDER.setSchemaName("b").build());
-    TABLE_SCHEMAS.put("c_OFFLINE", SCHEMA_BUILDER.setSchemaName("c").build());
-    TABLE_SCHEMAS.put("d", SCHEMA_BUILDER.setSchemaName("d").build());
+        .setSchemaName(schemaName);
   }
 
   protected QueryEnvironment _queryEnvironment;
@@ -83,7 +89,7 @@ public class QueryEnvironmentTestBase {
 
   @DataProvider(name = "testQueryDataProvider")
   protected Object[][] provideQueries() {
-    return new Object[][] {
+    return new Object[][]{
         new Object[]{"SELECT * FROM a UNION SELECT * FROM b"},
         new Object[]{"SELECT * FROM a UNION ALL SELECT * FROM b"},
         new Object[]{"SELECT * FROM a INTERSECT SELECT * FROM b"},
@@ -96,8 +102,10 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0"},
         new Object[]{"SELECT * FROM a JOIN b ON a.col1 = b.col2 WHERE a.col3 >= 0 AND a.col3 > b.col3"},
         new Object[]{"SELECT * FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2"},
-        new Object[]{"SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
-            + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0"},
+        new Object[]{
+            "SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 "
+                + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0"
+        },
         new Object[]{"SELECT a.col1, a.col3 + a.ts FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'"},
         new Object[]{"SELECT SUM(a.col3), COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'"},
         new Object[]{"SELECT AVG(a.col3), SUM(a.col3), COUNT(a.col3) FROM a"},
@@ -108,24 +116,36 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT a.col1, KURTOSIS(a.col2), SKEWNESS(a.col3) FROM a GROUP BY a.col1"},
         new Object[]{"SELECT COUNT(a.col3), AVG(a.col3), SUM(a.col3), MIN(a.col3), MAX(a.col3) FROM a"},
         new Object[]{"SELECT DISTINCTCOUNT(a.col3), COUNT(a.col4), COUNT(*), COUNT(DISTINCT a.col1) FROM a"},
-        new Object[]{"SELECT a.col2, DISTINCTCOUNT(a.col3), COUNT(a.col4), COUNT(*), COUNT(DISTINCT a.col1) FROM a "
-            + "GROUP BY a.col2 ORDER BY a.col2"},
+        new Object[]{
+            "SELECT a.col2, DISTINCTCOUNT(a.col3), COUNT(a.col4), COUNT(*), COUNT(DISTINCT a.col1) FROM a "
+                + "GROUP BY a.col2 ORDER BY a.col2"
+        },
         new Object[]{"SELECT a.col1, SKEWNESS(a.col3), KURTOSIS(a.col3), DISTINCTCOUNT(a.col1) FROM a GROUP BY a.col1"},
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
         new Object[]{"SELECT a.col1, COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
-        new Object[]{"SELECT a.col2, a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col1 = 'a' "
-            + " GROUP BY a.col1, a.col2"},
-        new Object[]{"SELECT a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 "
-            + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1"},
-        new Object[]{"SELECT a.col1, COUNT(*), SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1 "
-            + "HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 "
-            + "AND AVG(a.col3) = 5"},
+        new Object[]{
+            "SELECT a.col2, a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col1 = 'a' "
+                + " GROUP BY a.col1, a.col2"
+        },
+        new Object[]{
+            "SELECT a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2 "
+                + " WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1"
+        },
+        new Object[]{
+            "SELECT a.col1, COUNT(*), SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1 "
+                + "HAVING COUNT(*) > 10 AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 "
+                + "AND AVG(a.col3) = 5"
+        },
         new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10"},
         new Object[]{"SELECT dateTrunc('DAY', a.ts + b.ts) FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2"},
-        new Object[]{"SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
-            + " WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
-        new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 IN ('foo', 'bar') AND"
-            + " b.col2 NOT IN ('alice', 'charlie')"},
+        new Object[]{
+            "SELECT a.col2, a.col3 FROM a JOIN b ON a.col1 = b.col1 "
+                + " WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"
+        },
+        new Object[]{
+            "SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 IN ('foo', 'bar') AND"
+                + " b.col2 NOT IN ('alice', 'charlie')"
+        },
         new Object[]{"SELECT COUNT(*) OVER() FROM a"},
         new Object[]{"SELECT 42, COUNT(*) OVER() FROM a"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER () FROM a"},
@@ -133,38 +153,62 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2 ORDER BY a.col2) FROM a"},
         new Object[]{"SELECT a.col1, AVG(a.col3) OVER (), SUM(a.col3) OVER () FROM a"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER () FROM a WHERE a.col3 >= 0"},
-        new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2), MIN(a.col3) OVER (PARTITION BY a.col2) "
-            + "FROM a"},
+        new Object[]{
+            "SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2), MIN(a.col3) OVER (PARTITION BY a.col2) "
+                + "FROM a"
+        },
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (PARTITION BY a.col2, a.col1) FROM a"},
-        new Object[]{"SELECT a.col1, SUM(a.col3) OVER (ORDER BY a.col2, a.col1), MIN(a.col3) OVER (ORDER BY a.col2, "
-            + "a.col1) FROM a"},
+        new Object[]{
+            "SELECT a.col1, SUM(a.col3) OVER (ORDER BY a.col2, a.col1), MIN(a.col3) OVER (ORDER BY a.col2, "
+                + "a.col1) FROM a"
+        },
         new Object[]{"SELECT a.col1, ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col3) FROM a"},
         new Object[]{"SELECT RANK() OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a"},
-        new Object[]{"SELECT col1, total, rank FROM (SELECT a.col1 as col1, count(*) as total, "
-            + "RANK() OVER(ORDER BY count(*) DESC) AS rank FROM a GROUP BY a.col1) WHERE rank < 5"},
+        new Object[]{
+            "SELECT col1, total, rank FROM (SELECT a.col1 as col1, count(*) as total, "
+                + "RANK() OVER(ORDER BY count(*) DESC) AS rank FROM a GROUP BY a.col1) WHERE rank < 5"
+        },
         new Object[]{"SELECT RANK() OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a"},
         new Object[]{"SELECT DENSE_RANK() OVER(ORDER BY a.col1) FROM a"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (ORDER BY a.col2), MIN(a.col3) OVER (ORDER BY a.col2) FROM a"},
-        new Object[]{"SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col3, a.col1, SUM(b.col3) "
-            + "FROM a JOIN b ON a.col3 = b.col3 GROUP BY a.col3, a.col1"},
-        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, COUNT(*), SUM(a.col3), "
-            + "SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 "
-            + "AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
-        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a "
-            + "WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
-        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, COUNT(*) FROM a "
-            + "WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
-        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col1, SUM(a.col3) FROM a "
-            + "WHERE a.col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2"},
-        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, AVG(b.col3) FROM a JOIN b "
-            + "ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1"},
-        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1 as v1, a.col1 as v2, "
-            + "AVG(a.col3) FROM a GROUP BY v1, v2"},
-        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, COUNT(*), SUM(a.col3), "
-            + "SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 "
-            + "AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"},
-        new Object[]{"SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col3 FROM a JOIN b "
-            + "ON a.col1 = b.col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"},
+        new Object[]{
+            "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col3, a.col1, SUM(b.col3) "
+                + "FROM a JOIN b ON a.col3 = b.col3 GROUP BY a.col3, a.col1"
+        },
+        new Object[]{
+            "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, COUNT(*), SUM(a.col3), "
+                + "SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 "
+                + "AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"
+        },
+        new Object[]{
+            "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, SUM(a.col3) FROM a "
+                + "WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"
+        },
+        new Object[]{
+            "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, COUNT(*) FROM a "
+                + "WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"
+        },
+        new Object[]{
+            "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col1, SUM(a.col3) FROM a "
+                + "WHERE a.col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2"
+        },
+        new Object[]{
+            "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1, AVG(b.col3) FROM a JOIN b "
+                + "ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1"
+        },
+        new Object[]{
+            "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col1 as v1, a.col1 as v2, "
+                + "AVG(a.col3) FROM a GROUP BY v1, v2"
+        },
+        new Object[]{
+            "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, COUNT(*), SUM(a.col3), "
+                + "SUM(a.col1) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col2 HAVING COUNT(*) > 10 "
+                + "AND MAX(a.col3) >= 0 AND MIN(a.col3) < 20 AND SUM(a.col3) <= 10 AND AVG(a.col3) = 5"
+        },
+        new Object[]{
+            "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col3 FROM a JOIN b "
+                + "ON a.col1 = b.col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"
+        },
     };
   }
 
