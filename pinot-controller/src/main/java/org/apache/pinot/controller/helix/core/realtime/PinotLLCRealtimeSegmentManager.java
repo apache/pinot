@@ -694,7 +694,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Add the partition metadata if available
     SegmentPartitionMetadata partitionMetadata =
-        getPartitionMetadataFromTableConfig(tableConfig, newLLCSegmentName.getPartitionGroupId());
+        getPartitionMetadataFromTableConfig(tableConfig, newLLCSegmentName.getPartitionGroupId(), numPartitionGroups);
     if (partitionMetadata != null) {
       newSegmentZKMetadata.setPartitionMetadata(partitionMetadata);
     }
@@ -710,7 +710,8 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @Nullable
-  private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId) {
+  private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId,
+      int numPartitionGroups) {
     SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (partitionConfig == null) {
       return null;
@@ -719,8 +720,13 @@ public class PinotLLCRealtimeSegmentManager {
     if (columnPartitionMap.size() == 1) {
       Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
       ColumnPartitionConfig columnPartitionConfig = entry.getValue();
+      if (numPartitionGroups != columnPartitionConfig.getNumPartitions()) {
+        LOGGER.warn("Number of partition groups fetched from the stream is different than "
+            + "columnPartitionConfig.numPartitions in the table config. The stream partition count is used. "
+            + "Please update the table config accordingly.");
+      }
       ColumnPartitionMetadata columnPartitionMetadata =
-          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), columnPartitionConfig.getNumPartitions(),
+          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), numPartitionGroups,
               Collections.singleton(partitionId), columnPartitionConfig.getFunctionConfig());
       return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
     } else {
