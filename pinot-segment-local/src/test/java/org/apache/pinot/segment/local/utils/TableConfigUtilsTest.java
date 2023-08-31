@@ -323,7 +323,8 @@ public class TableConfigUtilsTest {
 
     // Using peer download scheme with replication of 1
     ingestionConfig.setTransformConfigs(null);
-    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
     segmentsValidationAndRetentionConfig.setReplicasPerPartition("1");
     segmentsValidationAndRetentionConfig.setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL);
     tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
