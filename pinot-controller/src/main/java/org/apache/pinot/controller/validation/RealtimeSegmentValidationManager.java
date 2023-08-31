@@ -123,9 +123,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Delete tmp segments
     try {
       long numDeleteTmpSegments = _llcRealtimeSegmentManager.deleteTmpSegments(realtimeTableName, segmentsZKMetadata);
+      LOGGER.info("Delete {} tmp segments for table {}", numDeleteTmpSegments, realtimeTableName);
       _validationMetrics.updateTmpSegmentCountGauge(realtimeTableName, numDeleteTmpSegments);
     } catch (Exception e) {
-      LOGGER.error(String.format("Fail to delete tmp segments for table %s, %s", realtimeTableName, e));
+      LOGGER.error(String.format("Fail to delete tmp segments for table %s", realtimeTableName), e);
     }
 
     // Update the total document count gauge

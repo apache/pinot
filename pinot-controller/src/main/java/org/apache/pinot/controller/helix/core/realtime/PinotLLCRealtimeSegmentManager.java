@@ -1505,10 +1505,10 @@ public class PinotLLCRealtimeSegmentManager {
         if (isTmpAndCanDelete(uri, deepURIs, pinotFS)) {
           LOGGER.info("Deleting temporary segment file: {}", uri);
           if (pinotFS.delete(uri, true)) {
-            LOGGER.info(String.format("Succeed to delete file: %s", uri));
+            LOGGER.info("Succeed to delete file: {}", uri);
             deletedTmpSegments++;
           } else {
-            LOGGER.warn(String.format("Failed to delete file: %s", uri));
+            LOGGER.warn("Failed to delete file: {}", uri);
           }
         }
       }
