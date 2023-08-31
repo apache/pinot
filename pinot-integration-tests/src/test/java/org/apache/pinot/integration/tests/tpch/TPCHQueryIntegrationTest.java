@@ -128,7 +128,7 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     h2statement.execute(h2Query);
     ResultSet h2ResultSet = h2statement.getResultSet();
-    
+
     // compare results.
     Assert.assertEquals(numColumns, h2ResultSet.getMetaData().getColumnCount());
     if (h2ResultSet.first()) {
