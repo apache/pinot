@@ -66,6 +66,8 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
     try {
       long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
       _queryEnvironment.explainQuery(query, requestId);
+      String queryWithoutExplainPlan = query.replace("EXPLAIN PLAN FOR ", "");
+      _queryEnvironment.planQuery(queryWithoutExplainPlan);
       Assert.fail("Query compilation should have failed with exception message pattern: " + expectedException);
     } catch (Exception e) {
       if (expectedException == null) {

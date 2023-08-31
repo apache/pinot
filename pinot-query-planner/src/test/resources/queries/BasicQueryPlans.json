@@ -59,7 +59,7 @@
         ]
       },
       {
-        "description": "",
+        "description": "case when with cast",
         "sql": "EXPLAIN PLAN FOR SELECT SUM(CASE WHEN col3 > 10 THEN 1 WHEN col3 > 20 THEN 2 WHEN col3 > 30 THEN 3 WHEN col3 > 40 THEN 4 WHEN col3 > 50 THEN '5' ELSE 0 END) FROM a",
         "output": [
           "Execution Plan",
@@ -69,6 +69,20 @@
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()])",
           "\n        LogicalProject($f0=[CAST(CASE(>($2, 10), '1':VARCHAR, >($2, 20), '2':VARCHAR, >($2, 30), '3':VARCHAR, >($2, 40), '4':VARCHAR, >($2, 50), '5':VARCHAR, '0':VARCHAR)):DECIMAL(1000, 500) NOT NULL])",
           "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Valid arrayToMV 2",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(col3) as sumCol3, arrayToMv(mcol1) FROM e GROUP BY arrayToMv(e.mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(sumCol3=[$1], EXPR$1=[$0])",
+          "\n  LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n        LogicalProject(EXPR$1=[ARRAYTOMV($6)], col3=[$2])",
+          "\n          LogicalTableScan(table=[[e]])",
           "\n"
         ]
       }
