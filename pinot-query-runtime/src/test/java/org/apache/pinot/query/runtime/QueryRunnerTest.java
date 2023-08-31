@@ -128,14 +128,12 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     }
 
     _reducerGrpcPort = QueryTestUtils.getAvailablePort();
-    _reducerHostname = String.format("Broker_%s", CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_HOSTNAME);
+    _reducerHostname = "Broker_localhost";
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
     _reducerScheduler = new OpChainSchedulerService(EXECUTOR);
-    _mailboxService =
-        new MailboxService(CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
-            new PinotConfiguration(reducerConfig));
+    _mailboxService = new MailboxService("localhost", _reducerGrpcPort, new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
     _queryEnvironment =
@@ -277,15 +275,23 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // test groups limit in both leaf and intermediate stage
         new Object[]{"SET numGroupsLimit = 1; SELECT col1, COUNT(*) FROM a GROUP BY col1", 1},
         new Object[]{"SET numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2},
-        new Object[]{"SET numGroupsLimit = 1; "
-            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1},
-        new Object[]{"SET numGroupsLimit = 2; "
-            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2},
+        new Object[]{
+            "SET numGroupsLimit = 1; "
+                + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1
+        },
+        new Object[]{
+            "SET numGroupsLimit = 2; "
+                + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2
+        },
         // TODO: Consider pushing down hint to the leaf stage
-        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
-            + "col1, COUNT(*) FROM a GROUP BY col1", 2},
-        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
-            + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1}
+        new Object[]{
+            "SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+                + "col1, COUNT(*) FROM a GROUP BY col1", 2
+        },
+        new Object[]{
+            "SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+                + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1
+        }
     };
   }
 

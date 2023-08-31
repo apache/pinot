@@ -1050,7 +1050,6 @@ public class CommonConstants {
      * {@link org.apache.pinot.common.datablock.DataBlock}.
      */
     public static final String KEY_OF_QUERY_RUNNER_HOSTNAME = "pinot.query.runner.hostname";
-    public static final String DEFAULT_QUERY_RUNNER_HOSTNAME = "localhost";
     public static final String KEY_OF_QUERY_RUNNER_PORT = "pinot.query.runner.port";
     public static final int DEFAULT_QUERY_RUNNER_PORT = 0;
 
