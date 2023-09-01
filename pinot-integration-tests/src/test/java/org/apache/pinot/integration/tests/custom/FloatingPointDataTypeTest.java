@@ -39,8 +39,10 @@ import static org.testng.Assert.assertEquals;
 public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME = "FloatingPointDataTypeTest";
   private static final int NUM_DOCS = 10;
-  private static final String MET_DOUBLE = "metDouble";
-  private static final String MET_FLOAT = "metFloat";
+  private static final String MET_DOUBLE_SORTED = "metDoubleSorted";
+  private static final String MET_FLOAT_SORTED = "metFloatSorted";
+  private static final String MET_DOUBLE_UNSORTED = "metDoubleUnsorted";
+  private static final String MET_FLOAT_UNSORTED = "metFloatUnsorted";
 
   @Override
   public String getTableName() {
@@ -50,8 +52,10 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
   @Override
   public Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
-        .addMetric(MET_DOUBLE, FieldSpec.DataType.DOUBLE)
-        .addMetric(MET_FLOAT, FieldSpec.DataType.FLOAT)
+        .addMetric(MET_DOUBLE_SORTED, FieldSpec.DataType.DOUBLE)
+        .addMetric(MET_FLOAT_SORTED, FieldSpec.DataType.FLOAT)
+        .addMetric(MET_DOUBLE_UNSORTED, FieldSpec.DataType.DOUBLE)
+        .addMetric(MET_FLOAT_UNSORTED, FieldSpec.DataType.FLOAT)
         .build();
   }
 
@@ -62,24 +66,35 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(ImmutableList.of(
-        new org.apache.avro.Schema.Field(MET_DOUBLE, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE),
-            null, null),
-        new org.apache.avro.Schema.Field(MET_FLOAT, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.FLOAT),
-            null, null)));
+        new org.apache.avro.Schema.Field(MET_DOUBLE_SORTED,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null),
+        // Please do not use FLOAT type in Avro schema, it is lossy.
+        // For example, 0.06 will be saved as 0.059999995 in Avro file when the data type is FLOAT.
+        new org.apache.avro.Schema.Field(MET_FLOAT_SORTED,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null),
+        new org.apache.avro.Schema.Field(MET_DOUBLE_UNSORTED,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null),
+        new org.apache.avro.Schema.Field(MET_FLOAT_UNSORTED,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null)));
 
     // create avro file
     File avroFile = new File(_tempDir, "data.avro");
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, avroFile);
-      double doubleValue = 0.0;
-      float floatValue = 0.0f;
+      double sortedValue = 0.0;
+      double unsortedValue = 0.05;
       for (int i = 0; i < getCountStarResult(); i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
-        record.put(MET_DOUBLE, doubleValue);
-        record.put(MET_FLOAT, floatValue);
-        doubleValue += 0.01;
-        floatValue += 0.01f;
+        record.put(MET_DOUBLE_SORTED, sortedValue);
+        record.put(MET_FLOAT_SORTED, sortedValue);
+        record.put(MET_DOUBLE_UNSORTED, unsortedValue);
+        record.put(MET_FLOAT_UNSORTED, unsortedValue);
+        sortedValue += 0.01;
+        unsortedValue += 0.01;
+        if (unsortedValue > 0.09) {
+          unsortedValue = 0.00;
+        }
 
         // add avro record to file
         fileWriter.append(record);
@@ -98,10 +113,19 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String[][] filterAndExpectedCount = {
-        {MET_DOUBLE + " > 0.05", "4"}, {MET_DOUBLE + " = 0.05", "1"}, {MET_DOUBLE + " < 0.05", "5"},
-        {MET_FLOAT + " > 0.05", "4"}
-        // FIXME: the result of the following queries is not correct
-        //  , {MET_FLOAT + " = 0.05", "1"}, {MET_FLOAT + " < 0.05", "5"}
+        {MET_DOUBLE_SORTED + " > 0.05", "4"}, {MET_DOUBLE_SORTED + " = 0.05", "1"},
+        {MET_DOUBLE_SORTED + " < 0.05", "5"},
+        {MET_FLOAT_SORTED + " > 0.05", "4"},
+        // FIXME: V1 query engine fails with null pointer exception for this query
+        //{MET_FLOAT_SORTED + " = 0.05", "1"},
+        {MET_FLOAT_SORTED + " < 0.05", "5"},
+        {MET_DOUBLE_UNSORTED + " > 0.05", "4"},
+        {MET_DOUBLE_UNSORTED + " = 0.05", "1"},
+        {MET_DOUBLE_UNSORTED + " < 0.05", "5"},
+        {MET_FLOAT_UNSORTED + " > 0.05", "4"},
+        // FIXME: V1 query engine fails with null pointer exception for this query
+        //{MET_FLOAT_UNSORTED + " = 0.05", "1"},
+        {MET_FLOAT_UNSORTED + " < 0.05", "5"},
     };
     for (String[] faec : filterAndExpectedCount) {
       String filter = faec[0];

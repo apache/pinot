@@ -189,7 +189,7 @@ public class FloatOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public double getDoubleValue(int dictId) {
-    return getFloatValue(dictId);
+    return Double.parseDouble(Float.valueOf(getFloatValue(dictId)).toString());
   }
 
   @Override

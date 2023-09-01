@@ -206,7 +206,7 @@ public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
   @Override
   public double getDoubleValue(int dictId) {
-    return getFloatValue(dictId);
+    return Double.parseDouble(Float.valueOf(getFloatValue(dictId)).toString());
   }
 
   @Override

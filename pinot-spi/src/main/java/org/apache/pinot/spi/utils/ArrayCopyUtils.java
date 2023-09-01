@@ -116,7 +116,7 @@ public class ArrayCopyUtils {
 
   public static void copy(float[] src, double[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = src[i];
+      dest[i] = Double.parseDouble(Float.valueOf(src[i]).toString());
     }
   }
 

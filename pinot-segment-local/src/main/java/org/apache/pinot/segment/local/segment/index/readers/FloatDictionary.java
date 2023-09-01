@@ -66,7 +66,7 @@ public class FloatDictionary extends BaseImmutableDictionary {
 
   @Override
   public double getDoubleValue(int dictId) {
-    return getFloat(dictId);
+    return Double.parseDouble(Float.valueOf(getFloat(dictId)).toString());
   }
 
   @Override
