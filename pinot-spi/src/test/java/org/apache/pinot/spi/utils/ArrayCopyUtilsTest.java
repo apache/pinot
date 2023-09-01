@@ -90,7 +90,7 @@ public class ArrayCopyUtilsTest {
     for (int i = 0; i < COPY_LENGTH; i++) {
       Assert.assertEquals(INT_BUFFER[i], (int) FLOAT_ARRAY[i]);
       Assert.assertEquals(LONG_BUFFER[i], (long) FLOAT_ARRAY[i]);
-      Assert.assertEquals(DOUBLE_BUFFER[i], (double) FLOAT_ARRAY[i]);
+      Assert.assertEquals(DOUBLE_BUFFER[i], Double.parseDouble(Float.valueOf(FLOAT_ARRAY[i]).toString()));
       Assert.assertEquals(STRING_BUFFER[i], Float.toString(FLOAT_ARRAY[i]));
     }
   }
