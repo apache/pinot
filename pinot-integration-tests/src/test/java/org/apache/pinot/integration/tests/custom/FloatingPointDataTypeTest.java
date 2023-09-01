@@ -83,7 +83,7 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
       fileWriter.create(avroSchema, avroFile);
       double sortedValue = 0.0;
       double unsortedValue = 0.05;
-      for (int i = 0; i < getCountStarResult(); i++) {
+      for (int i = 0; i < NUM_DOCS; i++) {
         // create avro record
         GenericData.Record record = new GenericData.Record(avroSchema);
         record.put(MET_DOUBLE_SORTED, sortedValue);
@@ -112,6 +112,7 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
   public void testQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Choose 0.05 because if it's not converted correctly, float 0.05 will be converted to double 0.05000000074505806
     String[][] filterAndExpectedCount = {
         {MET_DOUBLE_SORTED + " > 0.05", "4"}, {MET_DOUBLE_SORTED + " = 0.05", "1"},
         {MET_DOUBLE_SORTED + " < 0.05", "5"},
