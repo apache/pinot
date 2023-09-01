@@ -11,6 +11,30 @@
         ]
       },
       {
+        "description": "Select * with limit 0",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d LIMIT 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[0])",
+          "\n      LogicalTableScan(table=[[d]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select * with limit 0 offset 0",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d LIMIT 0 OFFSET 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[0])",
+          "\n      LogicalTableScan(table=[[d]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Select with filters",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col3 + a.ts FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
         "output": [

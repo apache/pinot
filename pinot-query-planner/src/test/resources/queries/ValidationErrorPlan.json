@@ -10,6 +10,16 @@
         "description": "arrayToMV validation error 2",
         "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) as sumCol3, arrayToMv(e.mcol1), a.col2  FROM a JOIN e on a.col1=e.col1 GROUP BY arrayToMv(e.mcol1), a.col2",
         "expectedException": "Error composing query plan for.*"
+      },
+      {
+        "description": "Select * with negative limit -1",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d LIMIT -1",
+        "expectedException": "Caught exception while parsing query.*"
+      },
+      {
+        "description": "Select * with negative offset",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d LIMIT 10 OFFSET -1",
+        "expectedException": "Caught exception while parsing query.*"
       }
     ]
   }
