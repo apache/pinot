@@ -44,7 +44,7 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
 
   @Override
   public void setValue(int value) {
-    throw new RuntimeException("Method 'setValue' (with int value) not supported for class " + getClass().getName());
+    throw new RuntimeException("Method 'setValue' (with int value) not supported in DoubleAggregationResultHolder");
   }
 
   /**
@@ -54,7 +54,7 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
    */
   @Override
   public void setValue(Object value) {
-    throw new RuntimeException("Method 'setValue' (with object value) not supported for class " + getClass().getName());
+    throw new RuntimeException("Method 'setValue' (with object value) not supported in DoubleAggregationResultHolder");
   }
 
   /**
@@ -73,7 +73,7 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
    */
   @Override
   public int getIntResult() {
-    throw new RuntimeException("Method 'getIntResult' not supported for class " + getClass().getName());
+    throw new RuntimeException("Method 'getIntResult' not supported in DoubleAggregationResultHolder");
   }
 
   /**
@@ -83,6 +83,6 @@ public class DoubleAggregationResultHolder implements AggregationResultHolder {
    */
   @Override
   public <T> T getResult() {
-    throw new RuntimeException("Method 'getResult' not supported for class " + getClass().getName());
+    throw new RuntimeException("Method 'getResult' not supported in DoubleAggregationResultHolder");
   }
 }

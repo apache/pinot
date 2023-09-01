@@ -60,7 +60,7 @@ public class ModuloPartitionFunction implements PartitionFunction {
       return toNonNegative((int) (Long.parseLong((String) value) % _numPartitions));
     } else {
       throw new IllegalArgumentException(
-          "Illegal argument for partitioning, expected Integer, got: " + value.getClass().getName());
+          "Illegal argument for partitioning, expected Integer, got: " + value.getClass().getSimpleName());
     }
   }
 

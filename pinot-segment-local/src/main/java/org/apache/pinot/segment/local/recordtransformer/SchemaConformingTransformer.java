@@ -410,7 +410,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
     } else {
       if (!(value instanceof Map)) {
         _logger.debug("Record doesn't match schema: Schema node '{}' is a map but record value is a {}", keyJsonPath,
-            value.getClass().getName());
+            value.getClass().getSimpleName());
         extraFieldsContainer.addIndexableEntry(key, value);
       } else {
         ExtraFieldsContainer childExtraFieldsContainer = new ExtraFieldsContainer(storeUnindexableExtras);
