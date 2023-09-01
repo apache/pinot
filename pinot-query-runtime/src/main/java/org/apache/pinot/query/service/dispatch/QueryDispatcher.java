@@ -189,7 +189,7 @@ public class QueryDispatcher {
     PlanFragment planFragment = dispatchablePlanFragment.getPlanFragment();
     PlanNode rootNode = planFragment.getFragmentRoot();
     Preconditions.checkState(rootNode instanceof MailboxReceiveNode,
-        "Expecting mailbox receive node as root of reduce stage, got: %s", rootNode.getClass().getName());
+        "Expecting mailbox receive node as root of reduce stage, got: %s", rootNode.getClass().getSimpleName());
     MailboxReceiveNode receiveNode = (MailboxReceiveNode) rootNode;
     List<WorkerMetadata> workerMetadataList = dispatchablePlanFragment.getWorkerMetadataList();
     Preconditions.checkState(workerMetadataList.size() == 1, "Expecting single worker for reduce stage, got: %s",

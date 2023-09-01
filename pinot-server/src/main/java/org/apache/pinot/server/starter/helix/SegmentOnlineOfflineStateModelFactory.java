@@ -69,7 +69,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   @SuppressWarnings("unused")
   @StateModelInfo(states = "{'OFFLINE','ONLINE', 'CONSUMING', 'DROPPED'}", initialState = "OFFLINE")
   public class SegmentOnlineOfflineStateModel extends StateModel {
-    private final Logger _logger = LoggerFactory.getLogger(_instanceId + " - " + getClass().getName());
+    private final Logger _logger = LoggerFactory.getLogger(_instanceId + " - SegmentOnlineOfflineStateModel");
 
     @Transition(from = "OFFLINE", to = "CONSUMING")
     public void onBecomeConsumingFromOffline(Message message, NotificationContext context) {
