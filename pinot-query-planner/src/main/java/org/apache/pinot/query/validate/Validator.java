@@ -20,14 +20,19 @@ package org.apache.pinot.query.validate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.validate.SelectScope;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlValidatorCatalogReader;
 import org.apache.calcite.sql.validate.SqlValidatorImpl;
@@ -123,5 +128,20 @@ public class Validator extends SqlValidatorImpl {
   private static String getColumnName(SqlIdentifier identifier) {
     List<String> names = identifier.names;
     return names.get(names.size() - 1);
+  }
+
+  protected void addToSelectList(
+      List<SqlNode> list,
+      Set<String> aliases,
+      List<Map.Entry<String, RelDataType>> fieldList,
+      SqlNode exp,
+      SelectScope scope,
+      final boolean includeSystemVars) {
+    if (exp.getKind() == SqlKind.IDENTIFIER) {
+      if ((((SqlIdentifier) exp).names).stream().anyMatch(s -> s.startsWith("$"))) {
+        return;
+      }
+    }
+    super.addToSelectList(list, aliases, fieldList, exp, scope, includeSystemVars);
   }
 }
