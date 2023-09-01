@@ -8,7 +8,7 @@ from
     select
       n1.n_name as supp_nation,
       n2.n_name as cust_nation,
-      substring(l_shipdate, 0, 4) as l_year,
+      extract(year from l_shipdate) as l_year,
       l_extendedprice * (1 - l_discount) as volume
     from
       supplier,
