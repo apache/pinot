@@ -28,13 +28,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.common.utils.NamedThreadFactory;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -63,11 +59,6 @@ public class QueryServerTest extends QueryTestSet {
   private static final int QUERY_SERVER_COUNT = 2;
   private static final String KEY_OF_SERVER_INSTANCE_HOST = "pinot.query.runner.server.hostname";
   private static final String KEY_OF_SERVER_INSTANCE_PORT = "pinot.query.runner.server.port";
-  private static final ExecutorService LEAF_WORKER_EXECUTOR_SERVICE =
-      Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS,
-          new NamedThreadFactory("QueryDispatcherTest_LeafWorker"));
-  private static final ExecutorService INTERM_WORKER_EXECUTOR_SERVICE =
-      Executors.newCachedThreadPool(new NamedThreadFactory("QueryDispatcherTest_IntermWorker"));
 
   private final Map<Integer, QueryServer> _queryServerMap = new HashMap<>();
   private final Map<Integer, QueryRunner> _queryRunnerMap = new HashMap<>();
@@ -81,8 +72,6 @@ public class QueryServerTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
-      Mockito.when(queryRunner.getOpChainExecutorService()).thenReturn(LEAF_WORKER_EXECUTOR_SERVICE);
-      Mockito.when(queryRunner.getOpChainExecutorService()).thenReturn(INTERM_WORKER_EXECUTOR_SERVICE);
       QueryServer queryServer = new QueryServer(availablePort, queryRunner);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
@@ -137,9 +126,9 @@ public class QueryServerTest extends QueryTestSet {
 
         DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
 
-        StageMetadata stageMetadata = new StageMetadata.Builder()
-            .setWorkerMetadataList(dispatchablePlanFragment.getWorkerMetadataList())
-            .addCustomProperties(dispatchablePlanFragment.getCustomProperties()).build();
+        StageMetadata stageMetadata =
+            new StageMetadata.Builder().setWorkerMetadataList(dispatchablePlanFragment.getWorkerMetadataList())
+                .addCustomProperties(dispatchablePlanFragment.getCustomProperties()).build();
 
         // ensure mock query runner received correctly deserialized payload.
         QueryRunner mockRunner =
@@ -170,8 +159,7 @@ public class QueryServerTest extends QueryTestSet {
   }
 
   private boolean isStageMetadataEqual(StageMetadata expected, StageMetadata actual) {
-    if (!EqualityUtils.isEqual(StageMetadata.getTableName(expected),
-        StageMetadata.getTableName(actual))) {
+    if (!EqualityUtils.isEqual(StageMetadata.getTableName(expected), StageMetadata.getTableName(actual))) {
       return false;
     }
     TimeBoundaryInfo expectedTimeBoundaryInfo = StageMetadata.getTimeBoundary(expected);
@@ -233,8 +221,8 @@ public class QueryServerTest extends QueryTestSet {
         Long.parseLong(queryRequest.getMetadataMap().get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
     PinotQueryWorkerGrpc.PinotQueryWorkerBlockingStub stub = PinotQueryWorkerGrpc.newBlockingStub(channel);
-    Worker.QueryResponse resp = stub.withDeadline(Deadline.after(timeoutMs, TimeUnit.MILLISECONDS))
-        .submit(queryRequest);
+    Worker.QueryResponse resp =
+        stub.withDeadline(Deadline.after(timeoutMs, TimeUnit.MILLISECONDS)).submit(queryRequest);
     channel.shutdown();
     return resp;
   }

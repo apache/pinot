@@ -349,6 +349,9 @@ public class CommonConstants {
 
         public static final String DROP_RESULTS = "dropResults";
 
+        // Maximum number of pending results blocks allowed in the streaming operator
+        public static final String MAX_STREAMING_PENDING_BLOCKS = "maxStreamingPendingBlocks";
+
         // Handle JOIN Overflow
         public static final String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
         public static final String JOIN_OVERFLOW_MODE = "joinOverflowMode";
@@ -364,6 +367,7 @@ public class CommonConstants {
 
       public static class QueryOptionValue {
         public static final String DEFAULT_IN_PREDICATE_SORT_THRESHOLD = "1000";
+        public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
     }
 

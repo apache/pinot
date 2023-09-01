@@ -152,7 +152,7 @@ public class QueryException {
     QUERY_SCHEDULING_TIMEOUT_ERROR.setMessage("QuerySchedulingTimeoutError");
     SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR.setMessage("ServerResourceLimitExceededError");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
-    DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableSerializationError");
+    DATA_TABLE_SERIALIZATION_ERROR.setMessage("DataTableSerializationError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
     DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableDeserializationError");
     FUTURE_CALL_ERROR.setMessage("FutureCallError");

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime;
+package org.apache.pinot.query.runtime.queries;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,7 +34,6 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
@@ -60,21 +59,16 @@ import org.testng.annotations.Test;
  */
 public class QueryRunnerTest extends QueryRunnerTestBase {
   public static final Object[][] ROWS = new Object[][]{
-      new Object[]{"foo", "foo", 1},
-      new Object[]{"bar", "bar", 42},
-      new Object[]{"alice", "alice", 1},
-      new Object[]{"bob", "foo", 42},
-      new Object[]{"charlie", "bar", 1},
+      new Object[]{"foo", "foo", 1}, new Object[]{"bar", "bar", 42}, new Object[]{"alice", "alice", 1}, new Object[]{
+          "bob", "foo", 42}, new Object[]{"charlie", "bar", 1},
   };
   public static final Schema.SchemaBuilder SCHEMA_BUILDER;
 
   static {
-    SCHEMA_BUILDER = new Schema.SchemaBuilder()
-        .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
+    SCHEMA_BUILDER = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
-        .addMetric("col3", FieldSpec.DataType.INT, 0)
-        .setSchemaName("defaultSchemaName");
+        .addMetric("col3", FieldSpec.DataType.INT, 0).setSchemaName("defaultSchemaName");
   }
 
   public static List<GenericRow> buildRows(String tableName) {
@@ -84,8 +78,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       row.putValue("col1", ROWS[i][0]);
       row.putValue("col2", ROWS[i][1]);
       row.putValue("col3", ROWS[i][2]);
-      row.putValue("ts", TableType.OFFLINE.equals(TableNameBuilder.getTableTypeFromTableName(tableName))
-          ? System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2) : System.currentTimeMillis());
+      row.putValue("ts",
+          TableType.OFFLINE.equals(TableNameBuilder.getTableTypeFromTableName(tableName)) ? System.currentTimeMillis()
+              - TimeUnit.DAYS.toMillis(2) : System.currentTimeMillis());
       rows.add(row);
     }
     return rows;
@@ -115,9 +110,6 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     factory2.addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
     factory2.addSegment("d_REALTIME", buildRows("d_REALTIME"));
 
-    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
-    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
-
     // Setting up H2 for validation
     setH2Connection();
     Schema schema = SCHEMA_BUILDER.build();
@@ -127,19 +119,16 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       addDataToH2(tableName, schema, factory2.buildTableRowsMap().get(tableName));
     }
 
-    _reducerGrpcPort = QueryTestUtils.getAvailablePort();
-    _reducerHostname = "Broker_localhost";
+    _reducerHostname = "localhost";
+    _reducerPort = QueryTestUtils.getAvailablePort();
     Map<String, Object> reducerConfig = new HashMap<>();
-    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _reducerScheduler = new OpChainSchedulerService(EXECUTOR);
-    _mailboxService = new MailboxService("localhost", _reducerGrpcPort, new PinotConfiguration(reducerConfig));
+    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerPort);
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
-    _queryEnvironment =
-        QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
-            factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
-            null);
+    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
+    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
@@ -148,6 +137,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     int port2 = server2.getPort();
     _servers.put(new QueryServerInstance("localhost", port1, port1), server1);
     _servers.put(new QueryServerInstance("localhost", port2, port2), server2);
+
+    _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerPort, server1.getPort(), server2.getPort(),
+        factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
+        null);
   }
 
   @AfterClass
@@ -163,8 +156,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    * Test compares with expected row count only.
    */
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
-  public void testSqlWithFinalRowCountChecker(String sql, int expectedRows)
-      throws Exception {
+  public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
     List<Object[]> resultRows = queryRunner(sql, null);
     Assert.assertEquals(resultRows.size(), expectedRows);
   }
@@ -246,52 +238,46 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
 
         // test dateTrunc
         //   - on leaf stage
-        new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 10},
-        new Object[]{"SELECT dateTrunc('DAY', CAST(col3 AS BIGINT)) FROM a LIMIT 10", 10},
+        new Object[]{"SELECT dateTrunc('DAY', ts) FROM a LIMIT 10", 10}, new Object[]{"SELECT dateTrunc('DAY', CAST"
+        + "(col3 AS BIGINT)) FROM a LIMIT 10", 10},
         //   - on intermediate stage
         new Object[]{
-            "SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b "
-                + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15
-        },
-        new Object[]{"SELECT dateTrunc('DAY', CAST(MAX(a.col3) AS BIGINT)) FROM a", 1},
+            "SELECT dateTrunc('DAY', round(a.ts, b.ts)) FROM a JOIN b " + "ON a.col1 = b.col1 AND a.col2 = b.col2", 15
+        }, new Object[]{"SELECT dateTrunc('DAY', CAST(MAX(a.col3) AS BIGINT)) FROM a", 1},
 
         // ScalarFunction
         // test function can be used in predicate/leaf/intermediate stage (using regexpLike)
         new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexpLike(a.col2, b.col1)", 9},
         new Object[]{"SELECT a.col1, b.col1 FROM a JOIN b ON a.col3 = b.col3 WHERE regexp_like(a.col2, b.col1)", 9},
-        new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
-        new Object[]{"SELECT regexp_like(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
+        new Object[]{"SELECT regexpLike(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39}, new Object[]{"SELECT "
+        + "regexp_like(a.col1, b.col1) FROM a JOIN b ON a.col3 = b.col3", 39},
 
         // test function with @ScalarFunction annotation and alias works (using round_decimal)
-        new Object[]{"SELECT roundDecimal(col3) FROM a", 15},
-        new Object[]{"SELECT round_decimal(col3) FROM a", 15},
-        new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5},
-        new Object[]{"SELECT col1, round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
+        new Object[]{"SELECT roundDecimal(col3) FROM a", 15}, new Object[]{"SELECT round_decimal(col3) FROM a", 15},
+        new Object[]{"SELECT col1, roundDecimal(COUNT(*)) FROM a GROUP BY col1", 5}, new Object[]{"SELECT col1, "
+        + "round_decimal(COUNT(*)) FROM a GROUP BY col1", 5},
 
         // test queries with special query options attached
         //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.
         new Object[]{"SET multiStageLeafLimit = 1; SELECT * FROM a", 2},
 
         // test groups limit in both leaf and intermediate stage
-        new Object[]{"SET numGroupsLimit = 1; SELECT col1, COUNT(*) FROM a GROUP BY col1", 1},
-        new Object[]{"SET numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2},
-        new Object[]{
-            "SET numGroupsLimit = 1; "
-                + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1
-        },
-        new Object[]{
-            "SET numGroupsLimit = 2; "
-                + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2
-        },
+        new Object[]{"SET numGroupsLimit = 1; SELECT col1, COUNT(*) FROM a GROUP BY col1", 1}, new Object[]{"SET "
+        + "numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2}, new Object[]{
+        "SET numGroupsLimit = 1; "
+            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1
+    }, new Object[]{
+        "SET numGroupsLimit = 2; "
+            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2
+    },
         // TODO: Consider pushing down hint to the leaf stage
         new Object[]{
             "SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
                 + "col1, COUNT(*) FROM a GROUP BY col1", 2
-        },
-        new Object[]{
-            "SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
-                + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1
-        }
+        }, new Object[]{
+        "SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+            + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1
+    }
     };
   }
 
@@ -300,39 +286,36 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     return new Object[][]{
         // Missing index
         new Object[]{
-            "SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10",
-            "without text index"
+            "SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10", "without text index"
         },
 
         // Query hint with dynamic broadcast pipeline breaker should return error upstream
         new Object[]{
             "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a "
-                + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE textMatch(col1, 'f')) AND a.col3 > 0",
-            "without text index"
+                + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE textMatch(col1, 'f')) AND a.col3 > 0", "without text "
+            + "index"
         },
 
         // Timeout exception should occur with this option:
         new Object[]{
-            "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",
-            "Timeout"
+            "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1", "Timeout"
         },
 
         // Function with incorrect argument signature should throw runtime exception when casting string to numeric
         new Object[]{
-            "SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1",
-            "For input string:"
+            "SELECT least(a.col2, b.col3) FROM a JOIN b ON a.col1 = b.col1", "For input string:"
         },
 
         // Scalar function that doesn't have a valid use should throw an exception on the leaf stage
         //   - predicate only functions:
-        new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"},
-        new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index"},
-        new Object[]{"SELECT * FROM a WHERE textContains(col1, 'f')", "supported only on native text index"},
-        new Object[]{"SELECT * FROM a WHERE text_contains(col1, 'f')", "supported only on native text index"},
+        new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index"}, new Object[]{"SELECT * FROM"
+        + " a WHERE text_match(col1, 'f')", "without text index"}, new Object[]{"SELECT * FROM a WHERE textContains"
+        + "(col1, 'f')", "supported only on native text index"}, new Object[]{"SELECT * FROM a WHERE text_contains"
+        + "(col1, 'f')", "supported only on native text index"},
 
         //  - transform only functions
-        new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"},
-        new Object[]{"SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String"},
+        new Object[]{"SELECT jsonExtractKey(col1, 'path') FROM a", "was expecting (JSON String"}, new Object[]{
+            "SELECT json_extract_key(col1, 'path') FROM a", "was expecting (JSON String"},
 
         //  - PlaceholderScalarFunction registered will throw on intermediate stage, but works on leaf stage.
         //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.

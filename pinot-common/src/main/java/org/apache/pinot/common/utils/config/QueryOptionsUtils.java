@@ -191,6 +191,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getMaxStreamingPendingBlocks(Map<String, String> queryOptions) {
+    String maxStreamingPendingBlocks = queryOptions.get(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS);
+    return maxStreamingPendingBlocks != null ? Integer.parseInt(maxStreamingPendingBlocks) : null;
+  }
+
+  @Nullable
   public static Integer getMaxRowsInJoin(Map<String, String> queryOptions) {
     String maxRowsInJoin = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_JOIN);
     return maxRowsInJoin != null ? Integer.parseInt(maxRowsInJoin) : null;

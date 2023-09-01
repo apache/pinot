@@ -29,7 +29,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
-import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
@@ -37,13 +36,11 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  */
 public class InstanceResponseBlock implements Block {
   private final BaseResultsBlock _resultsBlock;
-  private final QueryContext _queryContext;
   private final Map<Integer, String> _exceptions;
   private final Map<String, String> _metadata;
 
-  public InstanceResponseBlock(BaseResultsBlock resultsBlock, QueryContext queryContext) {
+  public InstanceResponseBlock(BaseResultsBlock resultsBlock) {
     _resultsBlock = resultsBlock;
-    _queryContext = queryContext;
     _exceptions = new HashMap<>();
     List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
     if (processingExceptions != null) {
@@ -59,14 +56,12 @@ public class InstanceResponseBlock implements Block {
    */
   public InstanceResponseBlock() {
     _resultsBlock = null;
-    _queryContext = null;
     _exceptions = new HashMap<>();
     _metadata = new HashMap<>();
   }
 
   private InstanceResponseBlock(Map<Integer, String> exceptions, Map<String, String> metadata) {
     _resultsBlock = null;
-    _queryContext = null;
     _exceptions = exceptions;
     _metadata = metadata;
   }
@@ -92,11 +87,6 @@ public class InstanceResponseBlock implements Block {
     return _resultsBlock;
   }
 
-  @Nullable
-  public QueryContext getQueryContext() {
-    return _queryContext;
-  }
-
   public Map<Integer, String> getExceptions() {
     return _exceptions;
   }
@@ -107,12 +97,12 @@ public class InstanceResponseBlock implements Block {
 
   @Nullable
   public DataSchema getDataSchema() {
-    return _resultsBlock != null ? _resultsBlock.getDataSchema(_queryContext) : null;
+    return _resultsBlock != null ? _resultsBlock.getDataSchema() : null;
   }
 
   @Nullable
   public List<Object[]> getRows() {
-    return _resultsBlock != null ? _resultsBlock.getRows(_queryContext) : null;
+    return _resultsBlock != null ? _resultsBlock.getRows() : null;
   }
 
   public DataTable toDataTable()
@@ -124,8 +114,7 @@ public class InstanceResponseBlock implements Block {
 
   public DataTable toDataOnlyDataTable()
       throws IOException {
-    return _resultsBlock != null ? _resultsBlock.getDataTable(_queryContext)
-        : DataTableBuilderFactory.getEmptyDataTable();
+    return _resultsBlock != null ? _resultsBlock.getDataTable() : DataTableBuilderFactory.getEmptyDataTable();
   }
 
   public DataTable toMetadataOnlyDataTable() {

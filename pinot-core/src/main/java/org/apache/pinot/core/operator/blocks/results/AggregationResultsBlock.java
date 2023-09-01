@@ -45,10 +45,13 @@ import org.roaringbitmap.RoaringBitmap;
 public class AggregationResultsBlock extends BaseResultsBlock {
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Object> _results;
+  private final QueryContext _queryContext;
 
-  public AggregationResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> results) {
+  public AggregationResultsBlock(AggregationFunction[] aggregationFunctions, List<Object> results,
+      QueryContext queryContext) {
     _aggregationFunctions = aggregationFunctions;
     _results = results;
+    _queryContext = queryContext;
   }
 
   public AggregationFunction[] getAggregationFunctions() {
@@ -65,14 +68,19 @@ public class AggregationResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
+  public QueryContext getQueryContext() {
+    return _queryContext;
+  }
+
+  @Override
+  public DataSchema getDataSchema() {
     List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
-        queryContext.getFilteredAggregationFunctions();
+        _queryContext.getFilteredAggregationFunctions();
     assert filteredAggregationFunctions != null;
     int numColumns = filteredAggregationFunctions.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
-    boolean returnFinalResult = queryContext.isServerReturnFinalResult();
+    boolean returnFinalResult = _queryContext.isServerReturnFinalResult();
     for (int i = 0; i < numColumns; i++) {
       Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
       AggregationFunction aggregationFunction = pair.getLeft();
@@ -84,20 +92,20 @@ public class AggregationResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public List<Object[]> getRows(QueryContext queryContext) {
+  public List<Object[]> getRows() {
     return Collections.singletonList(_results.toArray());
   }
 
   @Override
-  public DataTable getDataTable(QueryContext queryContext)
+  public DataTable getDataTable()
       throws IOException {
-    DataSchema dataSchema = getDataSchema(queryContext);
+    DataSchema dataSchema = getDataSchema();
     assert dataSchema != null;
     ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
-    boolean returnFinalResult = queryContext.isServerReturnFinalResult();
-    if (queryContext.isNullHandlingEnabled()) {
+    boolean returnFinalResult = _queryContext.isServerReturnFinalResult();
+    if (_queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       for (int i = 0; i < numColumns; i++) {
         nullBitmaps[i] = new RoaringBitmap();

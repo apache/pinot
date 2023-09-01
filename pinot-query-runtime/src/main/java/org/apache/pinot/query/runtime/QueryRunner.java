@@ -26,11 +26,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
@@ -64,15 +63,14 @@ import org.slf4j.LoggerFactory;
  */
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
-  private static final String PINOT_V1_SERVER_QUERY_CONFIG_PREFIX = "pinot.server.query.executor";
 
   private HelixManager _helixManager;
   private ServerMetrics _serverMetrics;
 
-  private ExecutorService _opChainExecutor;
-  private OpChainSchedulerService _scheduler;
+  private ExecutorService _executorService;
+  private OpChainSchedulerService _opChainScheduler;
   private MailboxService _mailboxService;
-  private ServerQueryExecutorV1Impl _leafQueryExecutor;
+  private QueryExecutor _leafQueryExecutor;
 
   // Group-by settings
   @Nullable
@@ -95,9 +93,10 @@ public class QueryRunner {
     _helixManager = helixManager;
     _serverMetrics = serverMetrics;
 
-    String instanceName = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
-    String hostname = instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE) ? instanceName.substring(
-        CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceName;
+    String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+    if (hostname.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      hostname = hostname.substring(CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    }
     int port = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
 
@@ -114,18 +113,23 @@ public class QueryRunner {
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
     //TODO: make this configurable
-    _opChainExecutor =
-        ExecutorServiceUtils.create(config, "pinot.query.runner.opchain", "op_chain_worker_on_" + port + "_port");
-    _scheduler = new OpChainSchedulerService(getOpChainExecutorService());
+    _executorService = ExecutorServiceUtils.createDefault("query-runner-on-" + port);
+    _opChainScheduler = new OpChainSchedulerService(_executorService);
     _mailboxService = new MailboxService(hostname, port, config);
     try {
       _leafQueryExecutor = new ServerQueryExecutorV1Impl();
-      _leafQueryExecutor.init(config.subset(PINOT_V1_SERVER_QUERY_CONFIG_PREFIX), instanceDataManager, serverMetrics);
+      _leafQueryExecutor.init(config.subset(CommonConstants.Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
+          serverMetrics);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
 
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
+  }
+
+  @VisibleForTesting
+  public ExecutorService getExecutorService() {
+    return _executorService;
   }
 
   public void start() {
@@ -136,7 +140,7 @@ public class QueryRunner {
   public void shutDown() {
     _leafQueryExecutor.shutDown();
     _mailboxService.shutdown();
-    ExecutorServiceUtils.close(_opChainExecutor);
+    ExecutorServiceUtils.close(_executorService);
   }
 
   /**
@@ -154,7 +158,7 @@ public class QueryRunner {
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
+        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, distributedStagePlan,
             requestMetadata, requestId, deadlineMs);
 
     // Send error block to all the receivers if pipeline breaker fails
@@ -192,7 +196,7 @@ public class QueryRunner {
     } else {
       opChain = PhysicalPlanVisitor.walkPlanNode(distributedStagePlan.getStageRoot(), executionContext);
     }
-    _scheduler.register(opChain);
+    _opChainScheduler.register(opChain);
   }
 
   private void setStageCustomProperties(Map<String, String> customProperties, Map<String, String> requestMetadata) {
@@ -231,12 +235,7 @@ public class QueryRunner {
   }
 
   public void cancel(long requestId) {
-    _scheduler.cancel(requestId);
-  }
-
-  @VisibleForTesting
-  public ExecutorService getOpChainExecutorService() {
-    return _opChainExecutor;
+    _opChainScheduler.cancel(requestId);
   }
 
   private OpChain compileLeafStage(OpChainExecutionContext executionContext,
@@ -248,29 +247,16 @@ public class QueryRunner {
     long queryArrivalTimeMs = System.currentTimeMillis();
     for (ServerPlanRequestContext requestContext : serverPlanRequestContexts) {
       serverQueryRequests.add(
-          new ServerQueryRequest(requestContext.getInstanceRequest(), _serverMetrics, queryArrivalTimeMs));
+          new ServerQueryRequest(requestContext.getInstanceRequest(), _serverMetrics, queryArrivalTimeMs, true));
     }
     MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
     MultiStageOperator leafStageOperator =
-        new LeafStageTransferableBlockOperator(executionContext, this::processServerQueryRequest, serverQueryRequests,
-            sendNode.getDataSchema());
+        new LeafStageTransferableBlockOperator(executionContext, serverQueryRequests, sendNode.getDataSchema(),
+            _leafQueryExecutor, _executorService);
     MailboxSendOperator mailboxSendOperator =
         new MailboxSendOperator(executionContext, leafStageOperator, sendNode.getDistributionType(),
             sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
             sendNode.isSortOnSender(), sendNode.getReceiverStageId());
     return new OpChain(executionContext, mailboxSendOperator);
-  }
-
-  private InstanceResponseBlock processServerQueryRequest(ServerQueryRequest request) {
-    InstanceResponseBlock result;
-    try {
-      result = _leafQueryExecutor.execute(request, getOpChainExecutorService());
-    } catch (Exception e) {
-      InstanceResponseBlock errorResponse = new InstanceResponseBlock();
-      errorResponse.getExceptions()
-          .put(QueryException.QUERY_EXECUTION_ERROR_CODE, e.getMessage() + QueryException.getTruncatedStackTrace(e));
-      result = errorResponse;
-    }
-    return result;
   }
 }

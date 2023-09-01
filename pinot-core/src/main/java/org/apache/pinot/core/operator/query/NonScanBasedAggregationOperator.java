@@ -38,6 +38,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -61,16 +62,16 @@ import org.apache.pinot.spi.utils.ByteArray;
  */
 @SuppressWarnings("rawtypes")
 public class NonScanBasedAggregationOperator extends BaseOperator<AggregationResultsBlock> {
-
   private static final String EXPLAIN_NAME = "AGGREGATE_NO_SCAN";
 
+  private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final DataSource[] _dataSources;
   private final int _numTotalDocs;
 
-  public NonScanBasedAggregationOperator(AggregationFunction[] aggregationFunctions, DataSource[] dataSources,
-      int numTotalDocs) {
-    _aggregationFunctions = aggregationFunctions;
+  public NonScanBasedAggregationOperator(QueryContext queryContext, DataSource[] dataSources, int numTotalDocs) {
+    _queryContext = queryContext;
+    _aggregationFunctions = queryContext.getAggregationFunctions();
     _dataSources = dataSources;
     _numTotalDocs = numTotalDocs;
   }
@@ -132,7 +133,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     }
 
     // Build intermediate result block based on aggregation result from the executor.
-    return new AggregationResultsBlock(_aggregationFunctions, aggregationResults);
+    return new AggregationResultsBlock(_aggregationFunctions, aggregationResults, _queryContext);
   }
 
   private static Double getMinValue(DataSource dataSource) {
