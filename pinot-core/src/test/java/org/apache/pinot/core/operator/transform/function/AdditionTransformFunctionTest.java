@@ -41,7 +41,8 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     double[] expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] =
-          (double) _intSVValues[i] + (double) _longSVValues[i] + (double) _floatSVValues[i] + _doubleSVValues[i]
+          (double) _intSVValues[i] + (double) _longSVValues[i]
+              + Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()) + _doubleSVValues[i]
               + Double.parseDouble(_stringSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
@@ -53,8 +54,8 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = ((12d + Double.parseDouble(_stringSVValues[i])) + _doubleSVValues[i] + (
-          ((double) _floatSVValues[i] + (double) _longSVValues[i]) + 0.34 + (double) _intSVValues[i])
-          + _doubleSVValues[i]);
+          (Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()) + (double) _longSVValues[i]) + 0.34
+              + (double) _intSVValues[i]) + _doubleSVValues[i]);
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -78,7 +79,7 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       double val1 = 12d + Double.parseDouble(_stringSVValues[i]);
       double val2 = _doubleSVValues[i];
-      double val3 = (double) _floatSVValues[i] + (double) _longSVValues[i];
+      double val3 = Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()) + (double) _longSVValues[i];
       BigDecimal val6 = BigDecimal.valueOf(val3).add(val4).add(BigDecimal.valueOf(_intSVValues[i]));
       expectedBigDecimalValues[i] =
           BigDecimal.valueOf(val1).add(BigDecimal.valueOf(val2)).add(val6).add(_bigDecimalSVValues[i]);

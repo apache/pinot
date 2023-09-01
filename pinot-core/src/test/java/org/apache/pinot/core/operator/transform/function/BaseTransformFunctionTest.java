@@ -387,7 +387,7 @@ public abstract class BaseTransformFunctionTest {
       assertEquals(intValues[i], (int) expectedValues[i]);
       assertEquals(longValues[i], (long) expectedValues[i]);
       assertEquals(floatValues[i], expectedValues[i]);
-      assertEquals(doubleValues[i], (double) expectedValues[i]);
+      assertEquals(doubleValues[i], Double.parseDouble(Float.valueOf(expectedValues[i]).toString()));
       assertEquals(bigDecimalValues[i].floatValue(), expectedValues[i]);
       assertEquals(stringValues[i], Float.toString(expectedValues[i]));
     }
@@ -629,7 +629,7 @@ public abstract class BaseTransformFunctionTest {
         assertEquals(intValuesMV[i][j], (int) expectedValues[i][j]);
         assertEquals(longValuesMV[i][j], (long) expectedValues[i][j]);
         assertEquals(floatValuesMV[i][j], expectedValues[i][j]);
-        assertEquals(doubleValuesMV[i][j], (double) expectedValues[i][j]);
+        assertEquals(doubleValuesMV[i][j], Double.parseDouble(Float.valueOf(expectedValues[i][j]).toString()));
         assertEquals(stringValuesMV[i][j], Float.toString(expectedValues[i][j]));
       }
     }

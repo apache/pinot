@@ -132,9 +132,11 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     long[] longScalarValues = new long[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedLongValues[i] =
-          (long) ((double) (int) _doubleSVValues[i] - (double) (float) _longSVValues[i] / (double) _intSVValues[i]);
+          (long) ((double) (int) _doubleSVValues[i]
+              - Double.parseDouble(Float.valueOf((float) _longSVValues[i]).toString()) / (double) _intSVValues[i]);
       longScalarValues[i] = (long) cast((double) (int) cast(_doubleSVValues[i], "int")
-          - (double) (float) cast(_longSVValues[i], "float") / (double) cast(_intSVValues[i], "double"), "long");
+          - Double.parseDouble(Float.valueOf((float) cast(_longSVValues[i], "float")).toString())
+          / (double) cast(_intSVValues[i], "double"), "long");
     }
     testTransformFunction(transformFunction, expectedLongValues);
     assertEquals(expectedLongValues, longScalarValues);

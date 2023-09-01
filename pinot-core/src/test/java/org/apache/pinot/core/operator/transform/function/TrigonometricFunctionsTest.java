@@ -104,7 +104,8 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
     Assert.assertEquals(transformFunction.getName(), Atan2TransformFunction.FUNCTION_NAME);
     double[] expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.atan2(_doubleSVValues[i], _floatSVValues[i]);
+      expectedValues[i] = Math.atan2(_doubleSVValues[i],
+          Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()));
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -137,7 +138,7 @@ public class TrigonometricFunctionsTest extends BaseTransformFunctionTest {
     Assert.assertEquals(transformFunction.getName(), sqlFunction);
     expectedValues = new double[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = op.applyAsDouble(_floatSVValues[i]);
+      expectedValues[i] = op.applyAsDouble(Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()));
     }
     testTransformFunction(transformFunction, expectedValues);
 

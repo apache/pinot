@@ -61,7 +61,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AbsTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.abs(_floatSVValues[i]);
+      expectedValues[i] = Double.parseDouble(Float.valueOf(Math.abs(_floatSVValues[i])).toString());
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -128,7 +128,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CeilTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.ceil(_floatSVValues[i]);
+      expectedValues[i] = Math.ceil(Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()));
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -261,7 +261,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof FloorTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.floor(_floatSVValues[i]);
+      expectedValues[i] = Math.floor(Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()));
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -329,7 +329,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof LnTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.log(_floatSVValues[i]);
+      expectedValues[i] = Math.log(Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()));
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -396,7 +396,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SqrtTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.sqrt(_floatSVValues[i]);
+      expectedValues[i] = Math.sqrt(Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()));
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -498,7 +498,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof Log10TransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.log10(_floatSVValues[i]);
+      expectedValues[i] = Math.log10(Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()));
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -555,7 +555,7 @@ public class SingleParamMathTransformFunctionTest extends BaseTransformFunctionT
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof Log2TransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = Math.log(_floatSVValues[i]) / Math.log(2);
+      expectedValues[i] = Math.log(Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString())) / Math.log(2);
     }
     testTransformFunction(transformFunction, expectedValues);
 

@@ -47,7 +47,7 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SubtractionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = (double) _longSVValues[i] - (double) _floatSVValues[i];
+      expectedValues[i] = (double) _longSVValues[i] - Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString());
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -55,7 +55,7 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof SubtractionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = (double) _floatSVValues[i] - _doubleSVValues[i];
+      expectedValues[i] = Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()) - _doubleSVValues[i];
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -82,8 +82,8 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
     Assert.assertTrue(transformFunction instanceof SubtractionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = (((((12d - Double.parseDouble(_stringSVValues[i])) - _doubleSVValues[i]) - (
-          ((double) _floatSVValues[i] - (double) _longSVValues[i]) - 0.34)) - (double) _intSVValues[i])
-          - _doubleSVValues[i]);
+          ((Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()) - (double) _longSVValues[i]) - 0.34))
+          - (double) _intSVValues[i]) - _doubleSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedValues);
 
@@ -96,7 +96,8 @@ public class SubtractionTransformFunctionTest extends BaseTransformFunctionTest 
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedBigDecimalValues[i] = (BigDecimal.valueOf(
               (((12d - Double.parseDouble(_stringSVValues[i])) - _doubleSVValues[i]) - (
-                  ((double) _floatSVValues[i] - (double) _longSVValues[i]) - 0.34)) - (double) _intSVValues[i])
+                  (Double.parseDouble(Float.valueOf(_floatSVValues[i]).toString()) - (double) _longSVValues[i]) - 0.34))
+                  - (double) _intSVValues[i])
           .subtract(_bigDecimalSVValues[i]));
     }
     testTransformFunction(transformFunction, expectedBigDecimalValues);
