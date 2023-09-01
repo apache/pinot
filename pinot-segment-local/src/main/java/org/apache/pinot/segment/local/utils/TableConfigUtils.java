@@ -649,6 +649,8 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
+    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null,
+        "Upsert/Dedup table cannot use tenant tag override");
 
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
