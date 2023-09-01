@@ -184,14 +184,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
 
     _reducerGrpcPort = QueryTestUtils.getAvailablePort();
-    _reducerHostname = String.format("Broker_%s", CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_HOSTNAME);
+    _reducerHostname = "Broker_localhost";
     Map<String, Object> reducerConfig = new HashMap<>();
     reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
     reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
     _reducerScheduler = new OpChainSchedulerService(EXECUTOR);
-    _mailboxService =
-        new MailboxService(CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
-            new PinotConfiguration(reducerConfig));
+    _mailboxService = new MailboxService("localhost", _reducerGrpcPort, new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
     Map<String, List<String>> tableToSegmentMap1 = factory1.buildTableSegmentNameMap();

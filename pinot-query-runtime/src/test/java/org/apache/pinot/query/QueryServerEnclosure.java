@@ -77,8 +77,7 @@ public class QueryServerEnclosure {
       _helixManager = mockHelixManager(factory.buildSchemaMap());
       _queryRunnerPort = QueryTestUtils.getAvailablePort();
       _runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
-      _runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME,
-          String.format("Server_%s", CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_HOSTNAME));
+      _runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "Server_localhost");
       _queryRunner = new QueryRunner();
     } catch (Exception e) {
       throw new RuntimeException("Test Failed!", e);
