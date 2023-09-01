@@ -39,6 +39,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class MultiStageBrokerRequestHandlerTest {
 
   private PinotConfiguration _config;
@@ -60,11 +61,11 @@ public class MultiStageBrokerRequestHandlerTest {
   public void setUp() {
     MockitoAnnotations.openMocks(this);
     _config = new PinotConfiguration();
-    _config.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, "10000");
+    _config.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
     _config.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, "12345");
     _accessControlFactory = new AllowAllAccessControlFactory();
     _requestHandler =
-        new MultiStageBrokerRequestHandler(_config, "testBrokerId", _routingManager, _accessControlFactory,
+        new MultiStageBrokerRequestHandler(_config, "Broker_localhost", _routingManager, _accessControlFactory,
             _queryQuotaManager, _tableCache, _brokerMetrics);
   }
 

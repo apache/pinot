@@ -65,7 +65,7 @@ public class ResultsBlockUtils {
     // NOTE: Use STRING column data type as default for selection query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    return new SelectionResultsBlock(dataSchema, Collections.emptyList());
+    return new SelectionResultsBlock(dataSchema, Collections.emptyList(), queryContext);
   }
 
   private static AggregationResultsBlock buildEmptyAggregationQueryResults(QueryContext queryContext) {
@@ -76,7 +76,7 @@ public class ResultsBlockUtils {
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
       results.add(aggregationFunction.extractAggregationResult(aggregationFunction.createAggregationResultHolder()));
     }
-    return new AggregationResultsBlock(aggregationFunctions, results);
+    return new AggregationResultsBlock(aggregationFunctions, results, queryContext);
   }
 
   private static GroupByResultsBlock buildEmptyGroupByQueryResults(QueryContext queryContext) {
@@ -100,7 +100,7 @@ public class ResultsBlockUtils {
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
       index++;
     }
-    return new GroupByResultsBlock(new DataSchema(columnNames, columnDataTypes));
+    return new GroupByResultsBlock(new DataSchema(columnNames, columnDataTypes), queryContext);
   }
 
   private static DistinctResultsBlock buildEmptyDistinctQueryResults(QueryContext queryContext) {
@@ -115,6 +115,6 @@ public class ResultsBlockUtils {
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
     DistinctTable distinctTable = new DistinctTable(new DataSchema(columns, columnDataTypes), Collections.emptySet(),
         queryContext.isNullHandlingEnabled());
-    return new DistinctResultsBlock(distinctTable);
+    return new DistinctResultsBlock(distinctTable, queryContext);
   }
 }

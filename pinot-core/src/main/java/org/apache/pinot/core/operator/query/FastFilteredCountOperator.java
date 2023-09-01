@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 
 
@@ -35,17 +36,19 @@ public class FastFilteredCountOperator extends BaseOperator<AggregationResultsBl
 
   private static final String EXPLAIN_NAME = "FAST_FILTERED_COUNT";
 
-  private final BaseFilterOperator _filterOperator;
+  private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
+  private final BaseFilterOperator _filterOperator;
   private final SegmentMetadata _segmentMetadata;
 
   private long _docsCounted;
 
-  public FastFilteredCountOperator(AggregationFunction[] aggregationFunctions, BaseFilterOperator filterOperator,
+  public FastFilteredCountOperator(QueryContext queryContext, BaseFilterOperator filterOperator,
       SegmentMetadata segmentMetadata) {
+    _queryContext = queryContext;
+    _aggregationFunctions = queryContext.getAggregationFunctions();
     _filterOperator = filterOperator;
     _segmentMetadata = segmentMetadata;
-    _aggregationFunctions = aggregationFunctions;
   }
 
   @Override
@@ -65,7 +68,7 @@ public class FastFilteredCountOperator extends BaseOperator<AggregationResultsBl
     List<Object> aggregates = new ArrayList<>(1);
     aggregates.add(count);
     _docsCounted += count;
-    return new AggregationResultsBlock(_aggregationFunctions, aggregates);
+    return new AggregationResultsBlock(_aggregationFunctions, aggregates, _queryContext);
   }
 
   @Override

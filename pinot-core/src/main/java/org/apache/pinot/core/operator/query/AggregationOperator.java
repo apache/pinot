@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 
 
@@ -38,6 +39,7 @@ import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE";
 
+  private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final BaseProjectOperator<?> _projectOperator;
   private final long _numTotalDocs;
@@ -45,9 +47,10 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
 
   private int _numDocsScanned = 0;
 
-  public AggregationOperator(AggregationFunction[] aggregationFunctions, BaseProjectOperator<?> projectOperator,
-      long numTotalDocs, boolean useStarTree) {
-    _aggregationFunctions = aggregationFunctions;
+  public AggregationOperator(QueryContext queryContext, BaseProjectOperator<?> projectOperator, long numTotalDocs,
+      boolean useStarTree) {
+    _queryContext = queryContext;
+    _aggregationFunctions = queryContext.getAggregationFunctions();
     _projectOperator = projectOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
@@ -69,7 +72,7 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
     }
 
     // Build intermediate result block based on aggregation result from the executor
-    return new AggregationResultsBlock(_aggregationFunctions, aggregationExecutor.getResult());
+    return new AggregationResultsBlock(_aggregationFunctions, aggregationExecutor.getResult(), _queryContext);
   }
 
   @Override
