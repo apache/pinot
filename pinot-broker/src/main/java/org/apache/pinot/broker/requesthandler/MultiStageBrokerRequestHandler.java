@@ -98,7 +98,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
-        new WorkerManager(reducerHostname, reducerPort, routingManager), _tableCache);
+        new WorkerManager(reducerHostname, reducerPort, routingManager), _tableCache, config);
     _mailboxService = new MailboxService(reducerHostname, reducerPort, config);
     _queryDispatcher = new QueryDispatcher(_mailboxService);
 

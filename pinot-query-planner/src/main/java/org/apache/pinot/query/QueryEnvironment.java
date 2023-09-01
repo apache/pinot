@@ -70,6 +70,7 @@ import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
@@ -96,7 +97,7 @@ public class QueryEnvironment {
   private final TableCache _tableCache;
 
   public QueryEnvironment(TypeFactory typeFactory, CalciteSchema rootSchema, WorkerManager workerManager,
-      TableCache tableCache) {
+      TableCache tableCache, @Nullable PinotConfiguration config) {
     _typeFactory = typeFactory;
     _rootSchema = rootSchema;
     _workerManager = workerManager;
@@ -129,7 +130,7 @@ public class QueryEnvironment {
 
     // ----
     // Run Pinot specific pre-rules
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PINOT_PRE_RULES);
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.getPinotPreRules(config));
 
     // ----
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
