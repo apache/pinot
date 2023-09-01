@@ -287,7 +287,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         break;
       case FLOAT:
         for (int i = 0; i < length; i++) {
-          values[i] = getFloat(docIds[i], context);
+          values[i] = Double.parseDouble(Float.valueOf(getFloat(docIds[i], context)).toString());
         }
         break;
       case DOUBLE:

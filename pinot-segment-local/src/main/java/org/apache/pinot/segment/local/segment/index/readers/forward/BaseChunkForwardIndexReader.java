@@ -337,7 +337,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
           int minOffset = docIds[0] * Float.BYTES;
           FloatBuffer buffer = _rawData.toDirectByteBuffer(minOffset, length * Float.BYTES).asFloatBuffer();
           for (int i = 0; i < buffer.limit(); i++) {
-            values[i] = buffer.get(i);
+            values[i] = Double.parseDouble(Float.valueOf(buffer.get(i)).toString());
           }
         }
         break;

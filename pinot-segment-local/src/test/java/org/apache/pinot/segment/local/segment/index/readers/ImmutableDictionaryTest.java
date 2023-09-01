@@ -270,7 +270,7 @@ public class ImmutableDictionaryTest {
       assertEquals(floatDictionary.getIntValue(i), (int) _floatValues[i]);
       assertEquals(floatDictionary.getLongValue(i), (long) _floatValues[i]);
       assertEquals(floatDictionary.getFloatValue(i), _floatValues[i]);
-      assertEquals(floatDictionary.getDoubleValue(i), (double) _floatValues[i]);
+      assertEquals(floatDictionary.getDoubleValue(i), Double.parseDouble(Float.valueOf(_floatValues[i]).toString()));
       Assert.assertEquals(Float.parseFloat(floatDictionary.getStringValue(i)), _floatValues[i], 0.0f);
 
       assertEquals(floatDictionary.indexOf(String.valueOf(_floatValues[i])), i);

@@ -104,7 +104,7 @@ public class OnHeapFloatDictionary extends BaseImmutableDictionary {
 
   @Override
   public double getDoubleValue(int dictId) {
-    return _dictIdToVal[dictId];
+    return Double.parseDouble(Float.valueOf(_dictIdToVal[dictId]).toString());
   }
 
   @Override
