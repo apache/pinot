@@ -22,11 +22,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -43,6 +47,10 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
   private static final String MET_FLOAT_SORTED = "metFloatSorted";
   private static final String MET_DOUBLE_UNSORTED = "metDoubleUnsorted";
   private static final String MET_FLOAT_UNSORTED = "metFloatUnsorted";
+  private static final String MET_DOUBLE_SORTED_NO_DIC = "metDoubleSortedNoDic";
+  private static final String MET_FLOAT_SORTED_NO_DIC = "metFloatSortedNoDic";
+  private static final String MET_DOUBLE_UNSORTED_NO_DIC = "metDoubleUnsortedNoDic";
+  private static final String MET_FLOAT_UNSORTED_NO_DIC = "metFloatUnsortedNoDic";
 
   @Override
   public String getTableName() {
@@ -56,6 +64,10 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
         .addMetric(MET_FLOAT_SORTED, FieldSpec.DataType.FLOAT)
         .addMetric(MET_DOUBLE_UNSORTED, FieldSpec.DataType.DOUBLE)
         .addMetric(MET_FLOAT_UNSORTED, FieldSpec.DataType.FLOAT)
+        .addMetric(MET_DOUBLE_SORTED_NO_DIC, FieldSpec.DataType.DOUBLE)
+        .addMetric(MET_FLOAT_SORTED_NO_DIC, FieldSpec.DataType.FLOAT)
+        .addMetric(MET_DOUBLE_UNSORTED_NO_DIC, FieldSpec.DataType.DOUBLE)
+        .addMetric(MET_FLOAT_UNSORTED_NO_DIC, FieldSpec.DataType.FLOAT)
         .build();
   }
 
@@ -75,6 +87,14 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
         new org.apache.avro.Schema.Field(MET_DOUBLE_UNSORTED,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null),
         new org.apache.avro.Schema.Field(MET_FLOAT_UNSORTED,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null),
+        new org.apache.avro.Schema.Field(MET_DOUBLE_SORTED_NO_DIC,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null),
+        new org.apache.avro.Schema.Field(MET_FLOAT_SORTED_NO_DIC,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null),
+        new org.apache.avro.Schema.Field(MET_DOUBLE_UNSORTED_NO_DIC,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null),
+        new org.apache.avro.Schema.Field(MET_FLOAT_UNSORTED_NO_DIC,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE), null, null)));
 
     // create avro file
@@ -90,6 +110,10 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
         record.put(MET_FLOAT_SORTED, sortedValue);
         record.put(MET_DOUBLE_UNSORTED, unsortedValue);
         record.put(MET_FLOAT_UNSORTED, unsortedValue);
+        record.put(MET_DOUBLE_SORTED_NO_DIC, sortedValue);
+        record.put(MET_FLOAT_SORTED_NO_DIC, sortedValue);
+        record.put(MET_DOUBLE_UNSORTED_NO_DIC, unsortedValue);
+        record.put(MET_FLOAT_UNSORTED_NO_DIC, unsortedValue);
         sortedValue += 0.01;
         unsortedValue += 0.01;
         if (unsortedValue > 0.09) {
@@ -108,13 +132,26 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
     return NUM_DOCS;
   }
 
+  @Override
+  public TableConfig createOfflineTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
+        .setNoDictionaryColumns(getNoDictionaryColumns()).build();
+  }
+
+  @Override
+  protected List<String> getNoDictionaryColumns() {
+    return ImmutableList.of(MET_DOUBLE_SORTED_NO_DIC, MET_FLOAT_SORTED_NO_DIC, MET_DOUBLE_UNSORTED_NO_DIC,
+        MET_FLOAT_UNSORTED_NO_DIC);
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Choose 0.05 because if it's not converted correctly, float 0.05 will be converted to double 0.05000000074505806
     String[][] filterAndExpectedCount = {
-        {MET_DOUBLE_SORTED + " > 0.05", "4"}, {MET_DOUBLE_SORTED + " = 0.05", "1"},
+        {MET_DOUBLE_SORTED + " > 0.05", "4"},
+        {MET_DOUBLE_SORTED + " = 0.05", "1"},
         {MET_DOUBLE_SORTED + " < 0.05", "5"},
         {MET_FLOAT_SORTED + " > 0.05", "4"},
         // FIXME: V1 query engine fails with null pointer exception for this query
@@ -127,6 +164,20 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
         // FIXME: V1 query engine fails with null pointer exception for this query
         //{MET_FLOAT_UNSORTED + " = 0.05", "1"},
         {MET_FLOAT_UNSORTED + " < 0.05", "5"},
+        {MET_DOUBLE_SORTED_NO_DIC + " > 0.05", "4"},
+        {MET_DOUBLE_SORTED_NO_DIC + " = 0.05", "1"},
+        {MET_DOUBLE_SORTED_NO_DIC + " < 0.05", "5"},
+        {MET_FLOAT_SORTED_NO_DIC + " > 0.05", "4"},
+        // FIXME: V1 query engine fails with null pointer exception for this query
+        // {MET_FLOAT_SORTED_NO_DIC + " = 0.05", "1"},
+        {MET_FLOAT_SORTED_NO_DIC + " < 0.05", "5"},
+        {MET_DOUBLE_UNSORTED_NO_DIC + " > 0.05", "4"},
+        {MET_DOUBLE_UNSORTED_NO_DIC + " = 0.05", "1"},
+        {MET_DOUBLE_UNSORTED_NO_DIC + " < 0.05", "5"},
+        {MET_FLOAT_UNSORTED_NO_DIC + " > 0.05", "4"},
+        // FIXME: V1 query engine fails with null pointer exception for this query
+        // {MET_FLOAT_UNSORTED_NO_DIC + " = 0.05", "1"},
+        {MET_FLOAT_UNSORTED_NO_DIC + " < 0.05", "5"},
     };
     for (String[] faec : filterAndExpectedCount) {
       String filter = faec[0];
