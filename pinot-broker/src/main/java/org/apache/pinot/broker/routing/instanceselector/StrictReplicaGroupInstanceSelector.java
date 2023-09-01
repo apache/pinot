@@ -32,8 +32,11 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,6 +123,53 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       }
     }
 
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
+    Map<String, Map<String, Integer>> segmentCountPerInstancePartition = new HashMap<>();
+    Set<String> corruptedInstances = new HashSet<>();
+    Map<String, Set<String>> segmentsPerPartition = new HashMap<>();
+    if (tableConfig != null && tableConfig.isUpsertEnabled()) {
+      for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
+        String segment = entry.getKey();
+        String partitionId = String.valueOf(new LLCSegmentName(segment).getPartitionGroupId());
+        Set<String> onlineInstances = entry.getValue();
+        segmentsPerPartition.compute(partitionId, (k, v) -> {
+          if (v == null) {
+            v = new HashSet<>();
+          }
+          v.add(segment);
+          return v;
+        });
+
+        for (String instance : onlineInstances) {
+          if (segmentCountPerInstancePartition.containsKey(partitionId)) {
+            Map<String, Integer> instanceCount = segmentCountPerInstancePartition.get(partitionId);
+            if (instanceCount.containsKey(instance)) {
+              instanceCount.put(instance, instanceCount.get(instance) + 1);
+            } else {
+              instanceCount.put(instance, 1);
+            }
+          } else {
+            Map<String, Integer> instanceCount = new HashMap<>();
+            instanceCount.put(instance, 1);
+            segmentCountPerInstancePartition.put(partitionId, instanceCount);
+          }
+        }
+      }
+
+      // for each partition, check whether each instances has all the segments for a partition assigned to it or not
+      // and then filter out the ones that don't have equal number of segments
+      for (Map.Entry<String, Map<String, Integer>> entry : segmentCountPerInstancePartition.entrySet()) {
+        String partitionId = entry.getKey();
+        Map<String, Integer> instanceCount = entry.getValue();
+        int count = segmentsPerPartition.get(partitionId).size();
+        for (Map.Entry<String, Integer> instanceEntry : instanceCount.entrySet()) {
+          if (instanceEntry.getValue() != count) {
+            corruptedInstances.add(instanceEntry.getKey());
+          }
+        }
+      }
+    }
+
     // Calculate the unavailable instances based on the old segments' online instances for each combination of instances
     // in the ideal state
     Map<Set<String>, Set<String>> unavailableInstancesMap = new HashMap<>();
@@ -135,6 +185,15 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
           if (unavailableInstances.add(instance)) {
             LOGGER.warn(
                 "Found unavailable instance: {} in instance group: {} for segment: {}, table: {} (IS: {}, EV: {})",
+                instance, instancesInIdealState, segment, _tableNameWithType, idealStateInstanceStateMap,
+                externalViewAssignment.get(segment));
+          }
+        }
+
+        if (corruptedInstances.contains(instance)) {
+          if (unavailableInstances.add(instance)) {
+            LOGGER.warn(
+                "Found corrupted instance: {} in instance group: {} for segment: {}, table: {} (IS: {}, EV: {})",
                 instance, instancesInIdealState, segment, _tableNameWithType, idealStateInstanceStateMap,
                 externalViewAssignment.get(segment));
           }
