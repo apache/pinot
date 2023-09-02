@@ -626,6 +626,26 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
   }
 
+  @Test
+  public void testLastWithTimeWithSubQuery()
+      throws Exception {
+    String pinotQuery =
+        "SELECT Carrier, LASTWITHTIME(s1, CAST(time_bucket as TIMESTAMP), 'LONG'), "
+            + "          LASTWITHTIME(s2, CAST(time_bucket as TIMESTAMP), 'DOUBLE')\n"
+            + "FROM (\n"
+            + "  SELECT DaysSinceEpoch*86400 as time_bucket, Carrier, "
+            + "  SUM(LongestAddGTime) as s1, AVG(TotalAddGTime) as s2 \n"
+            + "  FROM \"mytable\"\n"
+            + "  WHERE DaysSinceEpoch <= 16101 AND DaysSinceEpoch >= 16071 \n"
+            + "  GROUP BY DaysSinceEpoch, Carrier\n"
+            + "  ORDER BY DaysSinceEpoch\n"
+            + ")\n"
+            + "GROUP BY Carrier\n"
+            + "LIMIT 1000\n";
+    JsonNode jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 14);
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {
