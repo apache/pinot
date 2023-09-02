@@ -186,17 +186,9 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             }
             break;
           }
-          case FLOAT: {
-            float converted = (float) actual;
-            if (converted != actual) {
-              // Double to float conversion is lossy.
-              return getExpressionFromBoolean(result);
-            } else {
-              // Replace double value with converted float value.
-              rhs.getLiteral().setDoubleValue(converted);
-            }
+          case FLOAT:
+            // do not make decision on float value, let server handle it.
             break;
-          }
           default:
             break;
         }
