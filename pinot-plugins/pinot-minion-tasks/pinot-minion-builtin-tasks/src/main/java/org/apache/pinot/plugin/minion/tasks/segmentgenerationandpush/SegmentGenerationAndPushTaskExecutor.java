@@ -287,6 +287,8 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       recordReaderSpec.setDataFormat(taskConfigs.get(BatchConfigProperties.INPUT_FORMAT));
       recordReaderSpec.setClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CLASS));
       recordReaderSpec.setConfigClassName(taskConfigs.get(BatchConfigProperties.RECORD_READER_CONFIG_CLASS));
+      recordReaderSpec.setConfigs(IngestionConfigUtils.getConfigMapWithPrefix(taskConfigs,
+          BatchConfigProperties.RECORD_READER_PROP_PREFIX));
       taskSpec.setRecordReaderSpec(recordReaderSpec);
 
       String authToken = taskConfigs.get(BatchConfigProperties.AUTH_TOKEN);
