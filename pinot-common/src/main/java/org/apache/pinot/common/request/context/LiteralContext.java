@@ -139,8 +139,8 @@ public class LiteralContext {
         break;
       case BIG_DECIMAL_VALUE:
         _type = FieldSpec.DataType.BIG_DECIMAL;
-        _value = literal.getBigDecimalValue();
         _bigDecimalValue = BigDecimalUtils.deserialize(literal.getBigDecimalValue());
+        _value = _bigDecimalValue;
         break;
       case BINARY_VALUE:
         _type = FieldSpec.DataType.BYTES;

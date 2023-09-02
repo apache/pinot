@@ -20,6 +20,7 @@ package org.apache.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.GregorianCalendar;
@@ -32,9 +33,8 @@ import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.RelVisitor;
 import org.apache.calcite.rel.core.Project;
-import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
@@ -69,30 +69,25 @@ public class PinotEvaluateLiteralRule extends RelOptRule {
   public boolean matches(RelOptRuleCall call) {
     // Traverse the relational expression using a RexShuttle visitor
     AtomicBoolean hasLiteralOnlyCall = new AtomicBoolean(false);
-    call.rel(0).accept(new RexShuttle() {
-      @Override
-      public RexNode visitCall(RexCall call) {
-        // Check if all operands are RexLiteral
-        if (call.operands.stream().allMatch(operand -> (operand instanceof RexLiteral))) {
-          // If all operands are literals, this call can be evaluated
-          hasLiteralOnlyCall.set(true);
-          // early terminate if we found one evaluate call
-          return call;
+    try {
+      (new RelVisitor() {
+        @Override
+        public void visit(RelNode node, int ordinal, RelNode parent) {
+          // Check if all operands are RexLiteral
+          if (node.getInputs().stream().allMatch(operand -> (operand instanceof RexLiteral))) {
+            // If all operands are literals, this call can be evaluated
+            hasLiteralOnlyCall.set(true);
+            // early terminate if we found one evaluate call
+            throw new RuntimeException("Found one literal only call");
+          }
+          for (RelNode input : node.getInputs()) {
+            visit(input, ordinal, node);
+          }
         }
-        call.operands.forEach(operand -> {
-          if (hasLiteralOnlyCall.get()) {
-            // Early terminate if we already found one evaluate call
-            return;
-          }
-          // Recursively call visitCall on all RexCall operands
-          if (operand instanceof RexCall) {
-            visitCall((RexCall) operand);
-          }
-        });
-        // Return the call to continue traversal
-        return call;
-      }
-    });
+      }).go(call.rel(0));
+    } catch (RuntimeException e) {
+      // Found one literal only call
+    }
     return hasLiteralOnlyCall.get();
   }
 
@@ -104,68 +99,43 @@ public class PinotEvaluateLiteralRule extends RelOptRule {
 
     // Recursively evaluate all the calls with Literal only operands from bottom up
     // Traverse the relational expression using a RexShuttle visitor
-    rootRelNode.accept(new RexShuttle() {
+    RelNode newRelNode = rootRelNode.accept(new RexShuttle() {
       @Override
       public RexNode visitCall(RexCall call) {
-        call.operands.forEach(operand -> {
-          if (operand instanceof RexCall) {
-            visitCall((RexCall) operand);
-          }
-        });
         // Check if all operands are RexLiteral
         if (call.operands.stream().allMatch(operand -> operand instanceof RexLiteral)) {
           // If all operands are literals or already evaluated, this call can be evaluated
           return evaluateLiteralOnlyFunction(rexBuilder, call, evaluatedResults);
         }
-        // Return the call to continue traversal
-        return call;
+        List<RexNode> newOperands = call.operands.stream().map(operand -> {
+          if (operand instanceof RexCall) {
+            return visitCall((RexCall) operand);
+          }
+          return operand;
+        }).collect(Collectors.toList());
+        return call.clone(call.getType(), newOperands);
       }
     });
-
-    RelNode newRelNode = null;
-    if (rootRelNode instanceof Project) {
-      newRelNode = constructNewRelNode(rexBuilder, evaluatedResults, (Project) rootRelNode);
-    }
-    if (rootRelNode instanceof Filter) {
-      newRelNode = constructNewRelNode(evaluatedResults, (Filter) rootRelNode);
+    if (newRelNode instanceof Project) {
+      newRelNode = constructNewProject(rexBuilder, (Project) rootRelNode, (Project) newRelNode);
     }
     call.transformTo(newRelNode);
   }
 
-  private RelNode constructNewRelNode(RexBuilder rexBuilder, Map<RexNode, RexNode> evaluatedResults, Project project) {
-    List<RexNode> oldProjects = project.getProjects();
+  private RelNode constructNewProject(RexBuilder rexBuilder, Project oldProjectNode, Project newProjectNode) {
+    List<RexNode> oldProjects = oldProjectNode.getProjects();
     List<RexNode> newProjects = new ArrayList<>();
-    for (RexNode oldProject : oldProjects) {
-      RelDataType relDataType = oldProject.getType();
-      RexNode rexNode = replaceRexNodeWithLiteral(oldProject, evaluatedResults);
-
+    for (int i = 0; i < oldProjects.size(); i++) {
+      RexNode oldProject = oldProjects.get(i);
+      RexNode newProject = newProjectNode.getProjects().get(i);
       // Need to cast the result to the original type if the literal type is changed, e.g. VARCHAR literal is typed as
       // CHAR(STRING_LENGTH) in Calcite, but we need to cast it back to VARCHAR.
-      rexNode = (rexNode.getType() == relDataType) ? rexNode : rexBuilder.makeCast(relDataType, rexNode, true);
-      newProjects.add(rexNode);
+      newProject = (newProject.getType() == oldProject.getType()) ? newProject
+          : rexBuilder.makeCast(oldProject.getType(), newProject, true);
+      newProjects.add(newProject);
     }
-    return LogicalProject.create(project.getInput(), project.getHints(), newProjects, project.getRowType());
-  }
-
-  private RelNode constructNewRelNode(Map<RexNode, RexNode> evaluatedResults, Filter filter) {
-    RexNode oldConditions = filter.getCondition();
-    RexNode newConditions = replaceRexNodeWithLiteral(oldConditions, evaluatedResults);
-    return LogicalFilter.create(filter.getInput(), newConditions);
-  }
-
-  private RexNode replaceRexNodeWithLiteral(RexNode rexNode, Map<RexNode, RexNode> rexNodeToLiteralMapping) {
-    if (rexNodeToLiteralMapping.containsKey(rexNode)) {
-      return rexNodeToLiteralMapping.get(rexNode);
-    }
-    // Recursively check any match and replace.
-    if (rexNode instanceof RexCall) {
-      RexCall rexCall = (RexCall) rexNode;
-      List<RexNode> newOperands = rexCall.getOperands().stream()
-          .map(operand -> replaceRexNodeWithLiteral(operand, rexNodeToLiteralMapping))
-          .collect(Collectors.toList());
-      return rexCall.clone(rexCall.getType(), newOperands);
-    }
-    return rexNode;
+    return LogicalProject.create(oldProjectNode.getInput(), oldProjectNode.getHints(), newProjects,
+        oldProjectNode.getRowType());
   }
 
   /**
@@ -178,8 +148,9 @@ public class PinotEvaluateLiteralRule extends RelOptRule {
       return rexNode;
     }
     Preconditions.checkArgument(rexNode instanceof RexCall, "Expected RexCall, got: " + rexNode);
-    if (evaluatedResults.containsKey(rexNode)) {
-      return evaluatedResults.get(rexNode);
+    RexNode resultRexNode = evaluatedResults.get(rexNode);
+    if (resultRexNode != null) {
+      return resultRexNode;
     }
     RexCall function = (RexCall) rexNode;
     List<RexNode> operands = new ArrayList<>(function.getOperands());
@@ -193,7 +164,7 @@ public class PinotEvaluateLiteralRule extends RelOptRule {
 
     String functionName = PinotRuleUtils.extractFunctionName(function);
     FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numOperands);
-    RexNode resultRexNode = rexNode;
+    resultRexNode = rexNode;
     if (functionInfo != null) {
       Object[] arguments = new Object[numOperands];
       for (int i = 0; i < numOperands; i++) {
@@ -224,8 +195,14 @@ public class PinotEvaluateLiteralRule extends RelOptRule {
       if (functionResult == null) {
         resultRexNode = rexBuilder.makeNullLiteral(rexNodeType);
       } else if (rexNodeType.getSqlTypeName() == SqlTypeName.TIMESTAMP) {
-        long millis = (functionResult instanceof Number) ? ((Number) functionResult).longValue()
-            : TimestampUtils.toMillisSinceEpoch(functionResult.toString());
+        long millis;
+        if (functionResult instanceof Timestamp) {
+          millis = ((Timestamp) functionResult).getTime();
+        } else if (functionResult instanceof Number) {
+          millis = ((Number) functionResult).longValue();
+        } else {
+          millis = TimestampUtils.toMillisSinceEpoch(functionResult.toString());
+        }
         resultRexNode =
             rexBuilder.makeTimestampLiteral(TimestampString.fromMillisSinceEpoch(millis), rexNodeType.getPrecision());
       } else if (functionResult instanceof Byte || functionResult instanceof Short || functionResult instanceof Integer
@@ -233,8 +210,7 @@ public class PinotEvaluateLiteralRule extends RelOptRule {
         resultRexNode =
             rexBuilder.makeExactLiteral(BigDecimal.valueOf(((Number) functionResult).longValue()), rexNodeType);
       } else if (functionResult instanceof Float || functionResult instanceof Double) {
-        resultRexNode =
-            rexBuilder.makeExactLiteral(BigDecimal.valueOf(((Number) functionResult).doubleValue()), rexNodeType);
+        resultRexNode = rexBuilder.makeExactLiteral(new BigDecimal(functionResult.toString()), rexNodeType);
       } else if (functionResult instanceof BigDecimal) {
         resultRexNode = rexBuilder.makeExactLiteral((BigDecimal) functionResult, rexNodeType);
       } else if (functionResult instanceof byte[]) {

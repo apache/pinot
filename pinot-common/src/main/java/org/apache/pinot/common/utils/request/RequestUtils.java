@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.ByteString;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
@@ -176,12 +177,13 @@ public class RequestUtils {
 
   public static Expression getLiteralExpression(byte[] value) {
     Expression expression = createNewLiteralExpression();
-    // TODO: Set the binary value directly instead of converting it to hex string.
+    // TODO(After 1.0.0): This is for backward-compatibility, we can set the binary value directly instead of
+    //  converting it to hex string after the next released version.
     expression.getLiteral().setStringValue(BytesUtils.toHexString(value));
     return expression;
   }
 
-  public static Expression getLiteralExpression(com.google.protobuf.ByteString value) {
+  public static Expression getLiteralExpression(ByteString value) {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setBinaryValue(value.toByteArray());
     return expression;
@@ -219,8 +221,8 @@ public class RequestUtils {
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
     }
-    if (object instanceof com.google.protobuf.ByteString) {
-      return RequestUtils.getLiteralExpression((com.google.protobuf.ByteString) object);
+    if (object instanceof ByteString) {
+      return RequestUtils.getLiteralExpression((ByteString) object);
     }
     if (object instanceof Boolean) {
       return RequestUtils.getLiteralExpression(((Boolean) object).booleanValue());
