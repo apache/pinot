@@ -66,6 +66,8 @@ public class PinotQueryRuleSets {
           // push project through WINDOW
           CoreRules.PROJECT_WINDOW_TRANSPOSE,
 
+          PinotEvaluateLiteralRule.INSTANCE,
+
           // TODO: evaluate the SORT_JOIN_TRANSPOSE and SORT_JOIN_COPY rules
 
           // join rules

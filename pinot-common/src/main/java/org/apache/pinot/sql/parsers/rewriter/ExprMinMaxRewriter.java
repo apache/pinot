@@ -107,15 +107,21 @@ public class ExprMinMaxRewriter implements QueryRewriter {
       numMeasuringColumns.setLongValue(entry.getKey().size());
 
       Function parentFunction = new Function(isMax ? EXPR_MAX_PARENT : EXPR_MIN_PARENT);
-      parentFunction.addToOperands(new Expression(ExpressionType.LITERAL).setLiteral(functionID));
-      parentFunction.addToOperands(new Expression(ExpressionType.LITERAL).setLiteral(numMeasuringColumns));
+      Expression expr1 = new Expression(ExpressionType.LITERAL);
+      expr1.setLiteral(functionID);
+      parentFunction.addToOperands(expr1);
+      Expression expr2 = new Expression(ExpressionType.LITERAL);
+      expr2.setLiteral(numMeasuringColumns);
+      parentFunction.addToOperands(expr2);
       for (Expression expression : entry.getKey()) {
         parentFunction.addToOperands(expression);
       }
       for (Expression expression : entry.getValue()) {
         parentFunction.addToOperands(expression);
       }
-      selectList.add(new Expression(ExpressionType.FUNCTION).setFunctionCall(parentFunction));
+      Expression funcExpr = new Expression(ExpressionType.FUNCTION);
+      funcExpr.setFunctionCall(parentFunction);
+      selectList.add(funcExpr);
     }
   }
 
@@ -178,14 +184,16 @@ public class ExprMinMaxRewriter implements QueryRewriter {
       return v;
     });
 
-    String operator = function.operator;
+    String operator = function.getOperator();
     function.setOperator(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + operator);
 
     List<Expression> operands = function.getOperands();
     operands.add(0, exprMinMaxProjectionExpression);
     Literal functionID = new Literal();
     functionID.setLongValue(id);
-    operands.add(0, new Expression(ExpressionType.LITERAL).setLiteral(functionID));
+    Expression literalExpr = new Expression(ExpressionType.LITERAL);
+    literalExpr.setLiteral(functionID);
+    operands.add(0, literalExpr);
 
     return added.get();
   }

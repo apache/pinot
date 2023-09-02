@@ -970,7 +970,7 @@ public class CalciteSqlParser {
   }
 
   public static Expression removeOrderByFunctions(Expression expression) {
-    while (expression.isSetFunctionCall() && ORDER_BY_FUNCTIONS.contains(expression.getFunctionCall().operator)) {
+    while (expression.isSetFunctionCall() && ORDER_BY_FUNCTIONS.contains(expression.getFunctionCall().getOperator())) {
       expression = expression.getFunctionCall().getOperands().get(0);
     }
     return expression;

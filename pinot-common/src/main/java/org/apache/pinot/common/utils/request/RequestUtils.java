@@ -23,6 +23,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.ByteString;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +38,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.FilterKind;
@@ -174,7 +177,21 @@ public class RequestUtils {
 
   public static Expression getLiteralExpression(byte[] value) {
     Expression expression = createNewLiteralExpression();
+    // TODO(After 1.0.0): This is for backward-compatibility, we can set the binary value directly instead of
+    //  converting it to hex string after the next released version.
     expression.getLiteral().setStringValue(BytesUtils.toHexString(value));
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(ByteString value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setBinaryValue(value.toByteArray());
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(BigDecimal value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setBigDecimalValue(BigDecimalUtils.serialize(value));
     return expression;
   }
 
@@ -203,6 +220,9 @@ public class RequestUtils {
     }
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
+    }
+    if (object instanceof ByteString) {
+      return RequestUtils.getLiteralExpression((ByteString) object);
     }
     if (object instanceof Boolean) {
       return RequestUtils.getLiteralExpression(((Boolean) object).booleanValue());
