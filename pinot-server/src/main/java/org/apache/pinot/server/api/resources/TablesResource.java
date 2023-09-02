@@ -60,6 +60,8 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
@@ -80,6 +82,8 @@ import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -91,6 +95,9 @@ import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -520,6 +527,61 @@ public class TablesResource {
       }
     }
     return ResourceUtils.convertToJsonString(allValidDocIdMetadata);
+  }
+
+  @GET
+  @Path("/tables/{tableNameWithType}/upsertMetadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Provides latest record location for a primary key in upsert metadata",
+      notes = "Provides latest record location for a primary key in upsert metadata")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+  })
+  public String getUpsertMetadata(
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Partition Number", required = true) @QueryParam("partitionId") int partitionId,
+      @ApiParam(value = "Primary Key", allowMultiple = true, required = true) @QueryParam("primaryKey")
+          List<String> primaryKeys) {
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    TableUpsertMetadataManager tableUpsertMetadataManager = tableDataManager.getTableUpsertMetadataManager();
+    if (tableUpsertMetadataManager == null) {
+      throw new WebApplicationException(String.format("Table %s does not have upsert metadata", tableNameWithType),
+          Response.Status.NOT_FOUND);
+    }
+
+    PartitionUpsertMetadataManager partitionUpsertMetadataManager = tableUpsertMetadataManager.get(partitionId);
+    if (partitionUpsertMetadataManager == null) {
+      throw new WebApplicationException(
+          String.format("Table %s does not have upsert metadata for partition %d", tableNameWithType, partitionId),
+          Response.Status.NOT_FOUND);
+    }
+
+    Object[] values = new Object[primaryKeys.size()];
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _serverInstance.getInstanceDataManager().getPropertyStore();
+    Schema schema =
+        ZKMetadataProvider.getSchema(propertyStore, TableNameBuilder.extractRawTableName(tableNameWithType));
+    if (schema == null) {
+      throw new WebApplicationException(String.format("Table %s does not have schema", tableNameWithType),
+          Response.Status.NOT_FOUND);
+    }
+
+    for (int i = 0; i < primaryKeys.size(); i++) {
+      DataType dataType = schema.getFieldSpecFor(schema.getPrimaryKeyColumns().get(i)).getDataType();
+      values[i] = dataType.convert(primaryKeys.get(i));
+    }
+
+    PrimaryKey primaryKey = new PrimaryKey(values);
+    GenericRow upsertMetadata = partitionUpsertMetadataManager.getRecordLocation(primaryKey);
+    if (upsertMetadata == null) {
+      throw new WebApplicationException(
+          String.format("Table %s partition %d does not have upsert metadata for primary key %s", tableNameWithType,
+              partitionId, primaryKey), Response.Status.NOT_FOUND);
+    }
+    return ResourceUtils.convertToJsonString(upsertMetadata.getFieldToValueMap());
   }
 
   /**
