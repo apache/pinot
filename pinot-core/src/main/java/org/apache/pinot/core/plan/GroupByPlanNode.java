@@ -92,8 +92,7 @@ public class GroupByPlanNode implements PlanNode {
               BaseProjectOperator<?> projectOperator =
                   new StarTreeProjectPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs,
                       groupByExpressions, predicateEvaluatorsMap).run();
-              return new GroupByOperator(aggregationFunctions, groupByExpressions, projectOperator, numTotalDocs,
-                  _queryContext, true);
+              return new GroupByOperator(_queryContext, groupByExpressions, projectOperator, numTotalDocs, true);
             }
           }
         }
@@ -105,7 +104,6 @@ public class GroupByPlanNode implements PlanNode {
     BaseProjectOperator<?> projectOperator =
         new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new GroupByOperator(aggregationFunctions, groupByExpressions, projectOperator, numTotalDocs, _queryContext,
-        false);
+    return new GroupByOperator(_queryContext, groupByExpressions, projectOperator, numTotalDocs, false);
   }
 }

@@ -19,7 +19,9 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
@@ -41,9 +43,11 @@ import org.slf4j.LoggerFactory;
  * detects that the merged results can already satisfy the query, or the query is already errored out or timed out.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
-    extends BaseCombineOperator<T> {
+public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock> extends BaseCombineOperator<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleBlockCombineOperator.class);
+
+  // Use an unlimited BlockingQueue to store the intermediate results blocks
+  protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
 
   protected BaseSingleBlockCombineOperator(ResultsBlockMerger<T> resultsBlockMerger, List<Operator> operators,
       QueryContext queryContext, ExecutorService executorService) {

@@ -114,7 +114,8 @@ public class SketchFunctions {
       } else if (input instanceof byte[]) {
         sketch.update((byte[]) input);
       } else {
-        throw new IllegalArgumentException("Unrecognised input type for Theta sketch: " + input.getClass().getName());
+        throw new IllegalArgumentException(
+            "Unrecognised input type for Theta sketch: " + input.getClass().getSimpleName());
       }
     }
     return ObjectSerDeUtils.DATA_SKETCH_SER_DE.serialize(sketch.compact());
@@ -188,7 +189,7 @@ public class SketchFunctions {
       } else if (key instanceof byte[]) {
         is.update((byte[]) key, value);
       } else {
-        throw new IllegalArgumentException("Unrecognised key type for Theta sketch: " + key.getClass().getName());
+        throw new IllegalArgumentException("Unrecognised key type for Theta sketch: " + key.getClass().getSimpleName());
       }
     }
     return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(is.compact());

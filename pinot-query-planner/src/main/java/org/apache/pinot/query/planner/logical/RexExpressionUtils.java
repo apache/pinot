@@ -26,6 +26,7 @@ import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexCall;
@@ -85,6 +86,8 @@ public class RexExpressionUtils {
         return ((GregorianCalendar) value).getTimeInMillis();
       case STRING:
         return ((NlsString) value).getValue();
+      case BYTES:
+        return ((ByteString) value).getBytes();
       default:
         return value;
     }

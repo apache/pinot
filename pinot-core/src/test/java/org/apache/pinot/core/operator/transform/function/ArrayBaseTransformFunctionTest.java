@@ -35,7 +35,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("%s(%s)", getFunctionName(), INT_MV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertEquals(transformFunction.getClass().getName(), getArrayFunctionClass().getName());
+    Assert.assertEquals(transformFunction.getClass(), getArrayFunctionClass());
     Assert.assertEquals(transformFunction.getName(), getFunctionName());
     Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), getResultDataType(FieldSpec.DataType.INT));
     Assert.assertTrue(transformFunction.getResultMetadata().isSingleValue());
@@ -82,7 +82,7 @@ public abstract class ArrayBaseTransformFunctionTest extends BaseTransformFuncti
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("%s(%s)", getFunctionName(), INT_MV_NULL_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
-    Assert.assertEquals(transformFunction.getClass().getName(), getArrayFunctionClass().getName());
+    Assert.assertEquals(transformFunction.getClass(), getArrayFunctionClass());
     Assert.assertEquals(transformFunction.getName(), getFunctionName());
     Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), getResultDataType(FieldSpec.DataType.INT));
     Assert.assertTrue(transformFunction.getResultMetadata().isSingleValue());

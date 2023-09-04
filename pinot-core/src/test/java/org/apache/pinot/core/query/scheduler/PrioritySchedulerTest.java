@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
-import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,10 +42,10 @@ import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
@@ -298,7 +297,7 @@ public class PrioritySchedulerTest {
 
     @Override
     public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
-        @Nullable StreamObserver<Server.ServerResponse> responseObserver) {
+        @Nullable ResultsBlockStreamer streamer) {
       if (_useBarrier) {
         try {
           _startupBarrier.await();

@@ -146,6 +146,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
               : NetUtils.getHostAddress();
     }
+    // Override multi-stage query runner hostname if not set explicitly
+    if (!_brokerConf.containsKey(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME)) {
+      _brokerConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _hostname);
+    }
     _port = _listenerConfigs.get(0).getPort();
     _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
 

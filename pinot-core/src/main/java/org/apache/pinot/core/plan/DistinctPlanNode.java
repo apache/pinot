@@ -71,6 +71,6 @@ public class DistinctPlanNode implements PlanNode {
 
     BaseProjectOperator<?> projectOperator =
         new ProjectPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
-    return new DistinctOperator(_indexSegment, projectOperator, _queryContext);
+    return new DistinctOperator(_indexSegment, _queryContext, projectOperator);
   }
 }

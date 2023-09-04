@@ -16,7 +16,7 @@ select
 from
   lineitem
 where
-  l_shipdate <= 904694400
+  l_shipdate <= '1998-12-01'
 group by
   l_returnflag,
   l_linestatus

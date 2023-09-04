@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -39,12 +40,14 @@ public class EmptySelectionOperator extends BaseOperator<SelectionResultsBlock> 
   private static final String EXPLAIN_NAME = "SELECT_EMPTY";
 
   private final BaseProjectOperator<?> _projectOperator;
+  private final QueryContext _queryContext;
   private final DataSchema _dataSchema;
   private final ExecutionStatistics _executionStatistics;
 
-  public EmptySelectionOperator(IndexSegment indexSegment, List<ExpressionContext> expressions,
-      BaseProjectOperator<?> projectOperator) {
+  public EmptySelectionOperator(IndexSegment indexSegment, QueryContext queryContext,
+      List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator) {
     _projectOperator = projectOperator;
+    _queryContext = queryContext;
 
     int numExpressions = expressions.size();
     String[] columnNames = new String[numExpressions];
@@ -63,7 +66,7 @@ public class EmptySelectionOperator extends BaseOperator<SelectionResultsBlock> 
 
   @Override
   protected SelectionResultsBlock getNextBlock() {
-    return new SelectionResultsBlock(_dataSchema, Collections.emptyList());
+    return new SelectionResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
   }
 
   @Override

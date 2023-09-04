@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime;
+package org.apache.pinot.query.runtime.queries;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -36,14 +36,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironment;
@@ -54,8 +51,6 @@ import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -73,31 +68,21 @@ import org.testng.Assert;
 
 
 public abstract class QueryRunnerTestBase extends QueryTestSet {
-  // TODO: Find a better way to create the global test executor
-  public static final ExecutorService EXECUTOR =
-      Executors.newCachedThreadPool(new NamedThreadFactory("worker_on_" + OperatorTestUtil.class.getSimpleName()) {
-        @Override
-        public Thread newThread(Runnable r) {
-          Thread thread = super.newThread(r);
-          thread.setDaemon(true);
-          return thread;
-        }
-      });
   protected static final double DOUBLE_CMP_EPSILON = 0.0001d;
   protected static final String SEGMENT_BREAKER_KEY = "__SEGMENT_BREAKER_KEY__";
   protected static final String SEGMENT_BREAKER_STR = "------";
   protected static final GenericRow SEGMENT_BREAKER_ROW = new GenericRow();
   protected static final AtomicLong REQUEST_ID_GEN = new AtomicLong();
-  protected QueryEnvironment _queryEnvironment;
-  protected String _reducerHostname;
-  protected int _reducerGrpcPort;
-  protected Map<QueryServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
-  protected MailboxService _mailboxService;
-  protected OpChainSchedulerService _reducerScheduler;
 
   static {
     SEGMENT_BREAKER_ROW.putValue(SEGMENT_BREAKER_KEY, SEGMENT_BREAKER_STR);
   }
+
+  protected String _reducerHostname;
+  protected int _reducerPort;
+  protected MailboxService _mailboxService;
+  protected QueryEnvironment _queryEnvironment;
+  protected Map<QueryServerInstance, QueryServerEnclosure> _servers = new HashMap<>();
 
   // --------------------------------------------------------------------------
   // QUERY UTILS
@@ -149,8 +134,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverInstanceToWorkerIdMap.entrySet()) {
       QueryServerInstance server = entry.getKey();
       for (int workerId : entry.getValue()) {
-        DistributedStagePlan distributedStagePlan = constructDistributedStagePlan(
-            dispatchableSubPlan, stageId, new VirtualServerAddress(server, workerId));
+        DistributedStagePlan distributedStagePlan =
+            constructDistributedStagePlan(dispatchableSubPlan, stageId, new VirtualServerAddress(server, workerId));
         _servers.get(server).processQuery(distributedStagePlan, requestMetadataMap);
       }
     }

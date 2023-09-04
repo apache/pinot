@@ -26,6 +26,8 @@ import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 
@@ -79,5 +81,10 @@ public class PinotRuleUtils {
       }
     }
     return true;
+  }
+
+  public static String extractFunctionName(RexCall function) {
+    SqlKind funcSqlKind = function.getOperator().getKind();
+    return funcSqlKind == SqlKind.OTHER_FUNCTION ? function.getOperator().getName() : funcSqlKind.name();
   }
 }

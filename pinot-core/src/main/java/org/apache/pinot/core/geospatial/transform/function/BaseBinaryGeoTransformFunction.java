@@ -30,7 +30,6 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Geometry;
 
 
@@ -56,8 +55,7 @@ public abstract class BaseBinaryGeoTransformFunction extends BaseTransformFuncti
             || transformFunction instanceof LiteralTransformFunction,
         "The first argument must be of type BYTES , but was %s", transformFunction.getResultMetadata().getDataType());
     if (transformFunction instanceof LiteralTransformFunction) {
-      _firstLiteral = GeometrySerializer.deserialize(
-          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getStringLiteral()));
+      _firstLiteral = GeometrySerializer.deserialize(((LiteralTransformFunction) transformFunction).getBytesLiteral());
     } else {
       _firstArgument = transformFunction;
     }
@@ -68,8 +66,7 @@ public abstract class BaseBinaryGeoTransformFunction extends BaseTransformFuncti
             || transformFunction instanceof LiteralTransformFunction,
         "The second argument must be of type BYTES , but was %s", transformFunction.getResultMetadata().getDataType());
     if (transformFunction instanceof LiteralTransformFunction) {
-      _secondLiteral = GeometrySerializer.deserialize(
-          BytesUtils.toBytes(((LiteralTransformFunction) transformFunction).getStringLiteral()));
+      _secondLiteral = GeometrySerializer.deserialize(((LiteralTransformFunction) transformFunction).getBytesLiteral());
     } else {
       _secondArgument = transformFunction;
     }

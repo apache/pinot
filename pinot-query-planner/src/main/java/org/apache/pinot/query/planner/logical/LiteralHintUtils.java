@@ -26,6 +26,7 @@ import org.apache.calcite.util.Pair;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 public class LiteralHintUtils {
@@ -75,6 +76,8 @@ public class LiteralHintUtils {
         return Literal.doubleValue(Double.parseDouble(valueStr));
       case STRING:
         return Literal.stringValue(valueStr);
+      case BYTES:
+        return Literal.binaryValue(BytesUtils.toBytes(valueStr));
       default:
         throw new UnsupportedOperationException("Unsupported RexLiteral type: " + dataTypeStr);
     }

@@ -478,7 +478,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("Illegal base64 character"));
 
     // string literal used in a filter
     sqlQuery = "SELECT * FROM mytable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND "
@@ -642,11 +642,59 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testMultiValueColumnGroupByOrderBy()
       throws Exception {
-    String pinotQuery = "SELECT count(*), arrayToMV(RandomAirports) FROM mytable "
-        + "GROUP BY arrayToMV(RandomAirports) "
-        + "ORDER BY arrayToMV(RandomAirports) DESC";
+    String pinotQuery =
+        "SELECT count(*), arrayToMV(RandomAirports) FROM mytable " + "GROUP BY arrayToMV(RandomAirports) "
+            + "ORDER BY arrayToMV(RandomAirports) DESC";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
+  }
+
+  @Test
+  public void testMultiValueColumnTransforms()
+      throws Exception {
+    String pinotQuery = "SELECT arrayLength(RandomAirports) FROM mytable limit 10";
+    JsonNode jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    pinotQuery = "SELECT cardinality(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arrayMin dataType should be same as the column dataType
+    pinotQuery = "SELECT arrayMin(DivAirports) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+
+    pinotQuery = "SELECT arrayMin(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arrayMax dataType should be same as the column dataType
+    pinotQuery = "SELECT arrayMax(DivAirports) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+
+    pinotQuery = "SELECT arrayMax(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arraySum
+    pinotQuery = "SELECT arraySum(DivAirportIDs) FROM mytable limit 1";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
+
+    // arraySum
+    pinotQuery = "SELECT arrayAverage(DivAirportIDs) FROM mytable limit 1";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
   }
 
   @AfterClass
