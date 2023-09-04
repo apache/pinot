@@ -130,15 +130,19 @@ public class Validator extends SqlValidatorImpl {
     return names.get(names.size() - 1);
   }
 
-  protected void addToSelectList(
-      List<SqlNode> list,
-      Set<String> aliases,
-      List<Map.Entry<String, RelDataType>> fieldList,
-      SqlNode exp,
-      SelectScope scope,
-      final boolean includeSystemVars) {
+  /**
+   * This method is only called by Calcite when adding rows to select as a result of doing {@code select *}.
+   *
+   * This is just a patch knowing the internals of Calcite, but there is no officially supported solution right now.
+   * See <a href="https://lists.apache.org/thread/c71fkv329001hjjq7bp4hm56q6yx6dvw">this question in the dev email
+   * list</a>
+   */
+  @Override
+  protected void addToSelectList(List<SqlNode> list, Set<String> aliases,
+      List<Map.Entry<String, RelDataType>> fieldList, SqlNode exp, SelectScope scope, boolean includeSystemVars) {
     if (exp.getKind() == SqlKind.IDENTIFIER) {
-      if ((((SqlIdentifier) exp).names).stream().anyMatch(s -> s.startsWith("$"))) {
+      SqlIdentifier sqlIdentifier = (SqlIdentifier) exp;
+      if (sqlIdentifier.names.stream().anyMatch(s -> s.startsWith("$"))) {
         return;
       }
     }
