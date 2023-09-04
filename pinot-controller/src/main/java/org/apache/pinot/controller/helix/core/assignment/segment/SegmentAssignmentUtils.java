@@ -137,6 +137,7 @@ public class SegmentAssignmentUtils {
       instancesAssigned
           .add(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
     }
+
     return instancesAssigned;
   }
 
@@ -242,7 +243,9 @@ public class SegmentAssignmentUtils {
       newAssignment.put(segmentName, getReplicaGroupBasedInstanceStateMap(instancePartitions, partitionId, instanceId));
       intPair.setLeft(intPair.getLeft() + 1);
       heap.add(intPair);
+      numSegmentsAssignedPerInstance[instanceId]++;
     }
+
   }
 
   /**

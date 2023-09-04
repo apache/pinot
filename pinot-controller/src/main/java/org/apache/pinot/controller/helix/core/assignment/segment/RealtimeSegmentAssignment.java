@@ -20,9 +20,12 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
@@ -95,7 +98,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
       instancesAssigned = segmentAssignmentStrategy
           .assignSegment(segmentName, currentAssignment, instancePartitions, InstancePartitionsType.COMPLETED);
     } else {
-      instancesAssigned = assignConsumingSegment(segmentName, instancePartitions);
+      instancesAssigned = assignConsumingSegment(segmentName, currentAssignment, instancePartitions);
     }
     _logger.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
         _tableNameWithType);
@@ -105,7 +108,8 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
   /**
    * Helper method to assign instances for CONSUMING segment based on the segment partition id and instance partitions.
    */
-  private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
+  private List<String> assignConsumingSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+      InstancePartitions instancePartitions) {
     int segmentPartitionId = SegmentAssignmentUtils
         .getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
@@ -156,9 +160,57 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
         // Explicit partition:
         // Assign segment to the first instance within the partition.
 
-        for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-          int partitionId = segmentPartitionId % numPartitions;
-          instancesAssigned.add(instancePartitions.getInstances(partitionId, replicaGroupId).get(0));
+        Set<String> existingAssignedInstances = new TreeSet<>();
+        boolean isFirstSegment = true;
+
+        // Loop through all segments to find common instances for the same partitionId
+        for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
+          String existingSegmentName = entry.getKey();
+          int existingSegmentPartitionId =
+              SegmentAssignmentUtils.getRealtimeSegmentPartitionId(existingSegmentName, _tableNameWithType,
+                  _helixManager, _partitionColumn);
+
+          if (existingSegmentPartitionId == segmentPartitionId) {
+            Set<String> segmentInstances = entry.getValue().keySet();
+            if (isFirstSegment) {
+              existingAssignedInstances.addAll(segmentInstances);
+              isFirstSegment = false;
+            } else {
+              if (!segmentInstances.equals(existingAssignedInstances)) {
+                _logger.warn("Existing instances in IS do not match for segment: " + existingSegmentName);
+                //TODO: Add Metric to detect that instances in IS are not same for all segments in the same partition
+              }
+            }
+          }
+        }
+
+        if (existingAssignedInstances.size() == 0) {
+          // No existing segment in the same partition, assign instances based on the instance partitions
+          for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+            int partitionId = segmentPartitionId % numPartitions;
+            instancesAssigned.add(instancePartitions.getInstances(partitionId, replicaGroupId).get(0));
+          }
+        } else {
+          if (existingAssignedInstances.size() != numReplicaGroups) {
+            _logger.warn(
+                "Number of existing instances in IS : {} does not match number of replica-groups: {} for segment: {}",
+                existingAssignedInstances.size(), numReplicaGroups, segmentName);
+          }
+
+          instancesAssigned.addAll(existingAssignedInstances);
+
+          // Validate that the common instances are part of the instance partitions and assign
+          List<String> instanceAssignedWithInstancesPartitions = new ArrayList<>();
+          for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
+            int partitionId = segmentPartitionId % numPartitions;
+            instanceAssignedWithInstancesPartitions.add(
+                instancePartitions.getInstances(partitionId, replicaGroupId).get(0));
+          }
+
+          if (!instanceAssignedWithInstancesPartitions.containsAll(existingAssignedInstances)) {
+            _logger.warn("Existing instances in IS do not match for segment: " + segmentName);
+            //TODO: Add Metric to detect that instances in IS are not same for all segments in the same partition
+          }
         }
       }
 
@@ -219,7 +271,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
 
       newAssignment = new TreeMap<>();
       for (String segmentName : completedSegmentAssignment.keySet()) {
-        List<String> instancesAssigned = assignConsumingSegment(segmentName, consumingInstancePartitions);
+        List<String> instancesAssigned = assignConsumingSegment(segmentName, currentAssignment, consumingInstancePartitions);
         Map<String, String> instanceStateMap =
             SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.ONLINE);
         newAssignment.put(segmentName, instanceStateMap);
@@ -234,7 +286,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
           .info("Reassigning CONSUMING segments with CONSUMING instance partitions for table: {}", _tableNameWithType);
 
       for (String segmentName : consumingSegmentAssignment.keySet()) {
-        List<String> instancesAssigned = assignConsumingSegment(segmentName, consumingInstancePartitions);
+        List<String> instancesAssigned = assignConsumingSegment(segmentName, newAssignment, consumingInstancePartitions);
         Map<String, String> instanceStateMap =
             SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING);
         newAssignment.put(segmentName, instanceStateMap);
