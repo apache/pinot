@@ -674,6 +674,32 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
   }
 
+  @Test
+  public void selectStarDoesNotProjectSystemColumns()
+      throws Exception {
+    JsonNode jsonNode = postQuery("select * from mytable limit 0");
+    List<String> columns = getColumns(jsonNode);
+    for (int i = 0; i < columns.size(); i++) {
+      String colName = columns.get(i);
+      Assert.assertFalse(colName.startsWith("$"), "Column " + colName + " (found at index " + i + " is a system column "
+          + "and shouldn't be included in select *");
+    }
+  }
+
+  @Test(dataProvider = "systemColumns")
+  public void systemColumnsCanBeSelected(String systemColumn)
+      throws Exception {
+    JsonNode jsonNode = postQuery("select " + systemColumn + " from mytable limit 0");
+    assertNoError(jsonNode);
+  }
+
+  @Test(dataProvider = "systemColumns")
+  public void systemColumnsCanBeUsedInWhere(String systemColumn)
+      throws Exception {
+    JsonNode jsonNode = postQuery("select 1 from mytable where " + systemColumn + " is not null limit 0");
+    assertNoError(jsonNode);
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {
