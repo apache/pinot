@@ -130,8 +130,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
-    query = "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND "
-        + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
+    query =
+        "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff, substring(DestStateName, 4, 8) as "
+            + "stateSubStr FROM mytable WHERE CarrierDelay=15 AND "
+            + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
     testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
@@ -255,11 +257,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query, h2Query);
 
     // test arithmetic operations on date time columns
-    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable "
-        + "GROUP BY sub(DaysSinceEpoch,25) "
+    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable " + "GROUP BY sub(DaysSinceEpoch,25) "
         + "ORDER BY COUNT(*),sub(DaysSinceEpoch,25) DESC";
-    h2Query = "SELECT DaysSinceEpoch - 25, COUNT(*) FROM mytable "
-        + "GROUP BY DaysSinceEpoch "
+    h2Query = "SELECT DaysSinceEpoch - 25, COUNT(*) FROM mytable " + "GROUP BY DaysSinceEpoch "
         + "ORDER BY COUNT(*), DaysSinceEpoch DESC";
     testQuery(query, h2Query);
   }
