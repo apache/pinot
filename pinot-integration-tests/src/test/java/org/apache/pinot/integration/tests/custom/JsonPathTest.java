@@ -33,6 +33,7 @@ import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -336,21 +337,27 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "Select jsonExtractScalar(myMapStr,\"$.k1\",\"STRING\") from " + getTableName();
     JsonNode pinotResponse = postQuery(query);
-    Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);
+    int expectedStatusCode;
+    if (useMultiStageQueryEngine) {
+      expectedStatusCode = QueryException.QUERY_PLANNING_ERROR_CODE;
+    } else {
+      expectedStatusCode = QueryException.SQL_PARSING_ERROR_CODE;
+    }
+    Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);
     Assert.assertEquals(pinotResponse.get("totalDocs").asInt(), 0);
 
     query = "Select myMapStr from " + getTableName()
         + "  where jsonExtractScalar(myMapStr, '$.k1',\"STRING\") = 'value-k1-0'";
     pinotResponse = postQuery(query);
-    Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);
+    Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);
     Assert.assertEquals(pinotResponse.get("totalDocs").asInt(), 0);
 
     query = "Select jsonExtractScalar(myMapStr,\"$.k1\", 'STRING') from " + getTableName()
         + "  where jsonExtractScalar(myMapStr, '$.k1', 'STRING') = 'value-k1-0'";
     pinotResponse = postQuery(query);
-    Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), 150);
+    Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);
     Assert.assertEquals(pinotResponse.get("totalDocs").asInt(), 0);
   }
