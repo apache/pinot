@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -76,6 +77,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
@@ -511,6 +513,42 @@ public abstract class ClusterTest extends ControllerTest {
     }
     return JsonUtils.stringToJsonNode(
         sendPostRequest(controllerBaseApiUrl + "/sql", JsonUtils.objectToString(payload), headers));
+  }
+
+  public List<String> getColumns(JsonNode response) {
+    JsonNode resultTableJson = response.get("resultTable");
+    Assert.assertNotNull(resultTableJson, "'resultTable' is null");
+    JsonNode dataSchemaJson = resultTableJson.get("dataSchema");
+    Assert.assertNotNull(resultTableJson, "'resultTable.dataSchema' is null");
+    JsonNode colNamesJson = dataSchemaJson.get("columnNames");
+    Assert.assertNotNull(resultTableJson, "'resultTable.dataSchema.columnNames' is null");
+
+    List<String> cols = new ArrayList<>();
+    int i = 0;
+    for (JsonNode jsonNode : colNamesJson) {
+      String colName = jsonNode.textValue();
+      Assert.assertNotNull(colName, "Column at index " + i + " is not a string");
+      cols.add(colName);
+      i++;
+    }
+    return cols;
+  }
+
+  public void assertNoError(JsonNode response) {
+    JsonNode exceptionsJson = response.get("exceptions");
+    Iterator<JsonNode> exIterator = exceptionsJson.iterator();
+    if (exIterator.hasNext()) {
+      Assert.fail("There is at least one exception: " + exIterator.next());
+    }
+  }
+
+  @DataProvider(name = "systemColumns")
+  public Object[][] systemColumns() {
+    return new Object[][] {
+        {"$docId"},
+        {"$hostName"},
+        {"$segmentName"}
+    };
   }
 
   @DataProvider(name = "useBothQueryEngines")
