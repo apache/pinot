@@ -588,7 +588,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // TODO: Consider optimizing it by tracking and persisting only the changed snapshot
   protected void doTakeSnapshot() {
     int numTrackedSegments = _trackedSegments.size();
-    int numPrimaryKeysInSnapshot = 0;
+    long numPrimaryKeysInSnapshot = 0L;
     _logger.info("Taking snapshot for {} segments", numTrackedSegments);
     long startTimeMs = System.currentTimeMillis();
 
