@@ -88,7 +88,7 @@ const useStyles = makeStyles((theme) => ({
     paddingBottom: '48px',
   },
   sqlError: {
-    whiteSpace: 'pre-wrap',
+    whiteSpace: 'pre',
     overflow: "auto"
   },
   timeoutControl: {
