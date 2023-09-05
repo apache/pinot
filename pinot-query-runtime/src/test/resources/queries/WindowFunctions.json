@@ -141,6 +141,29 @@
         ]
       },
       {
+        "description": "Single OVER(ORDER BY) with ROWS frame",
+        "sql": "SELECT SUM(int_col) OVER(ORDER BY string_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl}",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [2],
+          [4],
+          [46],
+          [88],
+          [130],
+          [133],
+          [233],
+          [235],
+          [238],
+          [339],
+          [489],
+          [531],
+          [573],
+          [615],
+          [618],
+          [768]
+        ]
+      },
+      {
         "description": "Single OVER(ORDER BY) rank",
         "sql": "SELECT RANK() OVER(ORDER BY string_col) FROM {tbl}",
         "keepOutputRowOrder": true,
@@ -206,6 +229,29 @@
           ["e", 615, 42],
           ["g", 618, 3],
           ["h", 768, 150]
+        ]
+      },
+      {
+        "description": "Single OVER(ORDER BY) ROWS with select columns (two ORDER BY columns for deterministic output)",
+        "sql": "SELECT string_col, MAX(int_col) OVER(ORDER BY string_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), int_col FROM {tbl}",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 2, 2],
+          ["a", 2, 2],
+          ["a", 42, 42],
+          ["a", 42, 42],
+          ["a", 42, 42],
+          ["b", 42, 3],
+          ["b", 100, 100],
+          ["c", 100, 2],
+          ["c", 100, 3],
+          ["c", 101, 101],
+          ["c", 150, 150],
+          ["d", 150, 42],
+          ["e", 150, 42],
+          ["e", 150, 42],
+          ["g", 150, 3],
+          ["h", 150, 150]
         ]
       },
       {
@@ -298,6 +344,29 @@
           ["a", 768, 42],
           ["a", 768, 42],
           ["a", 768, 42]
+        ]
+      },
+      {
+        "description": "Single OVER(ORDER BY) ROWS with one DESC column with select columns (two ORDER BY columns for deterministic output)",
+        "sql": "SELECT string_col, MIN(int_col) OVER(ORDER BY string_col DESC, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), int_col FROM {tbl}",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["h", 150, 150],
+          ["g", 3, 3],
+          ["e", 3, 42],
+          ["e", 3, 42],
+          ["d", 3, 42],
+          ["c", 2, 2],
+          ["c", 2, 3],
+          ["c", 2, 101],
+          ["c", 2, 150],
+          ["b", 2, 3],
+          ["b", 2, 100],
+          ["a", 2, 2],
+          ["a", 2, 2],
+          ["a", 2, 42],
+          ["a", 2, 42],
+          ["a", 2, 42]
         ]
       },
       {
@@ -438,6 +507,29 @@
         ]
       },
       {
+        "description": "Single OVER(ORDER BY) avg ROWS with select columns with alias (two ORDER BY columns for deterministic output)",
+        "sql": "SELECT string_col AS str, AVG(double_col) OVER(ORDER BY string_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS avg, double_col FROM {tbl}",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 42, 42],
+          ["a", 46.25, 50.5],
+          ["a", 55.83333333, 75],
+          ["a", 116.875, 300],
+          ["a", 173.5, 400],
+          ["b", 144.75, 1],
+          ["b", 138.35714285714286, 100],
+          ["c", 121.18875, 1.01],
+          ["c", 107.89, 1.5],
+          ["c", 107.101, 100],
+          ["c", 133.7281818181818, 400],
+          ["d", 126.08416666666666, 42],
+          ["e", 119.61615384615385, 42],
+          ["e", 114.67928571428571, 50.5],
+          ["g", 113.70066666666666, 100],
+          ["h", 106.69, 1.53]
+        ]
+      },
+      {
         "description": "Single empty OVER() min with select columns and default frame",
         "sql": "SELECT bool_col, MIN(int_col) OVER(ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING), double_col FROM {tbl}",
         "comments": "Calcite validation fails if RANGE is used but later Calcite overrides ROWS with RANGE",
@@ -527,6 +619,29 @@
           ["e", 114.679286],
           ["e", 114.679286],
           ["g", 113.700667],
+          ["h", 106.69]
+        ]
+      },
+      {
+        "description": "Single OVER(ORDER BY) avg ROWS with select col with global order by",
+        "sql": "SELECT string_col, AVG(double_col) OVER(ORDER BY string_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as avg FROM {tbl} ORDER BY string_col, avg",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 42],
+          ["a", 46.25],
+          ["a", 55.83333333],
+          ["a", 116.875],
+          ["a", 173.5],
+          ["b", 138.35714285714286],
+          ["b", 144.75],
+          ["c", 107.101],
+          ["c", 107.89],
+          ["c", 121.18875],
+          ["c", 133.7281818181818],
+          ["d", 126.08416666666666],
+          ["e", 114.67928571428571],
+          ["e", 119.61615384615385],
+          ["g", 113.70066666666666],
           ["h", 106.69]
         ]
       },
@@ -721,6 +836,20 @@
         ]
       },
       {
+        "description": "Single OVER(ORDER BY) count ROWS with select col with global order by with LIMIT",
+        "sql": "SELECT string_col, COUNT(int_col) OVER(ORDER BY string_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as count FROM {tbl} ORDER BY string_col, count LIMIT 6",
+        "comments": "Cannot use LIMIT without ORDER BY since the results can change and we cannot verify exact row outputs",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 1],
+          ["a", 2],
+          ["a", 3],
+          ["a", 4],
+          ["a", 5],
+          ["b", 6]
+        ]
+      },
+      {
         "description": "Single empty OVER() and transform col",
         "sql": "SELECT CONCAT(string_col, bool_col, '-'), AVG(int_col) OVER() FROM {tbl}",
         "outputs": [
@@ -766,6 +895,29 @@
         ]
       },
       {
+        "description": "Single OVER(ORDER BY) ROWS and transform col (three ORDER BY columns for deterministic output)",
+        "sql": "SELECT CONCAT(string_col, bool_col, '-'), AVG(int_col) OVER(ORDER BY string_col, bool_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl}",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a-false", 42],
+          ["a-true", 22],
+          ["a-true", 15.333333333333334],
+          ["a-true", 22],
+          ["a-true", 26],
+          ["b-false", 22.1666666667],
+          ["b-false", 33.2857143],
+          ["c-false", 29.375],
+          ["c-false", 37.333333333333336],
+          ["c-false", 48.6],
+          ["c-true", 44.4545455],
+          ["d-false", 44.25],
+          ["e-false", 44.0769231],
+          ["e-true", 43.9285714],
+          ["g-true", 41.2],
+          ["h-false", 48]
+        ]
+      },
+      {
         "description": "Single empty OVER() with select col and filter",
         "sql": "SELECT string_col, COUNT(bool_col) OVER() FROM {tbl} WHERE string_col = 'a' AND bool_col = false",
         "outputs": [
@@ -783,6 +935,14 @@
       {
         "description": "Single OVER(ORDER BY) with select col and filter",
         "sql": "SELECT string_col, COUNT(bool_col) OVER(ORDER BY bool_col) FROM {tbl} WHERE string_col = 'a' AND bool_col = false",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 1]
+        ]
+      },
+      {
+        "description": "Single OVER(ORDER BY) ROWS with select col and filter",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(ORDER BY bool_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE string_col = 'a' AND bool_col = false",
         "keepOutputRowOrder": true,
         "outputs": [
           ["a", 1]
@@ -808,6 +968,12 @@
         "outputs": []
       },
       {
+        "description": "Single OVER(ORDER BY) ROWS with select col and filter which matches no rows",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(ORDER BY string_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200",
+        "keepOutputRowOrder": true,
+        "outputs": []
+      },
+      {
         "description": "Single empty OVER() with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
         "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER() as count FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
         "outputs": [
@@ -817,6 +983,14 @@
       {
         "description": "Single OVER(ORDER BY) with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
         "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(ORDER BY string_col) as count FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [null]
+        ]
+      },
+      {
+        "description": "Single OVER(ORDER BY) ROWS with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
+        "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(ORDER BY string_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as count FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
         "keepOutputRowOrder": true,
         "outputs": [
           [null]
@@ -848,8 +1022,34 @@
         ]
       },
       {
+        "description": "Single OVER(ORDER BY) ROWS with filter (two ORDER BY columns for deterministic output)",
+        "sql": "SELECT SUM(int_col) OVER(ORDER BY string_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE string_col IN ('b', 'c')",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [3],
+          [103],
+          [105],
+          [108],
+          [209],
+          [359]
+        ]
+      },
+      {
         "description": "Single OVER(ORDER BY) with select col and filter (two ORDER BY columns for deterministic output)",
         "sql": "SELECT double_col, SUM(int_col) OVER(ORDER BY string_col, double_col) FROM {tbl} WHERE string_col IN ('b', 'c')",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [1, 100],
+          [100, 103],
+          [1.01, 204],
+          [1.5, 354],
+          [100, 357],
+          [400, 359]
+        ]
+      },
+      {
+        "description": "Single OVER(ORDER BY) ROWS with select col and filter (two ORDER BY columns for deterministic output)",
+        "sql": "SELECT double_col, SUM(int_col) OVER(ORDER BY string_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE string_col IN ('b', 'c')",
         "keepOutputRowOrder": true,
         "outputs": [
           [1, 100],
@@ -917,6 +1117,26 @@
           ["a-true", 42],
           ["b-false", 42],
           ["c-false", 101],
+          ["c-false", 101],
+          ["c-true", 101],
+          ["d-false", 101],
+          ["e-false", 101],
+          ["e-true", 101],
+          ["g-true", 101]
+        ]
+      },
+      {
+        "description": "Single OVER(ORDER BY) ROWS with select transform and filter (three ORDER BY columns for deterministic output)",
+        "sql": "SELECT CONCAT(string_col, bool_col, '-'), MAX(int_col) OVER(ORDER BY string_col, bool_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} where int_col < 50 OR double_col = 1.01",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a-false", 42],
+          ["a-true", 42],
+          ["a-true", 42],
+          ["a-true", 42],
+          ["a-true", 42],
+          ["b-false", 42],
+          ["c-false", 42],
           ["c-false", 101],
           ["c-true", 101],
           ["d-false", 101],
@@ -1011,6 +1231,19 @@
         ]
       },
       {
+        "description": "Single OVER(ORDER BY) ROWS with group by",
+        "sql": "SELECT MAX({tbl}.int_col) OVER(ORDER BY {tbl}.int_col DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [150],
+          [150],
+          [150],
+          [150],
+          [150],
+          [150]
+        ]
+      },
+      {
         "description": "Single OVER(ORDER BY) row_number with group by",
         "sql": "SELECT ROW_NUMBER() OVER(ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY int_col",
         "keepOutputRowOrder": true,
@@ -1074,6 +1307,25 @@
         ]
       },
       {
+        "description": "Single OVER(ORDER BY) ROWS with select col and group by",
+        "sql": "SELECT string_col, MIN({tbl}.int_col) OVER(ORDER BY {tbl}.string_col DESC, {tbl}.int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY string_col, int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["h", 150],
+          ["g", 3],
+          ["e", 3],
+          ["d", 3],
+          ["c", 2],
+          ["c", 2],
+          ["c", 2],
+          ["c", 2],
+          ["b", 2],
+          ["b", 2],
+          ["a", 2],
+          ["a", 2]
+        ]
+      },
+      {
         "description": "Single empty OVER() with agg col and group by",
         "sql": "SELECT SUM(int_col), SUM({tbl}.int_col) OVER() FROM {tbl} GROUP BY int_col",
         "outputs": [
@@ -1088,6 +1340,19 @@
       {
         "description": "Single OVER(ORDER BY) with agg col and group by",
         "sql": "SELECT SUM(int_col), SUM({tbl}.int_col) OVER(ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [6, 2],
+          [9, 5],
+          [252, 47],
+          [100, 147],
+          [101, 248],
+          [300, 398]
+        ]
+      },
+      {
+        "description": "Single OVER(ORDER BY) ROWS with agg col and group by",
+        "sql": "SELECT SUM(int_col), SUM({tbl}.int_col) OVER(ORDER BY {tbl}.int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY int_col",
         "keepOutputRowOrder": true,
         "outputs": [
           [6, 2],
@@ -1150,6 +1415,19 @@
         ]
       },
       {
+        "description": "Single OVER(ORDER BY) ROWS with select col, agg col and group by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(ORDER BY {tbl}.int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [2, 6, 2],
+          [3, 9, 5],
+          [42, 252, 47],
+          [100, 100, 147],
+          [101, 101, 248],
+          [150, 300, 398]
+        ]
+      },
+      {
         "description": "Single empty OVER() with select col, agg col and group by with global order by",
         "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER() FROM {tbl} GROUP BY int_col ORDER BY int_col",
         "keepOutputRowOrder": true,
@@ -1165,6 +1443,19 @@
       {
         "description": "Single OVER(ORDER BY) with select col, agg col and group by with global order by",
         "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY int_col ORDER BY int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [2, 6, 2],
+          [3, 9, 5],
+          [42, 252, 47],
+          [100, 100, 147],
+          [101, 101, 248],
+          [150, 300, 398]
+        ]
+      },
+      {
+        "description": "Single OVER(ORDER BY) ROWS with select col, agg col and group by with global order by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(ORDER BY {tbl}.int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY int_col ORDER BY int_col",
         "keepOutputRowOrder": true,
         "outputs": [
           [2, 6, 2],
@@ -1221,6 +1512,16 @@
         ]
       },
       {
+        "description": "Single OVER(ORDER BY) ROWS with select col, agg col and group by with a filter",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(ORDER BY {tbl}.int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE int_col < 100 GROUP BY int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [2, 6, 2],
+          [3, 9, 5],
+          [42, 252, 47]
+        ]
+      },
+      {
         "description": "Single OVER(ORDER BY) row_number with select col, agg col and group by with a filter",
         "sql": "SELECT int_col, SUM(int_col), ROW_NUMBER() OVER(ORDER BY {tbl}.int_col) FROM {tbl} WHERE int_col < 100 GROUP BY int_col",
         "keepOutputRowOrder": true,
@@ -1248,6 +1549,12 @@
       {
         "description": "Single OVER(ORDER BY) with select col, agg col and group by with a filter that matches no rows",
         "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(ORDER BY {tbl}.int_col) FROM {tbl} WHERE int_col > 200 GROUP BY int_col",
+        "keepOutputRowOrder": true,
+        "outputs": []
+      },
+      {
+        "description": "Single OVER(ORDER BY) ROWS with select col, agg col and group by with a filter that matches no rows",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(ORDER BY {tbl}.int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE int_col > 200 GROUP BY int_col",
         "keepOutputRowOrder": true,
         "outputs": []
       },
@@ -1291,6 +1598,29 @@
           [489, 11],
           [531, 12],
           [615, 14],
+          [615, 14],
+          [618, 15],
+          [768, 16]
+        ]
+      },
+      {
+        "description": "Multiple OVER(ORDER BY)s ROWS",
+        "sql": "SELECT SUM(int_col) OVER(ORDER BY string_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), COUNT(string_col) OVER(ORDER BY string_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl}",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [2, 1],
+          [4, 2],
+          [46, 3],
+          [88, 4],
+          [130, 5],
+          [133, 6],
+          [233, 7],
+          [235, 8],
+          [238, 9],
+          [339, 10],
+          [489, 11],
+          [531, 12],
+          [573, 13],
           [615, 14],
           [618, 15],
           [768, 16]
@@ -1359,6 +1689,29 @@
           ["c", 489, 150, 400],
           ["d", 531, 42, 400],
           ["e", 615, 42, 400],
+          ["e", 615, 42, 400],
+          ["g", 618, 3, 400],
+          ["h", 768, 150, 400]
+        ]
+      },
+      {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select columns (two ORDER BY columns for deterministic output)",
+        "sql": "SELECT string_col, SUM(int_col) OVER(ORDER BY string_col, int_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), int_col, MAX(double_col) OVER(ORDER BY string_col, int_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl}",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 2, 2, 300],
+          ["a", 4, 2, 400],
+          ["a", 46, 42, 400],
+          ["a", 88, 42, 400],
+          ["a", 130, 42, 400],
+          ["b", 133, 3, 400],
+          ["b", 233, 100, 400],
+          ["c", 235, 2, 400],
+          ["c", 238, 3, 400],
+          ["c", 339, 101, 400],
+          ["c", 489, 150, 400],
+          ["d", 531, 42, 400],
+          ["e", 573, 42, 400],
           ["e", 615, 42, 400],
           ["g", 618, 3, 400],
           ["h", 768, 150, 400]
@@ -1434,6 +1787,29 @@
         ]
       },
       {
+        "description": "Multiple OVER(ORDER BY)s with one DESC column with select columns (two ORDER BY columns for deterministic output) - ranking functions",
+        "sql": "SELECT string_col, DENSE_RANK() OVER(ORDER BY string_col DESC, int_col), int_col, MAX(double_col) OVER(ORDER BY string_col DESC, int_col) FROM {tbl}",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["h", 1, 150, 1.53],
+          ["g", 2, 3, 100],
+          ["e", 3, 42, 100],
+          ["e", 3, 42, 100],
+          ["d", 4, 42, 100],
+          ["c", 5, 2, 400],
+          ["c", 6, 3, 400],
+          ["c", 7, 101, 400],
+          ["c", 8, 150, 400],
+          ["b", 9, 3, 400],
+          ["b", 10, 100, 400],
+          ["a", 11, 2, 400],
+          ["a", 11, 2, 400],
+          ["a", 12, 42, 400],
+          ["a", 12, 42, 400],
+          ["a", 12, 42, 400]
+        ]
+      },
+      {
         "description": "Multiple OVER(ORDER BY)s with two DESC columns with select columns (two ORDER BY columns for deterministic output)",
         "sql": "SELECT string_col, SUM(int_col) OVER(ORDER BY string_col DESC, int_col DESC), int_col, MAX(double_col) OVER(ORDER BY string_col DESC, int_col DESC) FROM {tbl}",
         "keepOutputRowOrder": true,
@@ -1457,7 +1833,7 @@
         ]
       },
       {
-        "description": "Multiple OVER(ORDER BY)s  with second DESC column with select columns (two ORDER BY columns for deterministic output)",
+        "description": "Multiple OVER(ORDER BY)s with second DESC column with select columns (two ORDER BY columns for deterministic output)",
         "sql": "SELECT string_col, SUM(int_col) OVER(ORDER BY string_col, int_col DESC), int_col, MAX(double_col) OVER(ORDER BY string_col, int_col DESC) FROM {tbl}",
         "keepOutputRowOrder": true,
         "outputs": [
@@ -1480,7 +1856,7 @@
         ]
       },
       {
-        "description": "Multiple OVER(ORDER BY)s  with second DESC column with select columns (two ORDER BY columns for deterministic output) with alias - ranking functions",
+        "description": "Multiple OVER(ORDER BY)s with second DESC column with select columns (two ORDER BY columns for deterministic output) with alias - ranking functions",
         "sql": "SELECT string_col, SUM(int_col) OVER(ORDER BY string_col, int_col DESC) as sum, int_col, RANK() OVER(ORDER BY string_col, int_col DESC) as rank FROM {tbl}",
         "keepOutputRowOrder": true,
         "outputs": [
@@ -1545,6 +1921,29 @@
           ["e", 400, 42, 615],
           ["g", 400, 3, 618],
           ["h", 400, 150, 768]
+        ]
+      },
+      {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select columns with alias (three ORDER BY columns for deterministic output)",
+        "sql": "SELECT string_col AS str, MIN(double_col) OVER(ORDER BY string_col, int_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS max, int_col, SUM(int_col) OVER(ORDER BY string_col, int_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS sum FROM {tbl}",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 300, 2, 2],
+          ["a", 300, 2, 4],
+          ["a", 42, 42, 46],
+          ["a", 42, 42, 88],
+          ["a", 42, 42, 130],
+          ["b", 42, 3, 133],
+          ["b", 1, 100, 233],
+          ["c", 1, 2, 235],
+          ["c", 1, 3, 238],
+          ["c", 1, 101, 339],
+          ["c", 1, 150, 489],
+          ["d", 1, 42, 531],
+          ["e", 1, 42, 573],
+          ["e", 1, 42, 615],
+          ["g", 1, 3, 618],
+          ["h", 1, 150, 768]
         ]
       },
       {
@@ -1665,6 +2064,29 @@
         ]
       },
       {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select col with global order by",
+        "sql": "SELECT string_col, AVG(double_col) OVER(ORDER BY string_col, double_col DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as avg, COUNT(string_col) OVER(ORDER BY string_col, double_col DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as count_col FROM {tbl} ORDER BY string_col, count_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 400, 1],
+          ["a", 350, 2],
+          ["a", 258.3333333333333, 3],
+          ["a", 206.375, 4],
+          ["a", 173.5, 5],
+          ["b", 161.25, 6],
+          ["b", 138.357143, 7],
+          ["c", 171.0625, 8],
+          ["c", 163.16666666666666, 9],
+          ["c", 147.0, 10],
+          ["c", 133.728182, 11],
+          ["d", 126.084167, 12],
+          ["e", 120.27, 13],
+          ["e", 114.679286, 14],
+          ["g", 113.700667, 15],
+          ["h", 106.69, 16]
+        ]
+      },
+      {
         "description": "Multiple OVER(ORDER BY)s with select col with global order by - ranking functions",
         "sql": "SELECT string_col, RANK() OVER(ORDER BY string_col), DENSE_RANK() OVER(ORDER BY string_col) FROM {tbl} ORDER BY string_col",
         "keepOutputRowOrder": true,
@@ -1712,6 +2134,20 @@
           ["a", 5, 26],
           ["a", 5, 26],
           ["b", 7, 33.2857143]
+        ]
+      },
+      {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select col with global order by with LIMIT",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(ORDER BY string_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as count, AVG(int_col) OVER(ORDER BY string_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} ORDER BY string_col, count LIMIT 6",
+        "comments": "Cannot use LIMIT without ORDER BY since the results can change and we cannot verify exact row outputs",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 1, 2],
+          ["a", 2, 2],
+          ["a", 3, 15.3333333333],
+          ["a", 4, 22],
+          ["a", 5, 26],
+          ["b", 6, 22.166666666666668]
         ]
       },
       {
@@ -1774,6 +2210,29 @@
         ]
       },
       {
+        "description": "Multiple OVER(ORDER BY)s ROWS and transform col (three ORDER BY columns for deterministic output)",
+        "sql": "SELECT CONCAT(string_col, bool_col, '-'), AVG(int_col) OVER(ORDER BY string_col, bool_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), MIN(double_col) OVER(ORDER BY string_col, bool_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl}",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a-false", 42, 42],
+          ["a-true", 22, 42],
+          ["a-true", 15.333333333333334, 42],
+          ["a-true", 22, 42],
+          ["a-true", 26, 42],
+          ["b-false", 22.166666666666668, 42],
+          ["b-false", 33.2857143, 1],
+          ["c-false", 29.375, 1],
+          ["c-false", 37.333333333333336, 1],
+          ["c-false", 48.6, 1],
+          ["c-true", 44.4545455, 1],
+          ["d-false", 44.25, 1],
+          ["e-false", 44.0769231, 1],
+          ["e-true", 43.9285714, 1],
+          ["g-true", 41.2, 1],
+          ["h-false", 48, 1]
+        ]
+      },
+      {
         "description": "Multiple OVER(ORDER BY)s and transform col (two ORDER BY columns for deterministic output) - ranking functions",
         "sql": "SELECT CONCAT(string_col, bool_col, '-'), RANK() OVER(ORDER BY string_col, bool_col), DENSE_RANK() OVER(ORDER BY string_col, bool_col) FROM {tbl}",
         "keepOutputRowOrder": true,
@@ -1822,6 +2281,17 @@
           ["a", 4, 50.5],
           ["a", 4, 50.5],
           ["a", 4, 50.5],
+          ["a", 4, 50.5]
+        ]
+      },
+      {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select col and filter",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(ORDER BY string_col, double_col DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), MIN(double_col) OVER(ORDER BY string_col, double_col DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE string_col = 'a' AND bool_col != false",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 1, 400],
+          ["a", 2, 300],
+          ["a", 3, 75],
           ["a", 4, 50.5]
         ]
       },
@@ -1875,6 +2345,14 @@
         ]
       },
       {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
+        "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(ORDER BY string_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as count, MIN(double_col) OVER(ORDER BY string_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as min FROM {tbl} WHERE string_col = 'a' AND bool_col != false AND int_col > 200)",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [null]
+        ]
+      },
+      {
         "description": "Multiple empty OVER()s with select col and filter",
         "sql": "SELECT double_col, SUM(int_col) OVER(), AVG(double_col) OVER() FROM {tbl} WHERE string_col NOT IN ('a', 'd', 'e', 'g', 'h')",
         "outputs": [
@@ -1900,6 +2378,19 @@
         ]
       },
       {
+        "description": "Multiple OVER(ORDER BY) ROWS with filter",
+        "sql": "SELECT SUM(int_col) OVER(ORDER BY string_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), AVG(double_col) OVER(ORDER BY string_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE string_col NOT IN ('a', 'd', 'e', 'g', 'h')",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [3, 100],
+          [103, 50.5],
+          [105, 167.0],
+          [108, 150.25],
+          [209, 120.402],
+          [359, 100.585]
+        ]
+      },
+      {
         "description": "Multiple OVER(ORDER BY) with filter - ranking functions",
         "sql": "SELECT DENSE_RANK() OVER(ORDER BY string_col), AVG(double_col) OVER(ORDER BY string_col) FROM {tbl} WHERE string_col NOT IN ('a', 'd', 'e', 'g', 'h')",
         "keepOutputRowOrder": true,
@@ -1915,6 +2406,19 @@
       {
         "description": "Multiple OVER(ORDER BY)s with select col and filter (two ORDER BY columns for deterministic output)",
         "sql": "SELECT double_col, SUM(int_col) OVER(ORDER BY string_col, double_col), AVG(double_col) OVER(ORDER BY string_col, double_col) FROM {tbl} WHERE string_col NOT IN ('a', 'd', 'e', 'g', 'h')",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [1, 100, 1],
+          [100, 103, 50.5],
+          [1.01, 204, 34.0033333],
+          [1.5, 354, 25.8775],
+          [100, 357, 40.702],
+          [400, 359, 100.585]
+        ]
+      },
+      {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select col and filter (two ORDER BY columns for deterministic output)",
+        "sql": "SELECT double_col, SUM(int_col) OVER(ORDER BY string_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), AVG(double_col) OVER(ORDER BY string_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE string_col NOT IN ('a', 'd', 'e', 'g', 'h')",
         "keepOutputRowOrder": true,
         "outputs": [
           [1, 100, 1],
@@ -1975,6 +2479,26 @@
           [7, 101, 11],
           [6, 101, 12],
           [6, 101, 13]
+        ]
+      },
+      {
+        "description": "Multiple OVER(ORDER BY)s ROWS and ROW_NUMBER with select transform and filter",
+        "sql": "SELECT LENGTH(CONCAT(string_col, bool_col, '-')), MAX(int_col) OVER(ORDER BY string_col, bool_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), COUNT(double_col) OVER(ORDER BY string_col, bool_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), ROW_NUMBER() OVER(ORDER BY string_col, bool_col, int_col) FROM {tbl} where int_col < 50 OR double_col = 1.01",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [7, 42, 1, 1],
+          [6, 42, 2, 2],
+          [6, 42, 3, 3],
+          [6, 42, 4, 4],
+          [6, 42, 5, 5],
+          [7, 42, 6, 6],
+          [7, 42, 7, 7],
+          [7, 101, 8, 8],
+          [6, 101, 9, 9],
+          [7, 101, 10, 10],
+          [7, 101, 11, 11],
+          [6, 101, 12, 12],
+          [6, 101, 13, 13]
         ]
       },
       {
@@ -2093,6 +2617,29 @@
         ]
       },
       {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select col and group by",
+        "sql": "SELECT string_col, MIN({tbl}.double_col) OVER(ORDER BY {tbl}.string_col, {tbl}.double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), SUM({tbl}.double_col) OVER(ORDER BY {tbl}.string_col, {tbl}.double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY string_col, double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 42, 42],
+          ["a", 42, 92.5],
+          ["a", 42, 167.5],
+          ["a", 42, 467.5],
+          ["a", 42, 867.5],
+          ["b", 1, 868.5],
+          ["b", 1, 968.5],
+          ["c", 1, 969.51],
+          ["c", 1, 971.01],
+          ["c", 1, 1071.01],
+          ["c", 1, 1471.01],
+          ["d", 1, 1513.01],
+          ["e", 1, 1555.01],
+          ["e", 1, 1605.51],
+          ["g", 1, 1705.51],
+          ["h", 1, 1707.04]
+        ]
+      },
+      {
         "description": "Multiple OVER(ORDER BY)s with select col and group by - ranking functions",
         "sql": "SELECT string_col, RANK() OVER(ORDER BY {tbl}.string_col), SUM({tbl}.double_col) OVER(ORDER BY {tbl}.string_col) FROM {tbl} GROUP BY string_col, double_col",
         "keepOutputRowOrder": true,
@@ -2199,6 +2746,23 @@
         ]
       },
       {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select col, agg col and group by",
+        "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(ORDER BY {tbl}.double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), AVG({tbl}.double_col) OVER(ORDER BY {tbl}.double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [1, 1, 1, 1],
+          [1.01, 1.01, 2.01, 1.005],
+          [1.5, 1.5, 3.51, 1.17],
+          [1.53, 1.53, 5.04, 1.26],
+          [42, 126, 47.04, 9.408],
+          [50.5, 101, 97.54, 16.2566667],
+          [75, 75, 172.54, 24.6485714],
+          [100, 300, 272.54, 34.0675],
+          [300, 300, 572.54, 63.6155556],
+          [400, 800, 972.54, 97.254]
+        ]
+      },
+      {
         "description": "Multiple OVER(ORDER BY)s with select col, agg col and group by - ranking function",
         "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(ORDER BY {tbl}.double_col), RANK() OVER(ORDER BY {tbl}.double_col) FROM {tbl} GROUP BY double_col",
         "keepOutputRowOrder": true,
@@ -2235,6 +2799,23 @@
       {
         "description": "Multiple OVER(ORDER BY)s with select col, agg col and group by with global order by",
         "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(ORDER BY {tbl}.double_col), AVG({tbl}.double_col) OVER(ORDER BY {tbl}.double_col) FROM {tbl} GROUP BY double_col ORDER BY double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [1, 1, 1, 1],
+          [1.01, 1.01, 2.01, 1.005],
+          [1.5, 1.5, 3.51, 1.17],
+          [1.53, 1.53, 5.04, 1.26],
+          [42, 126, 47.04, 9.408],
+          [50.5, 101, 97.54, 16.2566667],
+          [75, 75, 172.54, 24.6485714],
+          [100, 300, 272.54, 34.0675],
+          [300, 300, 572.54, 63.6155556],
+          [400, 800, 972.54, 97.254]
+        ]
+      },
+      {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select col, agg col and group by with global order by",
+        "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(ORDER BY {tbl}.double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), AVG({tbl}.double_col) OVER(ORDER BY {tbl}.double_col ROWS UNBOUNDED PRECEDING) FROM {tbl} GROUP BY double_col ORDER BY double_col",
         "keepOutputRowOrder": true,
         "outputs": [
           [1, 1, 1, 1],
@@ -2302,6 +2883,15 @@
         ]
       },
       {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select col, agg col and group by with a filter",
+        "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(ORDER BY {tbl}.double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), AVG({tbl}.double_col) OVER(ORDER BY {tbl}.double_col ROWS UNBOUNDED PRECEDING) FROM {tbl} WHERE double_col > 100 GROUP BY double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [300, 300, 300, 300],
+          [400, 800, 700, 350]
+        ]
+      },
+      {
         "description": "Multiple empty OVER()s with select col, agg col and group by with a filter that matches no rows",
         "sql": "SELECT double_col, SUM(double_col), SUM({tbl}.double_col) OVER(), AVG({tbl}.double_col) OVER() FROM {tbl} WHERE double_col > 500 GROUP BY double_col",
         "outputs": []
@@ -2326,6 +2916,18 @@
       {
         "description": "Multiple OVER(ORDER BY)s with select col and filter using bool aggregation",
         "sql": "SELECT string_col, BOOL_OR(bool_col) OVER(ORDER BY bool_col), BOOL_AND(bool_col) OVER(ORDER BY bool_col) FROM {tbl} WHERE string_col = 'a'",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", false, false],
+          ["a", true, false],
+          ["a", true, false],
+          ["a", true, false],
+          ["a", true, false]
+        ]
+      },
+      {
+        "description": "Multiple OVER(ORDER BY)s ROWS with select col and filter using bool aggregation",
+        "sql": "SELECT string_col, BOOL_OR(bool_col) OVER(ORDER BY bool_col ROWS UNBOUNDED PRECEDING), BOOL_AND(bool_col) OVER(ORDER BY bool_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE string_col = 'a'",
         "keepOutputRowOrder": true,
         "outputs": [
           ["a", false, false],
@@ -2480,6 +3082,30 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS sum",
+        "sql": "SELECT SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl}",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [2],
+          [4],
+          [46],
+          [88],
+          [130],
+          [3],
+          [103],
+          [-101],
+          [-99],
+          [-96],
+          [54],
+          [42],
+          [42],
+          [84],
+          [3],
+          [150]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ranking functions",
         "sql": "SELECT RANK() OVER(PARTITION BY string_col ORDER BY int_col) FROM {tbl}",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -2566,6 +3192,30 @@
           ["c", 54, 150],
           ["d", 42, 42],
           ["e", 84, 42],
+          ["e", 84, 42],
+          ["g", 3, 3],
+          ["h", 150, 150]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS sum with select columns",
+        "sql": "SELECT string_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING), int_col FROM {tbl}",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", 2, 2],
+          ["a", 4, 2],
+          ["a", 46, 42],
+          ["a", 88, 42],
+          ["a", 130, 42],
+          ["b", 3, 3],
+          ["b", 103, 100],
+          ["c", -101, -101],
+          ["c", -99, 2],
+          ["c", -96, 3],
+          ["c", 54, 150],
+          ["d", 42, 42],
+          ["e", 42, 42],
           ["e", 84, 42],
           ["g", 3, 3],
           ["h", 150, 150]
@@ -2764,6 +3414,30 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2 DESC, k3) ROWS sum with select columns",
+        "sql": "SELECT string_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col DESC, bool_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), int_col, bool_col FROM {tbl}",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", 42, 42, false],
+          ["a", 84, 42, true],
+          ["a", 126, 42, true],
+          ["a", 128, 2, true],
+          ["a", 130, 2, true],
+          ["b", 100, 100, false],
+          ["b", 103, 3, false],
+          ["c", 150, 150, false],
+          ["c", 153, 3, true],
+          ["c", 155, 2, false],
+          ["c", 54, -101, false],
+          ["d", 42, 42, false],
+          ["e", 42, 42, false],
+          ["e", 84, 42, true],
+          ["g", 3, 3, true],
+          ["h", 150, 150, false]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k1) sum with select columns",
         "sql": "SELECT string_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY string_col), int_col FROM {tbl}",
         "outputs": [
@@ -2783,6 +3457,50 @@
           ["c", 54, 150],
           ["c", 54, 3],
           ["c", 54, 2]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1,k2 ORDER BY k1,k2) sum with select columns",
+        "sql": "SELECT string_col, SUM(int_col) OVER(PARTITION BY string_col, int_col ORDER BY string_col, int_col), int_col FROM {tbl}",
+        "outputs": [
+          ["a", 4, 2],
+          ["a", 4, 2],
+          ["a", 126, 42],
+          ["a", 126, 42],
+          ["a", 126, 42],
+          ["b", 3, 3],
+          ["b", 100, 100],
+          ["e", 84, 42],
+          ["e", 84, 42],
+          ["d", 42, 42],
+          ["h", 150, 150],
+          ["g", 3, 3],
+          ["c", -101, -101],
+          ["c", 150, 150],
+          ["c", 3, 3],
+          ["c", 2, 2]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1,k2 ORDER BY k1,k2) ROWS sum with select columns",
+        "sql": "SELECT string_col, SUM(int_col) OVER(PARTITION BY string_col, int_col ORDER BY string_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), int_col FROM {tbl}",
+        "outputs": [
+          ["a", 2, 2],
+          ["a", 4, 2],
+          ["a", 42, 42],
+          ["a", 84, 42],
+          ["a", 126, 42],
+          ["b", 3, 3],
+          ["b", 100, 100],
+          ["e", 42, 42],
+          ["e", 84, 42],
+          ["d", 42, 42],
+          ["h", 150, 150],
+          ["g", 3, 3],
+          ["c", -101, -101],
+          ["c", 2, 2],
+          ["c", 3, 3],
+          ["c", 150, 150]
         ]
       },
       {
@@ -2920,6 +3638,30 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS max with select columns with alias",
+        "sql": "SELECT string_col AS str, MAX(double_col) OVER(PARTITION BY string_col ORDER BY int_col, double_col ROWS UNBOUNDED PRECEDING) AS max, int_col FROM {tbl}",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", 300, 2],
+          ["a", 400, 2],
+          ["a", 400, 42],
+          ["a", 400, 42],
+          ["a", 400, 42],
+          ["b", 100, 3],
+          ["b", 100, 100],
+          ["e", 42, 42],
+          ["e", 50.5, 42],
+          ["d", 42, 42],
+          ["c", 1.01, -101],
+          ["c", 400, 2],
+          ["c", 400, 3],
+          ["c", 400, 150],
+          ["h", -1.53, 150],
+          ["g", 100, 3]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k2) row_number with select columns with alias",
         "sql": "SELECT string_col AS str, ROW_NUMBER() OVER(PARTITION BY string_col ORDER BY int_col) AS row_number, int_col FROM {tbl}",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -2988,30 +3730,6 @@
           [false, -101, 1.5],
           [false, -101, -1.53],
           [false, -101, 400]
-        ]
-      },
-      {
-        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) min with select columns and default frame",
-        "sql": "SELECT bool_col, MIN(int_col) OVER(PARTITION BY bool_col ORDER BY int_col DESC RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), double_col FROM {tbl}",
-        "comments": "Calcite validation fails if more than 1 ORDER BY column is used with RANGE. ROWS is not yet supported. Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
-        "keepOutputRowOrder": false,
-        "outputs": [
-          [true, 2, 300],
-          [true, 2, 400],
-          [true, 3, 100],
-          [true, 42, 50.5],
-          [true, 42, 75],
-          [true, 42, 50.5],
-          [true, 3, 100],
-          [false, 3, 100],
-          [false, 100, 1],
-          [false, 42, 42],
-          [false, 42, 42],
-          [false, 42, 42],
-          [false, -101, 1.01],
-          [false, 150, 1.5],
-          [false, 150, -1.53],
-          [false, 2, 400]
         ]
       },
       {
@@ -3131,7 +3849,30 @@
         ]
       },
       {
-        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) avg with select col with global order by (use two global ORDER BY keys for deterministic ordering) - ranking functions",
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS avg with select col with global order by (use three global ORDER BY keys for deterministic ordering)",
+        "sql": "SELECT string_col, AVG(double_col) OVER(PARTITION BY string_col ORDER BY int_col, double_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} ORDER BY string_col, int_col, double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 300],
+          ["a", 350],
+          ["a", 247.33333333333334],
+          ["a", 198.125],
+          ["a", 173.5],
+          ["b", 100],
+          ["b", 50.5],
+          ["c", 1.01],
+          ["c", 200.505],
+          ["c", 167.003333],
+          ["c", 125.6275],
+          ["d", 42],
+          ["e", 42],
+          ["e", 46.25],
+          ["g", 100],
+          ["h", -1.53]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) rank with select col with global order by (use two global ORDER BY keys for deterministic ordering) - ranking functions",
         "sql": "SELECT string_col, RANK() OVER(PARTITION BY string_col ORDER BY int_col) FROM {tbl} ORDER BY string_col, int_col",
         "keepOutputRowOrder": true,
         "outputs": [
@@ -3185,6 +3926,29 @@
           ["a", true, 350.0],
           ["a", true, 350.0],
           ["a", true, 206.375],
+          ["a", true, 206.375],
+          ["b", false, 100],
+          ["b", false, 50.5],
+          ["c", false, 1.01],
+          ["c", false, 200.505],
+          ["c", false, 134.17],
+          ["c", true, 100],
+          ["d", false, 42],
+          ["e", false, 42],
+          ["e", true, 50.5],
+          ["g", true, 100],
+          ["h", false, -1.53]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY (2 keys) ORDER BY different key) ROWS avg with select col with global order by (added int_col, double_col to global order by for deterministic results)",
+        "sql": "SELECT string_col, bool_col, AVG(double_col) OVER(PARTITION BY string_col, bool_col ORDER BY int_col, double_col) FROM {tbl} ORDER BY string_col, bool_col, int_col, double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", false, 42],
+          ["a", true, 300.0],
+          ["a", true, 350.0],
+          ["a", true, 250.16666666666666],
           ["a", true, 206.375],
           ["b", false, 100],
           ["b", false, 50.5],
@@ -3275,6 +4039,21 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS count with select col with global order by with LIMIT (added int_col to ORDER BY list for deterministic results)",
+        "sql": "SELECT string_col, COUNT(int_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS count FROM {tbl} ORDER BY string_col, count LIMIT 7",
+        "comments": "Cannot use LIMIT without ORDER BY since the results can change and we cannot verify exact row outputs",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 1],
+          ["a", 2],
+          ["a", 3],
+          ["a", 4],
+          ["a", 5],
+          ["b", 1],
+          ["b", 2]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ranking functions with select col with global order by with LIMIT (added int_col to ORDER BY list for deterministic results)",
         "sql": "SELECT string_col, RANK() OVER(PARTITION BY string_col ORDER BY int_col) FROM {tbl} ORDER BY string_col, int_col LIMIT 7",
         "comments": "Cannot use LIMIT without ORDER BY since the results can change and we cannot verify exact row outputs",
@@ -3333,6 +4112,30 @@
           ["e-true", 42],
           ["h-false", 150],
           ["g-true", 3]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS and transform col",
+        "sql": "SELECT CONCAT(string_col, bool_col, '-'), COUNT(int_col) OVER(PARTITION BY string_col ORDER BY bool_col ROWS UNBOUNDED PRECEDING) FROM {tbl}",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a-false", 1],
+          ["a-true", 2],
+          ["a-true", 3],
+          ["a-true", 4],
+          ["a-true", 5],
+          ["b-false", 1],
+          ["b-false", 2],
+          ["c-false", 1],
+          ["c-false", 2],
+          ["c-false", 3],
+          ["c-true", 4],
+          ["d-false", 1],
+          ["e-false", 1],
+          ["e-true", 2],
+          ["h-false", 1],
+          ["g-true", 1]
         ]
       },
       {
@@ -3407,6 +4210,15 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS with select col and filter",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col ORDER BY bool_col ROWS UNBOUNDED PRECEDING) FROM {tbl} WHERE string_col = 'a' AND bool_col = false",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", 1]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k2) rank with select col and filter",
         "sql": "SELECT string_col, RANK() OVER(PARTITION BY string_col ORDER BY bool_col) FROM {tbl} WHERE string_col = 'a' AND bool_col = false",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -3444,6 +4256,15 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
+        "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING) as count FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [null]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY) with select col and filter",
         "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col) FROM {tbl} WHERE string_col IN ('b', 'c')",
         "outputs": [
@@ -3458,6 +4279,20 @@
       {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k2) with select col and filter",
         "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col ORDER BY int_col) FROM {tbl} WHERE string_col IN ('b', 'c')",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [100, 3],
+          [1, 103],
+          [1.01, -101],
+          [400, -99],
+          [1.5, 51],
+          [100, 3]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS with select col and filter",
+        "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col ORDER BY int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE string_col IN ('b', 'c')",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
         "keepOutputRowOrder": false,
         "outputs": [
@@ -3496,6 +4331,18 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k1) ROWS with select col and filter",
+        "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col, int_col ORDER BY bool_col, string_col, int_col ROWS UNBOUNDED PRECEDING) FROM {tbl} WHERE string_col IN ('b', 'c')",
+        "outputs": [
+          [100, 3],
+          [1, 100],
+          [1.01, -101],
+          [400, 2],
+          [1.5, 150],
+          [100, 3]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k1) row_number with select col and filter",
         "sql": "SELECT double_col, ROW_NUMBER() OVER(PARTITION BY bool_col, string_col ORDER BY bool_col, string_col) FROM {tbl} WHERE string_col IN ('b', 'c') AND int_col < 100 AND int_col > 0",
         "outputs": [
@@ -3523,6 +4370,30 @@
           [1.01, 51],
           [1.5, 51],
           [400, 51]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k1) with select col and filter where ORDER BY is DESC",
+        "sql": "SELECT bool_col, string_col, COUNT(int_col) OVER(PARTITION BY bool_col, string_col ORDER BY bool_col, string_col DESC) FROM {tbl} WHERE string_col IN ('b', 'c')",
+        "outputs": [
+          [false, "b", 2],
+          [false, "b", 2],
+          [false, "c", 3],
+          [false, "c", 3],
+          [false, "c", 3],
+          [true, "c", 1]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k1) ROWS with select col and filter where ORDER BY is DESC",
+        "sql": "SELECT bool_col, string_col, COUNT(int_col) OVER(PARTITION BY bool_col, string_col ORDER BY bool_col, string_col DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE string_col IN ('b', 'c')",
+        "outputs": [
+          [false, "b", 1],
+          [false, "b", 2],
+          [false, "c", 1],
+          [false, "c", 2],
+          [false, "c", 3],
+          [true, "c", 1]
         ]
       },
       {
@@ -3561,6 +4432,28 @@
       {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k2) with select transform and filter",
         "sql": "SELECT CONCAT(string_col, bool_col, '-'), MAX(int_col) OVER(PARTITION BY string_col, int_col ORDER BY bool_col) FROM {tbl} where int_col < 50 OR double_col = 1",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a-true", 2],
+          ["a-true", 2],
+          ["a-false", 42],
+          ["a-true", 42],
+          ["a-true", 42],
+          ["b-false", 3],
+          ["b-false", 100],
+          ["c-false", -101],
+          ["c-false", 2],
+          ["c-true", 3],
+          ["d-false", 42],
+          ["e-false", 42],
+          ["e-true", 42],
+          ["g-true", 3]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS with select transform and filter",
+        "sql": "SELECT CONCAT(string_col, bool_col, '-'), MAX(int_col) OVER(PARTITION BY string_col, int_col ORDER BY bool_col ROWS UNBOUNDED PRECEDING) FROM {tbl} where int_col < 50 OR double_col = 1",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
         "keepOutputRowOrder": false,
         "outputs": [
@@ -3663,6 +4556,26 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS with group by",
+        "sql": "SELECT MAX({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING) FROM {tbl} GROUP BY string_col, int_col",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [2],
+          [42],
+          [3],
+          [100],
+          [-101],
+          [2],
+          [3],
+          [150],
+          [42],
+          [42],
+          [3],
+          [150]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k2) with group by - ranking functions",
         "sql": "SELECT RANK() OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY string_col, int_col",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -3739,6 +4652,46 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) with DESC with select col and group by",
+        "sql": "SELECT string_col, MIN({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col DESC) FROM {tbl} GROUP BY string_col, int_col",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", 42],
+          ["a", 2],
+          ["b", 100],
+          ["b", 3],
+          ["c", 150],
+          ["c", 3],
+          ["c", 2],
+          ["c", -101],
+          ["d", 42],
+          ["e", 42],
+          ["g", 3],
+          ["h", 150]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS with select col and group by",
+        "sql": "SELECT string_col, MIN({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY string_col, int_col",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", 42],
+          ["a", 2],
+          ["b", 100],
+          ["b", 3],
+          ["c", 150],
+          ["c", 3],
+          ["c", 2],
+          ["c", -101],
+          ["d", 42],
+          ["e", 42],
+          ["g", 3],
+          ["h", 150]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k2) with select col and group by - ranking functions",
         "sql": "SELECT string_col, RANK() OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY string_col, int_col",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -3773,6 +4726,26 @@
       {
         "description": "Single OVER(PARTITION BY k1 ORDER by k2) with agg col and group by",
         "sql": "SELECT SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY string_col, int_col",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [4, 2],
+          [126, 44],
+          [3, 3],
+          [100, 103],
+          [-101, -101],
+          [2, -99],
+          [3, -96],
+          [150, 54],
+          [42, 42],
+          [84, 42],
+          [3, 3],
+          [150, 150]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER by k2) ROWS with agg col and group by",
+        "sql": "SELECT SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY string_col, int_col",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
         "keepOutputRowOrder": false,
         "outputs": [
@@ -3863,6 +4836,26 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER by k2) ROWS with select col, agg col and group by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY string_col, int_col",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [2, 4, 2],
+          [42, 126, 44],
+          [3, 3, 3],
+          [100, 100, 103],
+          [-101, -101, -101],
+          [2, 2, -99],
+          [3, 3, -96],
+          [150, 150, 54],
+          [42, 42, 42],
+          [42, 84, 42],
+          [3, 3, 3],
+          [150, 150, 150]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY k1 ORDER by k2) rank with select col, agg col and group by",
         "sql": "SELECT int_col, SUM(int_col), RANK() OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY string_col, int_col",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -3898,6 +4891,25 @@
       {
         "description": "Single OVER(PARTITION BY k1 ORDER by k2) with select col, agg col and group by with global order by",
         "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY string_col, int_col ORDER BY string_col, int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [2, 4, 2],
+          [42, 126, 44],
+          [3, 3, 3],
+          [100, 100, 103],
+          [-101, -101, -101],
+          [2, 2, -99],
+          [3, 3, -96],
+          [150, 150, 54],
+          [42, 42, 42],
+          [42, 84, 42],
+          [3, 3, 3],
+          [150, 150, 150]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER by k2) ROWS with select col, agg col and group by with global order by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} GROUP BY string_col, int_col ORDER BY string_col, int_col",
         "keepOutputRowOrder": true,
         "outputs": [
           [2, 4, 2],
@@ -3978,6 +4990,15 @@
         ]
       },
       {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS with select col, agg col and group by with a filter",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col ORDER BY {tbl}.string_col ROWS UNBOUNDED PRECEDING) FROM {tbl} WHERE int_col >= 100 GROUP BY string_col, int_col",
+        "outputs": [
+          [100, 100, 100],
+          [150, 150, 150],
+          [150, 150, 300]
+        ]
+      },
+      {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k2) rank with select col, agg col and group by with a filter",
         "sql": "SELECT int_col, SUM(int_col), RANK() OVER(PARTITION BY {tbl}.int_col ORDER BY {tbl}.string_col) FROM {tbl} WHERE int_col >= 100 GROUP BY string_col, int_col",
         "outputs": [
@@ -3994,6 +5015,11 @@
       {
         "description": "Single OVER(PARTITION BY k1 ORDER BY k2) with select col, agg col and group by with a filter that matches no rows",
         "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col ORDER BY {tbl}.string_col) FROM {tbl} WHERE int_col > 200 GROUP BY string_col, int_col",
+        "outputs": []
+      },
+      {
+        "description": "Single OVER(PARTITION BY k1 ORDER BY k2) ROWS with select col, agg col and group by with a filter that matches no rows",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col ORDER BY {tbl}.string_col ROWS UNBOUNDED PRECEDING) FROM {tbl} WHERE int_col > 200 GROUP BY string_col, int_col",
         "outputs": []
       },
       {
@@ -4037,6 +5063,30 @@
           [54, 4],
           [42, 1],
           [84, 2],
+          [84, 2],
+          [3, 1],
+          [150, 1]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS",
+        "sql": "SELECT SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING), COUNT(string_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING) FROM {tbl}",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [2, 1],
+          [4, 2],
+          [46, 3],
+          [88, 4],
+          [130, 5],
+          [3, 1],
+          [103, 2],
+          [-101, 1],
+          [-99, 2],
+          [-96, 3],
+          [54, 4],
+          [42, 1],
+          [42, 1],
           [84, 2],
           [3, 1],
           [150, 1]
@@ -4114,26 +5164,26 @@
       },
       {
         "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s row_number with select columns",
-        "sql": "SELECT string_col, ROW_NUMBER() OVER(PARTITION BY string_col ORDER BY int_col), int_col, ROW_NUMBER() OVER(PARTITION BY string_col ORDER BY int_col) FROM {tbl}",
+        "sql": "SELECT string_col, ROW_NUMBER() OVER(PARTITION BY string_col ORDER BY int_col), int_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl}",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
         "keepOutputRowOrder": false,
         "outputs": [
-          ["a", 1, 2, 1],
-          ["a", 2, 2, 2],
-          ["a", 3, 42, 3],
-          ["a", 4, 42, 4],
-          ["a", 5, 42, 5],
-          ["b", 1, 3, 1],
-          ["b", 2, 100, 2],
-          ["c", 1, -101, 1],
-          ["c", 2, 2, 2],
-          ["c", 3, 3, 3],
-          ["c", 4, 150, 4],
-          ["d", 1, 42, 1],
-          ["e", 1, 42, 1],
-          ["e", 2, 42, 2],
-          ["g", 1, 3, 1],
-          ["h", 1, 150, 1]
+          ["a", 1, 2, 2],
+          ["a", 2, 2, 4],
+          ["a", 3, 42, 46],
+          ["a", 4, 42, 88],
+          ["a", 5, 42, 130],
+          ["b", 1, 3, 3],
+          ["b", 2, 100, 103],
+          ["c", 1, -101, -101],
+          ["c", 2, 2, -99],
+          ["c", 3, 3, -96],
+          ["c", 4, 150, 54],
+          ["d", 1, 42, 42],
+          ["e", 1, 42, 42],
+          ["e", 2, 42, 84],
+          ["g", 1, 3, 3],
+          ["h", 1, 150, 150]
         ]
       },
       {
@@ -4169,6 +5219,30 @@
           ["a", 4, 2, 400],
           ["a", 46, 42, 400],
           ["a", 130, 42, 400],
+          ["a", 130, 42, 400],
+          ["b", 3, 3, 100],
+          ["b", 103, 100, 100],
+          ["c", -101, -101, 1.01],
+          ["c", -99, 2, 400],
+          ["c", -96, 3, 400],
+          ["c", 54, 150, 400],
+          ["d", 42, 42, 42],
+          ["e", 42, 42, 42],
+          ["e", 84, 42, 50.5],
+          ["g", 3, 3, 100],
+          ["h", 150, 150, -1.53]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2, k3, k4)s ROWS with select columns",
+        "sql": "SELECT string_col, SUM(int_col) OVER(PARTITION BY string_col ORDER BY int_col, double_col, bool_col ROWS UNBOUNDED PRECEDING), int_col, MAX(double_col) OVER(PARTITION BY string_col ORDER BY int_col, double_col, bool_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl}",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", 2, 2, 300],
+          ["a", 4, 2, 400],
+          ["a", 46, 42, 400],
+          ["a", 88, 42, 400],
           ["a", 130, 42, 400],
           ["b", 3, 3, 100],
           ["b", 103, 100, 100],
@@ -4326,6 +5400,30 @@
         ]
       },
       {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select col using bool aggregation",
+        "sql": "SELECT string_col, BOOL_OR(bool_col) OVER(PARTITION BY string_col ORDER BY bool_col DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), BOOL_AND(bool_col) OVER(PARTITION BY string_col ORDER BY bool_col DESC ROWS UNBOUNDED PRECEDING) FROM {tbl}",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", true, true],
+          ["a", true, true],
+          ["a", true, true],
+          ["a", true, true],
+          ["a", true, false],
+          ["b", false, false],
+          ["b", false, false],
+          ["d", false, false],
+          ["e", true, true],
+          ["e", true, false],
+          ["h", false, false],
+          ["g", true, true],
+          ["c", true, true],
+          ["c", true, false],
+          ["c", true, false],
+          ["c", true, false]
+        ]
+      },
+      {
         "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s with select col using bool aggregation and ranking function",
         "sql": "SELECT string_col, RANK() OVER(PARTITION BY string_col ORDER BY bool_col DESC), BOOL_AND(bool_col) OVER(PARTITION BY string_col ORDER BY bool_col DESC) FROM {tbl}",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -4393,6 +5491,30 @@
           ["c", 400, 150, -101],
           ["h", -1.53, 150, 150],
           ["g", 100, 3, 3]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select columns with alias",
+        "sql": "SELECT string_col AS str, ROW_NUMBER() OVER(PARTITION BY string_col ORDER BY int_col) AS max, int_col, MIN(int_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING) AS sum FROM {tbl}",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", 1, 2, 2],
+          ["a", 2, 2, 2],
+          ["a", 3, 42, 2],
+          ["a", 4, 42, 2],
+          ["a", 5, 42, 2],
+          ["b", 1, 3, 3],
+          ["b", 2, 100, 3],
+          ["e", 1, 42, 42],
+          ["e", 2, 42, 42],
+          ["d", 1, 42, 42],
+          ["c", 1, -101, -101],
+          ["c", 2, 2, -101],
+          ["c", 3, 3, -101],
+          ["c", 4, 150, -101],
+          ["h", 1, 150, 150],
+          ["g", 1, 3, 3]
         ]
       },
       {
@@ -4537,6 +5659,29 @@
         ]
       },
       {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select col with global order by (use two global ORDER BY keys for deterministic ordering)",
+        "sql": "SELECT string_col, AVG(double_col) OVER(PARTITION BY string_col ORDER BY int_col, double_col ROWS UNBOUNDED PRECEDING), COUNT(string_col) OVER(PARTITION BY string_col ORDER BY int_col, double_col ROWS UNBOUNDED PRECEDING) FROM {tbl} ORDER BY string_col, int_col, double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 300, 1],
+          ["a", 350, 2],
+          ["a", 247.33333333333334, 3],
+          ["a", 198.125, 4],
+          ["a", 173.5, 5],
+          ["b", 100, 1],
+          ["b", 50.5, 2],
+          ["c", 1.01, 1],
+          ["c", 200.505, 2],
+          ["c", 167.003333, 3],
+          ["c", 125.6275, 4],
+          ["d", 42, 1],
+          ["e", 42, 1],
+          ["e", 46.25, 2],
+          ["g", 100, 1],
+          ["h", -1.53, 1]
+        ]
+      },
+      {
         "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s with select col with global order by (use two global ORDER BY keys for deterministic ordering) ranking functions",
         "sql": "SELECT string_col, DENSE_RANK() OVER(PARTITION BY string_col ORDER BY int_col), RANK() OVER(PARTITION BY string_col ORDER BY int_col) FROM {tbl} ORDER BY string_col, int_col",
         "keepOutputRowOrder": true,
@@ -4606,7 +5751,30 @@
         ]
       },
       {
-        "description": "Single OVER(PARTITION BY (2 keys) ORDER BY different key)s avg with select col with global order by (added int_col to global order by for deterministic results) - ranking functions",
+        "description": "Single OVER(PARTITION BY (2 keys) ORDER BY different key)s ROWS avg with select col with global order by (added int_col to global order by for deterministic results)",
+        "sql": "SELECT string_col, bool_col, AVG(double_col) OVER(PARTITION BY string_col, bool_col ORDER BY int_col, double_col ROWS UNBOUNDED PRECEDING), COUNT(string_col) OVER(PARTITION BY bool_col, string_col ORDER BY int_col, double_col ROWS UNBOUNDED PRECEDING) FROM {tbl} ORDER BY string_col, bool_col, int_col, double_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", false, 42, 1],
+          ["a", true, 300.0, 1],
+          ["a", true, 350.0, 2],
+          ["a", true, 250.16666666666666, 3],
+          ["a", true, 206.375, 4],
+          ["b", false, 100, 1],
+          ["b", false, 50.5, 2],
+          ["c", false, 1.01, 1],
+          ["c", false, 200.505, 2],
+          ["c", false, 134.17, 3],
+          ["c", true, 100, 1],
+          ["d", false, 42, 1],
+          ["e", false, 42, 1],
+          ["e", true, 50.5, 1],
+          ["g", true, 100, 1],
+          ["h", false, -1.53, 1]
+        ]
+      },
+      {
+        "description": "Single OVER(PARTITION BY (2 keys) ORDER BY different key)s rank, dense_rank with select col with global order by (added int_col to global order by for deterministic results) - ranking functions",
         "sql": "SELECT string_col, bool_col, RANK() OVER(PARTITION BY string_col, bool_col ORDER BY int_col), DENSE_RANK() OVER(PARTITION BY bool_col, string_col ORDER BY int_col) FROM {tbl} ORDER BY string_col, bool_col, int_col",
         "keepOutputRowOrder": true,
         "outputs": [
@@ -4655,6 +5823,21 @@
           ["a", 5, 26],
           ["b", 1, 3],
           ["b", 2, 51.5]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select col with global order by with LIMIT",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING) as count, ROW_NUMBER() OVER(PARTITION BY string_col ORDER BY int_col) FROM {tbl} ORDER BY string_col, int_col, count LIMIT 7",
+        "comments": "Cannot use LIMIT without ORDER BY since the results can change and we cannot verify exact row outputs",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          ["a", 1, 1],
+          ["a", 2, 2],
+          ["a", 3, 3],
+          ["a", 4, 4],
+          ["a", 5, 5],
+          ["b", 1, 1],
+          ["b", 2, 2]
         ]
       },
       {
@@ -4719,6 +5902,30 @@
         ]
       },
       {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS and transform col",
+        "sql": "SELECT UPPER(CONCAT(string_col, bool_col, '-')), AVG(int_col) OVER(PARTITION BY string_col ORDER BY bool_col, int_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), MIN(double_col) OVER(PARTITION BY string_col ORDER BY bool_col, int_col ROWS UNBOUNDED PRECEDING) FROM {tbl}",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["A-FALSE", 42, 42],
+          ["A-TRUE", 22, 42],
+          ["A-TRUE", 15.333333333333334, 42],
+          ["A-TRUE", 22, 42],
+          ["A-TRUE", 26, 42],
+          ["B-FALSE", 3, 100],
+          ["B-FALSE", 51.5, 1],
+          ["C-FALSE", -101, 1.01],
+          ["C-FALSE", -49.5, 1.01],
+          ["C-FALSE", 17, 1.01],
+          ["C-TRUE", 13.5, 1.01],
+          ["D-FALSE", 42, 42],
+          ["E-FALSE", 42, 42],
+          ["E-TRUE", 42, 42],
+          ["G-TRUE", 3, 100],
+          ["H-FALSE", 150, -1.53]
+        ]
+      },
+      {
         "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s and transform col - ranking functions",
         "sql": "SELECT UPPER(CONCAT(string_col, bool_col, '-')), RANK() OVER(PARTITION BY string_col ORDER BY bool_col), DENSE_RANK() OVER(PARTITION BY string_col ORDER BY bool_col) FROM {tbl}",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -4765,6 +5972,18 @@
         ]
       },
       {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select col and filter",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col ORDER BY bool_col, double_col DESC ROWS UNBOUNDED PRECEDING), MIN(double_col) OVER(PARTITION BY string_col ORDER BY bool_col, double_col DESC ROWS UNBOUNDED PRECEDING) FROM {tbl} WHERE string_col = 'a' AND bool_col != false",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", 1, 400],
+          ["a", 2, 300],
+          ["a", 3, 75],
+          ["a", 4, 50.5]
+        ]
+      },
+      {
         "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s with select col and filter - ranking functinos",
         "sql": "SELECT string_col, RANK() OVER(PARTITION BY string_col ORDER BY bool_col), DENSE_RANK() OVER(PARTITION BY string_col ORDER BY bool_col) FROM {tbl} WHERE string_col = 'a' AND bool_col != false",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -4789,6 +6008,13 @@
         "outputs": []
       },
       {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select col and filter that matches no rows",
+        "sql": "SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING), AVG(int_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING) FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": []
+      },
+      {
         "description": "Multiple OVER(PARTITION BY)s with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
         "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col) as count, AVG(int_col) OVER(PARTITION BY string_col) as avg FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
         "outputs": [
@@ -4798,6 +6024,15 @@
       {
         "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
         "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col ORDER BY int_col) as count, AVG(int_col) OVER(PARTITION BY string_col ORDER BY int_col) as avg FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [null]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select col and filter which matches no rows in a sub-query and outer query with aggregation on that column",
+        "sql": "SELECT SUM(count) FROM (SELECT string_col, COUNT(bool_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING) as count, AVG(int_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING) as avg FROM {tbl} WHERE string_col = 'a' AND bool_col = false AND int_col > 200)",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
         "keepOutputRowOrder": false,
         "outputs": [
@@ -4819,6 +6054,20 @@
       {
         "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s with select col and filter",
         "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col ORDER BY int_col), AVG(double_col) OVER(PARTITION BY bool_col, string_col ORDER BY int_col) FROM {tbl} WHERE string_col NOT IN ('a', 'd', 'e', 'g', 'h')",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [100, 3, 100.0],
+          [1, 103, 50.5],
+          [1.01, -101, 1.01],
+          [400, -99, 200.505],
+          [1.5, 51, 134.17],
+          [100, 3, 100]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select col and filter",
+        "sql": "SELECT double_col, SUM(int_col) OVER(PARTITION BY bool_col, string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING), AVG(double_col) OVER(PARTITION BY bool_col, string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING) FROM {tbl} WHERE string_col NOT IN ('a', 'd', 'e', 'g', 'h')",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
         "keepOutputRowOrder": false,
         "outputs": [
@@ -4887,6 +6136,28 @@
         ]
       },
       {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select transform and filter",
+        "sql": "SELECT LENGTH(CONCAT(string_col, bool_col, '-')), MAX(int_col) OVER(PARTITION BY string_col, int_col ORDER BY bool_col ROWS UNBOUNDED PRECEDING), COUNT(double_col) OVER(PARTITION BY string_col, int_col ORDER BY bool_col ROWS UNBOUNDED PRECEDING) FROM {tbl} where int_col < 50 OR double_col = 1",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [6, 2, 1],
+          [6, 2, 2],
+          [7, 42, 1],
+          [6, 42, 2],
+          [6, 42, 3],
+          [7, 3, 1],
+          [7, 100, 1],
+          [7, -101, 1],
+          [7, 2, 1],
+          [6, 3, 1],
+          [7, 42, 1],
+          [7, 42, 1],
+          [6, 42, 2],
+          [6, 3, 1]
+        ]
+      },
+      {
         "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s with select transform and filter - ranking functions",
         "sql": "SELECT LENGTH(CONCAT(string_col, bool_col, '-')), RANK() OVER(PARTITION BY string_col, int_col ORDER BY bool_col), DENSE_RANK() OVER(PARTITION BY string_col, int_col ORDER BY bool_col) FROM {tbl} where int_col < 50 OR double_col = 1",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -4929,6 +6200,26 @@
       {
         "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s with group by",
         "sql": "SELECT MAX({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col), COUNT({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY string_col, int_col",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [2, 1],
+          [42, 2],
+          [3, 1],
+          [100, 2],
+          [-101, 1],
+          [2, 2],
+          [3, 3],
+          [150, 4],
+          [42, 1],
+          [42, 1],
+          [3, 1],
+          [150, 1]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with group by",
+        "sql": "SELECT MAX({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING), COUNT({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING) FROM {tbl} GROUP BY string_col, int_col",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
         "keepOutputRowOrder": false,
         "outputs": [
@@ -5005,6 +6296,26 @@
         ]
       },
       {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select col and group by",
+        "sql": "SELECT string_col, MIN({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING) FROM {tbl} GROUP BY string_col, int_col",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          ["a", 2, 2],
+          ["a", 2, 44],
+          ["b", 3, 3],
+          ["b", 3, 103],
+          ["c", -101, -101],
+          ["c", -101, -99],
+          ["c", -101, -96],
+          ["c", -101, 54],
+          ["d", 42, 42],
+          ["e", 42, 42],
+          ["g", 3, 3],
+          ["h", 150, 150]
+        ]
+      },
+      {
         "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s with select col and group by - ranking functions",
         "sql": "SELECT string_col, RANK() OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY string_col, int_col",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
@@ -5039,6 +6350,26 @@
       {
         "description": "Multiple OVER(PARTITION BY k1 ORDER by k2)s with agg col and group by",
         "sql": "SELECT SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col), AVG({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY string_col, int_col",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [4, 2, 2],
+          [126, 44, 22],
+          [3, 3, 3],
+          [100, 103, 51.5],
+          [-101, -101, -101],
+          [2, -99, -49.5],
+          [3, -96, -32],
+          [150, 54, 13.5],
+          [42, 42, 42],
+          [84, 42, 42],
+          [3, 3, 3],
+          [150, 150, 150]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER by k2)s ROWS with agg col and group by",
+        "sql": "SELECT SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING), AVG({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING) FROM {tbl} GROUP BY string_col, int_col",
         "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
         "keepOutputRowOrder": false,
         "outputs": [
@@ -5109,6 +6440,26 @@
         ]
       },
       {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER by k2)s ROWS with select col, agg col and group by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING), AVG({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING) FROM {tbl} GROUP BY string_col, int_col",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [2, 4, 2, 2],
+          [42, 126, 44, 22],
+          [3, 3, 3, 3],
+          [100, 100, 103, 51.5],
+          [-101, -101, -101, -101],
+          [2, 2, -99, -49.5],
+          [3, 3, -96, -32],
+          [150, 150, 54, 13.5],
+          [42, 42, 42, 42],
+          [42, 84, 42, 42],
+          [3, 3, 3, 3],
+          [150, 150, 150, 150]
+        ]
+      },
+      {
         "description": "Multiple OVER(PARTITION BY)s with select col, agg col and group by with global order by",
         "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col), AVG({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col) FROM {tbl} GROUP BY int_col ORDER BY int_col",
         "keepOutputRowOrder": true,
@@ -5124,6 +6475,25 @@
       {
         "description": "Multiple OVER(PARTITION BY k1 ORDER by k2)s with select col, agg col and group by with global order by",
         "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col), AVG({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col) FROM {tbl} GROUP BY string_col, int_col ORDER BY string_col, int_col",
+        "keepOutputRowOrder": true,
+        "outputs": [
+          [2, 4, 2, 2],
+          [42, 126, 44, 22],
+          [3, 3, 3, 3],
+          [100, 100, 103, 51.5],
+          [-101, -101, -101, -101],
+          [2, 2, -99, -49.5],
+          [3, 3, -96, -32],
+          [150, 150, 54, 13.5],
+          [42, 42, 42, 42],
+          [42, 84, 42, 42],
+          [3, 3, 3, 3],
+          [150, 150, 150, 150]
+        ]
+      },
+      {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER by k2)s ROWS with select col, agg col and group by with global order by",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING), AVG({tbl}.int_col) OVER(PARTITION BY {tbl}.string_col ORDER BY {tbl}.int_col ROWS UNBOUNDED PRECEDING) FROM {tbl} GROUP BY string_col, int_col ORDER BY string_col, int_col",
         "keepOutputRowOrder": true,
         "outputs": [
           [2, 4, 2, 2],
@@ -5179,6 +6549,17 @@
         ]
       },
       {
+        "description": "Multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS with select col, agg col and group by with a filter",
+        "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col ORDER BY {tbl}.string_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), MIN({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col ORDER BY {tbl}.string_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM {tbl} WHERE int_col >= 100 GROUP BY string_col, int_col",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [100, 100, 100, 100],
+          [150, 150, 150, 150],
+          [150, 150, 300, 150]
+        ]
+      },
+      {
         "description": "Multiple OVER(PARTITION BY)s with select col, agg col and group by with a filter that matches no rows",
         "sql": "SELECT int_col, SUM(int_col), SUM({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col), MIN({tbl}.int_col) OVER(PARTITION BY {tbl}.int_col) FROM {tbl} WHERE int_col > 200 GROUP BY int_col",
         "outputs": []
@@ -5207,6 +6588,25 @@
           [2, "e", 42],
           [1, "g", 3],
           [1, "h", 150]
+        ]
+      },
+      {
+        "description": "Subquery with ROW_NUMBER and another ROWS window function to get all values with ROW_NUMBER < value",
+        "sql": "SELECT row_number, string_col, int_col, rolling_count FROM (SELECT ROW_NUMBER() OVER(PARTITION BY string_col ORDER BY int_col) AS row_number, COUNT(string_col) OVER(PARTITION BY string_col ORDER BY int_col ROWS UNBOUNDED PRECEDING) AS rolling_count, string_col, int_col from {tbl}) WHERE row_number <= 2",
+        "comments": "Cannot enforce a global ordering as partitions aren't ordered, just keys within a partition are",
+        "keepOutputRowOrder": false,
+        "outputs": [
+          [1, "a", 2, 1],
+          [2, "a", 2, 2],
+          [1, "b", 3, 1],
+          [2, "b", 100, 2],
+          [1, "c", -101, 1],
+          [2, "c", 2, 2],
+          [1, "d", 42, 1],
+          [1, "e", 42, 1],
+          [2, "e", 42, 2],
+          [1, "g", 3, 1],
+          [1, "h", 150, 1]
         ]
       },
       {

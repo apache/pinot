@@ -89,7 +89,7 @@ public class QueryEnvironmentTestBase {
 
   @DataProvider(name = "testQueryDataProvider")
   protected Object[][] provideQueries() {
-    return new Object[][]{
+    return new Object[][] {
         new Object[]{"SELECT * FROM a UNION SELECT * FROM b"},
         new Object[]{"SELECT * FROM a UNION ALL SELECT * FROM b"},
         new Object[]{"SELECT * FROM a INTERSECT SELECT * FROM b"},
@@ -171,6 +171,10 @@ public class QueryEnvironmentTestBase {
         new Object[]{"SELECT RANK() OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a"},
         new Object[]{"SELECT DENSE_RANK() OVER(ORDER BY a.col1) FROM a"},
         new Object[]{"SELECT a.col1, SUM(a.col3) OVER (ORDER BY a.col2), MIN(a.col3) OVER (ORDER BY a.col2) FROM a"},
+        new Object[]{"SELECT SUM(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 ROWS BETWEEN UNBOUNDED "
+            + "PRECEDING AND CURRENT ROW) FROM a"},
+        new Object[]{"SELECT SUM(a.col3) OVER(ORDER BY a.col2 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT "
+            + "ROW) FROM a"},
         new Object[]{
             "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col3, a.col1, SUM(b.col3) "
                 + "FROM a JOIN b ON a.col3 = b.col3 GROUP BY a.col3, a.col1"

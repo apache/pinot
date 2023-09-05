@@ -1239,6 +1239,19 @@
         ]
       },
       {
+        "description": "single OVER(ORDER BY) ROWS only",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(ORDER BY) only rank",
         "sql": "EXPLAIN PLAN FOR SELECT RANK() OVER(ORDER BY a.col2) FROM a",
         "output": [
@@ -1259,6 +1272,20 @@
           "Execution Plan",
           "\nLogicalProject($0=[$2])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) ROWS only with select alias",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(ORDER BY a.col2 ROWS BETWEEN UNBOUNDED PRECEDING and CURRENT ROW) AS sum FROM a",
+        "notes": "TODO: Look into why aliases are getting ignored in the final plan",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
@@ -1305,6 +1332,19 @@
         ]
       },
       {
+        "description": "single OVER(ORDER BY) ROWS and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, COUNT(a.col1) OVER(ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\n  LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [COUNT($0)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(ORDER BY) row_number and select col with global order by on different column as inside over",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, ROW_NUMBER() OVER(ORDER BY a.col2) FROM a ORDER BY a.col1",
         "output": [
@@ -1316,6 +1356,22 @@
           "\n        LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) ROWS and select col with global order by on different column as inside over",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n        LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -1430,6 +1486,19 @@
         ]
       },
       {
+        "description": "single OVER(ORDER BY) ROWS and select col with select alias",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(ORDER BY a.col2 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS avg FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(value1=[$0], avg=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n  LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(ORDER BY) row_number and select col with select alias",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, ROW_NUMBER() OVER(ORDER BY a.col2) AS row_number FROM a",
         "notes": "TODO: Look into why aliases are getting ignored in the final plan",
@@ -1503,6 +1572,22 @@
         ]
       },
       {
+        "description": "single OVER(ORDER BY) ROWS and select col with LIMIT",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(ORDER BY a.col2 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[10])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n        LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(ORDER BY) row_number and select col with LIMIT",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, ROW_NUMBER() OVER(ORDER BY a.col2) FROM a LIMIT 10",
         "output": [
@@ -1551,6 +1636,22 @@
         ]
       },
       {
+        "description": "single OVER(ORDER BY) ROWS and select col with global order by with LIMIT",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, MIN(a.col3) OVER(ORDER BY a.col1 DESC ROWS UNBOUNDED PRECEDING) FROM a ORDER BY a.col1 LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], dir0=[ASC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC], fetch=[10])",
+          "\n      LogicalProject(col2=[$1], EXPR$1=[$3], col1=[$0])",
+          "\n        LogicalWindow(window#0=[window(order by [0 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MIN($2)])])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(ORDER BY) dense_rank and select col with global order by with LIMIT",
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, DENSE_RANK() OVER(ORDER BY a.col1 DESC) FROM a ORDER BY a.col3 LIMIT 10",
         "output": [
@@ -1573,6 +1674,19 @@
           "Execution Plan",
           "\nLogicalProject($0=[$2], $1=[$3])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [COUNT($0)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[SUBSTR($0, 0, 2)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) ROWS and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), COUNT(a.col2) OVER(ORDER BY a.col3 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[SUBSTR($0, 0, 2)])",
           "\n        LogicalTableScan(table=[[a]])",
@@ -1648,6 +1762,20 @@
         ]
       },
       {
+        "description": "single OVER(ORDER BY) row_number with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), SUM(a.col3) OVER(ORDER BY a.col2 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, '-', $1)])",
+          "\n        LogicalFilter(condition=[OR(AND(<>($0, 'bar'), <>($0, 'foo')), >=($2, 42))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(ORDER BY) rank with select transform and filter",
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), RANK() OVER(ORDER BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
@@ -1668,6 +1796,19 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[/(CAST($2):DOUBLE NOT NULL, $3)])",
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [SUM($0), COUNT($0)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, '-', $1)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(ORDER BY) ROWS with transform on order by key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(ORDER BY CONCAT(a.col1, '-', a.col2) ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[/(CAST($2):DOUBLE NOT NULL, $3)])",
+          "\n  LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, '-', $1)])",
           "\n        LogicalTableScan(table=[[a]])",
@@ -1714,6 +1855,19 @@
         ]
       },
       {
+        "description": "multiple OVER(ORDER BY)s ROWS on the same key only",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(ORDER BY a.col1 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), COUNT(a.col2) OVER(ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MAX($2), COUNT($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "multiple OVER(ORDER BY)s on the same key only - rank functions",
         "sql": "EXPLAIN PLAN FOR SELECT RANK() OVER(ORDER BY a.col1), DENSE_RANK() OVER(ORDER BY a.col1) FROM a",
         "output": [
@@ -1747,6 +1901,19 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(ORDER BY)s ROWS on the same key and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(ORDER BY a.col1 ROWS UNBOUNDED PRECEDING), MIN(a.col3) OVER(ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
@@ -1835,6 +2002,22 @@
         ]
       },
       {
+        "description": "multiple OVER(ORDER BY)s ROWS on the same key and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(ORDER BY a.col2, a.col1 DESC ROWS UNBOUNDED PRECEDING), AVG(a.col3) OVER(ORDER BY a.col2, a.col1 DESC ROWS UNBOUNDED PRECEDING) FROM a ORDER BY a.col1 DESC",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[DESC], offset=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[DESC])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n        LogicalWindow(window#0=[window(order by [1, 0 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "multiple OVER(ORDER BY)s on the same key and select col with global order by ranking functions",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, RANK() OVER(ORDER BY a.col2, a.col1 DESC), AVG(a.col3) OVER(ORDER BY a.col2, a.col1 DESC) FROM a ORDER BY a.col1 DESC",
         "output": [
@@ -1883,6 +2066,22 @@
         ]
       },
       {
+        "description": "multiple OVER(ORDER BY)s ROWS on the same key and select col with global order by with LIMIT",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(ORDER BY a.col2, a.col1 DESC ROWS UNBOUNDED PRECEDING), AVG(a.col3) OVER(ORDER BY a.col2, a.col1 DESC ROWS UNBOUNDED PRECEDING) FROM a ORDER BY a.col1 DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[DESC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n        LogicalWindow(window#0=[window(order by [1, 0 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
+          "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "multiple OVER(ORDER BY)s on the same key and select col with global order by with LIMIT - ranking functions",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, DENSE_RANK() OVER(ORDER BY a.col2, a.col1 DESC), RANK() OVER(ORDER BY a.col2, a.col1 DESC) FROM a ORDER BY a.col2, a.col1 DESC LIMIT 10",
         "output": [
@@ -1913,20 +2112,19 @@
       },
       {
         "description": "multiple OVER(ORDER BY)s row_number on the same key and transform col",
-        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), ROW_NUMBER() OVER(ORDER BY a.col2), ROW_NUMBER() OVER(ORDER BY a.col2) FROM a",
-        "notes": "ROW_NUMBER requires ROWS as the default frame, and the default frame cannot be overridden, thus it cannot be combined with other functions yet",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), ROW_NUMBER() OVER(ORDER BY a.col2), AVG(a.col3) OVER(ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$2], EXPR$2=[$2])",
-          "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[$3], EXPR$2=[/(CAST($4):DOUBLE NOT NULL, $5)])",
+          "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER(), SUM($1), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalProject(col2=[$1], $1=[REVERSE($0)])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[REVERSE($0)])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
       {
-        "description": "multiple OVER(ORDER BY)s ranking functinos on the same key and transform col",
+        "description": "multiple OVER(ORDER BY)s ranking functions on the same key and transform col",
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), DENSE_RANK() OVER(ORDER BY a.col2), RANK() OVER(ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
@@ -1967,6 +2165,20 @@
         ]
       },
       {
+        "description": "multiple OVER(ORDER BY)s ROWS on the same key with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(ORDER BY a.col1 ROWS UNBOUNDED PRECEDING), MAX(a.col3) OVER(ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MIN($1), MAX($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, ' ', $1))])",
+          "\n        LogicalFilter(condition=[AND(<>($1, 'bar'), <>($1, 'baz'), <>($1, 'foo'))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "multiple OVER(ORDER BY)s on the same key with select transform and filter - ranking functions",
         "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), RANK() OVER(ORDER BY a.col1), DENSE_RANK() OVER(ORDER BY a.col1) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
         "output": [
@@ -1987,6 +2199,19 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$1=[$5])",
           "\n  LogicalWindow(window#0=[window(order by [2] aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, '-', $1))])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(ORDER BY) ROWS with transform on order by key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2)) ROWS UNBOUNDED PRECEDING), COUNT(a.col1) OVER(ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2)) ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$1=[$5])",
+          "\n  LogicalWindow(window#0=[window(order by [2] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1), COUNT($1), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, '-', $1))])",
           "\n        LogicalTableScan(table=[[a]])",
@@ -2020,7 +2245,20 @@
         ]
       },
       {
-        "description": "single OVER(PARTITION BY k1 ORDER BY k1) only",
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) ROWS only",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) only ranking",
         "sql": "EXPLAIN PLAN FOR SELECT RANK() OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a",
         "output": [
           "Execution Plan",
@@ -2069,6 +2307,19 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) ROWS and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, COUNT(a.col1) OVER(PARTITION BY a.col2 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], $1=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [COUNT($0)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -2156,6 +2407,22 @@
         ]
       },
       {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) ROWS and select col with global order by",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a ORDER BY a.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], dir0=[ASC], offset=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC])",
+          "\n      LogicalProject(col2=[$1], EXPR$1=[$3], col1=[$0])",
+          "\n        LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MIN($2)])])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(PARTITION BY k1 ORDER BY k1) dense_rank and select col with global order by",
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, DENSE_RANK() OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a ORDER BY a.col1",
         "output": [
@@ -2197,6 +2464,22 @@
           "\n    LogicalSort(sort0=[$2], dir0=[ASC], fetch=[10])",
           "\n      LogicalProject(col2=[$1], EXPR$1=[$3], col1=[$0])",
           "\n        LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MIN($2)])])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) ROWS and select col with global order by with LIMIT",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a ORDER BY a.col1 LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], dir0=[ASC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC], fetch=[10])",
+          "\n      LogicalProject(col2=[$1], EXPR$1=[$3], col1=[$0])",
+          "\n        LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MIN($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              LogicalTableScan(table=[[a]])",
@@ -2263,6 +2546,20 @@
         ]
       },
       {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) ROWS select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col2=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1), COUNT($1)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$1], col3=[$2])",
+          "\n        LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(PARTITION BY k1 ORDER BY k1) row_number select col and filter",
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
         "output": [
@@ -2303,6 +2600,20 @@
         ]
       },
       {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) ROWS with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$2], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1), COUNT($1)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, '-', $1)])",
+          "\n        LogicalFilter(condition=[OR(AND(<>($0, 'bar'), <>($0, 'foo')), >=($2, 42))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(PARTITION BY k1 ORDER BY k1) rank with select transform and filter",
         "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), RANK() OVER(PARTITION BY a.col2 ORDER BY a.col2) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
         "output": [
@@ -2330,7 +2641,20 @@
         ]
       },
       {
-        "description": "single OVER(PARTITION BY k1 ORDER BY k1) with transform on partition key",
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) ROWS with transform on partition key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY CONCAT(a.col1, '-', a.col2) ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[/(CAST($2):DOUBLE NOT NULL, $3)])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($0), COUNT($0)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, '-', $1)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k1) dense_rank with transform on partition key",
         "sql": "EXPLAIN PLAN FOR SELECT DENSE_RANK() OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
           "Execution Plan",
@@ -2408,6 +2732,19 @@
         ]
       },
       {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s ROWS on the same key only",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING), COUNT(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MAX($2), COUNT($1)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key only - ranking function",
         "sql": "EXPLAIN PLAN FOR SELECT DENSE_RANK() OVER(PARTITION BY a.col1 ORDER BY a.col1), COUNT(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a",
         "output": [
@@ -2466,6 +2803,19 @@
           "Execution Plan",
           "\nLogicalProject(value1=[$0], avg=[/(CAST($2):DOUBLE NOT NULL, $3)], min=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s ROWS on the same key and select col with select alias",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) AS avg, MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) AS min FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(value1=[$0], avg=[/(CAST($2):DOUBLE NOT NULL, $3)], min=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
@@ -2563,7 +2913,23 @@
         ]
       },
       {
-        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key and select col with global order by with LIMIT",
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s ROWS on the same key and select col with global order by with LIMIT",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col2, a.col1 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), AVG(a.col3) OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col2, a.col1 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM a ORDER BY a.col2, a.col1 LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[ASC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[ASC], fetch=[10])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)], col2=[$1])",
+          "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [1, 0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
+          "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key and select col with global order by with LIMIT - ranking",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, RANK() OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col2, a.col1), DENSE_RANK() OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col2, a.col1) FROM a ORDER BY a.col2, a.col1 LIMIT 10",
         "output": [
           "Execution Plan",
@@ -2592,12 +2958,39 @@
         ]
       },
       {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s ROWS on the same key and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING), MAX(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1), MAX($1)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$1], col3=[$2], $2=[REVERSE($0)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s on the same key select col and filter",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1), COUNT(a.col1) OVER(PARTITION BY a.col1 ORDER BY a.col1) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col3=[$2])",
+          "\n        LogicalFilter(condition=[AND(>($2, 42), OR(=($0, 'chewbacca':VARCHAR(9)), =($0, 'vader':VARCHAR(9)), =($0, 'yoda':VARCHAR(9))))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s ROWS on the same key select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING), COUNT(a.col1) OVER(PARTITION BY a.col1 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1), COUNT($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), OR(=($0, 'chewbacca':VARCHAR(9)), =($0, 'vader':VARCHAR(9)), =($0, 'yoda':VARCHAR(9))))])",
@@ -2625,6 +3018,20 @@
           "Execution Plan",
           "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MIN($1), MAX($1)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, ' ', $1))])",
+          "\n        LogicalFilter(condition=[AND(<>($1, 'bar'), <>($1, 'baz'), <>($1, 'foo'))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s ROWS on the same key with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(CONCAT(a.col1, ' ', a.col2)), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a where a.col2 NOT IN ('foo', 'bar', 'baz')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2], $1=[$3], $2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MIN($1), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, ' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($1, 'bar'), <>($1, 'baz'), <>($1, 'foo'))])",
@@ -2661,14 +3068,13 @@
       },
       {
         "description": "multiple OVER(PARTITION BY k1 ORDER BY k1) row_number with transform on partition key",
-        "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))), ROW_NUMBER() OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))) FROM a",
-        "notes": "ROW_NUMBER requires ROWS as the default frame, and the default frame cannot be overridden, thus it cannot be combined with other functions yet",
+        "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2))), MAX(a.col3) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY REVERSE(CONCAT(a.col1, '-', a.col2)) ROWS UNBOUNDED PRECEDING) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[$1], EXPR$1=[$1])",
-          "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
-          "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject($0=[REVERSE(CONCAT($0, '-', $1))])",
+          "\nLogicalProject($0=[$2], $1=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER(), MAX($0)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[1]])",
+          "\n      LogicalProject(col3=[$2], $1=[REVERSE(CONCAT($0, '-', $1))])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -2726,12 +3132,38 @@
         ]
       },
       {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k1)s ROWS on the same key but order by has different direction and null direction and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 DESC NULLS LAST ROWS UNBOUNDED PRECEDING), MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col1 DESC NULLS LAST ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [0 DESC-nulls-last] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1), COUNT($1), MIN($1)])])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col1=[$0], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(PARTITION BY k1 ORDER BY k2) only",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) ROWS only",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
@@ -2791,6 +3223,19 @@
         ]
       },
       {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) ROWS and select col",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(PARTITION BY k1 ORDER BY k2) row_number and select col",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col1) FROM a",
         "output": [
@@ -2823,6 +3268,19 @@
           "Execution Plan",
           "\nLogicalProject(value1=[$0], avg=[/(CAST($3):DOUBLE NOT NULL, $4)])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) ROWS and select col with select alias",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) AS avg FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(value1=[$0], avg=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
@@ -2923,6 +3381,22 @@
         ]
       },
       {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) ROWS and select col with global order by with LIMIT",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a ORDER BY a.col1 LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$2], dir0=[ASC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$2], dir0=[ASC], fetch=[10])",
+          "\n      LogicalProject(col2=[$1], EXPR$1=[$3], col1=[$0])",
+          "\n        LogicalWindow(window#0=[window(partition {0} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MIN($2)])])",
+          "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(PARTITION BY k1 ORDER BY k2) dense_rank and select col with global order by with LIMIT",
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, DENSE_RANK() OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a ORDER BY a.col1 LIMIT 10",
         "output": [
@@ -2952,12 +3426,39 @@
         ]
       },
       {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) ROWS and transform col",
+        "sql": "EXPLAIN PLAN FOR SELECT SUBSTR(a.col1, 0, 2), COUNT(a.col2) OVER(PARTITION BY a.col3 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [COUNT($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[SUBSTR($0, 0, 2)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(PARTITION BY k1 ORDER BY k2) select col and filter",
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col2=[$1], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) ROWS select col and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a WHERE a.col3 > 10 AND a.col3 <= 500",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col2=[$1], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
@@ -2986,6 +3487,20 @@
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$3], EXPR$1=[/(CAST($4):DOUBLE NOT NULL, $5)])",
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[CONCAT($0, '-', $1)])",
+          "\n        LogicalFilter(condition=[OR(AND(<>($0, 'bar'), <>($0, 'foo')), >=($2, 42))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) ROWS with select transform and filter",
+        "sql": "EXPLAIN PLAN FOR SELECT CONCAT(a.col1, '-', a.col2), AVG(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a where a.col1 NOT IN ('foo', 'bar') OR a.col3 >= 42",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[$3], EXPR$1=[/(CAST($4):DOUBLE NOT NULL, $5)])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[CONCAT($0, '-', $1)])",
           "\n        LogicalFilter(condition=[OR(AND(<>($0, 'bar'), <>($0, 'foo')), >=($2, 42))])",
@@ -3035,6 +3550,19 @@
         ]
       },
       {
+        "description": "single OVER(PARTITION BY k1 ORDER BY k2) ROWS with transform on partition key and order key",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY REVERSE(a.col2) ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[/(CAST($3):DOUBLE NOT NULL, $4)])",
+          "\n  LogicalWindow(window#0=[window(partition {2} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($0), COUNT($0)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col3=[$2], $1=[REVERSE($1)], $2=[CONCAT($0, '-', $1)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "single OVER(PARTITION BY k1 ORDER BY k2) row_number with transform on partition key and order key",
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY CONCAT(a.col1, '-', a.col2) ORDER BY REVERSE(a.col2)) FROM a",
         "output": [
@@ -3067,6 +3595,19 @@
           "Execution Plan",
           "\nLogicalProject($0=[$3], $1=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2), COUNT($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS on the same key only (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3 ROWS UNBOUNDED PRECEDING), COUNT(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col3 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [2] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
@@ -3133,6 +3674,19 @@
           "Execution Plan",
           "\nLogicalProject(value1=[$0], avg=[/(CAST($3):DOUBLE NOT NULL, $4)], min=[$5])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2), MIN($2)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS on the same key and select col (single window group) with select alias",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) AS avg, MIN(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) AS min FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(value1=[$0], avg=[/(CAST($3):DOUBLE NOT NULL, $4)], min=[$5])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2), MIN($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalTableScan(table=[[a]])",
@@ -3230,6 +3784,22 @@
         ]
       },
       {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS on the same key and select col with global order by with LIMIT (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col3, a.col1 ROWS UNBOUNDED PRECEDING), AVG(a.col3) OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col3, a.col1 ROWS UNBOUNDED PRECEDING) FROM a ORDER BY a.col2, a.col1 DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[DESC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[3, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$3], sort1=[$0], dir0=[ASC], dir1=[DESC], fetch=[10])",
+          "\n      LogicalProject(col1=[$0], EXPR$1=[$3], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)], col2=[$1])",
+          "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2)])])",
+          "\n          PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s on the same key and select col with global order by with LIMIT (single window group) - ranking functions",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, DENSE_RANK() OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col3, a.col1), RANK() OVER(PARTITION BY a.col2, a.col1 ORDER BY a.col3, a.col1) FROM a ORDER BY a.col2, a.col1 DESC LIMIT 10",
         "output": [
@@ -3259,12 +3829,39 @@
         ]
       },
       {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS on the same key and transform col (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT REVERSE(a.col1), SUM(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING), MAX(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col1 ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3], $1=[$4], $2=[$5])",
+          "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), MAX($2)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[REVERSE($0)])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s on the same key select col and filter (single window group)",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2), COUNT(a.col1) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$2=[$5])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2), COUNT($0)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalFilter(condition=[AND(>($2, 42), OR(=($0, 'chewbacca':VARCHAR(9)), =($0, 'vader':VARCHAR(9)), =($0, 'yoda':VARCHAR(9))))])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2)s ROWS on the same key select col and filter (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING), COUNT(a.col1) OVER(PARTITION BY a.col1 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a WHERE a.col3 > 42 AND a.col1 IN ('vader', 'chewbacca', 'yoda')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], EXPR$1=[/(CAST($3):DOUBLE NOT NULL, $4)], EXPR$2=[$5])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2), COUNT($2), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), OR(=($0, 'chewbacca':VARCHAR(9)), =($0, 'vader':VARCHAR(9)), =($0, 'yoda':VARCHAR(9))))])",
@@ -3342,6 +3939,19 @@
         ]
       },
       {
+        "description": "multiple OVER(PARTITION BY k1 ORDER BY k2) ROWS with transform on partition key (single window group)",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY CONCAT(a.col1, '-', a.col2) ROWS UNBOUNDED PRECEDING), COUNT(a.col1) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY CONCAT(a.col1, '-', a.col2) ROWS UNBOUNDED PRECEDING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[/(CAST($4):DOUBLE NOT NULL, $5)], EXPR$1=[$6])",
+          "\n  LogicalWindow(window#0=[window(partition {3} order by [2] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($1), COUNT($1), COUNT($0)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[3]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col3=[$2], $2=[CONCAT($0, '-', $1)], $3=[REVERSE(CONCAT($0, '-', $1))])",
+          "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "multiple OVER(PARTITION BY k1 ORDER BY k2) with transform on partition key (single window group) - ranking functions",
         "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY CONCAT(a.col1, '-', a.col2)), RANK() OVER(PARTITION BY REVERSE(CONCAT(a.col1, '-', a.col2)) ORDER BY CONCAT(a.col1, '-', a.col2)) FROM a",
         "output": [
@@ -3366,6 +3976,25 @@
           "\n        LogicalJoin(condition=[=($0, $3)], joinType=[inner])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n          PinotLogicalExchange(distribution=[hash[1]])",
+          "\n            LogicalProject(col1=[$0], col2=[$1])",
+          "\n              LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Window function with JOIN example ROWS",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, b.col1, SUM(a.col3) OVER (PARTITION BY a.col1 ORDER BY a.col2 ROWS UNBOUNDED PRECEDING) FROM a JOIN b ON a.col1 = b.col2",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col10=[$3], $2=[$4])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [SUM($2)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], col10=[$3])",
+          "\n        LogicalJoin(condition=[=($0, $4)], joinType=[inner])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n              LogicalTableScan(table=[[a]])",
           "\n          PinotLogicalExchange(distribution=[hash[1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
@@ -3434,6 +4063,21 @@
         ]
       },
       {
+        "description": "Window function with GROUP BY example with aggregation used within ORDER BY clause in OVER with PARTITION BY ROWS",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, COUNT(*), MAX(a.col3) OVER(PARTITION BY a.col1 ORDER BY COUNT(*) desc, a.col1 asc ROWS UNBOUNDED PRECEDING) from a GROUP BY a.col1, a.col3",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$2], $2=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [2 DESC, 0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MAX($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)])",
+          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n          LogicalAggregate(group=[{0, 2}], agg#0=[COUNT()])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Window function CTE: row_number WITH statement having OVER with PARTITION BY ORDER BY",
         "sql": "EXPLAIN PLAN FOR WITH windowfunc AS (SELECT a.col1, ROW_NUMBER() OVER(PARTITION BY a.col2 ORDER BY a.col3) as rownum from a) SELECT a.col1, a.rownum FROM windowfunc AS a where a.rownum < 5",
         "output": [
@@ -3476,6 +4120,20 @@
         ]
       },
       {
+        "description": "Window function subquery: ROWS having OVER with PARTITION BY ORDER BY",
+        "sql": "EXPLAIN PLAN FOR SELECT min, col2, col3 FROM (SELECT MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3 DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as min, a.col2, a.col3 FROM a) WHERE min <= 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(min=[$2], col2=[$0], col3=[$1])",
+          "\n  LogicalFilter(condition=[<=($2, 10)])",
+          "\n    LogicalWindow(window#0=[window(partition {0} order by [1 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [MIN($1)])])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Window function subquery: rank having OVER with PARTITION BY ORDER BY and a GROUP BY",
         "sql": "EXPLAIN PLAN FOR SELECT col1, total, rank FROM (SELECT a.col1 as col1, count(*) as total, RANK() OVER(ORDER BY count(*) DESC) AS rank FROM a GROUP BY a.col1) WHERE rank = 1",
         "output": [
@@ -3487,6 +4145,28 @@
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{0}], agg#0=[COUNT()])",
           "\n            LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Window function subquery with join using ROWS",
+        "sql": "EXPLAIN PLAN FOR SELECT rolling_count, col2, col3 FROM (SELECT a.col2 as col2, a.col3 as col3, COUNT(a.col2) OVER(PARTITION BY a.col2 ORDER BY a.col3 DESC ROWS UNBOUNDED PRECEDING) as rolling_count FROM a INNER JOIN b ON a.col1 = b.col2 WHERE a.col3 > 100 AND b.col1 IN ('douglas adams', 'brandon sanderson')) where rolling_count = 1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(rolling_count=[$2], col2=[$0], col3=[$1])",
+          "\n  LogicalFilter(condition=[=($2, 1)])",
+          "\n    LogicalWindow(window#0=[window(partition {0} order by [1 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [COUNT($0)])])",
+          "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalJoin(condition=[=($0, $3)], joinType=[inner])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                LogicalFilter(condition=[>($2, 100)])",
+          "\n                  LogicalTableScan(table=[[a]])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              LogicalProject(col2=[$1])",
+          "\n                LogicalFilter(condition=[OR(=($0, 'brandon sanderson':VARCHAR(17)), =($0, 'douglas adams':VARCHAR(17)))])",
+          "\n                  LogicalTableScan(table=[[b]])",
           "\n"
         ]
       },

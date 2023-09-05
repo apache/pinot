@@ -442,6 +442,61 @@ public class WindowAggregateOperatorTest {
   }
 
   @Test
+  public void testAggregationFunctionWithRowsFrameType() {
+    // Given:
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(0)));
+    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(1));
+    List<RexExpression> order = ImmutableList.of(new RexExpression.InputRef(0));
+
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, STRING});
+    // Input should be in sorted order on the order by key as SortExchange will handle pre-sorting the data
+    Mockito.when(_input.nextBlock()).thenReturn(
+        OperatorTestUtil.block(inSchema, new Object[]{1, "foo"}, new Object[]{2, "bar"}, new Object[]{3, "and"}))
+        .thenReturn(
+            OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}, new Object[]{2, "foo"}, new Object[]{6, "the"},
+                new Object[]{10, "bar"})).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    DataSchema outSchema =
+        new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
+
+    // When:
+    WindowAggregateOperator operator =
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order, Collections.emptyList(),
+            Collections.emptyList(), calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.ROWS,
+            Collections.emptyList(), outSchema, inSchema);
+
+    TransferableBlock result = operator.getNextBlock();
+    TransferableBlock eosBlock = operator.getNextBlock();
+    List<Object[]> resultRows = result.getContainer();
+    Map<String, List<Object[]>> expectedPartitionToRowsMap = new HashMap<>();
+    expectedPartitionToRowsMap.put("and", Collections.singletonList(new Object[]{3, "and", 3.0}));
+    expectedPartitionToRowsMap.put("the", Collections.singletonList(new Object[]{6, "the", 6.0}));
+    expectedPartitionToRowsMap.put("bar", Arrays.asList(new Object[]{2, "bar", 2.0}, new Object[]{10, "bar", 12.0}));
+    expectedPartitionToRowsMap.put("foo", Arrays.asList(new Object[]{1, "foo", 1.0}, new Object[]{2, "foo", 3.0},
+        new Object[]{2, "foo", 5.0}));
+
+    String previousPartitionKey = null;
+    Map<String, List<Object[]>> resultsPartitionToRowsMap = new HashMap<>();
+    for (Object[] row : resultRows) {
+      String currentPartitionKey = (String) row[1];
+      if (!currentPartitionKey.equals(previousPartitionKey)) {
+        Assert.assertFalse(resultsPartitionToRowsMap.containsKey(currentPartitionKey));
+      }
+      resultsPartitionToRowsMap.computeIfAbsent(currentPartitionKey, k -> new ArrayList<>()).add(row);
+      previousPartitionKey = currentPartitionKey;
+    }
+
+    resultsPartitionToRowsMap.forEach((key, value) -> {
+      List<Object[]> expectedRows = expectedPartitionToRowsMap.get(key);
+      Assert.assertEquals(value.size(), expectedRows.size());
+      for (int i = 0; i < value.size(); i++) {
+        Assert.assertEquals(value.get(i), expectedRows.get(i));
+      }
+    });
+    Assert.assertTrue(eosBlock.isEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
   public void testNonEmptyOrderByKeysNotMatchingPartitionByKeys() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(0)));

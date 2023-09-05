@@ -56,7 +56,8 @@ import org.slf4j.LoggerFactory;
  * [input columns, aggregate result1, ... aggregate resultN]
  *
  * The window functions supported today are:
- * Aggregation: SUM/COUNT/MIN/MAX/AVG/BOOL_OR/BOOL_AND aggregations [RANGE window type only]
+ * Aggregation: SUM/COUNT/MIN/MAX/AVG/BOOL_OR/BOOL_AND aggregations [RANGE window type for non-ORDER BY only, ROWS and
+ *              RANGE window type for ORDER BY within OVER()]
  * Ranking: ROW_NUMBER [ROWS window type only], RANK, DENSE_RANK [RANGE window type only] ranking functions
  * Value: [none]
  *
@@ -121,7 +122,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
     _inputOperator = inputOperator;
     _groupSet = groupSet;
-    _isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet);
+    _isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet, windowFrameType);
     _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection, _isPartitionByOnly);
     _windowFrame = new WindowFrame(lowerBound, upperBound, windowFrameType);
 
@@ -192,17 +193,26 @@ public class WindowAggregateOperator extends MultiStageOperator {
           _windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.ROWS && _windowFrame.isUpperBoundCurrentRow(),
           String.format("%s must be of ROW frame type and have CURRENT ROW as the upper bound", functionName));
     } else {
-      Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE,
-          String.format("Only RANGE type frames are supported at present for function: %s", functionName));
+      Preconditions.checkState(_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE
+              || !_isPartitionByOnly, String.format("Only RANGE type frames are supported at present for function: %s "
+              + "without ORDER BY in the OVER()", functionName));
     }
   }
 
-  private boolean isPartitionByOnlyQuery(List<RexExpression> groupSet, List<RexExpression> orderSet) {
+  private boolean isPartitionByOnlyQuery(List<RexExpression> groupSet, List<RexExpression> orderSet,
+      WindowNode.WindowFrameType windowFrameType) {
     if (CollectionUtils.isEmpty(orderSet)) {
       return true;
     }
 
     if (CollectionUtils.isEmpty(groupSet) || (groupSet.size() != orderSet.size())) {
+      return false;
+    }
+
+    // ROWS and RANGE type window frames for the same PARTITION BY and ORDER BY clauses behaves differently:
+    // - RANGE: behaves the same as PARTITION BY only (result is the same for all rows within the partition)
+    // - ROWS: calculates the rolling window function over the rows
+    if (windowFrameType.equals(WindowNode.WindowFrameType.ROWS)) {
       return false;
     }
 
@@ -222,8 +232,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     List<Object[]> rows = new ArrayList<>(_numRows);
     if (_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE) {
-      // All aggregation window functions only support RANGE type today (SUM/AVG/MIN/MAX/COUNT/BOOL_AND/BOOL_OR)
-      // RANK and DENSE_RANK ranking window functions also only support RANGE type today
+      // RANK and DENSE_RANK ranking window functions only support RANGE type today
+      // All aggregation window functions support RANGE type only for window functions that do not have an ORDER BY
+      // clause within the OVER() (SUM/AVG/MIN/MAX/COUNT/BOOL_AND/BOOL_OR)
       for (Map.Entry<Key, List<Object[]>> e : _partitionRows.entrySet()) {
         Key partitionKey = e.getKey();
         List<Object[]> rowList = e.getValue();
@@ -241,7 +252,9 @@ public class WindowAggregateOperator extends MultiStageOperator {
         }
       }
     } else {
-      // Only ROW_NUMBER() window function is supported as ROWS type today
+      // - ROW_NUMBER() window function is only supported as ROWS type today
+      // - All aggregation window functions support ROWS type for ORDER BY within the OVER() clause (SUM/AVG/MIN/MAX/
+      //   COUNT/BOOL_AND/BOOL_OR)
       Key previousPartitionKey = null;
       Object[] previousRowValues = new Object[_windowAccumulators.length];
       for (int i = 0; i < _windowAccumulators.length; i++) {
@@ -359,7 +372,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
     final int _lowerBound;
     // The lower bound of the frame. Set to Integer.MAX_VALUE if UNBOUNDED FOLLOWING. Set to 0 if CURRENT ROW
     final int _upperBound;
-    // Enum to denote the FRAME type, can be either ROW or RANGE types
+    // Enum to denote the FRAME type, can be either ROWS or RANGE types
     final WindowNode.WindowFrameType _windowFrameType;
 
     WindowFrame(int lowerBound, int upperBound, WindowNode.WindowFrameType windowFrameType) {
@@ -464,7 +477,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
         Object previousRowOutputValue) {
       Object value = _inputRef == -1 ? _literal : row[_inputRef];
       if (previousPartitionKey == null || !currentPartitionKey.equals(previousPartitionKey)) {
-        return _merger.init(currentPartitionKey, _dataType);
+        return _merger.init(value, _dataType);
       } else {
         return _merger.merge(previousRowOutputValue, value);
       }

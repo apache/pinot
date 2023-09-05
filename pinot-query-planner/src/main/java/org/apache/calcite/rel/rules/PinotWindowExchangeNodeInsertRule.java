@@ -177,8 +177,9 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     // Has ROWS only aggregation call kind (e.g. ROW_NUMBER)?
     boolean isRowsOnlyTypeAggregateCall = isRowsOnlyAggregationCallType(windowGroup.aggCalls);
     // For Phase 1 only the default frame is supported
-    Preconditions.checkState(!windowGroup.isRows || isRowsOnlyTypeAggregateCall,
-        "Default frame must be of type RANGE and not ROWS unless this is a ROWS only aggregation function");
+    Preconditions.checkState(!windowGroup.isRows || isRowsOnlyTypeAggregateCall
+            || !windowGroup.orderKeys.getKeys().isEmpty(), "Default frame must be of type RANGE and not ROWS unless "
+        + "this is a ROWS only aggregation function or ORDER BY is included");
     Preconditions.checkState(windowGroup.lowerBound.isPreceding() && windowGroup.lowerBound.isUnbounded(),
         String.format("Lower bound must be UNBOUNDED PRECEDING but it is: %s", windowGroup.lowerBound));
     if (windowGroup.orderKeys.getKeys().isEmpty() && !isRowsOnlyTypeAggregateCall) {
