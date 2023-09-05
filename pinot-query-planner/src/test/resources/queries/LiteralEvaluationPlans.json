@@ -96,7 +96,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT substr('month',2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[CAST('nth':VARCHAR):VARCHAR])",
+          "\nLogicalProject(EXPR$0=[CAST('onth':VARCHAR):VARCHAR])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -106,7 +106,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT upper(lower(upper(substr('month',2)))) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[CAST('NTH':VARCHAR):VARCHAR])",
+          "\nLogicalProject(EXPR$0=[CAST('ONTH':VARCHAR):VARCHAR])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]
