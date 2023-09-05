@@ -83,6 +83,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -220,6 +221,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+  @BeforeMethod
+  public void resetMultiStage() {
+    setUseMultiStageQueryEngine(false);
   }
 
   protected void startBrokers()
@@ -1956,9 +1962,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Test
-  public void testCaseStatementWithLogicalTransformFunction()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseStatementWithLogicalTransformFunction(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String sqlQuery = "SELECT ArrDelay" + ", CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END"
         + ", CASE WHEN ArrDelay < 50 AND ArrDelay >= 10 THEN 10 ELSE 0 END" + " FROM mytable LIMIT 1000";
     JsonNode response = postQuery(sqlQuery);
