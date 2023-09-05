@@ -19,7 +19,7 @@
 
 import jwtDecode from "jwt-decode";
 import { get, map, each, isEqual, isArray, keys, union } from 'lodash';
-import { DataTable, SQLResult } from 'Models';
+import { DataTable, SqlException, SQLResult } from 'Models';
 import moment from 'moment';
 import {
   getTenants,
@@ -267,19 +267,15 @@ const getQueryResults = (params) => {
   return getQueryResult(params).then(({ data }) => {
     let queryResponse = getAsObject(data);
 
-    let errorStr = '';
+    let exceptions: SqlException[] | string = [];
     let dataArray = [];
     let columnList = [];
     // if sql api throws error, handle here
     if(typeof queryResponse === 'string'){
-      errorStr = queryResponse;
+      exceptions = queryResponse;
     } 
     if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
-      try{
-        errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
-      } catch {
-        errorStr = "";
-      }
+      exceptions = queryResponse.exceptions as SqlException[];
     } 
     if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
       columnList = queryResponse.resultTable.dataSchema.columnNames;
@@ -311,7 +307,7 @@ const getQueryResults = (params) => {
     ];
 
     return {
-      error: errorStr,
+      exceptions: exceptions,
       result: {
         columns: columnList,
         records: dataArray,
