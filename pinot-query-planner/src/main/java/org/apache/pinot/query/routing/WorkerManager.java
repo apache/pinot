@@ -230,7 +230,7 @@ public class WorkerManager {
       ServerInstance serverInstance =
           pickEnabledServer(partitionInfo._fullyReplicatedServers, enabledServerInstanceMap, indexToPick++);
       Preconditions.checkState(serverInstance != null,
-          "Failed to find enabled fully replicated server for table: %s, partition: %s in table: %s", tableName, i);
+          "Failed to find enabled fully replicated server for table: %s, partition: %s", tableName, i);
       workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
       workerIdToSegmentsMap.put(workerId, getSegmentsMap(partitionInfo));
       workerId++;
