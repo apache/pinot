@@ -186,9 +186,6 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             }
             break;
           }
-          case FLOAT:
-            // do not make decision on float value, let server handle it.
-            break;
           default:
             break;
         }
