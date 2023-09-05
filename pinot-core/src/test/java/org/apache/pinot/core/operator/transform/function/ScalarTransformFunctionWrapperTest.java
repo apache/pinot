@@ -89,7 +89,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testStringSubStrTransformFunction() {
     ExpressionContext expression =
-        RequestContextUtils.getExpression(String.format("sub_str(%s, 1, 2)", STRING_ALPHANUM_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("sub_str(%s, 0, 2)", STRING_ALPHANUM_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "substr");
@@ -99,13 +99,13 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = RequestContextUtils.getExpression(String.format("substr(%s, '2')", STRING_ALPHANUM_SV_COLUMN));
+    expression = RequestContextUtils.getExpression(String.format("substr(%s, '2', '-1')", STRING_ALPHANUM_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getName(), "substr");
     expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = _stringAlphaNumericSVValues[i].substring(1);
+      expectedValues[i] = _stringAlphaNumericSVValues[i].substring(2);
     }
     testTransformFunction(transformFunction, expectedValues);
   }
