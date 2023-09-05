@@ -897,7 +897,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.QUERY_EXECUTION_ERROR_CODE);
+      testQueryError(sqlQuery, QueryException.SQL_PARSING_ERROR_CODE);
     } else {
       response = postQuery(sqlQuery);
       assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
