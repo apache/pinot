@@ -20,10 +20,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Grid, Checkbox, Button, FormControl, Input, InputLabel } from '@material-ui/core';
+import { Grid, Checkbox, Button, FormControl, Input, InputLabel, Box } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
-import { TableData } from 'Models';
+import { SqlException, TableData } from 'Models';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
@@ -88,7 +88,8 @@ const useStyles = makeStyles((theme) => ({
     paddingBottom: '48px',
   },
   sqlError: {
-    whiteSpace: 'pre-wrap',
+    whiteSpace: 'pre',
+    overflow: "auto"
   },
   timeoutControl: {
     bottom: 10
@@ -183,7 +184,7 @@ const QueryPage = () => {
 
   const [outputResult, setOutputResult] = useState('');
 
-  const [resultError, setResultError] = useState('');
+  const [resultError, setResultError] = useState<SqlException[] | string>([]);
 
   const [queryStats, setQueryStats] = useState<TableData>({
     columns: [],
@@ -299,7 +300,7 @@ const QueryPage = () => {
     }
 
     const results = await PinotMethodUtils.getQueryResults(params);
-    setResultError(results.error || '');
+    setResultError(results.exceptions || []);
     setResultData(results.result || { columns: [], records: [] });
     setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
@@ -499,7 +500,7 @@ const QueryPage = () => {
                 Tracing
               </Grid>
 
-              <Grid item xs={2}>
+              <Grid item xs={3}>
                 <Checkbox
                     name="useMSE"
                     color="primary"
@@ -551,11 +552,24 @@ const QueryPage = () => {
                 }
         
                 {/* Sql result errors */}
-                {resultError && (
+                {resultError && typeof resultError === "string" && (
                   <Alert severity="error" className={classes.sqlError}>
                     {resultError}
                   </Alert>
                 )}
+
+                {resultError && typeof resultError === "object" && resultError.length && (
+                  <>
+                    {
+                      resultError.map((error) => (
+                        <Box style={{paddingBottom: "16px"}}>
+                          <Alert className={classes.sqlError} severity="error">{error.message}</Alert>
+                        </Box>
+                      ))
+                    }
+                  </>
+                  )
+                }
         
                 <Grid item xs style={{ backgroundColor: 'white' }}>
                   {resultData.columns.length ? (
