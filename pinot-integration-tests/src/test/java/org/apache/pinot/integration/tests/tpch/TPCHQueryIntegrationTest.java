@@ -55,10 +55,9 @@ import org.testng.annotations.Test;
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_TPCH_QUERIES = 24;
 
-  // Pinot query 6 fails due to mismatch results.
   // Pinot queries 15, 16, 17 fail due to lack of support for views.
   // Pinot queries 23 fail due to java heap space problem or timeout.
-  private static final Set<Integer> EXEMPT_QUERIES = ImmutableSet.of(6, 15, 16, 17, 23);
+  private static final Set<Integer> EXEMPT_QUERIES = ImmutableSet.of(15, 16, 17, 23);
 
   @BeforeClass
   public void setUp()
