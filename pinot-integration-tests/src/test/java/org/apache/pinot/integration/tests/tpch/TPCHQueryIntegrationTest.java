@@ -57,8 +57,8 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
 
   // Pinot query 6 fails due to mismatch results.
   // Pinot queries 15, 16, 17 fail due to lack of support for views.
-  // Pinot queries 23, 24 fail due to java heap space problem or timeout.
-  private static final Set<Integer> EXEMPT_QUERIES = ImmutableSet.of(6, 15, 16, 17, 23, 24);
+  // Pinot queries 23 fail due to java heap space problem or timeout.
+  private static final Set<Integer> EXEMPT_QUERIES = ImmutableSet.of(6, 15, 16, 17, 23);
 
   @BeforeClass
   public void setUp()
