@@ -216,29 +216,29 @@ public class NumericalFilterOptimizerTest {
             + " identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:-9"
             + ".223372036854776E18>)]))");
 
-    // Test FLOAT column with DOUBLE value that is within bounds of FLOAT.
+    // Test FLOAT column with DOUBLE value: no rewrite.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn > -2100000000.5"),
-        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN_OR_EQUAL, operands:[Expression"
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN, operands:[Expression"
             + "(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal "
-            + "doubleValue:-2.1E9>)]))");
+            + "doubleValue:-2.1000000005E9>)]))");
 
-    // Test FLOAT column with DOUBLE value that is within bounds of FLOAT.
+    // Test FLOAT column with DOUBLE value: no rewrite.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn < -2100000000.5"),
         "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN, operands:[Expression(type:IDENTIFIER, "
-            + "identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:-2"
-            + ".1E9>)]))");
+            + "identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:"
+            + "-2.1000000005E9>)]))");
 
-    // Test FLOAT column with DOUBLE value that is within bounds of FLOAT.
+    // Test FLOAT column with DOUBLE value: no rewrite.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn <= 2100000000.5"),
         "Expression(type:FUNCTION, functionCall:Function(operator:LESS_THAN_OR_EQUAL, operands:[Expression"
             + "(type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal "
-            + "doubleValue:2.1E9>)]))");
+            + "doubleValue:2.1000000005E9>)]))");
 
-    // Test FLOAT column with DOUBLE value that is within bounds of FLOAT.
+    // Test FLOAT column with DOUBLE value: no rewrite.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn >= 2100000000.5"),
-        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN, operands:[Expression(type:IDENTIFIER,"
-            + " identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:2"
-            + ".1E9>)]))");
+        "Expression(type:FUNCTION, functionCall:Function(operator:GREATER_THAN_OR_EQUAL, operands:[Expression("
+            + "type:IDENTIFIER, identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal "
+            + "doubleValue:2.1000000005E9>)]))");
 
     // Test LONG column with DOUBLE value greater than Long.MAX_VALUE.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn > 999999999999999999999999999999.9999"),

@@ -82,7 +82,7 @@ public class StringFunctions {
    * @param beginIndex index from which substring should be created
    * @return substring from beginIndex to end of the parent string
    */
-  @ScalarFunction(names = {"substr", "substring"})
+  @ScalarFunction
   public static String substr(String input, int beginIndex) {
     return StringUtils.substring(input, beginIndex);
   }
@@ -97,11 +97,37 @@ public class StringFunctions {
    * @param endIndex index at which substring should be terminated
    * @return substring from beginIndex to endIndex
    */
-  @ScalarFunction(names = {"substr", "substring"})
+  @ScalarFunction
   public static String substr(String input, int beginIndex, int endIndex) {
     if (endIndex == -1) {
       return substr(input, beginIndex);
     }
+    return StringUtils.substring(input, beginIndex, endIndex);
+  }
+
+  /**
+   * @param input Parent string
+   * @param beginIndex 1 based index from which substring should be created
+   * @return substring from beginIndex to end of the parent string
+   */
+  @ScalarFunction
+  public static String substring(String input, int beginIndex) {
+    return StringUtils.substring(input, beginIndex - 1);
+  }
+
+  /**
+   * Returns the substring of the main string from beginIndex of length.
+   *
+   * @param input Parent string
+   * @param beginIndex 1 based index from which substring should be created
+   * @param length length of substring to be created
+   * @return a substirng of input string from beginIndex of length 'length'
+   */
+  @ScalarFunction
+  public static String substring(String input, int beginIndex, int length) {
+    // index is always 1 based
+    beginIndex = beginIndex - 1;
+    int endIndex = beginIndex + length;
     return StringUtils.substring(input, beginIndex, endIndex);
   }
 

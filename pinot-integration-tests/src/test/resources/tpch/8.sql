@@ -6,7 +6,7 @@ select
 from
   (
     select
-      substring(o_orderdate, 0, 4) as o_year,
+      substring(o_orderdate, 1, 4) as o_year,
       l_extendedprice * (1 - l_discount) as volume,
       n2.n_name as nation
     from

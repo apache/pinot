@@ -186,17 +186,6 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
             }
             break;
           }
-          case FLOAT: {
-            float converted = (float) actual;
-            if (converted != actual) {
-              // Double to float conversion is lossy.
-              return getExpressionFromBoolean(result);
-            } else {
-              // Replace double value with converted float value.
-              rhs.getLiteral().setDoubleValue(converted);
-            }
-            break;
-          }
           default:
             break;
         }
@@ -334,14 +323,12 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
               // Literal value is less than the bounds of LONG.
               return getExpressionFromBoolean(
                   kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL);
-            } else {
-              int comparison = Double.compare(actual, converted);
-              // Rewrite range operator
-              rewriteRangeOperator(range, kind, comparison);
-
-              // Rewrite range literal
-              rhs.getLiteral().setDoubleValue(converted);
             }
+            // Do not rewrite range operator since double has higher precision than float
+            // If we do, we may introduce problems.
+            // For example, in the previous logic, "> 0.05" will be converted into ">= 0.05000000074505806". When the
+            // query reaches a server, the server will convert it to ">= 0.05" in
+            // ColumnValueSegmentPruner#pruneRangePredicate, which is incorrect.
             break;
           }
           default:
