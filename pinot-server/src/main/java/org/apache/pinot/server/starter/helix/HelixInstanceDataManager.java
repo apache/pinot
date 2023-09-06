@@ -472,8 +472,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       segmentLock.lock();
 
       // Reloads an existing segment, and the local segment metadata is existing as asserted above.
-      tableDataManager.reloadSegment(segmentName,
-          new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema), zkMetadata, segmentMetadata, schema,
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
+      indexLoadingConfig.setErrorOnColumnBuildFailure(true);
+      tableDataManager.reloadSegment(segmentName, indexLoadingConfig, zkMetadata, segmentMetadata, schema,
           forceDownload);
       LOGGER.info("Reloaded segment: {} of table: {}", segmentName, tableNameWithType);
     } finally {
