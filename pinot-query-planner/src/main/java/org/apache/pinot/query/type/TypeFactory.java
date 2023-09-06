@@ -59,6 +59,17 @@ public class TypeFactory extends JavaTypeFactoryImpl {
       case LONG:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BIGINT)
             : createArrayType(createSqlType(SqlTypeName.BIGINT), -1);
+      // Map float and double to the same RelDataType so that queries like
+      // `select count(*) from table where aFloatColumn = 0.05` works correctly in multi-stage query engine.
+      //
+      // If float and double are mapped to different RelDataType,
+      // `select count(*) from table where aFloatColumn = 0.05` will be converted to
+      // `select count(*) from table where CAST(aFloatColumn as "DOUBLE") = 0.05`. While casting
+      // from float to double does not always produce the same double value as the original float value, this leads to
+      // wrong query result.
+      //
+      // With float and double mapped to the same RelDataType, the behavior in multi-stage query engine will be the same
+      // as the query in v1 query engine.
       case FLOAT:
       case DOUBLE:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
