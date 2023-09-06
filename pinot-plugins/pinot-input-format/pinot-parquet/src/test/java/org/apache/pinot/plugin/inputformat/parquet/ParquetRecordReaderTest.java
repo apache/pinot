@@ -148,6 +148,15 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
     Assert.assertTrue(avroRecordReader.useAvroParquetRecordReader());
     Assert.assertFalse(nativeRecordReader.useAvroParquetRecordReader());
 
+    testComparison(avroRecordReader, nativeRecordReader, totalRecords);
+    avroRecordReader.rewind();
+    nativeRecordReader.rewind();
+    testComparison(avroRecordReader, nativeRecordReader, totalRecords);
+  }
+
+  private void testComparison(ParquetRecordReader avroRecordReader, ParquetRecordReader nativeRecordReader,
+      int totalRecords)
+      throws IOException {
     GenericRow avroReuse = new GenericRow();
     GenericRow nativeReuse = new GenericRow();
     int recordsRead = 0;
@@ -159,6 +168,7 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
       Assert.assertTrue(avroReaderRow.equals(nativeReaderRow));
       recordsRead++;
     }
+    Assert.assertFalse(nativeRecordReader.hasNext());
     Assert.assertEquals(recordsRead, totalRecords,
         "Message read from ParquetRecordReader doesn't match the expected number.");
   }
