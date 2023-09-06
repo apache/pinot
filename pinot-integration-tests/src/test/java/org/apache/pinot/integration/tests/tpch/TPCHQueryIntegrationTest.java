@@ -16,24 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.tpch;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
+import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.utils.JarUtils;
@@ -44,26 +45,20 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-
+// TODO: extract common functions from TPCHQueryIntegrationTest and SSBQueryIntegrationTest
+/**
+ * Integration test that tests Pinot using TPCH data.
+ * Data is loaded into Pinot and H2 from /resources/examples/batch/tpch. The dataset size is very small, please follow
+ * REAME.md to generate a larger dataset for better testing.
+ * Queries are executed against Pinot and H2, and the results are compared.
+ */
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
   private static final int NUM_TPCH_QUERIES = 24;
-  private static final Set<Integer> EXEMPT_QUERIES;
 
-  static {
-    TPCH_QUICKSTART_TABLE_RESOURCES = new HashMap<>();
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("orders", "examples/batch/tpch/orders");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("lineitem", "examples/batch/tpch/lineitem");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("region", "examples/batch/tpch/region");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("partsupp", "examples/batch/tpch/partsupp");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("customer", "examples/batch/tpch/customer");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("nation", "examples/batch/tpch/nation");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("part", "examples/batch/tpch/part");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("supplier", "examples/batch/tpch/supplier");
-    EXEMPT_QUERIES = new HashSet<>();
-    // The following queries fail due to lack of support for views.
-    EXEMPT_QUERIES.addAll(ImmutableList.of(15, 16, 17));
-  }
+  // Pinot query 6 fails due to mismatch results.
+  // Pinot queries 15, 16, 17 fail due to lack of support for views.
+  // Pinot queries 23, 24 fail due to java heap space problem or timeout.
+  private static final Set<Integer> EXEMPT_QUERIES = ImmutableSet.of(6, 15, 16, 17, 23, 24);
 
   @BeforeClass
   public void setUp()
@@ -76,12 +71,13 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    for (Map.Entry<String, String> tableResource : TPCH_QUICKSTART_TABLE_RESOURCES.entrySet()) {
-      File tableSegmentDir = new File(_segmentDir, tableResource.getKey());
-      File tarDir = new File(_tarDir, tableResource.getKey());
-      String tableName = tableResource.getKey();
-      URL resourceUrl = getClass().getClassLoader().getResource(tableResource.getValue());
-      Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResource.getValue());
+    setUpH2Connection();
+    for (String tableName : Constants.TPCH_TABLE_NAMES) {
+      File tableSegmentDir = new File(_segmentDir, tableName);
+      File tarDir = new File(_tarDir, tableName);
+      String tableResourceFolder = Constants.getTableResourceFolder(tableName);
+      URL resourceUrl = getClass().getClassLoader().getResource(tableResourceFolder);
+      Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResourceFolder);
       File resourceFile;
       if ("jar".equals(resourceUrl.getProtocol())) {
         String[] splits = resourceUrl.getFile().split("!");
@@ -92,7 +88,8 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       } else {
         resourceFile = new File(resourceUrl.getFile());
       }
-      File dataFile = new File(resourceFile.getAbsolutePath(), "rawdata" + File.separator + tableName + ".avro");
+      File dataFile =
+          new File(getClass().getClassLoader().getResource(Constants.getTableAvroFilePath(tableName)).getFile());
       Assert.assertTrue(dataFile.exists(), "Unable to load resource file from URL: " + dataFile);
       File schemaFile = new File(resourceFile.getPath(), tableName + "_schema.json");
       File tableFile = new File(resourceFile.getPath(), tableName + "_offline_table_config.json");
@@ -105,28 +102,53 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
           tableSegmentDir, tarDir);
       uploadSegments(tableName, tarDir);
+      // H2
+      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
     }
   }
 
   @Test(dataProvider = "QueryDataProvider")
-  public void testTPCHQueries(String query) {
-    testQueriesSucceed(query);
+  public void testTPCHQueries(String[] pinotAndH2Queries) throws Exception {
+    testQueriesSucceed(pinotAndH2Queries[0], pinotAndH2Queries[1]);
   }
 
-  protected void testQueriesSucceed(String query) {
-    ResultSetGroup pinotResultSetGroup = getPinotConnection().execute(query);
+  protected void testQueriesSucceed(String pinotQuery, String h2Query) throws Exception {
+    ResultSetGroup pinotResultSetGroup = getPinotConnection().execute(pinotQuery);
     org.apache.pinot.client.ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
-
     if (CollectionUtils.isNotEmpty(pinotResultSetGroup.getExceptions())) {
       Assert.fail(String.format(
-          "TPC-H query raised exception: %s. query: %s", pinotResultSetGroup.getExceptions().get(0), query));
+          "TPC-H query raised exception: %s. query: %s", pinotResultSetGroup.getExceptions().get(0), pinotQuery));
     }
-    // TODO: Enable the following 2 assertions after fixing the data so each query returns non-zero rows
-    /*
-    Assert.assertTrue(resultTableResultSet.getRowCount() > 0,
-        String.format("Expected non-zero rows for tpc-h query: %s", query));
-    Assert.assertTrue(resultTableResultSet.getColumnCount() > 0,
-        String.format("Expected non-zero columns for tpc-h query: %s", query)); */
+
+    int numRows = resultTableResultSet.getRowCount();
+    int numColumns = resultTableResultSet.getColumnCount();
+
+    // h2 response
+    Assert.assertNotNull(_h2Connection);
+    Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+    h2statement.execute(h2Query);
+    ResultSet h2ResultSet = h2statement.getResultSet();
+
+    // compare results.
+    Assert.assertEquals(numColumns, h2ResultSet.getMetaData().getColumnCount());
+    if (h2ResultSet.first()) {
+      for (int i = 0; i < numRows; i++) {
+        for (int c = 0; c < numColumns; c++) {
+          String h2Value = h2ResultSet.getString(c + 1);
+          String pinotValue = resultTableResultSet.getString(i, c);
+          boolean error = ClusterIntegrationTestUtils.fuzzyCompare(h2Value, pinotValue, pinotValue);
+          if (error) {
+            throw new RuntimeException("Value: " + c + " does not match at (" + i + ", " + c + "), "
+                + "expected h2 value: " + h2Value + ", actual Pinot value: " + pinotValue);
+          }
+        }
+        if (!h2ResultSet.next() && i != numRows - 1) {
+          throw new RuntimeException("H2 result set is smaller than Pinot result set after: " + i + " rows!");
+        }
+      }
+    }
+    Assert.assertFalse(h2ResultSet.next(), "Pinot result set is smaller than H2 result set after: "
+        + numRows + " rows!");
   }
 
   @Override
@@ -148,7 +170,7 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   public void tearDown()
       throws Exception {
     // unload all TPCH tables.
-    for (String table : TPCH_QUICKSTART_TABLE_RESOURCES.keySet()) {
+    for (String table : Constants.TPCH_TABLE_NAMES) {
       dropOfflineTable(table);
     }
 
@@ -169,11 +191,19 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
       if (EXEMPT_QUERIES.contains(query)) {
         continue;
       }
-      String path = String.format("tpch/%s.sql", query);
-      try (InputStream inputStream = TPCHQueryIntegrationTest.class.getClassLoader()
-          .getResourceAsStream(path)) {
-        queries[iter] = new Object[1];
-        queries[iter][0] = IOUtils.toString(Objects.requireNonNull(inputStream), Charset.defaultCharset());
+      String pinotQueryFilePath = String.format("tpch/%s.sql", query);
+      try (InputStream pinotQueryIs = TPCHQueryIntegrationTest.class.getClassLoader()
+          .getResourceAsStream(pinotQueryFilePath)) {
+        queries[iter] = new Object[2];
+        queries[iter][0] = IOUtils.toString(Objects.requireNonNull(pinotQueryIs), Charset.defaultCharset());
+        // TODO: remove this once we have Pinot support standard sql funtion extract().
+        String h2QueryFilePath = String.format("tpch/%s-h2.sql", query);
+        try (InputStream h2QueryIs = TPCHQueryIntegrationTest.class.getClassLoader()
+            .getResourceAsStream(h2QueryFilePath)) {
+          queries[iter][1] = IOUtils.toString(Objects.requireNonNull(h2QueryIs), Charset.defaultCharset());
+        } catch (Exception e) {
+          queries[iter][1] = queries[iter][0];
+        }
         iter++;
       }
     }

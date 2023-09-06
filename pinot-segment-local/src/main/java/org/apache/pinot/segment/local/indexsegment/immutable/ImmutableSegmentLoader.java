@@ -247,7 +247,7 @@ public class ImmutableSegmentLoader {
         segmentVersionToLoad);
     SegmentFormatConverter converter =
         SegmentFormatConverterFactory.getConverter(segmentVersionOnDisk, segmentVersionToLoad);
-    LOGGER.info("Using converter: {} to up-convert segment: {}", converter.getClass().getName(), segmentName);
+    LOGGER.info("Using converter: {} to up-convert segment: {}", converter.getClass().getSimpleName(), segmentName);
     converter.convert(indexDir);
     LOGGER.info("Successfully up-converted segment: {} from version: {} to {}", segmentName, segmentVersionOnDisk,
         segmentVersionToLoad);

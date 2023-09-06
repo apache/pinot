@@ -30,7 +30,6 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
@@ -78,28 +77,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final MailboxService _mailboxService;
   private final QueryDispatcher _queryDispatcher;
 
-  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerIdFromConfig,
-      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
-      QueryQuotaManager queryQuotaManager, TableCache tableCache, BrokerMetrics brokerMetrics) {
-    super(config, brokerIdFromConfig, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        brokerMetrics);
+  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      BrokerMetrics brokerMetrics) {
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
     LOGGER.info("Using Multi-stage BrokerRequestHandler.");
-    String reducerHostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
-    if (reducerHostname == null) {
-      // use broker ID as host name, but remove the
-      String brokerId = brokerIdFromConfig;
-      brokerId = brokerId.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) ? brokerId.substring(
-          CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH) : brokerId;
-      brokerId = StringUtils.split(brokerId, "_").length > 1 ? StringUtils.split(brokerId, "_")[0] : brokerId;
-      reducerHostname = brokerId;
-    }
-    // This config has to be set to a valid port number.
-    int reducerPort =
-        Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+    String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+    int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
-        new WorkerManager(reducerHostname, reducerPort, routingManager), _tableCache);
-    _mailboxService = new MailboxService(reducerHostname, reducerPort, config);
+        new WorkerManager(hostname, port, routingManager), _tableCache);
+    _mailboxService = new MailboxService(hostname, port, config);
     _queryDispatcher = new QueryDispatcher(_mailboxService);
 
     // TODO: move this to a startUp() function.

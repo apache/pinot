@@ -56,7 +56,8 @@ public class CalciteRexExpressionParser {
   static {
     CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();
     for (FilterKind filterKind : FilterKind.values()) {
-      CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(canonicalizeFunctionNameInternal(filterKind.name()), filterKind.name());
+      CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(RequestUtils.canonicalizeFunctionName(filterKind.name()),
+          filterKind.name());
     }
   }
 
@@ -276,18 +277,7 @@ public class CalciteRexExpressionParser {
   }
 
   private static String canonicalizeFunctionName(String functionName) {
-    String canonicalizeName = canonicalizeFunctionNameInternal(functionName);
+    String canonicalizeName = RequestUtils.canonicalizeFunctionName(functionName);
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalizeName, canonicalizeName);
-  }
-
-  /**
-   * Canonicalize Calcite generated Logical function names.
-   */
-  private static String canonicalizeFunctionNameInternal(String functionName) {
-    if (functionName.endsWith("0")) {
-      return functionName.substring(0, functionName.length() - 1).replace("_", "").toLowerCase();
-    } else {
-      return functionName.replace("_", "").toLowerCase();
-    }
   }
 }

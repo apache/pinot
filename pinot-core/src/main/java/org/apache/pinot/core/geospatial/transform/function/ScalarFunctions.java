@@ -159,4 +159,32 @@ public class ScalarFunctions {
   public static long geoToH3(double longitude, double latitude, int resolution) {
     return H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
   }
+
+  /**
+   * Gets the H3 hexagon address from the location
+   * @param geoBytes ST_point serialized bytes
+   * @param resolution H3 index resolution
+   * @return the H3 index address
+   */
+  @ScalarFunction
+  public static long geoToH3(byte[] geoBytes, int resolution) {
+    Geometry geometry = GeometrySerializer.deserialize(geoBytes);
+    double latitude = geometry.getCoordinate().y;
+    double longitude = geometry.getCoordinate().x;
+    return H3Utils.H3_CORE.geoToH3(latitude, longitude, resolution);
+  }
+
+  @ScalarFunction
+  public static double stDistance(byte[] firstPoint, byte[] secondPoint) {
+    Geometry firstGeometry = GeometrySerializer.deserialize(firstPoint);
+    Geometry secondGeometry = GeometrySerializer.deserialize(secondPoint);
+    if (GeometryUtils.isGeography(firstGeometry) != GeometryUtils.isGeography(secondGeometry)) {
+      throw new RuntimeException("The first and second arguments shall either all be geometry or all geography");
+    }
+    if (GeometryUtils.isGeography(firstGeometry)) {
+      return StDistanceFunction.sphericalDistance(firstGeometry, secondGeometry);
+    } else {
+      return firstGeometry.isEmpty() || secondGeometry.isEmpty() ? Double.NaN : firstGeometry.distance(secondGeometry);
+    }
+  }
 }

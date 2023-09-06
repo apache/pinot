@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
-import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,7 +36,6 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
-import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -132,9 +130,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
-      @Nullable StreamObserver<Server.ServerResponse> responseObserver) {
+      @Nullable ResultsBlockStreamer streamer) {
     if (!queryRequest.isEnableTrace()) {
-      return executeInternal(queryRequest, executorService, responseObserver);
+      return executeInternal(queryRequest, executorService, streamer);
     }
     try {
       long requestId = queryRequest.getRequestId();
@@ -143,14 +141,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long traceId =
           TableNameBuilder.isRealtimeTableResource(queryRequest.getTableNameWithType()) ? -requestId : requestId;
       Tracing.getTracer().register(traceId);
-      return executeInternal(queryRequest, executorService, responseObserver);
+      return executeInternal(queryRequest, executorService, streamer);
     } finally {
       Tracing.getTracer().unregister();
     }
   }
 
   private InstanceResponseBlock executeInternal(ServerQueryRequest queryRequest, ExecutorService executorService,
-      @Nullable StreamObserver<Server.ServerResponse> responseObserver) {
+      @Nullable ResultsBlockStreamer streamer) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer schedulerWaitTimer = timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     if (schedulerWaitTimer != null) {
@@ -251,7 +249,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     InstanceResponseBlock instanceResponse = null;
     try {
-      instanceResponse = executeInternal(indexSegments, queryContext, timerContext, executorService, responseObserver,
+      instanceResponse = executeInternal(indexSegments, queryContext, timerContext, executorService, streamer,
           queryRequest.isEnableStreaming());
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
@@ -340,8 +338,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   // NOTE: This method might change indexSegments. Do not use it after calling this method.
   private InstanceResponseBlock executeInternal(List<IndexSegment> indexSegments, QueryContext queryContext,
-      TimerContext timerContext, ExecutorService executorService,
-      @Nullable StreamObserver<Server.ServerResponse> responseObserver, boolean enableStreaming)
+      TimerContext timerContext, ExecutorService executorService, @Nullable ResultsBlockStreamer streamer,
+      boolean enableStreaming)
       throws Exception {
     handleSubquery(queryContext, indexSegments, timerContext, executorService);
 
@@ -364,14 +362,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       if (queryContext.isExplain()) {
         instanceResponse = getExplainResponseForNoMatchingSegment(numTotalSegments, queryContext);
       } else {
-        instanceResponse =
-            new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext), queryContext);
+        instanceResponse = new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext));
       }
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
       Plan queryPlan =
           enableStreaming ? _planMaker.makeStreamingInstancePlan(selectedSegments, queryContext, executorService,
-              responseObserver, _serverMetrics)
+              streamer, _serverMetrics)
               : _planMaker.makeInstancePlan(selectedSegments, queryContext, executorService, _serverMetrics);
       planBuildTimer.stopAndRecord();
 
@@ -393,11 +390,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private static InstanceResponseBlock getExplainResponseForNoMatchingSegment(int numTotalSegments,
       QueryContext queryContext) {
-    ExplainResultsBlock explainResults = new ExplainResultsBlock();
+    ExplainResultsBlock explainResults = new ExplainResultsBlock(queryContext);
     explainResults.addOperator(String.format(ExplainPlanRows.PLAN_START_FORMAT, numTotalSegments),
         ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS);
     explainResults.addOperator(ExplainPlanRows.ALL_SEGMENTS_PRUNED_ON_SERVER, 3, 2);
-    return new InstanceResponseBlock(explainResults, queryContext);
+    return new InstanceResponseBlock(explainResults);
   }
 
   /**
@@ -460,7 +457,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   public static InstanceResponseBlock executeExplainQuery(Plan queryPlan, QueryContext queryContext) {
-    ExplainResultsBlock explainResults = new ExplainResultsBlock();
+    ExplainResultsBlock explainResults = new ExplainResultsBlock(queryContext);
     InstanceResponseOperator responseOperator = (InstanceResponseOperator) queryPlan.getPlanNode().run();
 
     try {
@@ -496,7 +493,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         }
       }
 
-      InstanceResponseBlock instanceResponse = new InstanceResponseBlock(explainResults, queryContext);
+      InstanceResponseBlock instanceResponse = new InstanceResponseBlock(explainResults);
       instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
           String.valueOf(numEmptyFilterSegments));
       instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),

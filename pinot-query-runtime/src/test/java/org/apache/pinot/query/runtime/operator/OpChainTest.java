@@ -26,6 +26,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -34,7 +37,10 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -53,6 +59,7 @@ import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -68,7 +75,10 @@ import static org.testng.Assert.fail;
 
 public class OpChainTest {
   private static int _numOperatorsInitialized = 0;
+
   private final List<TransferableBlock> _blockList = new ArrayList<>();
+  private final ExecutorService _executorService = Executors.newCachedThreadPool();
+  private final AtomicReference<LeafStageTransferableBlockOperator> _leafOpRef = new AtomicReference<>();
 
   private AutoCloseable _mocks;
   @Mock
@@ -88,7 +98,7 @@ public class OpChainTest {
   private StageMetadata _receivingStageMetadata;
 
   @BeforeMethod
-  public void setUp() {
+  public void setUpMethod() {
     _mocks = MockitoAnnotations.openMocks(this);
     _serverAddress = new VirtualServerAddress("localhost", 123, 0);
     _receivingStageMetadata = new StageMetadata.Builder().setWorkerMetadataList(Stream.of(_serverAddress).map(
@@ -121,10 +131,15 @@ public class OpChainTest {
   }
 
   @AfterMethod
-  public void tearDown()
+  public void tearDownMethod()
       throws Exception {
     _mocks.close();
     _exchange.close();
+  }
+
+  @AfterClass
+  public void tearDown() {
+    _executorService.shutdown();
   }
 
   @Test
@@ -281,11 +296,14 @@ public class OpChainTest {
     }
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT intCol FROM tbl");
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new SelectionResultsBlock(upStreamSchema, Arrays.asList(new Object[]{1}, new Object[]{2})), queryContext));
-    LeafStageTransferableBlockOperator leafOp = new LeafStageTransferableBlockOperator(context,
-        LeafStageTransferableBlockOperatorTest.getStaticBlockProcessor(resultsBlockList),
-        Collections.singletonList(mock(ServerQueryRequest.class)), upStreamSchema);
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+        new SelectionResultsBlock(upStreamSchema, Arrays.asList(new Object[]{1}, new Object[]{2}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    LeafStageTransferableBlockOperator leafOp =
+        new LeafStageTransferableBlockOperator(context, Collections.singletonList(mock(ServerQueryRequest.class)),
+            upStreamSchema, queryExecutor, _executorService);
+    _leafOpRef.set(leafOp);
 
     //Transform operator
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
@@ -309,6 +327,18 @@ public class OpChainTest {
     operators.push(dummyWaitOperator);
     operators.push(sendOperator);
     return operators;
+  }
+
+  private QueryExecutor mockQueryExecutor(List<BaseResultsBlock> dataBlocks, InstanceResponseBlock metadataBlock) {
+    QueryExecutor queryExecutor = mock(QueryExecutor.class);
+    when(queryExecutor.execute(any(), any(), any())).thenAnswer(invocation -> {
+      LeafStageTransferableBlockOperator operator = _leafOpRef.get();
+      for (BaseResultsBlock dataBlock : dataBlocks) {
+        operator.addResultsBlock(dataBlock);
+      }
+      return metadataBlock;
+    });
+    return queryExecutor;
   }
 
   static class DummyMultiStageOperator extends MultiStageOperator {
@@ -356,7 +386,6 @@ public class OpChainTest {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
 
-    @Nullable
     @Override
     public String toExplainString() {
       return "DUMMY_" + _numOperatorsInitialized++;

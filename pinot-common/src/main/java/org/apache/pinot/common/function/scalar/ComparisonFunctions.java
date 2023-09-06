@@ -61,6 +61,6 @@ public class ComparisonFunctions {
 
   @ScalarFunction
   public static boolean between(double val, double a, double b) {
-    return val > a && val < b;
+    return val >= a && val <= b;
   }
 }

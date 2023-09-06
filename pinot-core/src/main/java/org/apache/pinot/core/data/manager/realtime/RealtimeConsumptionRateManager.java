@@ -147,9 +147,14 @@ public class RealtimeConsumptionRateManager {
 
     @Override
     public void throttle(int numMsgs) {
-      _metricEmitter.emitMetric(numMsgs, _rate, Clock.systemUTC().instant());
-      if (InstanceHolder.INSTANCE._isThrottlingAllowed && numMsgs > 0) {
-        _rateLimiter.acquire(numMsgs);
+      if (InstanceHolder.INSTANCE._isThrottlingAllowed) {
+        // Only emit metrics when throttling is allowed. Throttling is not enabled.
+        // until the server has passed startup checks. Otherwise, we will see
+        // consumption well over 100% during startup.
+        _metricEmitter.emitMetric(numMsgs, _rate, Clock.systemUTC().instant());
+        if (numMsgs > 0) {
+          _rateLimiter.acquire(numMsgs);
+        }
       }
     }
 

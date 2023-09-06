@@ -49,6 +49,7 @@ public class LiteralTransformFunction implements TransformFunction {
   private final float _floatLiteral;
   private final double _doubleLiteral;
   private final BigDecimal _bigDecimalLiteral;
+  private final byte[] _bytesLiteral;
 
   // literals may be shared but values are intentionally not volatile as assignment races are benign
   private int[] _intResult;
@@ -68,6 +69,7 @@ public class LiteralTransformFunction implements TransformFunction {
     _longLiteral = _bigDecimalLiteral.longValue();
     _floatLiteral = _bigDecimalLiteral.floatValue();
     _doubleLiteral = _bigDecimalLiteral.doubleValue();
+    _bytesLiteral = (_dataType == DataType.BYTES) ? (byte[]) _literal : null;
   }
 
   public boolean getBooleanLiteral() {
@@ -96,6 +98,10 @@ public class LiteralTransformFunction implements TransformFunction {
 
   public String getStringLiteral() {
     return String.valueOf(_literal);
+  }
+
+  public byte[] getBytesLiteral() {
+    return (_bytesLiteral != null) ? _bytesLiteral : BytesUtils.toBytes(getStringLiteral());
   }
 
   @Override
@@ -222,7 +228,7 @@ public class LiteralTransformFunction implements TransformFunction {
     if (bytesResult == null || bytesResult.length < numDocs) {
       bytesResult = new byte[numDocs][];
       // TODO: Handle null literal
-      Arrays.fill(bytesResult, BytesUtils.toBytes(getStringLiteral()));
+      Arrays.fill(bytesResult, getBytesLiteral());
       _bytesResult = bytesResult;
     }
     return bytesResult;

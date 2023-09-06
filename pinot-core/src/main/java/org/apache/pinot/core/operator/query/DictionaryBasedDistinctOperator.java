@@ -93,7 +93,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
       }
     }
 
-    return new DistinctResultsBlock(distinctTable);
+    return new DistinctResultsBlock(distinctTable, _queryContext);
   }
 
   private static List<Record> iterateOnDictionary(Dictionary dictionary, int length) {

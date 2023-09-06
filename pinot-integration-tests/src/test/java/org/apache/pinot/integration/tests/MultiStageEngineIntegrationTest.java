@@ -455,7 +455,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("Illegal base64 character"));
 
     // string literal used in a filter
     sqlQuery = "SELECT * FROM mytable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND "
@@ -529,6 +529,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       assertEquals(encoded, toBase64(toUtf8(original)));
       assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
     }
+
+    // Test select with group by order by limit
+    sqlQuery = "SELECT toBase64(toUtf8(AirlineID)) "
+        + "FROM mytable "
+        + "GROUP BY toBase64(toUtf8(AirlineID)) "
+        + "ORDER BY toBase64(toUtf8(AirlineID)) DESC "
+        + "LIMIT 10";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\"]");
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asText(), "MjExNzE=");
+    assertEquals(rows.get(1).get(0).asText(), "MjAzOTg=");
+    assertEquals(rows.get(2).get(0).asText(), "MjAzNjY=");
+    assertEquals(rows.get(3).get(0).asText(), "MjAzNTU=");
+    assertEquals(rows.get(4).get(0).asText(), "MjAzMDQ=");
+    assertEquals(rows.get(5).get(0).asText(), "MjA0Mzc=");
+    assertEquals(rows.get(6).get(0).asText(), "MjA0MzY=");
+    assertEquals(rows.get(7).get(0).asText(), "MjA0MDk=");
+    assertEquals(rows.get(8).get(0).asText(), "MTkzOTM=");
+    assertEquals(rows.get(9).get(0).asText(), "MTk5Nzc=");
   }
 
   @Test
@@ -597,11 +619,85 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testMultiValueColumnGroupByOrderBy()
       throws Exception {
-    String pinotQuery = "SELECT count(*), arrayToMV(RandomAirports) FROM mytable "
-        + "GROUP BY arrayToMV(RandomAirports) "
-        + "ORDER BY arrayToMV(RandomAirports) DESC";
+    String pinotQuery =
+        "SELECT count(*), arrayToMV(RandomAirports) FROM mytable " + "GROUP BY arrayToMV(RandomAirports) "
+            + "ORDER BY arrayToMV(RandomAirports) DESC";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
+  }
+
+  @Test
+  public void testMultiValueColumnTransforms()
+      throws Exception {
+    String pinotQuery = "SELECT arrayLength(RandomAirports) FROM mytable limit 10";
+    JsonNode jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    pinotQuery = "SELECT cardinality(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arrayMin dataType should be same as the column dataType
+    pinotQuery = "SELECT arrayMin(DivAirports) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+
+    pinotQuery = "SELECT arrayMin(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arrayMax dataType should be same as the column dataType
+    pinotQuery = "SELECT arrayMax(DivAirports) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+
+    pinotQuery = "SELECT arrayMax(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arraySum
+    pinotQuery = "SELECT arraySum(DivAirportIDs) FROM mytable limit 1";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
+
+    // arraySum
+    pinotQuery = "SELECT arrayAverage(DivAirportIDs) FROM mytable limit 1";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
+  }
+
+  @Test
+  public void selectStarDoesNotProjectSystemColumns()
+      throws Exception {
+    JsonNode jsonNode = postQuery("select * from mytable limit 0");
+    List<String> columns = getColumns(jsonNode);
+    for (int i = 0; i < columns.size(); i++) {
+      String colName = columns.get(i);
+      Assert.assertFalse(colName.startsWith("$"), "Column " + colName + " (found at index " + i + " is a system column "
+          + "and shouldn't be included in select *");
+    }
+  }
+
+  @Test(dataProvider = "systemColumns")
+  public void systemColumnsCanBeSelected(String systemColumn)
+      throws Exception {
+    JsonNode jsonNode = postQuery("select " + systemColumn + " from mytable limit 0");
+    assertNoError(jsonNode);
+  }
+
+  @Test(dataProvider = "systemColumns")
+  public void systemColumnsCanBeUsedInWhere(String systemColumn)
+      throws Exception {
+    JsonNode jsonNode = postQuery("select 1 from mytable where " + systemColumn + " is not null limit 0");
+    assertNoError(jsonNode);
   }
 
   @AfterClass

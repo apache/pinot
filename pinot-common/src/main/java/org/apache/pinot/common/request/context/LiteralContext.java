@@ -31,6 +31,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -135,6 +136,16 @@ public class LiteralContext {
           _bigDecimalValue = BigDecimal.ZERO;
         }
         _value = literal.getFieldValue().toString();
+        break;
+      case BIG_DECIMAL_VALUE:
+        _type = FieldSpec.DataType.BIG_DECIMAL;
+        _bigDecimalValue = BigDecimalUtils.deserialize(literal.getBigDecimalValue());
+        _value = _bigDecimalValue;
+        break;
+      case BINARY_VALUE:
+        _type = FieldSpec.DataType.BYTES;
+        _value = literal.getBinaryValue();
+        _bigDecimalValue = BigDecimal.ZERO;
         break;
       case NULL_VALUE:
         _type = FieldSpec.DataType.UNKNOWN;

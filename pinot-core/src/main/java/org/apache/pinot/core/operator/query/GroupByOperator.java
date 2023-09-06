@@ -47,28 +47,28 @@ import org.apache.pinot.spi.trace.Tracing;
 public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private static final String EXPLAIN_NAME = "GROUP_BY";
 
+  private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
   private final BaseProjectOperator<?> _projectOperator;
   private final long _numTotalDocs;
   private final boolean _useStarTree;
   private final DataSchema _dataSchema;
-  private final QueryContext _queryContext;
 
   private int _numDocsScanned = 0;
 
-  public GroupByOperator(AggregationFunction[] aggregationFunctions, ExpressionContext[] groupByExpressions,
-      BaseProjectOperator<?> projectOperator, long numTotalDocs, QueryContext queryContext, boolean useStarTree) {
-    _aggregationFunctions = aggregationFunctions;
+  public GroupByOperator(QueryContext queryContext, ExpressionContext[] groupByExpressions,
+      BaseProjectOperator<?> projectOperator, long numTotalDocs, boolean useStarTree) {
+    _queryContext = queryContext;
+    _aggregationFunctions = queryContext.getAggregationFunctions();
     _groupByExpressions = groupByExpressions;
     _projectOperator = projectOperator;
     _numTotalDocs = numTotalDocs;
     _useStarTree = useStarTree;
-    _queryContext = queryContext;
 
     // NOTE: The indexedTable expects that the the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = groupByExpressions.length;
-    int numAggregationFunctions = aggregationFunctions.length;
+    int numAggregationFunctions = _aggregationFunctions.length;
     int numColumns = numGroupByExpressions + numAggregationFunctions;
     String[] columnNames = new String[numColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
@@ -83,7 +83,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
     // Extract column names and data types for aggregation functions
     for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunction aggregationFunction = aggregationFunctions[i];
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
       int index = numGroupByExpressions + i;
       columnNames[index] = aggregationFunction.getResultColumnName();
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
@@ -123,13 +123,13 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
-        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords);
+        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         return resultsBlock;
       }
     }
 
-    GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult());
+    GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult(), _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     return resultsBlock;
   }
