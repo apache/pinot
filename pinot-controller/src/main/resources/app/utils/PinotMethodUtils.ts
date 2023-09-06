@@ -778,7 +778,12 @@ const getAllTaskTypes = async () => {
 const getTaskInfo = async (taskType) => {
   const tasksRes = await getTaskTypeTasks(taskType);
   const stateRes = await getTaskTypeState(taskType);
-  const state = get(stateRes, 'data', '');
+
+  let state = get(stateRes, 'data', '');
+  // response contains error
+  if(typeof state !== "string") {
+    state = "";
+  }
   return [tasksRes?.data?.length || 0, state];
 };
 
