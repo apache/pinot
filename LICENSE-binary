@@ -285,7 +285,7 @@ com.zaxxer:HikariCP-java7:2.4.13
 commons-cli:commons-cli:1.5.0
 commons-codec:commons-codec:1.15
 commons-collections:commons-collections:3.2.2
-commons-configuration:commons-configuration:1.10
+org.apache.commons:commons-configuration2:2.8.0
 commons-io:commons-io:2.11.0
 commons-lang:commons-lang:2.6
 commons-logging:commons-logging:1.2
