@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
@@ -450,7 +451,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SQLParsingError"));
+    int expectedStatusCode = useMultiStageQueryEngine() ? QueryException.QUERY_PLANNING_ERROR_CODE
+        : QueryException.SQL_PARSING_ERROR_CODE;
+    Assert.assertEquals(response.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
 
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
