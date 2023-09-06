@@ -78,7 +78,6 @@ const HomePage = () => {
   const fetchData = async () => {
     const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
     const instanceResponse = await PinotMethodUtils.getAllInstances();
-    const taskTypes = await PinotMethodUtils.getAllTaskTypes();
     const tablesResponse = await PinotMethodUtils.getQueryTablesList({bothType: true});
     const tablesList = [];
     tablesResponse.records.map((record)=>{
