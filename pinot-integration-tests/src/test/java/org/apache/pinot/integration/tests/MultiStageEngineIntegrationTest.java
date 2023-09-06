@@ -94,11 +94,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     return true;
   }
 
-  @Test
+  @Test(dataProvider = "useV2QueryEngine")
   @Override
-  public void testHardcodedQueries()
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testHardcodedQueries();
+    super.testHardcodedQueries(true);
   }
 
   @Test
@@ -116,12 +116,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(joinResult, expectedResult);
   }
 
-  @Test
+  @Test(dataProvider = "useV2QueryEngine")
   @Override
-  public void testGeneratedQueries()
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testGeneratedQueries(false, true);
-    super.testGeneratedQueries(true, true);
+    super.testGeneratedQueries(useMultiStageQueryEngine);
   }
 
   @Test

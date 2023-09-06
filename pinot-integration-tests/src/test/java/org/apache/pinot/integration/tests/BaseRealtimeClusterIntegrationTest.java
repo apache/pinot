@@ -106,10 +106,10 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
    * to ensure the right result is computed, wherein dictionary is not read if it is mutable
    * @throws Exception
    */
-  @Test
-  public void testDictionaryBasedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDictionaryBasedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Dictionary columns
     // int
     testDictionaryBasedFunctions("NASDelay");
@@ -142,31 +142,36 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
         String.format("SELECT MAX(%s)-MIN(%s) FROM %s", column, column, getTableName()));
   }
 
-  @Test
-  public void testHardcodedQueries()
+  // TODO: enable this test to `useBothQueryEngines` after fixing the issue.
+  @Test(dataProvider = "useV1QueryEngine")
+  @Override
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testHardcodedQueries();
+    super.testHardcodedQueries(useMultiStageQueryEngine);
   }
 
-  @Test
+  // TODO: enable this test to `useBothQueryEngines` after fixing the issue.
+  @Test(dataProvider = "useV1QueryEngine")
   @Override
-  public void testQueriesFromQueryFile()
+  public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testQueriesFromQueryFile();
+    super.testQueriesFromQueryFile(useMultiStageQueryEngine);
   }
 
-  @Test
+  // TODO: enable this test to `useBothQueryEngines` after fixing the issue.
+  @Test(dataProvider = "useV1QueryEngine")
   @Override
-  public void testGeneratedQueries()
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    testGeneratedQueries(true, false);
+    super.testGeneratedQueries(useMultiStageQueryEngine);
   }
 
-  @Test
+  // TODO: enable this test to `useBothQueryEngines` after fixing the issue.
+  @Test(dataProvider = "useV1QueryEngine")
   @Override
-  public void testQueryExceptions()
+  public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testQueryExceptions();
+    super.testQueryExceptions(useMultiStageQueryEngine);
   }
 
   @Test

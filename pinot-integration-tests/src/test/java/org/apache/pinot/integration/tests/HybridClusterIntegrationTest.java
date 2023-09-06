@@ -244,32 +244,36 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     Assert.assertTrue(postQueryWithOptions(query, "dropResults=truee").has(resultTag));
   }
 
-  @Test
+  // TODO: enable this test to `useBothQueryEngines` after fixing the issue.
+  @Test(dataProvider = "useV1QueryEngine")
   @Override
-  public void testHardcodedQueries()
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testHardcodedQueries();
+    super.testHardcodedQueries(useMultiStageQueryEngine);
   }
 
-  @Test
+  // TODO: enable this test to `useBothQueryEngines` after fixing the issue.
+  @Test(dataProvider = "useV1QueryEngine")
   @Override
-  public void testQueriesFromQueryFile()
+  public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testQueriesFromQueryFile();
+    super.testQueriesFromQueryFile(useMultiStageQueryEngine);
   }
 
-  @Test
+  // TODO: enable this test to `useBothQueryEngines` after fixing the issue.
+  @Test(dataProvider = "useV1QueryEngine")
   @Override
-  public void testGeneratedQueries()
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testGeneratedQueries();
+    super.testGeneratedQueries(useMultiStageQueryEngine);
   }
 
-  @Test
+  // TODO: enable this test to `useBothQueryEngines` after fixing the issue.
+  @Test(dataProvider = "useV1QueryEngine")
   @Override
-  public void testQueryExceptions()
+  public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testQueryExceptions();
+    super.testQueryExceptions(useMultiStageQueryEngine);
   }
 
   @Test
@@ -286,10 +290,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     super.testBrokerResponseMetadata();
   }
 
-  @Test
+  @Test(dataProvider = "useBothQueryEngines")
   @Override
-  public void testVirtualColumnQueries() {
-    super.testVirtualColumnQueries();
+  public void testVirtualColumnQueries(boolean useMultiStageQueryEngine) {
+    super.testVirtualColumnQueries(useMultiStageQueryEngine);
   }
 
   @AfterClass

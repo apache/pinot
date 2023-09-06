@@ -213,9 +213,9 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
         .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
-
-  @Test
-  public void testRealtimeToOfflineSegmentsTask()
+  // TODO: enable this test to `useBothQueryEngines` after fixing the issue.
+  @Test(dataProvider = "useV1QueryEngine")
+  public void testRealtimeToOfflineSegmentsTask(boolean useMultiStageQueryEngine)
       throws Exception {
     List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(_offlineTableName);
     assertTrue(segmentsZKMetadata.isEmpty());
@@ -262,7 +262,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
       expectedWatermark += 86400000;
     }
 
-    testHardcodedQueries();
+    testHardcodedQueries(useMultiStageQueryEngine);
   }
 
   @Test

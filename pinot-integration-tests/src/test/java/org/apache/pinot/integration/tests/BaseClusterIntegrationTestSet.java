@@ -85,8 +85,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    * Test hard-coded queries.
    * @throws Exception
    */
-  public void testHardcodedQueries()
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     testHardcodedQueriesCommon();
     if (useMultiStageQueryEngine()) {
       testHardcodedQueriesV2();
@@ -391,7 +392,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
   }
 
-  public void testVirtualColumnQueries() {
+  public void testVirtualColumnQueries(boolean useMultiStageQueryEngine) {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Check that there are no virtual columns in the query results
     ResultSetGroup resultSetGroup = getPinotConnection().execute("select * from mytable");
     ResultSet resultSet = resultSetGroup.getResultSet(0);
@@ -411,8 +413,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   /**
    * Test queries from the query file.
    */
-  public void testQueriesFromQueryFile()
+  public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     InputStream inputStream =
         BaseClusterIntegrationTestSet.class.getClassLoader().getResourceAsStream(getQueryFileName());
     assertNotNull(inputStream);
@@ -451,14 +454,15 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testGeneratedQueries()
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    // default test with MV columns, without using multistage engine
-    testGeneratedQueries(true, false);
+    testGeneratedQueries(false, useMultiStageQueryEngine);
+    testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
   protected void testGeneratedQueries(boolean withMultiValues, boolean useMultistageEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultistageEngine);
     QueryGenerator queryGenerator = getQueryGenerator();
     queryGenerator.setSkipMultiValuePredicates(!withMultiValues);
     queryGenerator.setUseMultistageEngine(useMultistageEngine);
@@ -484,8 +488,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testQueryExceptions()
+  public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     testQueryException("POTATO", QueryException.SQL_PARSING_ERROR_CODE);
     testQueryException("SELECT COUNT(*) FROM potato", QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
     testQueryException("SELECT POTATO(ArrTime) FROM mytable", QueryException.QUERY_EXECUTION_ERROR_CODE);
