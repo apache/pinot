@@ -60,8 +60,6 @@ public class TypeFactory extends JavaTypeFactoryImpl {
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BIGINT)
             : createArrayType(createSqlType(SqlTypeName.BIGINT), -1);
       case FLOAT:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.REAL)
-            : createArrayType(createSqlType(SqlTypeName.REAL), -1);
       case DOUBLE:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
             : createArrayType(createSqlType(SqlTypeName.DOUBLE), -1);
