@@ -82,7 +82,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -1375,10 +1374,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test(dependsOnMethods = "testAggregateMetadataAPI", dataProvider = "useBothQueryEngines")
   public void testDefaultColumns(boolean useMultiStageQueryEngine)
       throws Exception {
-    if (useMultiStageQueryEngine) {
-      throw new SkipException("TODO: This test is not working in V2 right now");
-    }
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     long numTotalDocs = getCountStarResult();
 
     reloadWithExtraColumns();
@@ -1750,10 +1747,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test(dataProvider = "useBothQueryEngines")
   public void testGroupByUDF(boolean useMultiStageQueryEngine)
       throws Exception {
-    if (useMultiStageQueryEngine) {
-      throw new SkipException("This test should work with V2 but it doesn't");
-    }
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     String query = "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS'), COUNT(*) FROM mytable "
         + "GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS') ORDER BY COUNT(*) DESC";
     JsonNode response = postQuery(query);
@@ -2092,10 +2087,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test(dataProvider = "useBothQueryEngines")
   public void testCaseStatementWithLogicalTransformFunction(boolean useMultiStageQueryEngine)
       throws Exception {
-    if (useMultiStageQueryEngine) {
-      throw new SkipException("TODO: This test is not working in V2 right now");
-    }
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     String sqlQuery = "SELECT ArrDelay" + ", CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END"
         + ", CASE WHEN ArrDelay < 50 AND ArrDelay >= 10 THEN 10 ELSE 0 END" + " FROM mytable LIMIT 1000";
     JsonNode response = postQuery(sqlQuery);

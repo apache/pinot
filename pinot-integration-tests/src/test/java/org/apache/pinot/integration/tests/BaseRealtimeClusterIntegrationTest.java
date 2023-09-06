@@ -29,7 +29,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -147,39 +146,32 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
   @Test(dataProvider = "useBothQueryEngines")
   public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    if (useMultiStageQueryEngine) {
-      throw new SkipException("Some queries fail when using multi-stage engine");
-    }
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     super.testHardcodedQueries();
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
-    if (useMultiStageQueryEngine) {
-      throw new SkipException("Some queries fail when using multi-stage engine");
-    }
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     super.testQueriesFromQueryFile();
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    if (useMultiStageQueryEngine) {
-      throw new SkipException("Some queries fail when using multi-stage engine");
-    }
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
-    if (useMultiStageQueryEngine) {
-      throw new SkipException("Some queries fail when using multi-stage engine");
-    }
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     super.testQueryExceptions();
   }
 

@@ -151,6 +151,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testCountWithNullDescription(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE description IS NOT NULL";
     testQuery(query);
   }
@@ -159,6 +160,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testCountWithNullDescriptionAndSalary(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE description IS NOT NULL AND salary IS NOT NULL";
     testQuery(query);
   }
@@ -217,6 +219,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testNullLiteralSelectionOnlyBroker(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     // Null literal only
     String sqlQuery = "SELECT null FROM mytable OPTION(enableNullHandling=true)";
     JsonNode response = postQuery(sqlQuery);

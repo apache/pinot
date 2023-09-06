@@ -203,6 +203,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testQueryTracing(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     JsonNode jsonNode = postQuery("SET trace = true; SELECT COUNT(*) FROM " + getTableName());
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
     Assert.assertTrue(jsonNode.get("exceptions").isEmpty());
@@ -216,6 +217,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testQueryTracingWithLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     JsonNode jsonNode =
         postQuery("SET trace = true; SELECT 1, \'test\', ArrDelay FROM " + getTableName() + " LIMIT 10");
     long countStarResult = 10;
@@ -252,6 +254,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     super.testHardcodedQueries();
   }
 
@@ -259,6 +262,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     super.testQueriesFromQueryFile();
   }
 
@@ -266,6 +270,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     super.testGeneratedQueries();
   }
 
@@ -273,6 +278,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     super.testQueryExceptions();
   }
 
