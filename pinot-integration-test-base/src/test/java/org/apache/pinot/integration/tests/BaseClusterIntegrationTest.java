@@ -37,6 +37,7 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -511,17 +512,24 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @return Pinot connection
    */
   protected org.apache.pinot.client.Connection getPinotConnection() {
+    // TODO: This code is assuming getPinotConnectionProperties() will always return the same values
     if (useMultiStageQueryEngine()) {
       if (_pinotConnectionV2 == null) {
         Properties properties = getPinotConnectionProperties();
         properties.put("useMultiStageEngine", "true");
-        _pinotConnectionV2 = ConnectionFactory.fromZookeeper(properties, getZkUrl() + "/" + getHelixClusterName());
+        _pinotConnectionV2 = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
+            new JsonAsyncHttpPinotClientTransportFactory()
+                .withConnectionProperties(properties)
+                .buildTransport());
       }
       return _pinotConnectionV2;
     }
     if (_pinotConnection == null) {
       _pinotConnection =
-          ConnectionFactory.fromZookeeper(getPinotConnectionProperties(), getZkUrl() + "/" + getHelixClusterName());
+          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
+              new JsonAsyncHttpPinotClientTransportFactory()
+                  .withConnectionProperties(getPinotConnectionProperties())
+                  .buildTransport());
     }
     return _pinotConnection;
   }
