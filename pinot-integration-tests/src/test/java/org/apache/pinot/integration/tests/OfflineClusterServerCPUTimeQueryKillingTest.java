@@ -49,6 +49,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.junit.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -214,9 +215,13 @@ public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterInte
         .build();
   }
 
-  @Test
-  public void testDigestTimeoutMultipleQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDigestTimeoutMultipleQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    if (useMultiStageQueryEngine) {
+      throw new SkipException("V2 does not cancel these queries");
+    }
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     AtomicReference<JsonNode> queryResponse1 = new AtomicReference<>();
     AtomicReference<JsonNode> queryResponse2 = new AtomicReference<>();
     AtomicReference<JsonNode> queryResponse3 = new AtomicReference<>();

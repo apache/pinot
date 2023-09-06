@@ -50,6 +50,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.junit.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -211,9 +212,13 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
         .build();
   }
 
-  @Test
-  public void testDigestOOM()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDigestOOM(boolean useMultiStageQueryEngine)
       throws Exception {
+    if (useMultiStageQueryEngine) {
+      throw new SkipException("V2 does not cancel this query");
+    }
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     JsonNode queryResponse = postQuery(OOM_QUERY);
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("\"errorCode\":"
         + QueryException.QUERY_CANCELLATION_ERROR_CODE));
@@ -221,17 +226,25 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }
 
-  @Test
-  public void testDigestOOM2()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDigestOOM2(boolean useMultiStageQueryEngine)
       throws Exception {
+    if (useMultiStageQueryEngine) {
+      throw new SkipException("V2 does not cancel this query");
+    }
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     JsonNode queryResponse = postQuery(OOM_QUERY_2);
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
   }
 
-  @Test
-  public void testDigestOOMMultipleQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDigestOOMMultipleQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    if (useMultiStageQueryEngine) {
+      throw new SkipException("V2 does not cancel these queries");
+    }
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     AtomicReference<JsonNode> queryResponse1 = new AtomicReference<>();
     AtomicReference<JsonNode> queryResponse2 = new AtomicReference<>();
     AtomicReference<JsonNode> queryResponse3 = new AtomicReference<>();
