@@ -871,7 +871,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // invalid argument
     sqlQuery = "SELECT toBase64() FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.SQL_PARSING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
     } else {
       response = postQuery(sqlQuery);
       assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
@@ -880,7 +880,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // invalid argument
     sqlQuery = "SELECT fromBase64() FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.SQL_PARSING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
     } else {
       response = postQuery(sqlQuery);
       assertTrue(response.get("exceptions").get(0).get("message").toString().startsWith("\"QueryExecutionError"));
@@ -889,7 +889,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.SQL_PARSING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
     } else {
       response = postQuery(sqlQuery);
       assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SqlCompilationException"));
@@ -898,7 +898,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
     if (useMultiStageQueryEngine) {
-      testQueryError(sqlQuery, QueryException.SQL_PARSING_ERROR_CODE);
+      testQueryError(sqlQuery, QueryException.QUERY_PLANNING_ERROR_CODE);
     } else {
       response = postQuery(sqlQuery);
       assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
@@ -2196,7 +2196,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     //test repeated columns in selection query with order by
     query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' order by ArrTime";
-    testQueryError(query, QueryException.SQL_PARSING_ERROR_CODE);
+    testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
 
     //test repeated columns in agg query
     query = "SELECT COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
@@ -2205,7 +2205,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     //test repeated columns in agg group by query
     query = "SELECT ArrTime, ArrTime, COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
         + "GROUP BY ArrTime, ArrTime";
-    testQueryError(query, QueryException.SQL_PARSING_ERROR_CODE);
+    testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -2483,7 +2483,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
 
     for (String query : queries) {
-      testQueryError(query, QueryException.SQL_PARSING_ERROR_CODE);
+      testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
     }
   }
 
@@ -2573,7 +2573,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
 
     for (String query : queries) {
-      testQueryError(query, QueryException.SQL_PARSING_ERROR_CODE);
+      testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
     }
   }
 
@@ -2603,7 +2603,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode exceptions = response.get("exceptions");
     assertFalse(exceptions.isEmpty(), "At least one exception was expected");
     JsonNode firstException = exceptions.get(0);
-    assertEquals(firstException.get("errorCode").asInt(), QueryException.SQL_PARSING_ERROR_CODE);
+    assertEquals(firstException.get("errorCode").asInt(), QueryException.QUERY_PLANNING_ERROR_CODE);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -2666,7 +2666,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // This is not supported in V2.
     query = "SELECT c_o_u_n_t(FlightNum) FROM mytable";
-    testQueryError(query, QueryException.SQL_PARSING_ERROR_CODE);
+    testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
   }
 
   @Test
