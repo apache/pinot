@@ -69,11 +69,11 @@
       <exclusions>
         <exclusion>
           <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>com.google.guava</groupId>
-          <artifactId>guava</artifactId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.webjars</groupId>
@@ -94,6 +94,18 @@
         <exclusion>
           <groupId>org.apache.yetus</groupId>
           <artifactId>audience-annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.github.luben</groupId>
+          <artifactId>zstd-jni</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>it.unimi.dsi</groupId>
+          <artifactId>fastutil</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.mindrot</groupId>
+          <artifactId>jbcrypt</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
