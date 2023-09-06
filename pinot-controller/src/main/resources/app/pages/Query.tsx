@@ -20,7 +20,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Grid, Checkbox, Button, FormControl, Input, InputLabel, Box } from '@material-ui/core';
+import { Grid, Checkbox, Button, FormControl, Input, InputLabel, Box, Typography } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
 import { SqlException, TableData } from 'Models';
@@ -558,12 +558,15 @@ const QueryPage = () => {
                   </Alert>
                 )}
 
-                {resultError && typeof resultError === "object" && resultError.length && (
+                {resultError && typeof resultError === "object" && resultError.length > 0 && (
                   <>
                     {
                       resultError.map((error) => (
                         <Box style={{paddingBottom: "16px"}}>
-                          <Alert className={classes.sqlError} severity="error">{error.message}</Alert>
+                          <Alert className={classes.sqlError} severity="error">
+                            <Typography variant="body2">Error Code: {error.errorCode}</Typography>
+                            {error.message}
+                          </Alert>
                         </Box>
                       ))
                     }
