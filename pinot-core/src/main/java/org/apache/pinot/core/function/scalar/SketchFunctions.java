@@ -32,6 +32,7 @@ import org.apache.datasketches.theta.Union;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -276,5 +277,96 @@ public class SketchFunctions {
       throw new RuntimeException("Exception occurred getting estimate from Theta Sketch, unsupported Object type: "
           + sketchObj.getClass());
     }
+  }
+
+  @ScalarFunction(names = {"intSumTupleSketchUnion", "int_sum_tuple_sketch_union"})
+  public static byte[] intSumTupleSketchUnion(Object o1, Object o2) {
+    return intSumTupleSketchUnion((int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK), o1, o2);
+  }
+
+  @ScalarFunction(names = {"intSumTupleSketchUnion", "int_sum_tuple_sketch_union"})
+  public static byte[] intSumTupleSketchUnion(int nomEntries, Object o1, Object o2) {
+    return intTupleSketchUnionVar(IntegerSummary.Mode.Sum, nomEntries, o1, o2);
+  }
+
+  @ScalarFunction(names = {"intMinTupleSketchUnion", "int_min_tuple_sketch_union"})
+  public static byte[] intMinTupleSketchUnion(Object o1, Object o2) {
+    return intMinTupleSketchUnion((int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK), o1, o2);
+  }
+
+  @ScalarFunction(names = {"intMinTupleSketchUnion", "int_min_tuple_sketch_union"})
+  public static byte[] intMinTupleSketchUnion(int nomEntries, Object o1, Object o2) {
+    return intTupleSketchUnionVar(IntegerSummary.Mode.Min, nomEntries, o1, o2);
+  }
+
+  @ScalarFunction(names = {"intMaxTupleSketchUnion", "int_max_tuple_sketch_union"})
+  public static byte[] intMaxTupleSketchUnion(Object o1, Object o2) {
+    return intMaxTupleSketchUnion((int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK), o1, o2);
+  }
+
+  @ScalarFunction(names = {"intMaxTupleSketchUnion", "int_max_tuple_sketch_union"})
+  public static byte[] intMaxTupleSketchUnion(int nomEntries, Object o1, Object o2) {
+    return intTupleSketchUnionVar(IntegerSummary.Mode.Max, nomEntries, o1, o2);
+  }
+
+  private static byte[] intTupleSketchUnionVar(IntegerSummary.Mode mode, int nomEntries, Object... sketchObjects) {
+    org.apache.datasketches.tuple.Union<IntegerSummary>
+        union = new org.apache.datasketches.tuple.Union<>(nomEntries,
+        new IntegerSummarySetOperations(mode, mode));
+    for (Object sketchObj : sketchObjects) {
+      union.union(asIntegerSketch(sketchObj));
+    }
+    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(union.getResult().compact());
+  }
+
+  @ScalarFunction(names = {"intSumTupleSketchIntersect", "int_sum_tuple_sketch_intersect"})
+  public static byte[] intSumTupleSketchIntersect(Object o1, Object o2) {
+    return intTupleSketchIntersectVar(IntegerSummary.Mode.Sum, o1, o2);
+  }
+
+  @ScalarFunction(names = {"intMinTupleSketchIntersect", "int_min_tuple_sketch_intersect"})
+  public static byte[] intMinTupleSketchIntersect(Object o1, Object o2) {
+    return intTupleSketchIntersectVar(IntegerSummary.Mode.Min, o1, o2);
+  }
+
+  @ScalarFunction(names = {"intMaxTupleSketchIntersect", "int_max_tuple_sketch_intersect"})
+  public static byte[] intMaxTupleSketchIntersect(Object o1, Object o2) {
+    return intTupleSketchIntersectVar(IntegerSummary.Mode.Max, o1, o2);
+  }
+
+  private static byte[] intTupleSketchIntersectVar(IntegerSummary.Mode mode, Object... sketchObjects) {
+    org.apache.datasketches.tuple.Intersection<IntegerSummary> intersection =
+        new org.apache.datasketches.tuple.Intersection<>(new IntegerSummarySetOperations(mode, mode));
+    for (Object sketchObj : sketchObjects) {
+      intersection.intersect(asIntegerSketch(sketchObj));
+    }
+    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(intersection.getResult().compact());
+  }
+
+  @ScalarFunction(names = {"intTupleSketchDiff", "int_tuple_sketch_diff"})
+  public static byte[] intSumTupleSketchDiff(Object o1, Object o2) {
+    org.apache.datasketches.tuple.AnotB<IntegerSummary> diff = new org.apache.datasketches.tuple.AnotB<>();
+    diff.setA(asIntegerSketch(o1));
+    diff.notB(asIntegerSketch(o2));
+    return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.serialize(diff.getResult(false).compact());
+  }
+
+  private static org.apache.datasketches.tuple.Sketch<IntegerSummary> asIntegerSketch(Object sketchObj) {
+    if (sketchObj instanceof String) {
+      byte[] decoded = Base64.getDecoder().decode((String) sketchObj);
+      return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(decoded);
+    } else if (sketchObj instanceof org.apache.datasketches.tuple.Sketch) {
+      return (org.apache.datasketches.tuple.Sketch<IntegerSummary>) sketchObj;
+    } else if (sketchObj instanceof byte[]) {
+      return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize((byte[]) sketchObj);
+    } else {
+      throw new RuntimeException("Exception occurred getting reading Tuple Sketch, unsupported Object type: "
+          + sketchObj.getClass());
+    }
+  }
+
+  @ScalarFunction(names = {"getIntTupleSketchEstimate", "get_int_tuple_sketch_estimate"})
+  public static long getIntTupleSketchEstimate(Object o1) {
+    return Math.round(asIntegerSketch(o1).getEstimate());
   }
 }
