@@ -71,6 +71,8 @@ public class TypeFactory extends JavaTypeFactoryImpl {
       // With float and double mapped to the same RelDataType, the behavior in multi-stage query engine will be the same
       // as the query in v1 query engine.
       case FLOAT:
+        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
+            : createArrayType(createSqlType(SqlTypeName.REAL), -1);
       case DOUBLE:
         return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
             : createArrayType(createSqlType(SqlTypeName.DOUBLE), -1);

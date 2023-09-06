@@ -87,6 +87,9 @@ public class TypeFactoryTest {
               new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.BIGINT), false));
           break;
         case "FLOAT_ARRAY_COL":
+          Assert.assertEquals(field.getType(),
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.REAL), false));
+          break;
         case "DOUBLE_ARRAY_COL":
           Assert.assertEquals(field.getType(),
               new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE), false));
