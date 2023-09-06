@@ -2088,7 +2088,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testCaseStatementWithLogicalTransformFunction(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     String sqlQuery = "SELECT ArrDelay" + ", CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END"
         + ", CASE WHEN ArrDelay < 50 AND ArrDelay >= 10 THEN 10 ELSE 0 END" + " FROM mytable LIMIT 1000";
     JsonNode response = postQuery(sqlQuery);
