@@ -29,16 +29,29 @@ public final class Constants {
       "customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"
   };
   static final String AVRO_FILE_SUFFIX = ".avro";
-  private static final String TPCH_TABLE_RESOURCE_FOLDER_PREFIX = "examples/batch/tpch/";
+  private static final String TPCH_TABLE_RESOURCE_FOLDER_PREFIX = "examples/batch/tpch";
   private Constants() {
   }
 
   static String getTableResourceFolder(String tableName) {
-    return TPCH_TABLE_RESOURCE_FOLDER_PREFIX + tableName;
+    return getTableResourceFolder(tableName, false);
+  }
+
+  static String getTableResourceFolder(String tableName, boolean useMultiValue) {
+    String path = TPCH_TABLE_RESOURCE_FOLDER_PREFIX;
+    if (useMultiValue) {
+      path += "MultiValue";
+    }
+
+    return path + File.separator + tableName;
   }
 
   static String getTableAvroFilePath(String tableName) {
-    return getTableResourceFolder(tableName) + File.separator
-        + "rawdata" + File.separator + tableName + AVRO_FILE_SUFFIX;
+    return getTableAvroFilePath(tableName, false);
+  }
+
+  static String getTableAvroFilePath(String tableName, boolean multiValue) {
+    String path = getTableResourceFolder(tableName, multiValue);
+    return path + File.separator + "rawdata" + File.separator + tableName + AVRO_FILE_SUFFIX;
   }
 }

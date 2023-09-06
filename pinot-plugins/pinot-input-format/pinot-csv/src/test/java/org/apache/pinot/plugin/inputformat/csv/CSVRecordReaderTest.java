@@ -21,6 +21,9 @@ package org.apache.pinot.plugin.inputformat.csv;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
@@ -215,5 +218,264 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     Assert.assertNotNull(row.getValue("col1"));
     Assert.assertNull(row.getValue("col2"));
     Assert.assertNull(row.getValue("col3"));
+  }
+
+  @Test
+  public void testReadingDataFileWithCommentedLines()
+      throws IOException, URISyntaxException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithCommentedLines.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    readerConfig.setCommentMarker('#');
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+  }
+
+  @Test
+  public void testReadingDataFileWithEmptyLines()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithEmptyLines.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(5, genericRows.size());
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(5, genericRows.size());
+  }
+
+  @Test
+  public void testReadingDataFileWithEscapedQuotes()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithEscapedQuotes.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(2, genericRows.size());
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(2, genericRows.size());
+  }
+
+  @Test
+  public void testReadingDataFileWithNoHeader()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithNoHeader.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    readerConfig.setHeader("id,name");
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+  }
+
+  @Test
+  public void testReadingDataFileWithQuotedHeaders()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithQuotedHeaders.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(2, genericRows.size());
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(2, genericRows.size());
+  }
+
+  @Test
+  public void testLineIteratorReadingDataFileWithUnparseableLines()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithUnparseableLines.csv").toURI();
+    File dataFile = new File(uri);
+
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(1, genericRows.size());
+  }
+
+  @Test (expectedExceptions = RuntimeException.class)
+  public void testDefaultCsvReaderExceptionReadingDataFileWithUnparseableLines()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithUnparseableLines.csv").toURI();
+    File dataFile = new File(uri);
+
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readCSVRecords(dataFile, readerConfig, false);
+  }
+
+  @Test
+  public void testLineIteratorReadingDataFileWithMultipleCombinations()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithMultipleCombinations.csv").toURI();
+    File dataFile = new File(uri);
+
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    readerConfig.setCommentMarker('#');
+    readerConfig.setIgnoreEmptyLines(true);
+
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(7, genericRows.size());
+  }
+
+  @Test
+  public void testDefaultCsvReaderReadingDataFileWithMultipleCombinations()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithMultipleCombinationsParseable.csv").toURI();
+    File dataFile = new File(uri);
+
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setCommentMarker('#');
+    readerConfig.setIgnoreEmptyLines(true);
+
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(7, genericRows.size());
+  }
+
+  @Test
+  public void testLineIteratorRewindMethod()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithMultipleCombinations.csv").toURI();
+    File dataFile = new File(uri);
+
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    readerConfig.setCommentMarker('#');
+    readerConfig.setIgnoreEmptyLines(true);
+    readCSVRecords(dataFile, readerConfig, true);
+
+    // Start reading again; results should be same
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(7, genericRows.size());
+  }
+
+  @Test
+  public void testDefaultCsvReaderRewindMethod()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithMultipleCombinationsParseable.csv").toURI();
+    File dataFile = new File(uri);
+
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setCommentMarker('#');
+    readerConfig.setIgnoreEmptyLines(true);
+    readCSVRecords(dataFile, readerConfig, true);
+
+    // Start reading again; results should be same
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(7, genericRows.size());
+  }
+
+  @Test
+  public void testReadingDataFileWithInvalidHeader()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithInvalidHeader.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setHeader("firstName,lastName,id");
+    readerConfig.setSkipHeader(true);
+    readerConfig.setSkipUnParseableLines(true);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+  }
+
+  @Test
+  public void testReadingDataFileWithAlternateDelimiter()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithAlternateDelimiter.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setDelimiter('|');
+    readerConfig.setSkipUnParseableLines(true);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+  }
+
+  @Test
+  public void testRewindMethodAndSkipHeader()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithInvalidHeader.csv").toURI();
+    File dataFile = new File(uri);
+
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    readerConfig.setHeader("id,name");
+    readerConfig.setSkipHeader(true);
+    readCSVRecords(dataFile, readerConfig, true);
+
+    // Start reading again; results should be same
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    readCSVRecords(dataFile, readerConfig, true);
+
+    // Start reading again; results should be same
+    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+  }
+
+  private List<GenericRow> readCSVRecords(File dataFile, CSVRecordReaderConfig readerConfig, boolean rewind)
+      throws IOException {
+    List<GenericRow> genericRows = new ArrayList<>();
+
+    try (CSVRecordReader recordReader = new CSVRecordReader()) {
+      recordReader.init(dataFile, null, readerConfig);
+      while (recordReader.hasNext()) {
+        GenericRow genericRow = recordReader.next();
+        genericRows.add(genericRow);
+      }
+
+      if (rewind) {
+        // rewind the reader after reading all the lines
+        recordReader.rewind();
+      }
+    }
+    return genericRows;
   }
 }
