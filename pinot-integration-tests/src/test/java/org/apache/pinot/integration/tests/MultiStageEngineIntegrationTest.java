@@ -27,7 +27,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
@@ -479,7 +481,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SQLParsingError"));
+    int expectedStatusCode = useMultiStageQueryEngine() ? QueryException.QUERY_PLANNING_ERROR_CODE
+        : QueryException.SQL_PARSING_ERROR_CODE;
+    Assert.assertEquals(response.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
 
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
@@ -726,6 +730,22 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void systemColumnsCanBeUsedInWhere(String systemColumn)
       throws Exception {
     JsonNode jsonNode = postQuery("select 1 from mytable where " + systemColumn + " is not null limit 0");
+    assertNoError(jsonNode);
+  }
+
+  @Test
+  public void testSearch()
+      throws Exception {
+    String sqlQuery = "SELECT CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END "
+        + "FROM mytable LIMIT 1000";
+    JsonNode jsonNode = postQuery("Explain plan for " + sqlQuery);
+    JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
+
+    Pattern pattern = Pattern.compile("SEARCH\\(\\$7, Sarg\\[\\(-∞\\.\\.10\\), \\(50\\.\\.\\+∞\\)]\\)");
+    boolean matches = pattern.matcher(plan.asText()).find();
+    Assert.assertTrue(matches, "Plan doesn't contain the expected SEARCH");
+
+    jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
   }
 
