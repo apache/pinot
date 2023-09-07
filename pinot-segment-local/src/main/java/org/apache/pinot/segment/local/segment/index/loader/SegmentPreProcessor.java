@@ -134,18 +134,8 @@ public class SegmentPreProcessor implements AutoCloseable {
       for (IndexHandler handler : indexHandlers) {
         handler.postUpdateIndicesCleanup(segmentWriter);
       }
-      segmentWriter.save();
-    }
-
-    // Startree creation will load the segment again, so we need to close and re-open the segment writer to make sure
-    // that the other required indices (e.g. forward index) are up-to-date.
-    try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
-      // Create/modify/remove star-trees if required.
-      processStarTrees(indexDir);
-      _segmentDirectory.reloadMetadata();
 
       // Add min/max value to column metadata according to the prune mode.
-      // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
       ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
           _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
       if (columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
@@ -156,6 +146,15 @@ public class SegmentPreProcessor implements AutoCloseable {
         // _segmentMetadata = new SegmentMetadataImpl(indexDir);
       }
 
+      segmentWriter.save();
+    }
+
+    // Startree creation will load the segment again, so we need to close and re-open the segment writer to make sure
+    // that the other required indices (e.g. forward index) are up-to-date.
+    try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
+      // Create/modify/remove star-trees if required.
+      processStarTrees(indexDir);
+      _segmentDirectory.reloadMetadata();
       segmentWriter.save();
     }
   }
