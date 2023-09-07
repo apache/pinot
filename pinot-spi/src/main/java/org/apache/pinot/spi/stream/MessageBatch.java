@@ -83,9 +83,7 @@ public interface MessageBatch<T> {
    * Returns the metadata associated with the message at a particular index. This typically includes the timestamp
    * when the message was ingested by the upstream stream-provider and other relevant metadata.
    */
-  default RowMetadata getMetadataAtIndex(int index) {
-    return null;
-  }
+  RowMetadata getMetadataAtIndex(int index);
 
   /**
    * Returns the offset of the next message.
