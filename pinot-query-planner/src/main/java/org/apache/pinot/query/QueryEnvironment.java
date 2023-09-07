@@ -43,6 +43,7 @@ import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rex.PinotRexBuilder;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
@@ -322,7 +323,7 @@ public class QueryEnvironment {
 
   private RelRoot toRelation(SqlNode parsed, PlannerContext plannerContext) {
     // 3. convert sqlNode to relNode.
-    RexBuilder rexBuilder = new RexBuilder(_typeFactory);
+    RexBuilder rexBuilder = new PinotRexBuilder(_typeFactory);
     RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
     SqlToRelConverter sqlToRelConverter =
         new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
