@@ -115,7 +115,6 @@ public class SegmentPreProcessor implements AutoCloseable {
       forwardHandler.updateIndices(segmentWriter);
 
       // Now that ForwardIndexHandler.updateIndices has been updated, we can run all other indexes in any order
-
       _segmentMetadata = new SegmentMetadataImpl(indexDir);
       _segmentDirectory.reloadMetadata();
 
@@ -131,13 +130,19 @@ public class SegmentPreProcessor implements AutoCloseable {
         }
       }
 
-      // Create/modify/remove star-trees if required.
-      processStarTrees(indexDir);
-
-      // Perform post-cleanup operations on the index handlers. This should be called after processing the startrees
+      // Perform post-cleanup operations on the index handlers.
       for (IndexHandler handler : indexHandlers) {
         handler.postUpdateIndicesCleanup(segmentWriter);
       }
+      segmentWriter.save();
+    }
+
+    // Startree creation will load the segment again, so we need to close and re-open the segment writer to make sure
+    // that the other required indices (e.g. forward index) are up-to-date.
+    try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
+      // Create/modify/remove star-trees if required.
+      processStarTrees(indexDir);
+      _segmentDirectory.reloadMetadata();
 
       // Add min/max value to column metadata according to the prune mode.
       // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
