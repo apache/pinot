@@ -114,7 +114,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
 
   @Test
   public void testInvalidDelimiterInHeader() {
-    //setup
+    // setup
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     csvRecordReaderConfig.setHeader("col1;col2;col3;col4;col5;col6;col7;col8;col9;col10");
@@ -436,6 +436,48 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
   }
 
   @Test
+  public void testReadingDataFileWithSpaceAroundHeaderFields()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithSpaceAroundHeaders.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    readerConfig.setIgnoreSurroundingSpaces(true);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+    validateSpaceAroundHeadersAreTrimmed(dataFile, readerConfig);
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+    validateSpaceAroundHeadersAreTrimmed(dataFile, readerConfig);
+  }
+
+  @Test
+  public void testReadingDataFileWithSpaceAroundHeaderAreRetained()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithSpaceAroundHeaders.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    readerConfig.setIgnoreSurroundingSpaces(false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+    validateSpaceAroundHeadersAreRetained(dataFile, readerConfig);
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(3, genericRows.size());
+    validateSpaceAroundHeadersAreRetained(dataFile, readerConfig);
+  }
+
+  @Test
   public void testRewindMethodAndSkipHeader()
       throws URISyntaxException, IOException {
     URI uri = ClassLoader.getSystemResource("dataFileWithInvalidHeader.csv").toURI();
@@ -460,6 +502,36 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     Assert.assertEquals(3, genericRows.size());
   }
 
+  @Test
+  public void testReadingDataFileWithPartialLastRow()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithPartialLastRow.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(2, genericRows.size());
+
+    // Note: The default CSVRecordReader cannot handle unparseable rows
+  }
+
+  @Test
+  public void testReadingDataFileWithNoRecords()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithNoRecords.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    Assert.assertEquals(0, genericRows.size());
+
+    // Note: The default CSVRecordReader cannot handle unparseable rows
+  }
+
   private List<GenericRow> readCSVRecords(File dataFile, CSVRecordReaderConfig readerConfig, boolean rewind)
       throws IOException {
     List<GenericRow> genericRows = new ArrayList<>();
@@ -477,5 +549,33 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
       }
     }
     return genericRows;
+  }
+
+  private void validateSpaceAroundHeadersAreTrimmed(File dataFile, CSVRecordReaderConfig readerConfig)
+      throws IOException {
+    try (CSVRecordReader recordReader = new CSVRecordReader()) {
+      recordReader.init(dataFile, null, readerConfig);
+      Map<String, Integer> headerMap = recordReader.getCSVHeaderMap();
+      Assert.assertEquals(3, headerMap.size());
+      List<String> headers = List.of("firstName", "lastName", "id");
+      for (String header : headers) {
+        // surrounding spaces in headers are trimmed
+        Assert.assertTrue(headerMap.containsKey(header));
+      }
+    }
+  }
+
+  private void validateSpaceAroundHeadersAreRetained(File dataFile, CSVRecordReaderConfig readerConfig)
+      throws IOException {
+    try (CSVRecordReader recordReader = new CSVRecordReader()) {
+      recordReader.init(dataFile, null, readerConfig);
+      Map<String, Integer> headerMap = recordReader.getCSVHeaderMap();
+      Assert.assertEquals(3, headerMap.size());
+      List<String> headers = List.of(" firstName ", " lastName ", " id");
+      for (String header : headers) {
+        // surrounding spaces in headers are trimmed
+        Assert.assertTrue(headerMap.containsKey(header));
+      }
+    }
   }
 }

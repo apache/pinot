@@ -36,7 +36,7 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.csv.QuoteMode;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -58,14 +58,15 @@ public class CSVRecordReader implements RecordReader {
   private Iterator<CSVRecord> _iterator;
   private CSVRecordExtractor _recordExtractor;
   private Map<String, Integer> _headerMap = new HashMap<>();
+  private boolean _isHeaderProvided = false;
 
   // line iterator specific variables
   private boolean _useLineIterator = false;
   private boolean _skipHeaderRecord = false;
-  private boolean _isHeaderProvided = false;
   private long _skippedLinesCount;
   private BufferedReader _bufferedReader;
   private String _nextLine;
+  private GenericRow _nextRecord;
 
   public CSVRecordReader() {
   }
@@ -77,7 +78,7 @@ public class CSVRecordReader implements RecordReader {
     CSVRecordReaderConfig config = (CSVRecordReaderConfig) recordReaderConfig;
     Character multiValueDelimiter = null;
     if (config == null) {
-      _format = CSVFormat.DEFAULT.withDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).withHeader();
+      _format = CSVFormat.DEFAULT.builder().setDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).setHeader().build();
       multiValueDelimiter = CSVRecordReaderConfig.DEFAULT_MULTI_VALUE_DELIMITER;
     } else {
       CSVFormat format;
@@ -104,50 +105,45 @@ public class CSVRecordReader implements RecordReader {
         }
       }
       char delimiter = config.getDelimiter();
-      format = format.withDelimiter(delimiter);
+      format = format.builder().setDelimiter(delimiter).build();
 
       if (config.isSkipUnParseableLines()) {
         _useLineIterator = true;
       }
 
-      String csvHeader = config.getHeader();
-      if (csvHeader == null) {
-        format = format.withHeader();
-      } else {
-        // do not validate header if using the line iterator
-        if (_useLineIterator) {
-          String[] header = StringUtils.split(csvHeader, delimiter);
-          setHeaderMap(header);
-          format = format.withHeader(header);
-          _isHeaderProvided = true;
-        } else {
-          // validate header for the delimiter before splitting
-          validateHeaderForDelimiter(delimiter, csvHeader, format);
-          format = format.withHeader(StringUtils.split(csvHeader, delimiter));
-        }
-      }
-      format = format.withSkipHeaderRecord(config.isSkipHeader());
+      _isHeaderProvided = config.getHeader() != null;
       _skipHeaderRecord = config.isSkipHeader();
-      format = format.withCommentMarker(config.getCommentMarker());
-      format = format.withEscape(config.getEscapeCharacter());
-      format = format.withIgnoreEmptyLines(config.isIgnoreEmptyLines());
-      format = format.withIgnoreSurroundingSpaces(config.isIgnoreSurroundingSpaces());
-      format = format.withQuote(config.getQuoteCharacter());
+      _format = format.builder()
+          .setHeader()
+          .setSkipHeaderRecord(config.isSkipHeader())
+          .setCommentMarker(config.getCommentMarker())
+          .setEscape(config.getEscapeCharacter())
+          .setIgnoreEmptyLines(config.isIgnoreEmptyLines())
+          .setIgnoreSurroundingSpaces(config.isIgnoreSurroundingSpaces())
+          .setQuote(config.getQuoteCharacter())
+          .build();
 
       if (config.getQuoteMode() != null) {
-        format = format.withQuoteMode(QuoteMode.valueOf(config.getQuoteMode()));
+        _format = _format.builder().setQuoteMode(QuoteMode.valueOf(config.getQuoteMode())).build();
       }
 
       if (config.getRecordSeparator() != null) {
-        format = format.withRecordSeparator(config.getRecordSeparator());
+        _format = _format.builder().setRecordSeparator(config.getRecordSeparator()).build();
       }
 
       String nullString = config.getNullStringValue();
       if (nullString != null) {
-        format = format.withNullString(nullString);
+        _format = _format.builder().setNullString(nullString).build();
       }
 
-      _format = format;
+      if (_isHeaderProvided) {
+        if (!_useLineIterator) {
+          validateHeaderForDelimiter(delimiter, config.getHeader(), _format);
+        }
+        _headerMap = parseLineAsHeader(config.getHeader());
+        _format = _format.builder().setHeader(_headerMap.keySet().toArray(new String[0])).build();
+      }
+
       if (config.isMultiValueDelimiterEnabled()) {
         multiValueDelimiter = config.getMultiValueDelimiter();
       }
@@ -210,7 +206,7 @@ public class CSVRecordReader implements RecordReader {
       // When line iterator is used, the call to this method won't throw an exception. The default and the only iterator
       // from commons-csv library can throw an exception upon calling the hasNext() method. The line iterator overcomes
       // this limitation.
-      return _nextLine != null;
+      return readNextRecord();
     }
     return _iterator.hasNext();
   }
@@ -218,14 +214,19 @@ public class CSVRecordReader implements RecordReader {
   @Override
   public GenericRow next()
       throws IOException {
-    return next(new GenericRow());
+    if (_useLineIterator) {
+      return _nextRecord;
+    } else {
+      return next(new GenericRow());
+    }
   }
 
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
     if (_useLineIterator) {
-      readNextLine(reuse);
+      throw new UnsupportedOperationException("Method signature 'next(GenericRow genericRow)'not supported while using "
+          + "the config option 'skipUnParseableLines'.");
     } else {
       CSVRecord record = _iterator.next();
       _recordExtractor.extract(record, reuse);
@@ -259,6 +260,18 @@ public class CSVRecordReader implements RecordReader {
     }
   }
 
+  private boolean readNextRecord() {
+    try {
+      _nextRecord = null;
+      GenericRow genericRow = new GenericRow();
+      readNextLine(genericRow);
+      _nextRecord = genericRow;
+    } catch (Exception e) {
+      LOGGER.info("Error parsing next record.", e);
+    }
+    return _nextRecord != null;
+  }
+
   private void readNextLine(GenericRow reuse)
       throws IOException {
     while (_nextLine != null) {
@@ -290,11 +303,15 @@ public class CSVRecordReader implements RecordReader {
     }
   }
 
-  private void setHeaderMap(String[] header) {
-    int columnPos = 0;
-    for (String columnName : header) {
-      _headerMap.put(columnName, columnPos++);
+  private Map<String, Integer> parseLineAsHeader(String line)
+      throws IOException {
+    Map<String, Integer> headerMap;
+    try (StringReader stringReader = new StringReader(line)) {
+      try (CSVParser parser = _format.parse(stringReader)) {
+        headerMap = parser.getHeaderMap();
+      }
     }
+    return headerMap;
   }
 
   private void initLineIteratorResources()
@@ -307,17 +324,15 @@ public class CSVRecordReader implements RecordReader {
         // When skip header config is set and header is supplied – skip the first line from the input file
         _bufferedReader.readLine();
         // turn off the property so that it doesn't interfere with further parsing
-        _format = _format.withSkipHeaderRecord(false);
+        _format = _format.builder().setSkipHeaderRecord(false).build();
       }
-      _nextLine = _bufferedReader.readLine();
     } else {
-      // Read the first line and set the header
+      // read the first line
       String headerLine = _bufferedReader.readLine();
-      String[] header = StringUtils.split(headerLine, _format.getDelimiter());
-      setHeaderMap(header);
-      _format = _format.withHeader(header);
-      _nextLine = _bufferedReader.readLine();
+      _headerMap = parseLineAsHeader(headerLine);
+      _format = _format.builder().setHeader(_headerMap.keySet().toArray(new String[0])).build();
     }
+    _nextLine = _bufferedReader.readLine();
   }
 
   private void resetLineIteratorResources()
