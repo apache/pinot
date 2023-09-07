@@ -156,7 +156,8 @@ public final class TableConfigUtils {
         } catch (Exception e) {
           throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
         }
-        validateDecoder(streamConfig);
+        validateDecoder(streamConfig.getStreamConfigsMap().getOrDefault(StreamConfigProperties.STREAM_TYPE,
+            "kafka"), streamConfig);
       }
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
@@ -515,14 +516,18 @@ public final class TableConfigUtils {
   }
 
   @VisibleForTesting
-  static void validateDecoder(StreamConfig streamConfig) {
+  static void validateDecoder(String streamType, StreamConfig streamConfig) {
     if (streamConfig.getDecoderClass().equals("org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder")) {
+      String descriptorFileKey = String.format("stream.%s.decoder.prop.descriptorFile", streamType);
       // check the existence of the needed decoder props
-      if (!streamConfig.getDecoderProperties().containsKey("stream.kafka.decoder.prop.descriptorFile")) {
-        throw new IllegalStateException("Missing property of descriptorFile for ProtoBufMessageDecoder");
+      if (!streamConfig.getDecoderProperties().containsKey(descriptorFileKey)) {
+        throw new IllegalStateException("Missing property of descriptorFile for ProtoBufMessageDecoder: "
+            + descriptorFileKey);
       }
-      if (!streamConfig.getDecoderProperties().containsKey("stream.kafka.decoder.prop.protoClassName")) {
-        throw new IllegalStateException("Missing property of protoClassName for ProtoBufMessageDecoder");
+      String protoClassName = String.format("stream.%s.decoder.prop.protoClassName", streamType);
+      if (!streamConfig.getDecoderProperties().containsKey(protoClassName)) {
+        throw new IllegalStateException("Missing property of protoClassName for ProtoBufMessageDecoder: "
+            + protoClassName);
       }
     }
   }

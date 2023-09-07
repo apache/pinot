@@ -622,14 +622,14 @@ public class TableConfigUtilsTest {
         "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
     streamConfigs.put("stream.kafka.decoder.prop.descriptorFile", "file://test");
     try {
-      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+      TableConfigUtils.validateDecoder("kafka", new StreamConfig("test", streamConfigs));
     } catch (IllegalStateException e) {
       // expected
     }
     streamConfigs.remove("stream.kafka.decoder.prop.descriptorFile");
     streamConfigs.put("stream.kafka.decoder.prop.protoClassName", "test");
     try {
-      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+      TableConfigUtils.validateDecoder("kafka", new StreamConfig("test", streamConfigs));
     } catch (IllegalStateException e) {
       // expected
     }
