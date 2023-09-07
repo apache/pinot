@@ -22,7 +22,6 @@ import java.util.List;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.RowMetadata;
-import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
