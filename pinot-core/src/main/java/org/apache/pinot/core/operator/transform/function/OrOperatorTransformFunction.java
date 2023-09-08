@@ -46,8 +46,12 @@ public class OrOperatorTransformFunction extends LogicalOperatorTransformFunctio
     return 1;
   }
 
+  private boolean isTrue(int i) {
+    return i != 0;
+  }
+
   @Override
   boolean valueSupersedesNull(int i) {
-    return i != 0;
+    return isTrue(i);
   }
 }
