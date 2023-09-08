@@ -18,10 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import javax.annotation.Nullable;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.blocks.ValueBlock;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -49,40 +46,8 @@ public class OrOperatorTransformFunction extends LogicalOperatorTransformFunctio
     return 1;
   }
 
-  @Nullable
   @Override
-  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    int numDocs = valueBlock.getNumDocs();
-    int numArguments = _arguments.size();
-    int[][] intValuesSVs = new int[numArguments][];
-    RoaringBitmap[] nullBitmaps = new RoaringBitmap[numArguments];
-    RoaringBitmap nullBitmap = new RoaringBitmap();
-    for (int i = 0; i < numArguments; i++) {
-      intValuesSVs[i] = _arguments.get(i).transformToIntValuesSV(valueBlock);
-      nullBitmaps[i] = _arguments.get(i).getNullBitmap(valueBlock);
-    }
-    for (int docId = 0; docId < numDocs; docId++) {
-      boolean isTrue = false;
-      for (int i = 0; i < numArguments; i++) {
-        if ((nullBitmaps[i] == null || !nullBitmaps[i].contains(docId)) && isTrue(intValuesSVs[i][docId])) {
-          isTrue = true;
-          break;
-        }
-      }
-      if (isTrue) {
-        continue;
-      }
-      for (int i = 0; i < numArguments; i++) {
-        if (nullBitmaps[i] != null && nullBitmaps[i].contains(docId)) {
-          nullBitmap.add(docId);
-          break;
-        }
-      }
-    }
-    return nullBitmap.isEmpty() ? null : nullBitmap;
-  }
-
-  private static boolean isTrue(int i) {
+  boolean valueSupersedesNull(int i) {
     return i != 0;
   }
 }
