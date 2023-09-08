@@ -292,8 +292,9 @@ public class ZKOperatorTest {
     assertEquals(segmentZKMetadata.getCreationTime(), 456L);
     long refreshTime = segmentZKMetadata.getRefreshTime();
     assertTrue(refreshTime > 0);
-    // DownloadURL and crypter should not unchanged
-    assertEquals(segmentZKMetadata.getDownloadUrl(), "downloadUrl");
+    // Download URL should change. Refer: https://github.com/apache/pinot/issues/11535
+    assertEquals(segmentZKMetadata.getDownloadUrl(), "otherDownloadUrl");
+    // crypter should not be changed
     assertEquals(segmentZKMetadata.getCrypterName(), "crypter");
     assertEquals(segmentZKMetadata.getSegmentUploadStartTime(), -1);
     assertEquals(segmentZKMetadata.getSizeInBytes(), 10);
