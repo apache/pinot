@@ -29,7 +29,8 @@ public class PinotRexBuilder extends RexBuilder {
   }
 
   /**
-   * An extension of the standard method that does not cast {@link SqlTypeName} float/real to double.
+   * Ensures expression is interpreted as a specified type. This is an extension of the standard method, this method
+   * does not cast expression if its {@link SqlTypeName} is float/real and the desired type is double.
    *
    * This makes queries like `select count(*) from table where aFloatColumn = 0.05` works correctly in multi-stage query
    * engine.
@@ -39,18 +40,25 @@ public class PinotRexBuilder extends RexBuilder {
    *
    * With this change, the behavior in multi-stage query engine will be the same as the query in v1 query engine.
    *
-   * @param type The {@link RelDataType} to cast to
-   * @param exp The {@link RexNode} to cast
-   * @return A new {@link RexNode} that casts the given expression to the given type
+   * @param type             desired type
+   * @param node             expression
+   * @param matchNullability whether to correct nullability of specified
+   *                         type to match the expression; this usually should
+   *                         be true, except for explicit casts which can
+   *                         override default nullability
+   * @return a casted expression or the original expression
    */
   @Override
-  public RexNode makeAbstractCast(RelDataType type, RexNode exp) {
+  public RexNode ensureType(
+      RelDataType type,
+      RexNode node,
+      boolean matchNullability) {
     SqlTypeName typeToCastTo = type.getSqlTypeName();
-    SqlTypeName typeToCastFrom = exp.getType().getSqlTypeName();
+    SqlTypeName typeToCastFrom = node.getType().getSqlTypeName();
     if (typeToCastTo == SqlTypeName.DOUBLE
         && (typeToCastFrom == SqlTypeName.REAL || typeToCastFrom == SqlTypeName.FLOAT)) {
-      return exp;
+      return node;
     }
-    return super.makeAbstractCast(type, exp);
+    return super.ensureType(type, node, matchNullability);
   }
 }
