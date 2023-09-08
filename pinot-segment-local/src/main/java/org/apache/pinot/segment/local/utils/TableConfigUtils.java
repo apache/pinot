@@ -517,9 +517,8 @@ public final class TableConfigUtils {
   @VisibleForTesting
   static void validateDecoder(StreamConfig streamConfig) {
     if (streamConfig.getDecoderClass().equals("org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder")) {
-      String streamType = streamConfig.getType();
-      String descriptorFilePath = String.format("stream.%s.decoder.prop.descriptorFile", streamType);
-      String protoClassName = String.format("stream.%s.decoder.prop.protoClassName", streamType);
+      String descriptorFilePath = "descriptorFile";
+      String protoClassName = "protoClassName";
       // check the existence of the needed decoder props
       if (!streamConfig.getDecoderProperties().containsKey(descriptorFilePath)) {
         throw new IllegalStateException("Missing property of descriptorFile for ProtoBufMessageDecoder");
