@@ -114,6 +114,40 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     _rows.add(row);
   }
 
+  @DataProvider(name = "BooleanAssertionFunctions")
+  public static Object[][] getBooleanAssertionFunctionsParameters() {
+    return new Object[][]{
+        {"istrue", true, true},
+        {"istrue", false, false},
+        {"istrue", null, false},
+        {"isnottrue", true, false},
+        {"isnottrue", false, true},
+        {"isnottrue", null, true},
+        {"isfalse", true, false},
+        {"isfalse", false, true},
+        {"isfalse", null, false},
+        {"isnotfalse", true, true},
+        {"isnotfalse", false, false},
+        {"isnotfalse", null, true}
+    };
+  }
+
+  @Test(dataProvider = "BooleanAssertionFunctions")
+  public void testBooleanAssertionFunctions(String function, Boolean data, Boolean queryResult)
+      throws Exception {
+    initializeRows();
+    insertRow(data);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT %s(%s) FROM testTable LIMIT 1", function, COLUMN1);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    assertEquals(resultTable.getRows().get(0)[0], queryResult);
+  }
+
   @Test
   public void testGroupByOrderByNullsLastUsingOrdinal()
       throws Exception {

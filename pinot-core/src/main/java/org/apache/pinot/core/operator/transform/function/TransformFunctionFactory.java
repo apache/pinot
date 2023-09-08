@@ -203,6 +203,10 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.GREATEST, GreatestTransformFunction.class);
 
     // null handling
+    typeToImplementation.put(TransformFunctionType.IS_TRUE, IsTrueTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_NOT_TRUE, IsNotTrueTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_FALSE, IsFalseTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IS_NOT_FALSE, IsNotFalseTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IS_NULL, IsNullTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.IS_NOT_NULL, IsNotNullTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.COALESCE, CoalesceTransformFunction.class);

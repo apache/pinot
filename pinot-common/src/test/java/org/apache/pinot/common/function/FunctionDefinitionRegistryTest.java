@@ -44,7 +44,7 @@ public class FunctionDefinitionRegistryTest {
       // functions we are not supporting post transform anyway
       "valuein", "mapvalue", "inidset", "lookup", "groovy", "scalar", "geotoh3", "not_in", "timeconvert",
       // functions not needed for register b/c they are in std sql table or they will not be composed directly.
-      "in", "and", "or", "range", "extract"
+      "in", "and", "or", "range", "extract", "is_true", "is_not_true", "is_false", "is_not_false"
   );
 
   @Test
