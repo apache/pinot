@@ -36,7 +36,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT timestampDiff(DAY, CAST(ts as TIMESTAMP), CAST(dateTrunc('MONTH', FROMDATETIME('1997-02-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')) as TIMESTAMP)) FROM d",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($6):TIMESTAMP(0) NOT NULL, CAST(854755200000:BIGINT):TIMESTAMP(0))])",
+          "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($7):TIMESTAMP(0) NOT NULL, CAST(854755200000:BIGINT):TIMESTAMP(0))])",
           "\n  LogicalTableScan(table=[[d]])",
           "\n"
         ]
@@ -46,7 +46,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM d WHERE CAST(ts AS TIMESTAMP) = FROMDATETIME('2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')",
         "output": [
           "Execution Plan",
-          "\nLogicalFilter(condition=[=(CAST($6):TIMESTAMP(0) NOT NULL, 2019-01-01 00:00:00)])",
+          "\nLogicalFilter(condition=[=(CAST($7):TIMESTAMP(0) NOT NULL, 2019-01-01 00:00:00)])",
           "\n  LogicalTableScan(table=[[d]])",
           "\n"
         ]
@@ -66,7 +66,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a WHERE  dateTrunc('MONTH', ts) =  dateTrunc('MONTH', FROMDATETIME('2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss'))",
         "output": [
           "Execution Plan",
-          "\nLogicalFilter(condition=[=(DATETRUNC('MONTH', $6), 1546300800000)])",
+          "\nLogicalFilter(condition=[=(DATETRUNC('MONTH', $7), 1546300800000)])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]

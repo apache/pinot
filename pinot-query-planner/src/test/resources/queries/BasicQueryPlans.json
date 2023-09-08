@@ -39,7 +39,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col3 + a.ts FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], EXPR$1=[+($2, $6)])",
+          "\nLogicalProject(col1=[$0], EXPR$1=[+($2, $7)])",
           "\n  LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n    LogicalTableScan(table=[[a]])",
           "\n"
@@ -50,7 +50,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col3 + a.ts AS colsum FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], colsum=[+($2, $6)])",
+          "\nLogicalProject(col1=[$0], colsum=[+($2, $7)])",
           "\n  LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
           "\n    LogicalTableScan(table=[[a]])",
           "\n"
@@ -64,7 +64,7 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(EXPR$0=[DATETRUNC('DAY', $6)])",
+          "\n      LogicalProject(EXPR$0=[DATETRUNC('DAY', $7)])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -77,7 +77,7 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(day=[DATETRUNC('DAY', $6)])",
+          "\n      LogicalProject(day=[DATETRUNC('DAY', $7)])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -105,7 +105,7 @@
           "\n  LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
-          "\n        LogicalProject(EXPR$1=[ARRAYTOMV($6)], col3=[$2])",
+          "\n        LogicalProject(EXPR$1=[ARRAYTOMV($7)], col3=[$2])",
           "\n          LogicalTableScan(table=[[e]])",
           "\n"
         ]
