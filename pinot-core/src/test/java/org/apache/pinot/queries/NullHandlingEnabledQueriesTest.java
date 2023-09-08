@@ -1556,6 +1556,22 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   }
 
   @Test
+  public void testNullAndNullReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT AND(%s, %s) FROM testTable LIMIT 1", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], null);
+  }
+
+  @Test
   public void testTrueOrNullReturnsTrue()
       throws Exception {
     initializeRows();
@@ -1576,6 +1592,22 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
       throws Exception {
     initializeRows();
     insertRowWithTwoColumns(false, null);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(COLUMN2, FieldSpec.DataType.BOOLEAN).build();
+    setUpSegments(tableConfig, schema);
+    String query = String.format("SELECT OR(%s, %s) FROM testTable LIMIT 1", COLUMN1, COLUMN2);
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
+
+    assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], null);
+  }
+
+  @Test
+  public void testNullOrNullReturnsNull()
+      throws Exception {
+    initializeRows();
+    insertRowWithTwoColumns(null, null);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(COLUMN1, FieldSpec.DataType.BOOLEAN)
         .addSingleValueDimension(COLUMN2, FieldSpec.DataType.BOOLEAN).build();
