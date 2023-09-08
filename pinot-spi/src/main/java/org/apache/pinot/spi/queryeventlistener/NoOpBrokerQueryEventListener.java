@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.spi.queryeventlistener;
 
-
 public class NoOpBrokerQueryEventListener implements BrokerQueryEventListener {
 
-    @Override
-    public void onQueryCompletion(BrokerQueryEventInfo brokerQueryEventInfo) {
-        // Not implemented method
-    }
+  @Override
+  public void onQueryCompletion(BrokerQueryEventInfo brokerQueryEventInfo) {
+    // Not implemented method
+  }
 }
