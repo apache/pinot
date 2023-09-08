@@ -28,7 +28,7 @@ public class IsNotFalseTransformFunction extends BooleanAssertionTransformFuncti
 
   @Override
   public String getName() {
-    return TransformFunctionType.IS_TRUE.getName();
+    return TransformFunctionType.IS_NOT_TRUE.getName();
   }
 
   @Override
