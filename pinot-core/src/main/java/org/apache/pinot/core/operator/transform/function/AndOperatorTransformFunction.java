@@ -54,7 +54,7 @@ public class AndOperatorTransformFunction extends LogicalOperatorTransformFuncti
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     int numArguments = _arguments.size();
-    int[][] intValuesSVs = new int[numArguments][numDocs];
+    int[][] intValuesSVs = new int[numArguments][];
     RoaringBitmap[] nullBitmaps = new RoaringBitmap[numArguments];
     RoaringBitmap nullBitmap = new RoaringBitmap();
     for (int i = 0; i < numArguments; i++) {
