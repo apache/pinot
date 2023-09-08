@@ -64,7 +64,7 @@ public class OrOperatorTransformFunction extends LogicalOperatorTransformFunctio
     for (int docId = 0; docId < numDocs; docId++) {
       boolean isTrue = false;
       for (int i = 0; i < numArguments; i++) {
-        if ((nullBitmaps[i] == null || !nullBitmaps[i].contains(docId)) && intValuesSVs[i][docId] != 0) {
+        if ((nullBitmaps[i] == null || !nullBitmaps[i].contains(docId)) && isTrue(intValuesSVs[i][docId])) {
           isTrue = true;
           break;
         }
@@ -80,5 +80,9 @@ public class OrOperatorTransformFunction extends LogicalOperatorTransformFunctio
       }
     }
     return nullBitmap.isEmpty() ? null : nullBitmap;
+  }
+
+  private static boolean isTrue(int i) {
+    return i != 0;
   }
 }

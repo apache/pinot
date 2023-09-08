@@ -64,7 +64,7 @@ public class AndOperatorTransformFunction extends LogicalOperatorTransformFuncti
     for (int docId = 0; docId < numDocs; docId++) {
       boolean isFalse = false;
       for (int i = 0; i < numArguments; i++) {
-        if ((nullBitmaps[i] == null || !nullBitmaps[i].contains(docId)) && intValuesSVs[i][docId] == 0) {
+        if ((nullBitmaps[i] == null || !nullBitmaps[i].contains(docId)) && isFalse(intValuesSVs[i][docId])) {
           isFalse = true;
           break;
         }
@@ -80,5 +80,9 @@ public class AndOperatorTransformFunction extends LogicalOperatorTransformFuncti
       }
     }
     return nullBitmap.isEmpty() ? null : nullBitmap;
+  }
+
+  private static boolean isFalse(int i) {
+    return i == 0;
   }
 }
