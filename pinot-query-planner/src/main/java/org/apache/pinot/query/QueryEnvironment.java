@@ -276,8 +276,7 @@ public class QueryEnvironment {
   // steps
   // --------------------------------------------------------------------------
 
-  @VisibleForTesting
-  protected RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext)
+  private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext)
       throws Exception {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);

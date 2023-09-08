@@ -29,10 +29,12 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.PlannerUtils;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -268,6 +270,44 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
       }
     }
+  }
+
+  // PinotRexBuilder is used to ensure that float to double cast is not added.
+  @Test
+  public void testImplicitFloatToDoubleCastDisabled() {
+    String query = "SELECT col1 FROM a WHERE col7 = 0.05";
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+    Assert.assertEquals(
+        ((RexExpression.FunctionCall) ((FilterNode) dispatchableSubPlan.getQueryStageList().get(0)
+            .getPlanFragment().getChildren().get(0).getFragmentRoot().getInputs().get(0).getInputs()
+            .get(0)).getCondition()).getFunctionOperands().get(0).getKind(),
+        SqlKind.INPUT_REF);
+
+    query = "SELECT col7 FROM a";
+    dispatchableSubPlan = _queryEnvironment.planQuery(query);
+    Assert.assertEquals(
+        ((ProjectNode) dispatchableSubPlan.getQueryStageList().get(0).getPlanFragment().getChildren().get(0)
+            .getFragmentRoot().getInputs().get(0)).getProjects().get(0).getKind(),
+        SqlKind.INPUT_REF);
+  }
+
+  @Test
+  public void testExplicitFloatToDoubleCastEnabled() {
+    String query = "SELECT col1 FROM a WHERE cast(col7 as double) = 0.05";
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+    Assert.assertEquals((
+        (RexExpression.FunctionCall)
+            ((FilterNode)
+                dispatchableSubPlan.getQueryStageList().get(0).getPlanFragment()
+                    .getChildren().get(0).getFragmentRoot().getInputs().get(0).getInputs().get(0))
+                .getCondition())
+        .getFunctionOperands().get(0).getKind(), SqlKind.CAST);
+    query = "SELECT cast(col7 as double) FROM a";
+    dispatchableSubPlan = _queryEnvironment.planQuery(query);
+    Assert.assertEquals(
+        ((ProjectNode) dispatchableSubPlan.getQueryStageList().get(0).getPlanFragment().getChildren().get(0)
+            .getFragmentRoot().getInputs().get(0)).getProjects().get(0).getKind(),
+        SqlKind.CAST);
   }
 
   @Test

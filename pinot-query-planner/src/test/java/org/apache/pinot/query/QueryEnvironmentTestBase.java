@@ -76,6 +76,7 @@ public class QueryEnvironmentTestBase {
         .addMetric("col3", FieldSpec.DataType.INT, 0)
         .addMetric("col4", FieldSpec.DataType.BIG_DECIMAL, 0)
         .addMetric("col6", FieldSpec.DataType.INT, 0)
+        .addMetric("col7", FieldSpec.DataType.FLOAT, 0)
         .setSchemaName(schemaName);
   }
 
