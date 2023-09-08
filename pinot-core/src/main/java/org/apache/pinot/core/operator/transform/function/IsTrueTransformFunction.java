@@ -18,19 +18,13 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.ColumnContext;
-import org.apache.pinot.core.operator.blocks.ValueBlock;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.roaringbitmap.RoaringBitmap;
 
 
-public class IsTrueTransformFunction extends BaseTransformFunction {
-  private TransformFunction _transformFunction;
+public class IsTrueTransformFunction extends BooleanAssertionTransformFunction {
 
   @Override
   public String getName() {
@@ -39,39 +33,21 @@ public class IsTrueTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    Preconditions.checkArgument(arguments.size() == 1, "Exact 1 argument is required for IS_NULL");
-    _transformFunction = arguments.get(0);
+    super.init(arguments, columnContextMap);
   }
 
   @Override
-  public TransformResultMetadata getResultMetadata() {
-    return BOOLEAN_SV_NO_DICTIONARY_METADATA;
+  boolean returnsTrueWhenValueIsTrue() {
+    return true;
   }
 
   @Override
-  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initIntValuesSV(length);
-    Arrays.fill(_intValuesSV, 0);
-    int[] intValuesSV = _transformFunction.transformToIntValuesSV(valueBlock);
-    RoaringBitmap nullBitmap = null;
-    if (_nullHandlingEnabled) {
-      nullBitmap = _transformFunction.getNullBitmap(valueBlock);
-    }
-    for (int docId = 0; docId < length; docId++) {
-      if (returnsTrue(intValuesSV[docId]) && (nullBitmap == null || !nullBitmap.contains(docId))) {
-        _intValuesSV[docId] = 1;
-      }
-    }
-    return _intValuesSV;
+  boolean returnsTrueWhenValueIsFalse() {
+    return false;
   }
 
   @Override
-  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    return null;
-  }
-
-  protected boolean returnsTrue(int val) {
-    return val != 0;
+  boolean returnsTrueWhenValueIsNull() {
+    return false;
   }
 }

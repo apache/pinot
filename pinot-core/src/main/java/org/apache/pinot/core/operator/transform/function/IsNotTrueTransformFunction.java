@@ -22,13 +22,13 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.ColumnContext;
-import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
-public class IsNotTrueTransformFunction extends IsTrueTransformFunction {
+public class IsNotTrueTransformFunction extends BooleanAssertionTransformFunction {
+
   @Override
   public String getName() {
-    return TransformFunctionType.IS_NOT_TRUE.getName();
+    return TransformFunctionType.IS_TRUE.getName();
   }
 
   @Override
@@ -37,13 +37,17 @@ public class IsNotTrueTransformFunction extends IsTrueTransformFunction {
   }
 
   @Override
-  public int[] transformToIntValuesSV(ValueBlock valueBlock) {
-    int length = valueBlock.getNumDocs();
-    initIntValuesSV(length);
-    int[] isTrue = super.transformToIntValuesSV(valueBlock);
-    for (int docId = 0; docId < length; docId++) {
-      _intValuesSV[docId] = isTrue[docId] == 1 ? 0 : 1;
-    }
-    return _intValuesSV;
+  boolean returnsTrueWhenValueIsTrue() {
+    return false;
+  }
+
+  @Override
+  boolean returnsTrueWhenValueIsFalse() {
+    return true;
+  }
+
+  @Override
+  boolean returnsTrueWhenValueIsNull() {
+    return true;
   }
 }
