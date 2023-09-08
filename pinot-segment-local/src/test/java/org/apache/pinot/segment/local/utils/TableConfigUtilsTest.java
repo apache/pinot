@@ -64,8 +64,6 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.AssertJUnit.assertTrue;
-
 
 /**
  * Tests for the validations in {@link TableConfigUtils}
