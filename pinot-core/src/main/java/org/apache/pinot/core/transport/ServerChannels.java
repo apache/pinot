@@ -142,7 +142,7 @@ public class ServerChannels {
   }
 
   @ThreadSafe
-  private class ServerChannel {
+  class ServerChannel {
     final ServerRoutingInstance _serverRoutingInstance;
     final Bootstrap _bootstrap;
     // lock to protect channel as requests must be written into channel sequentially
@@ -167,7 +167,10 @@ public class ServerChannels {
               // NOTE: data table de-serialization happens inside this handler
               // Revisit if this becomes a bottleneck
               ch.pipeline().addLast(
-                  ChannelHandlerFactory.getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
+                  ChannelHandlerFactory.getDirectOOMHandler(_queryRouter, _serverRoutingInstance, _serverToChannelMap)
+              );
+              ch.pipeline().addLast(ChannelHandlerFactory
+                      .getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
             }
           });
     }
