@@ -378,7 +378,7 @@ public class LLCSegmentCompletionHandlers {
       String rawTableName = new LLCSegmentName(segmentName).getTableName();
       URI segmentFileURI = URIUtils
           .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
-              URIUtils.encode(SegmentCompletionUtils.generateSegmentFileName(segmentName)));
+              URIUtils.encode(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName)));
       PinotFSFactory.create(segmentFileURI.getScheme()).copyFromLocalFile(localTempFile, segmentFileURI);
       SegmentCompletionProtocol.Response.Params responseParams = new SegmentCompletionProtocol.Response.Params()
           .withStreamPartitionMsgOffset(requestParams.getStreamPartitionMsgOffset())

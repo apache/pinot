@@ -497,7 +497,7 @@ public class PinotLLCRealtimeSegmentManager {
     if (!isTmpSegmentAsyncDeletionEnabled()) {
       try {
         for (String uri : pinotFS.listFiles(tableDirURI, false)) {
-          if (uri.contains(SegmentCompletionUtils.getSegmentNamePrefix(segmentName))) {
+          if (uri.contains(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName))) {
             LOGGER.warn("Deleting temporary segment file: {}", uri);
             Preconditions.checkState(pinotFS.delete(new URI(uri), true), "Failed to delete file: %s", uri);
           }
@@ -1469,6 +1469,13 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
+  /**
+   * Delete tmp segments for realtime table with low level consumer, split commit and async deletion is enabled.
+   * @param tableNameWithType
+   * @param segmentsZKMetadata
+   * @return number of deleted orphan temporary segments
+   *
+   */
   public long deleteTmpSegments(String tableNameWithType, List<SegmentZKMetadata> segmentsZKMetadata) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
@@ -1488,7 +1495,6 @@ public class PinotLLCRealtimeSegmentManager {
       return 0L;
     }
 
-    // Delete tmp segments for realtime table with low level consumer, split commit and async deletion is enabled.
     Set<String> deepURIs = segmentsZKMetadata.stream().filter(meta -> meta.getStatus() == Status.DONE
         && !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(meta.getDownloadUrl())).map(
         SegmentZKMetadata::getDownloadUrl).collect(

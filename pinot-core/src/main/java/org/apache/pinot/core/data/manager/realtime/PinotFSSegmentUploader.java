@@ -73,7 +73,7 @@ public class PinotFSSegmentUploader implements SegmentUploader {
     final String rawTableName = TableNameBuilder.extractRawTableName(segmentName.getTableName());
     Callable<URI> uploadTask = () -> {
       URI destUri = new URI(StringUtil.join(File.separator, _segmentStoreUriStr, segmentName.getTableName(),
-          SegmentCompletionUtils.generateSegmentFileName(segmentName.getSegmentName())));
+          SegmentCompletionUtils.generateTmpSegmentFileName(segmentName.getSegmentName())));
       long startTime = System.currentTimeMillis();
       try {
         PinotFS pinotFS = PinotFSFactory.create(new URI(_segmentStoreUriStr).getScheme());

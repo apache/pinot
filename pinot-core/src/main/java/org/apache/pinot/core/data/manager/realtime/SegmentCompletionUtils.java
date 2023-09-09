@@ -38,12 +38,12 @@ public class SegmentCompletionUtils {
    * @param segmentName segment name
    * @return
    */
-  public static String getSegmentNamePrefix(String segmentName) {
+  public static String getTmpSegmentNamePrefix(String segmentName) {
     return segmentName + TMP;
   }
 
-  public static String generateSegmentFileName(String segmentNameStr) {
-    return getSegmentNamePrefix(segmentNameStr) + UUID.randomUUID();
+  public static String generateTmpSegmentFileName(String segmentNameStr) {
+    return getTmpSegmentNamePrefix(segmentNameStr) + UUID.randomUUID();
   }
 
   public static boolean isTmpFile(String uri) {

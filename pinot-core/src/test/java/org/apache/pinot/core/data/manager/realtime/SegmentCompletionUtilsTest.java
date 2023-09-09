@@ -29,14 +29,14 @@ public class SegmentCompletionUtilsTest {
   @Test
   public void testGenerateSegmentFilePrefix() {
     String segmentName = "segment";
-    assertEquals(SegmentCompletionUtils.getSegmentNamePrefix(segmentName), "segment.tmp.");
+    assertEquals(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName), "segment.tmp.");
   }
 
   @Test
   public void testGenerateSegmentLocation() {
     String segmentName = "segment";
-    String segmentNamePrefix = SegmentCompletionUtils.getSegmentNamePrefix(segmentName);
-    assertTrue(SegmentCompletionUtils.generateSegmentFileName(segmentName).startsWith(segmentNamePrefix));
+    String segmentNamePrefix = SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName);
+    assertTrue(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName).startsWith(segmentNamePrefix));
   }
 
   @Test

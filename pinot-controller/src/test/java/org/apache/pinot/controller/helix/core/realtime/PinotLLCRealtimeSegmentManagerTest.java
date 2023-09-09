@@ -88,7 +88,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION;
-import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND;
+import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECONDS;
 import static org.apache.pinot.controller.ControllerConf.ENABLE_SPLIT_COMMIT;
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 import static org.mockito.ArgumentMatchers.any;
@@ -812,7 +812,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     PinotFSFactory.init(new PinotConfiguration());
     File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
     String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
-    String segmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
+    String segmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
     File segmentFile = new File(tableDir, segmentFileName);
     FileUtils.write(segmentFile, "temporary file contents");
 
@@ -833,9 +833,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
     String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
     String otherSegmentName = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, CURRENT_TIME_MS).getSegmentName();
-    String segmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
-    String extraSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
-    String otherSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(otherSegmentName);
+    String segmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    String extraSegmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
+    String otherSegmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(otherSegmentName);
     File segmentFile = new File(tableDir, segmentFileName);
     File extraSegmentFile = new File(tableDir, extraSegmentFileName);
     File otherSegmentFile = new File(tableDir, otherSegmentFileName);
@@ -1087,14 +1087,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
     ControllerConf config = new ControllerConf();
     config.setDataDir(TEMP_DIR.toString());
     config.setProperty(ENABLE_SPLIT_COMMIT, true);
-    config.setProperty(SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND, Integer.MIN_VALUE);
+    config.setProperty(SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECONDS, Integer.MIN_VALUE);
     config.setProperty(ENABLE_TMP_SEGMENT_ASYNC_DELETION, true);
 
     // simulate there's an orphan tmp file in localFS
     PinotFSFactory.init(new PinotConfiguration());
     File tableDir = new File(TEMP_DIR, RAW_TABLE_NAME);
     String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
-    String segmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
+    String segmentFileName = SegmentCompletionUtils.generateTmpSegmentFileName(segmentName);
     File segmentFile = new File(tableDir, segmentFileName);
     FileUtils.write(segmentFile, "temporary file contents", Charset.defaultCharset());
 
