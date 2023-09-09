@@ -37,17 +37,17 @@ public class IsFalseTransformFunction extends BaseBooleanAssertionTransformFunct
   }
 
   @Override
-  boolean returnsTrueWhenValueIsTrue() {
+  protected boolean returnsTrueWhenValueIsTrue() {
     return false;
   }
 
   @Override
-  boolean returnsTrueWhenValueIsFalse() {
+  protected boolean returnsTrueWhenValueIsFalse() {
     return true;
   }
 
   @Override
-  boolean returnsTrueWhenValueIsNull() {
+  protected boolean returnsTrueWhenValueIsNull() {
     return false;
   }
 }

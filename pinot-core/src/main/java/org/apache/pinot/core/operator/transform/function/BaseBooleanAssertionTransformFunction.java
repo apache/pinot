@@ -88,11 +88,11 @@ public abstract class BaseBooleanAssertionTransformFunction extends BaseTransfor
     return i != 0;
   }
 
-  abstract boolean returnsTrueWhenValueIsTrue();
+  protected abstract boolean returnsTrueWhenValueIsTrue();
 
-  abstract boolean returnsTrueWhenValueIsFalse();
+  protected abstract boolean returnsTrueWhenValueIsFalse();
 
-  abstract boolean returnsTrueWhenValueIsNull();
+  protected abstract boolean returnsTrueWhenValueIsNull();
 
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
