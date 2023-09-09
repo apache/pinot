@@ -58,21 +58,13 @@ public abstract class BaseBooleanAssertionTransformFunction extends BaseTransfor
           if (returnsTrueWhenValueIsNull()) {
             _intValuesSV[docId] = 1;
           }
-        } else if (intValuesSV[docId] != 0) {
-          if (returnsTrueWhenValueIsTrue()) {
+        } else if (valueEvaluatesToTrue(intValuesSV[docId])) {
             _intValuesSV[docId] = 1;
-          }
-        } else if (returnsTrueWhenValueIsFalse()) {
-          _intValuesSV[docId] = 1;
         }
       }
     } else {
       for (int docId = 0; docId < length; docId++) {
-        if (intValuesSV[docId] != 0) {
-          if (returnsTrueWhenValueIsTrue()) {
-            _intValuesSV[docId] = 1;
-          }
-        } else if (returnsTrueWhenValueIsFalse()) {
+        if (valueEvaluatesToTrue(intValuesSV[docId])) {
           _intValuesSV[docId] = 1;
         }
       }
@@ -80,11 +72,9 @@ public abstract class BaseBooleanAssertionTransformFunction extends BaseTransfor
     return _intValuesSV;
   }
 
-  protected abstract boolean returnsTrueWhenValueIsTrue();
-
-  protected abstract boolean returnsTrueWhenValueIsFalse();
-
   protected abstract boolean returnsTrueWhenValueIsNull();
+
+  protected abstract boolean valueEvaluatesToTrue(int value);
 
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
