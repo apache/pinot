@@ -35,11 +35,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * for the time-being. Once we have optimized the realtime, we can
  */
 public class RealtimeLuceneDocIdCollector implements Collector {
-
+  private volatile boolean _shouldCancel;
   private final MutableRoaringBitmap _docIds;
 
   public RealtimeLuceneDocIdCollector(MutableRoaringBitmap docIds) {
     _docIds = docIds;
+    _shouldCancel = false;
   }
 
   @Override
@@ -60,9 +61,16 @@ public class RealtimeLuceneDocIdCollector implements Collector {
       @Override
       public void collect(int doc)
           throws IOException {
+        if (_shouldCancel) {
+          throw new RuntimeException("Lucene query was cancelled after timeout was reached");
+        }
         // Compute the absolute lucene docID across sub-indexes as doc that is passed is relative to the current reader
         _docIds.add(context.docBase + doc);
       }
     };
+  }
+
+  public void markShouldCancel() {
+    _shouldCancel = true;
   }
 }

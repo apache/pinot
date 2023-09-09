@@ -20,17 +20,19 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
+import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -45,6 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneTextIndex.class);
+  private static final int INTERRUPT_RESOLUTION_MS = 5;
   private final LuceneTextIndexCreator _indexCreator;
   private SearcherManager _searcherManager;
   private final StandardAnalyzer _analyzer = new StandardAnalyzer();
@@ -109,27 +112,46 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
-    Collector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
-    IndexSearcher indexSearcher = null;
-    try {
-      Query query = new QueryParser(_column, _analyzer).parse(searchQuery);
-      indexSearcher = _searcherManager.acquire();
-      indexSearcher.search(query, docIDCollector);
-      return getPinotDocIds(indexSearcher, docIDs);
-    } catch (Exception e) {
-      LOGGER
-          .error("Failed while searching the realtime text index for column {}, search query {}, exception {}", _column,
-              searchQuery, e.getMessage());
-      throw new RuntimeException(e);
-    } finally {
+    RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
+    // A thread interrupt during indexSearcher.search() can break the underlying FSDirectory used by the IndexWriter
+    // which the SearcherManager is created with. To ensure the index is never corrupted the search is executed
+    // in a child thread and the interrupt is handled in the current thread by canceling the search gracefully
+    Callable<MutableRoaringBitmap> searchCallable = () -> {
+      IndexSearcher indexSearcher = null;
       try {
-        if (indexSearcher != null) {
-          _searcherManager.release(indexSearcher);
+        Query query = new QueryParser(_column, _analyzer).parse(searchQuery);
+        indexSearcher = _searcherManager.acquire();
+        indexSearcher.search(query, docIDCollector);
+        return getPinotDocIds(indexSearcher, docIDs);
+      } finally {
+        try {
+          if (indexSearcher != null) {
+            _searcherManager.release(indexSearcher);
+          }
+        } catch (Exception e) {
+          LOGGER.error(
+              "Failed while releasing the searcher manager for realtime text index for column {}, exception {}",
+              _column, e.getMessage());
         }
-      } catch (Exception e) {
-        LOGGER.error("Failed while releasing the searcher manager for realtime text index for column {}, exception {}",
-            _column, e.getMessage());
       }
+    };
+    FutureTask<MutableRoaringBitmap> searchTask = new FutureTask<>(searchCallable);
+    Thread searcherThread = new Thread(searchTask);
+    searcherThread.start();
+    try {
+      while (!searchTask.isDone()) {
+        // if thread is interrupted, cancel the query without interrupting the searcher thread
+        if (Tracing.ThreadAccountantOps.isInterrupted()) {
+          docIDCollector.markShouldCancel();
+          break;
+        }
+        Thread.sleep(INTERRUPT_RESOLUTION_MS);
+      }
+      return searchTask.get();
+    } catch (Exception e) {
+      LOGGER.error("Failed while searching the realtime text index for column {}, search query {}, exception {}",
+          _column, searchQuery, e.getMessage());
+      throw new RuntimeException(e);
     }
   }
 
