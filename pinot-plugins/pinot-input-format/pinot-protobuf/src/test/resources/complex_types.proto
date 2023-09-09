@@ -47,5 +47,15 @@ message TestMessage {
     GAMMA = 2;
     DELTA = 3;
   }
-  TestEnum enum_field = 15; // Field numbers do not need to be consecutive
+  TestEnum enum_field = 15;
+
+  optional string nullable_string_field = 16;
+  optional int32 nullable_int_field = 17;
+  optional int64 nullable_long_field = 18;
+  optional double nullable_double_field = 19;
+  optional float nullable_float_field = 20;
+  optional bool nullable_bool_field = 21;
+  optional bytes nullable_bytes_field = 22;
+
+  // Field numbers do not need to be consecutive
 }
