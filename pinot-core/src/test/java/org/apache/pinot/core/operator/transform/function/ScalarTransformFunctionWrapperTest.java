@@ -959,6 +959,26 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testArrayIndexOfAllString() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("array_index_of_all_string(%s, %s)", STRING_ALPHANUM_MV_COLUMN_2, "a"));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    int[][] expectedValues = new int[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int len = _stringAlphaNumericMV2Values[i].length;
+      int[] expectedValue = new int[len];
+      for (int j = 0; j < len; j++) {
+        expectedValue[j] = j;
+      }
+      expectedValues[i] = expectedValue;
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
   public void testBase64TransformFunction() {
     ExpressionContext expression = RequestContextUtils.getExpression(String.format("toBase64(%s)", BYTES_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);

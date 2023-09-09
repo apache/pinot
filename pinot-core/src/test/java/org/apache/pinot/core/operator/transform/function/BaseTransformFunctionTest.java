@@ -102,6 +102,8 @@ public abstract class BaseTransformFunctionTest {
   protected static final String STRING_MV_COLUMN = "stringMV";
   protected static final String STRING_ALPHANUM_MV_COLUMN = "stringAlphaNumMV";
   protected static final String STRING_LONG_MV_COLUMN = "stringLongMV";
+  // deterministic MV is useful for testing IndexOf and IndexOfAll
+  protected static final String STRING_ALPHANUM_MV_COLUMN_2 = "stringAlphaNumMV2";
   protected static final String TIME_COLUMN = "timeColumn";
   protected static final String TIMESTAMP_COLUMN = "timestampColumn";
   protected static final String TIMESTAMP_COLUMN_NULL = "timestampColumnNull";
@@ -122,6 +124,7 @@ public abstract class BaseTransformFunctionTest {
   protected final double[][] _doubleMVValues = new double[NUM_ROWS][];
   protected final String[][] _stringMVValues = new String[NUM_ROWS][];
   protected final String[][] _stringAlphaNumericMVValues = new String[NUM_ROWS][];
+  protected final String[][] _stringAlphaNumericMV2Values = new String[NUM_ROWS][];
   protected final String[][] _stringLongFormatMVValues = new String[NUM_ROWS][];
   protected final long[] _timeValues = new long[NUM_ROWS];
   protected final String[] _jsonValues = new String[NUM_ROWS];
@@ -155,6 +158,7 @@ public abstract class BaseTransformFunctionTest {
       _doubleMVValues[i] = new double[numValues];
       _stringMVValues[i] = new String[numValues];
       _stringAlphaNumericMVValues[i] = new String[numValues];
+      _stringAlphaNumericMV2Values[i] = new String[numValues];
       _stringLongFormatMVValues[i] = new String[numValues];
       _vector1Values[i] = new float[VECTOR_DIM_SIZE];
       _vector2Values[i] = new float[VECTOR_DIM_SIZE];
@@ -166,6 +170,7 @@ public abstract class BaseTransformFunctionTest {
         _doubleMVValues[i][j] = 1 + RANDOM.nextDouble();
         _stringMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextDouble());
         _stringAlphaNumericMVValues[i][j] = RandomStringUtils.randomAlphanumeric(26);
+        _stringAlphaNumericMV2Values[i][j] = "a";
         _stringLongFormatMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextLong());
       }
 
@@ -219,6 +224,7 @@ public abstract class BaseTransformFunctionTest {
       map.put(DOUBLE_MV_COLUMN, ArrayUtils.toObject(_doubleMVValues[i]));
       map.put(STRING_MV_COLUMN, _stringMVValues[i]);
       map.put(STRING_ALPHANUM_MV_COLUMN, _stringAlphaNumericMVValues[i]);
+      map.put(STRING_ALPHANUM_MV_COLUMN_2, _stringAlphaNumericMV2Values[i]);
       map.put(STRING_LONG_MV_COLUMN, _stringLongFormatMVValues[i]);
       map.put(TIMESTAMP_COLUMN, _timeValues[i]);
       if (isNullRow(i)) {
@@ -254,6 +260,7 @@ public abstract class BaseTransformFunctionTest {
         .addMultiValueDimension(DOUBLE_MV_COLUMN, FieldSpec.DataType.DOUBLE)
         .addMultiValueDimension(STRING_MV_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(STRING_ALPHANUM_MV_COLUMN, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(STRING_ALPHANUM_MV_COLUMN_2, FieldSpec.DataType.STRING)
         .addMultiValueDimension(STRING_LONG_MV_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(VECTOR_1_COLUMN, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(VECTOR_2_COLUMN, FieldSpec.DataType.FLOAT)
