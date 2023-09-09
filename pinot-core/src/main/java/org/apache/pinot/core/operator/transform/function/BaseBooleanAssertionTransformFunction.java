@@ -28,7 +28,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public abstract class BooleanAssertionTransformFunction extends BaseTransformFunction {
+public abstract class BaseBooleanAssertionTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
 
   @Override
@@ -52,24 +52,36 @@ public abstract class BooleanAssertionTransformFunction extends BaseTransformFun
     if (_nullHandlingEnabled) {
       nullBitmap = _transformFunction.getNullBitmap(valueBlock);
     }
-    for (int docId = 0; docId < length; docId++) {
-      if (isNull(nullBitmap, docId)) {
-        if (returnsTrueWhenValueIsNull()) {
+    if (nullBitmap != null) {
+      for (int docId = 0; docId < length; docId++) {
+        if (isNull(nullBitmap, docId)) {
+          if (returnsTrueWhenValueIsNull()) {
+            _intValuesSV[docId] = 1;
+          }
+        } else if (isTrue(intValuesSV[docId])) {
+          if (returnsTrueWhenValueIsTrue()) {
+            _intValuesSV[docId] = 1;
+          }
+        } else if (returnsTrueWhenValueIsFalse()) {
           _intValuesSV[docId] = 1;
         }
-      } else if (isTrue(intValuesSV[docId])) {
-        if (returnsTrueWhenValueIsTrue()) {
+      }
+    } else {
+      for (int docId = 0; docId < length; docId++) {
+        if (isTrue(intValuesSV[docId])) {
+          if (returnsTrueWhenValueIsTrue()) {
+            _intValuesSV[docId] = 1;
+          }
+        } else if (returnsTrueWhenValueIsFalse()) {
           _intValuesSV[docId] = 1;
         }
-      } else if (returnsTrueWhenValueIsFalse()) {
-        _intValuesSV[docId] = 1;
       }
     }
     return _intValuesSV;
   }
 
   private boolean isNull(RoaringBitmap nullBitmap, int i) {
-    return nullBitmap != null && nullBitmap.contains(i);
+    return nullBitmap.contains(i);
   }
 
   private boolean isTrue(int i) {

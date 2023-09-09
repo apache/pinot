@@ -24,7 +24,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.ColumnContext;
 
 
-public class IsFalseTransformFunction extends BooleanAssertionTransformFunction {
+public class IsFalseTransformFunction extends BaseBooleanAssertionTransformFunction {
 
   @Override
   public String getName() {
