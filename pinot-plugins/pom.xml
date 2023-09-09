@@ -52,7 +52,49 @@
     <module>pinot-environment</module>
   </modules>
 
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>4.7.3.2</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>test</phase>
+          </execution>
+        </executions>
+        <configuration>
+          <includeFilterFile>${pinot.root}/pinot-plugins/spotbugs-include.xml</includeFilterFile>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.pinot</groupId>
+              <artifactId>pinot-spotbugs-plugin</artifactId>
+              <version>${project.version}</version>
+            </plugin>
+          </plugins>
+        </configuration>
+        <dependencies>
+          <!-- overwrite dependency on spotbugs if you want to specify the version of spotbugs -->
+          <dependency>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs</artifactId>
+            <version>4.7.3</version>
+          </dependency>
+        </dependencies>
+      </plugin>
+    </plugins>
+  </build>
+
   <dependencies>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spotbugs-plugin</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
