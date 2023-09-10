@@ -31,6 +31,7 @@ import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -66,7 +67,14 @@ public class PinotCatalog implements Schema {
     if (schema == null) {
       throw new IllegalArgumentException(String.format("Could not find schema for table: '%s'", tableName));
     }
-    return new PinotTable(schema);
+    TableConfig tableConfig = _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    if (tableConfig == null) {
+      tableConfig = _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    }
+    if (tableConfig == null) {
+      throw new IllegalArgumentException(String.format("Could not find table config for table: '%s'", tableName));
+    }
+    return new PinotTable(schema, tableConfig.getIndexingConfig().isNullHandlingEnabled());
   }
 
   /**

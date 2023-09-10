@@ -84,7 +84,8 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
 
     // create & upload segments
     File avroFile = createAvroFile();
-    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir,
+        getNullHandlingEnabled());
     uploadSegments(getTableName(), _tarDir);
 
     waitForAllDocsLoaded(60_000);
@@ -117,7 +118,8 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
 
   @Override
   public TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).build();
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
+        .setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
   @Override

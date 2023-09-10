@@ -43,21 +43,21 @@ public class TypeFactory extends JavaTypeFactoryImpl {
     super(typeSystem);
   }
 
-  public RelDataType createRelDataTypeFromSchema(Schema schema) {
+  public RelDataType createRelDataTypeFromSchema(Schema schema, boolean nullHandlingEnabled) {
     Builder builder = new Builder(this);
     for (Map.Entry<String, FieldSpec> e : schema.getFieldSpecMap().entrySet()) {
-      builder.add(e.getKey(), toRelDataType(e.getValue()));
+      builder.add(e.getKey(), toRelDataType(e.getValue(), nullHandlingEnabled));
     }
     return builder.build();
   }
 
-  private RelDataType toRelDataType(FieldSpec fieldSpec) {
+  private RelDataType toRelDataType(FieldSpec fieldSpec, boolean nullHandlingEnabled) {
     switch (fieldSpec.getDataType()) {
       case INT:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.INTEGER)
+        return fieldSpec.isSingleValueField() ? createSingleValueType(SqlTypeName.INTEGER, nullHandlingEnabled)
             : createArrayType(createSqlType(SqlTypeName.INTEGER), -1);
       case LONG:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BIGINT)
+        return fieldSpec.isSingleValueField() ? createSingleValueType(SqlTypeName.BIGINT, nullHandlingEnabled)
             : createArrayType(createSqlType(SqlTypeName.BIGINT), -1);
       // Map float and double to the same RelDataType so that queries like
       // `select count(*) from table where aFloatColumn = 0.05` works correctly in multi-stage query engine.
@@ -71,28 +71,28 @@ public class TypeFactory extends JavaTypeFactoryImpl {
       // With float and double mapped to the same RelDataType, the behavior in multi-stage query engine will be the same
       // as the query in v1 query engine.
       case FLOAT:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
+        return fieldSpec.isSingleValueField() ? createSingleValueType(SqlTypeName.DOUBLE, nullHandlingEnabled)
             : createArrayType(createSqlType(SqlTypeName.REAL), -1);
       case DOUBLE:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
+        return fieldSpec.isSingleValueField() ? createSingleValueType(SqlTypeName.DOUBLE, nullHandlingEnabled)
             : createArrayType(createSqlType(SqlTypeName.DOUBLE), -1);
       case BOOLEAN:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BOOLEAN)
+        return fieldSpec.isSingleValueField() ? createSingleValueType(SqlTypeName.BOOLEAN, nullHandlingEnabled)
             : createArrayType(createSqlType(SqlTypeName.BOOLEAN), -1);
       case TIMESTAMP:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.TIMESTAMP)
+        return fieldSpec.isSingleValueField() ? createSingleValueType(SqlTypeName.TIMESTAMP, nullHandlingEnabled)
             : createArrayType(createSqlType(SqlTypeName.TIMESTAMP), -1);
       case STRING:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARCHAR)
+        return fieldSpec.isSingleValueField() ? createSingleValueType(SqlTypeName.VARCHAR, nullHandlingEnabled)
             : createArrayType(createSqlType(SqlTypeName.VARCHAR), -1);
       case BYTES:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARBINARY)
+        return fieldSpec.isSingleValueField() ? createSingleValueType(SqlTypeName.VARBINARY, nullHandlingEnabled)
             : createArrayType(createSqlType(SqlTypeName.VARBINARY), -1);
       case BIG_DECIMAL:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DECIMAL)
+        return fieldSpec.isSingleValueField() ? createSingleValueType(SqlTypeName.DECIMAL, nullHandlingEnabled)
             : createArrayType(createSqlType(SqlTypeName.DECIMAL), -1);
       case JSON:
-        return createSqlType(SqlTypeName.VARCHAR);
+        return createSingleValueType(SqlTypeName.VARCHAR, nullHandlingEnabled);
       case LIST:
         // TODO: support LIST, MV column should go fall into this category.
       case STRUCT:
@@ -101,5 +101,10 @@ public class TypeFactory extends JavaTypeFactoryImpl {
         String message = String.format("Unsupported type: %s ", fieldSpec.getDataType().toString());
         throw new UnsupportedOperationException(message);
     }
+  }
+
+  private RelDataType createSingleValueType(SqlTypeName sqlTypeName, boolean nullHandlingEnabled) {
+    RelDataType relDataType = createSqlType(sqlTypeName);
+    return nullHandlingEnabled ? createTypeWithNullability(relDataType, true) : relDataType;
   }
 }
