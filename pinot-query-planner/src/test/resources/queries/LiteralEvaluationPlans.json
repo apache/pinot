@@ -136,7 +136,7 @@
         "sql": "EXPLAIN PLAN FOR Select ST_Distance(X'8040340000000000004024000000000000', ST_Point(-122, 37.5, 1)) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[13416951.966757335:DOUBLE])",
+          "\nLogicalProject(EXPR$0=[1.3416951966757335E7:DOUBLE])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]

@@ -66,7 +66,9 @@ public class PinotQueryRuleSets {
           // push project through WINDOW
           CoreRules.PROJECT_WINDOW_TRANSPOSE,
 
-          PinotEvaluateLiteralRule.INSTANCE,
+          // TODO: Revisit and see if they can be replaced with CoreRules.PROJECT_REDUCE_EXPRESSIONS and
+          //       CoreRules.FILTER_REDUCE_EXPRESSIONS
+          PinotEvaluateLiteralRule.Project.INSTANCE, PinotEvaluateLiteralRule.Filter.INSTANCE,
 
           // TODO: evaluate the SORT_JOIN_TRANSPOSE and SORT_JOIN_COPY rules
 
