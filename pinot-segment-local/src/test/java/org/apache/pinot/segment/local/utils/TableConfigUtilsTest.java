@@ -617,17 +617,36 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validateIngestionConfig(tableConfig, null);
 
     // validate the proto decoder
-    streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.decoder.class.name",
-        "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
-    streamConfigs.put("stream.kafka.decoder.prop.descriptorFile", "file://test");
+    streamConfigs = getKafkaStreamConfigs();
+    //test config should be valid
+    TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    streamConfigs.remove("stream.kafka.decoder.prop.descriptorFile");
     try {
       TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
     } catch (IllegalStateException e) {
       // expected
     }
-    streamConfigs.remove("stream.kafka.decoder.prop.descriptorFile");
-    streamConfigs.put("stream.kafka.decoder.prop.protoClassName", "test");
+    streamConfigs = getKafkaStreamConfigs();
+    streamConfigs.remove("stream.kafka.decoder.prop.protoClassName");
+    try {
+      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    } catch (IllegalStateException e) {
+      // expected
+    }
+    //validate the protobuf pulsar config
+    streamConfigs = getPulsarStreamConfigs();
+    //test config should be valid
+    TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    //remove the descriptor file, should fail
+    streamConfigs.remove("stream.pulsar.decoder.prop.descriptorFile");
+    try {
+      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    } catch (IllegalStateException e) {
+      // expected
+    }
+    streamConfigs = getPulsarStreamConfigs();
+    //remove the proto class name, should fail
+    streamConfigs.remove("stream.pulsar.decoder.prop.protoClassName");
     try {
       TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
     } catch (IllegalStateException e) {
@@ -2090,6 +2109,30 @@ public class TableConfigUtilsTest {
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+    return streamConfigs;
+  }
+
+  private Map<String, String> getKafkaStreamConfigs() {
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
+    streamConfigs.put("stream.kafka.topic.name", "test");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
+    streamConfigs.put("stream.kafka.decoder.prop.descriptorFile", "file://test");
+    streamConfigs.put("stream.kafka.decoder.prop.protoClassName", "test");
+    return streamConfigs;
+  }
+
+  private Map<String, String> getPulsarStreamConfigs() {
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "pulsar");
+    streamConfigs.put("stream.pulsar.consumer.type", "lowlevel");
+    streamConfigs.put("stream.pulsar.topic.name", "test");
+    streamConfigs.put("stream.pulsar.decoder.prop.descriptorFile", "file://test");
+    streamConfigs.put("stream.pulsar.decoder.prop.protoClassName", "test");
+    streamConfigs.put("stream.pulsar.decoder.class.name",
+        "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
     return streamConfigs;
   }
 }
