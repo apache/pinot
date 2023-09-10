@@ -78,6 +78,10 @@ public enum TransformFunctionType {
   IN("in"),
   NOT_IN("not_in"),
 
+  IS_TRUE("is_true"),
+  IS_NOT_TRUE("is_not_true"),
+  IS_FALSE("is_false"),
+  IS_NOT_FALSE("is_not_false"),
   IS_NULL("is_null"),
   IS_NOT_NULL("is_not_null"),
   COALESCE("coalesce"),
