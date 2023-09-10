@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
@@ -86,5 +87,10 @@ public class KinesisRecordsBatch implements MessageBatch<KinesisStreamMessage> {
   @Override
   public RowMetadata getMetadataAtIndex(int index) {
     return _recordList.get(index).getMetadata();
+  }
+
+  @Override
+  public StreamMessage getStreamMessage(int index) {
+    return _recordList.get(index);
   }
 }
