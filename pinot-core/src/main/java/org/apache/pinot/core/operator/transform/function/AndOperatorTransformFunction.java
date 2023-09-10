@@ -46,12 +46,8 @@ public class AndOperatorTransformFunction extends LogicalOperatorTransformFuncti
     return 0;
   }
 
-  private boolean isFalse(int i) {
-    return i == 0;
-  }
-
   @Override
   boolean valueSupersedesNull(int i) {
-    return isFalse(i);
+    return i == 0;
   }
 }
