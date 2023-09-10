@@ -183,7 +183,11 @@ public enum TransformFunctionType {
   INIDSET("inIdSet"),
   LOOKUP("lookUp"),
   GROOVY("groovy"),
-  CLPDECODE("clpDecode"),
+
+  // CLP functions
+  CLPDECODE("clpDecode", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.family(
+      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER),
+      ordinal -> ordinal > 2), "clp_decode"),
 
   // Regexp functions
   REGEXP_EXTRACT("regexpExtract", "regexp_extract"),

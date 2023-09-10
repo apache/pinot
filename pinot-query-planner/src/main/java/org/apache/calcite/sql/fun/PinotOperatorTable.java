@@ -119,9 +119,9 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
     //   2. register special handling that differs from calcite standard.
     for (TransformFunctionType transformFunctionType : TransformFunctionType.values()) {
       if (transformFunctionType.getSqlKind() != null) {
-        // 1. Register the aggregation function with Calcite
+        // 1. Register the transform function with Calcite
         registerTransformFunction(transformFunctionType.getName(), transformFunctionType);
-        // 2. Register the aggregation function with Calcite on all alternative names
+        // 2. Register the transform function with Calcite on all alternative names
         List<String> alternativeFunctionNames = transformFunctionType.getAlternativeNames();
         for (String alternativeFunctionName : alternativeFunctionNames) {
           registerTransformFunction(alternativeFunctionName, transformFunctionType);
