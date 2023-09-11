@@ -63,8 +63,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   @Override
   public Boolean call()
       throws Exception {
-    String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-"
-            + _streamConfig.getTableNameWithType() + "-" + _topicName;
+    String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-" + _topicName;
     try (
         StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
       _newPartitionGroupMetadataList = streamMetadataProvider.computePartitionGroupMetadata(clientId, _streamConfig,
