@@ -19,13 +19,13 @@
 package org.apache.pinot.spi.env;
 
 import java.io.Reader;
-import org.apache.commons.configuration.PropertiesConfiguration.DefaultIOFactory;
-import org.apache.commons.configuration.PropertiesConfiguration.PropertiesReader;
+import org.apache.commons.configuration2.PropertiesConfiguration.DefaultIOFactory;
+import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
 
 
 public class ConfigFilePropertyReaderFactory extends DefaultIOFactory {
   @Override
-  public PropertiesReader createPropertiesReader(Reader in, char delimiter) {
+  public PropertiesReader createPropertiesReader(Reader in) {
     return new ConfigFilePropertyReader(in, delimiter);
   }
 }

@@ -19,10 +19,11 @@
 package org.apache.pinot.spi.env;
 
 import java.io.Reader;
-import org.apache.commons.configuration.PropertiesConfiguration.PropertiesReader;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
 
 
-public class ConfigFilePropertyReader extends PropertiesReader {
+public class ConfigFilePropertyReader extends PropertiesConfiguration.PropertiesReader {
 
   public ConfigFilePropertyReader(Reader reader, char listDelimiter) {
     super(reader, listDelimiter);
