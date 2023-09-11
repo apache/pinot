@@ -961,10 +961,10 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testArrayIndexOfAllString() {
     ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("array_index_of_all_string(%s, %s)", STRING_ALPHANUM_MV_COLUMN_2, "a"));
+        String.format("array_index_of_all_string(%s, 'a')", STRING_ALPHANUM_MV_COLUMN_2));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
-    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
     assertFalse(transformFunction.getResultMetadata().isSingleValue());
     int[][] expectedValues = new int[NUM_ROWS][];
     for (int i = 0; i < NUM_ROWS; i++) {
