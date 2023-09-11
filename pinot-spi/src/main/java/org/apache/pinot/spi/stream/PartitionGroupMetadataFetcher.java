@@ -38,7 +38,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private final StreamConsumerFactory _streamConsumerFactory;
   private Exception _exception;
   private final String _topicName;
-  private int _callRetries ;
+  private int _callRetries;
 
   public PartitionGroupMetadataFetcher(StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
@@ -65,7 +65,8 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   @Override
   public Boolean call()
       throws Exception {
-    String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-" + _topicName + "-try" + Integer.toString(++_callRetries);
+    String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-" + _topicName + "-try" + Integer
+        .toString(++_callRetries);
     try (
         StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
       _newPartitionGroupMetadataList = streamMetadataProvider.computePartitionGroupMetadata(clientId, _streamConfig,
