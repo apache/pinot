@@ -220,11 +220,6 @@ public class HelixSetupUtils {
     idealState.setInstanceGroupTag(CONTROLLER_INSTANCE);
     // Set batch message mode
     idealState.setBatchMessageMode(enableBatchMessageMode);
-    // Explicitly disable this resource when creating this new resource.
-    // When all the controllers are running the code with the logic to handle this resource, it can be enabled for
-    // backward compatibility.
-    // In the next major release, we can enable this resource by default, so that all the controller logic can be
-    // separated.
     return idealState;
   }
 
