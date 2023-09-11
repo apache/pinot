@@ -979,6 +979,26 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testIntersectIndices() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("intersect_indices(%s, %s)", INT_MONO_INCREASING_MV_1, INT_MONO_INCREASING_MV_2));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    int[][] expectedValues = new int[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int len = _intMonoIncreasingMV1Values[i].length;
+      int[] expectedValue = new int[len - 1];
+      for (int j = 0; j < expectedValue.length; j++) {
+        expectedValue[j] = j + 1;
+      }
+      expectedValues[i] = expectedValue;
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
   public void testBase64TransformFunction() {
     ExpressionContext expression = RequestContextUtils.getExpression(String.format("toBase64(%s)", BYTES_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);

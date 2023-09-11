@@ -107,6 +107,8 @@ public abstract class BaseTransformFunctionTest {
   protected static final String TIME_COLUMN = "timeColumn";
   protected static final String TIMESTAMP_COLUMN = "timestampColumn";
   protected static final String TIMESTAMP_COLUMN_NULL = "timestampColumnNull";
+  protected static final String INT_MONO_INCREASING_MV_1 = "intMonoIncreasingMV1";
+  protected static final String INT_MONO_INCREASING_MV_2 = "intMonoIncreasingMV2";
 
   protected static final String JSON_COLUMN = "json";
   protected static final String DEFAULT_JSON_COLUMN = "defaultJson";
@@ -130,6 +132,8 @@ public abstract class BaseTransformFunctionTest {
   protected final String[] _jsonValues = new String[NUM_ROWS];
   protected final float[][] _vector1Values = new float[NUM_ROWS][];
   protected final float[][] _vector2Values = new float[NUM_ROWS][];
+  protected final int[][] _intMonoIncreasingMV1Values = new int[NUM_ROWS][];
+  protected final int[][] _intMonoIncreasingMV2Values = new int[NUM_ROWS][];
 
   protected Map<String, DataSource> _dataSourceMap;
   protected ProjectionBlock _projectionBlock;
@@ -162,6 +166,8 @@ public abstract class BaseTransformFunctionTest {
       _stringLongFormatMVValues[i] = new String[numValues];
       _vector1Values[i] = new float[VECTOR_DIM_SIZE];
       _vector2Values[i] = new float[VECTOR_DIM_SIZE];
+      _intMonoIncreasingMV1Values[i] = new int[numValues];
+      _intMonoIncreasingMV2Values[i] = new int[numValues];
 
       for (int j = 0; j < numValues; j++) {
         _intMVValues[i][j] = 1 + RANDOM.nextInt(MAX_MULTI_VALUE);
@@ -172,6 +178,8 @@ public abstract class BaseTransformFunctionTest {
         _stringAlphaNumericMVValues[i][j] = RandomStringUtils.randomAlphanumeric(26);
         _stringAlphaNumericMV2Values[i][j] = "a";
         _stringLongFormatMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextLong());
+        _intMonoIncreasingMV1Values[i][j] = j;
+        _intMonoIncreasingMV2Values[i][j] = j + 1;
       }
 
       for (int j = 0; j < VECTOR_DIM_SIZE; j++) {
@@ -235,6 +243,8 @@ public abstract class BaseTransformFunctionTest {
       map.put(TIME_COLUMN, _timeValues[i]);
       _jsonValues[i] = JsonUtils.objectToJsonNode(map).toString();
       map.put(JSON_COLUMN, _jsonValues[i]);
+      map.put(INT_MONO_INCREASING_MV_1, ArrayUtils.toObject(_intMonoIncreasingMV1Values[i]));
+      map.put(INT_MONO_INCREASING_MV_2, ArrayUtils.toObject(_intMonoIncreasingMV2Values[i]));
       GenericRow row = new GenericRow();
       row.init(map);
       rows.add(row);
@@ -265,6 +275,8 @@ public abstract class BaseTransformFunctionTest {
         .addMultiValueDimension(VECTOR_1_COLUMN, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(VECTOR_2_COLUMN, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(ZERO_VECTOR_COLUMN, FieldSpec.DataType.FLOAT)
+        .addMultiValueDimension(INT_MONO_INCREASING_MV_1, FieldSpec.DataType.INT)
+        .addMultiValueDimension(INT_MONO_INCREASING_MV_2, FieldSpec.DataType.INT)
         .addDateTime(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addDateTime(TIMESTAMP_COLUMN_NULL, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();

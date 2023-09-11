@@ -112,8 +112,9 @@ public class ArrayFunctions {
     int j = 0;
     List<Integer> indices = new ArrayList<>();
     while (i < values1.length && j < values2.length) {
-      if (values1[i] == values2[j++]) {
+      if (values1[i] == values2[j]) {
         indices.add(values1[i]);
+        j++;
       }
       i++;
     }
