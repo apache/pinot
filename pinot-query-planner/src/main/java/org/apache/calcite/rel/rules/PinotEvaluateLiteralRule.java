@@ -85,7 +85,7 @@ public class PinotEvaluateLiteralRule {
       RexNode newNode = newProjects.get(i);
       // Need to cast the result to the original type if the literal type is changed, e.g. VARCHAR literal is typed as
       // CHAR(STRING_LENGTH) in Calcite, but we need to cast it back to VARCHAR.
-      if (oldNode.getType() != newNode.getType()) {
+      if (!oldNode.getType().equals(newNode.getType())) {
         needCast = true;
         newNode = rexBuilder.makeCast(oldNode.getType(), newNode, true);
       }
