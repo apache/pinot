@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -42,18 +43,23 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
 
   private final boolean _nullHandlingEnabled;
 
-  public CountAggregationFunction(ExpressionContext expression) {
-    this(expression, false);
+  public CountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    this(verifyArguments(arguments), nullHandlingEnabled);
   }
 
-  public CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
+    Preconditions.checkArgument(arguments.size() == 1, "COUNT expects 1 argument, got: %s", arguments.size());
+    return arguments.get(0);
+  }
+
+  protected CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     // Consider null values only when null handling is enabled and function is not COUNT(*)
     // Note COUNT on any literal gives same result as COUNT(*)
     // So allow for identifiers that are not * and functions, disable for literals and *
-    _nullHandlingEnabled = nullHandlingEnabled
-            && ((expression.getType() == ExpressionContext.Type.IDENTIFIER && !expression.getIdentifier().equals("*"))
-            || (expression.getType() == ExpressionContext.Type.FUNCTION));
+    _nullHandlingEnabled = nullHandlingEnabled && (
+        (expression.getType() == ExpressionContext.Type.IDENTIFIER && !expression.getIdentifier().equals("*")) || (
+            expression.getType() == ExpressionContext.Type.FUNCTION));
   }
 
   @Override

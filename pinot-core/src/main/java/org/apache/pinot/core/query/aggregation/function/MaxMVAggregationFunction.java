@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -28,8 +30,13 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 public class MaxMVAggregationFunction extends MaxAggregationFunction {
 
-  public MaxMVAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  public MaxMVAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifyArguments(arguments), false);
+  }
+
+  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
+    Preconditions.checkArgument(arguments.size() == 1, "MAX_MV expects 1 argument, got: %s", arguments.size());
+    return arguments.get(0);
   }
 
   @Override

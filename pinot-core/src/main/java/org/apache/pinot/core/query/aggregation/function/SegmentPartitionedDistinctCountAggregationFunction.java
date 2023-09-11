@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -48,8 +50,14 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class SegmentPartitionedDistinctCountAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
 
-  public SegmentPartitionedDistinctCountAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  public SegmentPartitionedDistinctCountAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifyArguments(arguments));
+  }
+
+  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
+    Preconditions.checkArgument(arguments.size() == 1, "SEGMENT_PARTITIONED_DISTINCT_COUNT expects 1 argument, got: %s",
+        arguments.size());
+    return arguments.get(0);
   }
 
   @Override

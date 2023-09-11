@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -33,8 +35,13 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 public class DistinctAvgMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
-  public DistinctAvgMVAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTAVGMV, false);
+  public DistinctAvgMVAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifyArguments(arguments), AggregationFunctionType.DISTINCTAVGMV, false);
+  }
+
+  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
+    Preconditions.checkArgument(arguments.size() == 1, "DISTINCT_AVG_MV expects 1 argument, got: %s", arguments.size());
+    return arguments.get(0);
   }
 
   @Override

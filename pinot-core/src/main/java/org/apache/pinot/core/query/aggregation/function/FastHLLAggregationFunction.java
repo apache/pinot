@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -40,8 +41,13 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
   public static final int DEFAULT_LOG2M = 8;
   private static final int BYTE_TO_CHAR_OFFSET = 129;
 
-  public FastHLLAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  public FastHLLAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifyArguments(arguments));
+  }
+
+  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
+    Preconditions.checkArgument(arguments.size() == 1, "FAST_HLL expects 1 argument, got: %s", arguments.size());
+    return arguments.get(0);
   }
 
   @Override
@@ -150,8 +156,8 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
       if (intermediateResult1.cardinality() == 0) {
         return intermediateResult2;
       } else {
-        Preconditions
-            .checkState(intermediateResult2.cardinality() == 0, "Cannot merge HyperLogLogs of different sizes");
+        Preconditions.checkState(intermediateResult2.cardinality() == 0,
+            "Cannot merge HyperLogLogs of different sizes");
         return intermediateResult1;
       }
     }

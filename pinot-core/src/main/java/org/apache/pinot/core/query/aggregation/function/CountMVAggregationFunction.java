@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,14 +31,14 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
 
-  /**
-   * Constructor for the class.
-   *
-   * @param expression Expression to aggregate on.
-   */
-  public CountMVAggregationFunction(ExpressionContext expression) {
+  public CountMVAggregationFunction(List<ExpressionContext> arguments) {
     // TODO(nhejazi): support proper null handling for aggregation functions on MV columns.
-    super(expression);
+    super(verifyArguments(arguments), false);
+  }
+
+  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
+    Preconditions.checkArgument(arguments.size() == 1, "COUNT_MV expects 1 argument, got: %s", arguments.size());
+    return arguments.get(0);
   }
 
   @Override

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -41,7 +43,17 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggregationFunction<RoaringBitmap, Integer> {
 
-  public DistinctCountBitmapAggregationFunction(ExpressionContext expression) {
+  public DistinctCountBitmapAggregationFunction(List<ExpressionContext> arguments) {
+    this(verifyArguments(arguments));
+  }
+
+  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
+    Preconditions.checkArgument(arguments.size() == 1, "DISTINCT_COUNT_BITMAP expects 1 argument, got: %s",
+        arguments.size());
+    return arguments.get(0);
+  }
+
+  protected DistinctCountBitmapAggregationFunction(ExpressionContext expression) {
     super(expression);
   }
 
