@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.core.transport;
 
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,11 +39,6 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
   private final QueryRouter _queryRouter;
   private final ServerRoutingInstance _serverRoutingInstance;
   private final ConcurrentHashMap<ServerRoutingInstance, ServerChannels.ServerChannel> _serverToChannelMap;
-
-  public void setSilentShutDown() {
-    _silentShutDown = true;
-  }
-
   private volatile boolean _silentShutDown = false;
 
   public DirectOOMHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
@@ -50,6 +46,10 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
     _queryRouter = queryRouter;
     _serverRoutingInstance = serverRoutingInstance;
     _serverToChannelMap = serverToChannelMap;
+  }
+
+  public void setSilentShutDown() {
+    _silentShutDown = true;
   }
 
   @Override
@@ -73,18 +73,13 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
           // close all channels to servers
           ctx.channel().close();
           _serverToChannelMap.keySet().forEach(serverRoutingInstance -> {
-            Channel channel = _serverToChannelMap.get(serverRoutingInstance)._channel;
-            if (channel != null) {
-              DirectOOMHandler directOOMHandler = channel.pipeline().get(DirectOOMHandler.class);
-              if (directOOMHandler != null) {
-                directOOMHandler.setSilentShutDown();
-              }
-              channel.close();
-            }
-            _serverToChannelMap.remove(serverRoutingInstance);
+            ServerChannels.ServerChannel removed = _serverToChannelMap.remove(serverRoutingInstance);
+            removed.closeChannel();
+            removed.setSilentShutdown();
           });
           _queryRouter.markServerDown(_serverRoutingInstance,
               new QueryCancelledException("Query cancelled as broker is out of direct memory"));
+          BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.DIRECT_MEMORY_OOM, 1L);
         } catch (Exception e) {
           LOGGER.error("Caught exception while handling direct memory OOM", e);
         } finally {

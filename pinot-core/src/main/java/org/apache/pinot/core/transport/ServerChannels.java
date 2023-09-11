@@ -164,15 +164,30 @@ public class ServerChannels {
 
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldBasedFrameDecoder());
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldPrepender());
-              // NOTE: data table de-serialization happens inside this handler
-              // Revisit if this becomes a bottleneck
               ch.pipeline().addLast(
                   ChannelHandlerFactory.getDirectOOMHandler(_queryRouter, _serverRoutingInstance, _serverToChannelMap)
               );
+              // NOTE: data table de-serialization happens inside this handler
+              // Revisit if this becomes a bottleneck
               ch.pipeline().addLast(ChannelHandlerFactory
                       .getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
             }
           });
+    }
+
+    void closeChannel() {
+      if (_channel != null) {
+        _channel.close();
+      }
+    }
+
+    void setSilentShutdown() {
+      if (_channel != null) {
+        DirectOOMHandler directOOMHandler = _channel.pipeline().get(DirectOOMHandler.class);
+        if (directOOMHandler != null) {
+          directOOMHandler.setSilentShutDown();
+        }
+      }
     }
 
     void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,

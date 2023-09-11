@@ -325,6 +325,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
       if (serializedDataTable.length > LARGE_RESPONSE_SIZE_THRESHOLD_BYTES) {
         LOGGER.warn("Large query: response size in bytes: {}, table name {}",
             serializedDataTable.length, tableNameWithType);
+        ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.LARGE_QUERY_RESPONSES_SENT, 1);
       }
     });
   }
