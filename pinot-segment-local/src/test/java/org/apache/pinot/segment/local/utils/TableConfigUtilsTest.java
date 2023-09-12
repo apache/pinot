@@ -233,6 +233,34 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validate(tableConfig, schema);
   }
 
+  @Test(expectedExceptions = { IllegalStateException.class },
+      expectedExceptionsMessageRegExp = ".* Unable to parse expression .*")
+  public void invalidSQLExpressionInTransformConfig() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING).build();
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+        new IngestionConfig(null, null, null,
+            List.of(new TransformConfig("myCol", "jsonPathString(order, '$.channel')")),
+            null)).build();
+
+    TableConfigUtils.validate(tableConfig, schema);
+  }
+
+  @Test(expectedExceptions = { IllegalStateException.class },
+      expectedExceptionsMessageRegExp = ".* Unable to compile expression .*")
+  public void invalidGroovyExpressionInTransformConfig() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING).build();
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(
+        new IngestionConfig(null, null, null,
+            List.of(new TransformConfig("myCol", "Groovy({foo..}, foo)")),
+            null)).build();
+
+    TableConfigUtils.validate(tableConfig, schema);
+  }
+
   @Test
   public void validateIngestionConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();

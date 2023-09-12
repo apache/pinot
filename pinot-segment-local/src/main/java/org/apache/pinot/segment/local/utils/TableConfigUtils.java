@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -82,6 +83,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.codehaus.groovy.control.CompilationFailedException;
 import org.quartz.CronScheduleBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -472,7 +474,17 @@ public final class TableConfigUtils {
           }
           try {
             expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+          } catch (CompilationFailedException e) {
+            throw new IllegalStateException(String.format(
+                "Invalid transform function '%s' for column '%s': Unable to compile expression - %s",
+                transformFunction, columnName, e.getMessage()), e);
           } catch (Exception e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof SqlParseException) {
+              throw new IllegalStateException(String.format(
+                  "Invalid transform function '%s' for column '%s': Unable to parse expression - %s",
+                  transformFunction, columnName, cause.getMessage()), e);
+            }
             throw new IllegalStateException(
                 "Invalid transform function '" + transformFunction + "' for column '" + columnName + "'", e);
           }
