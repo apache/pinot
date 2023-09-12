@@ -19,13 +19,12 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.13.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-common</artifactId>
@@ -100,7 +99,7 @@
             <importOrder>
               <order>,\#</order>
             </importOrder>
-            <removeUnusedImports/>
+            <removeUnusedImports />
           </java>
         </configuration>
       </plugin>
@@ -496,31 +495,31 @@
                 <phase>generate-sources</phase>
                 <configuration>
                   <tasks>
-                    <delete dir="target/generated-sources/gen-javabean"/>
-                    <mkdir dir="target/generated-sources"/>
+                    <delete dir="target/generated-sources/gen-javabean" />
+                    <mkdir dir="target/generated-sources" />
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/query.thrift"/>
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/query.thrift" />
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/request.thrift"/>
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/request.thrift" />
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/response.thrift"/>
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/response.thrift" />
                     </exec>
                     <copy todir="src/main/java/">
-                      <fileset dir="target/generated-sources/gen-javabean"/>
+                      <fileset dir="target/generated-sources/gen-javabean" />
                     </copy>
                   </tasks>
                 </configuration>
