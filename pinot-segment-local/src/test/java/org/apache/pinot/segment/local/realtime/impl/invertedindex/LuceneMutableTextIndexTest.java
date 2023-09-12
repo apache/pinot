@@ -37,6 +37,7 @@ import static org.testng.Assert.assertEquals;
 public class LuceneMutableTextIndexTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "LuceneMutableIndexTest");
   private static final String TEXT_COLUMN_NAME = "testColumnName";
+  private static RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
 
   private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
 
@@ -55,6 +56,7 @@ public class LuceneMutableTextIndexTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    _realtimeLuceneTextIndexSearcherPool = RealtimeLuceneTextIndexSearcherPool.init(1);
     _realtimeLuceneTextIndex =
         new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null, null, true, 500);
     String[][] documents = getTextData();

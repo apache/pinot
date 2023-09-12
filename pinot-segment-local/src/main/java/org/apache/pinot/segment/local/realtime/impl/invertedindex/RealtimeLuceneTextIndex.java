@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.FutureTask;
+import java.util.concurrent.Future;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
@@ -32,7 +32,6 @@ import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
-import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -47,7 +46,8 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(RealtimeLuceneTextIndex.class);
-  private static final int INTERRUPT_RESOLUTION_MS = 5;
+  private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
+      RealtimeLuceneTextIndexSearcherPool.getInstance();
   private final LuceneTextIndexCreator _indexCreator;
   private SearcherManager _searcherManager;
   private final StandardAnalyzer _analyzer = new StandardAnalyzer();
@@ -115,7 +115,8 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
     // A thread interrupt during indexSearcher.search() can break the underlying FSDirectory used by the IndexWriter
     // which the SearcherManager is created with. To ensure the index is never corrupted the search is executed
-    // in a child thread and the interrupt is handled in the current thread by canceling the search gracefully
+    // in a child thread and the interrupt is handled in the current thread by canceling the search gracefully.
+    // See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
     Callable<MutableRoaringBitmap> searchCallable = () -> {
       IndexSearcher indexSearcher = null;
       try {
@@ -135,22 +136,18 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
         }
       }
     };
-    FutureTask<MutableRoaringBitmap> searchTask = new FutureTask<>(searchCallable);
-    Thread searcherThread = new Thread(searchTask);
-    searcherThread.start();
+    Future<MutableRoaringBitmap> searchFuture =
+        SEARCHER_POOL.getExecutorService().submit(searchCallable);
     try {
-      while (!searchTask.isDone()) {
-        // if thread is interrupted, cancel the query without interrupting the searcher thread
-        if (Tracing.ThreadAccountantOps.isInterrupted()) {
-          docIDCollector.markShouldCancel();
-          break;
-        }
-        Thread.sleep(INTERRUPT_RESOLUTION_MS);
-      }
-      return searchTask.get();
+      return searchFuture.get();
+    } catch (InterruptedException e) {
+      docIDCollector.markShouldCancel();
+      LOGGER.warn("Lucene query timed out while searching the realtime text index for segment {}, column {},"
+              + " search query {}", _segmentName, _column, searchQuery);
+      throw new RuntimeException("Lucene query was cancelled after timeout was reached");
     } catch (Exception e) {
-      LOGGER.error("Failed while searching the realtime text index for column {}, search query {}, exception {}",
-          _column, searchQuery, e.getMessage());
+      LOGGER.error("Failed while searching the realtime text index for segment {}, column {}, search query {},"
+              + " exception {}", _segmentName, _column, searchQuery, e.getMessage());
       throw new RuntimeException(e);
     }
   }
