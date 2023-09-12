@@ -35,6 +35,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
@@ -105,6 +106,7 @@ import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -117,6 +119,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
@@ -525,6 +528,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       throw new RuntimeException("Unable to start controller due to existing HLC tables!");
     }
 
+    // One time job to fix schema name in all tables
+    // This method can be removed after the next major release.
+    fixSchemaNameInTableConfig();
+
     _controllerMetrics.addCallbackGauge("dataDir.exists", () -> new File(_config.getDataDir()).exists() ? 1L : 0L);
     _controllerMetrics.addCallbackGauge("dataDir.fileOpLatencyMs", () -> {
       File dataDir = new File(_config.getDataDir());
@@ -547,6 +554,93 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
+  }
+
+  /**
+   * This method is used to fix table/schema names.
+   * TODO: in the next release, maybe 2.0.0, we can remove this method. Meanwhile we can delete the orphan schemas
+   * that has been existed longer than a certain time period.
+   *
+   */
+  @VisibleForTesting
+  public void fixSchemaNameInTableConfig() {
+    AtomicInteger fixedSchemaTableCount = new AtomicInteger();
+    AtomicInteger tableWithoutSchemaCount = new AtomicInteger();
+    AtomicInteger failedToCopySchemaCount = new AtomicInteger();
+    AtomicInteger failedToUpdateTableConfigCount = new AtomicInteger();
+    AtomicInteger misConfiguredTableCount = new AtomicInteger();
+    List<String> allTables = _helixResourceManager.getAllTables();
+
+    allTables.forEach(table -> {
+      TableConfig tableConfig = _helixResourceManager.getTableConfig(table);
+      if ((tableConfig == null) || (tableConfig.getValidationConfig() == null)) {
+        // This might due to table deletion, just log it here.
+        LOGGER.warn("Failed to find table config for table: {}, the table likely already got deleted", table);
+        return;
+      }
+      String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+      String existSchemaName = tableConfig.getValidationConfig().getSchemaName();
+      if (existSchemaName == null || existSchemaName.equals(rawTableName)) {
+        // Although the table config is valid, we still need to ensure the schema exists
+        if (_helixResourceManager.getSchema(rawTableName) == null) {
+          LOGGER.warn("Failed to find schema for table: {}", rawTableName);
+          tableWithoutSchemaCount.getAndIncrement();
+          return;
+        }
+        // Table config is already in good status
+        return;
+      }
+      if (_helixResourceManager.getSchema(rawTableName) != null) {
+        // If a schema named `rawTableName` already exists, then likely this is a misconfiguration.
+        // Reset schema name in table config to null to let the table point to the existing schema.
+        LOGGER.warn("Schema: {} already exists, fix the schema name in table config from {} to null", rawTableName,
+            existSchemaName);
+        misConfiguredTableCount.getAndIncrement();
+      } else {
+        // Copy the schema current table referring to to `rawTableName` if it does not exist
+        Schema schema = _helixResourceManager.getSchema(existSchemaName);
+        if (schema == null) {
+          LOGGER.warn("Failed to find schema for schema name: {}, tale name: {}", existSchemaName, table);
+          misConfiguredTableCount.getAndIncrement();
+          tableWithoutSchemaCount.getAndIncrement();
+          return;
+        }
+        schema.setSchemaName(rawTableName);
+        try {
+          _helixResourceManager.addSchema(schema, false, false);
+          LOGGER.info("Copied schema: {} to {}", existSchemaName, rawTableName);
+        } catch (Exception e) {
+          LOGGER.error("Failed to copy schema: {} to {}", existSchemaName, rawTableName, e);
+          failedToCopySchemaCount.getAndIncrement();
+          return;
+        }
+      }
+      // Update table config to remove schema name
+      tableConfig.getValidationConfig().setSchemaName(null);
+      try {
+        _helixResourceManager.updateTableConfig(tableConfig);
+        LOGGER.info("Removed schema name from table config for table: {}", table);
+        fixedSchemaTableCount.getAndIncrement();
+      } catch (IOException e) {
+        failedToUpdateTableConfigCount.getAndIncrement();
+        LOGGER.error("Failed to remove schema name from table config for: {}", tableConfig.getTableName(), e);
+      }
+    });
+    LOGGER.info(
+        "Found {} tables are misconfigured, {} tables without schema. "
+            + "Successfully fixed schema for {} tables, "
+            + "failed to fix {} tables due to copy schema failure, "
+            + "failed to fix {} tables due to update table config failure.",
+        misConfiguredTableCount.get(), tableWithoutSchemaCount.get(),
+        fixedSchemaTableCount.get(), failedToCopySchemaCount.get(), failedToUpdateTableConfigCount.get());
+
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.MISCONFIGURED_SCHEMA_TABLE_COUNT,
+        misConfiguredTableCount.get());
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.TABLE_WITHOUT_SCHEMA_COUNT, tableWithoutSchemaCount.get());
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.FIXED_SCHEMA_TABLE_COUNT, fixedSchemaTableCount.get());
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.FAILED_TO_COPY_SCHEMA, failedToCopySchemaCount.get());
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.FAILED_TO_UPDATE_TABLE_CONFIG,
+        failedToUpdateTableConfigCount.get());
   }
 
   private ServiceStatus.ServiceStatusCallback generateServiceStatusCallback(HelixManager helixManager) {
