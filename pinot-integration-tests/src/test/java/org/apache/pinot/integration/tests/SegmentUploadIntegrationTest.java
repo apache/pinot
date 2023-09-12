@@ -122,7 +122,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create 1 segment, for METADATA push WITH move to final location
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema, "_with_move",
-        _segmentDir, _tarDir);
+        _segmentDir, _tarDir, getNullHandlingEnabled());
 
     SegmentMetadataPushJobRunner runner = new SegmentMetadataPushJobRunner();
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
@@ -176,7 +176,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create 1 segment, for METADATA push WITHOUT move to final location
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(1), offlineTableConfig, schema, "_without_move",
-        _segmentDir, _tarDir);
+        _segmentDir, _tarDir, getNullHandlingEnabled());
     jobSpec.setPushJobSpec(new PushJobSpec());
     runner = new SegmentMetadataPushJobRunner();
 
@@ -223,7 +223,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     String firstTimeStamp = Long.toString(System.currentTimeMillis());
 
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema, firstTimeStamp,
-        _segmentDir, _tarDir);
+        _segmentDir, _tarDir, getNullHandlingEnabled());
 
     // First test standalone metadata push job runner
     BaseSegmentPushJobRunner runner = new SegmentMetadataPushJobRunner();
@@ -287,7 +287,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     String secondTimeStamp = Long.toString(System.currentTimeMillis());
 
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(1), offlineTableConfig, schema, secondTimeStamp,
-        _segmentDir, _tarDir);
+        _segmentDir, _tarDir, getNullHandlingEnabled());
     jobSpec.setPushJobSpec(new PushJobSpec());
 
     // Now test standalone tar push job runner

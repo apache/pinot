@@ -293,7 +293,7 @@ public class ClusterIntegrationTestUtils {
       throws Exception {
     int numAvroFiles = avroFiles.size();
     if (numAvroFiles == 1) {
-      buildSegmentFromAvro(avroFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir);
+      buildSegmentFromAvro(avroFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir, false);
     } else {
       ExecutorService executorService = Executors.newFixedThreadPool(numAvroFiles);
       List<Future<Void>> futures = new ArrayList<>(numAvroFiles);
@@ -301,7 +301,7 @@ public class ClusterIntegrationTestUtils {
         File avroFile = avroFiles.get(i);
         int segmentIndex = i + baseSegmentIndex;
         futures.add(executorService.submit(() -> {
-          buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex, segmentDir, tarDir);
+          buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex, segmentDir, tarDir, false);
           return null;
         }));
       }
@@ -321,12 +321,14 @@ public class ClusterIntegrationTestUtils {
    * @param segmentIndex Segment index number
    * @param segmentDir Output directory for the un-tarred segments
    * @param tarDir Output directory for the tarred segments
+   * @param nullHandlingEnabled whether to enable null handling for the segment
    */
   public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
-      org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir)
+      org.apache.pinot.spi.data.Schema schema, int segmentIndex, File segmentDir, File tarDir,
+      boolean nullHandlingEnabled)
       throws Exception {
     // Test segment with space and special character in the file name
-    buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex + " %", segmentDir, tarDir);
+    buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex + " %", segmentDir, tarDir, nullHandlingEnabled);
   }
 
   /**
@@ -338,15 +340,18 @@ public class ClusterIntegrationTestUtils {
    * @param segmentNamePostfix Segment name postfix
    * @param segmentDir Output directory for the un-tarred segments
    * @param tarDir Output directory for the tarred segments
+   * @param nullHandlingEnabled whether to enable null handling for the segment
    */
   public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
-      org.apache.pinot.spi.data.Schema schema, String segmentNamePostfix, File segmentDir, File tarDir)
+      org.apache.pinot.spi.data.Schema schema, String segmentNamePostfix, File segmentDir, File tarDir,
+      boolean nullHandlingEnabled)
       throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());
     segmentGeneratorConfig.setTableName(tableConfig.getTableName());
     segmentGeneratorConfig.setSegmentNamePostfix(segmentNamePostfix);
+    segmentGeneratorConfig.setNullHandlingEnabled(nullHandlingEnabled);
 
     // Build the segment
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();

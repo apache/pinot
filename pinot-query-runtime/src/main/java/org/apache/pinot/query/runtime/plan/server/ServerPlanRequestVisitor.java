@@ -22,12 +22,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -63,8 +65,34 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     node.visit(INSTANCE, context);
   }
 
+  /*
+   * "istrue(expression) = true" -> "expression"
+   * "isfalse(expression) = true" -> "not (expression)"
+   */
+  private void removeOuterIsTrueAndIsFalse(AggregateNode node) {
+    PlanNode planNode = node.getInputs().get(0);
+    if (planNode instanceof ProjectNode) {
+      ProjectNode projectNode = (ProjectNode) planNode;
+      List<RexExpression> rexExpressions = projectNode.getProjects();
+      for (int i = 0; i < rexExpressions.size(); i++) {
+        RexExpression rexExpression = rexExpressions.get(i);
+        if (rexExpression instanceof RexExpression.FunctionCall) {
+          RexExpression.FunctionCall functionCall = (RexExpression.FunctionCall) rexExpression;
+          if (functionCall.getKind() == SqlKind.IS_TRUE) {
+            rexExpressions.set(i, functionCall.getFunctionOperands().get(0));
+          } else if (functionCall.getKind() == SqlKind.IS_FALSE) {
+            rexExpressions.set(i,
+                new RexExpression.FunctionCall(SqlKind.NOT, functionCall.getDataType(), SqlKind.NOT.name(),
+                    functionCall.getFunctionOperands()));
+          }
+        }
+      }
+    }
+  }
+
   @Override
   public Void visitAggregate(AggregateNode node, ServerPlanRequestContext context) {
+    removeOuterIsTrueAndIsFalse(node);
     visitChildren(node, context);
     // set group-by list
     context.getPinotQuery()
