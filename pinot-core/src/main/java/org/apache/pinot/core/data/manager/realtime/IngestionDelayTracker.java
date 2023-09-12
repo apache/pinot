@@ -210,8 +210,9 @@ public class IngestionDelayTracker {
    */
   public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
-    if (!_isServerReadyToServeQueries.get()) {
+    if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
+      // or once the table data manager has been shutdown.
       return;
     }
     if ((ingestionTimeMs < 0) && (firstStreamIngestionTimeMs < 0)) {
