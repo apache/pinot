@@ -1569,6 +1569,7 @@ public class PinotHelixResourceManager {
         throw new InvalidTableConfigException("No schema defined for table: " + tableNameWithType);
       }
       try {
+        // This is to ensure the uniqueness of table to schema 1:1 mapping.
         schema.setSchemaName(rawTableName);
         addSchema(schema, true, false);
       } catch (SchemaAlreadyExistsException e) {
