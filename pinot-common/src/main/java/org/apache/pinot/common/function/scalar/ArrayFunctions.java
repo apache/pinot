@@ -88,6 +88,39 @@ public class ArrayFunctions {
   }
 
   @ScalarFunction
+  public static int[] arrayIndexOfAllLong(long[] value, long valueToFind) {
+    List<Integer> indices = new ArrayList<>();
+    for (int i = 0; i < value.length; i++) {
+      if (value[i] == valueToFind) {
+        indices.add(i);
+      }
+    }
+    return indices.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexOfAllFloat(float[] value, float valueToFind) {
+    List<Integer> indices = new ArrayList<>();
+    for (int i = 0; i < value.length; i++) {
+      if (value[i] == valueToFind) {
+        indices.add(i);
+      }
+    }
+    return indices.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexOfAllDouble(double[] value, double valueToFind) {
+    List<Integer> indices = new ArrayList<>();
+    for (int i = 0; i < value.length; i++) {
+      if (value[i] == valueToFind) {
+        indices.add(i);
+      }
+    }
+    return indices.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  @ScalarFunction
   public static int[] arrayIndexOfAllString(String[] value, String valueToFind) {
     List<Integer> indices = new ArrayList<>();
     for (int i = 0; i < value.length; i++) {
@@ -99,7 +132,7 @@ public class ArrayFunctions {
   }
 
   /**
-   * Assume values1, and values2 are sorted unique indices of MV cols.
+   * Assume values1, and values2 are monotonous increasing indices of MV cols.
    * Here is the common usage:
    * col1: ["a", "b", "a", "b"]
    * col2: ["c", "d", "d", "c"]
@@ -108,6 +141,7 @@ public class ArrayFunctions {
    */
   @ScalarFunction
   public static int[] intersectIndices(int[] values1, int[] values2) {
+    // TODO: if values1.length << values2.length. Use binary search can speed up the query
     int i = 0;
     int j = 0;
     List<Integer> indices = new ArrayList<>();
