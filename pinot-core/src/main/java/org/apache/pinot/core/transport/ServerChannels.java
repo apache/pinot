@@ -19,6 +19,8 @@
 package org.apache.pinot.core.transport;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -151,7 +153,24 @@ public class ServerChannels {
 
     ServerChannel(ServerRoutingInstance serverRoutingInstance) {
       _serverRoutingInstance = serverRoutingInstance;
+      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
+      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY.getGaugeName(),
+          metric.usedDirectMemory());
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY.getGaugeName(),
+          metric.usedHeapMemory());
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT.getGaugeName(), metric.numDirectArenas());
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_ARENAS_HEAP.getGaugeName(), metric.numHeapArenas());
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_SMALL.getGaugeName(),
+          metric.smallCacheSize());
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL.getGaugeName(),
+          metric.normalCacheSize());
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_THREADLOCALCACHE.getGaugeName(),
+          metric.numThreadLocalCaches());
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE.getGaugeName(), metric.chunkSize());
+
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
+          .option(ChannelOption.ALLOCATOR, bufAllocator)
           .group(_eventLoopGroup).channel(_channelClass).option(ChannelOption.SO_KEEPALIVE, true)
           .handler(new ChannelInitializer<SocketChannel>() {
             @Override

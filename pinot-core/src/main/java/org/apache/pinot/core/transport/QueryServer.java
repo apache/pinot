@@ -19,6 +19,8 @@
 package org.apache.pinot.core.transport;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
@@ -37,6 +39,8 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.util.OsCheck;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +59,7 @@ public class QueryServer {
   private final EventLoopGroup _workerGroup;
   private final Class<? extends ServerSocketChannel> _channelClass;
   private final ChannelHandler _instanceRequestHandler;
+  private final ServerMetrics _metrics;
   private Channel _channel;
 
   /**
@@ -63,8 +68,9 @@ public class QueryServer {
    * @param port bind port
    * @param nettyConfig configurations for netty library
    */
-  public QueryServer(int port, NettyConfig nettyConfig, ChannelHandler instanceRequestHandler) {
-    this(port, nettyConfig, null, instanceRequestHandler);
+  public QueryServer(int port, NettyConfig nettyConfig, ChannelHandler instanceRequestHandler,
+      ServerMetrics serverMetrics) {
+    this(port, nettyConfig, null, instanceRequestHandler, serverMetrics);
   }
 
   /**
@@ -74,10 +80,12 @@ public class QueryServer {
    * @param nettyConfig configurations for netty library
    * @param tlsConfig TLS/SSL config
    */
-  public QueryServer(int port, NettyConfig nettyConfig, TlsConfig tlsConfig, ChannelHandler instanceRequestHandler) {
+  public QueryServer(int port, NettyConfig nettyConfig, TlsConfig tlsConfig, ChannelHandler instanceRequestHandler,
+      ServerMetrics serverMetrics) {
     _port = port;
     _tlsConfig = tlsConfig;
     _instanceRequestHandler = instanceRequestHandler;
+    _metrics = serverMetrics;
 
     boolean enableNativeTransports = nettyConfig != null && nettyConfig.isNativeTransportsEnabled();
     OsCheck.OSType operatingSystemType = OsCheck.getOperatingSystemType();
@@ -114,8 +122,21 @@ public class QueryServer {
   public void start() {
     try {
       ServerBootstrap serverBootstrap = new ServerBootstrap();
+
+      PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
+      PooledByteBufAllocatorMetric metric = bufAllocator.metric();
+      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_USED_DIRECT_MEMORY.getGaugeName(), metric.usedDirectMemory());
+      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_USED_HEAP_MEMORY.getGaugeName(), metric.usedHeapMemory());
+      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_ARENAS_DIRECT.getGaugeName(), metric.numDirectArenas());
+      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_ARENAS_HEAP.getGaugeName(), metric.numHeapArenas());
+      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_SMALL.getGaugeName(), metric.smallCacheSize());
+      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL.getGaugeName(), metric.normalCacheSize());
+      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_THREADLOCALCACHE.getGaugeName(),
+          metric.numThreadLocalCaches());
+      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_CHUNK_SIZE.getGaugeName(), metric.chunkSize());
       _channel = serverBootstrap.group(_bossGroup, _workerGroup).channel(_channelClass)
           .option(ChannelOption.SO_BACKLOG, 128).childOption(ChannelOption.SO_KEEPALIVE, true)
+          .option(ChannelOption.ALLOCATOR, bufAllocator)
           .childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {

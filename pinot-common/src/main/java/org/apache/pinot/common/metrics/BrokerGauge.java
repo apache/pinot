@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import io.netty.buffer.PooledByteBufAllocatorMetric;
 import org.apache.pinot.common.Utils;
 
 
@@ -35,7 +36,27 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   RESIZE_TIME_MS("milliseconds", false),
   UNHEALTHY_SERVERS("servers", true),
   TIME_BOUNDARY_DIFFERENCE("milliseconds", false),
-  JVM_HEAP_USED_BYTES("bytes", true);
+  JVM_HEAP_USED_BYTES("bytes", true),
+  NETTY_POOLED_USED_DIRECT_MEMORY("bytes", true),
+  NETTY_POOLED_USED_HEAP_MEMORY("bytes", true),
+  NETTY_POOLED_ARENAS_DIRECT("arenas", true),
+  NETTY_POOLED_ARENAS_HEAP("arenas", true),
+
+  /**
+   * The size of the small cache.
+   * See {@link PooledByteBufAllocatorMetric#smallCacheSize()}
+   */
+  NETTY_POOLED_CACHE_SIZE_SMALL("bytes", true),
+  /**
+   * The size of the normal cache.
+   * See {@link PooledByteBufAllocatorMetric#normalCacheSize()}
+   */
+  NETTY_POOLED_CACHE_SIZE_NORMAL("bytes", true),
+  /**
+   * The cache size used by the allocator for normal arenas
+   */
+  NETTY_POOLED_THREADLOCALCACHE("bytes", true),
+  NETTY_POOLED_CHUNK_SIZE("bytes", true);
 
   private final String _brokerGaugeName;
   private final String _unit;

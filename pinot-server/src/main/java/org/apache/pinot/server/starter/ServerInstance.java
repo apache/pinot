@@ -135,7 +135,7 @@ public class ServerInstance {
       _instanceRequestHandler = ChannelHandlerFactory
           .getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(), _queryScheduler,
               _serverMetrics, new AllowAllAccessFactory().create());
-      _nettyQueryServer = new QueryServer(nettyPort, nettyConfig, _instanceRequestHandler);
+      _nettyQueryServer = new QueryServer(nettyPort, nettyConfig, _instanceRequestHandler, _serverMetrics);
     } else {
       _nettyQueryServer = null;
     }
@@ -146,7 +146,8 @@ public class ServerInstance {
       _instanceRequestHandler = ChannelHandlerFactory
           .getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(), _queryScheduler,
               _serverMetrics, _accessControl);
-      _nettyTlsQueryServer = new QueryServer(nettySecPort, nettyConfig, tlsConfig, _instanceRequestHandler);
+      _nettyTlsQueryServer = new QueryServer(nettySecPort, nettyConfig, tlsConfig, _instanceRequestHandler,
+          _serverMetrics);
     } else {
       _nettyTlsQueryServer = null;
     }
