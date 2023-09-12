@@ -28,6 +28,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
@@ -84,6 +86,39 @@ public class AsyncQueryResponse implements QueryResponse {
       throws InterruptedException {
     try {
       boolean finish = _countDownLatch.await(_maxEndTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
+      return _responseMap;
+    } finally {
+      // Update ServerRoutingStats.
+      for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
+        ServerResponse response = entry.getValue();
+        if (response == null || response.getDataTable() == null) {
+          // These are servers from which a response was not received. So update query response stats for such
+          // servers with maximum latency i.e timeout value.
+          _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, entry.getKey().getInstanceId(),
+              _timeoutMs);
+        }
+      }
+
+      _queryRouter.markQueryDone(_requestId);
+    }
+  }
+
+  public Map<ServerRoutingInstance, ServerResponse> getFinalResponses(QueryContext queryContext)
+      throws InterruptedException {
+    try {
+      boolean finish;
+      if (!QueryContextUtils.isAggregationQuery(queryContext) && queryContext.getOrderByExpressions() == null) {
+        int expectedResponseSize = queryContext.getLimit();
+        long totalResponseSize = _countDownLatch.getCount();
+        while (expectedResponseSize + _countDownLatch.getCount() > totalResponseSize
+            && System.currentTimeMillis() <= _maxEndTimeMs) {
+        }
+        finish = (expectedResponseSize + _countDownLatch.getCount() <= totalResponseSize) || (System.currentTimeMillis()
+            >= _maxEndTimeMs);
+      } else {
+        finish = _countDownLatch.await(_maxEndTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      }
       _status.compareAndSet(Status.IN_PROGRESS, finish ? Status.COMPLETED : Status.TIMED_OUT);
       return _responseMap;
     } finally {

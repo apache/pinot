@@ -22,9 +22,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.failuredetector.FailureDetector;
 import org.apache.pinot.broker.failuredetector.FailureDetectorFactory;
@@ -43,6 +46,9 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -105,14 +111,19 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     if (requestContext.isSampledRequest()) {
       serverBrokerRequest.getPinotQuery().putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
     }
-
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        Objects.requireNonNullElse(offlineBrokerRequest, realtimeBrokerRequest).pinotQuery);
     String rawTableName = TableNameBuilder.extractRawTableName(serverBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
     AsyncQueryResponse asyncQueryResponse =
         _queryRouter.submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable,
             realtimeBrokerRequest, realtimeRoutingTable, timeoutMs);
     _failureDetector.notifyQuerySubmitted(asyncQueryResponse);
-    Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
+    Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses(queryContext);
+    if (!QueryContextUtils.isAggregationQuery(queryContext) && queryContext.getOrderByExpressions() == null) {
+      this.cancelQuery(requestId, (int) timeoutMs, Executors.newFixedThreadPool(1),
+          new MultiThreadedHttpConnectionManager(), new HashMap<>());
+    }
     _failureDetector.notifyQueryFinished(asyncQueryResponse);
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
         System.nanoTime() - scatterGatherStartTimeNs);

@@ -29,6 +29,8 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.server.access.AccessControl;
@@ -256,7 +258,6 @@ public class QueryRoutingTest {
     waitForStatsUpdate(_requestCount);
     assertEquals(_serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverId).intValue(), 0);
 
-
     // Submit query after server is down
     startTimeMs = System.currentTimeMillis();
     asyncQueryResponse =
@@ -286,5 +287,115 @@ public class QueryRoutingTest {
   @AfterClass
   public void tearDown() {
     _queryRouter.shutDown();
+  }
+
+  private QueryServer startServer(String instanceName, int port, byte[] responseBytes) {
+    InstanceRequestHandler handler =
+        new InstanceRequestHandler(instanceName, new PinotConfiguration(), mockQueryScheduler(0, responseBytes),
+            mock(ServerMetrics.class), mock(AccessControl.class));
+    return new QueryServer(port, null, handler);
+  }
+
+  @Test
+  public void testValidResponseWithShortCircuit()
+      throws Exception {
+    long requestId = 123;
+    DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
+    dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+    byte[] responseBytes = dataTable.toBytes();
+
+    // Start the server
+    QueryServer qs1 = startServer("server01", 1111, responseBytes);
+    QueryServer qs2 = startServer("server02", 1112, responseBytes);
+    QueryServer qs3 = startServer("server03", 1113, responseBytes);
+    QueryServer qs4 = startServer("server04", 1114, responseBytes);
+    QueryServer qs5 = startServer("server05", 1115, responseBytes);
+
+    qs1.start();
+    qs2.start();
+    qs3.start();
+    qs4.start();
+    qs5.start();
+
+    ServerInstance serverInstance1 = new ServerInstance("localhost", 1111);
+    ServerInstance serverInstance2 = new ServerInstance("localhost", 1112);
+    ServerInstance serverInstance3 = new ServerInstance("localhost", 1113);
+    ServerInstance serverInstance4 = new ServerInstance("localhost", 1114);
+    ServerInstance serverInstance5 = new ServerInstance("localhost", 1115);
+
+    Map<ServerInstance, List<String>> routingTable = new HashMap<>();
+    routingTable.put(serverInstance1, Collections.emptyList());
+    routingTable.put(serverInstance2, Collections.emptyList());
+    routingTable.put(serverInstance3, Collections.emptyList());
+    routingTable.put(serverInstance4, Collections.emptyList());
+    routingTable.put(serverInstance5, Collections.emptyList());
+
+    {
+      // Offline Only
+
+      String query = "SELECT * FROM testTable LIMIT 2";
+      BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+
+      AsyncQueryResponse asyncQueryResponse =
+          _queryRouter.submitQuery(requestId, "testTable", brokerRequest, routingTable, null, null, 600_000L);
+      Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses(queryContext);
+      assertEquals(response.size(), 5);
+
+      ServerRoutingInstance offlineServerRoutingInstance =
+          serverInstance1.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+      assertTrue(response.containsKey(offlineServerRoutingInstance));
+      ServerResponse serverResponse = response.get(offlineServerRoutingInstance);
+      assertNotNull(serverResponse.getDataTable());
+      assertEquals(serverResponse.getResponseSize(), responseBytes.length);
+
+      offlineServerRoutingInstance =
+          serverInstance2.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+      assertTrue(response.containsKey(offlineServerRoutingInstance));
+      serverResponse = response.get(offlineServerRoutingInstance);
+      assertNotNull(serverResponse.getDataTable());
+      assertEquals(serverResponse.getResponseSize(), responseBytes.length);
+
+      offlineServerRoutingInstance =
+          serverInstance3.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+      assertTrue(response.containsKey(offlineServerRoutingInstance));
+      serverResponse = response.get(offlineServerRoutingInstance);
+      assertNotNull(serverResponse.getDataTable());
+      assertEquals(serverResponse.getResponseSize(), responseBytes.length);
+
+      offlineServerRoutingInstance =
+          serverInstance4.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+      assertTrue(response.containsKey(offlineServerRoutingInstance));
+      serverResponse = response.get(offlineServerRoutingInstance);
+      assertNotNull(serverResponse.getDataTable());
+      assertEquals(serverResponse.getResponseSize(), responseBytes.length);
+
+      offlineServerRoutingInstance =
+          serverInstance5.toServerRoutingInstance(TableType.OFFLINE, ServerInstance.RoutingType.NETTY);
+      assertTrue(response.containsKey(offlineServerRoutingInstance));
+      serverResponse = response.get(offlineServerRoutingInstance);
+      assertNotNull(serverResponse.getDataTable());
+      assertEquals(serverResponse.getResponseSize(), responseBytes.length);
+
+      _requestCount += 10;
+      waitForStatsUpdate(_requestCount);
+      assertEquals(
+          _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance1.getInstanceId()).intValue(), 0);
+      assertEquals(
+          _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance2.getInstanceId()).intValue(), 0);
+      assertEquals(
+          _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance3.getInstanceId()).intValue(), 0);
+      assertEquals(
+          _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance4.getInstanceId()).intValue(), 0);
+      assertEquals(
+          _serverRoutingStatsManager.fetchNumInFlightRequestsForServer(serverInstance5.getInstanceId()).intValue(), 0);
+    }
+
+    // Shut down the server
+    qs1.shutDown();
+    qs2.shutDown();
+    qs3.shutDown();
+    qs4.shutDown();
+    qs5.shutDown();
   }
 }
