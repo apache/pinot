@@ -21,7 +21,8 @@ package org.apache.pinot.segment.spi.utils;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Map;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -46,7 +47,8 @@ public class SegmentMetadataUtils {
   }
 
   public static void savePropertiesConfiguration(PropertiesConfiguration propertiesConfiguration) {
-    File metadataFile = propertiesConfiguration.getFile();
+    FileHandler handler = new FileHandler(propertiesConfiguration);
+    File metadataFile = handler.getFile();
     Preconditions.checkState(metadataFile != null, "Cannot save PropertiesConfiguration not loaded from file");
     CommonsConfigurationUtils.saveToFile(propertiesConfiguration, metadataFile);
   }

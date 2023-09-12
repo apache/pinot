@@ -33,8 +33,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
+import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -52,17 +55,9 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromFile(File file) {
     try {
-      PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-
-      // Commons Configuration 1.10 does not support file path containing '%'.
-      // Explicitly providing the input stream on load bypasses the problem.
-      propertiesConfiguration.setFile(file);
-      if (file.exists()) {
-        propertiesConfiguration.load(new FileInputStream(file));
-      }
-
-      return propertiesConfiguration;
-    } catch (ConfigurationException | FileNotFoundException e) {
+      Configurations configs = new Configurations();
+      return configs.properties(file);
+    } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
   }
@@ -75,7 +70,8 @@ public class CommonsConfigurationUtils {
   public static PropertiesConfiguration fromInputStream(InputStream inputStream) {
     try {
       PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-      propertiesConfiguration.load(inputStream);
+      FileHandler handler = new FileHandler(propertiesConfiguration);
+      handler.load(inputStream);
       return propertiesConfiguration;
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);
@@ -85,8 +81,9 @@ public class CommonsConfigurationUtils {
   public static void saveToFile(PropertiesConfiguration propertiesConfiguration, File file) {
     // Commons Configuration 1.10 does not support file path containing '%'.
     // Explicitly providing the output stream for save bypasses the problem.
+    FileHandler handler = new FileHandler(propertiesConfiguration);
     try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
-      propertiesConfiguration.save(fileOutputStream);
+      handler.save(fileOutputStream);
     } catch (ConfigurationException | IOException e) {
       throw new RuntimeException(e);
     }

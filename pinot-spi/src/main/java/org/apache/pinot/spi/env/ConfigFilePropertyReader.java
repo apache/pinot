@@ -25,8 +25,8 @@ import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReade
 
 public class ConfigFilePropertyReader extends PropertiesConfiguration.PropertiesReader {
 
-  public ConfigFilePropertyReader(Reader reader, char listDelimiter) {
-    super(reader, listDelimiter);
+  public ConfigFilePropertyReader(Reader reader) {
+    super(reader);
   }
 
   @Override

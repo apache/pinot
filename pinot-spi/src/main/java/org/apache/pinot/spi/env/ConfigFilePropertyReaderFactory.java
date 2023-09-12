@@ -26,6 +26,6 @@ import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReade
 public class ConfigFilePropertyReaderFactory extends DefaultIOFactory {
   @Override
   public PropertiesReader createPropertiesReader(Reader in) {
-    return new ConfigFilePropertyReader(in, delimiter);
+    return new ConfigFilePropertyReader(in);
   }
 }
