@@ -28,6 +28,7 @@ import java.util.Set;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -48,7 +49,8 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
-public class UpsertTableRebalanceIntegrationTest extends BaseClusterIntegrationTest {
+
+public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_SERVERS = 1;
   private static final String PRIMARY_KEY_COL = "clientId";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME);
@@ -299,30 +301,6 @@ public class UpsertTableRebalanceIntegrationTest extends BaseClusterIntegrationT
     return 3;
   }
 
-  @Override
-  protected void waitForAllDocsLoaded(long timeoutMs)
-      throws Exception {
-    Thread.sleep(5000L); //TODO: Wait for some time for rebalance to kickoff
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        return getCurrentCountStarResultWithoutUpsert() == getCountStarResultWithoutUpsert();
-      } catch (Exception e) {
-        return null;
-      }
-    }, 100L, timeoutMs, "Failed to load all documents");
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
-  }
-
-  private long getCurrentCountStarResultWithoutUpsert() {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName() + " OPTION(skipUpsert=true)")
-        .getResultSet(0).getLong(0);
-  }
-
-  private long getCountStarResultWithoutUpsert() {
-    // 3 Avro files, each with 100 documents, one copy from streaming source, one copy from batch source
-    return 600;
-  }
-
   protected void waitForAllDocsLoaded(long timeoutMs, long expectedCount)
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
@@ -344,5 +322,50 @@ public class UpsertTableRebalanceIntegrationTest extends BaseClusterIntegrationT
       default:
         return new LLCSegmentName(segmentName).getPartitionGroupId();
     }
+  }
+
+  @Override
+  protected void waitForAllDocsLoaded(long timeoutMs)
+      throws Exception {
+    Thread.sleep(5000L); //TODO: Wait for some time for rebalance to kickoff
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        return getCurrentCountStarResultWithoutUpsert() == getCountStarResultWithoutUpsert();
+      } catch (Exception e) {
+        return null;
+      }
+    }, 100L, timeoutMs, "Failed to load all documents");
+    assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    // verify there are no null rows
+    assertEquals(getCurrentCountStarResultWithoutNulls(getTableName(), _schema), getCountStarResultWithoutUpsert());
+  }
+
+  private long getCurrentCountStarResultWithoutUpsert() {
+    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName() + " OPTION(skipUpsert=true)")
+        .getResultSet(0).getLong(0);
+  }
+
+  private long getCountStarResultWithoutUpsert() {
+    // 3 Avro files, each with 100 documents, one copy from streaming source, one copy from batch source
+    return 600;
+  }
+
+  protected long getCurrentCountStarResultWithoutNulls(String tableName, Schema schema) {
+    StringBuilder queryFilter = new StringBuilder(" WHERE ");
+    for (String column : schema.getColumnNames()) {
+      if (schema.getFieldSpecFor(column).isSingleValueField()) {
+        queryFilter.append(column).append(" IS NOT NULL AND ");
+      }
+    }
+
+    // remove last AND
+    queryFilter = new StringBuilder(queryFilter.substring(0, queryFilter.length() - 5));
+
+    ResultSetGroup resultSetGroup =
+        getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + queryFilter + " OPTION(skipUpsert=true)");
+    if (resultSetGroup.getResultSetCount() > 0) {
+      return resultSetGroup.getResultSet(0).getLong(0);
+    }
+    return 0;
   }
 }
