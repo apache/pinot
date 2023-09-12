@@ -22,6 +22,7 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -86,5 +87,10 @@ public class ChannelHandlerFactory {
   public static ChannelHandler getInstanceRequestHandler(String instanceName, PinotConfiguration config,
       QueryScheduler queryScheduler, ServerMetrics serverMetrics, AccessControl accessControl) {
     return new InstanceRequestHandler(instanceName, config, queryScheduler, serverMetrics, accessControl);
+  }
+
+  public static ChannelHandler getDirectOOMHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
+      ConcurrentHashMap<ServerRoutingInstance, ServerChannels.ServerChannel> serverToChannelMap) {
+    return new DirectOOMHandler(queryRouter, serverRoutingInstance, serverToChannelMap);
   }
 }

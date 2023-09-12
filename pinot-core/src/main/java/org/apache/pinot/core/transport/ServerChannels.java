@@ -142,7 +142,7 @@ public class ServerChannels {
   }
 
   @ThreadSafe
-  private class ServerChannel {
+  class ServerChannel {
     final ServerRoutingInstance _serverRoutingInstance;
     final Bootstrap _bootstrap;
     // lock to protect channel as requests must be written into channel sequentially
@@ -164,12 +164,30 @@ public class ServerChannels {
 
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldBasedFrameDecoder());
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldPrepender());
+              ch.pipeline().addLast(
+                  ChannelHandlerFactory.getDirectOOMHandler(_queryRouter, _serverRoutingInstance, _serverToChannelMap)
+              );
               // NOTE: data table de-serialization happens inside this handler
               // Revisit if this becomes a bottleneck
-              ch.pipeline().addLast(
-                  ChannelHandlerFactory.getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
+              ch.pipeline().addLast(ChannelHandlerFactory
+                      .getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
             }
           });
+    }
+
+    void closeChannel() {
+      if (_channel != null) {
+        _channel.close();
+      }
+    }
+
+    void setSilentShutdown() {
+      if (_channel != null) {
+        DirectOOMHandler directOOMHandler = _channel.pipeline().get(DirectOOMHandler.class);
+        if (directOOMHandler != null) {
+          directOOMHandler.setSilentShutDown();
+        }
+      }
     }
 
     void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
