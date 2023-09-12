@@ -261,7 +261,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null) {
-      requestContext.setErrorCode(QueryException.BROKER_REQUEST_SEND_ERROR_CODE);
+      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
       _brokerQueryEventListener.onQueryCompletion(new BrokerQueryEventInfo(requestContext));
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
