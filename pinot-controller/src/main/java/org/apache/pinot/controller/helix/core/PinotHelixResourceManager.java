@@ -316,7 +316,7 @@ public class PinotHelixResourceManager {
     Map<String, String> configs = _helixAdmin.getConfig(helixConfigScope,
         Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY));
     boolean caseInsensitive = Boolean.parseBoolean(configs.getOrDefault(Helix.ENABLE_CASE_INSENSITIVE_KEY,
-            Boolean.toString(Helix.DEFAULT_ENABLE_CASE_INSENSITIVE)));
+        Boolean.toString(Helix.DEFAULT_ENABLE_CASE_INSENSITIVE)));
     _tableCache = new TableCache(_propertyStore, caseInsensitive);
   }
 
@@ -1555,6 +1555,32 @@ public class PinotHelixResourceManager {
     validateTableTenantConfig(tableConfig);
     TableType tableType = tableConfig.getTableType();
 
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    // Ensure that table is not created if schema is not present
+    Schema schema =
+        ZKMetadataProvider.getSchema(_propertyStore, rawTableName);
+
+    // If schema and table name is not the same, we copy schema to same table name.
+    if (schema == null) {
+      // Fall back to getting schema-name from table config if schema-name != table-name
+      String schemaName = tableConfig.getValidationConfig().getSchemaName();
+      schema = ZKMetadataProvider.getSchema(_propertyStore, schemaName);
+      if (schemaName == null || schema == null) {
+        throw new InvalidTableConfigException("No schema defined for table: " + tableNameWithType);
+      }
+      try {
+        schema.setSchemaName(rawTableName);
+        addSchema(schema, true, false);
+      } catch (SchemaAlreadyExistsException e) {
+        // Let user manually figure out why they are trying to add a table with a schema that already exists
+        throw new InvalidTableConfigException("Schema name: " + schemaName + " already exists");
+      } catch (SchemaBackwardIncompatibleException e) {
+        throw new InvalidTableConfigException(
+            "Backward incompatibility found when update schema: " + rawTableName + " using schema: " + schemaName);
+      }
+      tableConfig.getValidationConfig().setSchemaName(rawTableName);
+    }
+
     switch (tableType) {
       case OFFLINE:
         // now lets build an ideal state
@@ -1584,18 +1610,6 @@ public class PinotHelixResourceManager {
 
       case REALTIME:
         verifyStreamConfig(tableNameWithType, tableConfig);
-
-        // Ensure that realtime table is not created if schema is not present
-        Schema schema =
-            ZKMetadataProvider.getSchema(_propertyStore, TableNameBuilder.extractRawTableName(tableNameWithType));
-
-        if (schema == null) {
-          // Fall back to getting schema-name from table config if schema-name != table-name
-          String schemaName = tableConfig.getValidationConfig().getSchemaName();
-          if (schemaName == null || ZKMetadataProvider.getSchema(_propertyStore, schemaName) == null) {
-            throw new InvalidTableConfigException("No schema defined for realtime table: " + tableNameWithType);
-          }
-        }
 
         try {
           // lets add table configs
@@ -2196,8 +2210,8 @@ public class PinotHelixResourceManager {
       tasks.put(jobId, jobMetadata);
       if (tasks.size() > CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK) {
         tasks = tasks.entrySet().stream().sorted((v1, v2) -> Long.compare(
-            Long.parseLong(v2.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)),
-            Long.parseLong(v1.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS))))
+                Long.parseLong(v2.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)),
+                Long.parseLong(v1.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS))))
             .collect(Collectors.toList()).subList(0, CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK)
             .stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       }
