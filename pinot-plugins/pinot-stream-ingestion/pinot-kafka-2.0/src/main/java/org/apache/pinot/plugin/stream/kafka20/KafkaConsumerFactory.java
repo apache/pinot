@@ -25,22 +25,22 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 
 public class KafkaConsumerFactory extends StreamConsumerFactory {
 
-  private String PARTITION_LEVEL_CONSUMER = "_partition_level_consumer";
-  private String PARTITION_METADATA_PROVIDER = "_partition_metadata_provider";
-  private String STREAM_METADATA_PROVIDER = "_stream_metadata_provider";
+  private static final String _PARTITION_LEVEL_CONSUMER = "_partition_level_consumer";
+  private static final String _PARTITION_METADATA_PROVIDER = "_partition_metadata_provider";
+  private static final String _STREAM_METADATA_PROVIDER = "_stream_metadata_provider";
 
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    return new KafkaPartitionLevelConsumer(clientId + PARTITION_LEVEL_CONSUMER, _streamConfig, partition);
+    return new KafkaPartitionLevelConsumer(clientId + _PARTITION_LEVEL_CONSUMER, _streamConfig, partition);
   }
 
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
-    return new KafkaStreamMetadataProvider(clientId + PARTITION_METADATA_PROVIDER, _streamConfig, partition);
+    return new KafkaStreamMetadataProvider(clientId + _PARTITION_METADATA_PROVIDER, _streamConfig, partition);
   }
 
   @Override
   public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
-    return new KafkaStreamMetadataProvider(clientId + STREAM_METADATA_PROVIDER, _streamConfig);
+    return new KafkaStreamMetadataProvider(clientId + _STREAM_METADATA_PROVIDER, _streamConfig);
   }
 }
