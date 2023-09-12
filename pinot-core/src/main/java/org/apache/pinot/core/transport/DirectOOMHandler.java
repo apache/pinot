@@ -28,11 +28,12 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-// Handling netty direct memory OOM. In this case there is a great chance that multiple channels are receiving
-// large data tables from servers concurrently. We want to close all channels to servers to proactively release
-// the direct memory, because the execution of netty threads can deadlock in allocating direct memory, in which case
-// no one will reach channelRead0.
+/**
+ * Handling netty direct memory OOM. In this case there is a great chance that multiple channels are receiving
+ * large data tables from servers concurrently. We want to close all channels to servers to proactively release
+ * the direct memory, because the execution of netty threads can all block in allocating direct memory, in which case
+ * no one will reach channelRead0.
+ */
 public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTableHandler.class);
   private static final AtomicBoolean DIRECT_OOM_SHUTTING_DOWN = new AtomicBoolean(false);
@@ -71,7 +72,6 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
           LOGGER.error("Closing ALL channels to servers, as we are running out of direct memory "
               + "while receiving response from {}", _serverRoutingInstance, cause);
           // close all channels to servers
-          ctx.channel().close();
           _serverToChannelMap.keySet().forEach(serverRoutingInstance -> {
             ServerChannels.ServerChannel removed = _serverToChannelMap.remove(serverRoutingInstance);
             removed.closeChannel();
