@@ -16,9 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.queryeventlistener;
+package org.apache.pinot.spi.eventlistener.query;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
+
 
 public interface BrokerQueryEventListener {
 
+  void init(PinotConfiguration eventListenerConfiguration);
   void onQueryCompletion(BrokerQueryEventInfo brokerQueryEventInfo);
 }

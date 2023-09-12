@@ -16,9 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.queryeventlistener;
+package org.apache.pinot.spi.eventlistener.query;
+
+import org.apache.pinot.spi.env.PinotConfiguration;
+
 
 public class NoOpBrokerQueryEventListener implements BrokerQueryEventListener {
+
+  @Override
+  public void init(PinotConfiguration eventListenerConfiguration) {
+    // Not implemented method
+  }
 
   @Override
   public void onQueryCompletion(BrokerQueryEventInfo brokerQueryEventInfo) {

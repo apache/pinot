@@ -29,7 +29,7 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.queryeventlistener.PinotBrokerQueryEventListenerUtils;
+import org.apache.pinot.spi.eventlistener.query.PinotBrokerQueryEventListenerUtils;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;

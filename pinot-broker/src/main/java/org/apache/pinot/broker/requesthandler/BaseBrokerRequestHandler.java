@@ -89,9 +89,9 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventInfo;
+import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventInfo;
-import org.apache.pinot.spi.queryeventlistener.BrokerQueryEventListener;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -246,6 +246,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       throws Exception {
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
+    long requestId = _brokerIdGenerator.get();
+    requestContext.setRequestId(requestId);
+
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.
     boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity);
@@ -256,10 +259,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
-    long requestId = _brokerIdGenerator.get();
-    requestContext.setRequestId(requestId);
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null) {
+      requestContext.setErrorCode(QueryException.BROKER_REQUEST_SEND_ERROR_CODE);
       _brokerQueryEventListener.onQueryCompletion(new BrokerQueryEventInfo(requestContext));
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }

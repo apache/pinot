@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.queryeventlistener;
+package org.apache.pinot.spi.eventlistener.query;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,15 +25,15 @@ import org.apache.pinot.spi.trace.RequestContext;
 
 
 public class BrokerQueryEventInfo {
-  private String _requestId;
-  private String _brokerId;
-  private String _query;
-  private String _queryStatus;
-  private String _failureJson;
-  private int _errorCode;
+  private String _requestId = "";
+  private String _brokerId = "";
+  private String _query = "";
+  private String _queryStatus = "";
+  private String _failureJson = "";
+  private int _errorCode = -1;
 
-  private long _requestArrivalTimeMillis;
-  private int _numServersQueried;
+  private long _requestArrivalTimeMillis = 0L;
+  private int _numServersQueried = 0;
   private int _numServersResponded = 0;
   private long _numDocsScanned = 0L;
   private long _numEntriesScannedInFilter = 0L;
@@ -67,8 +67,8 @@ public class BrokerQueryEventInfo {
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private int _numRowsResultSet = 0;
   private List<String> _tableNames = new ArrayList<>();
-  private String _offlineServerTenant;
-  private String _realtimeServerTenant;
+  private String _offlineServerTenant = "";
+  private String _realtimeServerTenant = "";
 
   public BrokerQueryEventInfo() {
   }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.queryeventlistener;
+package org.apache.pinot.spi.eventlistener.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -67,6 +67,7 @@ public class PinotBrokerQueryEventListenerUtils {
     clazzFound.ifPresent(clazz -> {
       try {
         BrokerQueryEventListener brokerQueryEventListener = (BrokerQueryEventListener) clazz.newInstance();
+        brokerQueryEventListener.init(eventListenerConfiguration);
         registerBrokerEventListener(brokerQueryEventListener);
       } catch (Exception e) {
         LOGGER.error("Caught exception while initializing event listener registry: {}, skipping it", clazz, e);
@@ -78,7 +79,7 @@ public class PinotBrokerQueryEventListenerUtils {
   }
 
   /**
-   * Registers an broker event listener.
+   * Registers a broker event listener.
    */
   private static void registerBrokerEventListener(BrokerQueryEventListener brokerQueryEventListener) {
     LOGGER.info("Registering broker event listener : {}", brokerQueryEventListener.getClass().getName());
