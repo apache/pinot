@@ -277,6 +277,10 @@ public final class TableConfigUtils {
         throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
             + "' for peerSegmentDownloadScheme. Must be one of http or https");
       }
+
+      if (tableConfig.getReplication() < 2) {
+        throw new IllegalStateException("peerSegmentDownloadScheme can't be used when replication is < 2");
+      }
     }
 
     validateRetentionConfig(tableConfig);
