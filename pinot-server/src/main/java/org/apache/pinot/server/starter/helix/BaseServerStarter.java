@@ -559,6 +559,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
               + "'", e);
     }
 
+    // Create a thread pool used for mutable lucene index searches, with size based on query_worker_threads config
+    LOGGER.info("Initializing lucene searcher thread pool");
+    int queryWorkerThreads =
+        _serverConf.getProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    _realtimeLuceneTextIndexSearcherPool = RealtimeLuceneTextIndexSearcherPool.init(queryWorkerThreads);
+
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
     ControllerLeaderLocator.create(_helixManager);
@@ -622,11 +628,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
         throw e;
       }
     }
-
-    // Create a thread pool used for mutable lucene index searches, with size based on query_worker_threads config
-    int queryWorkerThreads =
-        _serverConf.getProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
-    _realtimeLuceneTextIndexSearcherPool = RealtimeLuceneTextIndexSearcherPool.init(queryWorkerThreads);
 
     preServeQueries();
 

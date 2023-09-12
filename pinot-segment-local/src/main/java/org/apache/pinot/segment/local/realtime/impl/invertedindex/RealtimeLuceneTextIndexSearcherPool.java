@@ -45,7 +45,7 @@ public class RealtimeLuceneTextIndexSearcherPool {
     return _singletonInstance;
   }
 
-  public static synchronized RealtimeLuceneTextIndexSearcherPool init(int size) {
+  public static RealtimeLuceneTextIndexSearcherPool init(int size) {
     _singletonInstance = new RealtimeLuceneTextIndexSearcherPool(size);
     return _singletonInstance;
   }
