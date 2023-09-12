@@ -175,6 +175,12 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
         + "WHERE CRSDepTime BETWEEN 1137 AND 1849 AND DivArrDelay > 218 AND CRSDepTime NOT IN (35, 1633, 1457, 140) "
         + "AND LongestAddGTime NOT IN (17, 105, 20, 22) GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery);
+
+    // Query containing predicate with nested OR and ANDs
+    starQuery =
+        "SELECT SUM(DepDelayMinutes) FROM myStarTable WHERE ((DepDelay > 0 AND ArrDelay > 0) OR (OriginStateName = "
+            + "'Massachusetts' AND DepDelay = 5)) OR ArrDelay = 5 OR (DepDelay = 10 AND ArrDelay = 5)";
+    testStarQuery(starQuery);
   }
 
   private void testStarQuery(String starQuery)
