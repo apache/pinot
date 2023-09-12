@@ -165,9 +165,6 @@ public class AsyncQueryResponse implements QueryResponse {
     _status.set(Status.FAILED);
     _failedServer = serverRoutingInstance;
     _exception = exception;
-    _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, serverRoutingInstance.getInstanceId(),
-        _timeoutMs);
-
     int count = (int) _countDownLatch.getCount();
     for (int i = 0; i < count; i++) {
       _countDownLatch.countDown();
