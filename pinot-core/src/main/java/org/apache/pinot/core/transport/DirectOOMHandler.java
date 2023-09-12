@@ -66,6 +66,7 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
     // catch direct memory oom here
     if (cause instanceof OutOfMemoryError && cause.getMessage().contains("Direct buffer")) {
+      BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.DIRECT_MEMORY_OOM, 1L);
       // only one thread can get here and do the shutdown
       if (DIRECT_OOM_SHUTTING_DOWN.compareAndSet(false, true)) {
         try {
@@ -79,7 +80,6 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
           });
           _queryRouter.markServerDown(_serverRoutingInstance,
               new QueryCancelledException("Query cancelled as broker is out of direct memory"));
-          BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.DIRECT_MEMORY_OOM, 1L);
         } catch (Exception e) {
           LOGGER.error("Caught exception while handling direct memory OOM", e);
         } finally {
