@@ -203,9 +203,9 @@ public class QueryRunner {
   private Map<String, String> consolidateMetadata(Map<String, String> customProperties,
       Map<String, String> requestMetadata) {
     Map<String, String> opChainMetadata = new HashMap<>();
-    // 1. put all custom Properties
+    // 1. put all request level metadata
     opChainMetadata.putAll(requestMetadata);
-    // 2. put all request level metadata
+    // 2. put all stageMetadata.customProperties.
     opChainMetadata.putAll(customProperties);
     // 3. add all overrides from config if anything is still empty.
     Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
