@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -28,8 +29,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunction {
 
-  public MinMaxRangeMVAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  public MinMaxRangeMVAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifySingleArgument(arguments, "MIN_MAX_RANGE_MV"));
   }
 
   @Override

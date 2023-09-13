@@ -42,18 +42,18 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
 
   private final boolean _nullHandlingEnabled;
 
-  public CountAggregationFunction(ExpressionContext expression) {
-    this(expression, false);
+  public CountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    this(verifySingleArgument(arguments, "COUNT"), nullHandlingEnabled);
   }
 
-  public CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+  protected CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     // Consider null values only when null handling is enabled and function is not COUNT(*)
     // Note COUNT on any literal gives same result as COUNT(*)
     // So allow for identifiers that are not * and functions, disable for literals and *
-    _nullHandlingEnabled = nullHandlingEnabled
-            && ((expression.getType() == ExpressionContext.Type.IDENTIFIER && !expression.getIdentifier().equals("*"))
-            || (expression.getType() == ExpressionContext.Type.FUNCTION));
+    _nullHandlingEnabled = nullHandlingEnabled && (
+        (expression.getType() == ExpressionContext.Type.IDENTIFIER && !expression.getIdentifier().equals("*")) || (
+            expression.getType() == ExpressionContext.Type.FUNCTION));
   }
 
   @Override
