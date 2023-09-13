@@ -33,8 +33,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 public class DistinctSumAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
-  public DistinctSumAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTSUM);
+  public DistinctSumAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+    super(expression, AggregationFunctionType.DISTINCTSUM, nullHandlingEnabled);
   }
 
   @Override

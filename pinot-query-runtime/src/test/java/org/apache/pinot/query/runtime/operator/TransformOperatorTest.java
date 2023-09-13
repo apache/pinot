@@ -22,13 +22,12 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -60,19 +59,18 @@ public class TransformOperatorTest {
 
   @Test
   public void shouldHandleRefTransform() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"intCol", "strCol"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema upStreamSchema = new DataSchema(new String[]{"intCol", "strCol"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
     Mockito.when(_upstreamOp.nextBlock())
         .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1, "a"}, new Object[]{2, "b"}));
     // Output column value
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
     RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
-    TransformOperator op =
-        new TransformOperator(OperatorTestUtil.getDefaultContext(),
-            _upstreamOp, resultSchema, ImmutableList.of(ref0, ref1), upStreamSchema);
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+        ImmutableList.of(ref0, ref1), upStreamSchema);
     TransferableBlock result = op.nextBlock();
 
     Assert.assertTrue(!result.isErrorBlock());
@@ -85,24 +83,23 @@ public class TransformOperatorTest {
 
   @Test
   public void shouldHandleLiteralTransform() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"boolCol", "strCol"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.STRING
+    DataSchema upStreamSchema = new DataSchema(new String[]{"boolCol", "strCol"}, new ColumnDataType[]{
+        ColumnDataType.BOOLEAN, ColumnDataType.STRING
     });
     DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "strCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.STRING});
+        new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.STRING});
     Mockito.when(_upstreamOp.nextBlock())
         .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1, "a"}, new Object[]{2, "b"}));
     // Set up literal operands
-    RexExpression.Literal boolLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
-    RexExpression.Literal strLiteral = new RexExpression.Literal(FieldSpec.DataType.STRING, "str");
-    TransformOperator op =
-        new TransformOperator(OperatorTestUtil.getDefaultContext(),
-            _upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
+    RexExpression.Literal boolLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
+    RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+        ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     // Literal operands should just output original literals.
     Assert.assertTrue(!result.isErrorBlock());
     List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{true, "str"}, new Object[]{true, "str"});
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "str"}, new Object[]{1, "str"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
@@ -110,10 +107,9 @@ public class TransformOperatorTest {
 
   @Test
   public void shouldHandlePlusMinusFuncTransform() {
-    DataSchema upStreamSchema =
-        new DataSchema(new String[]{"doubleCol1", "doubleCol2"}, new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
-        });
+    DataSchema upStreamSchema = new DataSchema(new String[]{"doubleCol1", "doubleCol2"}, new ColumnDataType[]{
+        ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+    });
     Mockito.when(_upstreamOp.nextBlock())
         .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1.0, 1.0}, new Object[]{2.0, 3.0}));
     // Run a plus and minus function operand on double columns.
@@ -121,14 +117,13 @@ public class TransformOperatorTest {
     RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
     List<RexExpression> functionOperands = ImmutableList.of(ref0, ref1);
     RexExpression.FunctionCall plus01 =
-        new RexExpression.FunctionCall(PLUS, FieldSpec.DataType.DOUBLE, "plus", functionOperands);
+        new RexExpression.FunctionCall(PLUS, ColumnDataType.DOUBLE, "plus", functionOperands);
     RexExpression.FunctionCall minus01 =
-        new RexExpression.FunctionCall(MINUS, FieldSpec.DataType.DOUBLE, "minus", functionOperands);
+        new RexExpression.FunctionCall(MINUS, ColumnDataType.DOUBLE, "minus", functionOperands);
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
-    TransformOperator op =
-        new TransformOperator(OperatorTestUtil.getDefaultContext(),
-            _upstreamOp, resultSchema, ImmutableList.of(plus01, minus01), upStreamSchema);
+        new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+        ImmutableList.of(plus01, minus01), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(!result.isErrorBlock());
     List<Object[]> resultRows = result.getContainer();
@@ -140,85 +135,76 @@ public class TransformOperatorTest {
 
   @Test
   public void shouldThrowOnTypeMismatchFuncTransform() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
+    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING
     });
     Mockito.when(_upstreamOp.nextBlock())
-        .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{"1.0", "1.0"}, new Object[]{"2.0", "3.0"}));
+        .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{"str1", "str1"}, new Object[]{"str2", "str3"}));
     // Run a plus and minus function operand on string columns.
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
     RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
     List<RexExpression> functionOperands = ImmutableList.of(ref0, ref1);
     RexExpression.FunctionCall plus01 =
-        new RexExpression.FunctionCall(PLUS, FieldSpec.DataType.DOUBLE, "plus", functionOperands);
+        new RexExpression.FunctionCall(PLUS, ColumnDataType.DOUBLE, "plus", functionOperands);
     RexExpression.FunctionCall minus01 =
-        new RexExpression.FunctionCall(MINUS, FieldSpec.DataType.DOUBLE, "minus", functionOperands);
+        new RexExpression.FunctionCall(MINUS, ColumnDataType.DOUBLE, "minus", functionOperands);
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE});
-    TransformOperator op =
-        new TransformOperator(OperatorTestUtil.getDefaultContext(),
-            _upstreamOp, resultSchema, ImmutableList.of(plus01, minus01), upStreamSchema);
+        new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+        ImmutableList.of(plus01, minus01), upStreamSchema);
 
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    DataBlock data = result.getDataBlock();
-    Assert.assertTrue(data.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("ArithmeticFunctions"));
+    Assert.assertTrue(result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("NumberFormatException"));
   }
 
   @Test
   public void shouldPropagateUpstreamError() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
+    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING
     });
     Mockito.when(_upstreamOp.nextBlock())
         .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("transformError")));
-    RexExpression.Literal boolLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
-    RexExpression.Literal strLiteral = new RexExpression.Literal(FieldSpec.DataType.STRING, "str");
+    RexExpression.Literal boolLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
+    RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
-    TransformOperator op =
-        new TransformOperator(OperatorTestUtil.getDefaultContext(),
-            _upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+        ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    DataBlock data = result.getDataBlock();
-    Assert.assertTrue(data.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("transformError"));
+    Assert.assertTrue(result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("transformError"));
   }
 
   @Test
   public void testNoopBlock() {
-    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
+    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING
     });
     Mockito.when(_upstreamOp.nextBlock())
         .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{"a", "a"}, new Object[]{"b", "b"}))
-        .thenReturn(TransferableBlockUtils.getNoOpTransferableBlock())
         .thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{"c", "c"}, new Object[]{"d", "d"}, new Object[]{
             "e", "e"
         }));
-    RexExpression.Literal boolLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
-    RexExpression.Literal strLiteral = new RexExpression.Literal(FieldSpec.DataType.STRING, "str");
+    RexExpression.Literal boolLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
+    RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
     DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "strCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.STRING});
-    TransformOperator op =
-        new TransformOperator(OperatorTestUtil.getDefaultContext(),
-            _upstreamOp, resultSchema, ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
+        new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.STRING});
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema,
+        ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     // First block has two rows
     Assert.assertFalse(result.isErrorBlock());
     List<Object[]> resultRows = result.getContainer();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{true, "str"}, new Object[]{true, "str"});
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "str"}, new Object[]{1, "str"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
-    // Second row is NoOp
-    result = op.nextBlock();
-    Assert.assertTrue(result.isNoOpBlock());
-    // Third block has one row.
+    // Second block has one row.
     result = op.nextBlock();
     Assert.assertFalse(result.isErrorBlock());
     resultRows = result.getContainer();
-    expectedRows = Arrays.asList(new Object[]{true, "str"}, new Object[]{true, "str"}, new Object[]{true, "str"});
+    expectedRows = Arrays.asList(new Object[]{1, "str"}, new Object[]{1, "str"}, new Object[]{1, "str"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
@@ -229,26 +215,24 @@ public class TransformOperatorTest {
       + "should not be empty.*")
   public void testWrongNumTransform() {
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
-    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING
     });
-    TransformOperator transform =
-        new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema, new ArrayList<>(),
-            upStreamSchema);
+    new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema, new ArrayList<>(),
+        upStreamSchema);
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*doesn't match "
       + "transform operand size.*")
   public void testMismatchedSchemaOperandSize() {
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
-    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
+    DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
+        ColumnDataType.STRING, ColumnDataType.STRING
     });
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
-    TransformOperator transform =
-        new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema, ImmutableList.of(ref0),
-            upStreamSchema);
+    new TransformOperator(OperatorTestUtil.getDefaultContext(), _upstreamOp, resultSchema, ImmutableList.of(ref0),
+        upStreamSchema);
   }
 };

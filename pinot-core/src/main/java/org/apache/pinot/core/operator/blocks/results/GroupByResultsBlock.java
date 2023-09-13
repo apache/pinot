@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.utils.DataSchema;
@@ -51,6 +50,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   private final AggregationGroupByResult _aggregationGroupByResult;
   private final Collection<IntermediateRecord> _intermediateRecords;
   private final Table _table;
+  private final QueryContext _queryContext;
 
   private boolean _numGroupsLimitReached;
   private int _numResizes;
@@ -59,45 +59,47 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   /**
    * For segment level group-by results.
    */
-  public GroupByResultsBlock(DataSchema dataSchema, AggregationGroupByResult aggregationGroupByResult) {
+  public GroupByResultsBlock(DataSchema dataSchema, AggregationGroupByResult aggregationGroupByResult,
+      QueryContext queryContext) {
     _dataSchema = dataSchema;
     _aggregationGroupByResult = aggregationGroupByResult;
     _intermediateRecords = null;
     _table = null;
+    _queryContext = queryContext;
   }
 
   /**
    * For segment level group-by results.
    */
-  public GroupByResultsBlock(DataSchema dataSchema, Collection<IntermediateRecord> intermediateRecords) {
+  public GroupByResultsBlock(DataSchema dataSchema, Collection<IntermediateRecord> intermediateRecords,
+      QueryContext queryContext) {
     _dataSchema = dataSchema;
     _aggregationGroupByResult = null;
     _intermediateRecords = intermediateRecords;
     _table = null;
+    _queryContext = queryContext;
   }
 
   /**
    * For instance level group-by results.
    */
-  public GroupByResultsBlock(Table table) {
+  public GroupByResultsBlock(Table table, QueryContext queryContext) {
     _dataSchema = table.getDataSchema();
     _aggregationGroupByResult = null;
     _intermediateRecords = null;
     _table = table;
+    _queryContext = queryContext;
   }
 
   /**
    * For instance level empty group-by results.
    */
-  public GroupByResultsBlock(DataSchema dataSchema) {
+  public GroupByResultsBlock(DataSchema dataSchema, QueryContext queryContext) {
     _dataSchema = dataSchema;
     _aggregationGroupByResult = null;
     _intermediateRecords = null;
     _table = null;
-  }
-
-  public DataSchema getDataSchema() {
-    return _dataSchema;
+    _queryContext = queryContext;
   }
 
   public AggregationGroupByResult getAggregationGroupByResult() {
@@ -141,15 +143,18 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     return _table == null ? 0 : _table.size();
   }
 
-  @Nullable
   @Override
-  public DataSchema getDataSchema(QueryContext queryContext) {
+  public QueryContext getQueryContext() {
+    return _queryContext;
+  }
+
+  @Override
+  public DataSchema getDataSchema() {
     return _dataSchema;
   }
 
-  @Nullable
   @Override
-  public List<Object[]> getRows(QueryContext queryContext) {
+  public List<Object[]> getRows() {
     if (_table == null) {
       return Collections.emptyList();
     }
@@ -162,7 +167,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   }
 
   @Override
-  public DataTable getDataTable(QueryContext queryContext)
+  public DataTable getDataTable()
       throws IOException {
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(_dataSchema);
     if (_table == null) {
@@ -171,7 +176,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = _dataSchema.size();
     Iterator<Record> iterator = _table.iterator();
-    if (queryContext.isNullHandlingEnabled()) {
+    if (_queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       Object[] nullPlaceholders = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {

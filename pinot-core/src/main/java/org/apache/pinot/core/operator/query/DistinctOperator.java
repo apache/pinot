@@ -39,16 +39,16 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT";
 
   private final IndexSegment _indexSegment;
-  private final BaseProjectOperator<?> _projectOperator;
   private final QueryContext _queryContext;
+  private final BaseProjectOperator<?> _projectOperator;
 
   private int _numDocsScanned = 0;
 
-  public DistinctOperator(IndexSegment indexSegment, BaseProjectOperator<?> projectOperator,
-      QueryContext queryContext) {
+  public DistinctOperator(IndexSegment indexSegment, QueryContext queryContext,
+      BaseProjectOperator<?> projectOperator) {
     _indexSegment = indexSegment;
-    _projectOperator = projectOperator;
     _queryContext = queryContext;
+    _projectOperator = projectOperator;
   }
 
   @Override
@@ -61,7 +61,7 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
         break;
       }
     }
-    return new DistinctResultsBlock(executor.getResult());
+    return new DistinctResultsBlock(executor.getResult(), _queryContext);
   }
 
   @Override

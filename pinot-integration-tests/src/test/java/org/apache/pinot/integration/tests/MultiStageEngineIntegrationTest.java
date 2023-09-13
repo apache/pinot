@@ -27,13 +27,16 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -89,9 +92,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws IOException {
   }
 
+//  @Override
+//  protected boolean useMultiStageQueryEngine() {
+//    return true;
+//  }
+
+  @BeforeMethod
   @Override
-  protected boolean useMultiStageQueryEngine() {
-    return true;
+  public void resetMultiStage() {
+    setUseMultiStageQueryEngine(true);
   }
 
   @Test
@@ -99,6 +108,21 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testHardcodedQueries()
       throws Exception {
     super.testHardcodedQueries();
+  }
+
+  @Test
+  public void testSingleValueQuery()
+      throws Exception {
+    String query = "select sum(ActualElapsedTime) from mytable WHERE ActualElapsedTime > "
+        + "(select avg(ActualElapsedTime) as avg_profit from mytable)";
+    JsonNode jsonNode = postQuery(query);
+    long joinResult = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+
+    // The query of `SELECT avg(ActualElapsedTime) FROM mytable` is -1412.435033969449
+    query = "select sum(ActualElapsedTime) as profit from mytable WHERE ActualElapsedTime > -1412.435033969449";
+    jsonNode = postQuery(query);
+    long expectedResult = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+    assertEquals(joinResult, expectedResult);
   }
 
   @Test
@@ -140,12 +164,21 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     double[] expectedNumericResults = new double[]{
         364, 364, 355, 364, 364, 364, 5915969, 16252.662087912087
     };
+    double[] expectedNumericResultsV1 = new double[]{
+        364, 364, 357, 364, 364, 364, 5915969, 16252.662087912087
+    };
     Assert.assertEquals(numericResultFunctions.length, expectedNumericResults.length);
 
     for (int i = 0; i < numericResultFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", numericResultFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedNumericResults[i]);
+      if (useMultiStageQueryEngine) {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(),
+            expectedNumericResults[i]);
+      } else {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(),
+            expectedNumericResultsV1[i]);
+      }
     }
 
     String[] binaryResultFunctions = new String[]{
@@ -155,14 +188,21 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         360,
         3904
     };
+    int[] expectedBinarySizeResultsV1 = new int[]{
+        5480,
+        3904
+    };
     for (int i = 0; i < binaryResultFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", binaryResultFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
-          expectedBinarySizeResults[i]);
+      if (useMultiStageQueryEngine) {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
+            expectedBinarySizeResults[i]);
+      } else {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
+            expectedBinarySizeResultsV1[i]);
+      }
     }
-
-    setUseMultiStageQueryEngine(true);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -178,13 +218,21 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         -5.421344202E9, 577725, -9999.0, 16271.0, -9383.95292223809, 26270.0, 312, 312, 328, 3954484.0,
         12674.628205128205
     };
+    double[] expectedResultsV1 = new double[]{
+        -5.421344202E9, 577725, -9999.0, 16271.0, -9383.95292223809, 26270.0, 312, 312, 312, 3954484.0,
+        12674.628205128205
+    };
 
     Assert.assertEquals(multiValueFunctions.length, expectedResults.length);
 
     for (int i = 0; i < multiValueFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DivAirportIDs) FROM mytable", multiValueFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResults[i]);
+      if (useMultiStageQueryEngine) {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResults[i]);
+      } else {
+        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResultsV1[i]);
+      }
     }
 
     String pinotQuery = "SELECT percentileMV(DivAirportIDs, 99) FROM mytable";
@@ -210,8 +258,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(pinotQuery);
     Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() > 10000);
     Assert.assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble() < 17000);
-
-    setUseMultiStageQueryEngine(true);
   }
 
   @Test
@@ -435,12 +481,14 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // invalid argument
     sqlQuery = "SELECT toBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("SQLParsingError"));
+    int expectedStatusCode = useMultiStageQueryEngine() ? QueryException.QUERY_PLANNING_ERROR_CODE
+        : QueryException.SQL_PARSING_ERROR_CODE;
+    Assert.assertEquals(response.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
 
     // invalid argument
     sqlQuery = "SELECT fromBase64('hello!') FROM mytable";
     response = postQuery(sqlQuery);
-    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("IllegalArgumentException"));
+    assertTrue(response.get("exceptions").get(0).get("message").toString().contains("Illegal base64 character"));
 
     // string literal used in a filter
     sqlQuery = "SELECT * FROM mytable WHERE fromUtf8(fromBase64('aGVsbG8h')) != Carrier AND "
@@ -514,6 +562,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       assertEquals(encoded, toBase64(toUtf8(original)));
       assertEquals(decoded, fromUtf8(fromBase64(toBase64(toUtf8(original)))));
     }
+
+    // Test select with group by order by limit
+    sqlQuery = "SELECT toBase64(toUtf8(AirlineID)) "
+        + "FROM mytable "
+        + "GROUP BY toBase64(toUtf8(AirlineID)) "
+        + "ORDER BY toBase64(toUtf8(AirlineID)) DESC "
+        + "LIMIT 10";
+    response = postQuery(sqlQuery);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"STRING\"]");
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asText(), "MjExNzE=");
+    assertEquals(rows.get(1).get(0).asText(), "MjAzOTg=");
+    assertEquals(rows.get(2).get(0).asText(), "MjAzNjY=");
+    assertEquals(rows.get(3).get(0).asText(), "MjAzNTU=");
+    assertEquals(rows.get(4).get(0).asText(), "MjAzMDQ=");
+    assertEquals(rows.get(5).get(0).asText(), "MjA0Mzc=");
+    assertEquals(rows.get(6).get(0).asText(), "MjA0MzY=");
+    assertEquals(rows.get(7).get(0).asText(), "MjA0MDk=");
+    assertEquals(rows.get(8).get(0).asText(), "MTkzOTM=");
+    assertEquals(rows.get(9).get(0).asText(), "MTk5Nzc=");
   }
 
   @Test
@@ -582,11 +652,101 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testMultiValueColumnGroupByOrderBy()
       throws Exception {
-    String pinotQuery = "SELECT count(*), arrayToMV(RandomAirports) FROM mytable "
-        + "GROUP BY arrayToMV(RandomAirports) "
-        + "ORDER BY arrayToMV(RandomAirports) DESC";
+    String pinotQuery =
+        "SELECT count(*), arrayToMV(RandomAirports) FROM mytable " + "GROUP BY arrayToMV(RandomAirports) "
+            + "ORDER BY arrayToMV(RandomAirports) DESC";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
+  }
+
+  @Test
+  public void testMultiValueColumnTransforms()
+      throws Exception {
+    String pinotQuery = "SELECT arrayLength(RandomAirports) FROM mytable limit 10";
+    JsonNode jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    pinotQuery = "SELECT cardinality(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arrayMin dataType should be same as the column dataType
+    pinotQuery = "SELECT arrayMin(DivAirports) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+
+    pinotQuery = "SELECT arrayMin(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arrayMax dataType should be same as the column dataType
+    pinotQuery = "SELECT arrayMax(DivAirports) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
+
+    pinotQuery = "SELECT arrayMax(DivAirportIDs) FROM mytable limit 10";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+
+    // arraySum
+    pinotQuery = "SELECT arraySum(DivAirportIDs) FROM mytable limit 1";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
+
+    // arraySum
+    pinotQuery = "SELECT arrayAverage(DivAirportIDs) FROM mytable limit 1";
+    jsonNode = postQuery(pinotQuery);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "DOUBLE");
+  }
+
+  @Test
+  public void selectStarDoesNotProjectSystemColumns()
+      throws Exception {
+    JsonNode jsonNode = postQuery("select * from mytable limit 0");
+    List<String> columns = getColumns(jsonNode);
+    for (int i = 0; i < columns.size(); i++) {
+      String colName = columns.get(i);
+      Assert.assertFalse(colName.startsWith("$"), "Column " + colName + " (found at index " + i + " is a system column "
+          + "and shouldn't be included in select *");
+    }
+  }
+
+  @Test(dataProvider = "systemColumns")
+  public void systemColumnsCanBeSelected(String systemColumn)
+      throws Exception {
+    JsonNode jsonNode = postQuery("select " + systemColumn + " from mytable limit 0");
+    assertNoError(jsonNode);
+  }
+
+  @Test(dataProvider = "systemColumns")
+  public void systemColumnsCanBeUsedInWhere(String systemColumn)
+      throws Exception {
+    JsonNode jsonNode = postQuery("select 1 from mytable where " + systemColumn + " is not null limit 0");
+    assertNoError(jsonNode);
+  }
+
+  @Test
+  public void testSearch()
+      throws Exception {
+    String sqlQuery = "SELECT CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END "
+        + "FROM mytable LIMIT 1000";
+    JsonNode jsonNode = postQuery("Explain plan for " + sqlQuery);
+    JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
+
+    Pattern pattern = Pattern.compile("SEARCH\\(\\$7, Sarg\\[\\(-∞\\.\\.10\\), \\(50\\.\\.\\+∞\\)]\\)");
+    boolean matches = pattern.matcher(plan.asText()).find();
+    Assert.assertTrue(matches, "Plan doesn't contain the expected SEARCH");
+
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
   }
 
   @AfterClass

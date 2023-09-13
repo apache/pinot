@@ -143,8 +143,8 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     Object[] encodedVars = null;
     if (null != value) {
       if (!(value instanceof String)) {
-        LOGGER.error("Can't encode value of type {} with CLP. name: '{}', value: '{}'", value.getClass().getName(), key,
-            value);
+        LOGGER.error("Can't encode value of type {} with CLP. name: '{}', value: '{}'",
+            value.getClass().getSimpleName(), key, value);
       } else {
         String valueAsString = (String) value;
         try {

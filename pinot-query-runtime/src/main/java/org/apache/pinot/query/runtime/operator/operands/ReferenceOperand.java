@@ -18,21 +18,28 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
-public class ReferenceOperand extends TransformOperand {
-  private final int _refIndex;
+public class ReferenceOperand implements TransformOperand {
+  private final int _index;
+  private final ColumnDataType _resultType;
 
-  public ReferenceOperand(RexExpression.InputRef inputRef, DataSchema dataSchema) {
-    _refIndex = inputRef.getIndex();
-    _resultType = dataSchema.getColumnDataType(_refIndex);
-    _resultName = dataSchema.getColumnName(_refIndex);
+  public ReferenceOperand(int index, DataSchema dataSchema) {
+    _index = index;
+    _resultType = dataSchema.getColumnDataType(index);
   }
 
   @Override
+  public ColumnDataType getResultType() {
+    return _resultType;
+  }
+
+  @Nullable
+  @Override
   public Object apply(Object[] row) {
-    return row[_refIndex];
+    return row[_index];
   }
 }

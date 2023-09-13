@@ -36,7 +36,6 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
-import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -49,6 +48,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.BeforeMethod;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -68,6 +68,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
 
+  @BeforeMethod
+  public void resetMultiStage() {
+    setUseMultiStageQueryEngine(false);
+  }
+
   /**
    * Can be overridden to change default setting
    */
@@ -80,25 +85,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    */
   protected int getNumQueriesToGenerate() {
     return DEFAULT_NUM_QUERIES_TO_GENERATE;
-  }
-
-  /**
-   * Test server table data manager deletion after the table is dropped
-   */
-  protected void cleanupTestTableDataManager(String tableNameWithType) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        for (BaseServerStarter serverStarter : _serverStarters) {
-          if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType)
-              != null) {
-            return false;
-          }
-        }
-        return true;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 600_000L, "Failed to delete table data managers");
   }
 
   /**
@@ -150,8 +136,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
-    query = "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND "
-        + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
+    query =
+        "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff, substring(DestStateName, 4, 8) as "
+            + "stateSubStr FROM mytable WHERE CarrierDelay=15 AND "
+            + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
     testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
@@ -275,11 +263,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     testQuery(query, h2Query);
 
     // test arithmetic operations on date time columns
-    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable "
-        + "GROUP BY sub(DaysSinceEpoch,25) "
+    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable " + "GROUP BY sub(DaysSinceEpoch,25) "
         + "ORDER BY COUNT(*),sub(DaysSinceEpoch,25) DESC";
-    h2Query = "SELECT DaysSinceEpoch - 25, COUNT(*) FROM mytable "
-        + "GROUP BY DaysSinceEpoch "
+    h2Query = "SELECT DaysSinceEpoch - 25, COUNT(*) FROM mytable " + "GROUP BY DaysSinceEpoch "
         + "ORDER BY COUNT(*), DaysSinceEpoch DESC";
     testQuery(query, h2Query);
   }

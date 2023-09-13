@@ -33,7 +33,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
@@ -42,7 +41,9 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -214,26 +215,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void addOfflineSegment(String offlineTableName, String segmentName, File indexDir)
-      throws Exception {
-    LOGGER.info("Adding segment: {} to table: {}", segmentName, offlineTableName);
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", offlineTableName);
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
-    SegmentZKMetadata zkMetadata =
-        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, offlineTableName, segmentName);
-    Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for offline segment: %s, table: %s",
-        segmentName, offlineTableName);
-
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
-    indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-
-    _tableDataManagerMap.computeIfAbsent(offlineTableName, k -> createTableDataManager(k, tableConfig))
-        .addSegment(indexDir, indexLoadingConfig);
-    LOGGER.info("Added segment: {} to table: {}", segmentName, offlineTableName);
-  }
-
-  @Override
   public void addRealtimeSegment(String realtimeTableName, String segmentName)
       throws Exception {
     LOGGER.info("Adding segment: {} to table: {}", segmentName, realtimeTableName);
@@ -264,28 +245,43 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void deleteTable(String tableNameWithType)
       throws Exception {
-    // Wait externalview to converge
-    long endTimeMs = System.currentTimeMillis() + _externalViewDroppedMaxWaitMs;
-    do {
-      ExternalView externalView = _helixManager.getHelixDataAccessor()
-          .getProperty(_helixManager.getHelixDataAccessor().keyBuilder().externalView(tableNameWithType));
-      if (externalView == null) {
-        LOGGER.info("ExternalView converged for the table to delete: {}", tableNameWithType);
-        _tableDataManagerMap.compute(tableNameWithType, (k, v) -> {
-          if (v != null) {
-            v.shutDown();
-            LOGGER.info("Removed table: {}", tableNameWithType);
-          } else {
-            LOGGER.warn("Failed to find table data manager for table: {}, skip removing the table", tableNameWithType);
-          }
-          return null;
-        });
-        return;
-      }
-      Thread.sleep(_externalViewDroppedCheckInternalMs);
-    } while (System.currentTimeMillis() < endTimeMs);
-    throw new TimeoutException(
-        "Timeout while waiting for ExternalView to converge for the table to delete: " + tableNameWithType);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager == null) {
+      LOGGER.warn("Failed to find table data manager for table: {}, skip deleting the table", tableNameWithType);
+      return;
+    }
+    LOGGER.info("Shutting down table data manager for table: {}", tableNameWithType);
+    tableDataManager.shutDown();
+    LOGGER.info("Finished shutting down table data manager for table: {}", tableNameWithType);
+
+    try {
+      // Wait for external view to disappear or become empty before removing the table data manager.
+      //
+      // When creating the table, controller will check whether the external view exists, and allow table creation only
+      // if it doesn't exist. If the table is recreated just after external view disappeared, there is a small chance
+      // that server won't realize the external view is removed because it is recreated before the server checks it. In
+      // order to handle this scenario, we want to remove the table data manager when the external view exists but is
+      // empty.
+      HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+      PropertyKey externalViewKey = helixDataAccessor.keyBuilder().externalView(tableNameWithType);
+      long endTimeMs = System.currentTimeMillis() + _externalViewDroppedMaxWaitMs;
+      do {
+        ExternalView externalView = helixDataAccessor.getProperty(externalViewKey);
+        if (externalView == null) {
+          LOGGER.info("ExternalView is dropped for table: {}", tableNameWithType);
+          return;
+        }
+        if (externalView.getRecord().getMapFields().isEmpty()) {
+          LOGGER.info("ExternalView is empty for table: {}", tableNameWithType);
+          return;
+        }
+        Thread.sleep(_externalViewDroppedCheckInternalMs);
+      } while (System.currentTimeMillis() < endTimeMs);
+      LOGGER.warn("ExternalView still exists after {}ms for table: {}", _externalViewDroppedMaxWaitMs,
+          tableNameWithType);
+    } finally {
+      _tableDataManagerMap.remove(tableNameWithType);
+    }
   }
 
   @Override
@@ -476,8 +472,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       segmentLock.lock();
 
       // Reloads an existing segment, and the local segment metadata is existing as asserted above.
-      tableDataManager.reloadSegment(segmentName,
-          new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema), zkMetadata, segmentMetadata, schema,
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
+      indexLoadingConfig.setErrorOnColumnBuildFailure(true);
+      tableDataManager.reloadSegment(segmentName, indexLoadingConfig, zkMetadata, segmentMetadata, schema,
           forceDownload);
       LOGGER.info("Reloaded segment: {} of table: {}", segmentName, tableNameWithType);
     } finally {

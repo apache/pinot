@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import org.apache.calcite.rex.RexNode;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -33,9 +34,10 @@ public class ProjectNode extends AbstractPlanNode {
   public ProjectNode(int planFragmentId) {
     super(planFragmentId);
   }
+
   public ProjectNode(int currentStageId, DataSchema dataSchema, List<RexNode> projects) {
     super(currentStageId, dataSchema);
-    _projects = projects.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+    _projects = projects.stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
   }
 
   public List<RexExpression> getProjects() {

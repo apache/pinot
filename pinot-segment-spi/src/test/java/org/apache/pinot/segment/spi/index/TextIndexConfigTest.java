@@ -41,6 +41,8 @@ public class TextIndexConfigTest {
     assertFalse(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
     assertNull(config.getStopWordsInclude(), "Unexpected stopWordsInclude");
     assertNull(config.getStopWordsExclude(), "Unexpected stopWordsExclude");
+    assertTrue(config.isLuceneUseCompoundFile(), "Unexpected luceneUseCompoundFile");
+    assertEquals(config.getLuceneMaxBufferSizeMB(), 500, "Unexpected luceneMaxBufferSize");
   }
 
   @Test
@@ -56,6 +58,8 @@ public class TextIndexConfigTest {
     assertFalse(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
     assertNull(config.getStopWordsInclude(), "Unexpected stopWordsInclude");
     assertNull(config.getStopWordsExclude(), "Unexpected stopWordsExclude");
+    assertTrue(config.isLuceneUseCompoundFile(), "Unexpected luceneUseCompoundFile");
+    assertEquals(config.getLuceneMaxBufferSizeMB(), 500, "Unexpected luceneMaxBufferSize");
   }
 
   @Test
@@ -71,6 +75,8 @@ public class TextIndexConfigTest {
     assertFalse(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
     assertNull(config.getStopWordsInclude(), "Unexpected stopWordsInclude");
     assertNull(config.getStopWordsExclude(), "Unexpected stopWordsExclude");
+    assertTrue(config.isLuceneUseCompoundFile(), "Unexpected luceneUseCompoundFile");
+    assertEquals(config.getLuceneMaxBufferSizeMB(), 500, "Unexpected luceneMaxBufferSize");
   }
 
   @Test
@@ -86,6 +92,8 @@ public class TextIndexConfigTest {
     assertFalse(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
     assertNull(config.getStopWordsInclude(), "Unexpected stopWordsInclude");
     assertNull(config.getStopWordsExclude(), "Unexpected stopWordsExclude");
+    assertTrue(config.isLuceneUseCompoundFile(), "Unexpected luceneUseCompoundFile");
+    assertEquals(config.getLuceneMaxBufferSizeMB(), 500, "Unexpected luceneMaxBufferSize");
   }
 
   @Test
@@ -97,7 +105,9 @@ public class TextIndexConfigTest {
         + "        \"queryCache\": true,\n"
         + "        \"useANDForMultiTermQueries\": true,\n"
         + "        \"stopWordsInclude\": [\"a\"],\n"
-        + "        \"stopWordsExclude\": [\"b\"]\n"
+        + "        \"stopWordsExclude\": [\"b\"],\n"
+        + "        \"luceneUseCompoundFile\": false,\n"
+        + "        \"luceneMaxBufferSizeMB\": 1024\n"
         + "}";
     TextIndexConfig config = JsonUtils.stringToObject(confStr, TextIndexConfig.class);
 
@@ -108,5 +118,7 @@ public class TextIndexConfigTest {
     assertTrue(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
     assertEquals(config.getStopWordsInclude(), Lists.newArrayList("a"), "Unexpected stopWordsInclude");
     assertEquals(config.getStopWordsExclude(), Lists.newArrayList("b"), "Unexpected stopWordsExclude");
+    assertFalse(config.isLuceneUseCompoundFile(), "Unexpected luceneUseCompoundFile");
+    assertEquals(config.getLuceneMaxBufferSizeMB(), 1024, "Unexpected luceneMaxBufferSize");
   }
 }

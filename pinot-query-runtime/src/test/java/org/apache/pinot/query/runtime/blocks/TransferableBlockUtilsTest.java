@@ -34,26 +34,26 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+
 
 public class TransferableBlockUtilsTest {
   private static final int TOTAL_ROW_COUNT = 50;
   private static final int TEST_EST_BYTES_PER_COLUMN = 8;
-  private static final List<DataSchema.ColumnDataType> EXCLUDE_DATA_TYPES = ImmutableList.of(
-      DataSchema.ColumnDataType.OBJECT, DataSchema.ColumnDataType.JSON, DataSchema.ColumnDataType.BYTES,
-      DataSchema.ColumnDataType.BYTES_ARRAY);
+  private static final List<ColumnDataType> EXCLUDE_DATA_TYPES =
+      ImmutableList.of(ColumnDataType.OBJECT, ColumnDataType.JSON, ColumnDataType.BYTES, ColumnDataType.BYTES_ARRAY);
 
   private static DataSchema getDataSchema() {
-    DataSchema.ColumnDataType[] allDataTypes = DataSchema.ColumnDataType.values();
-    List<DataSchema.ColumnDataType> columnDataTypes = new ArrayList<DataSchema.ColumnDataType>();
-    List<String> columnNames = new ArrayList<String>();
+    ColumnDataType[] allDataTypes = ColumnDataType.values();
+    List<ColumnDataType> columnDataTypes = new ArrayList<>();
+    List<String> columnNames = new ArrayList<>();
     for (int i = 0; i < allDataTypes.length; i++) {
       if (!EXCLUDE_DATA_TYPES.contains(allDataTypes[i])) {
         columnNames.add(allDataTypes[i].name());
         columnDataTypes.add(allDataTypes[i]);
       }
     }
-    return new DataSchema(columnNames.toArray(new String[0]),
-        columnDataTypes.toArray(new DataSchema.ColumnDataType[0]));
+    return new DataSchema(columnNames.toArray(new String[0]), columnDataTypes.toArray(new ColumnDataType[0]));
   }
 
   @DataProvider
@@ -71,8 +71,8 @@ public class TransferableBlockUtilsTest {
     int estRowSizeInBytes = dataSchema.size() * TEST_EST_BYTES_PER_COLUMN;
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, TOTAL_ROW_COUNT, 1);
     RowDataBlock rowBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
-    validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rowBlock),
-        DataBlock.Type.ROW, estRowSizeInBytes * splitRowCount + 1), rows, dataSchema);
+    validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rowBlock), DataBlock.Type.ROW,
+        estRowSizeInBytes * splitRowCount + 1), rows, dataSchema);
     // compare non-serialized split
     validateBlocks(TransferableBlockUtils.splitBlock(new TransferableBlock(rows, dataSchema, DataBlock.Type.ROW),
         DataBlock.Type.ROW, estRowSizeInBytes * splitRowCount + 1), rows, dataSchema);
@@ -99,7 +99,7 @@ public class TransferableBlockUtilsTest {
         TransferableBlockUtils.splitBlock(new TransferableBlock(nonSplittableBlock), DataBlock.Type.METADATA,
             4 * 1024 * 1024);
     Assert.assertTrue(transferableBlocks.hasNext());
-    Assert.assertEquals(transferableBlocks.next().getDataBlock(), nonSplittableBlock);
+    Assert.assertSame(transferableBlocks.next().getDataBlock(), nonSplittableBlock);
     Assert.assertFalse(transferableBlocks.hasNext());
   }
 
@@ -113,11 +113,12 @@ public class TransferableBlockUtilsTest {
           if (row[colId] == null && rows.get(rowId)[colId] == null) {
             continue;
           }
-          DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(colId);
+          ColumnDataType columnDataType = dataSchema.getColumnDataType(colId);
           Object actualVal = row[colId];
           Object expectedVal = rows.get(rowId)[colId];
-          Assert.assertEquals(actualVal, expectedVal, "Error comparing split Block at (" + rowId + "," + colId + ")"
-              + " of Type: " + columnDataType + "! expected: [" + expectedVal + "], actual: [" + actualVal + "]");
+          Assert.assertEquals(actualVal, expectedVal,
+              "Error comparing split Block at (" + rowId + "," + colId + ")" + " of Type: " + columnDataType
+                  + "! expected: [" + expectedVal + "], actual: [" + actualVal + "]");
         }
         rowId++;
       }

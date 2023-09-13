@@ -132,9 +132,8 @@ public class ClusterIntegrationTestUtils {
               break;
             }
             if (typesInUnion.size() == 2) {
-              Schema.Type type = typesInUnion.get(0).getType();
-              Assert.assertTrue(isSingleValueAvroFieldType(type));
-              Assert.assertEquals(typesInUnion.get(1).getType(), Schema.Type.NULL);
+              Schema.Type type = extractSingleValueAvroFieldTypeFromTwoSizedUnion(typesInUnion.get(0).getType(),
+                  typesInUnion.get(1).getType());
               h2FieldNameAndTypes.add(buildH2FieldNameAndType(fieldName, type, true));
               break;
             }
@@ -201,6 +200,26 @@ public class ClusterIntegrationTestUtils {
   }
 
   /**
+   * Helper method to extract the single value Avro field type from a two sized UNION Avro field type if the UNION
+   * contains one single-value type and one NULL type; otherwise, fail the test.
+   * @param type1 the first type in the UNION
+   * @param type2 the second type in the UNION
+   * @return the single value Avro field type in the UNION if the UNION contains one single-value type and one NULL type
+   */
+  private static Schema.Type extractSingleValueAvroFieldTypeFromTwoSizedUnion(Schema.Type type1, Schema.Type type2) {
+    if (type1 == Schema.Type.NULL) {
+      Assert.assertTrue(isSingleValueAvroFieldType(type2));
+      return type2;
+    }
+    if (type2 == Schema.Type.NULL) {
+      Assert.assertTrue(isSingleValueAvroFieldType(type1));
+      return type1;
+    }
+    Assert.fail(String.format("Unsupported UNION Avro field with underlying types: %s, %s", type1, type2));
+    return null;
+  }
+
+  /**
    * Helper method to check whether the given Avro field type is a single value type (non-NULL).
    *
    * @param avroFieldType Avro field type
@@ -242,7 +261,7 @@ public class ClusterIntegrationTestUtils {
         h2FieldType = "bigint";
         break;
       case "string":
-        h2FieldType = "varchar(128)";
+        h2FieldType = "varchar(256)";
         break;
       default:
         h2FieldType = avroFieldTypeName;
@@ -395,7 +414,7 @@ public class ClusterIntegrationTestUtils {
       }
     }
     CSVFormat csvFormat = CSVFormat.DEFAULT.withSkipHeaderRecord(true);
-    for (String recordCsv: csvRecords) {
+    for (String recordCsv : csvRecords) {
       try (CSVParser parser = CSVParser.parse(recordCsv, csvFormat)) {
         for (CSVRecord csv : parser) {
           byte[] keyBytes = (partitionColumnIndex == null) ? Longs.toByteArray(counter++)
@@ -650,7 +669,7 @@ public class ClusterIntegrationTestUtils {
   static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers)
       throws Exception {
-    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null);
+    testQuery(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers, null, false);
   }
 
   /**
@@ -659,11 +678,12 @@ public class ClusterIntegrationTestUtils {
    */
   static void testQueryWithMatchingRowCount(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
-      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
+      boolean useMultiStageQueryEngine)
       throws Exception {
     try {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
-          extraJsonProperties, true, false);
+          extraJsonProperties, useMultiStageQueryEngine, true, false);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, e);
     }
@@ -671,10 +691,10 @@ public class ClusterIntegrationTestUtils {
 
   static void testQuery(String pinotQuery, String queryResourceUrl, org.apache.pinot.client.Connection pinotConnection,
       String h2Query, Connection h2Connection, @Nullable Map<String, String> headers,
-      @Nullable Map<String, String> extraJsonProperties) {
+      @Nullable Map<String, String> extraJsonProperties, boolean useMultiStageQueryEngine) {
     try {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
-          extraJsonProperties, false, false);
+          extraJsonProperties, useMultiStageQueryEngine, false, false);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, e);
     }
@@ -682,10 +702,11 @@ public class ClusterIntegrationTestUtils {
 
   static void testQueryViaController(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
-      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties) {
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
+      boolean useMultiStageQueryEngine) {
     try {
       testQueryInternal(pinotQuery, queryResourceUrl, pinotConnection, h2Query, h2Connection, headers,
-          extraJsonProperties, false, true);
+          extraJsonProperties, useMultiStageQueryEngine, false, true);
     } catch (Exception e) {
       failure(pinotQuery, h2Query, e);
     }
@@ -694,14 +715,16 @@ public class ClusterIntegrationTestUtils {
   private static void testQueryInternal(String pinotQuery, String queryResourceUrl,
       org.apache.pinot.client.Connection pinotConnection, String h2Query, Connection h2Connection,
       @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
-      boolean matchingRowCount, boolean viaController)
+      boolean useMultiStageQueryEngine, boolean matchingRowCount, boolean viaController)
       throws Exception {
     // broker response
     JsonNode pinotResponse;
     if (viaController) {
       pinotResponse = ClusterTest.postQueryToController(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
     } else {
-      pinotResponse = ClusterTest.postQuery(pinotQuery, queryResourceUrl, headers, extraJsonProperties);
+      pinotResponse =
+          ClusterTest.postQuery(pinotQuery, getBrokerQueryApiUrl(queryResourceUrl, useMultiStageQueryEngine), headers,
+              extraJsonProperties);
     }
     if (!pinotResponse.get("exceptions").isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
@@ -824,8 +847,13 @@ public class ClusterIntegrationTestUtils {
       @Nullable Map<String, String> extraJsonProperties)
       throws Exception {
     JsonNode explainPlanForResponse =
-        ClusterTest.postQuery("explain plan for " + pinotQuery, brokerUrl, headers, extraJsonProperties);
+        ClusterTest.postQuery("explain plan for " + pinotQuery, getBrokerQueryApiUrl(brokerUrl, false), headers,
+            extraJsonProperties);
     return ExplainPlanUtils.formatExplainPlan(explainPlanForResponse);
+  }
+
+  public static String getBrokerQueryApiUrl(String brokerBaseApiUrl, boolean useMultiStageQueryEngine) {
+    return useMultiStageQueryEngine ? brokerBaseApiUrl + "/query" : brokerBaseApiUrl + "/query/sql";
   }
 
   private static int getH2ExpectedValues(Set<String> expectedValues, List<String> expectedOrderByValues,
@@ -998,6 +1026,16 @@ public class ClusterIntegrationTestUtils {
   }
 
   public static boolean fuzzyCompare(String h2Value, String brokerValue, String connectionValue) {
+    if (("null".equals(h2Value) || h2Value == null)
+        && ("null".equals(brokerValue) || brokerValue == null)
+        && ("null".equals(connectionValue) || connectionValue == null)) {
+      return false;
+    }
+    if ("null".equals(h2Value) || h2Value == null
+        || "null".equals(brokerValue) || brokerValue == null
+        || "null".equals(connectionValue) || connectionValue == null) {
+      return true;
+    }
     // Fuzzy compare expected value and actual value
     boolean error = false;
     if (isParsableDouble(h2Value)) {
@@ -1021,6 +1059,7 @@ public class ClusterIntegrationTestUtils {
     String failureMessage = "Caught exception while testing query!";
     failure(pinotQuery, h2Query, failureMessage, e);
   }
+
   /**
    * Helper method to report failures.
    *

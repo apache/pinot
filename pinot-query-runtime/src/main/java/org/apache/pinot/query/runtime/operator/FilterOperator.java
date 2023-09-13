@@ -18,20 +18,20 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 /*
@@ -49,19 +49,19 @@ import org.slf4j.LoggerFactory;
  */
 public class FilterOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "FILTER";
+
   private final MultiStageOperator _upstreamOperator;
-  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
-  private TransferableBlock _upstreamErrorBlock;
 
   public FilterOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, DataSchema dataSchema,
       RexExpression filter) {
     super(context);
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
-    _filterOperand = TransformOperand.toTransformOperand(filter, dataSchema);
-    _upstreamErrorBlock = null;
+    _filterOperand = TransformOperandFactory.getTransformOperand(filter, dataSchema);
+    Preconditions.checkState(_filterOperand.getResultType() == ColumnDataType.BOOLEAN,
+        "Filter operand must return BOOLEAN, got: %s", _filterOperand.getResultType());
   }
 
   @Override
@@ -77,30 +77,14 @@ public class FilterOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    try {
-      TransferableBlock block = _upstreamOperator.nextBlock();
-      return transform(block);
-    } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
-    }
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  private TransferableBlock transform(TransferableBlock block)
-      throws Exception {
-    if (_upstreamErrorBlock != null) {
-      return _upstreamErrorBlock;
-    } else if (block.isErrorBlock()) {
-      _upstreamErrorBlock = block;
-      return _upstreamErrorBlock;
-    } else if (TransferableBlockUtils.isEndOfStream(block) || TransferableBlockUtils.isNoOpBlock(block)) {
+    TransferableBlock block = _upstreamOperator.nextBlock();
+    if (block.isEndOfStreamBlock()) {
       return block;
     }
-
     List<Object[]> resultRows = new ArrayList<>();
-    List<Object[]> container = block.getContainer();
-    for (Object[] row : container) {
-      if ((Boolean) TypeUtils.convert(_filterOperand.apply(row), DataSchema.ColumnDataType.BOOLEAN)) {
+    for (Object[] row : block.getContainer()) {
+      Object filterResult = _filterOperand.apply(row);
+      if (BooleanUtils.isTrueInternalValue(filterResult)) {
         resultRows.add(row);
       }
     }

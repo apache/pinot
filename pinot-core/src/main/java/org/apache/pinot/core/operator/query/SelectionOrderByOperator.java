@@ -184,7 +184,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator);
+    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
   }
 
   /**
@@ -303,7 +303,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
-    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator);
+    return new SelectionResultsBlock(dataSchema, getSortedRows(), _comparator, _queryContext);
   }
 
   private List<Object[]> getSortedRows() {

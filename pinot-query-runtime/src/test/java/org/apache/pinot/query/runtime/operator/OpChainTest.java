@@ -26,14 +26,21 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -49,15 +56,15 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -68,7 +75,10 @@ import static org.testng.Assert.fail;
 
 public class OpChainTest {
   private static int _numOperatorsInitialized = 0;
+
   private final List<TransferableBlock> _blockList = new ArrayList<>();
+  private final ExecutorService _executorService = Executors.newCachedThreadPool();
+  private final AtomicReference<LeafStageTransferableBlockOperator> _leafOpRef = new AtomicReference<>();
 
   private AutoCloseable _mocks;
   @Mock
@@ -88,7 +98,7 @@ public class OpChainTest {
   private StageMetadata _receivingStageMetadata;
 
   @BeforeMethod
-  public void setUp() {
+  public void setUpMethod() {
     _mocks = MockitoAnnotations.openMocks(this);
     _serverAddress = new VirtualServerAddress("localhost", 123, 0);
     _receivingStageMetadata = new StageMetadata.Builder().setWorkerMetadataList(Stream.of(_serverAddress).map(
@@ -108,11 +118,10 @@ public class OpChainTest {
         TransferableBlock arg = invocation.getArgument(0);
         _blockList.add(arg);
         return true;
-      }).when(_exchange).offerBlock(any(TransferableBlock.class), anyLong());
-      when(_exchange.getRemainingCapacity()).thenReturn(1);
+      }).when(_exchange).send(any(TransferableBlock.class));
       when(_mailbox2.poll()).then(x -> {
         if (_blockList.isEmpty()) {
-          return TransferableBlockUtils.getNoOpTransferableBlock();
+          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
         }
         return _blockList.remove(0);
       });
@@ -122,9 +131,15 @@ public class OpChainTest {
   }
 
   @AfterMethod
-  public void tearDown()
+  public void tearDownMethod()
       throws Exception {
     _mocks.close();
+    _exchange.close();
+  }
+
+  @AfterClass
+  public void tearDown() {
+    _executorService.shutdown();
   }
 
   @Test
@@ -133,7 +148,7 @@ public class OpChainTest {
       Thread.sleep(100);
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     });
-    OpChain opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator, new ArrayList<>());
+    OpChain opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator);
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
@@ -143,7 +158,7 @@ public class OpChainTest {
       Thread.sleep(20);
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     });
-    opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator, new ArrayList<>());
+    opChain = new OpChain(OperatorTestUtil.getDefaultContext(), _sourceOperator);
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
@@ -156,7 +171,7 @@ public class OpChainTest {
     OpChainExecutionContext context = OperatorTestUtil.getDefaultContext();
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
-    OpChain opChain = new OpChain(context, dummyMultiStageOperator, new ArrayList<>());
+    OpChain opChain = new OpChain(context, dummyMultiStageOperator);
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
@@ -167,8 +182,10 @@ public class OpChainTest {
 
     Map<String, String> executionStats =
         opChain.getStats().getOperatorStatsMap().get(dummyMultiStageOperator.getOperatorId()).getExecutionStats();
-    assertTrue(Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) >= 1000);
-    assertTrue(Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName())) <= 2000);
+
+    long time = Long.parseLong(executionStats.get(DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS.getName()));
+    assertTrue(time >= 1000 && time <= 2000,
+        "Expected " + DataTable.MetadataKey.OPERATOR_EXECUTION_TIME_MS + " to be in [1000, 2000] but found " + time);
   }
 
   @Test
@@ -176,7 +193,7 @@ public class OpChainTest {
     OpChainExecutionContext context = OperatorTestUtil.getDefaultContextWithTracingDisabled();
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
-    OpChain opChain = new OpChain(context, dummyMultiStageOperator, new ArrayList<>());
+    OpChain opChain = new OpChain(context, dummyMultiStageOperator);
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
@@ -191,13 +208,14 @@ public class OpChainTest {
 
     int receivedStageId = 2;
     int senderStageId = 1;
-    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress,
-        System.currentTimeMillis() + 1000, _receivingStageMetadata, null, true);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, Long.MAX_VALUE,
+            Collections.singletonMap(CommonConstants.Broker.Request.TRACE, "true"), _receivingStageMetadata, null);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
 
-    OpChain opChain = new OpChain(context, operators.peek(), new ArrayList<>());
+    OpChain opChain = new OpChain(context, operators.peek());
     opChain.getStats().executing();
     while (!opChain.getRoot().nextBlock().isEndOfStreamBlock()) {
       // Drain the opchain
@@ -205,8 +223,8 @@ public class OpChainTest {
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, null, true);
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, Long.MAX_VALUE,
+            Collections.singletonMap(CommonConstants.Broker.Request.TRACE, "true"), _receivingStageMetadata, null);
 
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId + 1);
@@ -230,20 +248,21 @@ public class OpChainTest {
 
     int receivedStageId = 2;
     int senderStageId = 1;
-    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress,
-        System.currentTimeMillis() + 1000, _receivingStageMetadata, null, false);
+    OpChainExecutionContext context =
+        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, _serverAddress, Long.MAX_VALUE,
+            Collections.emptyMap(), _receivingStageMetadata, null);
 
     Stack<MultiStageOperator> operators =
         getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
 
-    OpChain opChain = new OpChain(context, operators.peek(), new ArrayList<>());
+    OpChain opChain = new OpChain(context, operators.peek());
     opChain.getStats().executing();
     opChain.getRoot().nextBlock();
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress,
-            System.currentTimeMillis() + 1000, _receivingStageMetadata, null, false);
+        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, _serverAddress, Long.MAX_VALUE,
+            Collections.emptyMap(), _receivingStageMetadata, null);
     MailboxReceiveOperator secondStageReceiveOp =
         new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId);
 
@@ -267,8 +286,7 @@ public class OpChainTest {
   private Stack<MultiStageOperator> getFullOpchain(int receivedStageId, int senderStageId,
       OpChainExecutionContext context, long waitTimeInMillis) {
     Stack<MultiStageOperator> operators = new Stack<>();
-    DataSchema upStreamSchema =
-        new DataSchema(new String[]{"intCol"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    DataSchema upStreamSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT});
     //Mailbox Receive Operator
     try {
       when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1}),
@@ -278,11 +296,14 @@ public class OpChainTest {
     }
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT intCol FROM tbl");
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new SelectionResultsBlock(upStreamSchema, Arrays.asList(new Object[]{1}, new Object[]{2})), queryContext));
-    LeafStageTransferableBlockOperator leafOp = new LeafStageTransferableBlockOperator(context,
-        LeafStageTransferableBlockOperatorTest.getStaticBlockProcessor(resultsBlockList),
-        Collections.singletonList(mock(ServerQueryRequest.class)), upStreamSchema);
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+        new SelectionResultsBlock(upStreamSchema, Arrays.asList(new Object[]{1}, new Object[]{2}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    LeafStageTransferableBlockOperator leafOp =
+        new LeafStageTransferableBlockOperator(context, Collections.singletonList(mock(ServerQueryRequest.class)),
+            upStreamSchema, queryExecutor, _executorService);
+    _leafOpRef.set(leafOp);
 
     //Transform operator
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
@@ -290,7 +311,7 @@ public class OpChainTest {
         new TransformOperator(context, leafOp, upStreamSchema, Collections.singletonList(ref0), upStreamSchema);
 
     //Filter operator
-    RexExpression booleanLiteral = new RexExpression.Literal(FieldSpec.DataType.BOOLEAN, true);
+    RexExpression booleanLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
     FilterOperator filterOp = new FilterOperator(context, transformOp, upStreamSchema, booleanLiteral);
 
     // Dummy operator
@@ -306,6 +327,18 @@ public class OpChainTest {
     operators.push(dummyWaitOperator);
     operators.push(sendOperator);
     return operators;
+  }
+
+  private QueryExecutor mockQueryExecutor(List<BaseResultsBlock> dataBlocks, InstanceResponseBlock metadataBlock) {
+    QueryExecutor queryExecutor = mock(QueryExecutor.class);
+    when(queryExecutor.execute(any(), any(), any())).thenAnswer(invocation -> {
+      LeafStageTransferableBlockOperator operator = _leafOpRef.get();
+      for (BaseResultsBlock dataBlock : dataBlocks) {
+        operator.addResultsBlock(dataBlock);
+      }
+      return metadataBlock;
+    });
+    return queryExecutor;
   }
 
   static class DummyMultiStageOperator extends MultiStageOperator {
@@ -353,7 +386,6 @@ public class OpChainTest {
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
 
-    @Nullable
     @Override
     public String toExplainString() {
       return "DUMMY_" + _numOperatorsInitialized++;

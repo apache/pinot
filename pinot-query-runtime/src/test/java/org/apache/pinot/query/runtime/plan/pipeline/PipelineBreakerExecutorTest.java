@@ -20,8 +20,11 @@ package org.apache.pinot.query.runtime.plan.pipeline;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -29,6 +32,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -39,8 +43,8 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
@@ -49,7 +53,6 @@ import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -73,8 +76,9 @@ public class PipelineBreakerExecutorTest {
   private ReceivingMailbox _mailbox2;
 
   private VirtualServerAddress _server = new VirtualServerAddress("localhost", 123, 0);
-  private OpChainSchedulerService _scheduler = new OpChainSchedulerService(new RoundRobinScheduler(10_000L),
-      Executors.newCachedThreadPool());
+  private ExecutorService _executor = Executors.newCachedThreadPool(
+      new NamedThreadFactory("worker_on_asd_" + getClass().getSimpleName()));
+  private OpChainSchedulerService _scheduler = new OpChainSchedulerService(_executor);
   private StageMetadata _stageMetadata1 = new StageMetadata.Builder().setWorkerMetadataList(Stream.of(_server).map(
       s -> new WorkerMetadata.Builder().setVirtualServerAddress(s)
           .addMailBoxInfoMap(0, new MailboxMetadata(
@@ -89,14 +93,9 @@ public class PipelineBreakerExecutorTest {
               ImmutableList.of(_server), ImmutableMap.of()))
           .build()).collect(Collectors.toList())).build();
 
-  @BeforeClass
-  public void setUpClass() {
-    _scheduler.startAsync();
-  }
-
   @AfterClass
   public void tearDownClass() {
-    _scheduler.stopAsync();
+    ExecutorServiceUtils.close(_executor);
   }
 
   @BeforeMethod
@@ -104,6 +103,9 @@ public class PipelineBreakerExecutorTest {
     _mocks = MockitoAnnotations.openMocks(this);
     when(_mailboxService.getHostname()).thenReturn("localhost");
     when(_mailboxService.getPort()).thenReturn(123);
+
+    when(_mailbox1.getId()).thenReturn("mailbox1");
+    when(_mailbox2.getId()).thenReturn("mailbox2");
   }
 
   @AfterMethod
@@ -130,11 +132,12 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            Collections.emptyMap(), 0, Long.MAX_VALUE);
 
     // then
     // should have single PB result, receive 2 data blocks, EOS block shouldn't be included
     Assert.assertNotNull(pipelineBreakerResult);
+    Assert.assertNull(pipelineBreakerResult.getErrorBlock());
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 1);
     Assert.assertEquals(pipelineBreakerResult.getResultMap().values().iterator().next().size(), 2);
 
@@ -151,7 +154,8 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode mailboxReceiveNode2 =
         new MailboxReceiveNode(0, DATA_SCHEMA, 2, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
             null, null, false, false, null);
-    JoinNode joinNode = new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null);
+    JoinNode joinNode =
+        new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null, Collections.emptyList());
     joinNode.addInput(mailboxReceiveNode1);
     joinNode.addInput(mailboxReceiveNode2);
     DistributedStagePlan distributedStagePlan =
@@ -169,11 +173,12 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            Collections.emptyMap(), 0, Long.MAX_VALUE);
 
     // then
     // should have two PB result, receive 2 data blocks, one each, EOS block shouldn't be included
     Assert.assertNotNull(pipelineBreakerResult);
+    Assert.assertNull(pipelineBreakerResult.getErrorBlock());
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 2);
     Iterator<List<TransferableBlock>> it = pipelineBreakerResult.getResultMap().values().iterator();
     Assert.assertEquals(it.next().size(), 1);
@@ -196,11 +201,12 @@ public class PipelineBreakerExecutorTest {
     // when
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            Collections.emptyMap(), 0, Long.MAX_VALUE);
 
     // then
-    // should contain only failure error blocks
+    // should return empty block list
     Assert.assertNotNull(pipelineBreakerResult);
+    Assert.assertNull(pipelineBreakerResult.getErrorBlock());
     Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 1);
     List<TransferableBlock> resultBlocks = pipelineBreakerResult.getResultMap().values().iterator().next();
     Assert.assertEquals(resultBlocks.size(), 0);
@@ -210,32 +216,32 @@ public class PipelineBreakerExecutorTest {
 
   @Test
   public void shouldReturnErrorBlocksFailureWhenPBTimeout() {
-    MailboxReceiveNode incorrectlyConfiguredMailboxNode =
+    MailboxReceiveNode mailboxReceiveNode =
         new MailboxReceiveNode(0, DATA_SCHEMA, 1, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
             null, null, false, false, null);
     DistributedStagePlan distributedStagePlan =
-        new DistributedStagePlan(0, RECEIVER_ADDRESS, incorrectlyConfiguredMailboxNode, _stageMetadata1);
+        new DistributedStagePlan(0, RECEIVER_ADDRESS, mailboxReceiveNode, _stageMetadata1);
 
     // when
     when(_mailboxService.getReceivingMailbox(MAILBOX_ID_1)).thenReturn(_mailbox1);
-    Object[] row1 = new Object[]{1, 1};
-    Object[] row2 = new Object[]{2, 3};
-    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    CountDownLatch latch = new CountDownLatch(1);
+    when(_mailbox1.poll()).thenAnswer(invocation -> {
+      latch.await();
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    });
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() - 10_000L, 0, false);
+            Collections.emptyMap(), 0, System.currentTimeMillis() + 100);
 
     // then
     // should contain only failure error blocks
     Assert.assertNotNull(pipelineBreakerResult);
-    Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 1);
-    List<TransferableBlock> resultBlocks = pipelineBreakerResult.getResultMap().values().iterator().next();
-    Assert.assertEquals(resultBlocks.size(), 1);
-    Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
-    Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
+    TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+    Assert.assertNotNull(errorBlock);
+    Assert.assertTrue(errorBlock.isErrorBlock());
+
+    latch.countDown();
   }
 
   @Test
@@ -246,7 +252,8 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode =
         new MailboxReceiveNode(0, DATA_SCHEMA, 3, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
             null, null, false, false, null);
-    JoinNode joinNode = new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null);
+    JoinNode joinNode =
+        new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null, Collections.emptyList());
     joinNode.addInput(mailboxReceiveNode1);
     joinNode.addInput(incorrectlyConfiguredMailboxNode);
     DistributedStagePlan distributedStagePlan =
@@ -264,7 +271,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            Collections.emptyMap(), 0, Long.MAX_VALUE);
 
     // then
     // should pass when one PB returns result, the other returns empty.
@@ -284,7 +291,8 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode =
         new MailboxReceiveNode(0, DATA_SCHEMA, 2, RelDistribution.Type.SINGLETON, PinotRelExchangeType.PIPELINE_BREAKER,
             null, null, false, false, null);
-    JoinNode joinNode = new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null);
+    JoinNode joinNode =
+        new JoinNode(0, DATA_SCHEMA, DATA_SCHEMA, DATA_SCHEMA, JoinRelType.INNER, null, null, Collections.emptyList());
     joinNode.addInput(mailboxReceiveNode1);
     joinNode.addInput(incorrectlyConfiguredMailboxNode);
     DistributedStagePlan distributedStagePlan =
@@ -302,16 +310,13 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, distributedStagePlan,
-            System.currentTimeMillis() + 10_000L, 0, false);
+            Collections.emptyMap(), 0, Long.MAX_VALUE);
 
     // then
     // should fail even if one of the 2 PB doesn't contain error block from sender.
     Assert.assertNotNull(pipelineBreakerResult);
-    Assert.assertEquals(pipelineBreakerResult.getResultMap().size(), 2);
-    for (List<TransferableBlock> resultBlocks : pipelineBreakerResult.getResultMap().values()) {
-      Assert.assertEquals(resultBlocks.size(), 1);
-      Assert.assertTrue(resultBlocks.get(0).isEndOfStreamBlock());
-      Assert.assertFalse(resultBlocks.get(0).isSuccessfulEndOfStreamBlock());
-    }
+    TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+    Assert.assertNotNull(errorBlock);
+    Assert.assertTrue(errorBlock.isErrorBlock());
   }
 }

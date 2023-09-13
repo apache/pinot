@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -35,14 +36,17 @@ public class ValueNode extends AbstractPlanNode {
     super(planFragmentId);
   }
 
-  public ValueNode(int currentStageId, DataSchema dataSchema,
-      ImmutableList<ImmutableList<RexLiteral>> literalTuples) {
+  public ValueNode(int currentStageId, DataSchema dataSchema, ImmutableList<ImmutableList<RexLiteral>> literalTuples) {
     super(currentStageId, dataSchema);
     _literalRows = new ArrayList<>();
     for (List<RexLiteral> literalTuple : literalTuples) {
       List<RexExpression> literalRow = new ArrayList<>();
       for (RexLiteral literal : literalTuple) {
-        literalRow.add(RexExpression.toRexExpression(literal));
+        if (literal == null) {
+          literalRow.add(null);
+          continue;
+        }
+        literalRow.add(RexExpressionUtils.fromRexLiteral(literal));
       }
       _literalRows.add(literalRow);
     }

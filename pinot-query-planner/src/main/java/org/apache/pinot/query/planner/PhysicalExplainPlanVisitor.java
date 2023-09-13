@@ -250,7 +250,7 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
           host,
           workerId,
           hasMoreChildren ? _childPrefix + "├── " : _childPrefix + "└── ",
-          hasMoreChildren ? _childPrefix + "│   " : _childPrefix + "   ",
+          hasMoreChildren ? _childPrefix + "│   " : _childPrefix + "    ",
           _builder
       );
     }

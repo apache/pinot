@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -136,8 +135,7 @@ public class BrokerCache {
 
     Future<Response> responseFuture = getRequest.addHeader("accept", "application/json").execute();
     Response response = responseFuture.get();
-    String responseBody = response.getResponseBody(StandardCharsets.UTF_8);
-    return JsonUtils.stringToObject(responseBody, RESPONSE_TYPE_REF);
+    return JsonUtils.inputStreamToObject(response.getResponseBodyAsStream(), RESPONSE_TYPE_REF);
   }
 
   private BrokerData getBrokerData(Map<String, List<BrokerInstance>> responses) {

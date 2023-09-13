@@ -152,7 +152,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
     Preconditions.checkState(bufferDir.mkdirs(), "Failed to create buffer_dir: %s", bufferDir.getAbsolutePath());
     _bufferFile = new File(bufferDir, "buffer_file");
     resetBuffer();
-    LOGGER.info("Initialized {} for Pinot table: {}", this.getClass().getName(), _tableNameWithType);
+    LOGGER.info("Initialized {} for Pinot table: {}", this.getClass().getSimpleName(), _tableNameWithType);
   }
 
   private void registerMetrics(MetricGroup metricGrp) {
@@ -258,7 +258,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
   @Override
   public void close()
       throws IOException {
-    LOGGER.info("Closing {} for Pinot table: {}", this.getClass().getName(), _tableNameWithType);
+    LOGGER.info("Closing {} for Pinot table: {}", this.getClass().getSimpleName(), _tableNameWithType);
     _recordWriter.close();
     resetBuffer();
     _seqId = 0;

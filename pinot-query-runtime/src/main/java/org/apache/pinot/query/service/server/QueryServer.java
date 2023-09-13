@@ -34,9 +34,9 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.service.SubmissionService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,6 +88,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         _server.shutdown();
         _server.awaitTermination();
       }
+      _querySubmissionExecutorService.shutdown();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -97,10 +98,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
     // Deserialize the request
     List<DistributedStagePlan> distributedStagePlans;
-    Map<String, String> requestMetadataMap;
-    requestMetadataMap = request.getMetadataMap();
-    long requestId = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_ID));
-    long timeoutMs = Long.parseLong(requestMetadataMap.get(QueryConfig.KEY_OF_BROKER_REQUEST_TIMEOUT_MS));
+    Map<String, String> requestMetadata;
+    requestMetadata = request.getMetadataMap();
+    long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
+    long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
     // 1. Deserialized request
     try {
@@ -113,7 +114,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     // 2. Submit distributed stage plans
     SubmissionService submissionService = new SubmissionService(_querySubmissionExecutorService);
     distributedStagePlans.forEach(distributedStagePlan -> submissionService.submit(() -> {
-      _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
+      _queryRunner.processQuery(distributedStagePlan, requestMetadata);
     }));
     // 3. await response successful or any failure which cancels all other tasks.
     try {
@@ -121,13 +122,14 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     } catch (Throwable t) {
       LOGGER.error("error occurred during stage submission for {}:\n{}", requestId, t);
       responseObserver.onNext(Worker.QueryResponse.newBuilder()
-          .putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_ERROR, QueryException.getTruncatedStackTrace(t))
-          .build());
+          .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
+              QueryException.getTruncatedStackTrace(t)).build());
       responseObserver.onCompleted();
       return;
     }
     responseObserver.onNext(
-        Worker.QueryResponse.newBuilder().putMetadata(QueryConfig.KEY_OF_SERVER_RESPONSE_STATUS_OK, "").build());
+        Worker.QueryResponse.newBuilder().putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK, "")
+            .build());
     responseObserver.onCompleted();
   }
 

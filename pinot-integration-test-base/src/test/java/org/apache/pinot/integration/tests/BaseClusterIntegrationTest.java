@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -32,13 +33,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -103,6 +108,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected List<StreamDataServerStartable> _kafkaStarters;
 
   protected org.apache.pinot.client.Connection _pinotConnection;
+  protected org.apache.pinot.client.Connection _pinotConnectionV2;
   protected Connection _h2Connection;
   protected QueryGenerator _queryGenerator;
 
@@ -506,9 +512,24 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @return Pinot connection
    */
   protected org.apache.pinot.client.Connection getPinotConnection() {
+    // TODO: This code is assuming getPinotConnectionProperties() will always return the same values
+    if (useMultiStageQueryEngine()) {
+      if (_pinotConnectionV2 == null) {
+        Properties properties = getPinotConnectionProperties();
+        properties.put("useMultiStageEngine", "true");
+        _pinotConnectionV2 = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
+            new JsonAsyncHttpPinotClientTransportFactory()
+                .withConnectionProperties(properties)
+                .buildTransport());
+      }
+      return _pinotConnectionV2;
+    }
     if (_pinotConnection == null) {
       _pinotConnection =
-          ConnectionFactory.fromZookeeper(getPinotConnectionProperties(), getZkUrl() + "/" + getHelixClusterName());
+          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
+              new JsonAsyncHttpPinotClientTransportFactory()
+                  .withConnectionProperties(getPinotConnectionProperties())
+                  .buildTransport());
     }
     return _pinotConnection;
   }
@@ -582,8 +603,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected List<File> unpackTarData(String tarFileName, File outputDir)
       throws Exception {
-    InputStream inputStream =
-        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(tarFileName);
+    InputStream inputStream = BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(tarFileName);
     Assert.assertNotNull(inputStream);
     return TarGzCompressionUtils.untar(inputStream, outputDir);
   }
@@ -609,9 +629,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     String kafkaBroker = "localhost:" + getKafkaPort();
     StreamDataProducer producer = null;
     try {
-      producer =
-          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
-              getDefaultKafkaProducerProperties(kafkaBroker));
+      producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+          getDefaultKafkaProducerProperties(kafkaBroker));
       ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, kafkaTopic, partitionColumnIndex, injectTombstones(),
           producer);
     } catch (Exception e) {
@@ -626,9 +645,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     String kafkaBroker = "localhost:" + getKafkaPort();
     StreamDataProducer producer = null;
     try {
-      producer =
-          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
-              getDefaultKafkaProducerProperties(kafkaBroker));
+      producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+          getDefaultKafkaProducerProperties(kafkaBroker));
       ClusterIntegrationTestUtils.pushCsvIntoKafka(csvRecords, kafkaTopic, partitionColumnIndex, injectTombstones(),
           producer);
     } catch (Exception e) {
@@ -709,7 +727,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected long getCurrentCountStarResult(String tableName) {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getResultSet(0).getLong(0);
+    ResultSetGroup resultSetGroup = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName);
+    if (resultSetGroup.getResultSetCount() > 0) {
+      return resultSetGroup.getResultSet(0).getLong(0);
+    }
+    return 0;
   }
 
   /**
@@ -725,9 +747,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     final long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(
-        () -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
         "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
+  }
+
+  /**
+   * Wait for servers to remove the table data manager after the table is deleted.
+   */
+  protected void waitForTableDataManagerRemoved(String tableNameWithType) {
+    TestUtils.waitForCondition(aVoid -> {
+      for (BaseServerStarter serverStarter : _serverStarters) {
+        if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType) != null) {
+          return false;
+        }
+      }
+      return true;
+    }, 60_000L, "Failed to remove table data manager for table: " + tableNameWithType);
   }
 
   /**
@@ -753,7 +788,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
-        getH2Connection(), null, getExtraQueryProperties());
+        getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());
   }
 
   /**
@@ -762,6 +797,23 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testQueryWithMatchingRowCount(String pinotQuery, String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
-        h2Query, getH2Connection(), null, getExtraQueryProperties());
+        h2Query, getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());
+  }
+
+  protected String getType(JsonNode jsonNode, int colIndex) {
+    return jsonNode.get("resultTable")
+        .get("dataSchema")
+        .get("columnDataTypes")
+        .get(colIndex)
+        .asText();
+  }
+
+  protected <T> T getCellValue(JsonNode jsonNode, int colIndex, int rowIndex, Function<JsonNode, T> extract) {
+    JsonNode cellResult = jsonNode.get("resultTable").get("rows").get(rowIndex).get(colIndex);
+    return extract.apply(cellResult);
+  }
+
+  protected long getLongCellValue(JsonNode jsonNode, int colIndex, int rowIndex) {
+    return getCellValue(jsonNode, colIndex, rowIndex, JsonNode::asLong).longValue();
   }
 }

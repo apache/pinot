@@ -39,6 +39,11 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 
 
+/**
+ * The {@code TransformFunctionType} enum represents all the transform functions supported by Calcite SQL parser in
+ * v2 engine.
+ * TODO: Add support for scalar functions auto registration.
+ */
 public enum TransformFunctionType {
   // arithmetic functions for single-valued columns
   ADD("add", "plus"),
@@ -73,6 +78,10 @@ public enum TransformFunctionType {
   IN("in"),
   NOT_IN("not_in"),
 
+  IS_TRUE("is_true"),
+  IS_NOT_TRUE("is_not_true"),
+  IS_FALSE("is_false"),
+  IS_NOT_FALSE("is_not_false"),
   IS_NULL("is_null"),
   IS_NOT_NULL("is_not_null"),
   COALESCE("coalesce"),
@@ -124,6 +133,21 @@ public enum TransformFunctionType {
               SqlTypeFamily.CHARACTER),
           ordinal -> ordinal > 1)),
 
+  FROMDATETIME("fromDateTime", ReturnTypes.TIMESTAMP_NULLABLE,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+          ordinal -> ordinal > 1)),
+
+  TODATETIME("toDateTime", ReturnTypes.VARCHAR_2000_NULLABLE,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+          ordinal -> ordinal > 1)),
+
+  TIMESTAMPADD("timestampAdd", ReturnTypes.TIMESTAMP_NULLABLE,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.NUMERIC, SqlTypeFamily.ANY)),
+      "dateAdd"),
+
+  TIMESTAMPDIFF("timestampDiff", ReturnTypes.BIGINT_NULLABLE,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY, SqlTypeFamily.ANY)), "dateDiff"),
+
   YEAR("year"),
   YEAR_OF_WEEK("yearOfWeek", "yow"),
   QUARTER("quarter"),
@@ -142,11 +166,13 @@ public enum TransformFunctionType {
   // array functions
   // The only column accepted by "cardinality" function is multi-value array, thus putting "cardinality" as alias.
   // TODO: once we support other types of multiset, we should make CARDINALITY its own function
-  ARRAYLENGTH("arrayLength", "cardinality"),
-  ARRAYAVERAGE("arrayAverage"),
-  ARRAYMIN("arrayMin"),
-  ARRAYMAX("arrayMax"),
-  ARRAYSUM("arraySum"),
+  ARRAYLENGTH("arrayLength", ReturnTypes.INTEGER, OperandTypes.family(SqlTypeFamily.ARRAY), "cardinality"),
+  ARRAYAVERAGE("arrayAverage", ReturnTypes.DOUBLE, OperandTypes.family(SqlTypeFamily.ARRAY)),
+  ARRAYMIN("arrayMin", ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0),
+      SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(SqlTypeFamily.ARRAY)),
+  ARRAYMAX("arrayMax", ReturnTypes.cascade(opBinding -> positionalComponentReturnType(opBinding, 0),
+      SqlTypeTransforms.FORCE_NULLABLE), OperandTypes.family(SqlTypeFamily.ARRAY)),
+  ARRAYSUM("arraySum", ReturnTypes.DOUBLE, OperandTypes.family(SqlTypeFamily.ARRAY)),
   VALUEIN("valueIn"),
   MAPVALUE("mapValue", ReturnTypes.cascade(opBinding ->
       opBinding.getOperandType(2).getComponentType(), SqlTypeTransforms.FORCE_NULLABLE),
@@ -157,7 +183,11 @@ public enum TransformFunctionType {
   INIDSET("inIdSet"),
   LOOKUP("lookUp"),
   GROOVY("groovy"),
-  CLPDECODE("clpDecode"),
+
+  // CLP functions
+  CLPDECODE("clpDecode", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.family(
+      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER),
+      ordinal -> ordinal > 2), "clp_decode"),
 
   // Regexp functions
   REGEXP_EXTRACT("regexpExtract", "regexp_extract"),

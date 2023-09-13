@@ -249,7 +249,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     } else {
       indexedTable.finish(true, true);
     }
-    GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable);
+    GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable, _queryContext);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());

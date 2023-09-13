@@ -49,10 +49,6 @@ import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.runtime.QueryRunnerTestBase;
-import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.executor.RoundRobinScheduler;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.table.TableType;
@@ -60,6 +56,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -181,27 +178,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         }
       }
     }
-    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
-    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
-
-    _reducerGrpcPort = QueryTestUtils.getAvailablePort();
-    _reducerHostname = String.format("Broker_%s", QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME);
-    Map<String, Object> reducerConfig = new HashMap<>();
-    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, _reducerGrpcPort);
-    reducerConfig.put(QueryConfig.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
-    _reducerScheduler = new OpChainSchedulerService(new RoundRobinScheduler(10_000L), REDUCE_EXECUTOR);
-    _mailboxService = new MailboxService(QueryConfig.DEFAULT_QUERY_RUNNER_HOSTNAME, _reducerGrpcPort,
-        new PinotConfiguration(reducerConfig), _reducerScheduler::onDataAvailable);
-    _reducerScheduler.startAsync();
-    _mailboxService.start();
 
     Map<String, List<String>> tableToSegmentMap1 = factory1.buildTableSegmentNameMap();
     Map<String, List<String>> tableToSegmentMap2 = factory2.buildTableSegmentNameMap();
-
     for (Map.Entry<String, List<String>> entry : tableToSegmentMap1.entrySet()) {
       _tableToSegmentMap.put(entry.getKey(), new HashSet<>(entry.getValue()));
     }
-
     for (Map.Entry<String, List<String>> entry : tableToSegmentMap2.entrySet()) {
       if (_tableToSegmentMap.containsKey(entry.getKey())) {
         _tableToSegmentMap.get(entry.getKey()).addAll(entry.getValue());
@@ -210,10 +192,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       }
     }
 
-    _queryEnvironment =
-        QueryEnvironmentTestBase.getQueryEnvironment(_reducerGrpcPort, server1.getPort(), server2.getPort(),
-            factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
-            partitionedSegmentsMap);
+    _reducerHostname = "localhost";
+    _reducerPort = QueryTestUtils.getAvailablePort();
+    Map<String, Object> reducerConfig = new HashMap<>();
+    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _reducerHostname);
+    reducerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _reducerPort);
+    _mailboxService = new MailboxService(_reducerHostname, _reducerPort, new PinotConfiguration(reducerConfig));
+    _mailboxService.start();
+
+    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
+    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
     server1.start();
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
@@ -222,6 +210,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     int port2 = server2.getPort();
     _servers.put(new QueryServerInstance("localhost", port1, port1), server1);
     _servers.put(new QueryServerInstance("localhost", port2, port2), server2);
+
+    _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerPort, server1.getPort(), server2.getPort(),
+        factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
+        partitionedSegmentsMap);
   }
 
   private void addSegments(MockInstanceDataManagerFactory factory1, MockInstanceDataManagerFactory factory2,
@@ -249,7 +241,6 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       server.shutDown();
     }
     _mailboxService.shutdown();
-    _reducerScheduler.stopAsync();
   }
 
   // TODO: name the test using testCaseName for testng reports

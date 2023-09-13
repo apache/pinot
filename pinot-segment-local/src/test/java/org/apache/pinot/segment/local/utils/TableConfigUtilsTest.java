@@ -35,10 +35,12 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
@@ -319,8 +321,31 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    // invalid filter config since Groovy is disabled
+    // Using peer download scheme with replication of 1
     ingestionConfig.setTransformConfigs(null);
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
+    segmentsValidationAndRetentionConfig.setReplication("1");
+    segmentsValidationAndRetentionConfig.setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL);
+    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail when peer download scheme is used with replication of 1");
+    } catch (IllegalStateException e) {
+      // expected
+      Assert.assertEquals(e.getMessage(), "peerSegmentDownloadScheme can't be used when replication is < 2");
+    }
+
+    segmentsValidationAndRetentionConfig.setReplication("2");
+    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      // expected
+      Assert.fail("Should not fail when peer download scheme is used with replication of > 1");
+    }
+
+    // invalid filter config since Groovy is disabled
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({timestamp > 0}, timestamp)"));
     try {
       TableConfigUtils.validate(tableConfig, schema, null, true);
@@ -616,17 +641,36 @@ public class TableConfigUtilsTest {
     TableConfigUtils.validateIngestionConfig(tableConfig, null);
 
     // validate the proto decoder
-    streamConfigs = getStreamConfigs();
-    streamConfigs.put("stream.kafka.decoder.class.name",
-        "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
-    streamConfigs.put("stream.kafka.decoder.prop.descriptorFile", "file://test");
+    streamConfigs = getKafkaStreamConfigs();
+    //test config should be valid
+    TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    streamConfigs.remove("stream.kafka.decoder.prop.descriptorFile");
     try {
       TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
     } catch (IllegalStateException e) {
       // expected
     }
-    streamConfigs.remove("stream.kafka.decoder.prop.descriptorFile");
-    streamConfigs.put("stream.kafka.decoder.prop.protoClassName", "test");
+    streamConfigs = getKafkaStreamConfigs();
+    streamConfigs.remove("stream.kafka.decoder.prop.protoClassName");
+    try {
+      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    } catch (IllegalStateException e) {
+      // expected
+    }
+    //validate the protobuf pulsar config
+    streamConfigs = getPulsarStreamConfigs();
+    //test config should be valid
+    TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    //remove the descriptor file, should fail
+    streamConfigs.remove("stream.pulsar.decoder.prop.descriptorFile");
+    try {
+      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    } catch (IllegalStateException e) {
+      // expected
+    }
+    streamConfigs = getPulsarStreamConfigs();
+    //remove the proto class name, should fail
+    streamConfigs.remove("stream.pulsar.decoder.prop.protoClassName");
     try {
       TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
     } catch (IllegalStateException e) {
@@ -1522,6 +1566,18 @@ public class TableConfigUtilsTest {
           "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
     }
 
+    // invalid tag override with upsert
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(getStreamConfigs())
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .setTagOverrideConfig(new TagOverrideConfig("T1_REALTIME", "T2_REALTIME")).build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail("Tag override must not be allowed with upsert");
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Upsert/Dedup table cannot use tenant tag override");
+    }
+
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setUpsertConfig(upsertConfig)
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setStreamConfigs(streamConfigs).build();
@@ -1752,6 +1808,7 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert table"));
     }
+
     // validate that TASK config will be skipped with skip string.
     TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT", false);
 
@@ -1855,6 +1912,43 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateInstancePartitionsTypeMapConfig(invalidTableConfig);
       Assert.fail("Validation should have failed since both instancePartitionsMap and config are set");
     } catch (IllegalStateException ignored) {
+    }
+  }
+
+  @Test
+  public void testValidateHybridTableConfig() {
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      // Call validate hybrid table which realtime/offline tables are missing timeColumn.
+      TableConfigUtils.verifyHybridTableConfigs(TABLE_NAME, offlineTableConfig, realtimeTableConfig);
+      Assert.fail();
+    } catch (IllegalStateException ignored) {
+      // Expected
+    }
+
+    realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("secondsSinceEpoch").build();
+    offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName("secondssinceepoch").build();
+    try {
+      // Call validate hybrid table which realtime table and offline table have different time columns.
+      TableConfigUtils.verifyHybridTableConfigs(TABLE_NAME, offlineTableConfig, realtimeTableConfig);
+      Assert.fail();
+    } catch (IllegalStateException ignored) {
+      // Expected
+    }
+
+    realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("secondsSinceEpoch").setBrokerTenant("broker1").build();
+    offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName("secondsSinceEpoch").setBrokerTenant("broker2").build();
+    try {
+      // Call validate hybrid table which realtime and offline table have different brokers.
+      TableConfigUtils.verifyHybridTableConfigs(TABLE_NAME, offlineTableConfig, realtimeTableConfig);
+      Assert.fail();
+    } catch (IllegalArgumentException ignored) {
+      // Expected
     }
   }
 
@@ -2039,6 +2133,30 @@ public class TableConfigUtilsTest {
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+    return streamConfigs;
+  }
+
+  private Map<String, String> getKafkaStreamConfigs() {
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
+    streamConfigs.put("stream.kafka.topic.name", "test");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
+    streamConfigs.put("stream.kafka.decoder.prop.descriptorFile", "file://test");
+    streamConfigs.put("stream.kafka.decoder.prop.protoClassName", "test");
+    return streamConfigs;
+  }
+
+  private Map<String, String> getPulsarStreamConfigs() {
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "pulsar");
+    streamConfigs.put("stream.pulsar.consumer.type", "lowlevel");
+    streamConfigs.put("stream.pulsar.topic.name", "test");
+    streamConfigs.put("stream.pulsar.decoder.prop.descriptorFile", "file://test");
+    streamConfigs.put("stream.pulsar.decoder.prop.protoClassName", "test");
+    streamConfigs.put("stream.pulsar.decoder.class.name",
+        "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
     return streamConfigs;
   }
 }

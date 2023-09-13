@@ -36,9 +36,10 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.Pair;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.LiteralHintUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 
 
 /**
@@ -89,12 +90,12 @@ public class PinotAggregateLiteralAttachmentRule extends RelOptRule {
       int argSize = aggCall.getArgList().size();
       if (argSize > 1) {
         // use -1 argIdx to indicate size of the agg operands.
-        rexLiteralMap.put(new Pair<>(aggIdx, -1), new RexExpression.Literal(FieldSpec.DataType.INT, argSize));
+        rexLiteralMap.put(new Pair<>(aggIdx, -1), new RexExpression.Literal(ColumnDataType.INT, argSize));
         // put the literals in to the map.
         for (int argIdx = 0; argIdx < argSize; argIdx++) {
           RexNode field = rexNodes.get(aggCall.getArgList().get(argIdx));
           if (field instanceof RexLiteral) {
-            rexLiteralMap.put(new Pair<>(aggIdx, argIdx), LiteralHintUtils.rexLiteralToLiteral((RexLiteral) field));
+            rexLiteralMap.put(new Pair<>(aggIdx, argIdx), RexExpressionUtils.fromRexLiteral((RexLiteral) field));
           }
         }
       }

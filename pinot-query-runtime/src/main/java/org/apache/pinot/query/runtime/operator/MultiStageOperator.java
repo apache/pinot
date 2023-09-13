@@ -39,8 +39,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
 
   public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
-    _operatorId =
-        Joiner.on("_").join(toExplainString(), _context.getRequestId(), _context.getStageId(), _context.getServer());
+    _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
     _opChainStats = _context.getStats();
   }
 

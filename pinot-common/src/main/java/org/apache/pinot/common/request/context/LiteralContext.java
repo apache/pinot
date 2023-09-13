@@ -31,6 +31,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
 /**
@@ -95,6 +96,11 @@ public class LiteralContext {
         _value = literal.getFieldValue();
         _bigDecimalValue = PinotDataType.BOOLEAN.toBigDecimal(_value);
         break;
+      case INT_VALUE:
+        _type = FieldSpec.DataType.INT;
+        _value = literal.getIntValue();
+        _bigDecimalValue = new BigDecimal((int) _value);
+        break;
       case LONG_VALUE:
         long longValue = literal.getLongValue();
         if (longValue == (int) longValue) {
@@ -122,14 +128,24 @@ public class LiteralContext {
         Pair<FieldSpec.DataType, Object> typeAndValue =
             inferLiteralDataTypeAndValue(literal.getFieldValue().toString());
         _type = typeAndValue.getLeft();
-        _value = typeAndValue.getRight();
         if (_type == FieldSpec.DataType.BIG_DECIMAL) {
-          _bigDecimalValue = (BigDecimal) _value;
+          _bigDecimalValue = (BigDecimal) typeAndValue.getRight();
         } else if (_type == FieldSpec.DataType.TIMESTAMP) {
-          _bigDecimalValue = PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(_value.toString()));
+          _bigDecimalValue = PinotDataType.TIMESTAMP.toBigDecimal(typeAndValue.getRight());
         } else {
           _bigDecimalValue = BigDecimal.ZERO;
         }
+        _value = literal.getFieldValue().toString();
+        break;
+      case BIG_DECIMAL_VALUE:
+        _type = FieldSpec.DataType.BIG_DECIMAL;
+        _bigDecimalValue = BigDecimalUtils.deserialize(literal.getBigDecimalValue());
+        _value = _bigDecimalValue;
+        break;
+      case BINARY_VALUE:
+        _type = FieldSpec.DataType.BYTES;
+        _value = literal.getBinaryValue();
+        _bigDecimalValue = BigDecimal.ZERO;
         break;
       case NULL_VALUE:
         _type = FieldSpec.DataType.UNKNOWN;

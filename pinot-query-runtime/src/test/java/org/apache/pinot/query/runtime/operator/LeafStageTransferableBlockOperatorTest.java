@@ -18,22 +18,20 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Function;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
-import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
-import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -43,30 +41,61 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 // TODO: add tests for Agg / GroupBy / Distinct result blocks
 public class LeafStageTransferableBlockOperatorTest {
+  private final ExecutorService _executorService = Executors.newCachedThreadPool();
+  private final AtomicReference<LeafStageTransferableBlockOperator> _operatorRef = new AtomicReference<>();
+
   private AutoCloseable _mocks;
 
   @Mock
   private VirtualServerAddress _serverAddress;
 
   @BeforeMethod
-  public void setUp() {
+  public void setUpMethod() {
     _mocks = MockitoAnnotations.openMocks(this);
     Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
   }
 
   @AfterMethod
-  public void tearDown()
+  public void tearDownMethod()
       throws Exception {
     _mocks.close();
+  }
+
+  @AfterClass
+  public void tearDown() {
+    _executorService.shutdown();
+  }
+
+  private QueryExecutor mockQueryExecutor(List<BaseResultsBlock> dataBlocks, InstanceResponseBlock metadataBlock) {
+    QueryExecutor queryExecutor = mock(QueryExecutor.class);
+    when(queryExecutor.execute(any(), any(), any())).thenAnswer(invocation -> {
+      LeafStageTransferableBlockOperator operator = _operatorRef.get();
+      for (BaseResultsBlock dataBlock : dataBlocks) {
+        operator.addResultsBlock(dataBlock);
+      }
+      return metadataBlock;
+    });
+    return queryExecutor;
+  }
+
+  private List<ServerQueryRequest> mockQueryRequests(int numRequests) {
+    List<ServerQueryRequest> queryRequests = new ArrayList<>(numRequests);
+    for (int i = 0; i < numRequests; i++) {
+      queryRequests.add(mock(ServerQueryRequest.class));
+    }
+    return queryRequests;
   }
 
   @Test
@@ -75,11 +104,14 @@ public class LeafStageTransferableBlockOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})), queryContext));
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
     LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()), schema);
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), mockQueryRequests(1), schema,
+            queryExecutor, _executorService);
+    _operatorRef.set(operator);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
@@ -87,7 +119,9 @@ public class LeafStageTransferableBlockOperatorTest {
     // Then:
     Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{"foo", 1});
     Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{"", 2});
-    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
+    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading 2 blocks");
+
+    operator.close();
   }
 
   @Test
@@ -101,44 +135,24 @@ public class LeafStageTransferableBlockOperatorTest {
         new DataSchema(new String[]{"boolCol", "tsCol", "newNamedBoolCol"}, new DataSchema.ColumnDataType[]{
             DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP, DataSchema.ColumnDataType.BOOLEAN
         });
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new SelectionResultsBlock(resultSchema,
-            Arrays.asList(new Object[]{1, 1660000000000L}, new Object[]{0, 1600000000000L})), queryContext));
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(new SelectionResultsBlock(resultSchema,
+        Arrays.asList(new Object[]{1, 1660000000000L}, new Object[]{0, 1600000000000L}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
     LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()),
-            desiredSchema);
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), mockQueryRequests(1),
+            desiredSchema, queryExecutor, _executorService);
+    _operatorRef.set(operator);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{true, new Timestamp(1660000000000L), true});
-    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{false, new Timestamp(1600000000000L), false});
-    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
-  }
+    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, 1660000000000L, 1});
+    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{0, 1600000000000L, 0});
+    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading 2 blocks");
 
-  @Test
-  public void shouldHandleCanonicalizationCorrectly() {
-    // TODO: not all stored types are supported, add additional datatype when they are supported.
-    // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT boolCol, tsCol FROM tbl");
-    DataSchema schema = new DataSchema(new String[]{"boolCol", "tsCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.TIMESTAMP});
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new SelectionResultsBlock(schema,
-            Arrays.asList(new Object[]{1, 1660000000000L}, new Object[]{0, 1600000000000L})), queryContext));
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()), schema);
-
-    // When:
-    TransferableBlock resultBlock = operator.nextBlock();
-
-    // Then:
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{true, new Timestamp(1660000000000L)});
-    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{false, new Timestamp(1600000000000L)});
-    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
+    operator.close();
   }
 
   @Test
@@ -147,16 +161,15 @@ public class LeafStageTransferableBlockOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<InstanceResponseBlock> resultsBlockList = Arrays.asList(new InstanceResponseBlock(
-            new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})),
-            queryContext),
-        new InstanceResponseBlock(
-            new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4})),
-            queryContext),
-        new InstanceResponseBlock(new SelectionResultsBlock(schema, Collections.emptyList()), queryContext));
+    List<BaseResultsBlock> dataBlocks = Arrays.asList(
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext),
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
     LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()), schema);
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), mockQueryRequests(1), schema,
+            queryExecutor, _executorService);
+    _operatorRef.set(operator);
 
     // When:
     TransferableBlock resultBlock1 = operator.nextBlock();
@@ -168,8 +181,35 @@ public class LeafStageTransferableBlockOperatorTest {
     Assert.assertEquals(resultBlock1.getContainer().get(1), new Object[]{"", 2});
     Assert.assertEquals(resultBlock2.getContainer().get(0), new Object[]{"bar", 3});
     Assert.assertEquals(resultBlock2.getContainer().get(1), new Object[]{"foo", 4});
-    Assert.assertEquals(resultBlock3.getContainer().size(), 0);
-    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading two rows");
+    Assert.assertTrue(resultBlock3.isEndOfStreamBlock(), "Expected EOS after reading 2 blocks");
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldHandleMultipleRequests() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    List<BaseResultsBlock> dataBlocks = Arrays.asList(
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext),
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"bar", 3}, new Object[]{"foo", 4}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), mockQueryRequests(2), schema,
+            queryExecutor, _executorService);
+    _operatorRef.set(operator);
+
+    // Then: the 5th block should be EOS
+    Assert.assertTrue(operator.nextBlock().isDataBlock());
+    Assert.assertTrue(operator.nextBlock().isDataBlock());
+    Assert.assertTrue(operator.nextBlock().isDataBlock());
+    Assert.assertTrue(operator.nextBlock().isDataBlock());
+    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading 5 blocks");
+
+    operator.close();
   }
 
   @Test
@@ -178,139 +218,25 @@ public class LeafStageTransferableBlockOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
     DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+        new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}), queryContext));
     InstanceResponseBlock errorBlock = new InstanceResponseBlock();
     errorBlock.addException(QueryException.QUERY_EXECUTION_ERROR.getErrorCode(), "foobar");
-    List<InstanceResponseBlock> resultsBlockList = Arrays.asList(new InstanceResponseBlock(
-            new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2})),
-            queryContext),
-        errorBlock,
-        new InstanceResponseBlock(new SelectionResultsBlock(schema, Collections.emptyList()), queryContext));
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, errorBlock);
     LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()), schema);
-
-    // When:
-    TransferableBlock resultBlock = operator.nextBlock();
-    // Then:
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{"foo", 1});
-    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{"", 2});
-
-    // When:
-    resultBlock = operator.nextBlock();
-    Assert.assertTrue(resultBlock.isErrorBlock());
-  }
-
-  @Test
-  public void shouldReorderWhenQueryContextAskForNotInOrderGroupByAsDistinct() {
-    // Given:
-    QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContext("SELECT intCol, strCol FROM tbl GROUP BY strCol, intCol");
-    // result schema doesn't match with DISTINCT columns using GROUP BY.
-    DataSchema schema = new DataSchema(new String[]{"intCol", "strCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new DistinctResultsBlock(new DistinctTable(schema,
-            Arrays.asList(new Record(new Object[]{1, "foo"}), new Record(new Object[]{2, "bar"})))), queryContext));
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()), schema);
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), mockQueryRequests(1), schema,
+            queryExecutor, _executorService);
+    _operatorRef.set(operator);
 
     // When:
     TransferableBlock resultBlock = operator.nextBlock();
 
-    // Then:
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, "foo"});
-    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{2, "bar"});
-  }
+    // Then: error block can be returned as first or second block depending on the sequence of the execution
+    if (!resultBlock.isErrorBlock()) {
+      Assert.assertTrue(operator.nextBlock().isErrorBlock());
+    }
 
-  @Test
-  public void shouldParsedBlocksSuccessfullyWithDistinctQuery() {
-    // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCT strCol, intCol FROM tbl");
-    // result schema doesn't match with DISTINCT columns using GROUP BY.
-    DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new DistinctResultsBlock(new DistinctTable(schema,
-            Arrays.asList(new Record(new Object[]{"foo", 1}), new Record(new Object[]{"bar", 2})))), queryContext));
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()), schema);
-
-    // When:
-    TransferableBlock resultBlock = operator.nextBlock();
-
-    // Then:
-    Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{"foo", 1});
-    Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{"bar", 2});
-  }
-
-  @Test
-  public void shouldReorderWhenQueryContextAskForGroupByOutOfOrder() {
-    // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
-        "SELECT intCol, count(*), sum(doubleCol), strCol FROM tbl GROUP BY strCol, intCol");
-    // result schema doesn't match with columns ordering using GROUP BY, this should not occur.
-    DataSchema schema =
-        new DataSchema(new String[]{"intCol", "count(*)", "sum(doubleCol)", "strCol"}, new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG,
-            DataSchema.ColumnDataType.STRING
-        });
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
-        new InstanceResponseBlock(new GroupByResultsBlock(schema, Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()), schema);
-
-    // When:
-    TransferableBlock resultBlock = operator.nextBlock();
-
-    // Then:
-    Assert.assertFalse(resultBlock.isErrorBlock());
-  }
-
-  @Test
-  public void shouldNotErrorOutWhenQueryContextAskForGroupByOutOfOrderWithHaving() {
-    // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol, count(*), "
-        + "sum(doubleCol) FROM tbl GROUP BY strCol, intCol HAVING sum(doubleCol) < 10 AND count(*) > 0");
-    // result schema contains duplicate reference from agg and having. it will repeat itself.
-    DataSchema schema = new DataSchema(new String[]{"strCol", "intCol", "count(*)", "sum(doubleCol)", "sum(doubleCol)"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG
-        });
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(
-        new InstanceResponseBlock(new GroupByResultsBlock(schema, Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()), schema);
-
-    // When:
-    TransferableBlock resultBlock = operator.nextBlock();
-
-    // Then:
-    Assert.assertFalse(resultBlock.isErrorBlock());
-  }
-
-  @Test
-  public void shouldNotErrorOutWhenDealingWithAggregationResults() {
-    // Given:
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT count(*), sum(doubleCol) FROM tbl");
-    // result schema doesn't match with DISTINCT columns using GROUP BY.
-    DataSchema schema = new DataSchema(new String[]{"count_star", "sum(doubleCol)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
-    List<InstanceResponseBlock> resultsBlockList = Collections.singletonList(new InstanceResponseBlock(
-        new AggregationResultsBlock(queryContext.getAggregationFunctions(), Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(resultsBlockList), getStaticServerQueryRequests(resultsBlockList.size()), schema);
-
-    // When:
-    TransferableBlock resultBlock = operator.nextBlock();
-
-    // Then:
-    Assert.assertFalse(resultBlock.isErrorBlock());
+    operator.close();
   }
 
   @Test
@@ -321,96 +247,21 @@ public class LeafStageTransferableBlockOperatorTest {
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
     DataSchema desiredSchema = new DataSchema(new String[]{"strCol", "intCol"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    List<BaseResultsBlock> dataBlocks = Collections.emptyList();
+    InstanceResponseBlock emptySelectionResponseBlock =
+        new InstanceResponseBlock(new SelectionResultsBlock(resultSchema, Collections.emptyList(), queryContext));
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, emptySelectionResponseBlock);
+    LeafStageTransferableBlockOperator operator =
+        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(), mockQueryRequests(1),
+            desiredSchema, queryExecutor, _executorService);
+    _operatorRef.set(operator);
 
     // When:
-    List<InstanceResponseBlock> responseBlockList = Collections.singletonList(
-        new InstanceResponseBlock(new SelectionResultsBlock(resultSchema, Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(responseBlockList), getStaticServerQueryRequests(responseBlockList.size()),
-            desiredSchema);
     TransferableBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertEquals(resultBlock.getContainer().size(), 0);
-    Assert.assertEquals(resultBlock.getDataSchema(), desiredSchema);
-  }
+    Assert.assertTrue(resultBlock.isEndOfStreamBlock());
 
-  @Test
-  public void shouldNotErrorOutWhenIncorrectDataSchemaProvidedWithEmptyRowsDistinct() {
-    // Given:
-    QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl GROUP BY strCol, intCol");
-    DataSchema resultSchema = new DataSchema(new String[]{"strCol", "intCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
-    DataSchema desiredSchema = new DataSchema(new String[]{"strCol", "intCol"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-
-    // When:
-    List<InstanceResponseBlock> responseBlockList = Collections.singletonList(
-        new InstanceResponseBlock(new DistinctResultsBlock(new DistinctTable(resultSchema, Collections.emptyList())),
-            queryContext));
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(responseBlockList), getStaticServerQueryRequests(responseBlockList.size()),
-            desiredSchema);
-    TransferableBlock resultBlock = operator.nextBlock();
-
-    // Then:
-    Assert.assertEquals(resultBlock.getContainer().size(), 0);
-    Assert.assertEquals(resultBlock.getDataSchema(), desiredSchema);
-  }
-
-  @Test
-  public void shouldNotErrorOutWhenIncorrectDataSchemaProvidedWithEmptyRowsGroupBy() {
-    // Given:
-    QueryContext queryContext =
-        QueryContextConverterUtils.getQueryContext("SELECT strCol, SUM(intCol) FROM tbl GROUP BY strCol");
-    DataSchema resultSchema = new DataSchema(new String[]{"strCol", "SUM(intCol)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
-    DataSchema desiredSchema = new DataSchema(new String[]{"strCol", "SUM(intCol)"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
-
-    // When:
-    List<InstanceResponseBlock> responseBlockList = Collections.singletonList(
-        new InstanceResponseBlock(new GroupByResultsBlock(resultSchema, Collections.emptyList()), queryContext));
-    LeafStageTransferableBlockOperator operator =
-        new LeafStageTransferableBlockOperator(OperatorTestUtil.getDefaultContext(),
-            getStaticBlockProcessor(responseBlockList), getStaticServerQueryRequests(responseBlockList.size()),
-            desiredSchema);
-    TransferableBlock resultBlock = operator.nextBlock();
-
-    // Then:
-    Assert.assertEquals(resultBlock.getContainer().size(), 0);
-    Assert.assertEquals(resultBlock.getDataSchema(), desiredSchema);
-  }
-
-  @VisibleForTesting
-  static Function<ServerQueryRequest, InstanceResponseBlock> getStaticBlockProcessor(
-      List<InstanceResponseBlock> resultBlockList) {
-    return new StaticBlockProcessor(resultBlockList)::process;
-  }
-
-  static List<ServerQueryRequest> getStaticServerQueryRequests(int count) {
-    List<ServerQueryRequest> staticMockRequests = new ArrayList<>();
-    while (count > 0) {
-      staticMockRequests.add(mock(ServerQueryRequest.class));
-      count--;
-    }
-    return staticMockRequests;
-  }
-
-  private static class StaticBlockProcessor {
-    private final List<InstanceResponseBlock> _resultBlockList;
-    private int _currentIdx;
-
-    StaticBlockProcessor(List<InstanceResponseBlock> resultBlockList) {
-      _resultBlockList = resultBlockList;
-      _currentIdx = 0;
-    }
-
-    public InstanceResponseBlock process(ServerQueryRequest request) {
-      return _resultBlockList.get(_currentIdx++);
-    }
+    operator.close();
   }
 }

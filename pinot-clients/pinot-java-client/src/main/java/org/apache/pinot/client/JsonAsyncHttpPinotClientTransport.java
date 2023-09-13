@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.client;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
-import io.netty.handler.ssl.SslContext;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -61,6 +58,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   private final int _brokerReadTimeout;
   private final AsyncHttpClient _httpClient;
   private final String _extraOptionStr;
+  private final boolean _useMultiStageEngine;
 
   public JsonAsyncHttpPinotClientTransport() {
     _brokerReadTimeout = 60000;
@@ -68,41 +66,21 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;
     _httpClient = Dsl.asyncHttpClient(Dsl.config().setRequestTimeout(_brokerReadTimeout));
+    _useMultiStageEngine = false;
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
-      @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols,
-      @Nullable String appId) {
+      boolean useMultiStageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
+      TlsProtocols tlsProtocols, @Nullable String appId) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
     _extraOptionStr = StringUtils.isEmpty(extraOptionString) ? DEFAULT_EXTRA_QUERY_OPTION_STRING : extraOptionString;
+    _useMultiStageEngine = useMultiStageEngine;
 
     Builder builder = Dsl.config();
     if (sslContext != null) {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
-    }
-
-    builder.setRequestTimeout(_brokerReadTimeout)
-        .setReadTimeout(connectionTimeouts.getReadTimeoutMs())
-        .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
-        .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
-        .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua", appId))
-        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
-    _httpClient = Dsl.asyncHttpClient(builder.build());
-  }
-
-  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionStr,
-      @Nullable SslContext sslContext, ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols,
-      @Nullable String appId) {
-    _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
-    _headers = headers;
-    _scheme = scheme;
-    _extraOptionStr = StringUtils.isEmpty(extraOptionStr) ? DEFAULT_EXTRA_QUERY_OPTION_STRING : extraOptionStr;
-
-    Builder builder = Dsl.config();
-    if (sslContext != null) {
-      builder.setSslContext(sslContext);
     }
 
     builder.setRequestTimeout(_brokerReadTimeout)
@@ -131,7 +109,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       json.put("sql", query);
       json.put("queryOptions", _extraOptionStr);
 
-      String url = _scheme + "://" + brokerAddress + "/query/sql";
+      String url = String.format("%s://%s%s", _scheme, brokerAddress, _useMultiStageEngine ? "/query" : "/query/sql");
       BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
 
       if (_headers != null) {
@@ -139,21 +117,20 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       }
       LOGGER.debug("Sending query {} to {}", query, url);
       return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
-              .execute().toCompletableFuture().thenApply(httpResponse -> {
-        LOGGER.debug("Completed query, HTTP status is {}", httpResponse.getStatusCode());
+          .execute().toCompletableFuture().thenApply(httpResponse -> {
+            LOGGER.debug("Completed query, HTTP status is {}", httpResponse.getStatusCode());
 
-        if (httpResponse.getStatusCode() != 200) {
-          throw new PinotClientException(
+            if (httpResponse.getStatusCode() != 200) {
+              throw new PinotClientException(
                   "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
-        }
+            }
 
-        String responseBody = httpResponse.getResponseBody(StandardCharsets.UTF_8);
-        try {
-          return BrokerResponse.fromJson(OBJECT_READER.readTree(responseBody));
-        } catch (JsonProcessingException e) {
-          throw new CompletionException(e);
-        }
-      });
+            try {
+              return BrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
+            } catch (IOException e) {
+              throw new CompletionException(e);
+            }
+          });
     } catch (Exception e) {
       throw new PinotClientException(e);
     }

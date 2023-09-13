@@ -262,9 +262,11 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     testReload(false);
   }
 
-  @Test
-  public void testAddRemoveDictionaryAndInvertedIndex()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAddRemoveDictionaryAndInvertedIndex(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     String query = "SELECT COUNT(*) FROM myTable WHERE ActualElapsedTime = -9999";
     long numTotalDocs = getCountStarResult();
 

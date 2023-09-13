@@ -23,7 +23,6 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -63,8 +62,7 @@ public class BroadcastExchangeTest {
     ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 
     // When:
-    new BroadcastExchange(new OpChainId(1, 2, 3), destinations, TransferableBlockUtils::splitBlock,
-        (opChainId) -> { }, System.currentTimeMillis() + 10_000L).route(destinations, _block);
+    new BroadcastExchange(destinations, TransferableBlockUtils::splitBlock).route(destinations, _block);
 
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
 

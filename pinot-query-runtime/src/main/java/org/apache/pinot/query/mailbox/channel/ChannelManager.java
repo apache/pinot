@@ -22,7 +22,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.query.service.QueryConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -38,6 +38,8 @@ public class ChannelManager {
     // TODO: Revisit parameters
     return _channelMap.computeIfAbsent(Pair.of(hostname, port),
         (k) -> ManagedChannelBuilder.forAddress(k.getLeft(), k.getRight())
-            .maxInboundMessageSize(QueryConfig.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES).usePlaintext().build());
+            .maxInboundMessageSize(
+                CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
+            .usePlaintext().build());
   }
 }

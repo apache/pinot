@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.routing.segmentselector;
 
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 
 
 public class SegmentSelectorFactory {
@@ -27,10 +26,6 @@ public class SegmentSelectorFactory {
   }
 
   public static SegmentSelector getSegmentSelector(TableConfig tableConfig) {
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      return new OfflineSegmentSelector();
-    } else {
-      return new RealtimeSegmentSelector();
-    }
+    return new DefaultSegmentSelector();
   }
 }

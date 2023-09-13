@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -257,7 +258,7 @@ public class AggregationFunctionFactory {
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(firstArgument);
           case DISTINCTCOUNT:
-            return new DistinctCountAggregationFunction(firstArgument);
+            return new DistinctCountAggregationFunction(firstArgument, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
             return new DistinctCountBitmapAggregationFunction(firstArgument);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
@@ -275,9 +276,9 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTRAWTHETASKETCH:
             return new DistinctCountRawThetaSketchAggregationFunction(arguments);
           case DISTINCTSUM:
-            return new DistinctSumAggregationFunction(firstArgument);
+            return new DistinctSumAggregationFunction(firstArgument, nullHandlingEnabled);
           case DISTINCTAVG:
-            return new DistinctAvgAggregationFunction(firstArgument);
+            return new DistinctAvgAggregationFunction(firstArgument, nullHandlingEnabled);
           case IDSET:
             return new IdSetAggregationFunction(arguments);
           case COUNTMV:
@@ -317,13 +318,13 @@ public class AggregationFunctionFactory {
           case BOOLOR:
             return new BooleanOrAggregationFunction(firstArgument, nullHandlingEnabled);
           case VARPOP:
-            return new VarianceAggregationFunction(firstArgument, false, false);
+            return new VarianceAggregationFunction(firstArgument, false, false, nullHandlingEnabled);
           case VARSAMP:
-            return new VarianceAggregationFunction(firstArgument, true, false);
+            return new VarianceAggregationFunction(firstArgument, true, false, nullHandlingEnabled);
           case STDDEVPOP:
-            return new VarianceAggregationFunction(firstArgument, false, true);
+            return new VarianceAggregationFunction(firstArgument, false, true, nullHandlingEnabled);
           case STDDEVSAMP:
-            return new VarianceAggregationFunction(firstArgument, true, true);
+            return new VarianceAggregationFunction(firstArgument, true, true, nullHandlingEnabled);
           case SKEWNESS:
             return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.SKEWNESS);
           case KURTOSIS:
@@ -352,7 +353,7 @@ public class AggregationFunctionFactory {
             throw new IllegalArgumentException(
                 "Aggregation function: " + function + " is only supported in selection without alias.");
           case FUNNELCOUNT:
-            return new FunnelCountAggregationFunction(arguments);
+            return new FunnelCountAggregationFunctionFactory(arguments).get();
 
           default:
             throw new IllegalArgumentException();

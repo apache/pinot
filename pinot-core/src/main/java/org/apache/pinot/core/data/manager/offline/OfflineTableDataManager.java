@@ -38,5 +38,6 @@ public class OfflineTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doShutdown() {
+    releaseAndRemoveAllSegments();
   }
 }

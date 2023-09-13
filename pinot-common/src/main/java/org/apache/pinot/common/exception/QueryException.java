@@ -61,6 +61,7 @@ public class QueryException {
   public static final int SERVER_TABLE_MISSING_ERROR_CODE = 230;
   public static final int SERVER_SEGMENT_MISSING_ERROR_CODE = 235;
   public static final int QUERY_SCHEDULING_TIMEOUT_ERROR_CODE = 240;
+  public static final int SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE = 245;
   public static final int EXECUTION_TIMEOUT_ERROR_CODE = 250;
   public static final int DATA_TABLE_SERIALIZATION_ERROR_CODE = 260;
   public static final int BROKER_GATHER_ERROR_CODE = 300;
@@ -79,12 +80,14 @@ public class QueryException {
   public static final int COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE = 600;
   public static final int QUERY_VALIDATION_ERROR_CODE = 700;
   public static final int UNKNOWN_COLUMN_ERROR_CODE = 710;
+  public static final int QUERY_PLANNING_ERROR_CODE = 720;
   public static final int UNKNOWN_ERROR_CODE = 1000;
   // NOTE: update isClientError() method appropriately when new codes are added
 
   public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(JSON_PARSING_ERROR_CODE);
   public static final ProcessingException JSON_COMPILATION_ERROR = new ProcessingException(JSON_COMPILATION_ERROR_CODE);
   public static final ProcessingException SQL_PARSING_ERROR = new ProcessingException(SQL_PARSING_ERROR_CODE);
+  public static final ProcessingException QUERY_PLANNING_ERROR = new ProcessingException(QUERY_PLANNING_ERROR_CODE);
   public static final ProcessingException ACCESS_DENIED_ERROR = new ProcessingException(ACCESS_DENIED_ERROR_CODE);
   public static final ProcessingException SEGMENT_PLAN_EXECUTION_ERROR =
       new ProcessingException(SEGMENT_PLAN_EXECUTION_ERROR_CODE);
@@ -105,6 +108,8 @@ public class QueryException {
       new ProcessingException(SERVER_SEGMENT_MISSING_ERROR_CODE);
   public static final ProcessingException QUERY_SCHEDULING_TIMEOUT_ERROR =
       new ProcessingException(QUERY_SCHEDULING_TIMEOUT_ERROR_CODE);
+  public static final ProcessingException SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR =
+      new ProcessingException(SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
   public static final ProcessingException EXECUTION_TIMEOUT_ERROR =
       new ProcessingException(EXECUTION_TIMEOUT_ERROR_CODE);
   public static final ProcessingException DATA_TABLE_SERIALIZATION_ERROR =
@@ -137,6 +142,7 @@ public class QueryException {
     JSON_PARSING_ERROR.setMessage("JsonParsingError");
     JSON_COMPILATION_ERROR.setMessage("JsonCompilationError");
     SQL_PARSING_ERROR.setMessage("SQLParsingError");
+    QUERY_PLANNING_ERROR.setMessage("QueryPlanningError");
     SEGMENT_PLAN_EXECUTION_ERROR.setMessage("SegmentPlanExecutionError");
     COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR.setMessage("CombineSegmentPlanTimeoutError");
     TABLE_DOES_NOT_EXIST_ERROR.setMessage("TableDoesNotExistError");
@@ -147,8 +153,9 @@ public class QueryException {
     SERVER_TABLE_MISSING_ERROR.setMessage("ServerTableMissing");
     SERVER_SEGMENT_MISSING_ERROR.setMessage("ServerSegmentMissing");
     QUERY_SCHEDULING_TIMEOUT_ERROR.setMessage("QuerySchedulingTimeoutError");
+    SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR.setMessage("ServerResourceLimitExceededError");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
-    DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableSerializationError");
+    DATA_TABLE_SERIALIZATION_ERROR.setMessage("DataTableSerializationError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
     DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableDeserializationError");
     FUTURE_CALL_ERROR.setMessage("FutureCallError");

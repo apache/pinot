@@ -119,9 +119,10 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
     createServerTenant(TENANT_NAME, 1, 1);
   }
 
-  @Test
-  public void testGrpcBrokerRequestHandlerOnSelectionOnlyQuery()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGrpcBrokerRequestHandlerOnSelectionOnlyQuery(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT * FROM mytable LIMIT 1000000";
     testQuery(query);
     query = "SELECT * FROM mytable WHERE DaysSinceEpoch > 16312 LIMIT 10000000";

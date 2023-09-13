@@ -27,6 +27,7 @@ import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -50,7 +51,7 @@ public class AggregateNode extends AbstractPlanNode {
       List<RexExpression> groupSet, List<RelHint> relHints) {
     super(planFragmentId, dataSchema);
     Preconditions.checkState(areHintsValid(relHints), "invalid sql hint for agg node: {}", relHints);
-    _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+    _aggCalls = aggCalls.stream().map(RexExpressionUtils::fromAggregateCall).collect(Collectors.toList());
     _filterArgIndices = aggCalls.stream().map(c -> c.filterArg).collect(Collectors.toList());
     _groupSet = groupSet;
     _nodeHint = new NodeHint(relHints);

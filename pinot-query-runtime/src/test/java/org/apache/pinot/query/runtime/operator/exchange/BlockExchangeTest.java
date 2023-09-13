@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
-import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
@@ -29,7 +28,6 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -65,9 +63,9 @@ public class BlockExchangeTest {
     // Given:
     List<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
     BlockExchange exchange = new TestBlockExchange(destinations);
+
     // When:
-    exchange.offerBlock(TransferableBlockUtils.getEndOfStreamTransferableBlock(), Long.MAX_VALUE);
-    exchange.send();
+    exchange.send(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
@@ -91,8 +89,7 @@ public class BlockExchangeTest {
         new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}), DataBlock.Type.ROW);
 
     // When:
-    exchange.offerBlock(block, Long.MAX_VALUE);
-    exchange.send();
+    exchange.send(block);
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
@@ -100,30 +97,6 @@ public class BlockExchangeTest {
     Assert.assertEquals(captor.getValue().getContainer(), block.getContainer());
 
     Mockito.verify(_mailbox2, Mockito.never()).send(Mockito.any());
-  }
-
-  @Test
-  public void shouldSendErrorBlockIfExchangeInternalThrowException()
-      throws Exception {
-    // Given:
-    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
-    BlockExchange exchange = new ThrowingBlockExchange(destinations);
-    TransferableBlock block = new TransferableBlock(ImmutableList.of(new Object[]{"val"}),
-        new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}), DataBlock.Type.ROW);
-
-    // When:
-    exchange.offerBlock(block, Long.MAX_VALUE);
-    exchange.send();
-
-    // Then:
-    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
-    Mockito.verify(_mailbox1).complete();
-    Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
-    Assert.assertTrue(captor.getValue().isErrorBlock());
-
-    Mockito.verify(_mailbox2).complete();
-    Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture());
-    Assert.assertTrue(captor.getValue().isErrorBlock());
   }
 
   @Test
@@ -147,8 +120,7 @@ public class BlockExchangeTest {
         (block, type, maxSize) -> ImmutableList.of(outBlockOne, outBlockTwo).iterator());
 
     // When:
-    exchange.offerBlock(inBlock, Long.MAX_VALUE);
-    exchange.send();
+    exchange.send(inBlock);
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
@@ -166,7 +138,7 @@ public class BlockExchangeTest {
     }
 
     protected TestBlockExchange(List<SendingMailbox> destinations, BlockSplitter splitter) {
-      super(new OpChainId(1, 2, 3), destinations, splitter, (opChainId) -> { }, Long.MAX_VALUE);
+      super(destinations, splitter);
     }
 
     @Override
@@ -175,22 +147,6 @@ public class BlockExchangeTest {
       for (SendingMailbox mailbox : destinations) {
         sendBlock(mailbox, block);
       }
-    }
-  }
-
-  private static class ThrowingBlockExchange extends BlockExchange {
-    protected ThrowingBlockExchange(List<SendingMailbox> destinations) {
-      this(destinations, (block, type, size) -> Iterators.singletonIterator(block));
-    }
-
-    protected ThrowingBlockExchange(List<SendingMailbox> destinations, BlockSplitter splitter) {
-      super(new OpChainId(1, 2, 3), destinations, splitter, (opChainId) -> { }, Long.MAX_VALUE);
-    }
-
-    @Override
-    protected void route(List<SendingMailbox> destinations, TransferableBlock block)
-        throws Exception {
-      throw new IOException("Deliberate I/O Exception routing");
     }
   }
 }

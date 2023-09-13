@@ -44,6 +44,7 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -58,6 +59,7 @@ import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
@@ -67,6 +69,7 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -273,6 +276,10 @@ public final class TableConfigUtils {
           && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
         throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
             + "' for peerSegmentDownloadScheme. Must be one of http or https");
+      }
+
+      if (tableConfig.getReplication() < 2) {
+        throw new IllegalStateException("peerSegmentDownloadScheme can't be used when replication is < 2");
       }
     }
 
@@ -497,6 +504,12 @@ public final class TableConfigUtils {
           }
         }
       }
+
+      SchemaConformingTransformerConfig schemaConformingTransformerConfig =
+          ingestionConfig.getSchemaConformingTransformerConfig();
+      if (null != schemaConformingTransformerConfig && null != schema) {
+        SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
+      }
     }
   }
 
@@ -508,11 +521,13 @@ public final class TableConfigUtils {
   @VisibleForTesting
   static void validateDecoder(StreamConfig streamConfig) {
     if (streamConfig.getDecoderClass().equals("org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder")) {
+      String descriptorFilePath = "descriptorFile";
+      String protoClassName = "protoClassName";
       // check the existence of the needed decoder props
-      if (!streamConfig.getDecoderProperties().containsKey("stream.kafka.decoder.prop.descriptorFile")) {
+      if (!streamConfig.getDecoderProperties().containsKey(descriptorFilePath)) {
         throw new IllegalStateException("Missing property of descriptorFile for ProtoBufMessageDecoder");
       }
-      if (!streamConfig.getDecoderProperties().containsKey("stream.kafka.decoder.prop.protoClassName")) {
+      if (!streamConfig.getDecoderProperties().containsKey(protoClassName)) {
         throw new IllegalStateException("Missing property of protoClassName for ProtoBufMessageDecoder");
       }
     }
@@ -640,6 +655,8 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
+    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null,
+        "Upsert/Dedup table cannot use tenant tag override");
 
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -1252,6 +1269,17 @@ public final class TableConfigUtils {
       throw new IllegalStateException(String.format(
           "Time column names are different for table: %s! Offline time column name: %s. Realtime time column name: %s",
           rawTableName, offlineTimeColumnName, realtimeTimeColumnName));
+    }
+    TenantConfig offlineTenantConfig = offlineTableConfig.getTenantConfig();
+    TenantConfig realtimeTenantConfig = realtimeTableConfig.getTenantConfig();
+    String offlineBroker =
+        offlineTenantConfig.getBroker() == null ? TagNameUtils.DEFAULT_TENANT_NAME : offlineTenantConfig.getBroker();
+    String realtimeBroker =
+        realtimeTenantConfig.getBroker() == null ? TagNameUtils.DEFAULT_TENANT_NAME : realtimeTenantConfig.getBroker();
+    if (!offlineBroker.equals(realtimeBroker)) {
+      throw new IllegalArgumentException(String.format(
+          "Broker Tenants are different for table: %s! Offline broker tenant name: %s, Realtime broker tenant name: %s",
+          rawTableName, offlineBroker, realtimeBroker));
     }
   }
 

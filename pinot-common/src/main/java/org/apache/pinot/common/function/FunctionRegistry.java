@@ -159,33 +159,6 @@ public class FunctionRegistry {
    */
   private static class PlaceholderScalarFunctions {
 
-    /**
-     * Noted that {@code dateTimeConvert} with String as first input is actually supported.
-     *
-     * @see org.apache.pinot.common.function.scalar.DateTimeConvert#dateTimeConvert(String, String, String, String)
-     */
-    @ScalarFunction(names = {"dateTimeConvert", "date_time_convert"}, isPlaceholder = true)
-    public static String dateTimeConvert(long timeValueNumeric, String inputFormatStr, String outputFormatStr,
-        String outputGranularityStr) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
-    @ScalarFunction(names = {"jsonExtractScalar", "json_extract_scalar"}, isPlaceholder = true)
-    public static Object jsonExtractScalar(String jsonFieldName, String jsonPath, String resultsType) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
-    @ScalarFunction(names = {"jsonExtractScalar", "json_extract_scalar"}, isPlaceholder = true)
-    public static Object jsonExtractScalar(String jsonFieldName, String jsonPath, String resultsType,
-        Object defaultValue) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
-    @ScalarFunction(names = {"jsonExtractKey", "json_extract_key"}, isPlaceholder = true)
-    public static Object jsonExtractKey(String jsonFieldName, String jsonPath) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
     @ScalarFunction(names = {"textContains", "text_contains"}, isPlaceholder = true)
     public static boolean textContains(String text, String pattern) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
@@ -198,23 +171,6 @@ public class FunctionRegistry {
 
     @ScalarFunction(names = {"jsonMatch", "json_match"}, isPlaceholder = true)
     public static boolean jsonMatch(String text, String pattern) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
-    @ScalarFunction(names = {"clpDecode", "clp_decode"}, isPlaceholder = true)
-    public static Object clpDecode(String logtypeFieldName, String dictVarsFieldName, String encodedVarsFieldName) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
-    @ScalarFunction(names = {"clpDecode", "clp_decode"}, isPlaceholder = true)
-    public static Object clpDecode(String logtypeFieldName, String dictVarsFieldName, String encodedVarsFieldName,
-        String defaultValue) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
-    @ScalarFunction(names = {"arrayToMV", "array_to_mv"},
-        isPlaceholder = true)
-    public static String arrayToMV(Object multiValue) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
   }

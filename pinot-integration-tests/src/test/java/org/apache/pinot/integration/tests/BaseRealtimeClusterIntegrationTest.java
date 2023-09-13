@@ -106,9 +106,10 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
    * to ensure the right result is computed, wherein dictionary is not read if it is mutable
    * @throws Exception
    */
-  @Test
-  public void testDictionaryBasedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDictionaryBasedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // Dictionary columns
     // int
@@ -142,30 +143,35 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
         String.format("SELECT MAX(%s)-MIN(%s) FROM %s", column, column, getTableName()));
   }
 
-  @Test
-  public void testHardcodedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     super.testHardcodedQueries();
   }
 
-  @Test
-  @Override
-  public void testQueriesFromQueryFile()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     super.testQueriesFromQueryFile();
   }
 
-  @Test
-  @Override
-  public void testGeneratedQueries()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    testGeneratedQueries(true, false);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
+    testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
-  @Test
-  @Override
-  public void testQueryExceptions()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     super.testQueryExceptions();
   }
 
@@ -180,7 +186,7 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
   public void tearDown()
       throws Exception {
     dropRealtimeTable(getTableName());
-    cleanupTestTableDataManager(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+    waitForTableDataManagerRemoved(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
     stopServer();
     stopBroker();
     stopController();

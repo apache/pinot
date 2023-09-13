@@ -94,16 +94,21 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
       _whenStatements.add(arguments.get(i * 2));
       _thenStatements.add(arguments.get(i * 2 + 1));
     }
-    if (arguments.size() % 2 != 0) {
+    if (arguments.size() % 2 != 0 && !isNullLiteralTransformation(arguments.get(arguments.size() - 1))) {
       _elseStatement = arguments.get(arguments.size() - 1);
     }
   }
 
   private TransformResultMetadata calculateResultMetadata() {
-    TransformResultMetadata elseStatementResultMetadata = _elseStatement.getResultMetadata();
-    DataType dataType = elseStatementResultMetadata.getDataType();
-    Preconditions.checkState(elseStatementResultMetadata.isSingleValue(),
-        "Unsupported multi-value expression in the ELSE clause");
+    DataType dataType;
+    if (_elseStatement == null) {
+      dataType = DataType.UNKNOWN;
+    } else {
+      TransformResultMetadata elseStatementResultMetadata = _elseStatement.getResultMetadata();
+      dataType = elseStatementResultMetadata.getDataType();
+      Preconditions.checkState(elseStatementResultMetadata.isSingleValue(),
+          "Unsupported multi-value expression in the ELSE clause");
+    }
     int numThenStatements = _thenStatements.size();
     for (int i = 0; i < numThenStatements; i++) {
       TransformFunction thenStatement = _thenStatements.get(i);
@@ -221,6 +226,14 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   @Override
   public TransformResultMetadata getResultMetadata() {
     return _resultMetadata;
+  }
+
+  private boolean isNullLiteralTransformation(TransformFunction function) {
+    if (function instanceof LiteralTransformFunction) {
+      LiteralTransformFunction literalFunction = (LiteralTransformFunction) function;
+      return literalFunction.isNull();
+    }
+    return false;
   }
 
   /**

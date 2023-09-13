@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -31,6 +32,7 @@ import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.testutils.MockDataBlockOperatorFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class OperatorTestUtil {
@@ -75,22 +77,19 @@ public class OperatorTestUtil {
 
   public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService,
       VirtualServerAddress receiverAddress, long deadlineMs, StageMetadata stageMetadata) {
-    return new OpChainExecutionContext(mailboxService, 0, 0, receiverAddress, deadlineMs, stageMetadata, null, false);
+    return new OpChainExecutionContext(mailboxService, 0, 0, receiverAddress, deadlineMs, Collections.emptyMap(),
+        stageMetadata, null);
   }
 
   public static OpChainExecutionContext getDefaultContext() {
     VirtualServerAddress virtualServerAddress = new VirtualServerAddress("mock", 80, 0);
-    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE, null, null, true);
+    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE,
+        Collections.singletonMap(CommonConstants.Broker.Request.TRACE, "true"), null, null);
   }
 
   public static OpChainExecutionContext getDefaultContextWithTracingDisabled() {
     VirtualServerAddress virtualServerAddress = new VirtualServerAddress("mock", 80, 0);
-    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE, null, null, false);
-  }
-
-  public static OpChainExecutionContext getContext(long requestId, int stageId,
-      VirtualServerAddress virtualServerAddress) {
-    return new OpChainExecutionContext(null, requestId, stageId, virtualServerAddress, Long.MAX_VALUE, null, null,
-        true);
+    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE, Collections.emptyMap(), null,
+        null);
   }
 }

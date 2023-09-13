@@ -27,12 +27,10 @@ import org.apache.calcite.rel.RelFieldCollation.Direction;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
@@ -54,7 +52,6 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private final boolean _isSortOnSender;
   private final List<Object[]> _rows = new ArrayList<>();
 
-  private TransferableBlock _errorBlock;
   private boolean _isSortedBlockConstructed;
 
   public SortedMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
@@ -77,49 +74,25 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (_errorBlock != null) {
-      return _errorBlock;
-    }
-    if (System.currentTimeMillis() > _context.getDeadlineMs()) {
-      _errorBlock = TransferableBlockUtils.getErrorTransferableBlock(QueryException.EXECUTION_TIMEOUT_ERROR);
-      return _errorBlock;
-    }
-
-    // Since this operator needs to wait for all incoming data before it can send the data to the upstream operators,
-    // this operator will keep polling from all mailboxes until it receives null block or all blocks are collected.
-    // TODO: Use k-way merge when input data is sorted, and return blocks without waiting for all the data.
-    while (!_mailboxes.isEmpty()) {
-      ReceivingMailbox mailbox = _mailboxes.remove();
-      TransferableBlock block = mailbox.poll();
-
-      // Release the mailbox when the block is end-of-stream
-      if (block != null && block.isSuccessfulEndOfStreamBlock()) {
-        _mailboxService.releaseReceivingMailbox(mailbox);
-        _opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
-        continue;
-      }
-
-      // Add the mailbox back to the queue if the block is not end-of-stream
-      _mailboxes.add(mailbox);
-      if (block != null) {
-        if (block.isErrorBlock()) {
-          _errorBlock = block;
-          return _errorBlock;
-        }
+    while (true) { // loop in order to keep asking if we receive data blocks
+      TransferableBlock block = getMultiConsumer().readBlockBlocking();
+      if (block.isDataBlock()) {
         _rows.addAll(block.getContainer());
+      } else if (block.isErrorBlock()) {
+        return block;
       } else {
-        return TransferableBlockUtils.getNoOpTransferableBlock();
-      }
-    }
+        assert block.isSuccessfulEndOfStreamBlock();
 
-    if (!_isSortedBlockConstructed && !_rows.isEmpty()) {
-      _rows.sort(
-          new SortUtils.SortComparator(_collationKeys, _collationDirections, _collationNullDirections, _dataSchema,
-              false));
-      _isSortedBlockConstructed = true;
-      return new TransferableBlock(_rows, _dataSchema, DataBlock.Type.ROW);
-    } else {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        if (!_isSortedBlockConstructed && !_rows.isEmpty()) {
+          _rows.sort(
+              new SortUtils.SortComparator(_collationKeys, _collationDirections, _collationNullDirections, _dataSchema,
+                  false));
+          _isSortedBlockConstructed = true;
+          return new TransferableBlock(_rows, _dataSchema, DataBlock.Type.ROW);
+        } else {
+          return block;
+        }
+      }
     }
   }
 

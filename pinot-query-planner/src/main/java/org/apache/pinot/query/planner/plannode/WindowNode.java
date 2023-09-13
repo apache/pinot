@@ -28,6 +28,7 @@ import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -57,8 +58,7 @@ public class WindowNode extends AbstractPlanNode {
    * RANGE - RANGE type window frame
    */
   public enum WindowFrameType {
-    ROWS,
-    RANGE
+    ROWS, RANGE
   }
 
   public WindowNode(int planFragmentId) {
@@ -73,9 +73,9 @@ public class WindowNode extends AbstractPlanNode {
         String.format("Only a single window group is allowed! Number of window groups: %d", windowGroups.size()));
     Window.Group windowGroup = windowGroups.get(0);
 
-    _groupSet = windowGroup.keys == null ? Collections.emptyList() : RexExpression.toRexInputRefs(windowGroup.keys);
-    List<RelFieldCollation> relFieldCollations = windowGroup.orderKeys == null ? new ArrayList<>()
-        : windowGroup.orderKeys.getFieldCollations();
+    _groupSet = windowGroup.keys == null ? Collections.emptyList() : RexExpressionUtils.fromInputRefs(windowGroup.keys);
+    List<RelFieldCollation> relFieldCollations =
+        windowGroup.orderKeys == null ? new ArrayList<>() : windowGroup.orderKeys.getFieldCollations();
     _orderSet = new ArrayList<>(relFieldCollations.size());
     _orderSetDirection = new ArrayList<>(relFieldCollations.size());
     _orderSetNullDirection = new ArrayList<>(relFieldCollations.size());
@@ -84,7 +84,7 @@ public class WindowNode extends AbstractPlanNode {
       _orderSetDirection.add(relFieldCollation.direction);
       _orderSetNullDirection.add(relFieldCollation.nullDirection);
     }
-    _aggCalls = windowGroup.aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+    _aggCalls = windowGroup.aggCalls.stream().map(RexExpressionUtils::fromRexCall).collect(Collectors.toList());
 
     // TODO: For now only the default frame is supported. Add support for custom frames including rows support.
     //       Frame literals come in the constants from the LogicalWindow and the bound.getOffset() stores the
@@ -101,7 +101,7 @@ public class WindowNode extends AbstractPlanNode {
     //       extract the constant values into bounds as a part of frame support.
     _constants = new ArrayList<>();
     for (RexLiteral constant : constants) {
-      _constants.add(RexExpression.toRexExpression(constant));
+      _constants.add(RexExpressionUtils.fromRexLiteral(constant));
     }
   }
 

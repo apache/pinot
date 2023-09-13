@@ -86,7 +86,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
       ThreadResourceUsageProvider mainThreadResourceUsageProvider = new ThreadResourceUsageProvider();
       BaseResultsBlock resultsBlock = getCombinedResults();
-      InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(resultsBlock, _queryContext);
+      InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(resultsBlock);
       long mainThreadCpuTimeNs = mainThreadResourceUsageProvider.getThreadTimeNs();
 
       long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
@@ -108,7 +108,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
       return instanceResponseBlock;
     } else {
-      return new InstanceResponseBlock(getCombinedResults(), _queryContext);
+      return new InstanceResponseBlock(getCombinedResults());
     }
   }
 

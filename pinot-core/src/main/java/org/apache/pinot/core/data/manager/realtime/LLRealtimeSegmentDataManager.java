@@ -242,6 +242,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private volatile int _numRowsErrored = 0;
   private volatile int _consecutiveErrorCount = 0;
   private long _startTimeMs = 0;
+  private final IdleTimer _idleTimer = new IdleTimer();
   private final String _segmentNameStr;
   private final SegmentVersion _segmentVersion;
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
@@ -404,8 +405,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _numRowsErrored = 0;
     final long idlePipeSleepTimeMillis = 100;
     final long idleTimeoutMillis = _partitionLevelStreamConfig.getIdleTimeoutMillis();
-    long idleStartTimeMillis = -1;
-    boolean idle = false;
+    _idleTimer.init();
 
     StreamPartitionMsgOffset lastUpdatedOffset = _streamPartitionMsgOffsetFactory
         .create(_currentOffset);  // so that we always update the metric when we enter this method.
@@ -443,7 +443,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       boolean endCriteriaReached = processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
 
       if (_currentOffset.compareTo(lastUpdatedOffset) != 0) {
-        idle = false;
+        _idleTimer.markEventConsumed();
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         // TODO Issue 5359 Need to find a way to bump metrics without getting actual offset value.
         if (_currentOffset instanceof LongMsgOffset) {
@@ -462,7 +462,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         }
         // We check this flag again further down
       } else if (messageBatch.getUnfilteredMessageCount() > 0) {
-        idle = false;
+        _idleTimer.markEventConsumed();
         // we consumed something from the stream but filtered all the content out,
         // so we need to advance the offsets to avoid getting stuck
         StreamPartitionMsgOffset nextOffset = messageBatch.getOffsetOfNextBatch();
@@ -473,21 +473,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(nextOffset);
       } else {
         // We did not consume any rows.
-        if (!idle) {
-          idleStartTimeMillis = now();
-          idle = true;
-        }
-        if (idleTimeoutMillis >= 0) {
-          long totalIdleTimeMillis = now() - idleStartTimeMillis;
-          if (totalIdleTimeMillis > idleTimeoutMillis) {
-            // Update the partition-consuming metric only if we have been idling beyond idle timeout.
-            // Create a new stream consumer wrapper, in case we are stuck on something.
-            _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
-            recreateStreamConsumer(
-                String.format("Total idle time: %d ms exceeded idle timeout: %d ms", totalIdleTimeMillis,
-                    idleTimeoutMillis));
-            idle = false;
-          }
+        long timeSinceStreamLastCreatedOrConsumedMs = _idleTimer.getTimeSinceStreamLastCreatedOrConsumedMs();
+
+        if (idleTimeoutMillis >= 0 && (timeSinceStreamLastCreatedOrConsumedMs > idleTimeoutMillis)) {
+          // Update the partition-consuming metric only if we have been idling beyond idle timeout.
+          // Create a new stream consumer wrapper, in case we are stuck on something.
+          _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
+          recreateStreamConsumer(
+              String.format("Total idle time: %d ms exceeded idle timeout: %d ms",
+                  timeSinceStreamLastCreatedOrConsumedMs, idleTimeoutMillis));
+          _idleTimer.markStreamCreated();
         }
       }
 
@@ -1507,17 +1502,29 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
+  public long getTimeSinceEventLastConsumedMs() {
+    return _idleTimer.getTimeSinceEventLastConsumedMs();
+  }
+
   public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
+    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
+  }
+
+  public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs) {
+    return fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, maxWaitTimeMs);
+  }
+
+  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs) {
     if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("Fetch latest stream offset");
     }
     try {
-      return _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA,
-          maxWaitTimeMs);
+      return _partitionMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
     } catch (Exception e) {
       _segmentLogger.warn(
-          "Cannot fetch latest stream offset for clientId {} and partitionGroupId {} with maxWaitTime {}", _clientId,
-          _partitionGroupId, maxWaitTimeMs);
+          String.format(
+              "Cannot fetch stream offset with criteria %s for clientId %s and partitionGroupId %d with maxWaitTime %d",
+              offsetCriteria, _clientId, _partitionGroupId, maxWaitTimeMs), e);
     }
     return null;
   }
@@ -1595,7 +1602,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * Assumes there is a valid instance of {@link PartitionGroupConsumer}
    */
   private void recreateStreamConsumer(String reason) {
-    _segmentLogger.warn("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
+    _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
     _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
     closePartitionGroupConsumer();
     _partitionGroupConsumer =
@@ -1641,14 +1648,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _lastUpdatedRowsIndexed.set(_numRowsIndexed);
     final long now = now();
     final int rowsConsumed = _numRowsConsumed - _lastConsumedCount;
-    final long prevTime = _lastConsumedCount == 0 ? _consumeStartTime : _lastLogTime;
+    final long prevTime = _lastLogTime == 0 ? _consumeStartTime : _lastLogTime;
     // Log every minute or 100k events
     if (now - prevTime > TimeUnit.MINUTES.toMillis(TIME_THRESHOLD_FOR_LOG_MINUTES)
         || rowsConsumed >= MSG_COUNT_THRESHOLD_FOR_LOG) {
+      // multiply by 1000 to get events/sec. now and prevTime are in milliseconds.
+      float consumedRate = ((float) rowsConsumed) * 1000 / (now - prevTime);
       _segmentLogger.info(
           "Consumed {} events from (rate:{}/s), currentOffset={}, numRowsConsumedSoFar={}, numRowsIndexedSoFar={}",
-          rowsConsumed, (float) (rowsConsumed) * 1000 / (now - prevTime), _currentOffset, _numRowsConsumed,
-          _numRowsIndexed);
+          rowsConsumed, consumedRate, _currentOffset, _numRowsConsumed, _numRowsIndexed);
       _lastConsumedCount = _numRowsConsumed;
       _lastLogTime = now;
     }

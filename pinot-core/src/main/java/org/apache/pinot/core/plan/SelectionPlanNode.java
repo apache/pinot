@@ -59,7 +59,7 @@ public class SelectionPlanNode implements PlanNode {
     if (limit == 0) {
       // Empty selection (LIMIT 0)
       BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_indexSegment, _queryContext, expressions, 0).run();
-      return new EmptySelectionOperator(_indexSegment, expressions, projectOperator);
+      return new EmptySelectionOperator(_indexSegment, _queryContext, expressions, projectOperator);
     }
 
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();

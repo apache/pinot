@@ -18,16 +18,15 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.base.Preconditions;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,15 +45,25 @@ public class ReceivingMailbox {
       TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("Cancelled by receiver"));
 
   private final String _id;
-  private final Consumer<OpChainId> _receiveMailCallback;
   // TODO: Make the queue size configurable
   // TODO: Revisit if this is the correct way to apply back pressure
   private final BlockingQueue<TransferableBlock> _blocks = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
   private final AtomicReference<TransferableBlock> _errorBlock = new AtomicReference<>();
+  @Nullable
+  private volatile Reader _reader;
 
-  public ReceivingMailbox(String id, Consumer<OpChainId> receiveMailCallback) {
+  public ReceivingMailbox(String id) {
     _id = id;
-    _receiveMailCallback = receiveMailCallback;
+  }
+
+  public void registeredReader(Reader reader) {
+    if (_reader != null) {
+      throw new IllegalArgumentException("Only one reader is supported");
+    }
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[MAILBOX]== Reader registered for mailbox: " + _id);
+    }
+    _reader = reader;
   }
 
   public String getId() {
@@ -65,37 +74,44 @@ public class ReceivingMailbox {
    * Offers a non-error block into the mailbox within the timeout specified, returns whether the block is successfully
    * added. If the block is not added, an error block is added to the mailbox.
    */
-  public boolean offer(TransferableBlock block, long timeoutMs) {
-    if (_errorBlock.get() != null) {
+  public ReceivingMailboxStatus offer(TransferableBlock block, long timeoutMs) {
+    TransferableBlock errorBlock = _errorBlock.get();
+    if (errorBlock != null) {
       LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
-      return false;
+      return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.EARLY_TERMINATED
+          : ReceivingMailboxStatus.ERROR;
     }
-    if (timeoutMs < 0) {
+    if (timeoutMs <= 0) {
       LOGGER.debug("Mailbox: {} is already timed out", _id);
       setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
           new TimeoutException("Timed out while offering data to mailbox: " + _id)));
-      return false;
+      return ReceivingMailboxStatus.TIMEOUT;
     }
     try {
       if (_blocks.offer(block, timeoutMs, TimeUnit.MILLISECONDS)) {
-        if (_errorBlock.get() == null) {
-          _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
-          return true;
+        errorBlock = _errorBlock.get();
+        if (errorBlock == null) {
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("==[MAILBOX]== Block " + block + " ready to read from mailbox: " + _id);
+          }
+          notifyReader();
+          return ReceivingMailboxStatus.SUCCESS;
         } else {
           LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
           _blocks.clear();
-          return false;
+          return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.EARLY_TERMINATED
+              : ReceivingMailboxStatus.ERROR;
         }
       } else {
         LOGGER.debug("Failed to offer block into mailbox: {} within: {}ms", _id, timeoutMs);
         setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(
             new TimeoutException("Timed out while waiting for receive operator to consume data from mailbox: " + _id)));
-        return false;
+        return ReceivingMailboxStatus.TIMEOUT;
       }
     } catch (InterruptedException e) {
       LOGGER.error("Interrupted while offering block into mailbox: {}", _id);
       setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(e));
-      return false;
+      return ReceivingMailboxStatus.ERROR;
     }
   }
 
@@ -105,7 +121,7 @@ public class ReceivingMailbox {
   public void setErrorBlock(TransferableBlock errorBlock) {
     if (_errorBlock.compareAndSet(null, errorBlock)) {
       _blocks.clear();
-      _receiveMailCallback.accept(MailboxIdUtils.toOpChainId(_id));
+      notifyReader();
     }
   }
 
@@ -115,6 +131,7 @@ public class ReceivingMailbox {
    */
   @Nullable
   public TransferableBlock poll() {
+    Preconditions.checkState(_reader != null, "A reader must be registered");
     TransferableBlock errorBlock = _errorBlock.get();
     return errorBlock != null ? errorBlock : _blocks.poll();
   }
@@ -132,5 +149,23 @@ public class ReceivingMailbox {
 
   public int getNumPendingBlocks() {
     return _blocks.size();
+  }
+
+  private void notifyReader() {
+    Reader reader = _reader;
+    if (reader != null) {
+      LOGGER.debug("Notifying reader");
+      reader.blockReadyToRead();
+    } else {
+      LOGGER.debug("No reader to notify");
+    }
+  }
+
+  public interface Reader {
+    void blockReadyToRead();
+  }
+
+  public enum ReceivingMailboxStatus {
+    SUCCESS, ERROR, TIMEOUT, EARLY_TERMINATED
   }
 }

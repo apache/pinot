@@ -30,13 +30,16 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ListColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.MapColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.StructColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.orc.OrcFile;
 import org.apache.orc.TypeDescription;
 import org.apache.orc.Writer;
@@ -76,7 +79,8 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
             + "simpleStruct:struct<structString:string,structLong:bigint,structDouble:double>,"
             + "complexStruct:struct<structString:string,nestedStruct:struct<nestedStructInt:int,"
             + "nestedStructLong:bigint>>,"
-            + "complexList:array<struct<complexListInt:int,complexListDouble:double>>," + "simpleMap:map<string,int>,"
+            + "complexList:array<struct<complexListInt:int,complexListDouble:decimal(10,5)>>,"
+            + "simpleMap:map<string,int>,"
             + "complexMap:map<string,struct<doubleField:double,stringField:string>>" + ">");
     // @format:on
     // CHECKSTYLE:ON
@@ -118,7 +122,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
     StructColumnVector complexListElementVector = (StructColumnVector) complexListVector.child;
     LongColumnVector complexListIntVector = (LongColumnVector) complexListElementVector.fields[0];
     complexListIntVector.ensureSize(5, false);
-    DoubleColumnVector complexListDoubleVector = (DoubleColumnVector) complexListElementVector.fields[1];
+    DecimalColumnVector complexListDoubleVector = (DecimalColumnVector) complexListElementVector.fields[1];
     complexListDoubleVector.ensureSize(5, false);
 
     // simple map - string key and value long
@@ -141,7 +145,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
     complexMapValueBytesVector.ensureSize(6, false);
 
     Writer writer = OrcFile.createWriter(new Path(_dataFile.getAbsolutePath()),
-        OrcFile.writerOptions(new Configuration()).setSchema(schema));
+        OrcFile.writerOptions(new Configuration()).setSchema(schema).overwrite(true));
     for (int i = 0; i < numRecords; i++) {
       Map<String, Object> record = _inputRecords.get(i);
 
@@ -218,7 +222,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
         for (Map<String, Object> complexElement : complexList) {
           complexListIntVector.vector[complexListVector.childCount] = (int) complexElement.get("complexListInt");
           complexListDoubleVector.vector[complexListVector.childCount] =
-              (double) complexElement.get("complexListDouble");
+          new HiveDecimalWritable(HiveDecimal.create((String) complexElement.get("complexListDouble")));
           complexListVector.childCount++;
         }
       } else {
@@ -271,11 +275,11 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
 
     // complex list element - each element contains a struct of int and double
     List[] complexLists = new List[]{
-        Arrays.asList(createStructInput("complexListInt", 10, "complexListDouble", 100.0),
-            createStructInput("complexListInt", 20, "complexListDouble", 200.0)), null,
-        Collections.singletonList(createStructInput("complexListInt", 30, "complexListDouble", 300.0)),
-        Arrays.asList(createStructInput("complexListInt", 40, "complexListDouble", 400.0),
-            createStructInput("complexListInt", 50, "complexListDouble", 500.0))
+        Arrays.asList(createStructInput("complexListInt", 10, "complexListDouble", "100"),
+            createStructInput("complexListInt", 20, "complexListDouble", "200.212")), null,
+        Collections.singletonList(createStructInput("complexListInt", 30, "complexListDouble", "300.378")),
+        Arrays.asList(createStructInput("complexListInt", 40, "complexListDouble", "400.1"),
+            createStructInput("complexListInt", 50, "complexListDouble", "500.2323"))
     };
 
     // single value integer

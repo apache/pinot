@@ -33,8 +33,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
 
-  public DistinctCountAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTCOUNT);
+  public DistinctCountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+    super(expression, AggregationFunctionType.DISTINCTCOUNT, nullHandlingEnabled);
   }
 
   @Override

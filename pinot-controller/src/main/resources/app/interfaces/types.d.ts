@@ -257,4 +257,9 @@ declare module 'Models' {
     REALTIME = "realtime",
     OFFLINE = "offline"
   }
+
+  export interface SqlException {
+    errorCode: number,
+    message: string
+  }
 }

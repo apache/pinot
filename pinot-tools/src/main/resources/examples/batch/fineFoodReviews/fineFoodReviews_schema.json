@@ -1,0 +1,40 @@
+{
+  "metricFieldSpecs": [
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "STRING",
+      "name": "ProductId"
+    },
+    {
+      "dataType": "STRING",
+      "name": "UserId"
+    },
+    {
+      "dataType": "INT",
+      "name": "Score"
+    },
+    {
+      "dataType": "STRING",
+      "name": "Summary"
+    },
+    {
+      "dataType": "STRING",
+      "name": "Text"
+    },
+    {
+      "dataType": "STRING",
+      "name": "combined"
+    },
+    {
+      "dataType": "INT",
+      "name": "n_tokens"
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "embedding",
+      "singleValueField": false
+    }
+  ],
+  "schemaName": "fineFoodReviews"
+}

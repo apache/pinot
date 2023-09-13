@@ -25,8 +25,6 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.plan.PhysicalPlanContext;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -39,9 +37,6 @@ import org.testng.annotations.Test;
 public class LiteralValueOperatorTest {
 
   private AutoCloseable _mocks;
-
-  @Mock
-  private PhysicalPlanContext _context;
 
   @Mock
   private VirtualServerAddress _serverAddress;
@@ -64,8 +59,10 @@ public class LiteralValueOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"sLiteral", "iLiteral"},
         new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.INT});
     List<List<RexExpression>> literals = ImmutableList.of(
-        ImmutableList.of(new RexExpression.Literal(DataType.STRING, "foo"), new RexExpression.Literal(DataType.INT, 1)),
-        ImmutableList.of(new RexExpression.Literal(DataType.STRING, ""), new RexExpression.Literal(DataType.INT, 2)));
+        ImmutableList.of(new RexExpression.Literal(ColumnDataType.STRING, "foo"),
+            new RexExpression.Literal(ColumnDataType.INT, 1)),
+        ImmutableList.of(new RexExpression.Literal(ColumnDataType.STRING, ""),
+            new RexExpression.Literal(ColumnDataType.INT, 2)));
     LiteralValueOperator operator = new LiteralValueOperator(OperatorTestUtil.getDefaultContext(), schema, literals);
 
     // When:
