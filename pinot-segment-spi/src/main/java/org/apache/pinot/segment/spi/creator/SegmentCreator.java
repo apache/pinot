@@ -23,7 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.TreeMap;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;

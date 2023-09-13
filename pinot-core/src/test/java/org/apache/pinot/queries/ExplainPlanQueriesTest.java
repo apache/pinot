@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -314,9 +315,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     // Set up the query executor
     URL resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
     Assert.assertNotNull(resourceUrl);
-    PropertiesConfiguration queryExecutorConfig = new PropertiesConfiguration();
-    queryExecutorConfig.setDelimiterParsingDisabled(false);
-    queryExecutorConfig.load(new File(resourceUrl.getFile()));
+    Configurations configs = new Configurations();
+    //PropertiesConfiguration queryExecutorConfig = new PropertiesConfiguration();
+    //queryExecutorConfig.setDelimiterParsingDisabled(false);
+    PropertiesConfiguration queryExecutorConfig = configs.properties(new File(resourceUrl.getFile()));
+    //queryExecutorConfig.load(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, _serverMetrics);
 

@@ -26,8 +26,10 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.builder.fluent.Configurations;
+import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -254,7 +256,8 @@ public class DictionaryToRawIndexConverter {
   private void updateMetadata(File segmentDir, String[] columns, String tableName)
       throws IOException, ConfigurationException {
     File metadataFile = new File(segmentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-    PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
+    Configurations configs = new Configurations();
+    PropertiesConfiguration properties = configs.properties(metadataFile);
 
     if (tableName != null) {
       properties
@@ -267,7 +270,8 @@ public class DictionaryToRawIndexConverter {
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), -1);
     }
-    properties.save();
+    FileHandler handler = new FileHandler(properties);
+    handler.save(metadataFile);
   }
 
   /**

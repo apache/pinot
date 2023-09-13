@@ -20,7 +20,6 @@ package org.apache.pinot.spi.env;
 
 import java.io.Reader;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
 
 
 public class ConfigFilePropertyReader extends PropertiesConfiguration.PropertiesReader {

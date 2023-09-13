@@ -28,9 +28,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.configuration2.CompositeConfiguration;
 import org.apache.commons.configuration2.Configuration;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
 
@@ -181,13 +182,13 @@ public class PinotConfiguration {
   private static Configuration loadProperties(String configPath) {
     try {
       PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-
       propertiesConfiguration.setIOFactory(new ConfigFilePropertyReaderFactory());
+      FileHandler fileHandler = new FileHandler(propertiesConfiguration);
       if (configPath.startsWith("classpath:")) {
-        propertiesConfiguration
+        fileHandler
             .load(PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())));
       } else {
-        propertiesConfiguration.load(configPath);
+        fileHandler.load(configPath);
       }
 
       return propertiesConfiguration;

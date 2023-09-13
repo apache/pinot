@@ -32,8 +32,9 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
@@ -414,8 +415,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   private void writeMetadata()
       throws ConfigurationException {
-    PropertiesConfiguration properties =
-        new PropertiesConfiguration(new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    PropertiesConfiguration properties = new PropertiesConfiguration();
+    FileHandler fileHandler = new FileHandler(properties);
+    fileHandler.load(new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
     properties.setProperty(SEGMENT_CREATOR_VERSION, _config.getCreatorVersion());
     properties.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
@@ -510,7 +512,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
     }
 
-    properties.save();
+    fileHandler.save();
   }
 
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,

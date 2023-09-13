@@ -20,8 +20,9 @@ package org.apache.pinot.spi.env;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -94,13 +95,18 @@ public class CommonsConfigurationUtilsTest {
   private void testPropertyValueWithSpecialCharacters(String value)
       throws ConfigurationException {
     String replacedValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(value);
-    PropertiesConfiguration configuration = new PropertiesConfiguration(CONFIG_FILE);
+    PropertiesConfiguration configuration = new PropertiesConfiguration();
+    FileHandler fileHandler = new FileHandler(configuration);
+    fileHandler.load(CONFIG_FILE);
     configuration.setProperty(PROPERTY_KEY, replacedValue);
     String recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
-    configuration.save();
-    configuration = new PropertiesConfiguration(CONFIG_FILE);
+    fileHandler.save();
+
+    configuration = new PropertiesConfiguration();
+    fileHandler = new FileHandler(configuration);
+    fileHandler.load(CONFIG_FILE);
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);

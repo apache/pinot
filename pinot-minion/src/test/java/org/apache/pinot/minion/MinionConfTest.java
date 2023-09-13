@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.minion;
 
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
@@ -38,9 +39,11 @@ public class MinionConfTest {
         CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER,
         CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_PINOT_CRYPTER
     };
-    PinotConfiguration rawCfg = new PinotConfiguration(new PropertiesConfiguration(
-        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-old-minion.properties")
-            .getFile()));
+    PropertiesConfiguration configuration = new PropertiesConfiguration();
+    FileHandler fileHandler = new FileHandler(configuration);
+    fileHandler.load(PropertiesConfiguration.class.getClassLoader()
+        .getResource("pinot-configuration-old-minion.properties").getFile());
+    PinotConfiguration rawCfg = new PinotConfiguration(configuration);
     final MinionConf oldConfig = new MinionConf(rawCfg.toMap());
     Assert.assertEquals(oldConfig.getMetricsPrefix(), "pinot.minion.old.custom.metrics.");
     for (String cfgKey : cfgKeys) {
@@ -49,9 +52,11 @@ public class MinionConfTest {
     }
 
     // Check configs with new names that have the pinot.minion prefix.
-    rawCfg = new PinotConfiguration(new PropertiesConfiguration(
-        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-new-minion.properties")
-            .getFile()));
+    configuration = new PropertiesConfiguration();
+    fileHandler = new FileHandler(configuration);
+    fileHandler.load(PropertiesConfiguration.class.getClassLoader()
+        .getResource("pinot-configuration-old-minion.properties").getFile());
+    rawCfg = new PinotConfiguration(configuration);
     final MinionConf newConfig = new MinionConf(rawCfg.toMap());
     for (String cfgKey : cfgKeys) {
       Assert.assertTrue(newConfig.subset(cfgKey).isEmpty(), cfgKey);

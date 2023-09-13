@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -66,13 +67,17 @@ public class SegmentColumnarIndexCreatorTest {
   @Test
   public void testRemoveColumnMetadataInfo()
       throws Exception {
-    PropertiesConfiguration configuration = new PropertiesConfiguration(CONFIG_FILE);
+    PropertiesConfiguration configuration = new PropertiesConfiguration();
+    FileHandler fileHandler = new FileHandler(configuration);
+    fileHandler.load(CONFIG_FILE);
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "a", "foo");
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "b", "bar");
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "c", "foobar");
-    configuration.save();
+    fileHandler.save();
 
-    configuration = new PropertiesConfiguration(CONFIG_FILE);
+    configuration = new PropertiesConfiguration();
+    fileHandler = new FileHandler(configuration);
+    fileHandler.load(CONFIG_FILE);
     assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
     assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
     assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
@@ -80,9 +85,11 @@ public class SegmentColumnarIndexCreatorTest {
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
-    configuration.save();
+    fileHandler.save();
 
-    configuration = new PropertiesConfiguration(CONFIG_FILE);
+    configuration = new PropertiesConfiguration();
+    fileHandler = new FileHandler(configuration);
+    fileHandler.load(CONFIG_FILE);
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
