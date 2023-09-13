@@ -150,18 +150,18 @@ public class QueryRunner {
    * <p>This execution entry point should be asynchronously called by the request handler and caller should not wait
    * for results/exceptions.</p>
    */
-  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataOriginal) {
-    Map<String, String> requestMetadata = consolidateMetadata(
-        distributedStagePlan.getStageMetadata().getCustomProperties(), requestMetadataOriginal);
+  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadata) {
+    Map<String, String> contextMetadata = consolidateMetadata(
+        distributedStagePlan.getStageMetadata().getCustomProperties(), requestMetadata);
 
-    long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
-    long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    long requestId = Long.parseLong(contextMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
+    long timeoutMs = Long.parseLong(contextMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, distributedStagePlan,
-            requestMetadata, requestId, deadlineMs);
+            contextMetadata, requestId, deadlineMs);
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -190,7 +190,7 @@ public class QueryRunner {
     // run OpChain
     OpChainExecutionContext executionContext =
         new OpChainExecutionContext(_mailboxService, requestId, distributedStagePlan.getStageId(),
-            distributedStagePlan.getServer(), deadlineMs, requestMetadata, distributedStagePlan.getStageMetadata(),
+            distributedStagePlan.getServer(), deadlineMs, contextMetadata, distributedStagePlan.getStageMetadata(),
             pipelineBreakerResult);
     OpChain opChain;
     if (DistributedStagePlan.isLeafStage(distributedStagePlan)) {
@@ -199,6 +199,49 @@ public class QueryRunner {
       opChain = PhysicalPlanVisitor.walkPlanNode(distributedStagePlan.getStageRoot(), executionContext);
     }
     _opChainScheduler.register(opChain);
+  }
+
+  private Map<String, String> consolidateMetadata(Map<String, String> customProperties,
+      Map<String, String> requestMetadata) {
+    Map<String, String> contextMetadata = new HashMap<>();
+    // 1. put all custom Properties
+    contextMetadata.putAll(requestMetadata);
+    // 2. put all request level metadata
+    contextMetadata.putAll(customProperties);
+    // 3. add all overrides from config if anything is still empty.
+    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(contextMetadata);
+    if (numGroupsLimit == null) {
+      numGroupsLimit = _numGroupsLimit;
+    }
+    if (numGroupsLimit != null) {
+      contextMetadata.put(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(numGroupsLimit));
+    }
+
+    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(contextMetadata);
+    if (maxInitialResultHolderCapacity == null) {
+      maxInitialResultHolderCapacity = _maxInitialResultHolderCapacity;
+    }
+    if (maxInitialResultHolderCapacity != null) {
+      contextMetadata.put(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+          Integer.toString(maxInitialResultHolderCapacity));
+    }
+
+    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(contextMetadata);
+    if (maxRowsInJoin == null) {
+      maxRowsInJoin = _maxRowsInJoin;
+    }
+    if (maxRowsInJoin != null) {
+      contextMetadata.put(QueryOptionKey.MAX_ROWS_IN_JOIN, Integer.toString(maxRowsInJoin));
+    }
+
+    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(contextMetadata);
+    if (joinOverflowMode == null) {
+      joinOverflowMode = _joinOverflowMode;
+    }
+    if (joinOverflowMode != null) {
+      contextMetadata.put(QueryOptionKey.JOIN_OVERFLOW_MODE, joinOverflowMode.name());
+    }
+    return contextMetadata;
   }
 
   public void cancel(long requestId) {
@@ -225,48 +268,5 @@ public class QueryRunner {
             sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
             sendNode.isSortOnSender(), sendNode.getReceiverStageId());
     return new OpChain(executionContext, mailboxSendOperator);
-  }
-
-  private Map<String, String> consolidateMetadata(Map<String, String> customProperties,
-      Map<String, String> requestMetadataOriginal) {
-    Map<String, String> requestMetadata = new HashMap<>();
-    // first put all custom Properties
-    requestMetadata.putAll(customProperties);
-    // put all overrides from request
-    requestMetadata.putAll(requestMetadataOriginal);
-    // add all overrides from config
-    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(requestMetadata);
-    if (numGroupsLimit == null) {
-      numGroupsLimit = _numGroupsLimit;
-    }
-    if (numGroupsLimit != null) {
-      requestMetadata.put(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(numGroupsLimit));
-    }
-
-    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(requestMetadata);
-    if (maxInitialResultHolderCapacity == null) {
-      maxInitialResultHolderCapacity = _maxInitialResultHolderCapacity;
-    }
-    if (maxInitialResultHolderCapacity != null) {
-      requestMetadata.put(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          Integer.toString(maxInitialResultHolderCapacity));
-    }
-
-    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(requestMetadata);
-    if (maxRowsInJoin == null) {
-      maxRowsInJoin = _maxRowsInJoin;
-    }
-    if (maxRowsInJoin != null) {
-      requestMetadata.put(QueryOptionKey.MAX_ROWS_IN_JOIN, Integer.toString(maxRowsInJoin));
-    }
-
-    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(requestMetadata);
-    if (joinOverflowMode == null) {
-      joinOverflowMode = _joinOverflowMode;
-    }
-    if (joinOverflowMode != null) {
-      requestMetadata.put(QueryOptionKey.JOIN_OVERFLOW_MODE, joinOverflowMode.name());
-    }
-    return requestMetadata;
   }
 }

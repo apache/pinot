@@ -35,7 +35,7 @@ public class StageMetadata {
 
   StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
     _workerMetadataList = workerMetadataList;
-    _customProperties = customProperties;
+    _customProperties = Collections.unmodifiableMap(customProperties);
   }
 
   public List<WorkerMetadata> getWorkerMetadataList() {
@@ -43,7 +43,7 @@ public class StageMetadata {
   }
 
   public Map<String, String> getCustomProperties() {
-    return Collections.unmodifiableMap(_customProperties);
+    return _customProperties;
   }
 
   public static class Builder {

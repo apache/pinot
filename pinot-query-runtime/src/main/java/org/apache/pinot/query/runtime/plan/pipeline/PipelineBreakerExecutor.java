@@ -56,7 +56,7 @@ public class PipelineBreakerExecutor {
    * @param scheduler scheduler service to run the pipeline breaker main thread.
    * @param mailboxService mailbox service to attach the {@link MailboxReceiveNode} against.
    * @param distributedStagePlan the distributed stage plan to run pipeline breaker on.
-   * @param requestMetadata request metadata, including query options
+   * @param contextMetadata request metadata, including query options
    * @param requestId request ID
    * @param deadlineMs execution deadline
    * @return pipeline breaker result;
@@ -65,7 +65,7 @@ public class PipelineBreakerExecutor {
    */
   @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
-      MailboxService mailboxService, DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadata,
+      MailboxService mailboxService, DistributedStagePlan distributedStagePlan, Map<String, String> contextMetadata,
       long requestId, long deadlineMs) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(distributedStagePlan.getStageRoot(), pipelineBreakerContext);
@@ -76,7 +76,7 @@ public class PipelineBreakerExecutor {
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
             new OpChainExecutionContext(mailboxService, requestId, distributedStagePlan.getStageId(),
-                distributedStagePlan.getServer(), deadlineMs, requestMetadata, distributedStagePlan.getStageMetadata(),
+                distributedStagePlan.getServer(), deadlineMs, contextMetadata, distributedStagePlan.getStageMetadata(),
                 null);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {

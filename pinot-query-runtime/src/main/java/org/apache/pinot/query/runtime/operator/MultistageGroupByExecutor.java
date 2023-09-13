@@ -72,7 +72,7 @@ public class MultistageGroupByExecutor {
 
   public MultistageGroupByExecutor(List<ExpressionContext> groupByExpr, AggregationFunction[] aggFunctions,
       @Nullable int[] filterArgIndices, AggType aggType, Map<String, Integer> colNameToIndexMap,
-      DataSchema resultSchema, Map<String, String> customProperties, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+      DataSchema resultSchema, Map<String, String> contextMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
     _aggType = aggType;
     _colNameToIndexMap = colNameToIndexMap;
     _groupSet = groupByExpr;
@@ -85,8 +85,8 @@ public class MultistageGroupByExecutor {
 
     _groupKeyToIdMap = new HashMap<>();
 
-    _numGroupsLimit = getNumGroupsLimit(customProperties, nodeHint);
-    _maxInitialResultHolderCapacity = getMaxInitialResultHolderCapacity(customProperties, nodeHint);
+    _numGroupsLimit = getNumGroupsLimit(contextMetadata, nodeHint);
+    _maxInitialResultHolderCapacity = getMaxInitialResultHolderCapacity(contextMetadata, nodeHint);
 
     for (int i = 0; i < _aggFunctions.length; i++) {
       _aggregateResultHolders[i] =

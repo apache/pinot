@@ -143,12 +143,12 @@ public class HashJoinOperator extends MultiStageOperator {
     } else {
       _matchedRightRows = null;
     }
-    Map<String, String> metadata = context.getRequestMetadata();
+    Map<String, String> metadata = context.getContextMetadata();
     _maxRowsInHashTable = getMaxRowInJoin(metadata, node.getJoinHints());
     _joinOverflowMode = getJoinOverflowMode(metadata, node.getJoinHints());
   }
 
-  private int getMaxRowInJoin(Map<String, String> customProperties, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+  private int getMaxRowInJoin(Map<String, String> contextMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> joinOptions = nodeHint._hintOptions.get(PinotHintOptions.JOIN_HINT_OPTIONS);
       if (joinOptions != null) {
@@ -158,11 +158,11 @@ public class HashJoinOperator extends MultiStageOperator {
         }
       }
     }
-    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(customProperties);
+    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(contextMetadata);
     return maxRowsInJoin != null ? maxRowsInJoin : DEFAULT_MAX_ROWS_IN_JOIN;
   }
 
-  private JoinOverFlowMode getJoinOverflowMode(Map<String, String> customProperties,
+  private JoinOverFlowMode getJoinOverflowMode(Map<String, String> contextMetadata,
       @Nullable AbstractPlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> joinOptions = nodeHint._hintOptions.get(PinotHintOptions.JOIN_HINT_OPTIONS);
@@ -173,7 +173,7 @@ public class HashJoinOperator extends MultiStageOperator {
         }
       }
     }
-    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(customProperties);
+    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(contextMetadata);
     return joinOverflowMode != null ? joinOverflowMode : DEFAULT_JOIN_OVERFLOW_MODE;
   }
 
