@@ -340,9 +340,9 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment metadata", notes = "Provide segments metadata for the segment on server")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
-      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
-      ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getSegmentMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
