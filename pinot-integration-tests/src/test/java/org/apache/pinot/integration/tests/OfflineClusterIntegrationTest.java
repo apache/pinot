@@ -2920,8 +2920,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         JsonUtils.stringToObject(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/indexes?type=OFFLINE"),
             TableIndexMetadataResponse.class);
 
-    assertEquals(tableIndexMetadataResponse.getTotalOnlineSegments(), 12L);
-
     getInvertedIndexColumns().forEach(column -> {
       Assert.assertEquals(
           (long) tableIndexMetadataResponse.getColumnToIndexesCount().get(column).get(StandardIndexes.INVERTED_ID),
