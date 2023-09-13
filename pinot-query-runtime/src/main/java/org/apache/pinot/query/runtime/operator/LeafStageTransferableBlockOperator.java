@@ -93,7 +93,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     _dataSchema = dataSchema;
     _queryExecutor = queryExecutor;
     _executorService = executorService;
-    Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getRequestMetadata());
+    Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
   }
