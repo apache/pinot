@@ -19,7 +19,6 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -28,12 +27,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class BooleanAndAggregationFunction extends BaseBooleanAggregationFunction {
 
   public BooleanAndAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(verifyArguments(arguments), nullHandlingEnabled, BooleanMerge.AND);
-  }
-
-  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
-    Preconditions.checkArgument(arguments.size() == 1, "BOOL_AND expects 1 argument, got: %s", arguments.size());
-    return arguments.get(0);
+    super(verifySingleArgument(arguments, "BOOL_AND"), nullHandlingEnabled, BooleanMerge.AND);
   }
 
   @Override

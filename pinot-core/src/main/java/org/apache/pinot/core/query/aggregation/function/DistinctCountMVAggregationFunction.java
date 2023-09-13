@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,13 +35,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class DistinctCountMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
 
   public DistinctCountMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifyArguments(arguments), AggregationFunctionType.DISTINCTCOUNTMV, false);
-  }
-
-  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
-    Preconditions.checkArgument(arguments.size() == 1, "DISTINCT_COUNT_MV expects 1 argument, got: %s",
-        arguments.size());
-    return arguments.get(0);
+    super(verifySingleArgument(arguments, "DISTINCT_COUNT_MV"), AggregationFunctionType.DISTINCTCOUNTMV, false);
   }
 
   @Override

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -40,12 +39,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   private final boolean _nullHandlingEnabled;
 
   public MaxAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    this(verifyArguments(arguments), nullHandlingEnabled);
-  }
-
-  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
-    Preconditions.checkArgument(arguments.size() == 1, "MAX expects 1 argument, got: %s", arguments.size());
-    return arguments.get(0);
+    this(verifySingleArgument(arguments, "MAX"), nullHandlingEnabled);
   }
 
   protected MaxAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {

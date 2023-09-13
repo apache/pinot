@@ -42,12 +42,7 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
   private static final int BYTE_TO_CHAR_OFFSET = 129;
 
   public FastHLLAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifyArguments(arguments));
-  }
-
-  private static ExpressionContext verifyArguments(List<ExpressionContext> arguments) {
-    Preconditions.checkArgument(arguments.size() == 1, "FAST_HLL expects 1 argument, got: %s", arguments.size());
-    return arguments.get(0);
+    super(verifySingleArgument(arguments, "FAST_HLL"));
   }
 
   @Override
