@@ -68,6 +68,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONSOLE_SWAGGER_USE_HTTPS = "controller.swagger.use.https";
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
+  public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = "controller.resource.rebalance.delay_ms";
 
   // Comma separated list of packages that contain TableConfigTuners to be added to the registry
   public static final String TABLE_CONFIG_TUNER_PACKAGES = "controller.table.config.tuner.packages";
@@ -303,6 +304,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
   private static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
+  private static final int DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = 300_000; // 5 minutes
   private static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
@@ -991,6 +993,15 @@ public class ControllerConf extends PinotConfiguration {
   public String getLeadControllerResourceRebalanceStrategy() {
     return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY,
         DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
+  }
+
+  public void setLeadControllerResourceRebalanceDelayMs(long rebalanceDelayMs) {
+    setProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS, rebalanceDelayMs);
+  }
+
+  public int getLeadControllerResourceRebalanceDelayMs() {
+    return getProperty(
+        LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS);
   }
 
   public boolean getHLCTablesAllowed() {

@@ -106,7 +106,6 @@ public class CommonConstants {
     public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;
     public static final int LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT = 1;
     public static final int MIN_ACTIVE_REPLICAS = 0;
-    public static final int REBALANCE_DELAY_MS = 300_000; // 5 minutes.
 
     // Instance tags
     public static final String CONTROLLER_INSTANCE = "controller";
