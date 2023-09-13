@@ -143,12 +143,12 @@ public class HashJoinOperator extends MultiStageOperator {
     } else {
       _matchedRightRows = null;
     }
-    Map<String, String> metadata = context.getContextMetadata();
+    Map<String, String> metadata = context.getOpChainMetadata();
     _maxRowsInHashTable = getMaxRowInJoin(metadata, node.getJoinHints());
     _joinOverflowMode = getJoinOverflowMode(metadata, node.getJoinHints());
   }
 
-  private int getMaxRowInJoin(Map<String, String> contextMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+  private int getMaxRowInJoin(Map<String, String> opChainMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> joinOptions = nodeHint._hintOptions.get(PinotHintOptions.JOIN_HINT_OPTIONS);
       if (joinOptions != null) {
@@ -158,7 +158,7 @@ public class HashJoinOperator extends MultiStageOperator {
         }
       }
     }
-    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(contextMetadata);
+    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(opChainMetadata);
     return maxRowsInJoin != null ? maxRowsInJoin : DEFAULT_MAX_ROWS_IN_JOIN;
   }
 

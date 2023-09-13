@@ -39,7 +39,7 @@ public class OpChainExecutionContext {
   private final int _stageId;
   private final VirtualServerAddress _server;
   private final long _deadlineMs;
-  private final Map<String, String> _contextMetadata;
+  private final Map<String, String> _opChainMetadata;
   private final StageMetadata _stageMetadata;
   private final OpChainId _id;
   private final OpChainStats _stats;
@@ -47,14 +47,14 @@ public class OpChainExecutionContext {
   private final boolean _traceEnabled;
 
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
-      VirtualServerAddress server, long deadlineMs, Map<String, String> contextMetadata, StageMetadata stageMetadata,
+      VirtualServerAddress server, long deadlineMs, Map<String, String> opChainMetadata, StageMetadata stageMetadata,
       PipelineBreakerResult pipelineBreakerResult) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
     _server = server;
     _deadlineMs = deadlineMs;
-    _contextMetadata = Collections.unmodifiableMap(contextMetadata);
+    _opChainMetadata = Collections.unmodifiableMap(opChainMetadata);
     _stageMetadata = stageMetadata;
     _id = new OpChainId(requestId, server.workerId(), stageId);
     _stats = new OpChainStats(_id.toString());
@@ -62,7 +62,7 @@ public class OpChainExecutionContext {
     if (pipelineBreakerResult != null && pipelineBreakerResult.getOpChainStats() != null) {
       _stats.getOperatorStatsMap().putAll(pipelineBreakerResult.getOpChainStats().getOperatorStatsMap());
     }
-    _traceEnabled = Boolean.parseBoolean(contextMetadata.get(CommonConstants.Broker.Request.TRACE));
+    _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
   }
 
   public MailboxService getMailboxService() {
@@ -85,8 +85,8 @@ public class OpChainExecutionContext {
     return _deadlineMs;
   }
 
-  public Map<String, String> getContextMetadata() {
-    return _contextMetadata;
+  public Map<String, String> getOpChainMetadata() {
+    return _opChainMetadata;
   }
 
   public StageMetadata getStageMetadata() {

@@ -133,10 +133,10 @@ public class AggregateOperator extends MultiStageOperator {
     // Initialize the appropriate executor.
     if (!groupSet.isEmpty()) {
       _isGroupByAggregation = true;
-      Map<String, String> metadata = context.getContextMetadata();
+      Map<String, String> opChainMetadata = context.getOpChainMetadata();
       _groupByExecutor =
           new MultistageGroupByExecutor(groupByExpr, aggFunctions, filterArgIndexArray, aggType, _colNameToIndexMap,
-              _resultSchema, metadata, nodeHint);
+              _resultSchema, opChainMetadata, nodeHint);
     } else {
       _isGroupByAggregation = false;
       _aggregationExecutor =
