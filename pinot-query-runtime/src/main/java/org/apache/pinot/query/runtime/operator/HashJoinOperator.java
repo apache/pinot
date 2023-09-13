@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,7 +45,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 
@@ -145,11 +143,9 @@ public class HashJoinOperator extends MultiStageOperator {
     } else {
       _matchedRightRows = null;
     }
-    StageMetadata stageMetadata = context.getStageMetadata();
-    Map<String, String> customProperties =
-        stageMetadata != null ? stageMetadata.getCustomProperties() : Collections.emptyMap();
-    _maxRowsInHashTable = getMaxRowInJoin(customProperties, node.getJoinHints());
-    _joinOverflowMode = getJoinOverflowMode(customProperties, node.getJoinHints());
+    Map<String, String> metadata = context.getRequestMetadata();
+    _maxRowsInHashTable = getMaxRowInJoin(metadata, node.getJoinHints());
+    _joinOverflowMode = getJoinOverflowMode(metadata, node.getJoinHints());
   }
 
   private int getMaxRowInJoin(Map<String, String> customProperties, @Nullable AbstractPlanNode.NodeHint nodeHint) {

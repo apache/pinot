@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
@@ -85,7 +86,7 @@ public class OpChainExecutionContext {
   }
 
   public Map<String, String> getRequestMetadata() {
-    return _requestMetadata;
+    return Collections.unmodifiableMap(_requestMetadata);
   }
 
   public StageMetadata getStageMetadata() {

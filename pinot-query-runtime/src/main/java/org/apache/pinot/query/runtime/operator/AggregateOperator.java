@@ -48,7 +48,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.block.DataBlockValSet;
 import org.apache.pinot.query.runtime.operator.block.FilteredDataBlockValSet;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -134,12 +133,10 @@ public class AggregateOperator extends MultiStageOperator {
     // Initialize the appropriate executor.
     if (!groupSet.isEmpty()) {
       _isGroupByAggregation = true;
-      StageMetadata stageMetadata = context.getStageMetadata();
-      Map<String, String> customProperties =
-          stageMetadata != null ? stageMetadata.getCustomProperties() : Collections.emptyMap();
+      Map<String, String> metadata = context.getRequestMetadata();
       _groupByExecutor =
           new MultistageGroupByExecutor(groupByExpr, aggFunctions, filterArgIndexArray, aggType, _colNameToIndexMap,
-              _resultSchema, customProperties, nodeHint);
+              _resultSchema, metadata, nodeHint);
     } else {
       _isGroupByAggregation = false;
       _aggregationExecutor =

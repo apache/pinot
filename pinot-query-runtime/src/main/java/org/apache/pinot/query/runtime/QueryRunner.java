@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -149,12 +150,13 @@ public class QueryRunner {
    * <p>This execution entry point should be asynchronously called by the request handler and caller should not wait
    * for results/exceptions.</p>
    */
-  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadata) {
+  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataOriginal) {
+    Map<String, String> requestMetadata = consolidateMetadata(
+        distributedStagePlan.getStageMetadata().getCustomProperties(), requestMetadataOriginal);
+
     long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
-
-    setStageCustomProperties(distributedStagePlan.getStageMetadata().getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
@@ -199,41 +201,6 @@ public class QueryRunner {
     _opChainScheduler.register(opChain);
   }
 
-  private void setStageCustomProperties(Map<String, String> customProperties, Map<String, String> requestMetadata) {
-    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(requestMetadata);
-    if (numGroupsLimit == null) {
-      numGroupsLimit = _numGroupsLimit;
-    }
-    if (numGroupsLimit != null) {
-      customProperties.put(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(numGroupsLimit));
-    }
-
-    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(requestMetadata);
-    if (maxInitialResultHolderCapacity == null) {
-      maxInitialResultHolderCapacity = _maxInitialResultHolderCapacity;
-    }
-    if (maxInitialResultHolderCapacity != null) {
-      customProperties.put(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          Integer.toString(maxInitialResultHolderCapacity));
-    }
-
-    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(requestMetadata);
-    if (maxRowsInJoin == null) {
-      maxRowsInJoin = _maxRowsInJoin;
-    }
-    if (maxRowsInJoin != null) {
-      customProperties.put(QueryOptionKey.MAX_ROWS_IN_JOIN, Integer.toString(maxRowsInJoin));
-    }
-
-    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(requestMetadata);
-    if (joinOverflowMode == null) {
-      joinOverflowMode = _joinOverflowMode;
-    }
-    if (joinOverflowMode != null) {
-      customProperties.put(QueryOptionKey.JOIN_OVERFLOW_MODE, joinOverflowMode.name());
-    }
-  }
-
   public void cancel(long requestId) {
     _opChainScheduler.cancel(requestId);
   }
@@ -258,5 +225,48 @@ public class QueryRunner {
             sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
             sendNode.isSortOnSender(), sendNode.getReceiverStageId());
     return new OpChain(executionContext, mailboxSendOperator);
+  }
+
+  private Map<String, String> consolidateMetadata(Map<String, String> customProperties,
+      Map<String, String> requestMetadataOriginal) {
+    Map<String, String> requestMetadata = new HashMap<>();
+    // first put all custom Properties
+    requestMetadata.putAll(customProperties);
+    // put all overrides from request
+    requestMetadata.putAll(requestMetadataOriginal);
+    // add all overrides from config
+    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(requestMetadata);
+    if (numGroupsLimit == null) {
+      numGroupsLimit = _numGroupsLimit;
+    }
+    if (numGroupsLimit != null) {
+      requestMetadata.put(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(numGroupsLimit));
+    }
+
+    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(requestMetadata);
+    if (maxInitialResultHolderCapacity == null) {
+      maxInitialResultHolderCapacity = _maxInitialResultHolderCapacity;
+    }
+    if (maxInitialResultHolderCapacity != null) {
+      requestMetadata.put(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+          Integer.toString(maxInitialResultHolderCapacity));
+    }
+
+    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(requestMetadata);
+    if (maxRowsInJoin == null) {
+      maxRowsInJoin = _maxRowsInJoin;
+    }
+    if (maxRowsInJoin != null) {
+      requestMetadata.put(QueryOptionKey.MAX_ROWS_IN_JOIN, Integer.toString(maxRowsInJoin));
+    }
+
+    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(requestMetadata);
+    if (joinOverflowMode == null) {
+      joinOverflowMode = _joinOverflowMode;
+    }
+    if (joinOverflowMode != null) {
+      requestMetadata.put(QueryOptionKey.JOIN_OVERFLOW_MODE, joinOverflowMode.name());
+    }
+    return requestMetadata;
   }
 }

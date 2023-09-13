@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +43,7 @@ public class StageMetadata {
   }
 
   public Map<String, String> getCustomProperties() {
-    return _customProperties;
+    return Collections.unmodifiableMap(_customProperties);
   }
 
   public static class Builder {
