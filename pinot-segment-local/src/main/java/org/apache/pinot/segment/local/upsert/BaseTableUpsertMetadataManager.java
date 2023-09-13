@@ -105,8 +105,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       Preconditions.checkArgument(partialUpsertStrategies != null,
           "Partial-upsert strategies must be configured for partial-upsert enabled table: %s", _tableNameWithType);
       _partialUpsertHandler =
-          new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig.getDefaultPartialUpsertStrategy(),
-              _comparisonColumns);
+          new PartialUpsertHandler(schema, upsertConfig, _comparisonColumns);
     }
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();
@@ -144,6 +143,29 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       }
     }
   }
+
+  /**
+   * Reuses a PartialUpsertHandler if there is no custom row merger otherwise creates a new instance to avoid
+   * concurrent modification of state(LazyRow) between segments of the table
+   * @return partial upsert handler to merge previous and new row
+   */
+    protected PartialUpsertHandler getPartialUpsertHandler() {
+        UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
+        if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
+        Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
+        Preconditions.checkArgument(partialUpsertStrategies != null,
+                "Partial-upsert strategies must be configured for partial-upsert enabled table: %s",
+                _tableNameWithType);
+        if (upsertConfig.getRowMergerCustomImplementation() != null) {
+          // In case of custom merger, the PUH is dependent on LazyRow object to be reused. LazyRow is stateful and
+          // cause concurrent modification issues, hence a new PUH is created per partition
+          return new PartialUpsertHandler(_schema, upsertConfig, _comparisonColumns);
+        } else {
+          return _partialUpsertHandler;
+        }
+      }
+      return null;
+    }
 
   /**
    * Can be overridden to initialize custom variables after other variables are set but before preload starts. This is
@@ -271,6 +293,9 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
   @Override
   public UpsertConfig.Mode getUpsertMode() {
-    return _partialUpsertHandler == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
+    return _tableConfig.getUpsertConfig() != null
+            && _tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL
+            ? UpsertConfig.Mode.PARTIAL
+            : UpsertConfig.Mode.FULL;
   }
 }
