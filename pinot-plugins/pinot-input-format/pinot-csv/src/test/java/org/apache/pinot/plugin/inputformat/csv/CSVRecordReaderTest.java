@@ -230,12 +230,12 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
     readerConfig.setCommentMarker('#');
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
 
     // test using default CSVRecordReader
     readerConfig.setSkipUnParseableLines(false);
-    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
   }
 
@@ -248,12 +248,12 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     // test using line iterator
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(5, genericRows.size());
 
     // test using default CSVRecordReader
     readerConfig.setSkipUnParseableLines(false);
-    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(5, genericRows.size());
   }
 
@@ -266,12 +266,12 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     // test using line iterator
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(2, genericRows.size());
 
     // test using default CSVRecordReader
     readerConfig.setSkipUnParseableLines(false);
-    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(2, genericRows.size());
   }
 
@@ -285,12 +285,12 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
     readerConfig.setHeader("id,name");
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
 
     // test using default CSVRecordReader
     readerConfig.setSkipUnParseableLines(false);
-    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
   }
 
@@ -303,12 +303,12 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     // test using line iterator
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(2, genericRows.size());
 
     // test using default CSVRecordReader
     readerConfig.setSkipUnParseableLines(false);
-    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(2, genericRows.size());
   }
 
@@ -320,7 +320,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
 
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(1, genericRows.size());
   }
 
@@ -331,7 +331,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     File dataFile = new File(uri);
 
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
-    readCSVRecords(dataFile, readerConfig, false);
+    readCSVRecords(dataFile, readerConfig, null, false);
   }
 
   @Test
@@ -345,7 +345,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     readerConfig.setCommentMarker('#');
     readerConfig.setIgnoreEmptyLines(true);
 
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(7, genericRows.size());
   }
 
@@ -359,7 +359,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     readerConfig.setCommentMarker('#');
     readerConfig.setIgnoreEmptyLines(true);
 
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, new GenericRow(), false);
     Assert.assertEquals(7, genericRows.size());
   }
 
@@ -373,10 +373,10 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     readerConfig.setSkipUnParseableLines(true);
     readerConfig.setCommentMarker('#');
     readerConfig.setIgnoreEmptyLines(true);
-    readCSVRecords(dataFile, readerConfig, true);
+    readCSVRecords(dataFile, readerConfig, null, true);
 
     // Start reading again; results should be same
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, new GenericRow(), false);
     Assert.assertEquals(7, genericRows.size());
   }
 
@@ -389,10 +389,10 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setCommentMarker('#');
     readerConfig.setIgnoreEmptyLines(true);
-    readCSVRecords(dataFile, readerConfig, true);
+    readCSVRecords(dataFile, readerConfig, null, true);
 
     // Start reading again; results should be same
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(7, genericRows.size());
   }
 
@@ -407,12 +407,12 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     readerConfig.setHeader("firstName,lastName,id");
     readerConfig.setSkipHeader(true);
     readerConfig.setSkipUnParseableLines(true);
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
 
     // test using default CSVRecordReader
     readerConfig.setSkipUnParseableLines(false);
-    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
   }
 
@@ -426,12 +426,12 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setDelimiter('|');
     readerConfig.setSkipUnParseableLines(true);
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
 
     // test using default CSVRecordReader
     readerConfig.setSkipUnParseableLines(false);
-    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
   }
 
@@ -445,13 +445,13 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
     readerConfig.setIgnoreSurroundingSpaces(true);
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
     validateSpaceAroundHeadersAreTrimmed(dataFile, readerConfig);
 
     // test using default CSVRecordReader
     readerConfig.setSkipUnParseableLines(false);
-    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
     validateSpaceAroundHeadersAreTrimmed(dataFile, readerConfig);
   }
@@ -466,13 +466,13 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
     readerConfig.setIgnoreSurroundingSpaces(false);
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
     validateSpaceAroundHeadersAreRetained(dataFile, readerConfig);
 
     // test using default CSVRecordReader
     readerConfig.setSkipUnParseableLines(false);
-    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
     validateSpaceAroundHeadersAreRetained(dataFile, readerConfig);
   }
@@ -487,18 +487,18 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     readerConfig.setSkipUnParseableLines(true);
     readerConfig.setHeader("id,name");
     readerConfig.setSkipHeader(true);
-    readCSVRecords(dataFile, readerConfig, true);
+    readCSVRecords(dataFile, readerConfig, new GenericRow(), true);
 
     // Start reading again; results should be same
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
 
     // test using default CSVRecordReader
     readerConfig.setSkipUnParseableLines(false);
-    readCSVRecords(dataFile, readerConfig, true);
+    readCSVRecords(dataFile, readerConfig, null, true);
 
     // Start reading again; results should be same
-    genericRows = readCSVRecords(dataFile, readerConfig, false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(3, genericRows.size());
   }
 
@@ -511,7 +511,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     // test using line iterator
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(2, genericRows.size());
 
     // Note: The default CSVRecordReader cannot handle unparseable rows
@@ -526,20 +526,26 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     // test using line iterator
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
-    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
     Assert.assertEquals(0, genericRows.size());
 
     // Note: The default CSVRecordReader cannot handle unparseable rows
   }
 
-  private List<GenericRow> readCSVRecords(File dataFile, CSVRecordReaderConfig readerConfig, boolean rewind)
+  private List<GenericRow> readCSVRecords(File dataFile,
+      CSVRecordReaderConfig readerConfig, GenericRow genericRow, boolean rewind)
       throws IOException {
     List<GenericRow> genericRows = new ArrayList<>();
 
     try (CSVRecordReader recordReader = new CSVRecordReader()) {
       recordReader.init(dataFile, null, readerConfig);
+      GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        GenericRow genericRow = recordReader.next();
+        if (genericRow != null) {
+          recordReader.next(reuse);
+        } else {
+          recordReader.next();
+        }
         genericRows.add(genericRow);
       }
 

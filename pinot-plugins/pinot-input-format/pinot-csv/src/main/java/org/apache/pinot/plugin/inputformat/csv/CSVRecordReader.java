@@ -225,8 +225,7 @@ public class CSVRecordReader implements RecordReader {
   public GenericRow next(GenericRow reuse)
       throws IOException {
     if (_useLineIterator) {
-      throw new UnsupportedOperationException("Method signature 'next(GenericRow genericRow)'not supported while using "
-          + "the config option 'skipUnParseableLines'.");
+      reuse.init(_nextRecord);
     } else {
       CSVRecord record = _iterator.next();
       _recordExtractor.extract(record, reuse);
