@@ -320,7 +320,7 @@ public class TablesResource {
           DataSource colDataSource = segment.getDataSource(col);
           IndexService.getInstance().getAllIndexes().forEach(idxType -> {
             long count = colDataSource.getIndex(idxType) != null ? 1L : 0L;
-            columnToIndexesCount.get(col).merge(idxType.getPrettyName(), count, Long::sum);
+            columnToIndexesCount.get(col).merge(idxType.getId(), count, Long::sum);
           });
         });
       }

@@ -22,9 +22,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
@@ -35,6 +38,8 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
@@ -105,6 +110,38 @@ public class TablesResourceTest extends BaseResourceTest {
 
     // No such table
     Response response = _webTarget.path("/tables/noSuchTable/segments").request().get(Response.class);
+    Assert.assertNotNull(response);
+    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+  }
+
+  @Test
+  public void getTableIndexes()
+      throws Exception {
+    String tableIndexesPath =
+        "/tables/" + TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(TABLE_NAME) + "/indexes";
+
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(tableIndexesPath).request().get(String.class));
+    TableIndexMetadataResponse tableIndexMetadataResponse =
+        JsonUtils.jsonNodeToObject(jsonResponse, TableIndexMetadataResponse.class);
+    Assert.assertNotNull(tableIndexMetadataResponse);
+    Assert.assertEquals(tableIndexMetadataResponse.getTotalOnlineSegments(), _offlineIndexSegments.size());
+
+    Map<String, Map<String, Long>> columnToIndexCountMap = new HashMap<>();
+    for (ImmutableSegment segment : _offlineIndexSegments) {
+      segment.getColumnNames().forEach(colName -> {
+        DataSource dataSource = segment.getDataSource(colName);
+        columnToIndexCountMap.putIfAbsent(colName, new HashMap<>());
+        IndexService.getInstance().getAllIndexes().forEach(indexType -> {
+          long count = dataSource.getIndex(indexType) != null ? 1L : 0L;
+          columnToIndexCountMap.get(colName).merge(indexType.getId(), count, Long::sum);
+        });
+      });
+    }
+
+    Assert.assertEquals(tableIndexMetadataResponse.getColumnToIndexesCount(), columnToIndexCountMap);
+
+    // No such table
+    Response response = _webTarget.path("/tables/noSuchTable/indexes").request().get(Response.class);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }

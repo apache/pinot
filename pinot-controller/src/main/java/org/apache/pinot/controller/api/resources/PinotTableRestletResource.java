@@ -1019,7 +1019,7 @@ public class PinotTableRestletResource {
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       TableIndexMetadataResponse response = JsonUtils.stringToObject(responseString, TableIndexMetadataResponse.class);
-      totalSegments += response.getTotalSegments();
+      totalSegments += response.getTotalOnlineSegments();
       response.getColumnToIndexesCount().forEach((col, indexToCount) -> {
         columnToIndexCountMap.putIfAbsent(col, new HashMap<>());
 
