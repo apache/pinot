@@ -142,9 +142,9 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       return searchFuture.get();
     } catch (InterruptedException e) {
       docIDCollector.markShouldCancel();
-      LOGGER.warn("Lucene query timed out while searching the realtime text index for segment {}, column {},"
-              + " search query {}", _segmentName, _column, searchQuery);
-      throw new RuntimeException("Lucene query was cancelled after timeout was reached");
+      LOGGER.warn("TEXT_MATCH query timeout on realtime consuming segment {}, column {}, search query {}", _segmentName,
+          _column, searchQuery);
+      throw new RuntimeException("TEXT_MATCH query timeout on realtime consuming segment");
     } catch (Exception e) {
       LOGGER.error("Failed while searching the realtime text index for segment {}, column {}, search query {},"
               + " exception {}", _segmentName, _column, searchQuery, e.getMessage());

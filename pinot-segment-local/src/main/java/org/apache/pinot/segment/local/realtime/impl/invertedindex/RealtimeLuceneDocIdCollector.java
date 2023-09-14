@@ -62,7 +62,7 @@ public class RealtimeLuceneDocIdCollector implements Collector {
       public void collect(int doc)
           throws IOException {
         if (_shouldCancel) {
-          throw new RuntimeException("Lucene query was cancelled");
+          throw new RuntimeException("TEXT_MATCH query was cancelled");
         }
         // Compute the absolute lucene docID across sub-indexes as doc that is passed is relative to the current reader
         _docIds.add(context.docBase + doc);

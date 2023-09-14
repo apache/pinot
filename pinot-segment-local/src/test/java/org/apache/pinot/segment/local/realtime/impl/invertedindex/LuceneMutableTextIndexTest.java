@@ -93,7 +93,7 @@ public class LuceneMutableTextIndexTest {
   }
 
   @Test(expectedExceptions = ExecutionException.class,
-      expectedExceptionsMessageRegExp = ".*Lucene query was cancelled after timeout was reached.*")
+      expectedExceptionsMessageRegExp = ".*TEXT_MATCH query timeout on realtime consuming segment.*")
   public void testQueryCancellationIsSuccessful()
       throws InterruptedException, ExecutionException {
     ExecutorService executor = Executors.newSingleThreadExecutor();
