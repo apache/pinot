@@ -61,6 +61,9 @@ public class PinotResourceManagerTest {
     _testInstance.setupSharedStateAndValidate();
     _resourceManager = _testInstance.getHelixResourceManager();
 
+    // Create schema
+    _testInstance.addDummySchema(RAW_TABLE_NAME);
+
     // Adding an offline table
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     _resourceManager.addTable(offlineTableConfig);

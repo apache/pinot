@@ -600,14 +600,10 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
   @Test
   public void testGetConfigCompatibility()
       throws IOException {
-    // Should not fail if schema name does not match raw table name in the case they are created separately
-    String schemaName = "schema1";
-    Schema schema = createDummySchema(schemaName);
-    sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaCreate(), schema.toPrettyJsonString());
     String tableName = "table1";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
-    validationConfig.setSchemaName(schemaName);
     validationConfig.setReplication("1");
     offlineTableConfig.setValidationConfig(validationConfig);
     sendPostRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate(),
@@ -617,11 +613,11 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     TableConfigs tableConfigsResponse = JsonUtils.stringToObject(response, TableConfigs.class);
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
     Assert.assertEquals(tableConfigsResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
-    Assert.assertEquals(tableConfigsResponse.getSchema().getSchemaName(), schema.getSchemaName());
+    Assert.assertEquals(tableConfigsResponse.getSchema().getSchemaName(), tableName);
 
     // Delete
     sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaDelete(schemaName));
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaDelete(tableName));
   }
 
   @AfterClass

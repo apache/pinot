@@ -88,7 +88,6 @@ public class SparkSegmentGenerationJobRunnerTest {
     File tableConfigFile = new File(testDir, "tableConfig");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
       .setTableName("myTable")
-      .setSchemaName(schemaName)
       .setNumReplicas(1)
       .build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
@@ -184,7 +183,6 @@ public class SparkSegmentGenerationJobRunnerTest {
     File tableConfigFile = new File(testDir, "tableConfig");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("myTable")
-        .setSchemaName(schemaName)
         .setNumReplicas(1)
         .build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);

@@ -188,6 +188,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     }
 
     // Add a new table with same broker tenant
+    addDummySchema(newRawTableName);
     newTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(newRawTableName)
         .setServerTenant(TagNameUtils.DEFAULT_TENANT_NAME).build();
     _helixResourceManager.addTable(newTableConfig);

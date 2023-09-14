@@ -88,6 +88,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_I
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -792,9 +793,10 @@ public class ControllerTest {
   }
 
   public static String sendPostRequest(String urlString)
-    throws IOException {
+      throws IOException {
     return sendPostRequest(urlString, null);
   }
+
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
     return sendPostRequest(urlString, payload, Collections.emptyMap());
@@ -1030,7 +1032,9 @@ public class ControllerTest {
         DEFAULT_NUM_SERVER_INSTANCES);
 
     // No pre-existing tables
-    assertEquals(getHelixResourceManager().getAllTables().size(), 0);
+    assertTrue(CollectionUtils.isEmpty(getHelixResourceManager().getAllTables()));
+    // No pre-existing schemas
+    assertTrue(CollectionUtils.isEmpty(getHelixResourceManager().getSchemaNames()));
   }
 
   /**

@@ -79,6 +79,10 @@ public class TenantRebalancerTest extends ControllerTest {
     // tag all servers and brokers to test tenant
     addTenantTagToInstances(TENANT_NAME);
 
+    // create 2 schemas
+    addDummySchema(RAW_TABLE_NAME_A);
+    addDummySchema(RAW_TABLE_NAME_B);
+
     // create 2 tables, one on each of test tenant and default tenant
     createTableWithSegments(RAW_TABLE_NAME_A, DEFAULT_TENANT_NAME);
     createTableWithSegments(RAW_TABLE_NAME_B, TENANT_NAME);

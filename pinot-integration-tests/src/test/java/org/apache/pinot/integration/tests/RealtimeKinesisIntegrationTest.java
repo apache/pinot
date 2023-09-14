@@ -174,7 +174,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
   }
 
   public TableConfig createKinesisTableConfig() {
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getTableName())
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
         .setTimeColumnName("DaysSinceEpoch").setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())

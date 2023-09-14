@@ -104,6 +104,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
 
     // Create the table
+    addDummySchema(RAW_TABLE_NAME);
     _helixResourceManager.addTable(tableConfig);
 
     // Add the segments
@@ -332,6 +333,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setServerTenant(NO_TIER_NAME).build();
     // Create the table
+    addDummySchema(TIERED_TABLE_NAME);
     _helixResourceManager.addTable(tableConfig);
 
     // Add the segments
@@ -423,6 +425,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TIERED_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setServerTenant("replicaAssignment" + NO_TIER_NAME).build();
     // Create the table
+    addDummySchema(TIERED_TABLE_NAME);
     _helixResourceManager.addTable(tableConfig);
 
     // Add the segments

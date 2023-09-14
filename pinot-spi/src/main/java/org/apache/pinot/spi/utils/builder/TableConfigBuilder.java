@@ -64,7 +64,6 @@ public class TableConfigBuilder {
   private boolean _isDimTable;
 
   // Segments config related
-  private String _schemaName;
   private String _numReplicas = DEFAULT_NUM_REPLICAS;
   private String _timeColumnName;
   private String _timeType;
@@ -144,11 +143,6 @@ public class TableConfigBuilder {
   public TableConfigBuilder setLLC(boolean isLLC) {
     Preconditions.checkState(_tableType == TableType.REALTIME);
     Preconditions.checkArgument(isLLC, "Real-time table must use LLC");
-    return this;
-  }
-
-  public TableConfigBuilder setSchemaName(String schemaName) {
-    _schemaName = schemaName;
     return this;
   }
 
@@ -434,7 +428,6 @@ public class TableConfigBuilder {
     validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
     validationConfig.setReplicaGroupStrategyConfig(_replicaGroupStrategyConfig);
     validationConfig.setCompletionConfig(_completionConfig);
-    validationConfig.setSchemaName(_schemaName);
     validationConfig.setReplication(_numReplicas);
     validationConfig.setPeerSegmentDownloadScheme(_peerSegmentDownloadScheme);
     validationConfig.setCrypterClassName(_crypterClassName);

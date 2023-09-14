@@ -113,6 +113,14 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Create and upload the schema and table config
     Schema schema = createSchema();
     addSchema(schema);
+    schema.setSchemaName(SINGLE_LEVEL_CONCAT_TEST_TABLE);
+    addSchema(schema);
+    schema.setSchemaName(SINGLE_LEVEL_ROLLUP_TEST_TABLE);
+    addSchema(schema);
+    schema.setSchemaName(MULTI_LEVEL_CONCAT_TEST_TABLE);
+    addSchema(schema);
+    schema.setSchemaName(SINGLE_LEVEL_CONCAT_METADATA_TEST_TABLE);
+    addSchema(schema);
     TableConfig singleLevelConcatTableConfig =
         createOfflineTableConfig(SINGLE_LEVEL_CONCAT_TEST_TABLE, getSingleLevelConcatTaskConfig());
     TableConfig singleLevelRollupTableConfig =
@@ -149,6 +157,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     addTableConfig(tableConfig);
     _kafkaStarters.get(0)
         .createTopic(PROCESS_ALL_MODE_KAFKA_TOPIC, KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
+    schema.setSchemaName(MULTI_LEVEL_CONCAT_PROCESS_ALL_REALTIME_TABLE);
+    addSchema(schema);
     TableConfig singleLevelConcatProcessAllRealtimeTableConfig =
         createRealtimeTableConfigWithProcessAllMode(avroFiles.get(0),
             MULTI_LEVEL_CONCAT_PROCESS_ALL_REALTIME_TABLE, PROCESS_ALL_MODE_KAFKA_TOPIC);
@@ -206,7 +216,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
 
   private TableConfig createOfflineTableConfig(String tableName, TableTaskConfig taskConfig,
       @Nullable SegmentPartitionConfig partitionConfig) {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
         .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
@@ -236,7 +246,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     tableTaskConfigs.put("ActualElapsedTime.aggregationType", "min");
     tableTaskConfigs.put("WeatherDelay.aggregationType", "sum");
     tableTaskConfigs.put("mode", "processAll");
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
         .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())

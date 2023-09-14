@@ -116,10 +116,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return DEFAULT_TABLE_NAME;
   }
 
-  protected String getSchemaName() {
-    return DEFAULT_SCHEMA_NAME;
-  }
-
   protected String getSchemaFileName() {
     return DEFAULT_SCHEMA_FILE_NAME;
   }
@@ -270,14 +266,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     InputStream inputStream =
         BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(getSchemaFileName());
     Assert.assertNotNull(inputStream);
-    return Schema.fromInputStream(inputStream);
-  }
-
-  /**
-   * Returns the schema in the cluster.
-   */
-  protected Schema getSchema() {
-    return getSchema(getSchemaName());
+    Schema schema = Schema.fromInputStream(inputStream);
+    schema.setSchemaName(getTableName());
+    return schema;
   }
 
   protected Schema createSchema(File schemaFile)
@@ -298,7 +289,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * Creates a new OFFLINE table config.
    */
   protected TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
@@ -352,7 +343,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
@@ -374,7 +365,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(deleteColumn);
 
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
@@ -406,12 +397,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Creates a new Upsert enabled table config.
    */
-  protected TableConfig createCSVUpsertTableConfig(String tableName, @Nullable String schemaName,
-      @Nullable String kafkaTopicName, int numPartitions, Map<String, String> streamDecoderProperties,
-      UpsertConfig upsertConfig, String primaryKeyColumn) {
-    if (schemaName == null) {
-      schemaName = getSchemaName();
-    }
+  protected TableConfig createCSVUpsertTableConfig(String tableName, @Nullable String kafkaTopicName,
+      int numPartitions, Map<String, String> streamDecoderProperties, UpsertConfig upsertConfig,
+      String primaryKeyColumn) {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
@@ -428,7 +416,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         kafkaTopicName);
     streamConfigsMap.putAll(streamDecoderProperties);
 
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setSchemaName(schemaName)
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
@@ -448,7 +436,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName()).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())

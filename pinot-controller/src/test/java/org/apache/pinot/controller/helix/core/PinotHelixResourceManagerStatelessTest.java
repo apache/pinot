@@ -114,6 +114,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     resetBrokerTags();
     resetServerTags();
+    addDummySchema(RAW_TABLE_NAME);
   }
 
   private void untagBrokers() {
@@ -239,6 +240,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(untaggedBrokers.size(), 1);
 
     // Add a table
+    addDummySchema(RAW_TABLE_NAME);
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
@@ -297,6 +299,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   public void testRebuildBrokerResourceFromHelixTags()
       throws Exception {
     // Create the table
+    addDummySchema(RAW_TABLE_NAME);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
@@ -761,6 +764,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setTierConfigList(Collections.singletonList(tierConfig)).setServerTenant(SERVER_TENANT_NAME).build();
     waitForEVToDisappear(tableConfig.getTableName());
+    addDummySchema(RAW_TABLE_NAME);
     _helixResourceManager.addTable(tableConfig);
 
     String segmentName = "testSegment";
@@ -796,6 +800,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   @Test
   public void testSegmentReplacementWithCustomToSegments() throws Exception {
     // Create the table
+    addDummySchema(RAW_TABLE_NAME);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
@@ -830,6 +835,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   public void testSegmentReplacementRegular()
       throws Exception {
     // Create the table
+    addDummySchema(RAW_TABLE_NAME);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
@@ -1101,6 +1107,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   public void testSegmentReplacementForRefresh()
       throws Exception {
     // Create the table
+    addDummySchema(RAW_TABLE_NAME);
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY"));
     TableConfig tableConfig =

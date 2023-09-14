@@ -141,11 +141,6 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   }
 
   @Override
-  protected String getSchemaName() {
-    return "upsertSchema";
-  }
-
-  @Override
   protected String getAvroTarFileName() {
     return "upsert_upload_segment_test.tar.gz";
   }
