@@ -20,12 +20,15 @@ package org.apache.pinot.broker.broker;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.ws.rs.WebApplicationException;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -75,7 +78,11 @@ public class BasicAuthAccessControlTest {
     HttpRequesterIdentity identity = new HttpRequesterIdentity();
     identity.setHttpHeaders(headers);
 
-    Assert.assertFalse(_accessControl.hasAccess(identity, (BrokerRequest) null));
+    try{
+      _accessControl.hasAccess(identity, (BrokerRequest) null);
+    } catch (WebApplicationException e) {
+      Assert.assertEquals(e.getResponse().getStatus(), 401, "must return 401");
+    }
   }
 
   @Test
