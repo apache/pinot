@@ -78,7 +78,7 @@ public class TableConfigTest {
 
     TableConfig realtimeLLCTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TEST_REALTIME_LLC_TABLE_NAME)
-            .setStreamConfigs(getStreamConfigMap("lowlevel")).setLLC(true).setNumReplicas(2).build();
+            .setStreamConfigs(getStreamConfigMap("lowlevel")).setNumReplicas(2).build();
 
     assertEquals(2, realtimeLLCTableConfig.getReplication());
 

@@ -62,9 +62,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
-import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,24 +174,6 @@ public class TableRebalancer {
             + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}", tableNameWithType, dryRun,
         reassignInstances, includeConsuming, bootstrap, downtime, minReplicasToKeepUpForNoDowntime,
         enableStrictReplicaGroup, bestEfforts, externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs);
-
-    // Validate table config
-    try {
-      // Do not allow rebalancing HLC real-time table
-      if (tableConfig.getTableType() == TableType.REALTIME && new StreamConfig(tableNameWithType,
-          IngestionConfigUtils.getStreamConfigMap(tableConfig)).hasHighLevelConsumerType()) {
-        LOGGER.warn("For rebalanceId: {}, cannot rebalance table: {} with high-level consumer, aborting the rebalance",
-            rebalanceJobId, tableNameWithType);
-        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
-            "Cannot rebalance table with high-level consumer", null, null, null);
-      }
-    } catch (Exception e) {
-      LOGGER.warn(
-          "For rebalanceId: {}, caught exception while validating table config for table: {}, aborting the rebalance",
-          rebalanceJobId, tableNameWithType, e);
-      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
-          "Caught exception while validating table config: " + e, null, null, null);
-    }
 
     // Fetch ideal state
     PropertyKey idealStatePropertyKey = _helixDataAccessor.keyBuilder().idealStates(tableNameWithType);

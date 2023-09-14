@@ -34,8 +34,8 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.ConfigUtils;
@@ -73,15 +73,22 @@ public class ZKMetadataProvider {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
   }
 
-  public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
+  public static void setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
       ZNRecord znRecord) {
-    propertyStore.set(constructPropertyStorePathForResourceConfig(realtimeTableName), znRecord,
+    propertyStore.set(constructPropertyStorePathForResourceConfig(tableNameWithType), znRecord,
         AccessOption.PERSISTENT);
   }
 
+  @Deprecated
+  public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
+      ZNRecord znRecord) {
+    setTableConfig(propertyStore, realtimeTableName, znRecord);
+  }
+
+  @Deprecated
   public static void setOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String offlineTableName,
       ZNRecord znRecord) {
-    propertyStore.set(constructPropertyStorePathForResourceConfig(offlineTableName), znRecord, AccessOption.PERSISTENT);
+    setTableConfig(propertyStore, offlineTableName, znRecord);
   }
 
   public static void setInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -503,7 +510,7 @@ public class ZKMetadataProvider {
     if (propertyStore.exists(segmentsPath, AccessOption.PERSISTENT)) {
       List<String> segments = propertyStore.getChildNames(segmentsPath, AccessOption.PERSISTENT);
       for (String segment : segments) {
-        if (SegmentName.isLowLevelConsumerSegmentName(segment)) {
+        if (LLCSegmentName.isLLCSegment(segment)) {
           llcRealtimeSegments.add(segment);
         }
       }

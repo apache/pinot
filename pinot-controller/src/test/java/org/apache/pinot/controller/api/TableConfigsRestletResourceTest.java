@@ -67,8 +67,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     } else {
       StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
       return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setTimeColumnName("timeColumn")
-          .setRetentionTimeUnit("DAYS").setLLC(true).setRetentionTimeValue("5")
-          .setStreamConfigs(streamConfig.getStreamConfigsMap());
+          .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setStreamConfigs(streamConfig.getStreamConfigsMap());
     }
   }
 
