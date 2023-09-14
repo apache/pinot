@@ -78,10 +78,9 @@ public class QueryRoutingTest {
   }
 
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes) {
-    ServerMetrics serverMetrics = mock(ServerMetrics.class);
     InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(),
-        mockQueryScheduler(responseDelayMs, responseBytes), serverMetrics, mock(AccessControl.class));
-    return new QueryServer(TEST_PORT, null, handler, serverMetrics);
+        mockQueryScheduler(responseDelayMs, responseBytes), mock(ServerMetrics.class), mock(AccessControl.class));
+    return new QueryServer(TEST_PORT, null, handler);
   }
 
   private QueryScheduler mockQueryScheduler(int responseDelayMs, byte[] responseBytes) {
