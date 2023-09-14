@@ -92,6 +92,8 @@ public class CommonConstants {
 
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
+    public static final int DEFAULT_HYPERLOGLOG_PLUS_P = 14;
+    public static final int DEFAULT_HYPERLOGLOG_PLUS_SP = 0;
 
     // 2 to the power of 16, for tradeoffs see datasketches library documentation:
     // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html

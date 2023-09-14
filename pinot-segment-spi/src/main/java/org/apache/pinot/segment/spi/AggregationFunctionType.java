@@ -141,6 +141,15 @@ public enum AggregationFunctionType {
   PERCENTILERAWKLL("percentileRawKLL", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.VARCHAR_2000,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
+  // hyper log log plus plus functions
+  DISTINCTCOUNTHLLPLUS("distinctCountHLLPlus", ImmutableList.of("DISTINCT_COUNT_HLL_PLUS"), SqlKind.OTHER_FUNCTION,
+  SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC), ordinal -> ordinal > 0),
+  ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  DISTINCTCOUNTRAWHLLPLUS("distinctCountRawHLLPlus", ImmutableList.of("DISTINCT_COUNT_RAW_HLL_PLUS"),
+      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), ordinal -> ordinal > 0),
+  ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   // DEPRECATED in v2
   @Deprecated
@@ -248,6 +257,13 @@ public enum AggregationFunctionType {
   PERCENTILERAWKLLMV("percentileRawKLLMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC),
           ordinal -> ordinal > 1 && ordinal < 4), ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  // hyper log log plus plus functions
+  DISTINCTCOUNTHLLPLUSMV("distinctCountHLLPlusMV", null, SqlKind.OTHER_FUNCTION,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.BIGINT,
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
+  DISTINCTCOUNTRAWHLLPLUSMV("distinctCountRawHLLPlusMV", null, SqlKind.OTHER_FUNCTION,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.VARCHAR_2000,
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   // boolean aggregate functions
   BOOLAND("boolAnd", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,

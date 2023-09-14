@@ -351,6 +351,39 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
   }
 
   @Test
+  public void testDistinctCountHLLPLUSMV() {
+    String query = "SELECT DISTINCTCOUNTHLLPLUSMV(column6) AS value FROM testTable";
+
+    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
+        {DataSchema.ColumnDataType.LONG});
+    Object[] expectedResults = new Object[]{18651L};
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResults[0] = 1176L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 519028L, 62480L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + SV_GROUP_BY);
+    expectedResults[0] = 4796L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + SV_GROUP_BY);
+    expectedResults[0] = 1176L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 519028L, 124960L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + MV_GROUP_BY);
+    expectedResults[0] = 3457L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable);
+
+    brokerResponse = getBrokerResponse(query + FILTER + MV_GROUP_BY);
+    expectedResults[0] = 579L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 519028L, 124960L, 400000L, expectedResultTable);
+  }
+
+  @Test
   public void testDistinctCountRawHLLMV() {
     String query = "SELECT DISTINCTCOUNTRAWHLLMV(column6) AS value FROM testTable";
     Function<Object, Object> cardinalityExtractor =
@@ -387,6 +420,48 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
 
     brokerResponse = getBrokerResponse(query + FILTER + MV_GROUP_BY);
     expectedResults[0] = 606L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 519028L, 124960L, 400000L, expectedResultTable,
+        cardinalityExtractor);
+  }
+
+  @Test
+  public void testDistinctCountRawHLLPLUSMV() {
+    String query = "SELECT DISTINCTCOUNTRAWHLLPLUSMV(column6) AS value FROM testTable";
+    Function<Object, Object> cardinalityExtractor =
+        value -> ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(BytesUtils.toBytes((String) value))
+            .cardinality();
+
+    // Without filter, query should be answered by DictionaryBasedAggregationOperator (numEntriesScannedPostFilter = 0)
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    DataSchema expectedDataSchema = new DataSchema(new String[]{"value"}, new DataSchema.ColumnDataType[]
+        {DataSchema.ColumnDataType.LONG});
+    Object[] expectedResults = new Object[]{18651L};
+    ResultTable expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults));
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 400000L, 400000L, expectedResultTable,
+        cardinalityExtractor);
+
+    brokerResponse = getBrokerResponse(query + FILTER);
+    expectedResults[0] = 1176L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 519028L, 62480L, 400000L, expectedResultTable,
+        cardinalityExtractor);
+
+    brokerResponse = getBrokerResponse(query + SV_GROUP_BY);
+    expectedResults[0] = 4796L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable,
+        cardinalityExtractor);
+
+    brokerResponse = getBrokerResponse(query + FILTER + SV_GROUP_BY);
+    expectedResults[0] = 1176L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 519028L, 124960L, 400000L, expectedResultTable,
+        cardinalityExtractor);
+
+    brokerResponse = getBrokerResponse(query + MV_GROUP_BY);
+    expectedResults[0] = 3457L;
+    QueriesTestUtils.testInterSegmentsResult(brokerResponse, 400000L, 0L, 800000L, 400000L, expectedResultTable,
+        cardinalityExtractor);
+
+    brokerResponse = getBrokerResponse(query + FILTER + MV_GROUP_BY);
+    expectedResults[0] = 579L;
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 62480L, 519028L, 124960L, 400000L, expectedResultTable,
         cardinalityExtractor);
   }
