@@ -27,6 +27,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.Utils;
@@ -654,6 +655,18 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
         PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.get()));
     pinotGauge.setValueSupplier(valueSupplier);
+  }
+
+  /**
+   * Like {@link #setOrUpdateGauge(String, Supplier)}
+   * @param metricName
+   * @param valueSupplier
+   */
+  public void setOrUpdateGauge(final String metricName, final LongSupplier valueSupplier) {
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+        PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.getAsLong()));
+    pinotGauge.setValueSupplier((Supplier<Long>) () -> (Long) valueSupplier.getAsLong());
   }
 
   /**

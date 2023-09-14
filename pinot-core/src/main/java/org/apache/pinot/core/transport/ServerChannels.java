@@ -156,18 +156,17 @@ public class ServerChannels {
       PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
       PooledByteBufAllocatorMetric metric = bufAllocator.metric();
       _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_USED_DIRECT_MEMORY.getGaugeName(),
-          metric.usedDirectMemory());
+          metric::usedDirectMemory);
       _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_USED_HEAP_MEMORY.getGaugeName(),
-          metric.usedHeapMemory());
-      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT.getGaugeName(), metric.numDirectArenas());
-      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_ARENAS_HEAP.getGaugeName(), metric.numHeapArenas());
-      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_SMALL.getGaugeName(),
-          metric.smallCacheSize());
+          metric::usedHeapMemory);
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_ARENAS_DIRECT.getGaugeName(), metric::numDirectArenas);
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_ARENAS_HEAP.getGaugeName(), metric::numHeapArenas);
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_SMALL.getGaugeName(), metric::smallCacheSize);
       _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL.getGaugeName(),
-          metric.normalCacheSize());
+          metric::normalCacheSize);
       _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_THREADLOCALCACHE.getGaugeName(),
-          metric.numThreadLocalCaches());
-      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE.getGaugeName(), metric.chunkSize());
+          metric::numThreadLocalCaches);
+      _brokerMetrics.setOrUpdateGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE.getGaugeName(), metric::chunkSize);
 
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
           .option(ChannelOption.ALLOCATOR, bufAllocator)
