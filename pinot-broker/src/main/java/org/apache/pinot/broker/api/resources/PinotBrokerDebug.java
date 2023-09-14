@@ -158,7 +158,7 @@ public class PinotBrokerDebug {
       if (!_accessControlFactory.create()
           .hasAccess(httpHeaders, TargetType.TABLE, brokerRequest.getQuerySource().getTableName(),
               Actions.Table.GET_ROUTING_TABLE)) {
-        throw new WebApplicationException("Unauthorized", Response.Status.UNAUTHORIZED);
+        throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
       }
     } else {
       throw new WebApplicationException("Table name is not set in the query", Response.Status.BAD_REQUEST);

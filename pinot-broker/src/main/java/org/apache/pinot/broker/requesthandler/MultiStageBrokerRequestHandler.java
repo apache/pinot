@@ -125,7 +125,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           if (!hasTableAccess(requesterIdentity, tableNames, requestContext)) {
-            throw new WebApplicationException("Unauthorized", Response.Status.UNAUTHORIZED);
+            throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
           }
 
           return constructMultistageExplainPlan(query, plan);
@@ -155,7 +155,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Validate table access.
     if (!hasTableAccess(requesterIdentity, tableNames, requestContext)) {
-      throw new WebApplicationException("Unauthorized", Response.Status.UNAUTHORIZED);
+      throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
 
