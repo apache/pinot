@@ -155,6 +155,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     }
     int numServersNotResponded = serversNotResponded.size();
     if (numServersNotResponded != 0) {
+      brokerResponse.setPartialResult(true);
       brokerResponse.addToExceptions(new QueryProcessingException(QueryException.SERVER_NOT_RESPONDING_ERROR_CODE,
           String.format("%d servers %s not responded", numServersNotResponded, serversNotResponded)));
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);

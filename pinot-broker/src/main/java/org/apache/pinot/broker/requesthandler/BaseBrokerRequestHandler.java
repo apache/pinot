@@ -607,6 +607,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       int numUnavailableSegments = unavailableSegments.size();
       requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
+      boolean isPartialResult = false;
       List<ProcessingException> exceptions = new ArrayList<>();
       if (numUnavailableSegments > 0) {
         String errorMessage;
@@ -619,13 +620,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         }
         exceptions.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
+        isPartialResult = true;
       }
 
       if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
         if (!exceptions.isEmpty()) {
           LOGGER.info("No server found for request {}: {}", requestId, query);
           _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
-          return new BrokerResponseNative(exceptions);
+          BrokerResponseNative responseNative = new BrokerResponseNative(exceptions);
+          responseNative.setPartialResult(isPartialResult);
         } else {
           // When all segments have been pruned, we can just return an empty response.
           return getEmptyBrokerOnlyResponse(requestId, query, requesterIdentity, requestContext, pinotQuery, tableName);
@@ -658,7 +661,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         LOGGER.info("{} {}: {}", errorMessage, requestId, query);
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_TIMEOUT_BEFORE_SCATTERED_EXCEPTIONS, 1);
         exceptions.add(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage));
-        return new BrokerResponseNative(exceptions);
+        BrokerResponseNative responseNative = new BrokerResponseNative(exceptions);
+        responseNative.setPartialResult(isPartialResult);
+        return responseNative;
       }
 
       // Execute the query
@@ -712,9 +717,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
       // Track number of queries with number of groups limit reached
       if (brokerResponse.isNumGroupsLimitReached()) {
+        isPartialResult = true;
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
             1);
       }
+      brokerResponse.setPartialResult(isPartialResult);
 
       // Set total query processing time
       long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);

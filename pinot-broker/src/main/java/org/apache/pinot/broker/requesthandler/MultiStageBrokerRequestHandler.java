@@ -197,6 +197,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       String tableName = entry.getKey();
       Set<String> unavailableSegments = entry.getValue();
       numUnavailableSegments += unavailableSegments.size();
+      brokerResponse.setPartialResult(true);
       brokerResponse.addToExceptions(new QueryProcessingException(QueryException.SERVER_SEGMENT_MISSING_ERROR_CODE,
           String.format("Find unavailable segments: %s for table: %s", unavailableSegments, tableName)));
     }
