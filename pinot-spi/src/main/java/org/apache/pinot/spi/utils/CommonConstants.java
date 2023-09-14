@@ -343,8 +343,8 @@ public class CommonConstants {
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
 
-        // Handle IN predicate evaluation for big IN lists
-        public static final String IN_PREDICATE_SORT_THRESHOLD = "inPredicateSortThreshold";
+        public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
+        public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
 
         public static final String DROP_RESULTS = "dropResults";
 
@@ -365,7 +365,6 @@ public class CommonConstants {
       }
 
       public static class QueryOptionValue {
-        public static final String DEFAULT_IN_PREDICATE_SORT_THRESHOLD = "1000";
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
     }
