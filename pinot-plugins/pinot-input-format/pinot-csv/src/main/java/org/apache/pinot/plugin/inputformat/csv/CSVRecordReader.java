@@ -137,11 +137,11 @@ public class CSVRecordReader implements RecordReader {
       }
 
       if (_isHeaderProvided) {
+        _headerMap = parseLineAsHeader(config.getHeader());
+        _format = _format.builder().setHeader(_headerMap.keySet().toArray(new String[0])).build();
         if (!_useLineIterator) {
           validateHeaderForDelimiter(delimiter, config.getHeader(), _format);
         }
-        _headerMap = parseLineAsHeader(config.getHeader());
-        _format = _format.builder().setHeader(_headerMap.keySet().toArray(new String[0])).build();
       }
 
       if (config.isMultiValueDelimiterEnabled()) {
@@ -329,7 +329,12 @@ public class CSVRecordReader implements RecordReader {
       // read the first line
       String headerLine = _bufferedReader.readLine();
       _headerMap = parseLineAsHeader(headerLine);
-      _format = _format.builder().setHeader(_headerMap.keySet().toArray(new String[0])).build();
+      _format = _format.builder()
+          // If header isn't provided, the first line would be set as header and the 'skipHeader' property
+          // is set to false.
+          .setSkipHeaderRecord(false)
+          .setHeader(_headerMap.keySet().toArray(new String[0]))
+          .build();
     }
     _nextLine = _bufferedReader.readLine();
   }

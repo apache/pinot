@@ -532,6 +532,46 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     // Note: The default CSVRecordReader cannot handle unparseable rows
   }
 
+  @Test
+  public void testReadingDataFileWithNoHeaderAndDataRecordsWithEmptyValues()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithNoHeader2.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    readerConfig.setHeader("key,num0,num1");
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
+    Assert.assertEquals(4, genericRows.size());
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
+    Assert.assertEquals(4, genericRows.size());
+  }
+
+  @Test
+  public void testReadingDataFileWithValidHeaders()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithValidHeaders.csv").toURI();
+    File dataFile = new File(uri);
+
+    // test using line iterator
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    // No explicit header is set and attempt to skip the header should be ignored. 1st line would be treated as the
+    // header line.
+    readerConfig.setSkipHeader(false);
+    List<GenericRow> genericRows = readCSVRecords(dataFile, readerConfig, null, false);
+    Assert.assertEquals(4, genericRows.size());
+
+    // test using default CSVRecordReader
+    readerConfig.setSkipUnParseableLines(false);
+    genericRows = readCSVRecords(dataFile, readerConfig, null, false);
+    Assert.assertEquals(4, genericRows.size());
+  }
+
   private List<GenericRow> readCSVRecords(File dataFile,
       CSVRecordReaderConfig readerConfig, GenericRow genericRow, boolean rewind)
       throws IOException {
@@ -543,10 +583,11 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
       while (recordReader.hasNext()) {
         if (genericRow != null) {
           recordReader.next(reuse);
+          genericRows.add(reuse);
         } else {
-          recordReader.next();
+          GenericRow nextRow = recordReader.next();
+          genericRows.add(nextRow);
         }
-        genericRows.add(genericRow);
       }
 
       if (rewind) {
