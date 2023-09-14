@@ -565,7 +565,7 @@ public class TablesResource {
     }
 
     // Check the segment is low level consumer segment
-    if (!LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+    if (!LLCSegmentName.isLLCSegment(segmentName)) {
       throw new WebApplicationException(String.format("Segment %s is not a low level consumer segment", segmentName),
           Response.Status.BAD_REQUEST);
     }

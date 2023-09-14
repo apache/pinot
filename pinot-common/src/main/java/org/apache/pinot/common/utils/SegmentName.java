@@ -18,80 +18,16 @@
  */
 package org.apache.pinot.common.utils;
 
-public abstract class SegmentName {
-  public static final String SEPARATOR = "__";
-  public static final String REALTIME_SUFFIX = "_REALTIME";
-  public static final int REALTIME_SUFFIX_LENGTH = REALTIME_SUFFIX.length();
-
-  public enum RealtimeSegmentType {
-    UNSUPPORTED, HLC_LONG, HLC_SHORT, LLC,
-  }
-
-  public static RealtimeSegmentType getSegmentType(String segmentName) {
-    if (isHighLevelConsumerSegmentName(segmentName)) {
-      HLCSegmentName segName = new HLCSegmentName(segmentName);
-
-      if (segName.isOldStyleNaming()) {
-        return RealtimeSegmentType.HLC_LONG;
-      } else {
-        return RealtimeSegmentType.HLC_SHORT;
-      }
-    }
-
-    if (isLowLevelConsumerSegmentName(segmentName)) {
-      return RealtimeSegmentType.LLC;
-    }
-
-    return RealtimeSegmentType.UNSUPPORTED;
-  }
-
-  protected boolean isValidComponentName(String string) {
-    return !string.contains(SEPARATOR);
-  }
-
-  public abstract String getTableName();
-
-  public abstract String getSequenceNumberStr();
-
-  public abstract int getSequenceNumber();
-
-  public abstract String getSegmentName();
-
-  public abstract RealtimeSegmentType getSegmentType();
-
-  public String getGroupId() {
-    throw new RuntimeException("No groupId in " + getSegmentName());
-  }
-
-  public int getPartitionGroupId() {
-    throw new RuntimeException("No partitionGroupId in " + getSegmentName());
-  }
-
-  public String getPartitionRange() {
-    throw new RuntimeException("No partitionRange in " + getSegmentName());
-  }
-
-  public static boolean isHighLevelConsumerSegmentName(String segmentName) {
-    int numSeparators = getNumSeparators(segmentName);
-    return numSeparators == 2 || numSeparators == 4;
+@Deprecated
+public class SegmentName {
+  private SegmentName() {
   }
 
   public static boolean isLowLevelConsumerSegmentName(String segmentName) {
-    return getNumSeparators(segmentName) == 3;
+    return LLCSegmentName.isLLCSegment(segmentName);
   }
 
   public static boolean isRealtimeSegmentName(String segmentName) {
-    int numSeparators = getNumSeparators(segmentName);
-    return numSeparators >= 2 && numSeparators <= 4;
-  }
-
-  private static int getNumSeparators(String segmentName) {
-    int numSeparators = 0;
-    int index = 0;
-    while ((index = segmentName.indexOf(SEPARATOR, index)) != -1) {
-      numSeparators++;
-      index += 2; // SEPARATOR.length()
-    }
-    return numSeparators;
+    return LLCSegmentName.isLLCSegment(segmentName);
   }
 }

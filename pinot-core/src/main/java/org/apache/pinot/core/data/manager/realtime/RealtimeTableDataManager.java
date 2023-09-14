@@ -42,7 +42,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -401,10 +400,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     TableConfig tableConfig = indexLoadingConfig.getTableConfig();
     Schema schema = indexLoadingConfig.getSchema();
     assert schema != null;
-    boolean isHLCSegment = SegmentName.isHighLevelConsumerSegmentName(segmentName);
-    if (isHLCSegment) {
-      throw new UnsupportedOperationException("Adding high level consumer segment " + segmentName + " is not allowed");
-    }
     if (segmentZKMetadata.getStatus().isCompleted()) {
       if (tryLoadExistingSegment(segmentName, indexLoadingConfig, segmentZKMetadata)) {
         // The existing completed segment has been loaded successfully
@@ -550,8 +545,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {
-    // Cannot download HLC segment or consuming segment
-    if (SegmentName.isHighLevelConsumerSegmentName(segmentName) || zkMetadata.getStatus() == Status.IN_PROGRESS) {
+    // Cannot download consuming segment
+    if (zkMetadata.getStatus() == Status.IN_PROGRESS) {
       return false;
     }
     // TODO: may support download from peer servers as well.

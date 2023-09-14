@@ -34,7 +34,6 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -61,9 +60,6 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   @BeforeClass
   public void setup() {
     _streamConfigs.put(StreamConfigProperties.STREAM_TYPE, "kafka");
-    _streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            StreamConfig.ConsumerType.LOWLEVEL.toString());
     _streamConfigs
         .put(StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_TOPIC_NAME),
             "myTopic");

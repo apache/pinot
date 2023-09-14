@@ -56,7 +56,6 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -91,7 +90,6 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -302,18 +300,10 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = tableConfig.getTableName();
     LOGGER.info("Setting up new LLC table: {}", realtimeTableName);
 
-    // Make sure all the existing segments are HLC segments
-    List<String> currentSegments = getAllSegments(realtimeTableName);
-    for (String segmentName : currentSegments) {
-      // TODO: Should return 4xx HTTP status code. Currently all exceptions are returning 500
-      Preconditions.checkState(SegmentName.isHighLevelConsumerSegmentName(segmentName),
-          "Cannot set up new LLC table: %s with existing non-HLC segment: %s", realtimeTableName, segmentName);
-    }
-
     _flushThresholdUpdateManager.clearFlushThresholdUpdater(realtimeTableName);
 
-    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
-        IngestionConfigUtils.getStreamConfigMap(tableConfig));
+    StreamConfig streamConfig =
+        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     List<PartitionGroupMetadata> newPartitionGroupMetadataList =
         getNewPartitionGroupMetadataList(streamConfig, Collections.emptyList());
@@ -336,24 +326,6 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     setIdealState(realtimeTableName, idealState);
-  }
-
-  /**
-   * Removes all LLC segments from the given IdealState.
-   */
-  public void removeLLCSegments(IdealState idealState) {
-    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
-
-    String realtimeTableName = idealState.getResourceName();
-    LOGGER.info("Removing LLC segments for table: {}", realtimeTableName);
-
-    List<String> segmentsToRemove = new ArrayList<>();
-    for (String segmentName : idealState.getRecord().getMapFields().keySet()) {
-      if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        segmentsToRemove.add(segmentName);
-      }
-    }
-    _helixResourceManager.deleteSegments(realtimeTableName, segmentsToRemove);
   }
 
   // TODO: Consider using TableCache to read the table config
@@ -551,8 +523,8 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, committingSegmentName, false, true);
 
     // Using the latest segment of each partition group, creates a list of {@link PartitionGroupConsumptionStatus}
-    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
-        IngestionConfigUtils.getStreamConfigMap(tableConfig));
+    StreamConfig streamConfig =
+        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
     List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
         getPartitionGroupConsumptionStatusList(idealState, streamConfig);
 
@@ -673,7 +645,7 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * Creates and persists segment ZK metadata for the new CONSUMING segment.
    */
-  private void createNewSegmentZKMetadata(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+  private void createNewSegmentZKMetadata(TableConfig tableConfig, StreamConfig streamConfig,
       LLCSegmentName newLLCSegmentName, long creationTimeMs, CommittingSegmentDescriptor committingSegmentDescriptor,
       @Nullable SegmentZKMetadata committingSegmentZKMetadata, InstancePartitions instancePartitions,
       int numPartitionGroups, int numReplicas, List<PartitionGroupMetadata> partitionGroupMetadataList) {
@@ -885,7 +857,7 @@ public class PinotLLCRealtimeSegmentManager {
    * (this operation is done only if @param recreateDeletedConsumingSegment is set to true,
    * which means it's manually triggered by admin not by automatic periodic task)
    */
-  public void ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+  public void ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig,
       boolean recreateDeletedConsumingSegment, OffsetCriteria offsetCriteria) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
@@ -1066,9 +1038,9 @@ public class PinotLLCRealtimeSegmentManager {
    * TODO: split this method into multiple smaller methods
    */
   @VisibleForTesting
-  IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
-      IdealState idealState, List<PartitionGroupMetadata> newPartitionGroupMetadataList,
-      boolean recreateDeletedConsumingSegment, OffsetCriteria offsetCriteria) {
+  IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig, IdealState idealState,
+      List<PartitionGroupMetadata> newPartitionGroupMetadataList, boolean recreateDeletedConsumingSegment,
+      OffsetCriteria offsetCriteria) {
     String realtimeTableName = tableConfig.getTableName();
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
@@ -1261,7 +1233,7 @@ public class PinotLLCRealtimeSegmentManager {
     return idealState;
   }
 
-  private void createNewConsumingSegment(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+  private void createNewConsumingSegment(TableConfig tableConfig, StreamConfig streamConfig,
       SegmentZKMetadata latestSegmentZKMetadata, long currentTimeMs,
       List<PartitionGroupMetadata> newPartitionGroupMetadataList, InstancePartitions instancePartitions,
       Map<String, Map<String, String>> instanceStatesMap, SegmentAssignment segmentAssignment,
@@ -1323,7 +1295,7 @@ public class PinotLLCRealtimeSegmentManager {
    * Sets up a new partition group.
    * <p>Persists the ZK metadata for the first CONSUMING segment, and returns the segment name.
    */
-  private String setupNewPartitionGroup(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+  private String setupNewPartitionGroup(TableConfig tableConfig, StreamConfig streamConfig,
       PartitionGroupMetadata partitionGroupMetadata, long creationTimeMs, InstancePartitions instancePartitions,
       int numPartitionGroups, int numReplicas, List<PartitionGroupMetadata> partitionGroupMetadataList) {
     String realtimeTableName = tableConfig.getTableName();
@@ -1425,7 +1397,7 @@ public class PinotLLCRealtimeSegmentManager {
       String segmentName = segmentZKMetadata.getSegmentName();
       try {
         // Only fix the committed (DONE) LLC segment without deep store copy (empty download URL)
-        if (!SegmentName.isLowLevelConsumerSegmentName(segmentName) || segmentZKMetadata.getStatus() != Status.DONE
+        if (segmentZKMetadata.getStatus() != Status.DONE
             || !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
           continue;
         }

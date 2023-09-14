@@ -59,7 +59,6 @@ public class ConfigUtilsTest {
 
     String streamType = "fakeStream";
     String topic = "fakeTopic";
-    String consumerType = "simple";
     String tableName = "fakeTable_REALTIME";
     String defaultConsumerFactoryClass = "org.apache.pinot.plugin.stream.kafka20.StreamConsumerFactory";
     String defaultDecoderClass = "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
@@ -72,9 +71,6 @@ public class ConfigUtilsTest {
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
             topic);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerType);
     streamConfigMap.put(StreamConfigProperties
             .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
         consumerFactoryClass);
@@ -105,7 +101,6 @@ public class ConfigUtilsTest {
     StreamConfig streamConfig = new StreamConfig(tableName, indexingConfig.getStreamConfigs());
     Assert.assertEquals(streamConfig.getType(), streamType);
     Assert.assertEquals(streamConfig.getTopicName(), topic);
-    Assert.assertEquals(streamConfig.getConsumerTypes().get(0), StreamConfig.ConsumerType.LOWLEVEL);
     Assert.assertEquals(streamConfig.getConsumerFactoryClassName(), defaultConsumerFactoryClass);
     Assert.assertEquals(streamConfig.getDecoderClass(), defaultDecoderClass);
     Assert.assertEquals(streamConfig.getStreamConfigsMap().get("stream.fakeStream.aws.accessKey"),

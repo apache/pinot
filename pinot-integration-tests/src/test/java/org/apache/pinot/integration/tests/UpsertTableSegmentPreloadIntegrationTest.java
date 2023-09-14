@@ -217,7 +217,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
       for (BaseServerStarter serverStarter : _serverStarters) {
         String segmentDir = serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR);
         File[] files = new File(segmentDir, realtimeTableName).listFiles(
-            (dir, name) -> name.startsWith(rawTableName) && !LLCSegmentName.isLowLevelConsumerSegmentName(name));
+            (dir, name) -> name.startsWith(rawTableName) && !LLCSegmentName.isLLCSegment(name));
         for (File file : files) {
           if (!new File(new File(file, "v3"), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME).exists()) {
             return false;
@@ -239,8 +239,8 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     int maxSequenceNumber = 0;
     for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       String segmentName = entry.getKey();
-      if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName != null) {
         maxSequenceNumber = Math.max(maxSequenceNumber, llcSegmentName.getSequenceNumber());
       }
     }
@@ -253,8 +253,8 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
       assertEquals(instanceStateMap.size(), 1);
       Map.Entry<String, String> instanceIdAndState = instanceStateMap.entrySet().iterator().next();
       String state = instanceIdAndState.getValue();
-      if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName != null) {
         if (llcSegmentName.getSequenceNumber() < maxSequenceNumber) {
           assertEquals(state, SegmentStateModel.ONLINE);
         } else {
