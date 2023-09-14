@@ -59,7 +59,6 @@ public class QueryServer {
   private final EventLoopGroup _workerGroup;
   private final Class<? extends ServerSocketChannel> _channelClass;
   private final ChannelHandler _instanceRequestHandler;
-  private final ServerMetrics _metrics;
   private Channel _channel;
 
   /**
@@ -68,9 +67,8 @@ public class QueryServer {
    * @param port bind port
    * @param nettyConfig configurations for netty library
    */
-  public QueryServer(int port, NettyConfig nettyConfig, ChannelHandler instanceRequestHandler,
-      ServerMetrics serverMetrics) {
-    this(port, nettyConfig, null, instanceRequestHandler, serverMetrics);
+  public QueryServer(int port, NettyConfig nettyConfig, ChannelHandler instanceRequestHandler) {
+    this(port, nettyConfig, null, instanceRequestHandler);
   }
 
   /**
@@ -80,12 +78,10 @@ public class QueryServer {
    * @param nettyConfig configurations for netty library
    * @param tlsConfig TLS/SSL config
    */
-  public QueryServer(int port, NettyConfig nettyConfig, TlsConfig tlsConfig, ChannelHandler instanceRequestHandler,
-      ServerMetrics serverMetrics) {
+  public QueryServer(int port, NettyConfig nettyConfig, TlsConfig tlsConfig, ChannelHandler instanceRequestHandler) {
     _port = port;
     _tlsConfig = tlsConfig;
     _instanceRequestHandler = instanceRequestHandler;
-    _metrics = serverMetrics;
 
     boolean enableNativeTransports = nettyConfig != null && nettyConfig.isNativeTransportsEnabled();
     OsCheck.OSType operatingSystemType = OsCheck.getOperatingSystemType();
@@ -125,14 +121,15 @@ public class QueryServer {
 
       PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;
       PooledByteBufAllocatorMetric metric = bufAllocator.metric();
-      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_USED_DIRECT_MEMORY.getGaugeName(), metric::usedDirectMemory);
-      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_USED_HEAP_MEMORY.getGaugeName(), metric::usedHeapMemory);
-      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_ARENAS_DIRECT.getGaugeName(), metric::numDirectArenas);
-      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_ARENAS_HEAP.getGaugeName(), metric::numHeapArenas);
-      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_SMALL.getGaugeName(), metric::smallCacheSize);
-      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL.getGaugeName(), metric::normalCacheSize);
-      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_THREADLOCALCACHE.getGaugeName(), metric::numThreadLocalCaches);
-      _metrics.setOrUpdateGauge(ServerGauge.NETTY_POOLED_CHUNK_SIZE.getGaugeName(), metric::chunkSize);
+      ServerMetrics metrics = ServerMetrics.get();
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, metric::usedDirectMemory);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_HEAP_MEMORY, metric::usedHeapMemory);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_ARENAS_DIRECT, metric::numDirectArenas);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_ARENAS_HEAP, metric::numHeapArenas);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_SMALL, metric::smallCacheSize);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, metric::normalCacheSize);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_THREADLOCALCACHE, metric::numThreadLocalCaches);
+      metrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
       _channel = serverBootstrap.group(_bossGroup, _workerGroup).channel(_channelClass)
           .option(ChannelOption.SO_BACKLOG, 128).childOption(ChannelOption.SO_KEEPALIVE, true)
           .option(ChannelOption.ALLOCATOR, bufAllocator)

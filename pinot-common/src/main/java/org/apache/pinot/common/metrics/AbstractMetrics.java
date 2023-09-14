@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -659,14 +660,30 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   /**
    * Like {@link #setOrUpdateGauge(String, Supplier)}
-   * @param metricName
-   * @param valueSupplier
    */
   public void setOrUpdateGauge(final String metricName, final LongSupplier valueSupplier) {
     PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
         PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
         PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.getAsLong()));
     pinotGauge.setValueSupplier((Supplier<Long>) () -> (Long) valueSupplier.getAsLong());
+  }
+
+  /**
+   * Like {@link #setOrUpdateGauge(String, Supplier)} but using a global gauge
+   * @throws IllegalArgumentException if the gauge is not global
+   */
+  public void setOrUpdateGlobalGauge(final G gauge, final Supplier<Long> valueSupplier) {
+    Preconditions.checkArgument(gauge.isGlobal(), "Only global gauges should be sent to this method");
+    setOrUpdateGauge(gauge.getGaugeName(), valueSupplier);
+  }
+
+  /**
+   * Like {@link #setOrUpdateGauge(String, LongSupplier)} but using a global gauge
+   * @throws IllegalArgumentException if the gauge is not global
+   */
+  public void setOrUpdateGlobalGauge(final G gauge, final LongSupplier valueSupplier) {
+    Preconditions.checkArgument(gauge.isGlobal(), "Only global gauges should be sent to this method");
+    setOrUpdateGauge(gauge.getGaugeName(), valueSupplier);
   }
 
   /**
