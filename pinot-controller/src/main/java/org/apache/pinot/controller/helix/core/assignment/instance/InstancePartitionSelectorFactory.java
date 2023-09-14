@@ -31,7 +31,14 @@ public class InstancePartitionSelectorFactory {
 
   public static InstancePartitionSelector getInstance(InstanceAssignmentConfig.PartitionSelector partitionSelector,
       InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig, String tableNameWithType,
-      InstancePartitions existingInstancePartitions
+      InstancePartitions existingInstancePartitions) {
+    return getInstance(partitionSelector, instanceReplicaGroupPartitionConfig, tableNameWithType,
+        existingInstancePartitions, null);
+  }
+
+  public static InstancePartitionSelector getInstance(InstanceAssignmentConfig.PartitionSelector partitionSelector,
+      InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig, String tableNameWithType,
+      InstancePartitions existingInstancePartitions, InstancePartitions preConfiguredInstancePartitions
   ) {
     switch (partitionSelector) {
       case FD_AWARE_INSTANCE_PARTITION_SELECTOR:
@@ -40,6 +47,9 @@ public class InstancePartitionSelectorFactory {
       case INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR:
         return new InstanceReplicaGroupPartitionSelector(instanceReplicaGroupPartitionConfig, tableNameWithType,
             existingInstancePartitions);
+      case PRE_CONFIGURATION_BASED_PARTITION_SELECTOR:
+        return new PreConfiguredInstancePartitionSelector(instanceReplicaGroupPartitionConfig, tableNameWithType,
+            existingInstancePartitions, preConfiguredInstancePartitions);
       default:
         throw new IllegalStateException("Unexpected PartitionSelector: " + partitionSelector + ", should be from"
             + Arrays.toString(InstanceAssignmentConfig.PartitionSelector.values()));

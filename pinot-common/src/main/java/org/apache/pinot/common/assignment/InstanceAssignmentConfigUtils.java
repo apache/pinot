@@ -124,4 +124,14 @@ public class InstanceAssignmentConfigUtils {
 
     return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig);
   }
+
+  public static boolean isPreConfigurationBasedAssignment(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    // If the instance assignment config is not null and the partition selector is
+    // PRE_CONFIGURATION_BASED_PARTITION_SELECTOR,
+    return tableConfig.getInstanceAssignmentConfigMap().get(instancePartitionsType.toString()) != null
+        && InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, instancePartitionsType)
+        .getPartitionSelector()
+        == InstanceAssignmentConfig.PartitionSelector.PRE_CONFIGURATION_BASED_PARTITION_SELECTOR;
+  }
 }

@@ -69,7 +69,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.*;
 
 
 @Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
@@ -244,20 +244,32 @@ public class PinotInstanceAssignmentRestletResource {
   private void assignInstancesForInstancePartitionsType(Map<String, InstancePartitions> instancePartitionsMap,
       TableConfig tableConfig, List<InstanceConfig> instanceConfigs, InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
-    if (TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
+    if (!TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
+      InstancePartitions existingInstancePartitions =
+          InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getHelixZkManager().getHelixPropertyStore(),
+              InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+      instancePartitionsMap.put(instancePartitionsType.toString(),
+          new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
+              existingInstancePartitions));
+    } else if (InstanceAssignmentConfigUtils.isPreConfigurationBasedAssignment(tableConfig, instancePartitionsType)) {
+      InstancePartitions existingInstancePartitions =
+          InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getHelixZkManager().getHelixPropertyStore(),
+              InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      InstancePartitions preConfigured =
+          InstancePartitionsUtils.fetchInstancePartitionsWithRename(_resourceManager.getPropertyStore(),
+              tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
+              instancePartitionsType.getInstancePartitionsName(rawTableName));
+      instancePartitionsMap.put(instancePartitionsType.toString(),
+          new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
+              existingInstancePartitions, preConfigured));
+    } else {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       instancePartitionsMap.put(instancePartitionsType.toString(),
           InstancePartitionsUtils.fetchInstancePartitionsWithRename(_resourceManager.getPropertyStore(),
               tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
               instancePartitionsType.getInstancePartitionsName(rawTableName)));
-      return;
     }
-    InstancePartitions existingInstancePartitions =
-        InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getHelixZkManager().getHelixPropertyStore(),
-            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
-    instancePartitionsMap.put(instancePartitionsType.toString(),
-        new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
-            existingInstancePartitions));
   }
 
   private void assignInstancesForTier(Map<String, InstancePartitions> instancePartitionsMap, TableConfig tableConfig,
