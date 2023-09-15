@@ -273,7 +273,15 @@ const getQueryResults = (params) => {
     // if sql api throws error, handle here
     if(typeof queryResponse === 'string'){
       exceptions = queryResponse;
-    } 
+    }
+    // if sql api returns a structured error with a `code`, handle here
+    if (queryResponse && queryResponse.code) {
+      if (queryResponse.error) {
+        exceptions = "Query failed with error code: " + queryResponse.code + " and error: " + queryResponse.error;
+      } else {
+        exceptions = "Query failed with error code: " + queryResponse.code + " but no logs. Please see controller logs for error.";
+      }
+    }
     if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
       exceptions = queryResponse.exceptions as SqlException[];
     } 
