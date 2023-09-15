@@ -22,6 +22,8 @@ package org.apache.pinot.segment.local.segment.index.h3;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -60,6 +62,7 @@ import org.apache.pinot.spi.data.Schema;
 public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator>
   implements ConfigurableFromIndexLoadingConfig<H3IndexConfig> {
   public static final String INDEX_DISPLAY_NAME = "h3";
+  private static final List<String> EXTENSIONS = Collections.singletonList(V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
 
   protected H3IndexType() {
     super(StandardIndexes.H3_ID);
@@ -118,8 +121,8 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   }
 
   @Override
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    return V1Constants.Indexes.H3_INDEX_FILE_EXTENSION;
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    return EXTENSIONS;
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<H3IndexConfig, H3IndexReader> {

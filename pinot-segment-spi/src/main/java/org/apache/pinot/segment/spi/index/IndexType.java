@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index;
 
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -94,7 +95,13 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
     return indexContainer.getIndex(this);
   }
 
-  String getFileExtension(ColumnMetadata columnMetadata);
+  /**
+   * Returns the possible file extensions for this index type.
+   *
+   * @param columnMetadata an optional filter. In case it is provided, the index type will do its best to try to filter
+   *                      which extensions are valid. See ForwardIndexType.
+   */
+  List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata);
 
   IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig);
