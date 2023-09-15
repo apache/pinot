@@ -239,14 +239,6 @@ public class ValidationMetrics {
     removeGauge(resource, ValidationMetricName.SEGMENT_COUNT);
   }
 
-  public void updateTmpSegmentCountGauge(final String resource, final long tmpSegmentCount) {
-    makeGauge(resource, ValidationMetricName.DELETED_TMP_SEGMENT_COUNT, _storedValueGaugeFactory, tmpSegmentCount);
-  }
-
-  public void cleanupTmpSegmentCountGauge(final String resource) {
-    removeGauge(resource, ValidationMetricName.DELETED_TMP_SEGMENT_COUNT);
-  }
-
   @VisibleForTesting
   public static String makeGaugeName(final String resource, final String gaugeName) {
     return "pinot.controller." + resource + "." + gaugeName;
@@ -307,8 +299,7 @@ public class ValidationMetrics {
     LAST_PUSH_TIME_DELAY_HOURS("lastPushTimeDelayHours"),
     TOTAL_DOCUMENT_COUNT("TotalDocumentCount"),
     NON_CONSUMING_PARTITION_COUNT("NonConsumingPartitionCount"),
-    SEGMENT_COUNT("SegmentCount"),
-    DELETED_TMP_SEGMENT_COUNT("DeletedTmpSegmentCount");
+    SEGMENT_COUNT("SegmentCount");
 
     private final String _metricName;
 

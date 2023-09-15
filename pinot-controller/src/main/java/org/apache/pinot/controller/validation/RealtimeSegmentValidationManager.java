@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.HLCSegmentName;
@@ -51,6 +52,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
+  private final ControllerMetrics _controllerMetrics;
 
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
@@ -66,6 +68,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
         leadControllerManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
+    _controllerMetrics = controllerMetrics;
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
@@ -124,7 +127,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     try {
       long numDeleteTmpSegments = _llcRealtimeSegmentManager.deleteTmpSegments(realtimeTableName, segmentsZKMetadata);
       LOGGER.info("Deleted {} tmp segments for table: {}", numDeleteTmpSegments, realtimeTableName);
-      _validationMetrics.updateTmpSegmentCountGauge(realtimeTableName, numDeleteTmpSegments);
+      _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.DELETED_TMP_SEGMENT_COUNT,
+          numDeleteTmpSegments);
     } catch (Exception e) {
       LOGGER.error("Failed to delete tmp segments for table: {}", realtimeTableName, e);
     }
@@ -147,7 +151,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     for (String tableNameWithType : tableNamesWithType) {
       if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
         _validationMetrics.cleanupTotalDocumentCountGauge(tableNameWithType);
-        _validationMetrics.cleanupTmpSegmentCountGauge(tableNameWithType);
+        _controllerMetrics.removeTableMeter(tableNameWithType, ControllerMeter.DELETED_TMP_SEGMENT_COUNT);
       }
     }
   }

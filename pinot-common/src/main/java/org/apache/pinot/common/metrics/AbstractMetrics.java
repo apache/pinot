@@ -285,9 +285,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public PinotMeter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
       PinotMeter reusedMeter) {
-    String meterName = meter.getMeterName();
-    final String fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
+    return addValueToMeter(getTableFullMeterName(tableName, meter), meter.getUnit(), unitCount, reusedMeter);
   }
 
   /**
@@ -331,12 +329,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   public PinotMeter getMeteredTableValue(final String tableName, final M meter) {
-    final String fullMeterName;
-    String meterName = meter.getMeterName();
-    fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
+    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz,
+        getTableFullMeterName(tableName, meter));
 
     return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+  }
+
+  private String getTableFullMeterName(final String tableName, final M meter) {
+    String meterName = meter.getMeterName();
+    return _metricPrefix + getTableName(tableName) + "." + meterName;
   }
 
   /**
@@ -721,6 +722,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void removeGauge(final String gaugeName) {
     _gaugeValues.remove(gaugeName);
     removeGaugeFromMetricRegistry(gaugeName);
+  }
+
+  public void removeTableMeter(final String tableName, final M meter) {
+    PinotMetricUtils.removeMetric(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, getTableFullMeterName(tableName, meter)));
   }
 
   /**
