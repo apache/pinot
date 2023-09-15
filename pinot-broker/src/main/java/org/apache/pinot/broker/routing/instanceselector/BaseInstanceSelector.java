@@ -43,6 +43,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,19 +61,19 @@ import org.slf4j.LoggerFactory;
  * selection. When it is selected, we don't serve the new segment.
  * <p>
  * Definition of new segment:
- * 1) Segment pushed more than 5 minutes ago.
- * - If we first see a segment via initialization, we look up segment push time from zookeeper.
+ * 1) Segment created more than 5 minutes ago.
+ * - If we first see a segment via initialization, we look up segment creation time from zookeeper.
  * - If we first see a segment via onAssignmentChange initialization, we use the calling time of onAssignmentChange
  * as approximation.
  * 2) We retire new segment as old when:
- * - The push time is more than 5 minutes ago
+ * - The creation time is more than 5 minutes ago
  * - Any instance for new segment is in ERROR state
  * - External view for segment converges with ideal state
  *
  * Note that this implementation means:
  * 1) Inconsistent selection of new segments across queries (some queries will serve new segments and others won't).
  * 2) When there is no state update from helix, new segments won't be retired because of the time passing (those with
- * push time more than 5 minutes ago).
+ * creation time more than 5 minutes ago).
  * TODO: refresh new/old segment state where there is no update from helix for long time.
  */
 abstract class BaseInstanceSelector implements InstanceSelector {
@@ -109,8 +110,9 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   public void init(Set<String> enabledInstances, IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     _enabledInstances = enabledInstances;
-    Map<String, Long> newSegmentPushTimeMap = getNewSegmentPushTimeMapFromZK(idealState, externalView, onlineSegments);
-    updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentPushTimeMap);
+    Map<String, Long> newSegmentCreationTimeMap =
+        getNewSegmentCreationTimeMapFromZK(idealState, externalView, onlineSegments);
+    updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
     refreshSegmentStates();
   }
 
@@ -122,9 +124,9 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   /**
-   * Returns a map from new segment to their push time based on the ZK metadata.
+   * Returns a map from new segment to their creation time based on the ZK metadata.
    */
-  Map<String, Long> getNewSegmentPushTimeMapFromZK(IdealState idealState, ExternalView externalView,
+  Map<String, Long> getNewSegmentCreationTimeMapFromZK(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
     List<String> potentialNewSegments = new ArrayList<>();
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
@@ -136,9 +138,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       }
     }
 
-    // Use push time in ZK metadata to determine whether the potential new segment is newly pushed
-    Map<String, Long> newSegmentPushTimeMap = new HashMap<>();
-    long nowMillis = _clock.millis();
+    Map<String, Long> newSegmentCreationTimeMap = new HashMap<>();
+    long currentTimeMs = _clock.millis();
     String segmentZKMetadataPathPrefix =
         ZKMetadataProvider.constructPropertyStorePathForResource(_tableNameWithType) + "/";
     List<String> segmentZKMetadataPaths = new ArrayList<>(potentialNewSegments.size());
@@ -151,14 +152,14 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         continue;
       }
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(record);
-      long pushTimeMillis = segmentZKMetadata.getPushTime();
-      if (InstanceSelector.isNewSegment(pushTimeMillis, nowMillis)) {
-        newSegmentPushTimeMap.put(segmentZKMetadata.getSegmentName(), pushTimeMillis);
+      long creationTimeMs = SegmentUtils.getSegmentCreationTimeMs(segmentZKMetadata);
+      if (InstanceSelector.isNewSegment(creationTimeMs, currentTimeMs)) {
+        newSegmentCreationTimeMap.put(segmentZKMetadata.getSegmentName(), creationTimeMs);
       }
     }
     LOGGER.info("Got {} new segments: {} for table: {} by reading ZK metadata, current time: {}",
-        newSegmentPushTimeMap.size(), newSegmentPushTimeMap, _tableNameWithType, nowMillis);
-    return newSegmentPushTimeMap;
+        newSegmentCreationTimeMap.size(), newSegmentCreationTimeMap, _tableNameWithType, currentTimeMs);
+    return newSegmentCreationTimeMap;
   }
 
   /**
@@ -220,21 +221,21 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    * ONLINE/CONSUMING instances in the ideal state and pre-selected by the {@link SegmentPreSelector}) and new segments.
    * After this update:
    * - Old segments' online instances should be tracked in _oldSegmentCandidatesMap
-   * - New segments' state (push time and candidate instances) should be tracked in _newSegmentStateMap
+   * - New segments' state (creation time and candidate instances) should be tracked in _newSegmentStateMap
    */
   void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, Long> newSegmentPushTimeMap) {
+      Map<String, Long> newSegmentCreationTimeMap) {
     _oldSegmentCandidatesMap.clear();
-    _newSegmentStateMap = new HashMap<>(HashUtil.getHashMapCapacity(newSegmentPushTimeMap.size()));
+    _newSegmentStateMap = new HashMap<>(HashUtil.getHashMapCapacity(newSegmentCreationTimeMap.size()));
 
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
-      Long newSegmentPushTimeMillis = newSegmentPushTimeMap.get(segment);
+      Long newSegmentCreationTimeMs = newSegmentCreationTimeMap.get(segment);
       Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
       if (externalViewInstanceStateMap == null) {
-        if (newSegmentPushTimeMillis != null) {
+        if (newSegmentCreationTimeMs != null) {
           // New segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
           for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
@@ -242,14 +243,14 @@ abstract class BaseInstanceSelector implements InstanceSelector {
               candidates.add(new SegmentInstanceCandidate(entry.getKey(), false));
             }
           }
-          _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentPushTimeMillis, candidates));
+          _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
         } else {
           // Old segment
           _oldSegmentCandidatesMap.put(segment, Collections.emptyList());
         }
       } else {
         TreeSet<String> onlineInstances = getOnlineInstances(idealStateInstanceStateMap, externalViewInstanceStateMap);
-        if (newSegmentPushTimeMillis != null) {
+        if (newSegmentCreationTimeMs != null) {
           // New segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
           for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
@@ -258,7 +259,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
               candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance)));
             }
           }
-          _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentPushTimeMillis, candidates));
+          _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
         } else {
           // Old segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
@@ -358,44 +359,44 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    */
   @Override
   public void onAssignmentChange(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {
-    Map<String, Long> newSegmentPushTimeMap =
-        getNewSegmentPushTimeMapFromExistingStates(idealState, externalView, onlineSegments);
-    updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentPushTimeMap);
+    Map<String, Long> newSegmentCreationTimeMap =
+        getNewSegmentCreationTimeMapFromExistingStates(idealState, externalView, onlineSegments);
+    updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
     refreshSegmentStates();
   }
 
   /**
-   * Returns a map from new segment to their push time based on the existing in-memory states.
+   * Returns a map from new segment to their creation time based on the existing in-memory states.
    */
-  Map<String, Long> getNewSegmentPushTimeMapFromExistingStates(IdealState idealState, ExternalView externalView,
+  Map<String, Long> getNewSegmentCreationTimeMapFromExistingStates(IdealState idealState, ExternalView externalView,
       Set<String> onlineSegments) {
-    Map<String, Long> newSegmentPushTimeMap = new HashMap<>();
-    long nowMillis = _clock.millis();
+    Map<String, Long> newSegmentCreationTimeMap = new HashMap<>();
+    long currentTimeMs = _clock.millis();
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
     for (String segment : onlineSegments) {
       NewSegmentState newSegmentState = _newSegmentStateMap.get(segment);
-      long pushTimeMillis = 0;
+      long creationTimeMs = 0;
       if (newSegmentState != null) {
-        // It was a new segment before, check the push time and segment state to see if it is still a new segment
-        if (InstanceSelector.isNewSegment(newSegmentState.getPushTimeMillis(), nowMillis)) {
-          pushTimeMillis = newSegmentState.getPushTimeMillis();
+        // It was a new segment before, check the creation time and segment state to see if it is still a new segment
+        if (InstanceSelector.isNewSegment(newSegmentState.getCreationTimeMs(), currentTimeMs)) {
+          creationTimeMs = newSegmentState.getCreationTimeMs();
         }
       } else if (!_oldSegmentCandidatesMap.containsKey(segment)) {
-        // This is the first time we see this segment, use the current time as the push time
-        pushTimeMillis = nowMillis;
+        // This is the first time we see this segment, use the current time as the creation time
+        creationTimeMs = currentTimeMs;
       }
-      // For recently pushed segment, check if it is qualified as new segment
-      if (pushTimeMillis > 0) {
+      // For recently created segment, check if it is qualified as new segment
+      if (creationTimeMs > 0) {
         assert idealStateAssignment.containsKey(segment);
         if (isPotentialNewSegment(idealStateAssignment.get(segment), externalViewAssignment.get(segment))) {
-          newSegmentPushTimeMap.put(segment, pushTimeMillis);
+          newSegmentCreationTimeMap.put(segment, creationTimeMs);
         }
       }
     }
     LOGGER.info("Got {} new segments: {} for table: {} by processing existing states, current time: {}",
-        newSegmentPushTimeMap.size(), newSegmentPushTimeMap, _tableNameWithType, nowMillis);
-    return newSegmentPushTimeMap;
+        newSegmentCreationTimeMap.size(), newSegmentCreationTimeMap, _tableNameWithType, currentTimeMs);
+    return newSegmentCreationTimeMap;
   }
 
   @Override

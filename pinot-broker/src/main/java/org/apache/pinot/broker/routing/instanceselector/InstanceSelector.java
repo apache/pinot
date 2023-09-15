@@ -34,8 +34,8 @@ import org.apache.pinot.common.request.BrokerRequest;
 public interface InstanceSelector {
   long NEW_SEGMENT_EXPIRATION_MILLIS = TimeUnit.MINUTES.toMillis(5);
 
-  static boolean isNewSegment(long pushMillis, long nowMillis) {
-    return nowMillis - pushMillis <= NEW_SEGMENT_EXPIRATION_MILLIS;
+  static boolean isNewSegment(long creationTimeMs, long currentTimeMs) {
+    return creationTimeMs > 0 && currentTimeMs - creationTimeMs <= NEW_SEGMENT_EXPIRATION_MILLIS;
   }
 
   /**

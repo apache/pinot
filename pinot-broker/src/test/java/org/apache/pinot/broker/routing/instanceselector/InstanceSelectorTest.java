@@ -108,16 +108,17 @@ public class InstanceSelectorTest {
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
           "segment8", "segment9", "segment10", "segment11");
 
-  private void createSegments(List<Pair<String, Long>> segmentPushMillis) {
+  private void createSegments(List<Pair<String, Long>> segmentCreationTimeMsPairs) {
     List<String> segmentZKMetadataPaths = new ArrayList<>();
     List<ZNRecord> zkRecords = new ArrayList<>();
-    for (Pair<String, Long> segment : segmentPushMillis) {
-      SegmentZKMetadata offlineSegmentZKMetadata0 = new SegmentZKMetadata(segment.getLeft());
-      offlineSegmentZKMetadata0.setPushTime(segment.getRight());
+    for (Pair<String, Long> segmentCreationTimeMsPair : segmentCreationTimeMsPairs) {
+      String segment = segmentCreationTimeMsPair.getLeft();
+      long creationTimeMs = segmentCreationTimeMsPair.getRight();
+      SegmentZKMetadata offlineSegmentZKMetadata0 = new SegmentZKMetadata(segment);
+      offlineSegmentZKMetadata0.setCreationTime(creationTimeMs);
       offlineSegmentZKMetadata0.setTimeUnit(TimeUnit.MILLISECONDS);
       ZNRecord record = offlineSegmentZKMetadata0.toZNRecord();
-      segmentZKMetadataPaths.add(
-          ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE_NAME, segment.getLeft()));
+      segmentZKMetadataPaths.add(ZKMetadataProvider.constructPropertyStorePathForSegment(TABLE_NAME, segment));
       zkRecords.add(record);
     }
     when(_propertyStore.get(eq(segmentZKMetadataPaths), any(), anyInt(), anyBoolean())).thenReturn(zkRecords);
@@ -1377,8 +1378,9 @@ public class InstanceSelectorTest {
   public void testNewSegmentFromZKMetadataSelection(String selectorType) {
     String oldSeg = "segment0";
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1484,9 +1486,10 @@ public class InstanceSelectorTest {
     // Set segment0 as new segment
     String newSeg = "segment0";
     String oldSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
-        Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
+            Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(newSeg, oldSeg);
 
     // Set up instances
@@ -1541,8 +1544,9 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1621,8 +1625,9 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1775,8 +1780,9 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1844,10 +1850,10 @@ public class InstanceSelectorTest {
     String oldSeg = "segment0";
     // Set segment1 as new segment
     String newSeg = "segment1";
-    List<Pair<String, Long>> segmentPushTime =
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
         ImmutableList.of(Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100),
             Pair.of(newSeg, _mutableClock.millis() - 100));
-    createSegments(segmentPushTime);
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(oldSeg, newSeg);
 
     // Set up instances
@@ -1893,11 +1899,10 @@ public class InstanceSelectorTest {
     String newSeg = "segment0";
     String oldSeg = "segment1";
 
-    List<Pair<String, Long>> segmentPushTime = ImmutableList.of(
-        Pair.of(newSeg, _mutableClock.millis() - 100),
-        Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
-
-    createSegments(segmentPushTime);
+    List<Pair<String, Long>> segmentCreationTimeMsPairs =
+        ImmutableList.of(Pair.of(newSeg, _mutableClock.millis() - 100),
+            Pair.of(oldSeg, _mutableClock.millis() - NEW_SEGMENT_EXPIRATION_MILLIS - 100));
+    createSegments(segmentCreationTimeMsPairs);
     Set<String> onlineSegments = ImmutableSet.of(newSeg, oldSeg);
 
     // Set up instances

@@ -225,7 +225,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
     assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
 
-    // Updating the new segment to be replicated on 2 servers should add the fully replicated server back
+    // Updating the segment to be replicated on 2 servers should add the fully replicated server back
     segmentAssignment.put(segment2, ImmutableMap.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
     tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
@@ -236,7 +236,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
     assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
 
-    // Adding a new segment without available replica should not update the partition map
+    // Adding a newly created segment without available replica should not update the partition map
     String newSegment = "newSegment";
     onlineSegments.add(newSegment);
     setSegmentZKMetadata(newSegment, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, System.currentTimeMillis());
@@ -265,11 +265,11 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
   }
 
   private void setSegmentZKMetadata(String segment, String partitionFunction, int numPartitions, int partitionId,
-      long pushTimeMs) {
+      long creationTimeMs) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
     segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
         new ColumnPartitionMetadata(partitionFunction, numPartitions, Collections.singleton(partitionId), null))));
-    segmentZKMetadata.setPushTime(pushTimeMs);
+    segmentZKMetadata.setCreationTime(creationTimeMs);
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentZKMetadata);
   }
 }
