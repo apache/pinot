@@ -52,6 +52,8 @@ import static org.testng.Assert.assertNull;
  */
 public class JsonIndexTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonIndexTest");
+  private static final String ON_HEAP_COLUMN_NAME = "onHeap";
+  private static final String OFF_HEAP_COLUMN_NAME = "offHeap";
 
   @BeforeMethod
   public void setUp()
@@ -87,34 +89,21 @@ public class JsonIndexTest {
     };
     //CHECKSTYLE:ON
     // @formatter: on
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
 
-    String onHeapColumnName = "onHeap";
-    try (JsonIndexCreator onHeapIndexCreator = new OnHeapJsonIndexCreator(INDEX_DIR, onHeapColumnName,
-        new JsonIndexConfig())) {
-      for (String record : records) {
-        onHeapIndexCreator.add(record);
-      }
-      onHeapIndexCreator.seal();
-    }
-    File onHeapIndexFile = new File(INDEX_DIR, onHeapColumnName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     Assert.assertTrue(onHeapIndexFile.exists());
 
-    String offHeapColumnName = "offHeap";
-    try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(INDEX_DIR, offHeapColumnName,
-        new JsonIndexConfig())) {
-      for (String record : records) {
-        offHeapIndexCreator.add(record);
-      }
-      offHeapIndexCreator.seal();
-    }
-    File offHeapIndexFile = new File(INDEX_DIR, offHeapColumnName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     Assert.assertTrue(offHeapIndexFile.exists());
 
     try (PinotDataBuffer onHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
         PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
         JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
-        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig())) {
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
@@ -173,34 +162,21 @@ public class JsonIndexTest {
           "{\"name\":\"adam-%d\",\"addresses\":[{\"street\":\"us-%d\",\"country\":\"us\"},{\"street\":\"ca-%d\","
               + "\"country\":\"ca\"}]}", i, i, i);
     }
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
 
-    String onHeapColumnName = "onHeap";
-    try (JsonIndexCreator onHeapIndexCreator = new OnHeapJsonIndexCreator(INDEX_DIR, onHeapColumnName,
-        new JsonIndexConfig())) {
-      for (String record : records) {
-        onHeapIndexCreator.add(record);
-      }
-      onHeapIndexCreator.seal();
-    }
-    File onHeapIndexFile = new File(INDEX_DIR, onHeapColumnName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     Assert.assertTrue(onHeapIndexFile.exists());
 
-    String offHeapColumnName = "offHeap";
-    try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(INDEX_DIR, offHeapColumnName,
-        new JsonIndexConfig())) {
-      for (String record : records) {
-        offHeapIndexCreator.add(record);
-      }
-      offHeapIndexCreator.seal();
-    }
-    File offHeapIndexFile = new File(INDEX_DIR, offHeapColumnName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     Assert.assertTrue(offHeapIndexFile.exists());
 
     try (PinotDataBuffer onHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
         PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
         JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
-        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig())) {
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
@@ -230,6 +206,76 @@ public class JsonIndexTest {
         matchingDocIds = getMatchingDocIds(indexReader, "name != 'adam-100000'");
         Assert.assertEquals(matchingDocIds.getCardinality(), 123_455);
       }
+    }
+  }
+
+  @Test
+  public void testFilteringLongValues()
+      throws Exception {
+    String[] records = new String[]{
+        "{\"key1\":\"value1\",\"key2\":\"longValue2\",\"nestedKey3\":{\"key4\":\"longValue4\"}}",
+        "{\"key5\":\"longValue5\",\"key6\":\"value6\",\"nestedKey7\":{\"key8\":\"value8\"}}"
+    };
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    jsonIndexConfig.setMaxValueLength(6);
+
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(offHeapIndexFile.exists());
+
+    try (PinotDataBuffer onHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+        PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+        JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
+        JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+      for (String record : records) {
+        mutableJsonIndex.add(record);
+      }
+
+      JsonIndexReader[] indexReaders = new JsonIndexReader[]{onHeapIndexReader, offHeapIndexReader, mutableJsonIndex};
+      for (JsonIndexReader indexReader : indexReaders) {
+        System.err.println(indexReader);
+        MutableRoaringBitmap matchingDocIds = getMatchingDocIds(indexReader, "key1='value1'");
+        Assert.assertEquals(new int[]{0}, matchingDocIds.toArray());
+
+        matchingDocIds = getMatchingDocIds(indexReader, "key2='longValue2'");
+        Assert.assertTrue(matchingDocIds.isEmpty());
+
+        matchingDocIds = getMatchingDocIds(indexReader, "nestedKey3.key4='longValue4'");
+        Assert.assertTrue(matchingDocIds.isEmpty());
+
+        matchingDocIds = getMatchingDocIds(indexReader, "key5='longValue5'");
+        Assert.assertTrue(matchingDocIds.isEmpty());
+
+        matchingDocIds = getMatchingDocIds(indexReader, "key6='value6'");
+        Assert.assertEquals(new int[]{1}, matchingDocIds.toArray());
+
+        matchingDocIds = getMatchingDocIds(indexReader, "nestedKey7.key8='value8'");
+        Assert.assertEquals(new int[]{1}, matchingDocIds.toArray());
+      }
+    }
+  }
+
+  /**
+   * Creates a JSON index with the given config and adds the given records
+   * @param createOnHeap Whether to create an on-heap index
+   * @param jsonIndexConfig
+   * @param records
+   * @throws IOException on error
+   */
+  private void createIndex(boolean createOnHeap, JsonIndexConfig jsonIndexConfig, String[] records)
+      throws IOException {
+    try (JsonIndexCreator indexCreator = createOnHeap
+        ? new OnHeapJsonIndexCreator(INDEX_DIR, ON_HEAP_COLUMN_NAME, jsonIndexConfig)
+        : new OffHeapJsonIndexCreator(INDEX_DIR, OFF_HEAP_COLUMN_NAME, jsonIndexConfig)) {
+      for (String record : records) {
+        indexCreator.add(record);
+      }
+      indexCreator.seal();
     }
   }
 
