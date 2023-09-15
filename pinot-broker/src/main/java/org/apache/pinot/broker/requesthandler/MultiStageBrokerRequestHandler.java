@@ -138,7 +138,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       throw e;
     } catch (RuntimeException e) {
       String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(e);
-      LOGGER.info("Caught exception compiling request {}: {}, {}", requestId, query, consolidatedMessage);
+      LOGGER.warn("Caught exception planning request {}: {}, {}", requestId, query, consolidatedMessage);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       requestContext.setErrorCode(QueryException.QUERY_PLANNING_ERROR_CODE);
       return new BrokerResponseNative(
