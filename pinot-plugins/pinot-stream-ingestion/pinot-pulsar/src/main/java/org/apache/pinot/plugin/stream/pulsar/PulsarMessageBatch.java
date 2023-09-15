@@ -22,6 +22,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.impl.BatchMessageIdImpl;
@@ -52,12 +54,25 @@ public class PulsarMessageBatch implements MessageBatch<PulsarStreamMessage> {
   @Deprecated
   @Override
   public PulsarStreamMessage getMessageAtIndex(int index) {
-    return _messageList.get(index);
+    return getMessageList(index);
   }
 
   @Override
+  public StreamMessage getStreamMessage(int index) {
+    return getMessageList(index);
+  }
+
+  private PulsarStreamMessage getMessageList(int index) {
+    return _messageList.get(index);
+  }
+  @Override
   public byte[] getMessageBytesAtIndex(int index) {
-    return getMessageAtIndex(index).getValue();
+    return getMessageList(index).getValue();
+  }
+
+  @Override
+  public RowMetadata getMetadataAtIndex(int index) {
+    return getMessageList(index).getMetadata();
   }
 
   @Override

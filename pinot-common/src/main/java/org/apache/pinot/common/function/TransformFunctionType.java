@@ -78,6 +78,10 @@ public enum TransformFunctionType {
   IN("in"),
   NOT_IN("not_in"),
 
+  IS_TRUE("is_true"),
+  IS_NOT_TRUE("is_not_true"),
+  IS_FALSE("is_false"),
+  IS_NOT_FALSE("is_not_false"),
   IS_NULL("is_null"),
   IS_NOT_NULL("is_not_null"),
   COALESCE("coalesce"),
@@ -179,7 +183,11 @@ public enum TransformFunctionType {
   INIDSET("inIdSet"),
   LOOKUP("lookUp"),
   GROOVY("groovy"),
-  CLPDECODE("clpDecode"),
+
+  // CLP functions
+  CLPDECODE("clpDecode", ReturnTypes.VARCHAR_2000_NULLABLE, OperandTypes.family(
+      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER),
+      ordinal -> ordinal > 2), "clp_decode"),
 
   // Regexp functions
   REGEXP_EXTRACT("regexpExtract", "regexp_extract"),

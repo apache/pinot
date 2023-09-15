@@ -64,6 +64,7 @@ import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -1774,7 +1775,7 @@ public class SegmentPreProcessorTest {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // build good segment, no needPreprocess
-    File segment = buildTestSegmentForMinMax(tableConfig, schema, "validSegment", stringValuesValid, longValues);
+    File segment = buildTestSegment(tableConfig, schema, "validSegment", stringValuesValid, longValues);
     SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
         .load(segment.toURI(),
             new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
@@ -1785,7 +1786,7 @@ public class SegmentPreProcessorTest {
 
     // build bad segment, still no needPreprocess, since minMaxInvalid flag should be set
     FileUtils.deleteQuietly(INDEX_DIR);
-    segment = buildTestSegmentForMinMax(tableConfig, schema, "invalidSegment", stringValuesInvalid, longValues);
+    segment = buildTestSegment(tableConfig, schema, "invalidSegment", stringValuesInvalid, longValues);
     segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(segment.toURI(),
         new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
     indexLoadingConfig = getDefaultIndexLoadingConfig();
@@ -1807,7 +1808,75 @@ public class SegmentPreProcessorTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private File buildTestSegmentForMinMax(final TableConfig tableConfig, final Schema schema, String segmentName,
+  @Test
+  public void testStarTreeCreationWithDictionaryChanges()
+      throws Exception {
+    // Build the sample segment
+    String[] stringValues = {"A", "C", "B", "C", "D", "E", "E", "E"};
+    long[] longValues = {2, 1, 2, 3, 4, 5, 3, 2};
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("stringCol", FieldSpec.DataType.STRING)
+        .addMetric("longCol", DataType.LONG).build();
+    FileUtils.deleteQuietly(INDEX_DIR);
+
+    // Build good segment, no need for preprocess
+    File segment = buildTestSegment(tableConfig, schema, "validSegment", stringValues, longValues);
+    SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(segment.toURI(),
+            new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
+
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertFalse(processor.needProcess());
+    }
+
+    // Update table config to convert dict to noDict for longCol
+    indexLoadingConfig.setNoDictionaryColumns(Set.of("longCol"));
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+
+    // Update table config to convert noDict to dict for longCol
+    indexLoadingConfig.setNoDictionaryColumns(Set.of());
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+
+    // Update table config to convert dict to noDict for longCol and add the Startree index config
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), 1000);
+    tableConfig.getIndexingConfig().setStarTreeIndexConfigs(List.of(starTreeIndexConfig));
+    tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
+    tableConfig.getIndexingConfig().setNoDictionaryColumns(List.of("longCol"));
+    indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+
+    // Remove Startree index but keep the no dictionary for longCol
+    tableConfig.getIndexingConfig().setStarTreeIndexConfigs(List.of());
+    tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
+    indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+
+    // Update table config to convert noDict to dict for longCol and also add the Startree index
+    tableConfig.getIndexingConfig().setStarTreeIndexConfigs(List.of(starTreeIndexConfig));
+    tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
+    tableConfig.getIndexingConfig().setNoDictionaryColumns(List.of());
+    indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
+    try (SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
+      assertTrue(processor.needProcess());
+      processor.process();
+    }
+  }
+
+  private File buildTestSegment(final TableConfig tableConfig, final Schema schema, String segmentName,
       String[] stringValues, long[] longValues)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);

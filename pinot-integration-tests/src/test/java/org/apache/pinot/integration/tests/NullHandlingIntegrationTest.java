@@ -139,62 +139,72 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     return 100;
   }
 
-  @Test
-  public void testTotalCount()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTotalCount(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT COUNT(*) FROM " + getTableName();
     testQuery(query);
   }
 
-  @Test
-  public void testCountWithNullDescription()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCountWithNullDescription(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE description IS NOT NULL";
     testQuery(query);
   }
 
-  @Test
-  public void testCountWithNullDescriptionAndSalary()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCountWithNullDescriptionAndSalary(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE description IS NOT NULL AND salary IS NOT NULL";
     testQuery(query);
   }
 
-  @Test
-  public void testCaseWithNullSalary()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseWithNullSalary(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT CASE WHEN salary IS NULL THEN 1 ELSE 0 END FROM " + getTableName();
     testQuery(query);
   }
 
-  @Test
-  public void testCaseWithNotNullDescription()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseWithNotNullDescription(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT CASE WHEN description IS NOT NULL THEN 1 ELSE 0 END FROM " + getTableName();
     testQuery(query);
   }
 
-  @Test
-  public void testCaseWithIsDistinctFrom()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseWithIsDistinctFrom(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT salary IS DISTINCT FROM salary FROM " + getTableName();
     testQuery(query);
     query = "SELECT salary FROM " + getTableName() + " where salary IS DISTINCT FROM salary";
     testQuery(query);
   }
 
-  @Test
-  public void testCaseWithIsNotDistinctFrom()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseWithIsNotDistinctFrom(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = "SELECT description IS NOT DISTINCT FROM description FROM " + getTableName();
     testQuery(query);
     query = "SELECT description FROM " + getTableName() + " where description IS NOT DISTINCT FROM description";
     testQuery(query);
   }
 
-  @Test
-  public void testTotalCountWithNullHandlingQueryOptionEnabled()
-          throws Exception {
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTotalCountWithNullHandlingQueryOptionEnabled(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String pinotQuery = "SELECT COUNT(*) FROM " + getTableName() + " option(enableNullHandling=true)";
     String h2Query = "SELECT COUNT(*) FROM " + getTableName();
     testQuery(pinotQuery, h2Query);
@@ -205,9 +215,11 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
-  @Test
-  public void testNullLiteralSelectionOnlyBroker()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testNullLiteralSelectionOnlyBroker(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
     // Null literal only
     String sqlQuery = "SELECT null FROM mytable OPTION(enableNullHandling=true)";
     JsonNode response = postQuery(sqlQuery);
@@ -300,35 +312,40 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals(rows.get(0).get(0).asText(), "null");
   }
 
-  @Test
-  public void testOrderByNullsFirst()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testOrderByNullsFirst(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String h2Query = "SELECT salary FROM " + getTableName() + " ORDER BY salary NULLS FIRST";
     String pinotQuery = h2Query + " option(enableNullHandling=true)";
 
     testQuery(pinotQuery, h2Query);
   }
 
-  @Test
-  public void testOrderByNullsLast()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testOrderByNullsLast(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String h2Query = "SELECT salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
     String pinotQuery = h2Query + " option(enableNullHandling=true)";
 
     testQuery(pinotQuery, h2Query);
   }
 
-  @Test
-  public void testDistinctOrderByNullsLast()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctOrderByNullsLast(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String h2Query = "SELECT distinct salary FROM " + getTableName() + " ORDER BY salary DESC NULLS LAST";
     String pinotQuery = h2Query + " option(enableNullHandling=true)";
 
     testQuery(pinotQuery, h2Query);
   }
 
-  @Test
-  public void testSelectNullLiteral() throws Exception {
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testSelectNullLiteral(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Need to also select an identifier column to skip the all literal query optimization which returns without
     // querying the segment.
     String sqlQuery = "SELECT NULL, salary FROM mytable OPTION(enableNullHandling=true)";
@@ -339,9 +356,10 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals(rows.get(0).get(0).asText(), "null");
   }
 
-  @Test
-  public void testCaseWhenAllLiteral()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testCaseWhenAllLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String sqlQuery =
         "SELECT CASE WHEN true THEN 1 WHEN NOT true THEN 0 ELSE NULL END FROM mytable OPTION(enableNullHandling=true)";
 

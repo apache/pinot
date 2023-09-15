@@ -106,6 +106,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try {
       // Parse the request
       sqlNodeAndOptions = sqlNodeAndOptions != null ? sqlNodeAndOptions : RequestUtils.parseQuery(query, request);
+    } catch (RuntimeException e) {
+      String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(e);
+      LOGGER.info("Caught exception parsing request {}: {}, {}", requestId, query, consolidatedMessage);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+      return new BrokerResponseNative(
+          QueryException.getException(QueryException.SQL_PARSING_ERROR, consolidatedMessage));
+    }
+    try {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
       queryTimeoutMs = timeoutMsFromQueryOption == null ? _brokerTimeoutMs : timeoutMsFromQueryOption;
       // Compile the request
@@ -125,13 +134,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
           break;
       }
-    } catch (Exception e) {
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (RuntimeException e) {
       String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(e);
-      LOGGER.info("Caught exception compiling request {}: {}, {}", requestId, query, consolidatedMessage);
+      LOGGER.warn("Caught exception planning request {}: {}, {}", requestId, query, consolidatedMessage);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
-      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+      requestContext.setErrorCode(QueryException.QUERY_PLANNING_ERROR_CODE);
       return new BrokerResponseNative(
-          QueryException.getException(QueryException.SQL_PARSING_ERROR, consolidatedMessage));
+          QueryException.getException(QueryException.QUERY_PLANNING_ERROR, consolidatedMessage));
     }
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();

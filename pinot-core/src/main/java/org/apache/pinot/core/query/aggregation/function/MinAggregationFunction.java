@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -37,11 +38,11 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
   private final boolean _nullHandlingEnabled;
 
-  public MinAggregationFunction(ExpressionContext expression) {
-    this(expression, false);
+  public MinAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    this(verifySingleArgument(arguments, "MIN"), nullHandlingEnabled);
   }
 
-  public MinAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+  protected MinAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
   }

@@ -91,9 +91,9 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
    */
   @Override
   void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
-      Map<String, Long> newSegmentPushTimeMap) {
+      Map<String, Long> newSegmentCreationTimeMap) {
     _oldSegmentCandidatesMap.clear();
-    int newSegmentMapCapacity = HashUtil.getHashMapCapacity(newSegmentPushTimeMap.size());
+    int newSegmentMapCapacity = HashUtil.getHashMapCapacity(newSegmentCreationTimeMap.size());
     _newSegmentStateMap = new HashMap<>(newSegmentMapCapacity);
 
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
@@ -113,7 +113,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       } else {
         onlineInstances = getOnlineInstances(idealStateInstanceStateMap, externalViewInstanceStateMap);
       }
-      if (newSegmentPushTimeMap.containsKey(segment)) {
+      if (newSegmentCreationTimeMap.containsKey(segment)) {
         newSegmentToOnlineInstancesMap.put(segment, onlineInstances);
       } else {
         oldSegmentToOnlineInstancesMap.put(segment, onlineInstances);
@@ -170,7 +170,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
           candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance)));
         }
       }
-      _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentPushTimeMap.get(segment), candidates));
+      _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));
     }
   }
 }

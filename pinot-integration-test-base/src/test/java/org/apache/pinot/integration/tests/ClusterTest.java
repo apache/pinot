@@ -78,6 +78,7 @@ import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
 
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
@@ -571,5 +572,11 @@ public abstract class ClusterTest extends ControllerTest {
     return new Object[][]{
         {true}
     };
+  }
+
+  protected void notSupportedInV2() {
+    if (useMultiStageQueryEngine()) {
+      throw new SkipException("Some queries fail when using multi-stage engine");
+    }
   }
 }

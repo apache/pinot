@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -301,7 +302,8 @@ public class DateTimeFormatSpec {
   public long fromFormatToMillis(String dateTimeValue) {
     switch (_patternSpec.getTimeFormat()) {
       case EPOCH:
-        return TimeUnit.MILLISECONDS.convert(Long.parseLong(dateTimeValue) * _size, _unitSpec.getTimeUnit());
+        return TimeUnit.MILLISECONDS.convert((new BigDecimal(dateTimeValue).longValue() * _size),
+            _unitSpec.getTimeUnit());
       case TIMESTAMP:
         return TimestampUtils.toMillisSinceEpoch(dateTimeValue);
       case SIMPLE_DATE_FORMAT:

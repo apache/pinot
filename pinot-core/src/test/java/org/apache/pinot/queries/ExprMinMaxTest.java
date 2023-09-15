@@ -41,6 +41,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -610,9 +611,9 @@ public class ExprMinMaxTest extends BaseQueriesTest {
       ResultTable resultTable = brokerResponse.getResultTable();
       List<Object[]> rows = resultTable.getRows();
       fail();
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Aggregation function: exprmax(longColumn,intColumn) "
-          + "is only supported in selection without alias."));
+    } catch (BadQueryRequestException e) {
+      assertTrue(
+          e.getMessage().contains("Aggregation function: EXPRMAX is only supported in selection without alias."));
     }
   }
 
@@ -627,8 +628,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
       List<Object[]> rows = resultTable.getRows();
       fail();
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Aggregation function: exprmax(longColumn,intColumn) "
-          + "is only supported in selection without alias."));
+      assertTrue(
+          e.getMessage().contains("Aggregation function: EXPRMAX is only supported in selection without alias."));
     }
   }
 

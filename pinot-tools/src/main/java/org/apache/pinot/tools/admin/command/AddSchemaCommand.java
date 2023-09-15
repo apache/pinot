@@ -20,6 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.net.URI;
 import java.util.Collections;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -47,6 +48,14 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
   @CommandLine.Option(names = {"-schemaFile"}, required = true, description = "Path to schema file.")
   private String _schemaFile = null;
+
+  @CommandLine.Option(names = {"-override"}, required = false, description = "Whether to override the schema if the "
+      + "schema exists.")
+  private boolean _override = false;
+
+  @CommandLine.Option(names = {"-force"}, required = false, description = "Whether to force overriding the schema if "
+      + "the schema exists.")
+  private boolean _force = false;
 
   @CommandLine.Option(names = {"-exec"}, required = false, description = "Execute the command.")
   private boolean _exec;
@@ -87,8 +96,8 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @Override
   public String toString() {
     String retString = ("AddSchema -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -schemaFile " + _schemaFile + " -user " + _user + " -password "
-        + "[hidden]");
+        + " -controllerPort " + _controllerPort + " -schemaFile " + _schemaFile + " -override " + _override + " _force "
+        + _force + " -user " + _user + " -password " + "[hidden]");
 
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -114,6 +123,16 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
   public AddSchemaCommand setSchemaFilePath(String schemaFilePath) {
     _schemaFile = schemaFilePath;
+    return this;
+  }
+
+  public AddSchemaCommand setOverride(boolean override) {
+    _override = override;
+    return this;
+  }
+
+  public AddSchemaCommand setForce(boolean force) {
+    _force = force;
     return this;
   }
 
@@ -155,8 +174,10 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
     Schema schema = Schema.fromFile(schemaFile);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient.addSchema(FileUploadDownloadClient
-              .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort)),
+      URI schemaURI = FileUploadDownloadClient
+          .getUploadSchemaURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
+      schemaURI = new URI(schemaURI + "?override=" + _override + "?force=" + _force);
+      fileUploadDownloadClient.addSchema(schemaURI,
           schema.getSchemaName(), schemaFile, makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken,
               _user, _password)), Collections.emptyList());
     } catch (Exception e) {

@@ -30,7 +30,6 @@ import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TablePartitionInfo;
@@ -230,7 +229,7 @@ public class WorkerManager {
       ServerInstance serverInstance =
           pickEnabledServer(partitionInfo._fullyReplicatedServers, enabledServerInstanceMap, indexToPick++);
       Preconditions.checkState(serverInstance != null,
-          "Failed to find enabled fully replicated server for table: %s, partition: %s in table: %s", tableName, i);
+          "Failed to find enabled fully replicated server for table: %s, partition: %s", tableName, i);
       workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
       workerIdToSegmentsMap.put(workerId, getSegmentsMap(partitionInfo));
       workerId++;
@@ -498,8 +497,6 @@ public class WorkerManager {
     List<String> candidateList = new ArrayList<>(candidates);
     candidateList.sort(null);
     int startIndex = (int) ((indexToPick & Long.MAX_VALUE) % numCandidates);
-    String[] servers = candidates.toArray(new String[0]);
-    ArrayUtils.shuffle(servers, RANDOM);
     for (int i = 0; i < numCandidates; i++) {
       String server = candidateList.get((startIndex + i) % numCandidates);
       ServerInstance serverInstance = enabledServerInstanceMap.get(server);

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -33,8 +34,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 public class DistinctAvgAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
-  public DistinctAvgAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, AggregationFunctionType.DISTINCTAVG, nullHandlingEnabled);
+  public DistinctAvgAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "DISTINCT_AVG"), AggregationFunctionType.DISTINCTAVG, nullHandlingEnabled);
   }
 
   @Override

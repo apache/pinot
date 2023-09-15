@@ -588,6 +588,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // TODO: Consider optimizing it by tracking and persisting only the changed snapshot
   protected void doTakeSnapshot() {
     int numTrackedSegments = _trackedSegments.size();
+    long numPrimaryKeysInSnapshot = 0L;
     _logger.info("Taking snapshot for {} segments", numTrackedSegments);
     long startTimeMs = System.currentTimeMillis();
 
@@ -596,11 +597,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (segment instanceof ImmutableSegmentImpl) {
         ((ImmutableSegmentImpl) segment).persistValidDocIdsSnapshot();
         numImmutableSegments++;
+        numPrimaryKeysInSnapshot +=
+            ((ImmutableSegmentImpl) segment).getValidDocIds().getMutableRoaringBitmap().getCardinality();
       }
     }
 
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
+        ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
     _logger.info("Finished taking snapshot for {} immutable segments (out of {} total segments) in {}ms",
         numImmutableSegments, numTrackedSegments, System.currentTimeMillis() - startTimeMs);
   }

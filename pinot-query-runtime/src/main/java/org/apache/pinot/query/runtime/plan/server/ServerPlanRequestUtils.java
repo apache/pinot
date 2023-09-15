@@ -122,7 +122,7 @@ public class ServerPlanRequestUtils {
     long requestId = (executionContext.getRequestId() << 16) + ((long) stagePlan.getStageId() << 8) + (
         tableType == TableType.REALTIME ? 1 : 0);
     PinotQuery pinotQuery = new PinotQuery();
-    Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(executionContext.getRequestMetadata());
+    Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(executionContext.getOpChainMetadata());
     if (leafNodeLimit != null) {
       pinotQuery.setLimit(leafNodeLimit);
     } else {
@@ -174,7 +174,7 @@ public class ServerPlanRequestUtils {
    * Helper method to update query options.
    */
   private static void updateQueryOptions(PinotQuery pinotQuery, OpChainExecutionContext executionContext) {
-    Map<String, String> queryOptions = new HashMap<>(executionContext.getRequestMetadata());
+    Map<String, String> queryOptions = new HashMap<>(executionContext.getOpChainMetadata());
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(executionContext.getDeadlineMs() - System.currentTimeMillis()));
     pinotQuery.setQueryOptions(queryOptions);

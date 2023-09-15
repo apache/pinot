@@ -104,6 +104,7 @@ public class IndexLoadingConfig {
   private boolean _isDirectRealtimeOffHeapAllocation;
   private boolean _enableSplitCommitEndWithMetadata;
   private String _segmentStoreURI;
+  private boolean _errorOnColumnBuildFailure;
 
   // constructed from FieldConfig
   private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
@@ -878,6 +879,14 @@ public class IndexLoadingConfig {
   public void setTableDataDir(String tableDataDir) {
     _tableDataDir = tableDataDir;
     _dirty = true;
+  }
+
+  public boolean isErrorOnColumnBuildFailure() {
+    return _errorOnColumnBuildFailure;
+  }
+
+  public void setErrorOnColumnBuildFailure(boolean errorOnColumnBuildFailure) {
+    _errorOnColumnBuildFailure = errorOnColumnBuildFailure;
   }
 
   public String getTableDataDir() {

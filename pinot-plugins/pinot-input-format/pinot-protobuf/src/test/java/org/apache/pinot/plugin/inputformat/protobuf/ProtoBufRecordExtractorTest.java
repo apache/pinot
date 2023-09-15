@@ -52,6 +52,13 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
   private static final String FLOAT_FIELD = "float_field";
   private static final String BOOL_FIELD = "bool_field";
   private static final String BYTES_FIELD = "bytes_field";
+  private static final String NULLABLE_STRING_FIELD = "nullable_string_field";
+  private static final String NULLABLE_INT_FIELD = "nullable_int_field";
+  private static final String NULLABLE_LONG_FIELD = "nullable_long_field";
+  private static final String NULLABLE_DOUBLE_FIELD = "nullable_double_field";
+  private static final String NULLABLE_FLOAT_FIELD = "nullable_float_field";
+  private static final String NULLABLE_BOOL_FIELD = "nullable_bool_field";
+  private static final String NULLABLE_BYTES_FIELD = "nullable_bytes_field";
   private static final String REPEATED_STRINGS = "repeated_strings";
   private static final String NESTED_MESSAGE = "nested_message";
   private static final String REPEATED_NESTED_MESSAGES = "repeated_nested_messages";
@@ -69,7 +76,9 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   protected Set<String> getSourceFields() {
     return Sets.newHashSet(STRING_FIELD, INT_FIELD, LONG_FIELD, DOUBLE_FIELD, FLOAT_FIELD, BOOL_FIELD, BYTES_FIELD,
-        REPEATED_STRINGS, NESTED_MESSAGE, REPEATED_NESTED_MESSAGES, COMPLEX_MAP, SIMPLE_MAP, ENUM_FIELD);
+        NULLABLE_STRING_FIELD, NULLABLE_INT_FIELD, NULLABLE_LONG_FIELD, NULLABLE_DOUBLE_FIELD, NULLABLE_FLOAT_FIELD,
+        NULLABLE_BOOL_FIELD, NULLABLE_BYTES_FIELD, REPEATED_STRINGS, NESTED_MESSAGE, REPEATED_NESTED_MESSAGES,
+        COMPLEX_MAP, SIMPLE_MAP, ENUM_FIELD);
   }
 
   /**
@@ -98,6 +107,29 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
       messageBuilder.setFloatField((Float) inputRecord.get(FLOAT_FIELD));
       messageBuilder.setBoolField(Boolean.parseBoolean((String) inputRecord.get(BOOL_FIELD)));
       messageBuilder.setBytesField(ByteString.copyFrom((byte[]) inputRecord.get(BYTES_FIELD)));
+
+      if (inputRecord.get(NULLABLE_STRING_FIELD) != null) {
+        messageBuilder.setNullableStringField((String) inputRecord.get(NULLABLE_STRING_FIELD));
+      }
+      if (inputRecord.get(NULLABLE_INT_FIELD) != null) {
+        messageBuilder.setNullableIntField((Integer) inputRecord.get(NULLABLE_INT_FIELD));
+      }
+      if (inputRecord.get(NULLABLE_LONG_FIELD) != null) {
+        messageBuilder.setNullableLongField((Long) inputRecord.get(NULLABLE_LONG_FIELD));
+      }
+      if (inputRecord.get(NULLABLE_DOUBLE_FIELD) != null) {
+        messageBuilder.setNullableDoubleField((Double) inputRecord.get(NULLABLE_DOUBLE_FIELD));
+      }
+      if (inputRecord.get(NULLABLE_FLOAT_FIELD) != null) {
+        messageBuilder.setNullableFloatField((Float) inputRecord.get(NULLABLE_FLOAT_FIELD));
+      }
+      if (inputRecord.get(NULLABLE_BOOL_FIELD) != null) {
+        messageBuilder.setNullableBoolField(Boolean.parseBoolean((String) inputRecord.get(NULLABLE_BOOL_FIELD)));
+      }
+      if (inputRecord.get(NULLABLE_BYTES_FIELD) != null) {
+        messageBuilder.setNullableBytesField(ByteString.copyFrom((byte[]) inputRecord.get(NULLABLE_BYTES_FIELD)));
+      }
+
       messageBuilder.addAllRepeatedStrings((List) inputRecord.get(REPEATED_STRINGS));
       messageBuilder.setNestedMessage(createNestedMessage((Map<String, Object>) inputRecord.get(NESTED_MESSAGE)));
 
@@ -136,6 +168,13 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(FLOAT_FIELD, 2.2f);
     record.put(BOOL_FIELD, "false");
     record.put(BYTES_FIELD, "hello world!".getBytes(UTF_8));
+    record.put(NULLABLE_STRING_FIELD, "");
+    record.put(NULLABLE_INT_FIELD, 0);
+    record.put(NULLABLE_LONG_FIELD, 0L);
+    record.put(NULLABLE_DOUBLE_FIELD, 0.0);
+    record.put(NULLABLE_FLOAT_FIELD, 0.0f);
+    record.put(NULLABLE_BOOL_FIELD, "false");
+    record.put(NULLABLE_BYTES_FIELD, "".getBytes(UTF_8));
     record.put(REPEATED_STRINGS, Arrays.asList("aaa", "bbb", "ccc"));
     record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 9));
     record.put(REPEATED_NESTED_MESSAGES, Arrays
@@ -158,6 +197,13 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(FLOAT_FIELD, 4.4f);
     record.put(BOOL_FIELD, "true");
     record.put(BYTES_FIELD, "goodbye world!".getBytes(UTF_8));
+    record.put(NULLABLE_STRING_FIELD, null);
+    record.put(NULLABLE_INT_FIELD, null);
+    record.put(NULLABLE_LONG_FIELD, null);
+    record.put(NULLABLE_DOUBLE_FIELD, null);
+    record.put(NULLABLE_FLOAT_FIELD, null);
+    record.put(NULLABLE_BOOL_FIELD, null);
+    record.put(NULLABLE_BYTES_FIELD, null);
     record.put(REPEATED_STRINGS, Arrays.asList("ddd", "eee", "fff"));
     record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "Starbucks", NESTED_INT_FIELD, 100));
     record.put(REPEATED_NESTED_MESSAGES, Arrays

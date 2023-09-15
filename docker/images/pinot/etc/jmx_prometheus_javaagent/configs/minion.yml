@@ -25,3 +25,30 @@ rules:
   cache: true
   labels:
     id: "$1"
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.version\\.(\\w+)\"?><>(\\w+)"
+  name: "pinot_$1_version"
+  cache: true
+  labels:
+    version: "$2"
+
+  ## Metrics that fit the catch-all patterns above should not be added to this file.
+  ## In case a metric does not fit the catch-all patterns, add them before this comment
+
+  # This is a catch-all pattern for pinot table metrics with offline/realtime suffix.
+  # Patterns after this line may be skipped.
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
+  name: "pinot_$1_$4_$5"
+  cache: true
+  labels:
+    table: "$2"
+    tableType: "$3"
+  # This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
+  name: "pinot_$1_$3_$4"
+  cache: true
+  labels:
+    table: "$2"
+  # This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
+  name: "pinot_$1_$2_$3"
+  cache: true

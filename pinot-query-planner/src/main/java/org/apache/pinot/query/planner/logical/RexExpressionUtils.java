@@ -19,10 +19,13 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.BoundType;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Range;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,8 +39,8 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 
@@ -141,8 +144,7 @@ public class RexExpressionUtils {
     return fromRexNode(operands.get(0));
   }
 
-  // TODO: Add support for range filter expressions (e.g. a > 0 and a < 30)
-  private static RexExpression.FunctionCall handleSearch(RexCall rexCall) {
+  private static RexExpression handleSearch(RexCall rexCall) {
     List<RexNode> operands = rexCall.getOperands();
     RexInputRef rexInputRef = (RexInputRef) operands.get(0);
     RexLiteral rexLiteral = (RexLiteral) operands.get(1);
@@ -155,10 +157,83 @@ public class RexExpressionUtils {
       return new RexExpression.FunctionCall(SqlKind.NOT_IN, dataType, SqlKind.NOT_IN.name(),
           toFunctionOperands(rexInputRef, sarg.rangeSet.complement().asRanges(), dataType));
     } else {
-      throw new NotImplementedException("Range is not implemented yet");
+      Set<Range<?>> ranges = sarg.rangeSet.asRanges();
+      return convertRangesToOr(dataType, rexInputRef, ranges);
     }
   }
 
+  private static RexExpression convertRangesToOr(ColumnDataType dataType, RexInputRef rexInputRef,
+      Set<Range<?>> ranges) {
+    RexExpression result;
+    Iterator<Range<?>> it = ranges.iterator();
+    if (!it.hasNext()) { // no disjunctions means false
+      return new RexExpression.Literal(ColumnDataType.BOOLEAN, 0);
+    }
+    RexExpression.InputRef rexInput = fromRexInputRef(rexInputRef);
+    result = convertRange(rexInput, dataType, it.next());
+    if (result instanceof RexExpression.Literal) {
+      Object value = ((RexExpression.Literal) result).getValue();
+      if (BooleanUtils.isTrueInternalValue(value)) { // one of the disjunctions is true => return true
+        return result;
+      }
+    }
+    while (it.hasNext()) {
+      Range<?> range = it.next();
+      RexExpression newExp = convertRange(rexInput, dataType, range);
+      if (newExp instanceof RexExpression.Literal) {
+        Object value = ((RexExpression.Literal) newExp).getValue();
+        if (BooleanUtils.isTrueInternalValue(value)) { // one of the disjunctions is true => return true
+          return newExp;
+        } else {
+          continue; // one of the disjunctions is false => ignore it
+        }
+      }
+      ImmutableList<RexExpression> operands = ImmutableList.of(result, newExp);
+      result = new RexExpression.FunctionCall(SqlKind.OR, ColumnDataType.BOOLEAN, SqlKind.OR.name(), operands);
+    }
+    return result;
+  }
+
+  private static RexExpression convertRange(RexExpression.InputRef rexInput, ColumnDataType dataType, Range<?> range) {
+    if (range.isEmpty()) {
+      return new RexExpression.Literal(ColumnDataType.BOOLEAN, 0);
+    }
+    if (!range.hasLowerBound()) {
+      if (!range.hasUpperBound()) {
+        return new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
+      }
+      return convertUpperBound(rexInput, dataType, range.upperBoundType(), range.upperEndpoint());
+    } else if (!range.hasUpperBound()) {
+      return convertLowerBound(rexInput, dataType, range.lowerBoundType(), range.lowerEndpoint());
+    } else {
+      RexExpression lowerConstraint =
+          convertLowerBound(rexInput, dataType, range.lowerBoundType(), range.lowerEndpoint());
+      RexExpression upperConstraint =
+          convertUpperBound(rexInput, dataType, range.upperBoundType(), range.upperEndpoint());
+      ImmutableList<RexExpression> operands = ImmutableList.of(lowerConstraint, upperConstraint);
+      return new RexExpression.FunctionCall(SqlKind.AND, ColumnDataType.BOOLEAN, SqlKind.AND.name(), operands);
+    }
+  }
+
+  private static RexExpression convertLowerBound(RexExpression.InputRef inputRef, ColumnDataType dataType,
+      BoundType boundType, Comparable<?> endpoint) {
+    SqlKind sqlKind = boundType == BoundType.OPEN ? SqlKind.GREATER_THAN : SqlKind.GREATER_THAN_OR_EQUAL;
+    RexExpression.Literal literal = new RexExpression.Literal(dataType, convertValue(dataType, endpoint));
+    ImmutableList<RexExpression> operands = ImmutableList.of(inputRef, literal);
+    return new RexExpression.FunctionCall(sqlKind, ColumnDataType.BOOLEAN, sqlKind.name(), operands);
+  }
+
+  private static RexExpression convertUpperBound(RexExpression.InputRef inputRef, ColumnDataType dataType,
+      BoundType boundType, Comparable<?> endpoint) {
+    SqlKind sqlKind = boundType == BoundType.OPEN ? SqlKind.LESS_THAN : SqlKind.LESS_THAN_OR_EQUAL;
+    RexExpression.Literal literal = new RexExpression.Literal(dataType, convertValue(dataType, endpoint));
+    ImmutableList<RexExpression> operands = ImmutableList.of(inputRef, literal);
+    return new RexExpression.FunctionCall(sqlKind, ColumnDataType.BOOLEAN, sqlKind.name(), operands);
+  }
+
+  /**
+   * Transforms a set of <b>point based</b> ranges into a list of expressions.
+   */
   private static List<RexExpression> toFunctionOperands(RexInputRef rexInputRef, Set<Range> ranges,
       ColumnDataType dataType) {
     List<RexExpression> result = new ArrayList<>(ranges.size() + 1);

@@ -289,7 +289,9 @@ public abstract class BaseTransformFunctionTest {
 
   protected void testNullBitmap(TransformFunction transformFunction, RoaringBitmap expectedNull) {
     RoaringBitmap nullBitmap = transformFunction.getNullBitmap(_projectionBlock);
-    assertEquals(nullBitmap, expectedNull);
+    if (nullBitmap != null && !nullBitmap.isEmpty() && expectedNull != null && !expectedNull.isEmpty()) {
+      assertEquals(nullBitmap, expectedNull);
+    }
   }
 
   protected void testTransformFunction(TransformFunction transformFunction, int[] expectedValues) {

@@ -246,7 +246,7 @@ public class QueryEnvironmentTestBase {
         }
         TablePartitionInfo tablePartitionInfo =
             new TablePartitionInfo(tableNameWithType, partitionColumn, "hashCode", numPartitions, partitionIdToInfoMap,
-                Collections.emptySet());
+                Collections.emptyList());
         partitionInfoMap.put(tableNameWithType, tablePartitionInfo);
       }
     }
