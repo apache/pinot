@@ -166,6 +166,10 @@ public class SegmentZKMetadata implements ZKMetadata {
     setValue(Segment.TIER, tier);
   }
 
+  /**
+   * For uploaded segment, this is the time when the segment file is created. For real-time segment, this is the time
+   * when the consuming segment is created.
+   */
   public long getCreationTime() {
     return _znRecord.getLongField(Segment.CREATION_TIME, -1);
   }
@@ -174,6 +178,10 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.CREATION_TIME, creationTime);
   }
 
+  /**
+   * Push time exists only for uploaded segments. It is the time when the segment is first pushed to the cluster (i.e.
+   * when the segment ZK metadata is created).
+   */
   public long getPushTime() {
     String pushTimeString = _simpleFields.get(Segment.PUSH_TIME);
     // Handle legacy push time key
@@ -188,6 +196,10 @@ public class SegmentZKMetadata implements ZKMetadata {
     setNonNegativeValue(Segment.PUSH_TIME, pushTime);
   }
 
+  /**
+   * Refresh time exists only for uploaded segments that have been replaced. It is the time when the segment is last
+   * replaced.
+   */
   public long getRefreshTime() {
     String refreshTimeString = _simpleFields.get(Segment.REFRESH_TIME);
     // Handle legacy refresh time key
