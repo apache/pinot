@@ -42,9 +42,7 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,12 +97,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
       if (tableConfig.getTableType() != TableType.REALTIME) {
         LOGGER.warn("Skip generating task: {} for non-REALTIME table: {}", taskType, realtimeTableName);
-        continue;
-      }
-      StreamConfig streamConfig =
-          new StreamConfig(realtimeTableName, IngestionConfigUtils.getStreamConfigMap(tableConfig));
-      if (streamConfig.hasHighLevelConsumerType()) {
-        LOGGER.warn("Skip generating task: {} for HLC REALTIME table: {}", taskType, realtimeTableName);
         continue;
       }
       LOGGER.info("Start generating task configs for table: {} for task: {}", realtimeTableName, taskType);

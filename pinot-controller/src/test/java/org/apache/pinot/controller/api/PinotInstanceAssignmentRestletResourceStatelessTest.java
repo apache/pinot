@@ -95,7 +95,7 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
     _helixResourceManager.addTable(offlineTableConfig);
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
-            .setServerTenant(SERVER_TENANT_NAME).setLLC(true)
+            .setServerTenant(SERVER_TENANT_NAME)
             .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()).build();
     _helixResourceManager.addTable(realtimeTableConfig);
 

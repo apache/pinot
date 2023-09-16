@@ -48,10 +48,8 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,19 +150,13 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
 
-    // Segment relocation doesn't apply to HLC
-    boolean isRealtimeTable = TableNameBuilder.isRealtimeTableResource(tableNameWithType);
-    if (isRealtimeTable && new StreamConfig(tableNameWithType,
-        IngestionConfigUtils.getStreamConfigMap(tableConfig)).hasHighLevelConsumerType()) {
-      return;
-    }
-
     boolean relocate = false;
     if (TierConfigUtils.shouldRelocateToTiers(tableConfig)) {
       relocate = true;
       LOGGER.info("Relocating segments to tiers for table: {}", tableNameWithType);
     }
-    if (isRealtimeTable && InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
+    if (tableConfig.getTableType() == TableType.REALTIME
+        && InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
       relocate = true;
       LOGGER.info("Relocating COMPLETED segments for table: {}", tableNameWithType);
     }

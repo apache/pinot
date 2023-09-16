@@ -47,7 +47,7 @@ import org.apache.pinot.controller.helix.core.realtime.MissingConsumingSegmentFi
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -311,10 +311,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
-      PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
-          IngestionConfigUtils.getStreamConfigMap(tableConfig));
-      new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics, streamConfig)
-          .findAndEmitMetrics(idealState);
+      StreamConfig streamConfig =
+          new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
+          streamConfig).findAndEmitMetrics(idealState);
     }
   }
 

@@ -70,7 +70,6 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -90,12 +89,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class PinotLLCRealtimeSegmentManagerTest {
@@ -757,20 +751,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
   }
 
-  @Test(expectedExceptions = IllegalStateException.class)
-  public void testPreExistingSegments() {
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
-    segmentManager._numReplicas = 2;
-    segmentManager.makeTableConfig();
-    segmentManager._numInstances = 5;
-    segmentManager.makeConsumingInstancePartitions();
-    segmentManager._numPartitions = 4;
-
-    String existingSegmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
-    segmentManager._segmentZKMetadataMap.put(existingSegmentName, new SegmentZKMetadata(existingSegmentName));
-    segmentManager.setUpNewTable();
-  }
-
   @Test
   public void testCommitSegmentWhenControllerWentThroughGC() {
     // Set up a new table with 2 replicas, 5 instances, 4 partitions
@@ -864,12 +844,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // All operations should fail after stopping the segment manager
     try {
       segmentManager.setUpNewTable(segmentManager._tableConfig, new IdealState(REALTIME_TABLE_NAME));
-      fail();
-    } catch (IllegalStateException e) {
-      // Expected
-    }
-    try {
-      segmentManager.removeLLCSegments(new IdealState(REALTIME_TABLE_NAME));
       fail();
     } catch (IllegalStateException e) {
       // Expected
@@ -1089,7 +1063,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     int _numReplicas;
     TableConfig _tableConfig;
-    PartitionLevelStreamConfig _streamConfig;
+    StreamConfig _streamConfig;
     int _numInstances;
     InstancePartitions _consumingInstancePartitions;
     Map<String, SegmentZKMetadata> _segmentZKMetadataMap = new HashMap<>();
@@ -1112,9 +1086,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
       Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
       _tableConfig =
           new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(_numReplicas)
-              .setLLC(true).setStreamConfigs(streamConfigs).build();
-      _streamConfig = new PartitionLevelStreamConfig(_tableConfig.getTableName(),
-          IngestionConfigUtils.getStreamConfigMap(_tableConfig));
+              .setStreamConfigs(streamConfigs).build();
+      _streamConfig =
+          new StreamConfig(_tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(_tableConfig));
     }
 
     void makeConsumingInstancePartitions() {

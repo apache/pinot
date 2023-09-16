@@ -26,8 +26,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
-import org.apache.pinot.common.utils.HLCSegmentName;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -35,7 +33,7 @@ import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTas
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -102,32 +100,24 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
       return;
     }
-    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
-        IngestionConfigUtils.getStreamConfigMap(tableConfig));
-
+    StreamConfig streamConfig =
+        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
     if (context._runSegmentLevelValidation) {
       runSegmentLevelValidation(tableConfig, streamConfig);
     }
-
-    if (streamConfig.hasLowLevelConsumerType()) {
-      _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
-          context._recreateDeletedConsumingSegment, context._offsetCriteria);
-    }
+    _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
+        context._recreateDeletedConsumingSegment, context._offsetCriteria);
   }
 
-  private void runSegmentLevelValidation(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig) {
+  private void runSegmentLevelValidation(TableConfig tableConfig, StreamConfig streamConfig) {
     String realtimeTableName = tableConfig.getTableName();
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
 
     // Update the total document count gauge
-    // Count HLC segments if high level consumer is configured
-    boolean countHLCSegments = streamConfig.hasHighLevelConsumerType();
-    _validationMetrics.updateTotalDocumentCountGauge(realtimeTableName,
-        computeTotalDocumentCount(segmentsZKMetadata, countHLCSegments));
+    _validationMetrics.updateTotalDocumentCountGauge(realtimeTableName, computeTotalDocumentCount(segmentsZKMetadata));
 
     // Check missing segments and upload them to the deep store
-    if (streamConfig.hasLowLevelConsumerType()
-        && _llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
+    if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
   }
@@ -142,34 +132,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   }
 
   @VisibleForTesting
-  static long computeTotalDocumentCount(List<SegmentZKMetadata> segmentsZKMetadata, boolean countHLCSegments) {
+  static long computeTotalDocumentCount(List<SegmentZKMetadata> segmentsZKMetadata) {
     long numTotalDocs = 0;
-    if (countHLCSegments) {
-      String groupId = null;
-      for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
-        String segmentName = segmentZKMetadata.getSegmentName();
-        if (SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
-          HLCSegmentName hlcSegmentName = new HLCSegmentName(segmentName);
-          String segmentGroupId = hlcSegmentName.getGroupId();
-          if (groupId == null) {
-            groupId = segmentGroupId;
-            numTotalDocs = segmentZKMetadata.getTotalDocs();
-          } else {
-            // Discard all segments with different group id as they are replicas
-            if (groupId.equals(segmentGroupId)) {
-              numTotalDocs += segmentZKMetadata.getTotalDocs();
-            }
-          }
-        }
-      }
-    } else {
-      for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
-        String segmentName = segmentZKMetadata.getSegmentName();
-        if (!SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
-          // LLC segments or uploaded segments
-          numTotalDocs += segmentZKMetadata.getTotalDocs();
-        }
-      }
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      numTotalDocs += segmentZKMetadata.getTotalDocs();
     }
     return numTotalDocs;
   }

@@ -42,7 +42,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
@@ -216,10 +215,6 @@ public class SegmentDeletionManager {
 
   protected void removeSegmentFromStore(String tableNameWithType, String segmentId,
       @Nullable Long deletedSegmentsRetentionMs) {
-    // Ignore HLC segments as they are not stored in Pinot FS
-    if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
-      return;
-    }
     if (_dataDir != null) {
       long retentionMs = deletedSegmentsRetentionMs == null
           ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;

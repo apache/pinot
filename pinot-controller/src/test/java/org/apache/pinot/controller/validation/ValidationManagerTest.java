@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -102,32 +101,14 @@ public class ValidationManagerTest {
 
   @Test
   public void testTotalDocumentCountRealTime() {
-    // Create a bunch of dummy segments
-    final String group1 = TEST_TABLE_NAME + "_REALTIME_1466446700000_34";
-    final String group2 = TEST_TABLE_NAME + "_REALTIME_1466446700000_17";
-    String segmentName1 = new HLCSegmentName(group1, "0", "1").getSegmentName();
-    String segmentName2 = new HLCSegmentName(group1, "0", "2").getSegmentName();
-    String segmentName3 = new HLCSegmentName(group1, "0", "3").getSegmentName();
-    String segmentName4 = new HLCSegmentName(group2, "0", "3").getSegmentName();
-
+    // Create some dummy LLC segments (both committed and uploaded)
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
-    segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName1, 10));
-    segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName2, 20));
-    segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName3, 30));
-    // This should get ignored in the count as it belongs to a different group id
-    segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName4, 20));
-
-    assertEquals(RealtimeSegmentValidationManager.computeTotalDocumentCount(segmentsZKMetadata, true), 60);
-
-    // Now add some LLC segments (both committed and uploaded)
     String segmentName5 = new LLCSegmentName(TEST_TABLE_NAME, 1, 0, 1000).getSegmentName();
     String segmentName6 = new LLCSegmentName(TEST_TABLE_NAME, 2, 27, 10000).getSegmentName();
     segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName5, 10));
     segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(segmentName6, 5));
     segmentsZKMetadata.add(SegmentMetadataMockUtils.mockSegmentZKMetadata(TEST_SEGMENT_NAME, 15));
-
-    // Only the LLC segments should get counted.
-    assertEquals(RealtimeSegmentValidationManager.computeTotalDocumentCount(segmentsZKMetadata, false), 30);
+    assertEquals(RealtimeSegmentValidationManager.computeTotalDocumentCount(segmentsZKMetadata), 30);
   }
 
   @Test

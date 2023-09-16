@@ -63,7 +63,7 @@ public class RealtimeConsumerMonitorTest {
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setTimeColumnName("timeColumn").setLLC(true)
+        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setTimeColumnName("timeColumn")
             .setNumReplicas(2).setStreamConfigs(getStreamConfigMap()).build();
     LLCSegmentName segmentPartition1Seq0 = new LLCSegmentName(rawTableName, 1, 0, System.currentTimeMillis());
     LLCSegmentName segmentPartition1Seq1 = new LLCSegmentName(rawTableName, 1, 1, System.currentTimeMillis());

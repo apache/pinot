@@ -26,7 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
@@ -136,7 +136,7 @@ public class ZKMetadataUtils {
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
 
       // For new segment, start/end offset must exist if the segment name follows LLC segment name convention
-      if (newSegment && SegmentName.isLowLevelConsumerSegmentName(segmentMetadata.getName())) {
+      if (newSegment && LLCSegmentName.isLLCSegment(segmentMetadata.getName())) {
         Preconditions.checkArgument(segmentMetadata.getStartOffset() != null && segmentMetadata.getEndOffset() != null,
             "New uploaded LLC segment must have start/end offset in the segment metadata");
       }

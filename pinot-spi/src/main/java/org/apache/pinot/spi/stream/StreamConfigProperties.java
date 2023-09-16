@@ -38,6 +38,7 @@ public class StreamConfigProperties {
    */
   public static final String STREAM_TYPE = "streamType";
   public static final String STREAM_TOPIC_NAME = "topic.name";
+  @Deprecated
   public static final String STREAM_CONSUMER_TYPES = "consumer.type";
   public static final String STREAM_CONSUMER_FACTORY_CLASS = "consumer.factory.class.name";
   public static final String STREAM_CONSUMER_OFFSET_CRITERIA = "consumer.prop.auto.offset.reset";

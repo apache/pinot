@@ -89,7 +89,7 @@ public class ZKOperatorTest {
     TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-            .setStreamConfigs(getStreamConfigs()).setLLC(true).setNumReplicas(1).build();
+            .setStreamConfigs(getStreamConfigs()).setNumReplicas(1).build();
 
     _resourceManager.addSchema(schema, false, false);
     _resourceManager.addTable(offlineTableConfig);

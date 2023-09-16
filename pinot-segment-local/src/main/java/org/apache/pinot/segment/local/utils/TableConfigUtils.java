@@ -1164,53 +1164,16 @@ public final class TableConfigUtils {
   }
 
   /**
-   * TODO: After deprecating "replicasPerPartition", we can change this function's behavior to always overwrite
-   * config to "replication" only.
-   *
    * Ensure that the table config has the minimum number of replicas set as per cluster configs.
-   * If is doesn't, set the required amount of replication in the table config
    */
   public static void ensureMinReplicas(TableConfig tableConfig, int defaultTableMinReplicas) {
-    // For self-serviced cluster, ensure that the tables are created with at least min replication factor irrespective
-    // of table configuration value
-    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
-    boolean verifyReplicasPerPartition;
-    boolean verifyReplication;
-
-    try {
-      verifyReplicasPerPartition = ReplicationUtils.useReplicasPerPartition(tableConfig);
-      verifyReplication = ReplicationUtils.useReplication(tableConfig);
-    } catch (Exception e) {
-      throw new IllegalStateException(String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage()), e);
-    }
-
-    if (verifyReplication) {
-      int requestReplication;
-      try {
-        requestReplication = tableConfig.getReplication();
-        if (requestReplication < defaultTableMinReplicas) {
-          LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
-              defaultTableMinReplicas, requestReplication);
-          segmentsConfig.setReplication(String.valueOf(defaultTableMinReplicas));
-        }
-      } catch (NumberFormatException e) {
-        throw new IllegalStateException("Invalid replication number", e);
-      }
-    }
-
-    if (verifyReplicasPerPartition) {
-      int replicasPerPartition;
-      try {
-        replicasPerPartition = tableConfig.getReplication();
-        if (replicasPerPartition < defaultTableMinReplicas) {
-          LOGGER.info(
-              "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
-              defaultTableMinReplicas, replicasPerPartition);
-          segmentsConfig.setReplicasPerPartition(String.valueOf(defaultTableMinReplicas));
-        }
-      } catch (NumberFormatException e) {
-        throw new IllegalStateException("Invalid replicasPerPartition number", e);
-      }
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    int replication = tableConfig.getReplication();
+    if (replication < defaultTableMinReplicas) {
+      LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
+          defaultTableMinReplicas, replication);
+      validationConfig.setReplicasPerPartition(null);
+      validationConfig.setReplication(String.valueOf(defaultTableMinReplicas));
     }
   }
 

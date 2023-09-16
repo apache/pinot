@@ -79,9 +79,9 @@ import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLagState;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamDataDecoder;
@@ -280,7 +280,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final long _consumeStartTime;
   private final StreamPartitionMsgOffset _startOffset;
-  private final PartitionLevelStreamConfig _partitionLevelStreamConfig;
+  private final StreamConfig _streamConfig;
 
   private RowMetadata _lastRowMetadata;
   private long _lastConsumedTimestampMs = -1;
@@ -403,8 +403,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     removeSegmentFile();
 
     _numRowsErrored = 0;
-    final long idlePipeSleepTimeMillis = 100;
-    final long idleTimeoutMillis = _partitionLevelStreamConfig.getIdleTimeoutMillis();
+    long idlePipeSleepTimeMillis = 100;
+    long idleTimeoutMillis = _streamConfig.getIdleTimeoutMillis();
     _idleTimer.init();
 
     StreamPartitionMsgOffset lastUpdatedOffset = _streamPartitionMsgOffsetFactory
@@ -416,8 +416,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
       try {
-        messageBatch = _partitionGroupConsumer
-            .fetchMessages(_currentOffset, null, _partitionLevelStreamConfig.getFetchTimeoutMillis());
+        messageBatch =
+            _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("message batch received. filtered={} unfiltered={} endOfPartitionGroup={}",
               messageBatch.getMessageCount(), messageBatch.getUnfilteredMessageCount(),
@@ -1335,11 +1335,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    _partitionLevelStreamConfig =
-        new PartitionLevelStreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig));
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig);
+    _streamConfig = new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig));
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
-    String streamTopic = _partitionLevelStreamConfig.getTopicName();
+    String streamTopic = _streamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _partitionGroupId = llcSegmentName.getPartitionGroupId();
     _partitionGroupConsumptionStatus =
@@ -1358,7 +1357,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         serverMetrics);
 
     _rateLimiter = RealtimeConsumptionRateManager.getInstance()
-        .createRateLimiter(_partitionLevelStreamConfig, _tableNameWithType, _serverMetrics, _clientId);
+        .createRateLimiter(_streamConfig, _tableNameWithType, _serverMetrics, _clientId);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     String sortedColumn;
@@ -1388,7 +1387,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     // Read the max number of rows
-    int segmentMaxRowCount = _partitionLevelStreamConfig.getFlushThresholdRows();
+    int segmentMaxRowCount = _streamConfig.getFlushThresholdRows();
     int flushThresholdSize = segmentZKMetadata.getSizeThresholdToFlushSegment();
     if (flushThresholdSize > 0) {
       segmentMaxRowCount = flushThresholdSize;
@@ -1429,8 +1428,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
     try {
-      StreamMessageDecoder streamMessageDecoder =
-          StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
+      StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(_streamConfig, fieldsToRead);
       _streamDataDecoder = new StreamDataDecoderImpl(streamMessageDecoder);
     } catch (Exception e) {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
@@ -1484,7 +1482,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {
-    long maxConsumeTimeMillis = _partitionLevelStreamConfig.getFlushThresholdTimeMillis();
+    long maxConsumeTimeMillis = _streamConfig.getFlushThresholdTimeMillis();
     _consumeEndTime = segmentZKMetadata.getCreationTime() + maxConsumeTimeMillis;
 
     // When we restart a server, the consuming segments retain their creationTime (derived from segment
@@ -1557,9 +1555,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
           //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
-          int numPartitionGroups = _partitionMetadataProvider
-              .computePartitionGroupMetadata(_clientId, _partitionLevelStreamConfig,
-                  Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
+          int numPartitionGroups = _partitionMetadataProvider.computePartitionGroupMetadata(_clientId, _streamConfig,
+              Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
 
           if (numPartitionGroups != numPartitions) {
             _segmentLogger.warn(
