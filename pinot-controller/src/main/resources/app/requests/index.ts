@@ -229,13 +229,13 @@ export const rebalanceBrokersForTable = (tableName: string): Promise<AxiosRespon
   baseApi.post(`/tables/${tableName}/rebuildBrokerResourceFromHelixTags`, null, {headers});
 
 export const validateSchema = (schemaObject: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.post(`/schemas/validate`, JSON.stringify(schemaObject), {headers});
+  baseApi.post(`/schemas/validate`, schemaObject, {headers});
 
 export const validateTable = (tableObject: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/tables/validate`, JSON.stringify(tableObject), {headers});
 
 export const saveSchema = (schemaObject: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.post(`/schemas`, JSON.stringify(schemaObject), {headers});
+  baseApi.post(`/schemas`, schemaObject, {headers});
 
 export const saveTable = (tableObject: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/tables`, JSON.stringify(tableObject), {headers});
