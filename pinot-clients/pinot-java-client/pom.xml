@@ -66,48 +66,6 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.guava</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.webjars</groupId>
-          <artifactId>swagger-ui</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.lz4</groupId>
-          <artifactId>lz4-java</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.mindrot</groupId>
-          <artifactId>jbcrypt</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.github.seancfoley</groupId>
-          <artifactId>ipaddress</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.yetus</groupId>
-          <artifactId>audience-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.github.luben</groupId>
-          <artifactId>zstd-jni</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>it.unimi.dsi</groupId>
-          <artifactId>fastutil</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.mindrot</groupId>
-          <artifactId>jbcrypt</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
