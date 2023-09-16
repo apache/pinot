@@ -89,7 +89,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventInfo;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -255,14 +254,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (!hasAccess) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-      _brokerQueryEventListener.onQueryCompletion(new BrokerQueryEventInfo(requestContext));
+      _brokerQueryEventListener.onQueryCompletion();
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null) {
       requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-      _brokerQueryEventListener.onQueryCompletion(new BrokerQueryEventInfo(requestContext));
+      _brokerQueryEventListener.onQueryCompletion();
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
     String query = sql.asText();
@@ -281,7 +280,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     brokerResponse.setRequestId(String.valueOf(requestId));
     brokerResponse.setBrokerId(_brokerId);
     brokerResponse.setBrokerReduceTimeMs(requestContext.getReduceTimeMillis());
-    _brokerQueryEventListener.onQueryCompletion(new BrokerQueryEventInfo(requestContext));
+    _brokerQueryEventListener.onQueryCompletion();
     return brokerResponse;
   }
 

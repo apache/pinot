@@ -68,6 +68,11 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public RequestContext getRequestContext() {
+    return this;
+  }
+
+  @Override
   public long getOfflineSystemActivitiesCpuTimeNs() {
     return _offlineSystemActivitiesCpuTimeNs;
   }

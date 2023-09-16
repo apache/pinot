@@ -29,7 +29,7 @@ public class NoOpBrokerQueryEventListener implements BrokerQueryEventListener {
   }
 
   @Override
-  public void onQueryCompletion(BrokerQueryEventInfo brokerQueryEventInfo) {
+  public void onQueryCompletion() {
     // Not implemented method
   }
 }

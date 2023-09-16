@@ -24,5 +24,5 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public interface BrokerQueryEventListener {
 
   void init(PinotConfiguration eventListenerConfiguration);
-  void onQueryCompletion(BrokerQueryEventInfo brokerQueryEventInfo);
+  void onQueryCompletion();
 }
