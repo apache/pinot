@@ -20,6 +20,7 @@
 package org.apache.pinot.controller.api.access;
 
 import javax.annotation.Nullable;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -63,6 +64,9 @@ public final class AccessControlUtils {
           return;
         }
       }
+    } catch (WebApplicationException exception) {
+      // throwing the exception if it's WebApplicationException
+      throw exception;
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught exception while validating permission for "
           + userMessage, Response.Status.INTERNAL_SERVER_ERROR, e);

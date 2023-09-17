@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.ws.rs.WebApplicationException;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -75,7 +76,11 @@ public class BasicAuthAccessControlTest {
     HttpRequesterIdentity identity = new HttpRequesterIdentity();
     identity.setHttpHeaders(headers);
 
-    Assert.assertFalse(_accessControl.hasAccess(identity, (BrokerRequest) null));
+    try {
+      _accessControl.hasAccess(identity, (BrokerRequest) null);
+    } catch (WebApplicationException e) {
+      Assert.assertEquals(e.getResponse().getStatus(), 401, "must return 401");
+    }
   }
 
   @Test

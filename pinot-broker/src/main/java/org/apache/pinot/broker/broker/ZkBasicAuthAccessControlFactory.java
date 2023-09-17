@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.ws.rs.NotAuthorizedException;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.api.AccessControl;
@@ -99,8 +100,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         public boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
             Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
             if (!principalOpt.isPresent()) {
-                // no matching token? reject
-                return false;
+                throw new NotAuthorizedException("Basic");
             }
             if (tables == null || tables.isEmpty()) {
                 return true;

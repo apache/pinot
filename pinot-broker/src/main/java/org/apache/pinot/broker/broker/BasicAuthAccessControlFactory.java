@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.ws.rs.NotAuthorizedException;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -86,8 +87,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       if (!principalOpt.isPresent()) {
-        // no matching token? reject
-        return false;
+        throw new NotAuthorizedException("Basic");
       }
 
       BasicAuthPrincipal principal = principalOpt.get();
@@ -105,8 +105,7 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       if (!principalOpt.isPresent()) {
-        // no matching token? reject
-        return false;
+        throw new NotAuthorizedException("Basic");
       }
 
       if (tables == null || tables.isEmpty()) {
