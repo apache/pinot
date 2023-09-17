@@ -33,10 +33,10 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
   </properties>
-  <version>1.0.0-hotfix-SNAPSHOT</version>
+  <version>1.0.0-hotfix</version>
   <scm>
     <developerConnection>scm:git:git@github.com:apache/pinot.git</developerConnection>
-    <tag>release-1.0.0-pinot-java-client-bugfix</tag>
+    <tag>pinot-java-client-1.0.0-hotfix</tag>
   </scm>
   <build>
     <plugins>
