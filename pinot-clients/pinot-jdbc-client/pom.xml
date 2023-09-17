@@ -33,6 +33,11 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
   </properties>
+  <version>1.0.0-hotfix-SNAPSHOT</version>
+  <scm>
+    <developerConnection>scm:git:git@github.com:apache/pinot.git</developerConnection>
+    <tag>pinot-jdbc-client-1.0.0-hotfix</tag>
+  </scm>
   <build>
     <plugins>
       <plugin>
@@ -66,12 +71,94 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-java-client</artifactId>
-      <version>${project.version}</version>
+      <version>1.0.0-hotfix</version>
+      <exclusions>
+        <exclusion>
+          <artifactId>pinot-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>pinot-segment-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>pinot-common</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spi</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi</artifactId>
+      <version>1.0.0</version>
+      <exclusions>
+        <exclusion>
+          <artifactId>pinot-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-common</artifactId>
+      <version>1.0.0</version>
+      <exclusions>
+        <exclusion>
+          <artifactId>pinot-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>pinot-segment-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
+      <version>1.0.0</version>
+      <exclusions>
+        <exclusion>
+          <artifactId>pinot-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>pinot-segment-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>pinot-common</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
-      <version>${project.version}</version>
+      <version>1.0.0</version>
+      <exclusions>
+        <exclusion>
+          <artifactId>pinot-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>pinot-segment-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>pinot-common</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>pinot-segment-local</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>
@@ -99,7 +186,6 @@
       <artifactId>jsr305</artifactId>
     </dependency>
   </dependencies>
-
   <profiles>
     <profile>
       <id>build-shaded-jar</id>
