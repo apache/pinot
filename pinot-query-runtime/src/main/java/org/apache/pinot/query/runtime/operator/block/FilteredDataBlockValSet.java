@@ -21,10 +21,11 @@ package org.apache.pinot.query.runtime.operator.block;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -35,13 +36,38 @@ import org.roaringbitmap.RoaringBitmap;
  * aggregations using v1 aggregation functions.
  * TODO: Support MV
  */
-public class FilteredDataBlockValSet extends DataBlockValSet {
-  private final int _filterIdx;
+public class FilteredDataBlockValSet implements BlockValSet {
+  private final DataType _dataType;
+  private final DataType _storedType;
+  private final DataBlock _dataBlock;
+  private final int _colId;
+  private final int _numMatchedRows;
+  private final RoaringBitmap _matchedBitmap;
+  private final RoaringBitmap _matchedNullBitmap;
 
-  public FilteredDataBlockValSet(DataSchema.ColumnDataType columnDataType, DataBlock dataBlock, int colIndex,
-      int filterIdx) {
-    super(columnDataType, dataBlock, colIndex);
-    _filterIdx = filterIdx;
+  public FilteredDataBlockValSet(ColumnDataType columnDataType, DataBlock dataBlock, int colId, int numMatchedRows,
+      RoaringBitmap matchedBitmap) {
+    _dataType = columnDataType.toDataType();
+    _storedType = _dataType.getStoredType();
+    _dataBlock = dataBlock;
+    _colId = colId;
+    _numMatchedRows = numMatchedRows;
+    _matchedBitmap = matchedBitmap;
+
+    RoaringBitmap nullBitmap = dataBlock.getNullRowIds(colId);
+    if (nullBitmap == null) {
+      _matchedNullBitmap = null;
+    } else {
+      RoaringBitmap matchedNullBitmap = new RoaringBitmap();
+      PeekableIntIterator iterator = matchedBitmap.getIntIterator();
+      for (int i = 0; i < numMatchedRows; i++) {
+        int rowId = iterator.next();
+        if (nullBitmap.contains(rowId)) {
+          matchedNullBitmap.add(i);
+        }
+      }
+      _matchedNullBitmap = !matchedNullBitmap.isEmpty() ? matchedNullBitmap : null;
+    }
   }
 
   /**
@@ -50,11 +76,11 @@ public class FilteredDataBlockValSet extends DataBlockValSet {
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap() {
-    return _nullBitMap;
+    return _matchedNullBitmap;
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
+  public DataType getValueType() {
     return _dataType;
   }
 
@@ -77,37 +103,44 @@ public class FilteredDataBlockValSet extends DataBlockValSet {
 
   @Override
   public int[] getIntValuesSV() {
-    return DataBlockUtils.extractIntValuesForColumn(_dataBlock, _index, _filterIdx);
+    return DataBlockExtractUtils.extractIntColumn(_storedType, _dataBlock, _colId, _numMatchedRows, _matchedBitmap,
+        _matchedNullBitmap);
   }
 
   @Override
   public long[] getLongValuesSV() {
-    return DataBlockUtils.extractLongValuesForColumn(_dataBlock, _index, _filterIdx);
+    return DataBlockExtractUtils.extractLongColumn(_storedType, _dataBlock, _colId, _numMatchedRows, _matchedBitmap,
+        _matchedNullBitmap);
   }
 
   @Override
   public float[] getFloatValuesSV() {
-    return DataBlockUtils.extractFloatValuesForColumn(_dataBlock, _index, _filterIdx);
+    return DataBlockExtractUtils.extractFloatColumn(_storedType, _dataBlock, _colId, _numMatchedRows, _matchedBitmap,
+        _matchedNullBitmap);
   }
 
   @Override
   public double[] getDoubleValuesSV() {
-    return DataBlockUtils.extractDoubleValuesForColumn(_dataBlock, _index, _filterIdx);
+    return DataBlockExtractUtils.extractDoubleColumn(_storedType, _dataBlock, _colId, _numMatchedRows, _matchedBitmap,
+        _matchedNullBitmap);
   }
 
   @Override
   public BigDecimal[] getBigDecimalValuesSV() {
-    return DataBlockUtils.extractBigDecimalValuesForColumn(_dataBlock, _index, _filterIdx);
+    return DataBlockExtractUtils.extractBigDecimalColumn(_storedType, _dataBlock, _colId, _numMatchedRows,
+        _matchedBitmap, _matchedNullBitmap);
   }
 
   @Override
   public String[] getStringValuesSV() {
-    return DataBlockUtils.extractStringValuesForColumn(_dataBlock, _index, _filterIdx);
+    return DataBlockExtractUtils.extractStringColumn(_storedType, _dataBlock, _colId, _numMatchedRows, _matchedBitmap,
+        _matchedNullBitmap);
   }
 
   @Override
   public byte[][] getBytesValuesSV() {
-    return DataBlockUtils.extractBytesValuesForColumn(_dataBlock, _index, _filterIdx);
+    return DataBlockExtractUtils.extractBytesColumn(_storedType, _dataBlock, _colId, _numMatchedRows, _matchedBitmap,
+        _matchedNullBitmap);
   }
 
   @Override

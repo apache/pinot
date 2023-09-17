@@ -20,9 +20,7 @@
       }
     },
     "queries": [
-      { 
-        "ignored": true,
-        "comments": "FILTER WHERE clause with IN hard-wired to translate into subquery, which in this case should not happen.",
+      {
         "sql": "SELECT min(double_col) FILTER (WHERE string_col IN ('a', 'b')), count(*) FROM {tbl}"
       },
       {
@@ -36,8 +34,6 @@
         "sql": "SELECT count(*) FILTER (WHERE string_col = 'a' OR int_col > 10) FROM {tbl} GROUP BY int_col"
       },
       {
-        "ignored": true,
-        "comments": "agg with group by and filter will create NULL-able columns that are unsupported with current AGG FILTER WHERE semantics.",
         "sql": "SELECT min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), max(double_col) FILTER (WHERE string_col = 'a' OR int_col > 10), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col > 10), count(*) FROM {tbl} GROUP BY int_col, string_col"
       },
       {
@@ -50,26 +46,34 @@
         "comments": "FILTER WHERE clause might omit group key entirely if nothing is being selected out, this is non-standard SQL behavior but it is v1 behavior",
         "sql": "SELECT int_col, count(double_col) FILTER (WHERE string_col = 'a' OR int_col > 10) FROM {tbl} GROUP BY int_col"
       },
-      { "sql": "SELECT count(*) FILTER (WHERE string_col = 'a' OR int_col > 10) FROM {tbl}" },
-      { "sql": "SELECT min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), max(double_col) FILTER (WHERE string_col = 'a' OR int_col > 10), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col > 10), count(*) FROM {tbl}" },
-      { "sql": "SELECT min(int_col) FILTER (WHERE bool_col IS TRUE), max(int_col) FILTER (WHERE bool_col AND int_col < 10), avg(int_col) FILTER (WHERE MOD(int_col, 3) = 0), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FILTER (WHERE MOD(int_col, 3) = 0) FROM {tbl}" },
-      { "sql": "SELECT count(*) FILTER (WHERE string_col = 'a' OR int_col > 10) FROM {tbl} WHERE string_col='b'" },
-      { "sql": "SELECT min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), max(double_col) FILTER (WHERE string_col = 'a' OR int_col > 10), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col > 10), count(*) FROM {tbl} WHERE string_col='b'" },
-      { "sql": "SELECT int_col, COALESCE(count(double_col) FILTER (WHERE string_col = 'a' OR int_col > 0), 0), count(*) FROM {tbl} GROUP BY int_col" },
       {
-        "ignored": true,
-        "comments": "Calcite limitation on SQL type inference and Relational type inference has mismatched info (regarding filterArg existent, thus nullability mismatched",
+        "sql": "SELECT count(*) FILTER (WHERE string_col = 'a' OR int_col > 10) FROM {tbl}"
+      },
+      {
+        "sql": "SELECT min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), max(double_col) FILTER (WHERE string_col = 'a' OR int_col > 10), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col > 10), count(*) FROM {tbl}"
+      },
+      {
+        "sql": "SELECT min(int_col) FILTER (WHERE bool_col IS TRUE), max(int_col) FILTER (WHERE bool_col AND int_col < 10), avg(int_col) FILTER (WHERE MOD(int_col, 3) = 0), sum(int_col), count(int_col), count(distinct(int_col)), count(*) FILTER (WHERE MOD(int_col, 3) = 0) FROM {tbl}"
+      },
+      {
+        "sql": "SELECT count(*) FILTER (WHERE string_col = 'a' OR int_col > 10) FROM {tbl} WHERE string_col='b'"
+      },
+      {
+        "sql": "SELECT min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), max(double_col) FILTER (WHERE string_col = 'a' OR int_col > 10), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col > 10), count(*) FROM {tbl} WHERE string_col='b'"
+      },
+      {
+        "sql": "SELECT int_col, COALESCE(count(double_col) FILTER (WHERE string_col = 'a' OR int_col > 0), 0), count(*) FROM {tbl} GROUP BY int_col"
+      },
+      {
         "sql": "SELECT int_col, string_col, COALESCE(min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), 0), COALESCE(max(double_col) FILTER (WHERE string_col = 'a' OR int_col > 10), 0), avg(double_col), sum(double_col), count(double_col), COALESCE(count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col > 10), 0) FROM {tbl} GROUP BY int_col, string_col"
       },
       {
-        "ignored": true,
-        "comments": "Calcite limitation on SQL type inference and Relational type inference has mismatched info (regarding filterArg existent, thus nullability mismatched",
         "sql": "SELECT double_col, COALESCE(min(int_col) FILTER (WHERE bool_col IS TRUE), 0), COALESCE(max(int_col) FILTER (WHERE bool_col AND int_col < 10), 0), COALESCE(avg(int_col) FILTER (WHERE MOD(int_col, 3) = 0), 0), sum(int_col), count(int_col), count(distinct(int_col)), count(string_col) FILTER (WHERE MOD(int_col, 3) = 0) FROM {tbl} GROUP BY double_col"
       },
-      { "sql": "SELECT double_col, bool_col, count(int_col) FILTER (WHERE string_col = 'a' OR int_col > 10), count(int_col) FROM {tbl} WHERE string_col IN ('a', 'b') GROUP BY double_col, bool_col" },
       {
-        "ignored": true,
-        "comments": "Calcite limitation on SQL type inference and Relational type inference has mismatched info (regarding filterArg existent, thus nullability mismatched",
+        "sql": "SELECT double_col, bool_col, count(int_col) FILTER (WHERE string_col = 'a' OR int_col > 10), count(int_col) FROM {tbl} WHERE string_col IN ('a', 'b') GROUP BY double_col, bool_col"
+      },
+      {
         "sql": "SELECT bool_col, COALESCE(min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), 0), COALESCE(max(double_col) FILTER (WHERE string_col = 'a' OR int_col > 10), 0), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col > 10), count(string_col) FROM {tbl} WHERE string_col='b' GROUP BY bool_col"
       }
     ]
@@ -110,8 +114,6 @@
     },
     "queries": [
       {
-        "ignored": true,
-        "comments": "FILTER WHERE clause with IN hard-wired to translate into subquery, which in this case should not happen.",
         "sql": "SELECT min(double_col) FILTER (WHERE string_col IN ('a', 'b')), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2"
       },
       {
@@ -123,8 +125,6 @@
         "sql": "SELECT count(*) FILTER (WHERE string_col = 'a' OR int_col2 > 10) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY int_col2"
       },
       {
-        "ignored": true,
-        "comments": "agg with group by and filter will create NULL-able columns that are unsupported with current AGG FILTER WHERE semantics.",
         "sql": "SELECT min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), max(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 10), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col2 > 10), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY int_col2, string_col"
       },
       {
@@ -137,26 +137,34 @@
         "comments": "FILTER WHERE clause might omit group key entirely if nothing is being selected out, this is non-standard SQL behavior but it is v1 behavior",
         "sql": "SELECT int_col2, count(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 10) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY int_col2"
       },
-      { "sql": "SELECT count(*) FILTER (WHERE string_col = 'a' OR int_col2 > 10) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2" },
-      { "sql": "SELECT min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), max(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 10), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col2 > 10), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2" },
-      { "sql": "SELECT min(int_col2) FILTER (WHERE bool_col IS TRUE), max(int_col2) FILTER (WHERE bool_col AND int_col2 < 10), avg(int_col2) FILTER (WHERE MOD(int_col2, 3) = 0), sum(int_col2), count(int_col2), count(distinct(int_col2)), count(*) FILTER (WHERE MOD(int_col2, 3) = 0) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2" },
-      { "sql": "SELECT count(*) FILTER (WHERE string_col = 'a' OR int_col2 > 10) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 WHERE string_col='b'" },
-      { "sql": "SELECT min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), max(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 10), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col2 > 10), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 WHERE string_col='b'" },
-      { "sql": "SELECT int_col2, COALESCE(count(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 0), 0), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY int_col2" },
       {
-        "ignored": true,
-        "comments": "Calcite limitation on SQL type inference and Relational type inference has mismatched info (regarding filterArg existent, thus nullability mismatched",
+        "sql": "SELECT count(*) FILTER (WHERE string_col = 'a' OR int_col2 > 10) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2"
+      },
+      {
+        "sql": "SELECT min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), max(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 10), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col2 > 10), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2"
+      },
+      {
+        "sql": "SELECT min(int_col2) FILTER (WHERE bool_col IS TRUE), max(int_col2) FILTER (WHERE bool_col AND int_col2 < 10), avg(int_col2) FILTER (WHERE MOD(int_col2, 3) = 0), sum(int_col2), count(int_col2), count(distinct(int_col2)), count(*) FILTER (WHERE MOD(int_col2, 3) = 0) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2"
+      },
+      {
+        "sql": "SELECT count(*) FILTER (WHERE string_col = 'a' OR int_col2 > 10) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 WHERE string_col='b'"
+      },
+      {
+        "sql": "SELECT min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), max(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 10), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col2 > 10), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 WHERE string_col='b'"
+      },
+      {
+        "sql": "SELECT int_col2, COALESCE(count(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 0), 0), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY int_col2"
+      },
+      {
         "sql": "SELECT int_col2, string_col, COALESCE(min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), 0), COALESCE(max(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 10), 0), avg(double_col), sum(double_col), count(double_col), COALESCE(count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col2 > 10), 0) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY int_col2, string_col"
       },
       {
-        "ignored": true,
-        "comments": "Calcite limitation on SQL type inference and Relational type inference has mismatched info (regarding filterArg existent, thus nullability mismatched",
         "sql": "SELECT double_col, COALESCE(min(int_col2) FILTER (WHERE bool_col IS TRUE), 0), COALESCE(max(int_col2) FILTER (WHERE bool_col AND int_col2 < 10), 0), COALESCE(avg(int_col2) FILTER (WHERE MOD(int_col2, 3) = 0), 0), sum(int_col2), count(int_col2), count(distinct(int_col2)), count(string_col) FILTER (WHERE MOD(int_col2, 3) = 0) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY double_col"
       },
-      { "sql": "SELECT double_col, bool_col, count(int_col2) FILTER (WHERE string_col = 'a' OR int_col2 > 10), count(int_col2) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 WHERE string_col IN ('a', 'b') GROUP BY double_col, bool_col" },
       {
-        "ignored": true,
-        "comments": "Calcite limitation on SQL type inference and Relational type inference has mismatched info (regarding filterArg existent, thus nullability mismatched",
+        "sql": "SELECT double_col, bool_col, count(int_col2) FILTER (WHERE string_col = 'a' OR int_col2 > 10), count(int_col2) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 WHERE string_col IN ('a', 'b') GROUP BY double_col, bool_col"
+      },
+      {
         "sql": "SELECT bool_col, COALESCE(min(double_col) FILTER (WHERE string_col = 'a' OR string_col = 'b'), 0), COALESCE(max(double_col) FILTER (WHERE string_col = 'a' OR int_col2 > 10), 0), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)) FILTER (WHERE string_col = 'b' OR int_col2 > 10), count(string_col) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2 WHERE string_col='b' GROUP BY bool_col"
       }
     ]

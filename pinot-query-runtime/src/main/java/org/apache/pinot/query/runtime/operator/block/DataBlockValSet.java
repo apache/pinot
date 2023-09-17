@@ -21,12 +21,12 @@ package org.apache.pinot.query.runtime.operator.block;
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
+
 
 /**
  * In the multistage engine, the leaf stage servers process the data in columnar fashion. By the time the
@@ -36,29 +36,28 @@ import org.roaringbitmap.RoaringBitmap;
  * TODO: Support MV
  */
 public class DataBlockValSet implements BlockValSet {
-  protected final FieldSpec.DataType _dataType;
-  protected final DataBlock _dataBlock;
-  protected final int _index;
-  protected final RoaringBitmap _nullBitMap;
+  private final DataType _dataType;
+  private final DataType _storedType;
+  private final DataBlock _dataBlock;
+  private final int _colId;
+  private final RoaringBitmap _nullBitmap;
 
-  public DataBlockValSet(DataSchema.ColumnDataType columnDataType, DataBlock dataBlock, int colIndex) {
+  public DataBlockValSet(ColumnDataType columnDataType, DataBlock dataBlock, int colId) {
     _dataType = columnDataType.toDataType();
+    _storedType = _dataType.getStoredType();
     _dataBlock = dataBlock;
-    _index = colIndex;
-    _nullBitMap = dataBlock.getNullRowIds(colIndex);
+    _colId = colId;
+    _nullBitmap = dataBlock.getNullRowIds(colId);
   }
 
-  /**
-   * Returns a bitmap of indices where null values are found.
-   */
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap() {
-    return _nullBitMap;
+    return _nullBitmap;
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
+  public DataType getValueType() {
     return _dataType;
   }
 
@@ -81,37 +80,37 @@ public class DataBlockValSet implements BlockValSet {
 
   @Override
   public int[] getIntValuesSV() {
-    return DataBlockUtils.extractIntValuesForColumn(_dataBlock, _index);
+    return DataBlockExtractUtils.extractIntColumn(_storedType, _dataBlock, _colId, _nullBitmap);
   }
 
   @Override
   public long[] getLongValuesSV() {
-    return DataBlockUtils.extractLongValuesForColumn(_dataBlock, _index);
+    return DataBlockExtractUtils.extractLongColumn(_storedType, _dataBlock, _colId, _nullBitmap);
   }
 
   @Override
   public float[] getFloatValuesSV() {
-    return DataBlockUtils.extractFloatValuesForColumn(_dataBlock, _index);
+    return DataBlockExtractUtils.extractFloatColumn(_storedType, _dataBlock, _colId, _nullBitmap);
   }
 
   @Override
   public double[] getDoubleValuesSV() {
-    return DataBlockUtils.extractDoubleValuesForColumn(_dataBlock, _index);
+    return DataBlockExtractUtils.extractDoubleColumn(_storedType, _dataBlock, _colId, _nullBitmap);
   }
 
   @Override
   public BigDecimal[] getBigDecimalValuesSV() {
-    return DataBlockUtils.extractBigDecimalValuesForColumn(_dataBlock, _index);
+    return DataBlockExtractUtils.extractBigDecimalColumn(_storedType, _dataBlock, _colId, _nullBitmap);
   }
 
   @Override
   public String[] getStringValuesSV() {
-    return DataBlockUtils.extractStringValuesForColumn(_dataBlock, _index);
+    return DataBlockExtractUtils.extractStringColumn(_storedType, _dataBlock, _colId, _nullBitmap);
   }
 
   @Override
   public byte[][] getBytesValuesSV() {
-    return DataBlockUtils.extractBytesValuesForColumn(_dataBlock, _index);
+    return DataBlockExtractUtils.extractBytesColumn(_storedType, _dataBlock, _colId, _nullBitmap);
   }
 
   @Override
