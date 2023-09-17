@@ -33,6 +33,11 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
   </properties>
+  <version>1.0.0-hotfix-SNAPSHOT</version>
+  <scm>
+    <developerConnection>scm:git:git@github.com:apache/pinot.git</developerConnection>
+    <tag>release-1.0.0-pinot-java-client-bugfix</tag>
+  </scm>
   <build>
     <plugins>
       <plugin>
@@ -63,8 +68,34 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spi</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-spi</artifactId>
+      <version>1.0.0</version>
+      <exclusions>
+        <exclusion>
+          <artifactId>pinot-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
-      <version>${project.version}</version>
+      <version>1.0.0</version>
+      <exclusions>
+        <exclusion>
+          <artifactId>pinot-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>pinot-segment-spi</artifactId>
+          <groupId>org.apache.pinot</groupId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
