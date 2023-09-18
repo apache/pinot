@@ -81,6 +81,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -962,6 +963,73 @@ public class PinotTableRestletResource {
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("tables/{tableName}/indexes")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the aggregate index details of all segments for a table", notes = "Get the aggregate "
+      + "index details of all segments for a table")
+  public String getTableIndexes(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+    LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+
+    String tableIndexMetadata;
+    try {
+      JsonNode segmentsMetadataJson = getAggregateIndexMetadataFromServer(tableNameWithType);
+      tableIndexMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, ioe);
+    }
+    return tableIndexMetadata;
+  }
+
+  private JsonNode getAggregateIndexMetadataFromServer(String tableNameWithType)
+      throws InvalidConfigException, JsonProcessingException {
+    final Map<String, List<String>> serverToSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+
+    BiMap<String, String> serverEndPoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+
+    List<String> serverUrls = new ArrayList<>();
+    BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
+    for (String endpoint : endpointsToServers.keySet()) {
+      String segmentIndexesEndpoint = endpoint + String.format("/tables/%s/indexes", tableNameWithType);
+      serverUrls.add(segmentIndexesEndpoint);
+    }
+
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
+
+    int totalSegments = 0;
+    Map<String, Map<String, Integer>> columnToIndexCountMap = new HashMap<>();
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      String responseString = streamResponse.getValue();
+      TableIndexMetadataResponse response = JsonUtils.stringToObject(responseString, TableIndexMetadataResponse.class);
+      totalSegments += response.getTotalOnlineSegments();
+      response.getColumnToIndexesCount().forEach((col, indexToCount) -> {
+        Map<String, Integer> indexCountMap = columnToIndexCountMap.computeIfAbsent(col, c -> new HashMap<>());
+        indexToCount.forEach((indexName, count) -> {
+          indexCountMap.merge(indexName, count, Integer::sum);
+        });
+      });
+    }
+
+    TableIndexMetadataResponse tableIndexMetadataResponse =
+        new TableIndexMetadataResponse(totalSegments, columnToIndexCountMap);
+
+    return JsonUtils.objectToJsonNode(tableIndexMetadataResponse);
   }
 
   /**

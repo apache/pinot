@@ -54,12 +54,14 @@ import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -2909,6 +2911,38 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testHardcodedServerPartitionedSqlQueries()
       throws Exception {
     super.testHardcodedServerPartitionedSqlQueries();
+  }
+
+  @Test
+  public void testIndexMetadataAPI()
+      throws Exception {
+    TableIndexMetadataResponse tableIndexMetadataResponse =
+        JsonUtils.stringToObject(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/indexes?type=OFFLINE"),
+            TableIndexMetadataResponse.class);
+
+    getInvertedIndexColumns().forEach(column -> {
+      Assert.assertEquals(
+          (long) tableIndexMetadataResponse.getColumnToIndexesCount().get(column).get(StandardIndexes.INVERTED_ID),
+          tableIndexMetadataResponse.getTotalOnlineSegments());
+    });
+
+    getNoDictionaryColumns().forEach(column -> {
+      Assert.assertEquals(
+          (long) tableIndexMetadataResponse.getColumnToIndexesCount().get(column).get(StandardIndexes.DICTIONARY_ID),
+          0);
+    });
+
+    getRangeIndexColumns().forEach(column -> {
+      Assert.assertEquals(
+          (long) tableIndexMetadataResponse.getColumnToIndexesCount().get(column).get(StandardIndexes.RANGE_ID),
+          tableIndexMetadataResponse.getTotalOnlineSegments());
+    });
+
+    getBloomFilterColumns().forEach(column -> {
+      Assert.assertEquals(
+          (long) tableIndexMetadataResponse.getColumnToIndexesCount().get(column).get(StandardIndexes.BLOOM_FILTER_ID),
+          tableIndexMetadataResponse.getTotalOnlineSegments());
+    });
   }
 
   @Test
