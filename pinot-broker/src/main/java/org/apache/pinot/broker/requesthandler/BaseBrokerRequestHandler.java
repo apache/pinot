@@ -25,7 +25,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -1399,11 +1398,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @VisibleForTesting
   static void updateColumnNames(String rawTableName, PinotQuery pinotQuery, boolean isCaseInsensitive,
       Map<String, String> columnNameMap) {
-    Map<String, String> aliasMap = new HashMap<>();
     if (pinotQuery != null) {
       boolean hasStar = false;
       for (Expression expression : pinotQuery.getSelectList()) {
-        fixColumnName(rawTableName, expression, columnNameMap, aliasMap, isCaseInsensitive);
+        fixColumnName(rawTableName, expression, columnNameMap, isCaseInsensitive);
         //check if the select expression is '*'
         if (!hasStar && expression.equals(STAR)) {
           hasStar = true;
@@ -1415,25 +1413,26 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
       Expression filterExpression = pinotQuery.getFilterExpression();
       if (filterExpression != null) {
-        fixColumnName(rawTableName, filterExpression, columnNameMap, aliasMap, isCaseInsensitive);
+        // We don't support alias in filter expression, so we don't need to pass aliasMap
+        fixColumnName(rawTableName, filterExpression, columnNameMap, isCaseInsensitive);
       }
       List<Expression> groupByList = pinotQuery.getGroupByList();
       if (groupByList != null) {
         for (Expression expression : groupByList) {
-          fixColumnName(rawTableName, expression, columnNameMap, aliasMap, isCaseInsensitive);
+          fixColumnName(rawTableName, expression, columnNameMap, isCaseInsensitive);
         }
       }
       List<Expression> orderByList = pinotQuery.getOrderByList();
       if (orderByList != null) {
         for (Expression expression : orderByList) {
           // NOTE: Order-by is always a Function with the ordering of the Expression
-          fixColumnName(rawTableName, expression.getFunctionCall().getOperands().get(0), columnNameMap, aliasMap,
+          fixColumnName(rawTableName, expression.getFunctionCall().getOperands().get(0), columnNameMap,
               isCaseInsensitive);
         }
       }
       Expression havingExpression = pinotQuery.getHavingExpression();
       if (havingExpression != null) {
-        fixColumnName(rawTableName, havingExpression, columnNameMap, aliasMap, isCaseInsensitive);
+        fixColumnName(rawTableName, havingExpression, columnNameMap, isCaseInsensitive);
       }
     }
   }
@@ -1466,32 +1465,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Fixes the column names to the actual column names in the given expression.
    */
   private static void fixColumnName(String rawTableName, Expression expression, Map<String, String> columnNameMap,
-      Map<String, String> aliasMap, boolean ignoreCase) {
+      boolean ignoreCase) {
     ExpressionType expressionType = expression.getType();
     if (expressionType == ExpressionType.IDENTIFIER) {
       Identifier identifier = expression.getIdentifier();
-      identifier.setName(getActualColumnName(rawTableName, identifier.getName(), columnNameMap, aliasMap, ignoreCase));
+      identifier.setName(getActualColumnName(rawTableName, identifier.getName(), columnNameMap, ignoreCase));
     } else if (expressionType == ExpressionType.FUNCTION) {
       final Function functionCall = expression.getFunctionCall();
       switch (functionCall.getOperator()) {
         case "as":
-          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, aliasMap, ignoreCase);
-          final Expression rightAsExpr = functionCall.getOperands().get(1);
-          if (rightAsExpr.isSetIdentifier()) {
-            String rightColumn = rightAsExpr.getIdentifier().getName();
-            if (ignoreCase) {
-              aliasMap.put(rightColumn.toLowerCase(), rightColumn);
-            } else {
-              aliasMap.put(rightColumn, rightColumn);
-            }
-          }
+          fixColumnName(rawTableName, functionCall.getOperands().get(0), columnNameMap, ignoreCase);
           break;
         case "lookup":
           // LOOKUP function looks up another table's schema, skip the check for now.
           break;
         default:
           for (Expression operand : functionCall.getOperands()) {
-            fixColumnName(rawTableName, operand, columnNameMap, aliasMap, ignoreCase);
+            fixColumnName(rawTableName, operand, columnNameMap, ignoreCase);
           }
           break;
       }
@@ -1505,7 +1495,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   @VisibleForTesting
   static String getActualColumnName(String rawTableName, String columnName, @Nullable Map<String, String> columnNameMap,
-      @Nullable Map<String, String> aliasMap, boolean ignoreCase) {
+      boolean ignoreCase) {
     if ("*".equals(columnName)) {
       return columnName;
     }
@@ -1521,12 +1511,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String actualColumnName = columnNameMap.get(columnNameToCheck);
       if (actualColumnName != null) {
         return actualColumnName;
-      }
-    }
-    if (aliasMap != null) {
-      String actualAlias = aliasMap.get(columnNameToCheck);
-      if (actualAlias != null) {
-        return actualAlias;
       }
     }
     if (columnName.charAt(0) == '$') {

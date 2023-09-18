@@ -140,6 +140,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(e);
       LOGGER.warn("Caught exception planning request {}: {}, {}", requestId, query, consolidatedMessage);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+      if (e.getMessage().matches(".* Column .* not found in any table'")) {
+        requestContext.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
+        return new BrokerResponseNative(
+            QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, consolidatedMessage));
+      }
       requestContext.setErrorCode(QueryException.QUERY_PLANNING_ERROR_CODE);
       return new BrokerResponseNative(
           QueryException.getException(QueryException.QUERY_PLANNING_ERROR, consolidatedMessage));

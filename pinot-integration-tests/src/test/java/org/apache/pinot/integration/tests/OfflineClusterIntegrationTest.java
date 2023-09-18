@@ -2231,6 +2231,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     {
+      String pinotQuery = "SELECT count(*), DaysSinceEpoch as d FROM mytable WHERE d = 16138 GROUP BY d";
+      JsonNode jsonNode = postQuery(pinotQuery);
+      JsonNode exceptions = jsonNode.get("exceptions");
+      assertFalse(exceptions.isEmpty());
+      assertEquals(exceptions.get(0).get("errorCode").asInt(), 710);
+    }
+    {
       //test same alias name with column name
       String query = "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable "
           + "ORDER BY DaysSinceEpoch DESC";
@@ -2598,7 +2605,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pinotQuery = "SELECT DISTINCT Carrier FROM db.mytable LIMIT 1000000";
     testQuery(pinotQuery, h2Query);
   }
-
 
   @Test
   public void testQuerySourceWithDatabaseNameV2()
