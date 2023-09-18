@@ -783,7 +783,7 @@ public class PinotSegmentRestletResource {
         LOGGER.error("Failed to add reload all segments job meta into zookeeper for table: {}", tableNameWithType, e);
       }
     }
-    return new SuccessResponse(JsonUtils.objectToPrettyString(perTableMsgData));
+    return new SuccessResponse("Segment reload details: " + perTableMsgData);
   }
 
   @Deprecated
