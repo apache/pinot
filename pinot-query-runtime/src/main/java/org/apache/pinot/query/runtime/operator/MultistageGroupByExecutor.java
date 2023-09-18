@@ -50,16 +50,13 @@ import org.roaringbitmap.RoaringBitmap;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MultistageGroupByExecutor {
-  private final AggType _aggType;
-  // The identifier operands for the aggregation function only store the column name. This map contains mapping
-  // between column name to their index which is used in v2 engine.
-  private final Map<String, Integer> _colNameToIndexMap;
-  private final DataSchema _resultSchema;
-
   private final int[] _groupKeyIds;
   private final AggregationFunction[] _aggFunctions;
   private final int[] _filterArgIds;
   private final int _maxFilterArgId;
+  private final AggType _aggType;
+  private final DataSchema _resultSchema;
+  private final int _numGroupsLimit;
 
   // Group By Result holders for each mode
   private final GroupByResultHolder[] _aggregateResultHolders;
@@ -67,32 +64,33 @@ public class MultistageGroupByExecutor {
 
   // Mapping from the row-key to a zero based integer index. This is used when we invoke the v1 aggregation functions
   // because they use the zero based integer indexes to store results.
-  private final Map<Key, Integer> _groupKeyToIdMap;
-
-  private final int _numGroupsLimit;
+  private final Map<Key, Integer> _groupKeyToIdMap = new HashMap<>();
 
   private boolean _numGroupsLimitReached;
 
   public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
-      int maxFilterArgId, AggType aggType, Map<String, Integer> colNameToIndexMap, DataSchema resultSchema,
-      Map<String, String> opChainMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+      int maxFilterArgId, AggType aggType, DataSchema resultSchema, Map<String, String> opChainMetadata,
+      @Nullable AbstractPlanNode.NodeHint nodeHint) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
     _maxFilterArgId = maxFilterArgId;
     _aggType = aggType;
-    _colNameToIndexMap = colNameToIndexMap;
     _resultSchema = resultSchema;
-
-    _aggregateResultHolders = new GroupByResultHolder[_aggFunctions.length];
-    _mergeResultHolder = new HashMap<>();
-    _groupKeyToIdMap = new HashMap<>();
-
     int maxInitialResultHolderCapacity = getMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
     _numGroupsLimit = getNumGroupsLimit(opChainMetadata, nodeHint);
-    for (int i = 0; i < _aggFunctions.length; i++) {
-      _aggregateResultHolders[i] =
-          _aggFunctions[i].createGroupByResultHolder(maxInitialResultHolderCapacity, _numGroupsLimit);
+
+    int numFunctions = aggFunctions.length;
+    if (!aggType.isInputIntermediateFormat()) {
+      _aggregateResultHolders = new GroupByResultHolder[_aggFunctions.length];
+      for (int i = 0; i < _aggFunctions.length; i++) {
+        _aggregateResultHolders[i] =
+            _aggFunctions[i].createGroupByResultHolder(maxInitialResultHolderCapacity, _numGroupsLimit);
+      }
+      _mergeResultHolder = null;
+    } else {
+      _mergeResultHolder = new HashMap<>();
+      _aggregateResultHolders = null;
     }
   }
 
@@ -199,8 +197,7 @@ public class MultistageGroupByExecutor {
       int[] intKeys = generateGroupByKeys(block);
       for (int i = 0; i < _aggFunctions.length; i++) {
         AggregationFunction aggFunction = _aggFunctions[i];
-        Map<ExpressionContext, BlockValSet> blockValSetMap =
-            AggregateOperator.getBlockValSetMap(aggFunction, block, _colNameToIndexMap);
+        Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(aggFunction, block);
         GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
         groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
         aggFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
@@ -219,8 +216,7 @@ public class MultistageGroupByExecutor {
           if (intKeys == null) {
             intKeys = generateGroupByKeys(block);
           }
-          Map<ExpressionContext, BlockValSet> blockValSetMap =
-              AggregateOperator.getBlockValSetMap(aggFunction, block, _colNameToIndexMap);
+          Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(aggFunction, block);
           GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
           groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
           aggFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
@@ -237,8 +233,7 @@ public class MultistageGroupByExecutor {
           int numMatchedRows = numMatchedRowsArray[filterArgId];
           int[] filteredIntKeys = filteredIntKeysArray[filterArgId];
           Map<ExpressionContext, BlockValSet> blockValSetMap =
-              AggregateOperator.getFilteredBlockValSetMap(aggFunction, block, _colNameToIndexMap, numMatchedRows,
-                  matchedBitmap);
+              AggregateOperator.getFilteredBlockValSetMap(aggFunction, block, numMatchedRows, matchedBitmap);
           GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
           groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
           aggFunction.aggregateGroupBySV(numMatchedRows, filteredIntKeys, groupByResultHolder, blockValSetMap);
@@ -253,7 +248,7 @@ public class MultistageGroupByExecutor {
     int numFunctions = _aggFunctions.length;
     Object[][] intermediateResults = new Object[numFunctions][numRows];
     for (int i = 0; i < numFunctions; i++) {
-      intermediateResults[i] = AggregateOperator.getIntermediateResults(_aggFunctions[i], block, _colNameToIndexMap);
+      intermediateResults[i] = AggregateOperator.getIntermediateResults(_aggFunctions[i], block);
     }
     for (int i = 0; i < numRows; i++) {
       Object[] mergedResults = _mergeResultHolder.computeIfAbsent(intKeys[i], k -> new Object[numFunctions]);

@@ -20,7 +20,6 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -89,10 +88,7 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   @Override
   public MultiStageOperator visitAggregate(AggregateNode node, OpChainExecutionContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    DataSchema inputSchema = node.getInputs().get(0).getDataSchema();
-    DataSchema resultSchema = node.getDataSchema();
-
-    return new AggregateOperator(context, nextOperator, resultSchema, inputSchema, node.getAggCalls(),
+    return new AggregateOperator(context, nextOperator, node.getDataSchema(), node.getAggCalls(),
         node.getGroupSet(), node.getAggType(), node.getFilterArgIndices(), node.getNodeHint());
   }
 
