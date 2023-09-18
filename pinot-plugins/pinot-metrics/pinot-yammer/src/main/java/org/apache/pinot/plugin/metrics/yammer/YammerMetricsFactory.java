@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.metrics.yammer;
 
+import com.google.auto.service.AutoService;
 import java.util.function.Function;
 import org.apache.pinot.spi.annotations.metrics.MetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
@@ -28,6 +29,7 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
+@AutoService(PinotMetricsFactory.class)
 @MetricsFactory
 public class YammerMetricsFactory implements PinotMetricsFactory {
   private PinotMetricsRegistry _pinotMetricsRegistry = null;
