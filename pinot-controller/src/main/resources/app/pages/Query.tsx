@@ -577,20 +577,12 @@ const QueryPage = () => {
 
                       {
                         showException && resultError.map((error) => (
-                          <>
                           <Box style={{paddingBottom: "10px"}}>
                             <Alert className={classes.sqlError} severity="error">
                               {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode}</Typography>}
                               {error.message}
                             </Alert>
                           </Box>
-                           <Box style={{paddingBottom: "10px"}}>
-                           <Alert className={classes.sqlError} severity="error">
-                             {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode}</Typography>}
-                             {error.message}
-                           </Alert>
-                         </Box>
-                         </>
                         ))
                       }
                     </>
