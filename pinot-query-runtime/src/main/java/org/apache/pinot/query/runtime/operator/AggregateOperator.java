@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -26,51 +25,38 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.query.reduce.FilteredRowBasedBlockValSet;
+import org.apache.pinot.core.query.reduce.RowBasedBlockValSet;
 import org.apache.pinot.query.planner.logical.LiteralHintUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.block.DataBlockExtractUtils;
 import org.apache.pinot.query.runtime.operator.block.DataBlockValSet;
 import org.apache.pinot.query.runtime.operator.block.FilteredDataBlockValSet;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- *
  * AggregateOperator is used to aggregate values over a set of group by keys.
  * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
- * Currently, we only support the following aggregation functions:
- * 1. SUM
- * 2. COUNT
- * 3. MIN
- * 4. MAX
- * 5. DistinctCount and Count(Distinct)
- * 6. AVG
- * 7. FourthMoment
- * 8. BoolAnd and BoolOr
- *
  * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
- * In this case, the input can be any type.
- *
- * If the list of aggregation calls is not empty, the input of aggregation has to be a number.
- * Note: This class performs aggregation over the double value of input.
- * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  */
 public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
@@ -82,32 +68,25 @@ public class AggregateOperator extends MultiStageOperator {
 
   // Map that maintains the mapping between columnName and the column ordinal index. It is used to fetch the required
   // column value from row-based container and fetch the input datatype for the column.
+  // TODO: Pass the column index instead of converting back and forth
   private final Map<String, Integer> _colNameToIndexMap;
+
   private final Map<Integer, Map<Integer, Literal>> _aggCallSignatureMap;
 
-  private boolean _hasReturnedAggregateBlock;
-
-  private final boolean _isGroupByAggregation;
   private MultistageAggregationExecutor _aggregationExecutor;
   private MultistageGroupByExecutor _groupByExecutor;
+  private boolean _hasReturnedAggregateBlock;
 
-  @VisibleForTesting
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator, DataSchema resultSchema,
       DataSchema inputSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType,
-      @Nullable List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+      List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint) {
     super(context);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
     _inputSchema = inputSchema;
     _aggType = aggType;
-    // filter arg index array
-    int[] filterArgIndexArray;
-    if (filterArgIndices == null || filterArgIndices.size() == 0) {
-      filterArgIndexArray = null;
-    } else {
-      filterArgIndexArray = filterArgIndices.stream().mapToInt(Integer::intValue).toArray();
-    }
-    // filter operand and literal hints
+
+    // Process literal hints
     if (nodeHint != null && nodeHint._hintOptions != null
         && nodeHint._hintOptions.get(PinotHintOptions.INTERNAL_AGG_OPTIONS) != null) {
       _aggCallSignatureMap = LiteralHintUtils.hintStringToLiteralMap(
@@ -117,31 +96,34 @@ public class AggregateOperator extends MultiStageOperator {
       _aggCallSignatureMap = Collections.emptyMap();
     }
 
-    _hasReturnedAggregateBlock = false;
+    // Initialize the aggregation functions
     _colNameToIndexMap = new HashMap<>();
-
-    // Convert groupSet to ExpressionContext that our aggregation functions understand.
-    List<ExpressionContext> groupByExpr = getGroupSet(groupSet);
-
     List<FunctionContext> functionContexts = getFunctionContexts(aggCalls);
-    AggregationFunction[] aggFunctions = new AggregationFunction[functionContexts.size()];
-
-    for (int i = 0; i < functionContexts.size(); i++) {
+    int numFunctions = functionContexts.size();
+    AggregationFunction<?, ?>[] aggFunctions = new AggregationFunction[numFunctions];
+    for (int i = 0; i < numFunctions; i++) {
       aggFunctions[i] = AggregationFunctionFactory.getAggregationFunction(functionContexts.get(i), true);
     }
 
+    // Process the filter argument indices
+    int[] filterArgIds = new int[numFunctions];
+    int maxFilterArgId = -1;
+    for (int i = 0; i < numFunctions; i++) {
+      filterArgIds[i] = filterArgIndices.get(i);
+      maxFilterArgId = Math.max(maxFilterArgId, filterArgIds[i]);
+    }
+
     // Initialize the appropriate executor.
-    if (!groupSet.isEmpty()) {
-      _isGroupByAggregation = true;
-      Map<String, String> opChainMetadata = context.getOpChainMetadata();
-      _groupByExecutor =
-          new MultistageGroupByExecutor(groupByExpr, aggFunctions, filterArgIndexArray, aggType, _colNameToIndexMap,
-              _resultSchema, opChainMetadata, nodeHint);
-    } else {
-      _isGroupByAggregation = false;
+    if (groupSet.isEmpty()) {
       _aggregationExecutor =
-          new MultistageAggregationExecutor(aggFunctions, filterArgIndexArray, aggType, _colNameToIndexMap,
+          new MultistageAggregationExecutor(aggFunctions, filterArgIds, maxFilterArgId, aggType, _colNameToIndexMap,
               _resultSchema);
+      _groupByExecutor = null;
+    } else {
+      _groupByExecutor =
+          new MultistageGroupByExecutor(getGroupKeyIds(groupSet), aggFunctions, filterArgIds, maxFilterArgId, aggType,
+              _colNameToIndexMap, _resultSchema, context.getOpChainMetadata(), nodeHint);
+      _aggregationExecutor = null;
     }
   }
 
@@ -159,12 +141,7 @@ public class AggregateOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      TransferableBlock finalBlock;
-      if (_isGroupByAggregation) {
-        finalBlock = consumeGroupBy();
-      } else {
-        finalBlock = consumeAggregation();
-      }
+      TransferableBlock finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
 
       // setting upstream error block
       if (finalBlock.isErrorBlock()) {
@@ -184,7 +161,9 @@ public class AggregateOperator extends MultiStageOperator {
 
   private TransferableBlock produceAggregatedBlock() {
     _hasReturnedAggregateBlock = true;
-    if (_isGroupByAggregation) {
+    if (_aggregationExecutor != null) {
+      return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
+    } else {
       List<Object[]> rows = _groupByExecutor.getResult();
       if (rows.isEmpty()) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
@@ -197,8 +176,6 @@ public class AggregateOperator extends MultiStageOperator {
         }
         return dataBlock;
       }
-    } else {
-      return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
     }
   }
 
@@ -209,7 +186,7 @@ public class AggregateOperator extends MultiStageOperator {
   private TransferableBlock consumeGroupBy() {
     TransferableBlock block = _inputOperator.nextBlock();
     while (block.isDataBlock()) {
-      _groupByExecutor.processBlock(block, _inputSchema);
+      _groupByExecutor.processBlock(block);
       block = _inputOperator.nextBlock();
     }
     return block;
@@ -222,19 +199,18 @@ public class AggregateOperator extends MultiStageOperator {
   private TransferableBlock consumeAggregation() {
     TransferableBlock block = _inputOperator.nextBlock();
     while (block.isDataBlock()) {
-      _aggregationExecutor.processBlock(block, _inputSchema);
+      _aggregationExecutor.processBlock(block);
       block = _inputOperator.nextBlock();
     }
     return block;
   }
 
   private List<FunctionContext> getFunctionContexts(List<RexExpression> aggCalls) {
-    List<RexExpression.FunctionCall> aggFunctionCalls =
-        aggCalls.stream().map(RexExpression.FunctionCall.class::cast).collect(Collectors.toList());
-    List<FunctionContext> functionContexts = new ArrayList<>();
-    for (int aggIdx = 0; aggIdx < aggFunctionCalls.size(); aggIdx++) {
-      RexExpression.FunctionCall functionCall = aggFunctionCalls.get(aggIdx);
-      FunctionContext funcContext = convertRexExpressionsToFunctionContext(aggIdx, functionCall);
+    int numFunctions = aggCalls.size();
+    List<FunctionContext> functionContexts = new ArrayList<>(numFunctions);
+    for (int i = 0; i < numFunctions; i++) {
+      RexExpression.FunctionCall functionCall = (RexExpression.FunctionCall) aggCalls.get(i);
+      FunctionContext funcContext = convertRexExpressionsToFunctionContext(i, functionCall);
       functionContexts.add(funcContext);
     }
     return functionContexts;
@@ -282,16 +258,6 @@ public class AggregateOperator extends MultiStageOperator {
     }
   }
 
-  private List<ExpressionContext> getGroupSet(List<RexExpression> groupBySetRexExpr) {
-    List<ExpressionContext> groupByExprContext = new ArrayList<>();
-    for (RexExpression groupByRexExpr : groupBySetRexExpr) {
-      ExpressionContext exprContext = convertRexExpressionToExpressionContext(-1, -1, groupByRexExpr);
-      groupByExprContext.add(exprContext);
-    }
-
-    return groupByExprContext;
-  }
-
   private ExpressionContext convertRexExpressionToExpressionContext(int aggIdx, int argIdx, RexExpression rexExpr) {
     ExpressionContext exprContext;
     if (_aggCallSignatureMap.get(aggIdx) != null && _aggCallSignatureMap.get(aggIdx).get(argIdx) != null) {
@@ -325,57 +291,126 @@ public class AggregateOperator extends MultiStageOperator {
     return exprContext;
   }
 
-  // TODO: If the previous block is not mailbox received, this method is not efficient.  Then getDataBlock() will
-  //  convert the unserialized format to serialized format of BaseDataBlock. Then it will convert it back to column
-  //  value primitive type.
-  static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction aggFunction, TransferableBlock block,
-      DataSchema inputDataSchema, Map<String, Integer> colNameToIndexMap, int filterArgIdx) {
+  private int[] getGroupKeyIds(List<RexExpression> groupSet) {
+    int numKeys = groupSet.size();
+    int[] groupKeyIds = new int[numKeys];
+    for (int i = 0; i < numKeys; i++) {
+      RexExpression rexExp = groupSet.get(i);
+      Preconditions.checkState(rexExp.getKind() == SqlKind.INPUT_REF, "Group key must be an input reference, got: %s",
+          rexExp.getKind());
+      groupKeyIds[i] = ((RexExpression.InputRef) rexExp).getIndex();
+    }
+    return groupKeyIds;
+  }
+
+  static RoaringBitmap getMatchedBitmap(TransferableBlock block, int filterArgId) {
+    Preconditions.checkArgument(filterArgId >= 0, "Got negative filter argument id: %s", filterArgId);
+    RoaringBitmap matchedBitmap = new RoaringBitmap();
+    if (block.isContainerConstructed()) {
+      List<Object[]> rows = block.getContainer();
+      int numRows = rows.size();
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        if ((int) rows.get(rowId)[filterArgId] == 1) {
+          matchedBitmap.add(rowId);
+        }
+      }
+    } else {
+      DataBlock dataBlock = block.getDataBlock();
+      int numRows = dataBlock.getNumberOfRows();
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        if (dataBlock.getInt(rowId, filterArgId) == 1) {
+          matchedBitmap.add(rowId);
+        }
+      }
+    }
+    return matchedBitmap;
+  }
+
+  static Map<ExpressionContext, BlockValSet> getBlockValSetMap(AggregationFunction<?, ?> aggFunction,
+      TransferableBlock block, Map<String, Integer> colNameToIndexMap) {
     List<ExpressionContext> expressions = aggFunction.getInputExpressions();
     int numExpressions = expressions.size();
     if (numExpressions == 0) {
       return Collections.emptyMap();
     }
-
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
-    for (ExpressionContext expression : expressions) {
-      if (expression.getType().equals(ExpressionContext.Type.IDENTIFIER) && !"__PLACEHOLDER__".equals(
-          expression.getIdentifier())) {
-        int index = colNameToIndexMap.get(expression.getIdentifier());
-        ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
-        Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
-        if (filterArgIdx == -1) {
-          blockValSetMap.put(expression, new DataBlockValSet(dataType, block.getDataBlock(), index));
-        } else {
+    if (block.isContainerConstructed()) {
+      List<Object[]> rows = block.getContainer();
+      for (ExpressionContext expression : expressions) {
+        if (expression.getType() == ExpressionContext.Type.IDENTIFIER && !"__PLACEHOLDER__".equals(
+            expression.getIdentifier())) {
+          int colId = colNameToIndexMap.get(expression.getIdentifier());
           blockValSetMap.put(expression,
-              new FilteredDataBlockValSet(dataType, block.getDataBlock(), index, filterArgIdx));
+              new RowBasedBlockValSet(block.getDataSchema().getColumnDataType(colId), rows, colId, true));
+        }
+      }
+    } else {
+      DataBlock dataBlock = block.getDataBlock();
+      for (ExpressionContext expression : expressions) {
+        if (expression.getType() == ExpressionContext.Type.IDENTIFIER && !"__PLACEHOLDER__".equals(
+            expression.getIdentifier())) {
+          int colId = colNameToIndexMap.get(expression.getIdentifier());
+          blockValSetMap.put(expression,
+              new DataBlockValSet(block.getDataSchema().getColumnDataType(colId), dataBlock, colId));
         }
       }
     }
     return blockValSetMap;
   }
 
-  static int computeBlockNumRows(TransferableBlock block, int filterArgIdx) {
-    if (filterArgIdx == -1) {
-      return block.getNumRows();
-    } else {
-      int rowCount = 0;
-      for (int rowId = 0; rowId < block.getNumRows(); rowId++) {
-        // NOTE: The value of filterArgIdx is 0 (FALSE) or 1 (TRUE), so we can directly add them up
-        rowCount += block.getDataBlock().getInt(rowId, filterArgIdx);
-      }
-      return rowCount;
+  static Map<ExpressionContext, BlockValSet> getFilteredBlockValSetMap(AggregationFunction<?, ?> aggFunction,
+      TransferableBlock block, Map<String, Integer> colNameToIndexMap, int numMatchedRows,
+      RoaringBitmap matchedBitmap) {
+    List<ExpressionContext> expressions = aggFunction.getInputExpressions();
+    int numExpressions = expressions.size();
+    if (numExpressions == 0) {
+      return Collections.emptyMap();
     }
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    if (block.isContainerConstructed()) {
+      List<Object[]> rows = block.getContainer();
+      for (ExpressionContext expression : expressions) {
+        if (expression.getType() == ExpressionContext.Type.IDENTIFIER && !"__PLACEHOLDER__".equals(
+            expression.getIdentifier())) {
+          int colId = colNameToIndexMap.get(expression.getIdentifier());
+          blockValSetMap.put(expression,
+              new FilteredRowBasedBlockValSet(block.getDataSchema().getColumnDataType(colId), rows, colId,
+                  numMatchedRows, matchedBitmap, true));
+        }
+      }
+    } else {
+      DataBlock dataBlock = block.getDataBlock();
+      for (ExpressionContext expression : expressions) {
+        if (expression.getType() == ExpressionContext.Type.IDENTIFIER && !"__PLACEHOLDER__".equals(
+            expression.getIdentifier())) {
+          int colId = colNameToIndexMap.get(expression.getIdentifier());
+          blockValSetMap.put(expression,
+              new FilteredDataBlockValSet(block.getDataSchema().getColumnDataType(colId), dataBlock, colId,
+                  numMatchedRows, matchedBitmap));
+        }
+      }
+    }
+    return blockValSetMap;
   }
 
-  static Object extractValueFromRow(AggregationFunction aggregationFunction, Object[] row,
+  static Object[] getIntermediateResults(AggregationFunction<?, ?> aggregationFunction, TransferableBlock block,
       Map<String, Integer> colNameToIndexMap) {
-    List<ExpressionContext> expressions = aggregationFunction.getInputExpressions();
-    ExpressionContext expr = expressions.get(0);
-    ExpressionContext.Type exprType = expr.getType();
-    if (exprType == ExpressionContext.Type.IDENTIFIER) {
-      return row[colNameToIndexMap.get(expr.getIdentifier())];
+    ExpressionContext exp = aggregationFunction.getInputExpressions().get(0);
+    Preconditions.checkState(exp.getType() == ExpressionContext.Type.IDENTIFIER, "Expected identifier, got: %s",
+        exp.getType());
+    Integer index = colNameToIndexMap.get(exp.getIdentifier());
+    Preconditions.checkState(index != null, "Failed to find index for column: %s", exp.getIdentifier());
+    int colId = index;
+    int numValues = block.getNumRows();
+    if (block.isContainerConstructed()) {
+      Object[] values = new Object[numValues];
+      List<Object[]> rows = block.getContainer();
+      for (int i = 0; i < numValues; i++) {
+        values[i] = rows.get(i)[colId];
+      }
+      return values;
+    } else {
+      return DataBlockExtractUtils.extractColumn(block.getDataBlock(), colId);
     }
-    Preconditions.checkState(exprType == ExpressionContext.Type.LITERAL, "Unsupported expression type: %s", exprType);
-    return expr.getLiteral().getValue();
   }
 }

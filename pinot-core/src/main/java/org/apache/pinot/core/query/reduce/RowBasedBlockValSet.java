@@ -19,49 +19,66 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * When the data is retrieved from pinot servers and merged on the broker, it
- * will become row based data. If we want to apply Transformation or Aggregation,
- * we need {@link BlockValSet} format data. This class is used to provide
- * {@link BlockValSet} interface wrapping around row based data.
+ * A {@link BlockValSet} implementation backed by row major data.
  *
- * TODO: We need add support for BYTES and MV
+ * TODO: Support MV
  */
 public class RowBasedBlockValSet implements BlockValSet {
-
-  private final FieldSpec.DataType _dataType;
-  private final PinotDataType _pinotDataType;
+  private final DataType _dataType;
+  private final DataType _storedType;
   private final List<Object[]> _rows;
-  private final int _columnIndex;
+  private final int _colId;
+  private final RoaringBitmap _nullBitmap;
 
-  public RowBasedBlockValSet(DataSchema.ColumnDataType columnDataType, List<Object[]> rows,
-      int columnIndex) {
+  public RowBasedBlockValSet(ColumnDataType columnDataType, List<Object[]> rows, int colId,
+      boolean nullHandlingEnabled) {
     _dataType = columnDataType.toDataType();
-    _pinotDataType = PinotDataType.getPinotDataTypeForExecution(columnDataType);
+    _storedType = _dataType.getStoredType();
     _rows = rows;
-    _columnIndex = columnIndex;
+    _colId = colId;
+
+    if (nullHandlingEnabled) {
+      RoaringBitmap nullBitmap;
+      int numRows = rows.size();
+      if (_dataType == DataType.UNKNOWN) {
+        nullBitmap = new RoaringBitmap();
+        nullBitmap.add(0L, numRows);
+      } else {
+        nullBitmap = new RoaringBitmap();
+        for (int i = 0; i < numRows; i++) {
+          if (rows.get(i)[colId] == null) {
+            nullBitmap.add(i);
+          }
+        }
+      }
+      _nullBitmap = nullBitmap.isEmpty() ? null : nullBitmap;
+    } else {
+      _nullBitmap = null;
+    }
   }
 
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap() {
-    // TODO: The assumption for now is that the rows in RowBasedBlockValSet contain non-null values.
-    //  Update to pass nullBitmap in constructor if rows have null values. Alternatively, compute nullBitmap on the fly.
-    return null;
+    return _nullBitmap;
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
+  public DataType getValueType() {
     return _dataType;
   }
 
@@ -83,99 +100,297 @@ public class RowBasedBlockValSet implements BlockValSet {
 
   @Override
   public int[] getIntValuesSV() {
-    int length = _rows.size();
-    int[] values = new int[length];
-    if (_dataType.isNumeric()) {
-      for (int i = 0; i < length; i++) {
-        values[i] = ((Number) _rows.get(i)[_columnIndex]).intValue();
-      }
-    } else if (_dataType == FieldSpec.DataType.STRING) {
-      for (int i = 0; i < length; i++) {
-        values[i] = Integer.parseInt((String) _rows.get(i)[_columnIndex]);
+    int numRows = _rows.size();
+    int[] values = new int[numRows];
+    if (numRows == 0 || _dataType == DataType.UNKNOWN) {
+      return values;
+    }
+    if (_nullBitmap == null) {
+      if (_storedType.isNumeric()) {
+        for (int i = 0; i < numRows; i++) {
+          values[i] = ((Number) _rows.get(i)[_colId]).intValue();
+        }
+      } else if (_storedType == DataType.STRING) {
+        for (int i = 0; i < numRows; i++) {
+          values[i] = Integer.parseInt((String) _rows.get(i)[_colId]);
+        }
+      } else {
+        throw new IllegalStateException("Cannot read int values from data type: " + _dataType);
       }
     } else {
-      throw new IllegalStateException("Cannot read int values from data type: " + _dataType);
+      if (_storedType.isNumeric()) {
+        for (int i = 0; i < numRows; i++) {
+          Number value = (Number) _rows.get(i)[_colId];
+          if (value != null) {
+            values[i] = value.intValue();
+          }
+        }
+      } else if (_storedType == DataType.STRING) {
+        for (int i = 0; i < numRows; i++) {
+          String value = (String) _rows.get(i)[_colId];
+          if (value != null) {
+            values[i] = Integer.parseInt(value);
+          }
+        }
+      } else {
+        throw new IllegalStateException("Cannot read int values from data type: " + _dataType);
+      }
     }
     return values;
   }
 
   @Override
   public long[] getLongValuesSV() {
-    int length = _rows.size();
-    long[] values = new long[length];
-    if (_dataType.isNumeric()) {
-      for (int i = 0; i < length; i++) {
-        values[i] = ((Number) _rows.get(i)[_columnIndex]).longValue();
-      }
-    } else if (_dataType == FieldSpec.DataType.STRING) {
-      for (int i = 0; i < length; i++) {
-        values[i] = Long.parseLong((String) _rows.get(i)[_columnIndex]);
+    int numRows = _rows.size();
+    long[] values = new long[numRows];
+    if (numRows == 0 || _dataType == DataType.UNKNOWN) {
+      return values;
+    }
+    if (_nullBitmap == null) {
+      if (_storedType.isNumeric()) {
+        for (int i = 0; i < numRows; i++) {
+          values[i] = ((Number) _rows.get(i)[_colId]).longValue();
+        }
+      } else if (_storedType == DataType.STRING) {
+        for (int i = 0; i < numRows; i++) {
+          values[i] = Long.parseLong((String) _rows.get(i)[_colId]);
+        }
+      } else {
+        throw new IllegalStateException("Cannot read long values from data type: " + _dataType);
       }
     } else {
-      throw new IllegalStateException("Cannot read long values from data type: " + _dataType);
+      if (_storedType.isNumeric()) {
+        for (int i = 0; i < numRows; i++) {
+          Number value = (Number) _rows.get(i)[_colId];
+          if (value != null) {
+            values[i] = value.longValue();
+          }
+        }
+      } else if (_storedType == DataType.STRING) {
+        for (int i = 0; i < numRows; i++) {
+          String value = (String) _rows.get(i)[_colId];
+          if (value != null) {
+            values[i] = Long.parseLong(value);
+          }
+        }
+      } else {
+        throw new IllegalStateException("Cannot read long values from data type: " + _dataType);
+      }
     }
     return values;
   }
 
   @Override
   public float[] getFloatValuesSV() {
-    int length = _rows.size();
-    float[] values = new float[length];
-    if (_dataType.isNumeric()) {
-      for (int i = 0; i < length; i++) {
-        values[i] = ((Number) _rows.get(i)[_columnIndex]).floatValue();
-      }
-    } else if (_dataType == FieldSpec.DataType.STRING) {
-      for (int i = 0; i < length; i++) {
-        values[i] = Float.parseFloat((String) _rows.get(i)[_columnIndex]);
+    int numRows = _rows.size();
+    float[] values = new float[numRows];
+    if (numRows == 0 || _dataType == DataType.UNKNOWN) {
+      return values;
+    }
+    if (_nullBitmap == null) {
+      if (_storedType.isNumeric()) {
+        for (int i = 0; i < numRows; i++) {
+          values[i] = ((Number) _rows.get(i)[_colId]).floatValue();
+        }
+      } else if (_storedType == DataType.STRING) {
+        for (int i = 0; i < numRows; i++) {
+          values[i] = Float.parseFloat((String) _rows.get(i)[_colId]);
+        }
+      } else {
+        throw new IllegalStateException("Cannot read float values from data type: " + _dataType);
       }
     } else {
-      throw new IllegalStateException("Cannot read float values from data type: " + _dataType);
+      if (_storedType.isNumeric()) {
+        for (int i = 0; i < numRows; i++) {
+          Number value = (Number) _rows.get(i)[_colId];
+          if (value != null) {
+            values[i] = value.floatValue();
+          }
+        }
+      } else if (_storedType == DataType.STRING) {
+        for (int i = 0; i < numRows; i++) {
+          String value = (String) _rows.get(i)[_colId];
+          if (value != null) {
+            values[i] = Float.parseFloat(value);
+          }
+        }
+      } else {
+        throw new IllegalStateException("Cannot read float values from data type: " + _dataType);
+      }
     }
     return values;
   }
 
   @Override
   public double[] getDoubleValuesSV() {
-    int length = _rows.size();
-    double[] values = new double[length];
-    if (_dataType.isNumeric()) {
-      for (int i = 0; i < length; i++) {
-        values[i] = ((Number) _rows.get(i)[_columnIndex]).doubleValue();
-      }
-    } else if (_dataType == FieldSpec.DataType.STRING) {
-      for (int i = 0; i < length; i++) {
-        values[i] = Double.parseDouble((String) _rows.get(i)[_columnIndex]);
+    int numRows = _rows.size();
+    double[] values = new double[numRows];
+    if (numRows == 0 || _dataType == DataType.UNKNOWN) {
+      return values;
+    }
+    if (_nullBitmap == null) {
+      if (_storedType.isNumeric()) {
+        for (int i = 0; i < numRows; i++) {
+          values[i] = ((Number) _rows.get(i)[_colId]).doubleValue();
+        }
+      } else if (_storedType == DataType.STRING) {
+        for (int i = 0; i < numRows; i++) {
+          values[i] = Double.parseDouble((String) _rows.get(i)[_colId]);
+        }
+      } else {
+        throw new IllegalStateException("Cannot read double values from data type: " + _dataType);
       }
     } else {
-      throw new IllegalStateException("Cannot read double values from data type: " + _dataType);
+      if (_storedType.isNumeric()) {
+        for (int i = 0; i < numRows; i++) {
+          Number value = (Number) _rows.get(i)[_colId];
+          if (value != null) {
+            values[i] = value.doubleValue();
+          }
+        }
+      } else if (_storedType == DataType.STRING) {
+        for (int i = 0; i < numRows; i++) {
+          String value = (String) _rows.get(i)[_colId];
+          if (value != null) {
+            values[i] = Double.parseDouble(value);
+          }
+        }
+      } else {
+        throw new IllegalStateException("Cannot read double values from data type: " + _dataType);
+      }
     }
     return values;
   }
 
   @Override
   public BigDecimal[] getBigDecimalValuesSV() {
-    int length = _rows.size();
-    BigDecimal[] values = new BigDecimal[length];
-    for (int i = 0; i < length; i++) {
-      values[i] = _pinotDataType.toBigDecimal(_rows.get(i)[_columnIndex]);
+    int numRows = _rows.size();
+    BigDecimal[] values = new BigDecimal[numRows];
+    if (numRows == 0) {
+      return values;
+    }
+    if (_dataType == DataType.UNKNOWN) {
+      Arrays.fill(values, NullValuePlaceHolder.BIG_DECIMAL);
+      return values;
+    }
+    if (_nullBitmap == null) {
+      switch (_storedType) {
+        case INT:
+        case LONG:
+          for (int i = 0; i < numRows; i++) {
+            values[i] = BigDecimal.valueOf(((Number) _rows.get(i)[_colId]).longValue());
+          }
+          break;
+        case FLOAT:
+        case DOUBLE:
+        case STRING:
+          for (int i = 0; i < numRows; i++) {
+            values[i] = new BigDecimal(_rows.get(i)[_colId].toString());
+          }
+          break;
+        case BIG_DECIMAL:
+          for (int i = 0; i < numRows; i++) {
+            values[i] = (BigDecimal) _rows.get(i)[_colId];
+          }
+          break;
+        case BYTES:
+          for (int i = 0; i < numRows; i++) {
+            values[i] = BigDecimalUtils.deserialize((ByteArray) _rows.get(i)[_colId]);
+          }
+          break;
+        default:
+          throw new IllegalStateException("Cannot read BigDecimal values from data type: " + _dataType);
+      }
+    } else {
+      switch (_storedType) {
+        case INT:
+        case LONG:
+          for (int i = 0; i < numRows; i++) {
+            Number value = (Number) _rows.get(i)[_colId];
+            values[i] = value != null ? BigDecimal.valueOf(value.longValue()) : NullValuePlaceHolder.BIG_DECIMAL;
+          }
+          break;
+        case FLOAT:
+        case DOUBLE:
+        case STRING:
+          for (int i = 0; i < numRows; i++) {
+            Object value = _rows.get(i)[_colId];
+            values[i] = value != null ? new BigDecimal(value.toString()) : NullValuePlaceHolder.BIG_DECIMAL;
+          }
+          break;
+        case BIG_DECIMAL:
+          for (int i = 0; i < numRows; i++) {
+            BigDecimal value = (BigDecimal) _rows.get(i)[_colId];
+            values[i] = value != null ? value : NullValuePlaceHolder.BIG_DECIMAL;
+          }
+          break;
+        case BYTES:
+          for (int i = 0; i < numRows; i++) {
+            ByteArray value = (ByteArray) _rows.get(i)[_colId];
+            values[i] = value != null ? BigDecimalUtils.deserialize(value) : NullValuePlaceHolder.BIG_DECIMAL;
+          }
+          break;
+        default:
+          throw new IllegalStateException("Cannot read BigDecimal values from data type: " + _dataType);
+      }
     }
     return values;
   }
 
   @Override
   public String[] getStringValuesSV() {
-    int length = _rows.size();
-    String[] values = new String[length];
-    for (int i = 0; i < length; i++) {
-      values[i] = _rows.get(i)[_columnIndex].toString();
+    int numRows = _rows.size();
+    String[] values = new String[numRows];
+    if (numRows == 0) {
+      return values;
+    }
+    if (_dataType == DataType.UNKNOWN) {
+      Arrays.fill(values, NullValuePlaceHolder.STRING);
+      return values;
+    }
+    if (_nullBitmap == null) {
+      for (int i = 0; i < numRows; i++) {
+        values[i] = _rows.get(i)[_colId].toString();
+      }
+    } else {
+      for (int i = 0; i < numRows; i++) {
+        Object value = _rows.get(i)[_colId];
+        values[i] = value != null ? value.toString() : NullValuePlaceHolder.STRING;
+      }
     }
     return values;
   }
 
   @Override
   public byte[][] getBytesValuesSV() {
-    throw new UnsupportedOperationException();
+    int numRows = _rows.size();
+    byte[][] values = new byte[numRows][];
+    if (numRows == 0) {
+      return values;
+    }
+    if (_dataType == DataType.UNKNOWN) {
+      Arrays.fill(values, NullValuePlaceHolder.BYTES);
+      return values;
+    }
+    if (_nullBitmap == null) {
+      if (_storedType == DataType.BYTES) {
+        for (int i = 0; i < numRows; i++) {
+          values[i] = ((ByteArray) _rows.get(i)[_colId]).getBytes();
+        }
+      } else {
+        throw new IllegalStateException("Cannot read bytes values from data type: " + _dataType);
+      }
+    } else {
+      if (_storedType == DataType.BYTES) {
+        for (int i = 0; i < numRows; i++) {
+          ByteArray value = (ByteArray) _rows.get(i)[_colId];
+          values[i] = value != null ? value.getBytes() : NullValuePlaceHolder.BYTES;
+        }
+      } else {
+        throw new IllegalStateException("Cannot read bytes values from data type: " + _dataType);
+      }
+    }
+    return values;
   }
 
   @Override

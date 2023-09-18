@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils;
 
 import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.List;
 import org.apache.pinot.spi.config.instance.InstanceType;
 
@@ -1064,5 +1065,15 @@ public class CommonConstants {
     public enum JoinOverFlowMode {
       THROW, BREAK
     }
+  }
+
+  public static class NullValuePlaceHolder {
+    public static final int INT = 0;
+    public static final long LONG = 0L;
+    public static final float FLOAT = 0f;
+    public static final double DOUBLE = 0d;
+    public static final BigDecimal BIG_DECIMAL = BigDecimal.ZERO;
+    public static final String STRING = "";
+    public static final byte[] BYTES = new byte[0];
   }
 }
