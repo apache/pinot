@@ -305,8 +305,8 @@ public class CommonConstants {
         "pinot.broker.instance.enableThreadAllocatedBytesMeasurement";
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
     public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
-    public static final String CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES
-        = "pinot.broker.result.rewriter.class.names";
+    public static final String CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES =
+        "pinot.broker.result.rewriter.class.names";
 
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
@@ -1075,5 +1075,12 @@ public class CommonConstants {
     public static final BigDecimal BIG_DECIMAL = BigDecimal.ZERO;
     public static final String STRING = "";
     public static final byte[] BYTES = new byte[0];
+    public static final ByteArray INTERNAL_BYTES = new ByteArray(BYTES);
+    public static final int[] INT_ARRAY = new int[0];
+    public static final long[] LONG_ARRAY = new long[0];
+    public static final float[] FLOAT_ARRAY = new float[0];
+    public static final double[] DOUBLE_ARRAY = new double[0];
+    public static final String[] STRING_ARRAY = new String[0];
+    public static final byte[][] BYTES_ARRAY = new byte[0][];
   }
 }

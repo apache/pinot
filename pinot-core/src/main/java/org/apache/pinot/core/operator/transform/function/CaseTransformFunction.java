@@ -28,11 +28,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -346,7 +346,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _intValuesSV[docId] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+          _intValuesSV[docId] = NullValuePlaceHolder.INT;
         }
       } else {
         int[] intValuesSV = _elseStatement.transformToIntValuesSV(valueBlock);
@@ -391,7 +391,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _intValuesSV[docId] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+          _intValuesSV[docId] = NullValuePlaceHolder.INT;
           bitmap.add(docId);
         }
       } else {
@@ -431,7 +431,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _longValuesSV[docId] = (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+          _longValuesSV[docId] = NullValuePlaceHolder.LONG;
         }
       } else {
         long[] longValuesSV = _elseStatement.transformToLongValuesSV(valueBlock);
@@ -476,7 +476,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _longValuesSV[docId] = (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+          _longValuesSV[docId] = NullValuePlaceHolder.LONG;
           bitmap.add(docId);
         }
       } else {
@@ -516,7 +516,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _floatValuesSV[docId] = (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+          _floatValuesSV[docId] = NullValuePlaceHolder.FLOAT;
         }
       } else {
         float[] floatValuesSV = _elseStatement.transformToFloatValuesSV(valueBlock);
@@ -561,7 +561,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _floatValuesSV[docId] = (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+          _floatValuesSV[docId] = NullValuePlaceHolder.FLOAT;
           bitmap.add(docId);
         }
       } else {
@@ -601,7 +601,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _doubleValuesSV[docId] = (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+          _doubleValuesSV[docId] = NullValuePlaceHolder.DOUBLE;
         }
       } else {
         float[] doubleValuesSV = _elseStatement.transformToFloatValuesSV(valueBlock);
@@ -647,7 +647,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _doubleValuesSV[docId] = (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+          _doubleValuesSV[docId] = NullValuePlaceHolder.DOUBLE;
           bitmap.add(docId);
         }
       } else {
@@ -687,7 +687,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _bigDecimalValuesSV[docId] = (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder();
+          _bigDecimalValuesSV[docId] = NullValuePlaceHolder.BIG_DECIMAL;
         }
       } else {
         BigDecimal[] bigDecimalValuesSV = _elseStatement.transformToBigDecimalValuesSV(valueBlock);
@@ -733,7 +733,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _bigDecimalValuesSV[docId] = (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder();
+            _bigDecimalValuesSV[docId] = NullValuePlaceHolder.BIG_DECIMAL;
           bitmap.add(docId);
         }
       } else {
@@ -773,7 +773,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _stringValuesSV[docId] = (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+          _stringValuesSV[docId] = NullValuePlaceHolder.STRING;
         }
       } else {
         String[] stringValuesSV = _elseStatement.transformToStringValuesSV(valueBlock);
@@ -819,7 +819,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _stringValuesSV[docId] = (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+          _stringValuesSV[docId] = NullValuePlaceHolder.STRING;
           bitmap.add(docId);
         }
       } else {
@@ -859,7 +859,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _bytesValuesSV[docId] = (byte[]) DataSchema.ColumnDataType.BYTES.getNullPlaceholder();
+          _bytesValuesSV[docId] = NullValuePlaceHolder.BYTES;
         }
       } else {
         byte[][] byteValuesSV = _elseStatement.transformToBytesValuesSV(valueBlock);
@@ -904,7 +904,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _bytesValuesSV[docId] = (byte[]) DataSchema.ColumnDataType.BYTES.getNullPlaceholder();
+          _bytesValuesSV[docId] = NullValuePlaceHolder.BYTES;
           bitmap.add(docId);
         }
       } else {

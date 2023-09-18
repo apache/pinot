@@ -37,6 +37,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -191,25 +192,25 @@ public class DataSchema {
   }
 
   public enum ColumnDataType {
-    INT(0),
-    LONG(0L),
-    FLOAT(0f),
-    DOUBLE(0d),
-    BIG_DECIMAL(BigDecimal.ZERO),
-    BOOLEAN(INT, 0),
-    TIMESTAMP(LONG, 0L),
-    STRING(""),
-    JSON(STRING, ""),
-    BYTES(new ByteArray(new byte[0])),
+    INT(NullValuePlaceHolder.INT),
+    LONG(NullValuePlaceHolder.LONG),
+    FLOAT(NullValuePlaceHolder.FLOAT),
+    DOUBLE(NullValuePlaceHolder.DOUBLE),
+    BIG_DECIMAL(NullValuePlaceHolder.BIG_DECIMAL),
+    BOOLEAN(INT, NullValuePlaceHolder.INT),
+    TIMESTAMP(LONG, NullValuePlaceHolder.LONG),
+    STRING(NullValuePlaceHolder.STRING),
+    JSON(STRING, NullValuePlaceHolder.STRING),
+    BYTES(NullValuePlaceHolder.INTERNAL_BYTES),
     OBJECT(null),
-    INT_ARRAY(new int[0]),
-    LONG_ARRAY(new long[0]),
-    FLOAT_ARRAY(new float[0]),
-    DOUBLE_ARRAY(new double[0]),
-    BOOLEAN_ARRAY(INT_ARRAY, new int[0]),
-    TIMESTAMP_ARRAY(LONG_ARRAY, new long[0]),
-    STRING_ARRAY(new String[0]),
-    BYTES_ARRAY(new byte[0][]),
+    INT_ARRAY(NullValuePlaceHolder.INT_ARRAY),
+    LONG_ARRAY(NullValuePlaceHolder.LONG_ARRAY),
+    FLOAT_ARRAY(NullValuePlaceHolder.FLOAT_ARRAY),
+    DOUBLE_ARRAY(NullValuePlaceHolder.DOUBLE_ARRAY),
+    BOOLEAN_ARRAY(INT_ARRAY, NullValuePlaceHolder.INT_ARRAY),
+    TIMESTAMP_ARRAY(LONG_ARRAY, NullValuePlaceHolder.LONG_ARRAY),
+    STRING_ARRAY(NullValuePlaceHolder.STRING_ARRAY),
+    BYTES_ARRAY(NullValuePlaceHolder.BYTES_ARRAY),
     UNKNOWN(null);
 
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
