@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -29,8 +32,13 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
+import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
@@ -39,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -113,6 +122,9 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     // Check that a replica has been added
     assertEquals(finalReplicas, NUM_SERVERS + 1, "Rebalancing didn't correctly add the new server");
 
+    waitForRebalanceToComplete(rebalanceResult, 600_000L);
+    waitForAllDocsLoaded(600_000L);
+
     verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalReplicas);
 
     // Add a new server
@@ -125,6 +137,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     // Check that a replica has been added
     assertEquals(finalReplicas, NUM_SERVERS + 2, "Rebalancing didn't correctly add the new server");
 
+    waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
 
     // number of instances assigned can't be more than number of partitions for rf = 1
@@ -140,6 +153,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, NUM_SERVERS);
 
+    waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
 
     _resourceManager.disableInstance(serverStarter1.getInstanceId());
@@ -156,9 +170,20 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   public void testReload()
       throws Exception {
     pushAvroIntoKafka(_avroFiles);
-    reloadRealtimeTable(getTableName());
+    String statusResponse = reloadRealtimeTable(getTableName());
+    Map<String, String> statusResponseJson =
+        JsonUtils.stringToObject(statusResponse, new TypeReference<Map<String, String>>() {
+        });
+    String reloadResponse = statusResponseJson.get("status");
+    int jsonStartIndex = reloadResponse.indexOf("{");
+    String trimmedResponse = reloadResponse.substring(jsonStartIndex);
+    Map<String, Map<String, String>> reloadStatus =
+        JsonUtils.stringToObject(trimmedResponse, new TypeReference<Map<String, Map<String, String>>>() {
+        });
+    String reloadJobId = reloadStatus.get(REALTIME_TABLE_NAME).get("reloadJobId");
+    waitForReloadToComplete(reloadJobId, 600_000L);
     waitForAllDocsLoaded(600_000L, 300);
-    verifyIdealState(2, NUM_SERVERS);
+    verifyIdealState(4, NUM_SERVERS);
   }
 
   @AfterMethod
@@ -324,10 +349,57 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     }
   }
 
+  protected void waitForRebalanceToComplete(RebalanceResult rebalanceResult, long timeoutMs)
+      throws Exception {
+    String jobId = rebalanceResult.getJobId();
+    if (rebalanceResult.getStatus() != RebalanceResult.Status.IN_PROGRESS) {
+      return;
+    }
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(jobId);
+        try {
+          SimpleHttpResponse httpResponse =
+              HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
+
+          ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse =
+              JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
+          String status = serverRebalanceJobStatusResponse.getTableRebalanceProgressStats().getStatus();
+          return status.equals(RebalanceResult.Status.DONE.toString()) || status.equals(
+              RebalanceResult.Status.FAILED.toString());
+        } catch (HttpErrorStatusException | URISyntaxException e) {
+          throw new IOException(e);
+        }
+      } catch (Exception e) {
+        return null;
+      }
+    }, 1000L, timeoutMs, "Failed to load all segments after rebalance");
+  }
+
+  protected void waitForReloadToComplete(String reloadJobId, long timeoutMs)
+      throws Exception {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String requestUrl = getControllerRequestURLBuilder().forControllerJobStatus(reloadJobId);
+        try {
+          SimpleHttpResponse httpResponse =
+              HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(requestUrl).toURI(), null));
+          ServerReloadControllerJobStatusResponse segmentReloadStatusValue =
+              JsonUtils.stringToObject(httpResponse.getResponse(), ServerReloadControllerJobStatusResponse.class);
+          return segmentReloadStatusValue.getSuccessCount() == segmentReloadStatusValue.getTotalSegmentCount();
+        } catch (HttpErrorStatusException | URISyntaxException e) {
+          throw new IOException(e);
+        }
+      } catch (Exception e) {
+        return null;
+      }
+    }, 1000L, timeoutMs, "Failed to load all segments after reload");
+  }
+
   @Override
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    Thread.sleep(5000L); //TODO: Wait for some time for rebalance to kickoff
     TestUtils.waitForCondition(aVoid -> {
       try {
         return getCurrentCountStarResultWithoutUpsert() == getCountStarResultWithoutUpsert();

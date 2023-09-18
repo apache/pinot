@@ -716,14 +716,14 @@ public class ControllerTest {
     return getControllerRequestClient().getTableSize(tableName);
   }
 
-  public void reloadOfflineTable(String tableName)
+  public String reloadOfflineTable(String tableName)
       throws IOException {
-    reloadOfflineTable(tableName, false);
+    return reloadOfflineTable(tableName, false);
   }
 
-  public void reloadOfflineTable(String tableName, boolean forceDownload)
+  public String reloadOfflineTable(String tableName, boolean forceDownload)
       throws IOException {
-    getControllerRequestClient().reloadTable(tableName, TableType.OFFLINE, forceDownload);
+    return getControllerRequestClient().reloadTable(tableName, TableType.OFFLINE, forceDownload);
   }
 
   public void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
@@ -731,9 +731,9 @@ public class ControllerTest {
     getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
   }
 
-  public void reloadRealtimeTable(String tableName)
+  public String reloadRealtimeTable(String tableName)
       throws IOException {
-    getControllerRequestClient().reloadTable(tableName, TableType.REALTIME, false);
+    return getControllerRequestClient().reloadTable(tableName, TableType.REALTIME, false);
   }
 
   public void createBrokerTenant(String tenantName, int numBrokers)
