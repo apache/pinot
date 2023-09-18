@@ -180,6 +180,7 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
+    <surefire.version>3.0.0-M5</surefire.version>
   </properties>
 
   <profiles>
@@ -1116,7 +1117,7 @@
       <dependency>
         <groupId>org.apache.maven.surefire</groupId>
         <artifactId>surefire-testng</artifactId>
-        <version>3.0.0-M5</version>
+        <version>${surefire.versino}</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -1415,7 +1416,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>3.0.0-M5</version>
+          <version>${surefire.version}</version>
           <configuration>
             <forkCount>1</forkCount>
             <reuseForks>false</reuseForks>
@@ -1437,6 +1438,14 @@
               --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
             </argLine>
           </configuration>
+          <!-- Explicitly select the test provider, instead of relying on the classpath -->
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.maven.surefire</groupId>
+              <artifactId>surefire-testng</artifactId>
+              <version>${surefire.version}</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
