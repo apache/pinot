@@ -25,11 +25,11 @@ import java.util.Map;
 
 public class TableIndexMetadataResponse {
   private final long _totalOnlineSegments;
-  private final Map<String, Map<String, Long>> _columnToIndexesCount;
+  private final Map<String, Map<String, Integer>> _columnToIndexesCount;
 
   @JsonCreator
   public TableIndexMetadataResponse(@JsonProperty("totalOnlineSegments") long totalOnlineSegments,
-      @JsonProperty("columnToIndexesCount") Map<String, Map<String, Long>> columnToIndexesCount) {
+      @JsonProperty("columnToIndexesCount") Map<String, Map<String, Integer>> columnToIndexesCount) {
     _totalOnlineSegments = totalOnlineSegments;
     _columnToIndexesCount = columnToIndexesCount;
   }
@@ -38,7 +38,7 @@ public class TableIndexMetadataResponse {
     return _totalOnlineSegments;
   }
 
-  public Map<String, Map<String, Long>> getColumnToIndexesCount() {
+  public Map<String, Map<String, Integer>> getColumnToIndexesCount() {
     return _columnToIndexesCount;
   }
 }

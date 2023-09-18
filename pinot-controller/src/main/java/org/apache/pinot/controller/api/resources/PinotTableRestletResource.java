@@ -996,8 +996,6 @@ public class PinotTableRestletResource {
       throws InvalidConfigException, JsonProcessingException {
     final Map<String, List<String>> serverToSegments =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
-    BiMap<String, String> endpoints =
-        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
 
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
@@ -1007,25 +1005,23 @@ public class PinotTableRestletResource {
     List<String> serverUrls = new ArrayList<>();
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String reloadTaskStatusEndpoint = endpoint + String.format("/tables/%s/indexes", tableNameWithType);
-      serverUrls.add(reloadTaskStatusEndpoint);
+      String segmentIndexesEndpoint = endpoint + String.format("/tables/%s/indexes", tableNameWithType);
+      serverUrls.add(segmentIndexesEndpoint);
     }
 
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
 
-    long totalSegments = 0;
-    Map<String, Map<String, Long>> columnToIndexCountMap = new HashMap<>();
+    int totalSegments = 0;
+    Map<String, Map<String, Integer>> columnToIndexCountMap = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       TableIndexMetadataResponse response = JsonUtils.stringToObject(responseString, TableIndexMetadataResponse.class);
       totalSegments += response.getTotalOnlineSegments();
       response.getColumnToIndexesCount().forEach((col, indexToCount) -> {
-        columnToIndexCountMap.putIfAbsent(col, new HashMap<>());
-
+        Map<String, Integer> indexCountMap = columnToIndexCountMap.putIfAbsent(col, new HashMap<>());
         indexToCount.forEach((indexName, count) -> {
-          columnToIndexCountMap.get(col)
-              .put(indexName, columnToIndexCountMap.get(col).getOrDefault(indexName, 0L) + count);
+          indexCountMap.merge(indexName, count, Integer::sum);
         });
       });
     }

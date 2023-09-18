@@ -306,8 +306,8 @@ public class TablesResource {
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     List<SegmentDataManager> allSegments = tableDataManager.acquireAllSegments();
     try {
-      long totalSegmentCount = 0;
-      Map<String, Map<String, Long>> columnToIndexesCount = new HashMap<>();
+      int totalSegmentCount = 0;
+      Map<String, Map<String, Integer>> columnToIndexesCount = new HashMap<>();
       for (SegmentDataManager segmentDataManager : allSegments) {
         if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           // REALTIME segments may not have indexes since not all indexes have mutable implementations
@@ -319,8 +319,8 @@ public class TablesResource {
           columnToIndexesCount.putIfAbsent(col, new HashMap<>());
           DataSource colDataSource = segment.getDataSource(col);
           IndexService.getInstance().getAllIndexes().forEach(idxType -> {
-            long count = colDataSource.getIndex(idxType) != null ? 1L : 0L;
-            columnToIndexesCount.get(col).merge(idxType.getId(), count, Long::sum);
+            int count = colDataSource.getIndex(idxType) != null ? 1 : 0;
+            columnToIndexesCount.get(col).merge(idxType.getId(), count, Integer::sum);
           });
         });
       }
