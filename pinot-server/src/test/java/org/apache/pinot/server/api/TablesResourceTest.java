@@ -126,14 +126,14 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertNotNull(tableIndexMetadataResponse);
     Assert.assertEquals(tableIndexMetadataResponse.getTotalOnlineSegments(), _offlineIndexSegments.size());
 
-    Map<String, Map<String, Long>> columnToIndexCountMap = new HashMap<>();
+    Map<String, Map<String, Integer>> columnToIndexCountMap = new HashMap<>();
     for (ImmutableSegment segment : _offlineIndexSegments) {
       segment.getColumnNames().forEach(colName -> {
         DataSource dataSource = segment.getDataSource(colName);
         columnToIndexCountMap.putIfAbsent(colName, new HashMap<>());
         IndexService.getInstance().getAllIndexes().forEach(indexType -> {
-          long count = dataSource.getIndex(indexType) != null ? 1L : 0L;
-          columnToIndexCountMap.get(colName).merge(indexType.getId(), count, Long::sum);
+          int count = dataSource.getIndex(indexType) != null ? 1 : 0;
+          columnToIndexCountMap.get(colName).merge(indexType.getId(), count, Integer::sum);
         });
       });
     }
