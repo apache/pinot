@@ -137,22 +137,6 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   }
 
   @Override
-  public BrokerResponse executeQuery(String brokerAddress, Request request)
-      throws PinotClientException {
-    try {
-      return executeQueryAsync(brokerAddress, request).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
-  }
-
-  @Override
-  public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-      throws PinotClientException {
-    return executeQueryAsync(brokerAddress, request.getQuery());
-  }
-
-  @Override
   public void close()
       throws PinotClientException {
     if (_httpClient.isClosed()) {
