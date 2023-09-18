@@ -2154,15 +2154,16 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
 
   private String getConcatUseInWhereQueryString(String concatFunction, String col1, String col2, String concatCol,
       String table, String compareOperator, int mvPerArray, int limit) {
-    return String.format("SELECT %s(%s, %s) AS %s FROM %s WHERE arraylength(%s) %s %d LIMIT %d", concatFunction, col1,
-        col2, concatCol, table, concatCol, compareOperator, mvPerArray, limit);
+    String function = String.format("%s(%s, %s)", concatFunction, col1, col2);
+    return String.format("SELECT %s AS %s FROM %s WHERE arraylength(%s) %s %d LIMIT %d", function, concatCol, table,
+        function, compareOperator, mvPerArray, limit);
   }
 
   private String getConcatGroupByQueryString(String concatFunction, String col1, String col2, String concatCol,
       String table, String compareOperator, int mvPerArray, int limit) {
-    return String.format(
-        "SELECT %s(%s, %s) AS %s, sum(svIntCol) FROM %s WHERE arraylength(%s) %s %d GROUP BY %s LIMIT %d",
-        concatFunction, col1, col2, concatCol, table, concatCol, compareOperator, mvPerArray, concatCol, limit);
+    String function = String.format("%s(%s, %s)", concatFunction, col1, col2);
+    return String.format("SELECT %s AS %s, sum(svIntCol) FROM %s WHERE arraylength(%s) %s %d GROUP BY %s LIMIT %d",
+        function, concatCol, table, function, compareOperator, mvPerArray, concatCol, limit);
   }
 
   @Test
