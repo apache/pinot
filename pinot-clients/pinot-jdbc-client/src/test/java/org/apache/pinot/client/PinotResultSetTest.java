@@ -195,18 +195,6 @@ public class PinotResultSetTest {
     }
 
     @Override
-    public BrokerResponse executeQuery(String brokerAddress, Request request)
-        throws PinotClientException {
-      return executeQuery(brokerAddress, request.getQuery());
-    }
-
-    @Override
-    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-        throws PinotClientException {
-      return null;
-    }
-
-    @Override
     public void close()
         throws PinotClientException {
     }
