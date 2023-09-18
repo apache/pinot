@@ -590,7 +590,6 @@ public class ObjectSerDeUtils {
 
     @Override
     public HyperLogLogPlus deserialize(ByteBuffer byteBuffer) {
-      // NOTE: The passed in byte buffer is always BIG ENDIAN
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
       return deserialize(bytes);

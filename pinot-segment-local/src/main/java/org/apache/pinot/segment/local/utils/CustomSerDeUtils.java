@@ -213,11 +213,7 @@ public class CustomSerDeUtils {
     public HyperLogLogPlus deserialize(ByteBuffer byteBuffer) {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
-      try {
-        return HyperLogLogPlus.Builder.build(bytes);
-      } catch (IOException e) {
-        throw new RuntimeException("Caught exception while de-serializing HyperLogLogPlus", e);
-      }
+      return deserialize(bytes);
     }
   };
 

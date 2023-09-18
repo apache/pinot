@@ -260,7 +260,7 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
   private static HyperLogLogPlus getDistinctCountHLLPlusResult(Dictionary dictionary,
       DistinctCountHLLPlusAggregationFunction function) {
     if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
-      // Treat BYTES value as serialized HyperLogLog
+      // Treat BYTES value as serialized HyperLogLogPlus
       try {
         HyperLogLogPlus hllplus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(0));
         int length = dictionary.length();
