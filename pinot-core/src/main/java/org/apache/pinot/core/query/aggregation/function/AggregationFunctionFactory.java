@@ -351,6 +351,10 @@ public class AggregationFunctionFactory {
                 "Aggregation function: " + functionType + " is only supported in selection without alias.");
           case FUNNELCOUNT:
             return new FunnelCountAggregationFunctionFactory(arguments).get();
+          case FREQUENTSTRINGSSKETCH:
+            return new FrequentStringsSketchAggregationFunction(arguments);
+          case FREQUENTLONGSSKETCH:
+            return new FrequentLongsSketchAggregationFunction(arguments);
 
           default:
             throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);

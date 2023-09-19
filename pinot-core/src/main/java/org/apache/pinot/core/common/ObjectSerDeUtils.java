@@ -57,6 +57,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.datasketches.common.ArrayOfStringsSerDe;
+import org.apache.datasketches.frequencies.ItemsSketch;
+import org.apache.datasketches.frequencies.LongsSketch;
 import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
@@ -134,7 +137,9 @@ public class ObjectSerDeUtils {
     PinotFourthMoment(34),
     ArgMinMaxObject(35),
     KllDataSketch(36),
-    IntegerTupleSketch(37);
+    IntegerTupleSketch(37),
+    FrequentStringsSketch(38),
+    FrequentLongsSketch(39);
 
     private final int _value;
 
@@ -226,6 +231,10 @@ public class ObjectSerDeUtils {
         return ObjectType.IntegerTupleSketch;
       } else if (value instanceof ExprMinMaxObject) {
         return ObjectType.ArgMinMaxObject;
+      } else if (value instanceof ItemsSketch) {
+        return ObjectType.FrequentStringsSketch;
+      } else if (value instanceof LongsSketch) {
+        return ObjectType.FrequentLongsSketch;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -1285,6 +1294,46 @@ public class ObjectSerDeUtils {
         }
       };
 
+  public static final ObjectSerDe<ItemsSketch<String>> FREQUENT_STRINGS_SKETCH_SER_DE =
+      new ObjectSerDe<>() {
+        @Override
+        public byte[] serialize(ItemsSketch<String> sketch) {
+          return sketch.toByteArray(new ArrayOfStringsSerDe());
+        }
+
+        @Override
+        public ItemsSketch<String> deserialize(byte[] bytes) {
+          return ItemsSketch.getInstance(Memory.wrap(bytes), new ArrayOfStringsSerDe());
+        }
+
+        @Override
+        public ItemsSketch<String> deserialize(ByteBuffer byteBuffer) {
+          byte[] arr = new byte[byteBuffer.remaining()];
+          byteBuffer.get(arr);
+          return ItemsSketch.getInstance(Memory.wrap(arr), new ArrayOfStringsSerDe());
+        }
+      };
+
+  public static final ObjectSerDe<LongsSketch> FREQUENT_LONGS_SKETCH_SER_DE =
+      new ObjectSerDe<>() {
+        @Override
+        public byte[] serialize(LongsSketch sketch) {
+          return sketch.toByteArray();
+        }
+
+        @Override
+        public LongsSketch deserialize(byte[] bytes) {
+          return LongsSketch.getInstance(Memory.wrap(bytes));
+        }
+
+        @Override
+        public LongsSketch deserialize(ByteBuffer byteBuffer) {
+          byte[] arr = new byte[byteBuffer.remaining()];
+          byteBuffer.get(arr);
+          return LongsSketch.getInstance(Memory.wrap(arr));
+        }
+      };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -1326,6 +1375,8 @@ public class ObjectSerDeUtils {
       ARG_MIN_MAX_OBJECT_SER_DE,
       KLL_SKETCH_SER_DE,
       DATA_SKETCH_INT_TUPLE_SER_DE,
+      FREQUENT_STRINGS_SKETCH_SER_DE,
+      FREQUENT_LONGS_SKETCH_SER_DE,
   };
   //@formatter:on
 

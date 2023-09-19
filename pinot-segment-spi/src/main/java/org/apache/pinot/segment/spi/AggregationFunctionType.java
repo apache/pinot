@@ -190,6 +190,9 @@ public enum AggregationFunctionType {
       SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.BINARY, ReturnTypes.BIGINT,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
 
+  FREQUENTSTRINGSSKETCH("frequentStringsSketch"),
+  FREQUENTLONGSSKETCH("frequentLongsSketch"),
+
   // Geo aggregation functions
   STUNION("STUnion", ImmutableList.of("ST_UNION"), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.BINARY, ReturnTypes.explicit(SqlTypeName.VARBINARY), ReturnTypes.explicit(SqlTypeName.OTHER)),
