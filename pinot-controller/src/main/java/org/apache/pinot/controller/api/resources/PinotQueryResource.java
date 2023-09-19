@@ -57,6 +57,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -120,7 +121,7 @@ public class PinotQueryResource {
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing post request {}", pe.getMessage());
-      return pe.getMessage();
+      return constructQueryExceptionResponse(pe);
     } catch (WebApplicationException wae) {
       LOGGER.error("Caught exception while processing post request", wae);
       throw wae;
@@ -140,7 +141,7 @@ public class PinotQueryResource {
       return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
-      return pe.getMessage();
+      return constructQueryExceptionResponse(pe);
     } catch (WebApplicationException wae) {
       LOGGER.error("Caught exception while processing get request", wae);
       throw wae;
@@ -171,8 +172,7 @@ public class PinotQueryResource {
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
         return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, endpointUrl, traceEnabled);
       } else {
-        throw new UnsupportedOperationException("V2 Multi-Stage query engine not enabled. "
-            + "Please see https://docs.pinot.apache.org/ for instruction to enable V2 engine.");
+        throw QueryException.getException(QueryException.INTERNAL_ERROR, "V2 Multi-Stage query engine not enabled.");
       }
     } else {
       PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
@@ -186,7 +186,7 @@ public class PinotQueryResource {
                   .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
           return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers).toJsonString();
         default:
-          throw new UnsupportedOperationException("Unsupported SQL type - " + sqlType);
+          throw QueryException.getException(QueryException.INTERNAL_ERROR, "Unsupported SQL type - " + sqlType);
       }
     }
   }
@@ -203,7 +203,13 @@ public class PinotQueryResource {
 
     QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
         CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
-    List<String> tableNames = queryEnvironment.getTableNamesForQuery(query);
+    List<String> tableNames;
+    try {
+      tableNames = queryEnvironment.getTableNamesForQuery(query);
+    } catch (Exception e) {
+      return QueryException.getException(QueryException.SQL_PARSING_ERROR,
+          new Exception("Unable to find table for this query", e)).toString();
+    }
     List<String> instanceIds;
     if (tableNames.size() != 0) {
       List<TableConfig> tableConfigList = getListTableConfigs(tableNames);
@@ -462,6 +468,14 @@ public class PinotQueryResource {
     } catch (final Exception ex) {
       LOGGER.error("Caught exception in sendQueryRaw", ex);
       Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
+    }
+  }
+
+  private static String constructQueryExceptionResponse(ProcessingException pe) {
+    try {
+      return new BrokerResponseNative(pe).toJsonString();
+    } catch (IOException ioe) {
       throw new AssertionError("Should not reach this");
     }
   }
