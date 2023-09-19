@@ -19,8 +19,10 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +69,13 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT = 100;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT = 100_000;
+  private static final List<String> EXTENSIONS = Lists.newArrayList(
+      V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION
+  );
 
   protected ForwardIndexType() {
     super(StandardIndexes.FORWARD_ID);
@@ -209,7 +218,6 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     return ForwardIndexReaderFactory.INSTANCE;
   }
 
-  @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     if (columnMetadata.isSingleValue()) {
       if (!columnMetadata.hasDictionary()) {
@@ -224,6 +232,14 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     } else {
       return V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
     }
+  }
+
+  @Override
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    if (columnMetadata == null) {
+      return EXTENSIONS;
+    }
+    return Collections.singletonList(getFileExtension(columnMetadata));
   }
 
   /**

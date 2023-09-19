@@ -25,8 +25,10 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -101,7 +103,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
     } else {
-      FileUtils.deleteQuietly(getFileFor(columnName, indexType));
+      getFilesFor(columnName, indexType).forEach(FileUtils::deleteQuietly);
     }
   }
 
@@ -150,8 +152,21 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @VisibleForTesting
   File getFileFor(String column, IndexType<?, ?, ?> indexType) {
-    String fileExtension = indexType.getFileExtension(_segmentMetadata.getColumnMetadataFor(column));
-    return new File(_segmentDirectory, column + fileExtension);
+    List<File> candidates = getFilesFor(column, indexType);
+    if (candidates.isEmpty()) {
+      throw new RuntimeException("No file candidates for index " + indexType + " and column " + column);
+    }
+
+    return candidates.stream()
+        .filter(File::exists)
+        .findAny()
+        .orElse(candidates.get(0));
+  }
+
+  private List<File> getFilesFor(String column, IndexType<?, ?, ?> indexType) {
+    return indexType.getFileExtensions(_segmentMetadata.getColumnMetadataFor(column)).stream()
+        .map(fileExtension -> new File(_segmentDirectory, column + fileExtension))
+        .collect(Collectors.toList());
   }
 
   private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context)

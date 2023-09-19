@@ -89,6 +89,7 @@ public class DictionaryIndexType
     extends AbstractIndexType<DictionaryIndexConfig, Dictionary, SegmentDictionaryCreator>
     implements ConfigurableFromIndexLoadingConfig<DictionaryIndexConfig> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryIndexType.class);
+  private static final List<String> EXTENSIONS = Collections.singletonList(V1Constants.Dict.FILE_EXTENSION);
 
   protected DictionaryIndexType() {
     super(StandardIndexes.DICTIONARY_ID);
@@ -334,8 +335,8 @@ public class DictionaryIndexType
   }
 
   @Override
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    return getFileExtension();
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    return EXTENSIONS;
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<DictionaryIndexConfig, Dictionary> {
