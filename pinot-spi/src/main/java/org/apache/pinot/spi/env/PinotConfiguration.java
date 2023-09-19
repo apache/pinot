@@ -30,6 +30,7 @@ import org.apache.commons.configuration2.CompositeConfiguration;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.convert.DefaultListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
@@ -108,6 +109,7 @@ public class PinotConfiguration {
    */
   public PinotConfiguration(Configuration baseConfiguration) {
     _configuration = new CompositeConfiguration(computeConfigurationsFromSources(baseConfiguration, new HashMap<>()));
+    _configuration.setListDelimiterHandler(new DefaultListDelimiterHandler(','));
   }
 
   /**
@@ -129,6 +131,7 @@ public class PinotConfiguration {
    */
   public PinotConfiguration(Map<String, Object> baseProperties, Map<String, String> environmentVariables) {
     _configuration = new CompositeConfiguration(computeConfigurationsFromSources(baseProperties, environmentVariables));
+    _configuration.setListDelimiterHandler(new DefaultListDelimiterHandler(','));
   }
 
   /**
@@ -163,8 +166,11 @@ public class PinotConfiguration {
 
         .map(PinotConfiguration::loadProperties);
 
-    return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(MapConfiguration::new),
-        propertiesFromConfigPaths).collect(Collectors.toList());
+    return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(e -> {
+          MapConfiguration mapConfiguration = new MapConfiguration(e);
+          mapConfiguration.setListDelimiterHandler(new DefaultListDelimiterHandler(','));
+          return mapConfiguration;
+        }), propertiesFromConfigPaths).collect(Collectors.toList());
   }
 
   private static String getProperty(String name, Configuration configuration) {
@@ -183,6 +189,7 @@ public class PinotConfiguration {
     try {
       PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
       propertiesConfiguration.setIOFactory(new ConfigFilePropertyReaderFactory());
+      propertiesConfiguration.setListDelimiterHandler(new DefaultListDelimiterHandler(','));
       FileHandler fileHandler = new FileHandler(propertiesConfiguration);
       if (configPath.startsWith("classpath:")) {
         fileHandler
