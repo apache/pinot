@@ -1468,9 +1468,7 @@ public class PinotLLCRealtimeSegmentManager {
       return 0L;
     }
 
-    if (!isLowLevelConsumer(tableNameWithType, tableConfig)
-        || !getIsSplitCommitEnabled()
-        || !isTmpSegmentAsyncDeletionEnabled()) {
+    if (!getIsSplitCommitEnabled() || !isTmpSegmentAsyncDeletionEnabled()) {
       return 0L;
     }
 
@@ -1503,7 +1501,8 @@ public class PinotLLCRealtimeSegmentManager {
     return deletedTmpSegments;
   }
 
-  private boolean isTmpAndCanDelete(URI uri, Set<String> deepURIs, PinotFS pinotFS) throws Exception {
+  private boolean isTmpAndCanDelete(URI uri, Set<String> deepURIs, PinotFS pinotFS)
+      throws Exception {
     long lastModified = pinotFS.lastModified(uri);
     if (lastModified <= 0) {
       LOGGER.warn("file {} modification time {} is not positive, ineligible for delete", uri.toString(), lastModified);
@@ -1512,12 +1511,6 @@ public class PinotLLCRealtimeSegmentManager {
     String uriString = uri.toString();
     return SegmentCompletionUtils.isTmpFile(uriString) && !deepURIs.contains(uriString)
         && getCurrentTimeMs() - lastModified > _controllerConf.getTmpSegmentRetentionInSeconds() * 1000L;
-  }
-
-  private boolean isLowLevelConsumer(String tableNameWithType, TableConfig tableConfig) {
-    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableNameWithType,
-        IngestionConfigUtils.getStreamConfigMap(tableConfig));
-    return streamConfig.hasLowLevelConsumerType();
   }
 
   /**

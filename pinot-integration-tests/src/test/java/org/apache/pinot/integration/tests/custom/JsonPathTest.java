@@ -339,7 +339,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode pinotResponse = postQuery(query);
     int expectedStatusCode;
     if (useMultiStageQueryEngine) {
-      expectedStatusCode = QueryException.QUERY_PLANNING_ERROR_CODE;
+      expectedStatusCode = QueryException.UNKNOWN_COLUMN_ERROR_CODE;
     } else {
       expectedStatusCode = QueryException.SQL_PARSING_ERROR_CODE;
     }

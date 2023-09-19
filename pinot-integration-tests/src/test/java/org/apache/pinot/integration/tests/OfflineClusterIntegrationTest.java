@@ -2231,6 +2231,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     {
+      String pinotQuery = "SELECT count(*), DaysSinceEpoch as d FROM mytable WHERE d = 16138 GROUP BY d";
+      JsonNode jsonNode = postQuery(pinotQuery);
+      JsonNode exceptions = jsonNode.get("exceptions");
+      assertFalse(exceptions.isEmpty());
+      assertEquals(exceptions.get(0).get("errorCode").asInt(), 710);
+    }
+    {
       //test same alias name with column name
       String query = "SELECT ArrTime AS ArrTime, Carrier AS Carrier, DaysSinceEpoch AS DaysSinceEpoch FROM mytable "
           + "ORDER BY DaysSinceEpoch DESC";
@@ -2254,6 +2261,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
       query = "SELECT count(*) AS cnt, Carrier AS CarrierName FROM mytable GROUP BY CarrierName ORDER BY cnt";
       testQuery(query);
+
+      // Test: 1. Alias should not be applied to filter; 2. Ordinal can be properly applied
+      query =
+          "SELECT DaysSinceEpoch + 100 AS DaysSinceEpoch, COUNT(*) AS cnt FROM mytable WHERE DaysSinceEpoch <= 16312 "
+              + "GROUP BY 1 ORDER BY 1 DESC";
+      // NOTE: H2 does not support ordinal in GROUP BY
+      String h2Query =
+          "SELECT DaysSinceEpoch + 100 AS DaysSinceEpoch, COUNT(*) AS cnt FROM mytable WHERE DaysSinceEpoch <= 16312 "
+              + "GROUP BY DaysSinceEpoch ORDER BY 1 DESC";
+      testQuery(query, h2Query);
     }
     {
       //test multiple alias
@@ -2588,7 +2605,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pinotQuery = "SELECT DISTINCT Carrier FROM db.mytable LIMIT 1000000";
     testQuery(pinotQuery, h2Query);
   }
-
 
   @Test
   public void testQuerySourceWithDatabaseNameV2()

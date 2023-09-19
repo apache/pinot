@@ -321,7 +321,8 @@ public class BrokerRequestToQueryContextConverterTest {
     // Alias
     // NOTE: All the references to the alias should already be converted to the original expressions.
     {
-      String query = "SELECT SUM(foo) AS a, bar AS b FROM testTable WHERE b IN (5, 10, 15) GROUP BY b ORDER BY a DESC";
+      String query =
+          "SELECT SUM(foo) AS a, bar AS b FROM testTable WHERE bar IN (5, 10, 15) GROUP BY b ORDER BY a DESC";
       QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
       assertEquals(queryContext.getTableName(), "testTable");
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();

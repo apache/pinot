@@ -19,10 +19,8 @@
 package org.apache.pinot.sql.parsers.rewriter;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
@@ -31,38 +29,30 @@ import org.apache.pinot.sql.parsers.SqlCompilationException;
 
 
 public class AliasApplier implements QueryRewriter {
+
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {
-
-    // Update alias
-    Map<Identifier, Expression> aliasMap = extractAlias(pinotQuery.getSelectList());
+    Map<String, Expression> aliasMap = extractAlias(pinotQuery.getSelectList());
     applyAlias(aliasMap, pinotQuery);
-
-    // Validate
-    validateSelectionClause(aliasMap, pinotQuery);
     return pinotQuery;
   }
 
-  private static Map<Identifier, Expression> extractAlias(List<Expression> expressions) {
-    Map<Identifier, Expression> aliasMap = new HashMap<>();
-    for (Expression expression : expressions) {
-      Function functionCall = expression.getFunctionCall();
-      if (functionCall == null) {
+  private static Map<String, Expression> extractAlias(List<Expression> selectExpressions) {
+    Map<String, Expression> aliasMap = new HashMap<>();
+    for (Expression expression : selectExpressions) {
+      Function function = expression.getFunctionCall();
+      if (function == null || !function.getOperator().equals("as")) {
         continue;
       }
-      if (functionCall.getOperator().equals("as")) {
-        Expression identifierExpr = functionCall.getOperands().get(1);
-        aliasMap.put(identifierExpr.getIdentifier(), functionCall.getOperands().get(0));
+      String alias = function.getOperands().get(1).getIdentifier().getName();
+      if (aliasMap.put(alias, function.getOperands().get(0)) != null) {
+        throw new SqlCompilationException("Find duplicate alias: " + alias);
       }
     }
     return aliasMap;
   }
 
-  private static void applyAlias(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery) {
-    Expression filterExpression = pinotQuery.getFilterExpression();
-    if (filterExpression != null) {
-      applyAlias(aliasMap, filterExpression);
-    }
+  private static void applyAlias(Map<String, Expression> aliasMap, PinotQuery pinotQuery) {
     List<Expression> groupByList = pinotQuery.getGroupByList();
     if (groupByList != null) {
       for (Expression expression : groupByList) {
@@ -81,10 +71,10 @@ public class AliasApplier implements QueryRewriter {
     }
   }
 
-  private static void applyAlias(Map<Identifier, Expression> aliasMap, Expression expression) {
-    Identifier identifierKey = expression.getIdentifier();
-    if (identifierKey != null) {
-      Expression aliasExpression = aliasMap.get(identifierKey);
+  private static void applyAlias(Map<String, Expression> aliasMap, Expression expression) {
+    Identifier identifier = expression.getIdentifier();
+    if (identifier != null) {
+      Expression aliasExpression = aliasMap.get(identifier.getName());
       if (aliasExpression != null) {
         expression.setType(aliasExpression.getType());
         expression.setIdentifier(aliasExpression.getIdentifier());
@@ -97,18 +87,6 @@ public class AliasApplier implements QueryRewriter {
     if (function != null) {
       for (Expression operand : function.getOperands()) {
         applyAlias(aliasMap, operand);
-      }
-    }
-  }
-
-  private static void validateSelectionClause(Map<Identifier, Expression> aliasMap, PinotQuery pinotQuery)
-      throws SqlCompilationException {
-    // Sanity check on selection expression shouldn't use alias reference.
-    Set<String> aliasKeys = new HashSet<>();
-    for (Identifier identifier : aliasMap.keySet()) {
-      String aliasName = identifier.getName().toLowerCase();
-      if (!aliasKeys.add(aliasName)) {
-        throw new SqlCompilationException("Duplicated alias name found.");
       }
     }
   }
