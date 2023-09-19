@@ -200,15 +200,22 @@ public class AggregateOperator extends MultiStageOperator {
       Map<Integer, Map<Integer, Literal>> literalArgumentsMap) {
     int numFunctions = aggCalls.size();
     AggregationFunction<?, ?>[] aggFunctions = new AggregationFunction[numFunctions];
-    for (int i = 0; i < numFunctions; i++) {
-      RexExpression.FunctionCall functionCall = (RexExpression.FunctionCall) aggCalls.get(i);
-      Map<Integer, Literal> literalArguments = literalArgumentsMap.getOrDefault(i, Collections.emptyMap());
-      aggFunctions[i] = getAggFunction(functionCall, literalArguments);
+    if (!_aggType.isInputIntermediateFormat()) {
+      for (int i = 0; i < numFunctions; i++) {
+        Map<Integer, Literal> literalArguments = literalArgumentsMap.getOrDefault(i, Collections.emptyMap());
+        aggFunctions[i] = getAggFunctionForRawInput((RexExpression.FunctionCall) aggCalls.get(i), literalArguments);
+      }
+    } else {
+      for (int i = 0; i < numFunctions; i++) {
+        Map<Integer, Literal> literalArguments = literalArgumentsMap.getOrDefault(i, Collections.emptyMap());
+        aggFunctions[i] =
+            getAggFunctionForIntermediateInput((RexExpression.FunctionCall) aggCalls.get(i), literalArguments);
+      }
     }
     return aggFunctions;
   }
 
-  private AggregationFunction<?, ?> getAggFunction(RexExpression.FunctionCall functionCall,
+  private AggregationFunction<?, ?> getAggFunctionForRawInput(RexExpression.FunctionCall functionCall,
       Map<Integer, Literal> literalArguments) {
     String functionName = functionCall.getFunctionName();
     List<RexExpression> operands = functionCall.getFunctionOperands();
@@ -218,46 +225,65 @@ public class AggregateOperator extends MultiStageOperator {
           "Aggregate function without argument must be COUNT, got: %s", functionName);
       return COUNT_STAR_AGG_FUNCTION;
     }
-
-    // For intermediate aggregation, we might need to append the arguments to match the signature of the aggregation
-    int numExpectedArguments = numArguments;
-    if (_aggType.isInputIntermediateFormat()) {
-      Literal literal = literalArguments.get(-1);
-      if (literal != null) {
-        numExpectedArguments = literal.getIntValue();
-      }
-    }
-
-    List<ExpressionContext> arguments = new ArrayList<>(numExpectedArguments);
-    for (int i = 0; i < numExpectedArguments; i++) {
-      Literal literal = literalArguments.get(i);
-      if (literal != null) {
-        arguments.add(ExpressionContext.forLiteralContext(literal));
-        continue;
-      }
-      if (i >= numArguments) {
-        // Append placeholder argument for intermediate aggregation
-        arguments.add(PLACEHOLDER_IDENTIFIER);
-        continue;
-      }
-      RexExpression operand = operands.get(i);
-      switch (operand.getKind()) {
-        case INPUT_REF:
-          RexExpression.InputRef inputRef = (RexExpression.InputRef) operand;
-          arguments.add(ExpressionContext.forIdentifier(fromColIdToIdentifier(inputRef.getIndex())));
-          break;
-        case LITERAL:
-          RexExpression.Literal literalRexExp = (RexExpression.Literal) operand;
-          arguments.add(
-              ExpressionContext.forLiteralContext(literalRexExp.getDataType().toDataType(), literalRexExp.getValue()));
-          break;
-        default:
-          throw new IllegalStateException("Illegal aggregation function operand type: " + operand.getKind());
+    List<ExpressionContext> arguments = new ArrayList<>(numArguments);
+    for (int i = 0; i < numArguments; i++) {
+      Literal literalArgument = literalArguments.get(i);
+      if (literalArgument != null) {
+        arguments.add(ExpressionContext.forLiteralContext(literalArgument));
+      } else {
+        RexExpression operand = operands.get(i);
+        switch (operand.getKind()) {
+          case INPUT_REF:
+            RexExpression.InputRef inputRef = (RexExpression.InputRef) operand;
+            arguments.add(ExpressionContext.forIdentifier(fromColIdToIdentifier(inputRef.getIndex())));
+            break;
+          case LITERAL:
+            RexExpression.Literal literalRexExp = (RexExpression.Literal) operand;
+            arguments.add(ExpressionContext.forLiteralContext(literalRexExp.getDataType().toDataType(),
+                literalRexExp.getValue()));
+            break;
+          default:
+            throw new IllegalStateException("Illegal aggregation function operand type: " + operand.getKind());
+        }
       }
     }
 
     return AggregationFunctionFactory.getAggregationFunction(
         new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
+  }
+
+  private static AggregationFunction<?, ?> getAggFunctionForIntermediateInput(RexExpression.FunctionCall functionCall,
+      Map<Integer, Literal> literalArguments) {
+    String functionName = functionCall.getFunctionName();
+    List<RexExpression> operands = functionCall.getFunctionOperands();
+    int numArguments = operands.size();
+    Preconditions.checkState(numArguments == 1, "Intermediate aggregate must have 1 argument, got: %s", numArguments);
+    RexExpression operand = operands.get(0);
+    Preconditions.checkState(operand.getKind() == SqlKind.INPUT_REF,
+        "Intermediate aggregate argument must be an input reference, got: %s", operand.getKind());
+    // We might need to append extra arguments extracted from the hint to match the signature of the aggregation
+    Literal numArgumentsLiteral = literalArguments.get(-1);
+    if (numArgumentsLiteral == null) {
+      return AggregationFunctionFactory.getAggregationFunction(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, Collections.singletonList(
+              ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex())))),
+          true);
+    } else {
+      int numExpectedArguments = numArgumentsLiteral.getIntValue();
+      List<ExpressionContext> arguments = new ArrayList<>(numExpectedArguments);
+      arguments.add(
+          ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex())));
+      for (int i = 1; i < numExpectedArguments; i++) {
+        Literal literalArgument = literalArguments.get(i);
+        if (literalArgument != null) {
+          arguments.add(ExpressionContext.forLiteralContext(literalArgument));
+        } else {
+          arguments.add(PLACEHOLDER_IDENTIFIER);
+        }
+      }
+      return AggregationFunctionFactory.getAggregationFunction(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
+    }
   }
 
   private static String fromColIdToIdentifier(int colId) {
