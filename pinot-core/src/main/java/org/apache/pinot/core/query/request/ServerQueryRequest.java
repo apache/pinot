@@ -61,10 +61,15 @@ public class ServerQueryRequest {
   private final TimerContext _timerContext;
 
   public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
+    this(instanceRequest, serverMetrics, queryArrivalTimeMs, false);
+  }
+
+  public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs,
+      boolean enableStreaming) {
     _requestId = instanceRequest.getRequestId();
     _brokerId = instanceRequest.getBrokerId() != null ? instanceRequest.getBrokerId() : "unknown";
     _enableTrace = instanceRequest.isEnableTrace();
-    _enableStreaming = false;
+    _enableStreaming = enableStreaming;
     _segmentsToQuery = instanceRequest.getSearchSegments();
     _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,

@@ -154,9 +154,8 @@ public class RetentionManagerTest {
 
   private TableConfig createRealtimeTableConfig1(int replicaCount) {
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(TEST_TABLE_NAME).setLLC(true)
-        .setStreamConfigs(streamConfigs).setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-        .setNumReplicas(replicaCount).build();
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(TEST_TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setNumReplicas(replicaCount).build();
   }
 
   private void setupPinotHelixResourceManager(TableConfig tableConfig, final List<String> removedSegments,
@@ -273,7 +272,7 @@ public class RetentionManagerTest {
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
 
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
+        PinotTableIdealStateBuilder.buildEmptyIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
 
     final int kafkaPartition = 5;
     final long millisInDays = TimeUnit.DAYS.toMillis(1);
@@ -337,7 +336,7 @@ public class RetentionManagerTest {
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
 
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
+        PinotTableIdealStateBuilder.buildEmptyIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
 
     final int kafkaPartition = 5;
     final long millisInDays = TimeUnit.DAYS.toMillis(1);

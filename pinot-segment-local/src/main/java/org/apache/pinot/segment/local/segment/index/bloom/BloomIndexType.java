@@ -19,6 +19,8 @@
 
 package org.apache.pinot.segment.local.segment.index.bloom;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
@@ -51,6 +53,8 @@ public class BloomIndexType
     extends AbstractIndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator>
     implements ConfigurableFromIndexLoadingConfig<BloomFilterConfig> {
   public static final String INDEX_DISPLAY_NAME = "bloom";
+  private static final List<String> EXTENSIONS =
+      Collections.singletonList(V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
   protected BloomIndexType() {
     super(StandardIndexes.BLOOM_FILTER_ID);
@@ -116,8 +120,8 @@ public class BloomIndexType
   }
 
   @Override
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    return V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    return EXTENSIONS;
   }
 
   @Override

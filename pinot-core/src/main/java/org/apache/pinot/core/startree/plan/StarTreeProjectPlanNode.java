@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -80,7 +81,8 @@ public class StarTreeProjectPlanNode implements PlanNode {
         new StarTreeDocIdSetPlanNode(_queryContext, _starTreeV2, _predicateEvaluatorsMap, groupByColumns).run();
     Map<String, DataSource> dataSourceMap = new HashMap<>(HashUtil.getHashMapCapacity(projectionColumns.size()));
     projectionColumns.forEach(column -> dataSourceMap.put(column, _starTreeV2.getDataSource(column)));
-    ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
+    ProjectionOperator projectionOperator =
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator);
     // NOTE: Here we do not put aggregation expressions into TransformOperator based on the following assumptions:
     //       - They are all columns (not functions or constants), where no transform is required
     //       - We never call TransformOperator.getResultColumnContext() on them

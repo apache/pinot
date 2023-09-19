@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.plannode;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
@@ -36,7 +37,7 @@ public class JoinNode extends AbstractPlanNode {
   @ProtoProperties
   private List<RexExpression> _joinClause;
   @ProtoProperties
-  private boolean _isColocatedJoin;
+  private NodeHint _joinHints;
   @ProtoProperties
   private List<String> _leftColumnNames;
   @ProtoProperties
@@ -47,14 +48,14 @@ public class JoinNode extends AbstractPlanNode {
   }
 
   public JoinNode(int planFragmentId, DataSchema dataSchema, DataSchema leftSchema, DataSchema rightSchema,
-      JoinRelType joinRelType, JoinKeys joinKeys, List<RexExpression> joinClause, boolean isColocatedJoin) {
+      JoinRelType joinRelType, JoinKeys joinKeys, List<RexExpression> joinClause, List<RelHint> joinHints) {
     super(planFragmentId, dataSchema);
     _leftColumnNames = Arrays.asList(leftSchema.getColumnNames());
     _rightColumnNames = Arrays.asList(rightSchema.getColumnNames());
     _joinRelType = joinRelType;
     _joinKeys = joinKeys;
     _joinClause = joinClause;
-    _isColocatedJoin = isColocatedJoin;
+    _joinHints = new NodeHint(joinHints);
   }
 
   public JoinRelType getJoinRelType() {
@@ -69,8 +70,8 @@ public class JoinNode extends AbstractPlanNode {
     return _joinClause;
   }
 
-  public boolean isColocatedJoin() {
-    return _isColocatedJoin;
+  public NodeHint getJoinHints() {
+    return _joinHints;
   }
 
   public List<String> getLeftColumnNames() {

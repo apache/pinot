@@ -19,7 +19,13 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -37,6 +43,7 @@ public class PulsarConfig {
   public static final String AUTHENTICATION_TOKEN = "authenticationToken";
   public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
   public static final String ENABLE_KEY_VALUE_STITCH = "enableKeyValueStitch";
+  public static final String METADATA_FIELDS = "metadata.fields"; //list of the metadata fields comma separated
 
   private final String _pulsarTopicName;
   private final String _subscriberId;
@@ -45,8 +52,11 @@ public class PulsarConfig {
   private final SubscriptionInitialPosition _subscriptionInitialPosition;
   private final String _authenticationToken;
   private final String _tlsTrustCertsFilePath;
+  // Deprecated since pulsar supports record key extraction
+  @Deprecated
   private final boolean _enableKeyValueStitch;
-
+  private final boolean _populateMetadata;
+  private final Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> _metadataFields;
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
     _pulsarTopicName = streamConfig.getTopicName();
@@ -71,8 +81,32 @@ public class PulsarConfig {
 
     _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(offsetCriteria);
     _initialMessageId = PulsarUtils.offsetCriteriaToMessageId(offsetCriteria);
+    _populateMetadata = Boolean.parseBoolean(streamConfig.getStreamConfigsMap().getOrDefault(
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE),
+        "false"));
+    String metadataFieldsToExtractCSV = streamConfig.getStreamConfigsMap().getOrDefault(
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, METADATA_FIELDS), "");
+    if (StringUtils.isBlank(metadataFieldsToExtractCSV) || !_populateMetadata) {
+      _metadataFields = Collections.emptySet();
+    } else {
+      _metadataFields = parseConfigStringToEnumSet(metadataFieldsToExtractCSV);
+    }
   }
 
+  private Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> parseConfigStringToEnumSet(
+      String listOfMetadataFields) {
+    try {
+      String[] metadataFieldsArr = listOfMetadataFields.split(",");
+      return Stream.of(metadataFieldsArr)
+          .map(String::trim)
+          .filter(StringUtils::isNotBlank)
+          .map(PulsarStreamMessageMetadata.PulsarMessageMetadataValue::findByKey)
+          .filter(Objects::nonNull)
+          .collect(Collectors.toSet());
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Invalid metadata fields list: " + listOfMetadataFields, e);
+    }
+  }
   public String getPulsarTopicName() {
     return _pulsarTopicName;
   }
@@ -100,8 +134,14 @@ public class PulsarConfig {
   public String getTlsTrustCertsFilePath() {
     return _tlsTrustCertsFilePath;
   }
-
   public boolean getEnableKeyValueStitch() {
     return _enableKeyValueStitch;
+  }
+  public boolean isPopulateMetadata() {
+    return _populateMetadata;
+  }
+
+  public Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> getMetadataFields() {
+    return _metadataFields;
   }
 }

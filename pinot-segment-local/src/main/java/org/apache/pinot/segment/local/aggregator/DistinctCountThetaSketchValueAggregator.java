@@ -73,7 +73,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
       addObjectsToSketch((Object[]) rawValue, sketch);
     } else {
       throw new IllegalStateException(
-          "Unsupported data type for Theta Sketch aggregation: " + rawValue.getClass().getName());
+          "Unsupported data type for Theta Sketch aggregation: " + rawValue.getClass().getSimpleName());
     }
     return sketch.compact();
   }
@@ -101,7 +101,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
       }
     } else {
       throw new IllegalStateException(
-          "Unsupported data type for Theta Sketch aggregation: " + rawValues.getClass().getName());
+          "Unsupported data type for Theta Sketch aggregation: " + rawValues.getClass().getSimpleName());
     }
   }
 

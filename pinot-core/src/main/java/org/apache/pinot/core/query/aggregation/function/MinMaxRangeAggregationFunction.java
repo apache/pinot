@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -34,7 +35,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFunction<MinMaxRangePair, Double> {
 
-  public MinMaxRangeAggregationFunction(ExpressionContext expression) {
+  public MinMaxRangeAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifySingleArgument(arguments, "MIN_MAX_RANGE"));
+  }
+
+  protected MinMaxRangeAggregationFunction(ExpressionContext expression) {
     super(expression);
   }
 

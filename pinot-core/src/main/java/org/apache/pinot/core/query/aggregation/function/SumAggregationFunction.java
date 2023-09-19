@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -37,11 +38,11 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   private static final double DEFAULT_VALUE = 0.0;
   private final boolean _nullHandlingEnabled;
 
-  public SumAggregationFunction(ExpressionContext expression) {
-    this(expression, false);
+  public SumAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    this(verifySingleArgument(arguments, "SUM"), nullHandlingEnabled);
   }
 
-  public SumAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+  protected SumAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
   }

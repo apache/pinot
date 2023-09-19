@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,7 @@ public class StageMetadata {
 
   StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
     _workerMetadataList = workerMetadataList;
-    _customProperties = customProperties;
+    _customProperties = Collections.unmodifiableMap(customProperties);
   }
 
   public List<WorkerMetadata> getWorkerMetadataList() {

@@ -119,3 +119,23 @@ void SqlAtTimeZone(List<Object> list, ExprContext exprContext, Span s) :
         list.addAll(list2);
     }
 }
+
+SqlNode SqlPhysicalExplain() :
+{
+    SqlNode stmt;
+    SqlExplainLevel detailLevel = SqlExplainLevel.EXPPLAN_ATTRIBUTES;
+    SqlExplain.Depth depth = SqlExplain.Depth.PHYSICAL;
+    final SqlExplainFormat format = SqlExplainFormat.TEXT;
+}
+{
+    <EXPLAIN> <IMPLEMENTATION> <PLAN>
+    [ detailLevel = ExplainDetailLevel() ]
+    <FOR> stmt = SqlQueryOrDml() {
+        return new SqlPhysicalExplain(getPos(),
+            stmt,
+            detailLevel.symbol(SqlParserPos.ZERO),
+            depth.symbol(SqlParserPos.ZERO),
+            format.symbol(SqlParserPos.ZERO),
+            nDynamicParams);
+    }
+}

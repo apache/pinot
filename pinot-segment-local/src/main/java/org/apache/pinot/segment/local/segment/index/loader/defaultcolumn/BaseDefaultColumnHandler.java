@@ -347,6 +347,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   protected boolean createColumnV1Indices(String column)
       throws Exception {
     TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
+    boolean errorOnFailure = _indexLoadingConfig.isErrorOnColumnBuildFailure();
     if (tableConfig != null && tableConfig.getIngestionConfig() != null
         && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
       List<TransformConfig> transformConfigs = tableConfig.getIngestionConfig().getTransformConfigs();
@@ -364,6 +365,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             if (columnMetadata == null) {
               LOGGER.warn("Skip creating derived column: {} because argument: {} does not exist in the segment", column,
                   argument);
+              if (errorOnFailure) {
+                throw new RuntimeException(String.format(
+                    "Failed to create derived column: %s because argument: %s does not exist in the segment", column,
+                    argument));
+              }
               return false;
             }
             // TODO: Support creation of derived columns from forward index disabled columns
@@ -379,12 +385,19 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           // TODO: Support raw derived column
           if (_indexLoadingConfig.getNoDictionaryColumns().contains(column)) {
             LOGGER.warn("Skip creating raw derived column: {}", column);
+            if (errorOnFailure) {
+              throw new UnsupportedOperationException(String.format("Failed to create raw derived column: %s", column));
+            }
             return false;
           }
 
           // TODO: Support forward index disabled derived column
           if (_indexLoadingConfig.getForwardIndexDisabledColumns().contains(column)) {
             LOGGER.warn("Skip creating forward index disabled derived column: {}", column);
+            if (errorOnFailure) {
+              throw new UnsupportedOperationException(
+                  String.format("Failed to create forward index disabled derived column: %s", column));
+            }
             return false;
           }
 
@@ -394,6 +407,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           } catch (Exception e) {
             LOGGER.error("Caught exception while creating derived column: {} with transform function: {}", column,
                 transformFunction, e);
+            if (errorOnFailure) {
+              throw e;
+            }
             return false;
           }
         }

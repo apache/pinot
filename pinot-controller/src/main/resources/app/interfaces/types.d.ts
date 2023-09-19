@@ -247,4 +247,19 @@ declare module 'Models' {
     GOOD = "GOOD",
     UPDATING = "UPDATING",
   }
+
+  export const enum InstanceState {
+    ENABLE = "enable",
+    DISABLE = "disable"
+  }
+
+  export const enum TableType {
+    REALTIME = "realtime",
+    OFFLINE = "offline"
+  }
+
+  export interface SqlException {
+    errorCode: number,
+    message: string
+  }
 }

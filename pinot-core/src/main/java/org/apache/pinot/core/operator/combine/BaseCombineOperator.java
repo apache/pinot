@@ -19,10 +19,8 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -66,8 +64,6 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
 
   // Use an AtomicInteger to track the next operator to execute
   protected final AtomicInteger _nextOperatorId = new AtomicInteger();
-  // Use a BlockingQueue to store the intermediate results blocks
-  protected final BlockingQueue<BaseResultsBlock> _blockingQueue = new LinkedBlockingQueue<>();
   // Use an AtomicReference to track the exception/error during segment processing
   protected final AtomicReference<Throwable> _processingException = new AtomicReference<>();
 

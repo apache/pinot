@@ -19,7 +19,7 @@
 
 import jwtDecode from "jwt-decode";
 import { get, map, each, isEqual, isArray, keys, union } from 'lodash';
-import { DataTable, SQLResult } from 'Models';
+import { DataTable, SqlException, SQLResult } from 'Models';
 import moment from 'moment';
 import {
   getTenants,
@@ -39,7 +39,7 @@ import {
   resumeTasks,
   cleanupTasks,
   deleteTasks,
-  sheduleTask,
+  scheduleTask,
   executeTask,
   getJobDetail,
   getMinionMeta,
@@ -267,19 +267,23 @@ const getQueryResults = (params) => {
   return getQueryResult(params).then(({ data }) => {
     let queryResponse = getAsObject(data);
 
-    let errorStr = '';
+    let exceptions: SqlException[] = [];
     let dataArray = [];
     let columnList = [];
     // if sql api throws error, handle here
     if(typeof queryResponse === 'string'){
-      errorStr = queryResponse;
-    } 
-    if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
-      try{
-        errorStr = JSON.stringify(queryResponse.exceptions, null, 2);
-      } catch {
-        errorStr = "";
+      exceptions.push({errorCode: null, message: queryResponse});
+    }
+    // if sql api returns a structured error with a `code`, handle here
+    if (queryResponse && queryResponse.code) {
+      if (queryResponse.error) {
+        exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " and error: " + queryResponse.error});
+      } else {
+        exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " but no logs. Please see controller logs for error."});
       }
+    }
+    if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
+      exceptions = queryResponse.exceptions as SqlException[];
     } 
     if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
       columnList = queryResponse.resultTable.dataSchema.columnNames;
@@ -311,7 +315,7 @@ const getQueryResults = (params) => {
     ];
 
     return {
-      error: errorStr,
+      exceptions: exceptions,
       result: {
         columns: columnList,
         records: dataArray,
@@ -782,7 +786,12 @@ const getAllTaskTypes = async () => {
 const getTaskInfo = async (taskType) => {
   const tasksRes = await getTaskTypeTasks(taskType);
   const stateRes = await getTaskTypeState(taskType);
-  const state = get(stateRes, 'data', '');
+
+  let state = get(stateRes, 'data', '');
+  // response contains error
+  if(typeof state !== "string") {
+    state = "";
+  }
   return [tasksRes?.data?.length || 0, state];
 };
 
@@ -1114,7 +1123,7 @@ const getTableData = (params)=>{
 };
 
 const scheduleTaskAction = (tableName, taskType)=>{
-  return sheduleTask(tableName, taskType).then(response=>{
+  return scheduleTask(tableName, taskType).then(response=>{
     return response.data;
   })
 };

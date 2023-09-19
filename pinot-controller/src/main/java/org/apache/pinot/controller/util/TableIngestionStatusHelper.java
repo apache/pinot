@@ -23,8 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.ws.rs.core.Response;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.helix.task.TaskState;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -46,7 +46,8 @@ public class TableIngestionStatusHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableIngestionStatusHelper.class);
 
   public static TableStatus.IngestionStatus getRealtimeTableIngestionStatus(String tableNameWithType, int timeoutMs,
-      Executor executor, HttpConnectionManager connectionManager, PinotHelixResourceManager pinotHelixResourceManager) {
+      Executor executor, HttpClientConnectionManager connectionManager,
+      PinotHelixResourceManager pinotHelixResourceManager) {
     ConsumingSegmentInfoReader consumingSegmentInfoReader =
         new ConsumingSegmentInfoReader(executor, connectionManager, pinotHelixResourceManager);
     return consumingSegmentInfoReader.getIngestionStatus(tableNameWithType, timeoutMs);

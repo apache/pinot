@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Sets;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -29,8 +30,12 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.ClientErrorException;
@@ -49,11 +54,15 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -87,6 +96,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all instances")
   @ApiResponses(value = {
@@ -99,6 +109,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances/{instanceName}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get instance information", produces = MediaType.APPLICATION_JSON)
   @ApiResponses(value = {
@@ -189,6 +200,7 @@ public class PinotInstanceRestletResource {
 
   @POST
   @Path("/instances")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_INSTANCE)
   @Authenticate(AccessType.CREATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -216,8 +228,51 @@ public class PinotInstanceRestletResource {
     }
   }
 
+  @PUT
+  @Path("/instances/{instanceName}/state")
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
+  @ApiOperation(value = "Enable/disable an instance", notes = "Enable/disable an instance")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Instance not found"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  public SuccessResponse toggleInstanceState(
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
+      @PathParam("instanceName") String instanceName,
+      @ApiParam(value = "enable|disable", required = true) @QueryParam("state") String state) {
+    if (!_pinotHelixResourceManager.instanceExists(instanceName)) {
+      throw new ControllerApplicationException(LOGGER, "Instance '" + instanceName + "' does not exist",
+          Response.Status.NOT_FOUND);
+    }
+
+    if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
+      PinotResourceManagerResponse response = _pinotHelixResourceManager.enableInstance(instanceName);
+      if (!response.isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to enable instance '" + instanceName + "': " + response.getMessage(),
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
+    } else if (StateType.DISABLE.name().equalsIgnoreCase(state)) {
+      PinotResourceManagerResponse response = _pinotHelixResourceManager.disableInstance(instanceName);
+      if (!response.isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to disable instance '" + instanceName + "': " + response.getMessage(),
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
+    } else {
+      throw new ControllerApplicationException(LOGGER, "Unknown state '" + state + "'", Response.Status.BAD_REQUEST);
+    }
+    return new SuccessResponse("Request to " + state + " instance '" + instanceName + "' is successful");
+  }
+
+  @Deprecated
   @POST
   @Path("/instances/{instanceName}/state")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_INSTANCE)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
@@ -229,7 +284,7 @@ public class PinotInstanceRestletResource {
       @ApiResponse(code = 409, message = "Instance cannot be dropped"),
       @ApiResponse(code = 500, message = "Internal error")
   })
-  public SuccessResponse toggleInstanceState(
+  public SuccessResponse toggleInstanceStateDeprecated(
       @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
       @PathParam("instanceName") String instanceName, String state) {
     if (!_pinotHelixResourceManager.instanceExists(instanceName)) {
@@ -266,6 +321,7 @@ public class PinotInstanceRestletResource {
 
   @DELETE
   @Path("/instances/{instanceName}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_INSTANCE)
   @Authenticate(AccessType.DELETE)
   @Consumes(MediaType.TEXT_PLAIN)
   @Produces(MediaType.APPLICATION_JSON)
@@ -298,6 +354,7 @@ public class PinotInstanceRestletResource {
 
   @PUT
   @Path("/instances/{instanceName}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_INSTANCE)
   @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -328,6 +385,7 @@ public class PinotInstanceRestletResource {
 
   @PUT
   @Path("/instances/{instanceName}/updateTags")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_INSTANCE)
   @Authenticate(AccessType.UPDATE)
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
@@ -365,6 +423,7 @@ public class PinotInstanceRestletResource {
 
   @POST
   @Path("/instances/{instanceName}/updateBrokerResource")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_BROKER_RESOURCE)
   @Authenticate(AccessType.UPDATE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update the tables served by the specified broker instance in the broker resource", notes =
@@ -394,6 +453,7 @@ public class PinotInstanceRestletResource {
 
   @GET
   @Path("/instances/dropInstance/validate")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Check if it's safe to drop the given instances. If not list all the reasons why its not safe.")
   @ApiResponses(value = {
@@ -415,5 +475,148 @@ public class PinotInstanceRestletResource {
       throw new ControllerApplicationException(LOGGER, "Failed to check the safety for instance drop operation.",
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  /**
+   * Endpoint to validate the safety of instance tag update requests.
+   * This is to ensure that any instance tag update operation that user wants to perform is safe and does not create any
+   * side effect on the cluster and disturb the cluster consistency.
+   * This operation does not perform any changes to the cluster, but surfaces the possible issues which might occur upon
+   * applying the intended changes.
+   * @param requests list if instance tag update requests
+   * @return list of {@link OperationValidationResponse} which denotes the validity of each request along with listing
+   * the issues if any.
+   */
+  @POST
+  @Path("/instances/updateTags/validate")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Check if it's safe to update the tags of the given instances. If not list all the reasons.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  public List<OperationValidationResponse> instanceTagUpdateSafetyCheck(List<InstanceTagUpdateRequest> requests) {
+    LOGGER.info("Performing safety check on tag update request received for instances: {}",
+        requests.stream().map(InstanceTagUpdateRequest::getInstanceName).collect(Collectors.toList()));
+    Map<String, Integer> tagMinServerMap = _pinotHelixResourceManager.minimumInstancesRequiredForTags();
+    Map<String, Integer> tagToInstanceCountMap = getUpdatedTagToInstanceCountMap(requests);
+    Map<String, Integer> tagDeficiency = computeTagDeficiency(tagToInstanceCountMap, tagMinServerMap);
+
+    Map<String, List<OperationValidationResponse.ErrorWrapper>> responseMap = new HashMap<>(requests.size());
+    List<OperationValidationResponse.ErrorWrapper> tenantIssues = new ArrayList<>();
+    requests.forEach(request -> responseMap.put(request.getInstanceName(), new ArrayList<>()));
+    for (InstanceTagUpdateRequest request : requests) {
+      String name = request.getInstanceName();
+      Set<String> oldTags;
+      try {
+        oldTags = new HashSet<>(_pinotHelixResourceManager.getTagsForInstance(name));
+      } catch (NullPointerException exception) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Instance %s is not a valid instance name.", name), Response.Status.PRECONDITION_FAILED);
+      }
+      Set<String> newTags = new HashSet<>(request.getNewTags());
+      // tags removed from instance
+      for (String tag : Sets.difference(oldTags, newTags)) {
+        Integer deficiency = tagDeficiency.get(tag);
+        if (deficiency != null && deficiency > 0) {
+          String tenant = TagNameUtils.getTenantFromTag(tag);
+          String tagType = getInstanceTypeFromTag(tag);
+          responseMap.get(name).add(new OperationValidationResponse.ErrorWrapper(
+              OperationValidationResponse.ErrorCode.MINIMUM_INSTANCE_UNSATISFIED, tenant, tagType, tag, tagType, name));
+          tagDeficiency.put(tag, deficiency - 1);
+        }
+      }
+      // newly added tags to instance
+      for (String tag : newTags) {
+        String tagType = getInstanceTypeFromTag(tag);
+        if (tagType == null && (name.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)
+            || name.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE))) {
+          responseMap.get(name).add(new OperationValidationResponse.ErrorWrapper(
+              OperationValidationResponse.ErrorCode.UNRECOGNISED_TAG_TYPE, tag));
+          continue;
+        }
+        Integer deficiency = tagDeficiency.get(tag);
+        if (deficiency != null && deficiency > 0) {
+          tenantIssues.add(new OperationValidationResponse.ErrorWrapper(
+              OperationValidationResponse.ErrorCode.ALREADY_DEFICIENT_TENANT, TagNameUtils.getTenantFromTag(tag),
+              tagType, deficiency.toString(), name));
+        }
+      }
+    }
+
+    // consolidate all the issues based on instances
+    List<OperationValidationResponse> response = new ArrayList<>(requests.size());
+    responseMap.forEach((instance, issueList) -> response.add(issueList.isEmpty()
+        ? new OperationValidationResponse().setInstanceName(instance).setSafe(true)
+        : new OperationValidationResponse().putAllIssues(issueList).setInstanceName(instance).setSafe(false)));
+    // separate entry to group all the deficient tenant issues as it's not related to any instance
+    if (!tenantIssues.isEmpty()) {
+      response.add(new OperationValidationResponse().putAllIssues(tenantIssues).setSafe(false));
+    }
+    return response;
+  }
+
+  private String getInstanceTypeFromTag(String tag) {
+    if (TagNameUtils.isServerTag(tag)) {
+      return "server";
+    } else if (TagNameUtils.isBrokerTag(tag)) {
+      return "broker";
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Compute the number of deficient instances for each tag.
+   * The utility accepts two maps
+   * - map of tags and count of their intended tagged instances
+   * - map of tags and their minimum number of instance requirements
+   * And then compares these two maps to return a map of tags and the number of their deficient instances.
+   *
+   * @param tagToInstanceCountMap tags and count of their intended tagged instances
+   * @param tagToMinInstanceCountMap tags and their minimum number of instance requirements
+   * @return tags and the number of their deficient instances
+   */
+  private Map<String, Integer> computeTagDeficiency(Map<String, Integer> tagToInstanceCountMap,
+      Map<String, Integer> tagToMinInstanceCountMap) {
+    Map<String, Integer> tagDeficiency = new HashMap<>();
+    Map<String, Integer> tagToInstanceCountMapCopy = new HashMap<>(tagToInstanceCountMap);
+    // compute deficiency for each of the minimum instance requirement entry
+    tagToMinInstanceCountMap.forEach((tag, minInstances) -> {
+      Integer updatedInstances = tagToInstanceCountMapCopy.remove(tag);
+      // if tag is not present in the provided map its considered as if tag is not assigned to any instance
+      // hence deficiency = minimum instance requirement.
+      tagDeficiency.put(tag, minInstances - (updatedInstances != null ? updatedInstances : 0));
+    });
+    // tags for which minimum instance requirement is not specified are assumed to have no deficiency (deficiency = 0)
+    tagToInstanceCountMapCopy.forEach((tag, updatedInstances) -> tagDeficiency.put(tag, 0));
+    return tagDeficiency;
+  }
+
+  /**
+   * Utility to fetch the existing tags and count of their respective tagged instances and then apply the changes based
+   * on the provided list of {@link InstanceTagUpdateRequest} to get the updated map of tags and count of their
+   * respective tagged instances
+   * @param requests list of {@link InstanceTagUpdateRequest}
+   * @return map of tags and updated count of their respective tagged instances
+   */
+  private Map<String, Integer> getUpdatedTagToInstanceCountMap(List<InstanceTagUpdateRequest> requests) {
+    Map<String, Integer> updatedTagInstanceMap = new HashMap<>();
+    Set<String> visitedInstances = new HashSet<>();
+    // build the map of tags and their respective instance counts from the given tag update request list
+    requests.forEach(instance -> {
+      instance.getNewTags().forEach(tag ->
+          updatedTagInstanceMap.put(tag, updatedTagInstanceMap.getOrDefault(tag, 0) + 1));
+      visitedInstances.add(instance.getInstanceName());
+    });
+    // add the instance counts to tags for the rest of the instances apart from the ones mentioned in requests
+    _pinotHelixResourceManager.getAllInstances().forEach(instance -> {
+      if (!visitedInstances.contains(instance)) {
+        _pinotHelixResourceManager.getTagsForInstance(instance).forEach(tag ->
+            updatedTagInstanceMap.put(tag, updatedTagInstanceMap.getOrDefault(tag, 0) + 1));
+        visitedInstances.add(instance);
+      }
+    });
+    return updatedTagInstanceMap;
   }
 }

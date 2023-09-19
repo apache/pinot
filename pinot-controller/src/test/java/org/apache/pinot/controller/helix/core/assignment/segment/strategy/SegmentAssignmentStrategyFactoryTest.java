@@ -100,8 +100,8 @@ public class SegmentAssignmentStrategyFactoryTest {
   @Test
   public void testBalancedNumSegmentAssignmentStrategyForRealtimeTables() {
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setLLC(true)
-        .setStreamConfigs(streamConfigs).build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setStreamConfigs(streamConfigs).build();
     InstancePartitions instancePartitions = new InstancePartitions(INSTANCE_PARTITIONS_NAME);
     instancePartitions.setInstances(0, 0, INSTANCES);
 

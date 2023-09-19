@@ -92,7 +92,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     if (call.rel(0) instanceof Aggregate) {
       Aggregate agg = call.rel(0);
       ImmutableList<RelHint> hints = agg.getHints();
-      return !PinotHintStrategyTable.containsHint(hints, PinotHintOptions.INTERNAL_AGG_OPTIONS);
+      return !PinotHintStrategyTable.containsHintOption(hints, PinotHintOptions.INTERNAL_AGG_OPTIONS,
+          PinotHintOptions.InternalAggregateOptions.AGG_TYPE);
     }
     return false;
   }
@@ -111,17 +112,18 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     ImmutableList<RelHint> oldHints = oldAggRel.getHints();
 
     Aggregate newAgg;
-    if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.containsHintOption(oldHints,
+    if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.isHintOptionTrue(oldHints,
         PinotHintOptions.AGGREGATE_HINT_OPTIONS, PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS)) {
       // ------------------------------------------------------------------------
       // If the "is_partitioned_by_group_by_keys" aggregate hint option is set, just add additional hints indicating
       // this is a single stage aggregation.
-      ImmutableList<RelHint> newLeafAggHints =
-          new ImmutableList.Builder<RelHint>().addAll(oldHints).add(createAggHint(AggType.DIRECT)).build();
+      List<RelHint> newHints = PinotHintStrategyTable.replaceHintOptions(oldAggRel.getHints(),
+          PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE,
+          AggType.DIRECT.name());
       newAgg =
-          new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newLeafAggHints, oldAggRel.getInput(),
+          new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newHints, oldAggRel.getInput(),
               oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), oldAggRel.getAggCallList());
-    } else if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.containsHintOption(oldHints,
+    } else if (!oldAggRel.getGroupSet().isEmpty() && PinotHintStrategyTable.isHintOptionTrue(oldHints,
         PinotHintOptions.AGGREGATE_HINT_OPTIONS,
         PinotHintOptions.AggregateOptions.SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION)) {
       // ------------------------------------------------------------------------
@@ -161,9 +163,9 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    */
   private RelNode createPlanWithExchangeDirectAggregation(RelOptRuleCall call) {
     Aggregate oldAggRel = call.rel(0);
-    ImmutableList<RelHint> oldHints = oldAggRel.getHints();
-    ImmutableList<RelHint> newHints =
-        new ImmutableList.Builder<RelHint>().addAll(oldHints).add(createAggHint(AggType.DIRECT)).build();
+    List<RelHint> newHints = PinotHintStrategyTable.replaceHintOptions(oldAggRel.getHints(),
+        PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE,
+        AggType.DIRECT.name());
 
     // create project when there's none below the aggregate to reduce exchange overhead
     RelNode childRel = ((HepRelVertex) oldAggRel.getInput()).getCurrentRel();
@@ -183,7 +185,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    * The following is copied from {@link AggregateExtractProjectRule#onMatch(RelOptRuleCall)}
    * with modification to insert an exchange in between the Aggregate and Project
    */
-  private RelNode convertAggForExchangeDirectAggregate(RelOptRuleCall call, ImmutableList<RelHint> newHints) {
+  private RelNode convertAggForExchangeDirectAggregate(RelOptRuleCall call, List<RelHint> newHints) {
     final Aggregate aggregate = call.rel(0);
     final RelNode input = aggregate.getInput();
     // Compute which input fields are used.
@@ -241,9 +243,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
       newCalls.add(buildAggregateCall(oldAggRel.getInput(), oldCall, oldCall.getArgList(), oldAggRel.getGroupCount(),
           AggType.LEAF));
     }
-    ImmutableList<RelHint> oldHints = oldAggRel.getHints();
-    ImmutableList<RelHint> newHints =
-        new ImmutableList.Builder<RelHint>().addAll(oldHints).add(createAggHint(AggType.LEAF)).build();
+    List<RelHint> newHints = PinotHintStrategyTable.replaceHintOptions(oldAggRel.getHints(),
+        PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE, AggType.LEAF.name());
     return new LogicalAggregate(oldAggRel.getCluster(), oldAggRel.getTraitSet(), newHints, oldAggRel.getInput(),
         oldAggRel.getGroupSet(), oldAggRel.getGroupSets(), newCalls);
   }
@@ -278,8 +279,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
 
     // create new aggregate relation.
     ImmutableList<RelHint> orgHints = oldAggRel.getHints();
-    ImmutableList<RelHint> newAggHint =
-        new ImmutableList.Builder<RelHint>().addAll(orgHints).add(createAggHint(aggType)).build();
+    List<RelHint> newAggHint = PinotHintStrategyTable.replaceHintOptions(orgHints,
+        PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE, aggType.name());
     ImmutableBitSet groupSet = ImmutableBitSet.range(nGroups);
     relBuilder.aggregate(relBuilder.groupKey(groupSet, ImmutableList.of(groupSet)), newCalls);
     relBuilder.hints(newAggHint);
@@ -323,7 +324,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
         orgAggCall.isApproximate(),
         orgAggCall.ignoreNulls(),
         argList,
-        orgAggCall.filterArg,
+        aggType.isInputIntermediateFormat() ? -1 : orgAggCall.filterArg,
         orgAggCall.distinctKeys,
         orgAggCall.collation,
         numberGroups,
@@ -335,11 +336,5 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
   private static String getFunctionNameFromAggregateCall(AggregateCall aggregateCall) {
     return aggregateCall.getAggregation().getName().equalsIgnoreCase("COUNT") && aggregateCall.isDistinct()
         ? "distinctCount" : aggregateCall.getAggregation().getName();
-  }
-
-  private static RelHint createAggHint(AggType aggType) {
-    return RelHint.builder(PinotHintOptions.INTERNAL_AGG_OPTIONS)
-        .hintOption(PinotHintOptions.InternalAggregateOptions.AGG_TYPE, aggType.name())
-        .build();
   }
 }

@@ -35,16 +35,24 @@ import static org.testng.Assert.assertTrue;
 
 
 public class FunctionDefinitionRegistryTest {
-  private static final int MAX_NARG = 10;
-  private static final List<Pattern> IGNORED_TRANSFORM_FUNCTION_SIGNATURE = ImmutableList.of(
-      Pattern.compile("array.*"), // array related functions are not supported at the moment
-      Pattern.compile("st_.*")// all ST GEO features are ignored.
+  private static final List<Pattern> IGNORED_FUNCTION_NAME_PATTERNS = ImmutableList.of(
+      // Geo functions are defined in pinot-core
+      Pattern.compile("st_.*")
   );
   private static final List<String> IGNORED_FUNCTION_NAMES = ImmutableList.of(
-      // functions we are not supporting post transform anyway
-      "valuein", "mapvalue", "inidset", "lookup", "groovy", "scalar", "geotoh3", "not_in", "timeconvert",
+      // Geo functions are defined in pinot-core
+      "geotoh3",
+      // ArrayToMV and ArrayValueConstructor are placeholder functions without implementation
+      "arraytomv", "arrayvalueconstructor",
+      // Scalar function
+      "scalar",
+      // Functions without scalar function counterpart as of now
+      // TODO: Revisit this list when we add scalar function for these functions
+      "arraylength", "arrayaverage", "arraymin", "arraymax", "arraysum",
+      "valuein", "mapvalue", "inidset", "lookup", "groovy",
+      "timeconvert", "datetimeconvert", "jsonextractscalar", "jsonextractkey", "clpdecode",
       // functions not needed for register b/c they are in std sql table or they will not be composed directly.
-      "in", "and", "or", "range", "extract"
+      "in", "not_in", "and", "or", "range", "extract", "is_true", "is_not_true", "is_false", "is_not_false"
   );
 
   @Test
@@ -86,7 +94,7 @@ public class FunctionDefinitionRegistryTest {
     if (IGNORED_FUNCTION_NAMES.contains(funcName)) {
       return true;
     }
-    for (Pattern signature : IGNORED_TRANSFORM_FUNCTION_SIGNATURE) {
+    for (Pattern signature : IGNORED_FUNCTION_NAME_PATTERNS) {
       if (signature.matcher(funcName).find()) {
         return true;
       }

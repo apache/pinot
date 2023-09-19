@@ -49,8 +49,6 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
 
   private static @MonotonicNonNull PinotOperatorTable _instance;
 
-  public static final SqlFunction COALESCE = new PinotSqlCoalesceFunction();
-
   // TODO: clean up lazy init by using Suppliers.memorized(this::computeInstance) and make getter wrapped around
   // supplier instance. this should replace all lazy init static objects in the codebase
   public static synchronized PinotOperatorTable instance() {
@@ -75,6 +73,12 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
    * which are multistage enabled.
    */
   public final void initNoDuplicate() {
+    // Pinot supports native COALESCE function, thus no need to create CASE WHEN conversion.
+    register(new PinotSqlCoalesceFunction());
+    // Ensure ArrayValueConstructor is registered before ArrayQueryConstructor
+    register(ARRAY_VALUE_CONSTRUCTOR);
+
+    // TODO: reflection based registration is not ideal, we should use a static list of operators and register them
     // Use reflection to register the expressions stored in public fields.
     for (Field field : getClass().getFields()) {
       try {
@@ -115,9 +119,9 @@ public class PinotOperatorTable extends SqlStdOperatorTable {
     //   2. register special handling that differs from calcite standard.
     for (TransformFunctionType transformFunctionType : TransformFunctionType.values()) {
       if (transformFunctionType.getSqlKind() != null) {
-        // 1. Register the aggregation function with Calcite
+        // 1. Register the transform function with Calcite
         registerTransformFunction(transformFunctionType.getName(), transformFunctionType);
-        // 2. Register the aggregation function with Calcite on all alternative names
+        // 2. Register the transform function with Calcite on all alternative names
         List<String> alternativeFunctionNames = transformFunctionType.getAlternativeNames();
         for (String alternativeFunctionName : alternativeFunctionNames) {
           registerTransformFunction(alternativeFunctionName, transformFunctionType);

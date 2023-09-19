@@ -62,6 +62,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // This metric track the number of broker responses with processing exceptions inside.
   // The processing exceptions could be caught from both server side and broker side.
   BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS("badResponses", false),
+  // This metric tracks the number of broker responses with unavailable segments.
+  BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS("badResponses", false),
   // This metric track the number of broker responses with not all servers responded.
   // (numServersQueried > numServersResponded)
   BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED("badResponses", false),
@@ -96,7 +98,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
 
-  PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true);
+  PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true),
+  DIRECT_MEMORY_OOM("directMemoryOOMCount", true);
 
   private final String _brokerMeterName;
   private final String _unit;

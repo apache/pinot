@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.ws.rs.NotAuthorizedException;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.api.AccessControl;
@@ -50,93 +51,93 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  *
  */
 public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
-    private static final String HEADER_AUTHORIZATION = "authorization";
+  private static final String HEADER_AUTHORIZATION = "authorization";
 
-    private AccessControl _accessControl;
+  private AccessControl _accessControl;
 
-    public ZkBasicAuthAccessControlFactory() {
-        // left blank
+  public ZkBasicAuthAccessControlFactory() {
+    // left blank
+  }
+
+  @Override
+  public void init(PinotConfiguration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    _accessControl = new BasicAuthAccessControl(new AccessControlUserCache(propertyStore));
+  }
+
+  @Override
+  public AccessControl create() {
+    return _accessControl;
+  }
+
+  /**
+   * Access Control using header-based basic http authentication
+   */
+  private static class BasicAuthAccessControl implements AccessControl {
+    private Map<String, ZkBasicAuthPrincipal> _name2principal;
+    private final AccessControlUserCache _userCache;
+
+    public BasicAuthAccessControl(AccessControlUserCache userCache) {
+      _userCache = userCache;
     }
 
     @Override
-    public void init(PinotConfiguration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-        _accessControl = new BasicAuthAccessControl(new AccessControlUserCache(propertyStore));
+    public boolean hasAccess(RequesterIdentity requesterIdentity) {
+      return hasAccess(requesterIdentity, (BrokerRequest) null);
     }
 
     @Override
-    public AccessControl create() {
-        return _accessControl;
+    public boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
+      if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
+          .isSetTableName()) {
+        // no table restrictions? accept
+        return true;
+      }
+
+      return hasAccess(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
     }
 
-    /**
-     * Access Control using header-based basic http authentication
-     */
-    private static class BasicAuthAccessControl implements AccessControl {
-        private Map<String, ZkBasicAuthPrincipal> _name2principal;
-        private final AccessControlUserCache _userCache;
+    @Override
+    public boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
+      Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
+      if (!principalOpt.isPresent()) {
+        throw new NotAuthorizedException("Basic");
+      }
+      if (tables == null || tables.isEmpty()) {
+        return true;
+      }
 
-        public BasicAuthAccessControl(AccessControlUserCache userCache) {
-            _userCache = userCache;
+      ZkBasicAuthPrincipal principal = principalOpt.get();
+      for (String table : tables) {
+        if (!principal.hasTable(table)) {
+          return false;
         }
+      }
 
-        @Override
-        public boolean hasAccess(RequesterIdentity requesterIdentity) {
-            return hasAccess(requesterIdentity, (BrokerRequest) null);
-        }
-
-        @Override
-        public boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest) {
-            if (brokerRequest == null || !brokerRequest.isSetQuerySource() || !brokerRequest.getQuerySource()
-                .isSetTableName()) {
-                // no table restrictions? accept
-                return true;
-            }
-
-            return hasAccess(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
-        }
-
-        @Override
-        public boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
-            Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
-            if (!principalOpt.isPresent()) {
-                // no matching token? reject
-                return false;
-            }
-            if (tables == null || tables.isEmpty()) {
-                return true;
-            }
-
-            ZkBasicAuthPrincipal principal = principalOpt.get();
-            for (String table : tables) {
-                if (!principal.hasTable(table)) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {
-            Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity,
-                "HttpRequesterIdentity required");
-            HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
-
-            Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
-
-            _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig())
-                .stream().collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
-
-
-            Map<String, String> name2password = tokens.stream().collect(Collectors
-                .toMap(BasicAuthUtils::extractUsername, BasicAuthUtils::extractPassword));
-            Map<String, ZkBasicAuthPrincipal> password2principal = name2password.keySet().stream()
-                .collect(Collectors.toMap(name2password::get, _name2principal::get));
-
-            Optional<ZkBasicAuthPrincipal> principalOpt =
-                password2principal.entrySet().stream()
-                    .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
-                    .map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
-            return principalOpt;
-        }
+      return true;
     }
+
+    private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {
+      Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity,
+          "HttpRequesterIdentity required");
+      HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
+
+      Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
+
+      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig())
+          .stream().collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
+
+      Map<String, String> name2password = tokens.stream().collect(Collectors
+          .toMap(
+              org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
+              org.apache.pinot.common.auth.BasicAuthUtils::extractPassword));
+      Map<String, ZkBasicAuthPrincipal> password2principal = name2password.keySet().stream()
+          .collect(Collectors.toMap(name2password::get, _name2principal::get));
+
+      Optional<ZkBasicAuthPrincipal> principalOpt =
+          password2principal.entrySet().stream()
+              .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
+              .map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
+      return principalOpt;
+    }
+  }
 }

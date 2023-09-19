@@ -23,19 +23,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
-import software.amazon.awssdk.services.kinesis.model.Record;
 
 
 /**
  * A {@link MessageBatch} for collecting records from the Kinesis stream
  */
-public class KinesisRecordsBatch implements MessageBatch<byte[]> {
-  private final List<Record> _recordList;
+public class KinesisRecordsBatch implements MessageBatch<KinesisStreamMessage> {
+  private final List<KinesisStreamMessage> _recordList;
   private final String _shardId;
   private final boolean _endOfShard;
 
-  public KinesisRecordsBatch(List<Record> recordList, String shardId, boolean endOfShard) {
+  public KinesisRecordsBatch(List<KinesisStreamMessage> recordList, String shardId, boolean endOfShard) {
     _recordList = recordList;
     _shardId = shardId;
     _endOfShard = endOfShard;
@@ -47,18 +48,23 @@ public class KinesisRecordsBatch implements MessageBatch<byte[]> {
   }
 
   @Override
-  public byte[] getMessageAtIndex(int index) {
-    return _recordList.get(index).data().asByteArray();
+  public KinesisStreamMessage getMessageAtIndex(int index) {
+    return _recordList.get(index);
+  }
+
+  @Override
+  public byte[] getMessageBytesAtIndex(int index) {
+    return _recordList.get(index).getValue();
   }
 
   @Override
   public int getMessageOffsetAtIndex(int index) {
-    return ByteBuffer.wrap(_recordList.get(index).data().asByteArray()).arrayOffset();
+    return ByteBuffer.wrap(_recordList.get(index).getValue()).arrayOffset();
   }
 
   @Override
   public int getMessageLengthAtIndex(int index) {
-    return _recordList.get(index).data().asByteArray().length;
+    return _recordList.get(index).getValue().length;
   }
 
   @Override
@@ -76,5 +82,15 @@ public class KinesisRecordsBatch implements MessageBatch<byte[]> {
   @Override
   public boolean isEndOfPartitionGroup() {
     return _endOfShard;
+  }
+
+  @Override
+  public RowMetadata getMetadataAtIndex(int index) {
+    return _recordList.get(index).getMetadata();
+  }
+
+  @Override
+  public StreamMessage getStreamMessage(int index) {
+    return _recordList.get(index);
   }
 }

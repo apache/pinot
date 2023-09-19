@@ -340,8 +340,6 @@
     ]
   },
   "order_by_boolean": {
-    "ignored": true,
-    "comment": "fails when we try to canonicalizeRow with ClassCastException - value is already in memory as boolean but DataSchema expects it to be an int",
     "tables": {
       "bools": {
         "schema": [

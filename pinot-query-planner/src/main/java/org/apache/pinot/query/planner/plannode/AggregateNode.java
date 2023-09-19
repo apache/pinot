@@ -27,13 +27,17 @@ import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
 public class AggregateNode extends AbstractPlanNode {
-  private List<RelHint> _relHints;
+  @ProtoProperties
+  private NodeHint _nodeHint;
   @ProtoProperties
   private List<RexExpression> _aggCalls;
+  @ProtoProperties
+  private List<Integer> _filterArgIndices;
   @ProtoProperties
   private List<RexExpression> _groupSet;
   @ProtoProperties
@@ -47,11 +51,12 @@ public class AggregateNode extends AbstractPlanNode {
       List<RexExpression> groupSet, List<RelHint> relHints) {
     super(planFragmentId, dataSchema);
     Preconditions.checkState(areHintsValid(relHints), "invalid sql hint for agg node: {}", relHints);
-    _aggCalls = aggCalls.stream().map(RexExpression::toRexExpression).collect(Collectors.toList());
+    _aggCalls = aggCalls.stream().map(RexExpressionUtils::fromAggregateCall).collect(Collectors.toList());
+    _filterArgIndices = aggCalls.stream().map(c -> c.filterArg).collect(Collectors.toList());
     _groupSet = groupSet;
-    _relHints = relHints;
-    _aggType = AggType.valueOf(PinotHintStrategyTable.getHintOption(
-        relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS, PinotHintOptions.InternalAggregateOptions.AGG_TYPE));
+    _nodeHint = new NodeHint(relHints);
+    _aggType = AggType.valueOf(PinotHintStrategyTable.getHintOption(relHints, PinotHintOptions.INTERNAL_AGG_OPTIONS,
+        PinotHintOptions.InternalAggregateOptions.AGG_TYPE));
   }
 
   private boolean areHintsValid(List<RelHint> relHints) {
@@ -62,12 +67,16 @@ public class AggregateNode extends AbstractPlanNode {
     return _aggCalls;
   }
 
+  public List<Integer> getFilterArgIndices() {
+    return _filterArgIndices;
+  }
+
   public List<RexExpression> getGroupSet() {
     return _groupSet;
   }
 
-  public List<RelHint> getRelHints() {
-    return _relHints;
+  public NodeHint getNodeHint() {
+    return _nodeHint;
   }
 
   public AggType getAggType() {

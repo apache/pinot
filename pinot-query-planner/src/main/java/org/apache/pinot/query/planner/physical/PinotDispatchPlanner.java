@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
@@ -25,6 +29,7 @@ import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.physical.colocated.GreedyShuffleRewriteVisitor;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
 import org.apache.pinot.query.routing.WorkerManager;
 
 
@@ -65,9 +70,24 @@ public class PinotDispatchPlanner {
     rootNode.visit(MailboxAssignmentVisitor.INSTANCE, context);
     // 5. Run physical optimizations
     runPhysicalOptimizers(rootNode, context, _tableCache);
-    // 6. convert it into query plan.
+    // 6. Run validations
+    runValidations(rootFragment, context);
+    // 7. convert it into query plan.
     // TODO: refactor this to be a pluggable interface.
     return finalizeDispatchableSubPlan(rootFragment, context);
+  }
+
+  /**
+   * Run validations on the plan. Since there is only one validator right now, don't try to over-engineer it.
+   */
+  private void runValidations(PlanFragment planFragment, DispatchablePlanContext context) {
+    PlanNode rootPlanNode = planFragment.getFragmentRoot();
+    boolean isIntermediateStage =
+        context.getDispatchablePlanMetadataMap().get(rootPlanNode.getPlanFragmentId()).getScannedTables().isEmpty();
+    rootPlanNode.visit(ArrayToMvValidationVisitor.INSTANCE, isIntermediateStage);
+    for (PlanFragment child : planFragment.getChildren()) {
+      runValidations(child, context);
+    }
   }
 
   // TODO: Switch to Worker SPI to avoid multiple-places where workers are assigned.
@@ -84,6 +104,16 @@ public class PinotDispatchPlanner {
       DispatchablePlanContext dispatchablePlanContext) {
     return new DispatchableSubPlan(dispatchablePlanContext.getResultFields(),
         dispatchablePlanContext.constructDispatchablePlanFragmentList(subPlanRoot),
-        dispatchablePlanContext.getTableNames());
+        dispatchablePlanContext.getTableNames(),
+        populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()));
+  }
+
+  private static Map<String, Set<String>> populateTableUnavailableSegments(
+      Map<Integer, DispatchablePlanMetadata> dispatchablePlanMetadataMap) {
+    Map<String, Set<String>> tableToUnavailableSegments = new HashMap<>();
+    dispatchablePlanMetadataMap.values().forEach(metadata -> metadata.getTableToUnavailableSegmentsMap().forEach(
+        (tableName, unavailableSegments) -> tableToUnavailableSegments.computeIfAbsent(tableName, k -> new HashSet<>())
+            .addAll(unavailableSegments)));
+    return tableToUnavailableSegments;
   }
 }

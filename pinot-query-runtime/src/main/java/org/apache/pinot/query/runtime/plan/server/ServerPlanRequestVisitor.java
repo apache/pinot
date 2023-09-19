@@ -71,8 +71,8 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         .setGroupByList(CalciteRexExpressionParser.convertGroupByList(node.getGroupSet(), context.getPinotQuery()));
     // set agg list
     context.getPinotQuery().setSelectList(
-        CalciteRexExpressionParser.addSelectList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
-            context.getPinotQuery()));
+        CalciteRexExpressionParser.convertAggregateList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
+            node.getFilterArgIndices(), context.getPinotQuery()));
     return null;
   }
 
@@ -110,7 +110,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       staticSide = node.getInputs().get(1);
     }
     staticSide.visit(this, context);
-    PipelineBreakerResult pipelineBreakerResult = context.getPlanContext().getPipelineBreakerResult();
+    PipelineBreakerResult pipelineBreakerResult = context.getExecutionContext().getPipelineBreakerResult();
     int resultMapId = pipelineBreakerResult.getNodeIdMap().get(dynamicSide);
     List<TransferableBlock> transferableBlocks = pipelineBreakerResult.getResultMap().getOrDefault(
         resultMapId, Collections.emptyList());
@@ -122,7 +122,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       }
     }
 
-    if (resultDataContainer.size() > 0) {
+    if (!resultDataContainer.isEmpty()) {
       // rewrite SEMI-JOIN as filter clause.
       ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getJoinKeys(), resultDataContainer,
           dataSchema);
@@ -149,7 +149,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
     context.getPinotQuery()
-        .setSelectList(CalciteRexExpressionParser.overwriteSelectList(node.getProjects(), context.getPinotQuery()));
+        .setSelectList(CalciteRexExpressionParser.convertProjectList(node.getProjects(), context.getPinotQuery()));
     return null;
   }
 
@@ -157,13 +157,13 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitSort(SortNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
     PinotQuery pinotQuery = context.getPinotQuery();
-    if (node.getCollationKeys().size() > 0) {
+    if (!node.getCollationKeys().isEmpty()) {
       pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(node, pinotQuery));
     }
-    if (node.getFetch() > 0) {
+    if (node.getFetch() >= 0) {
       pinotQuery.setLimit(node.getFetch());
     }
-    if (node.getOffset() > 0) {
+    if (node.getOffset() >= 0) {
       pinotQuery.setOffset(node.getOffset());
     }
     return null;

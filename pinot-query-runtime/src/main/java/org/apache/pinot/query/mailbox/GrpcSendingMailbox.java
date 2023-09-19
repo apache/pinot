@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.mailbox;
 
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.stub.StreamObserver;
@@ -61,35 +60,51 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public void send(TransferableBlock block)
       throws IOException {
+    if (isTerminated()) {
+      return;
+    }
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("==[GRPC SEND]== sending data to: " + _id);
+    }
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
     }
-    Preconditions.checkState(!_statusObserver.isFinished(), "Mailbox: %s is already closed", _id);
     _contentObserver.onNext(toMailboxContent(block));
   }
 
   @Override
   public void complete() {
+    if (isTerminated()) {
+      return;
+    }
     _contentObserver.onCompleted();
   }
 
   @Override
   public void cancel(Throwable t) {
-    if (!_statusObserver.isFinished()) {
-      LOGGER.debug("Cancelling mailbox: {}", _id);
-      if (_contentObserver == null) {
-        _contentObserver = getContentObserver();
-      }
-      try {
-        // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
-        _contentObserver.onNext(toMailboxContent(TransferableBlockUtils.getErrorTransferableBlock(
-            new RuntimeException("Cancelled by sender with exception: " + t.getMessage(), t))));
-        _contentObserver.onCompleted();
-      } catch (Exception e) {
-        // Exception can be thrown if the stream is already closed, so we simply ignore it
-        LOGGER.debug("Caught exception cancelling mailbox: {}", _id, e);
-      }
+    if (isTerminated()) {
+      return;
     }
+    LOGGER.debug("Cancelling mailbox: {}", _id);
+    if (_contentObserver == null) {
+      _contentObserver = getContentObserver();
+    }
+    try {
+      String msg = t != null ? t.getMessage() : "Unknown";
+      // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
+      _contentObserver.onNext(toMailboxContent(TransferableBlockUtils.getErrorTransferableBlock(
+          new RuntimeException("Cancelled by sender with exception: " + msg, t))));
+      _contentObserver.onCompleted();
+    } catch (Exception e) {
+      // Exception can be thrown if the stream is already closed, so we simply ignore it
+      LOGGER.debug("Caught exception cancelling mailbox: {}", _id, e);
+    }
+  }
+
+  @Override
+  public boolean isTerminated() {
+    // TODO: We cannot differentiate early termination vs stream error
+    return _statusObserver.isFinished();
   }
 
   private StreamObserver<MailboxContent> getContentObserver() {
@@ -102,7 +117,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
     DataBlock dataBlock = block.getDataBlock();
     byte[] bytes = dataBlock.toBytes();
     ByteString byteString = UnsafeByteOperations.unsafeWrap(bytes);
-    return MailboxContent.newBuilder().setMailboxId(_id).setPayload(byteString)
-        .build();
+    return MailboxContent.newBuilder().setMailboxId(_id).setPayload(byteString).build();
   }
 }

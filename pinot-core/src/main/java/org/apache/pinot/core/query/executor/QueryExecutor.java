@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.core.query.executor;
 
-import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -57,43 +53,6 @@ public interface QueryExecutor {
   void shutDown();
 
   /**
-   * Processes the non-streaming query with the given executor service.
-   *
-   * Deprecated: use execute() instead.
-   */
-  @Deprecated
-  default DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService) {
-    return processQuery(queryRequest, executorService, null);
-  }
-
-  /**
-   * Processes the query (streaming or non-streaming) with the given executor service.
-   * <ul>
-   *   <li>
-   *     For streaming request, the returned {@link DataTable} contains only the metadata. The response is streamed back
-   *     via the observer.
-   *   </li>
-   *   <li>
-   *     For non-streaming request, the returned {@link DataTable} contains both data and metadata.
-   *   </li>
-   * </ul>
-   *
-   * Deprecated: use execute() instead.
-   */
-  @Deprecated
-  default DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService,
-      @Nullable StreamObserver<Server.ServerResponse> responseObserver) {
-    InstanceResponseBlock instanceResponse = execute(queryRequest, executorService, responseObserver);
-    try {
-      return instanceResponse.toDataTable();
-    } catch (Exception e) {
-      DataTable metadataOnlyDataTable = instanceResponse.toMetadataOnlyDataTable();
-      metadataOnlyDataTable.addException(QueryException.getException(QueryException.DATA_TABLE_SERIALIZATION_ERROR, e));
-      return metadataOnlyDataTable;
-    }
-  }
-
-  /**
    * Executes the non-streaming query with the given executor service.
    */
   default InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService) {
@@ -113,5 +72,5 @@ public interface QueryExecutor {
    * </ul>
    */
   InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
-      @Nullable StreamObserver<Server.ServerResponse> responseObserver);
+      @Nullable ResultsBlockStreamer streamer);
 }

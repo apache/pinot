@@ -321,7 +321,8 @@ public class BrokerRequestToQueryContextConverterTest {
     // Alias
     // NOTE: All the references to the alias should already be converted to the original expressions.
     {
-      String query = "SELECT SUM(foo) AS a, bar AS b FROM testTable WHERE b IN (5, 10, 15) GROUP BY b ORDER BY a DESC";
+      String query =
+          "SELECT SUM(foo) AS a, bar AS b FROM testTable WHERE bar IN (5, 10, 15) GROUP BY b ORDER BY a DESC";
       QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
       assertEquals(queryContext.getTableName(), "testTable");
       List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
@@ -676,7 +677,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertTrue(orderByExpressionContext.isDesc());
+    assertFalse(orderByExpressionContext.isAsc());
     assertTrue(orderByExpressionContext.isNullsLast());
     assertEquals(orderByExpressionContext.getExpression().getFunction().getFunctionName(), "datetrunc");
     assertEquals(orderByExpressionContext.getExpression().getFunction().getArguments().get(0).getIdentifier(), "A");
@@ -762,7 +763,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertTrue(orderByExpressionContext.isDesc());
+    assertFalse(orderByExpressionContext.isAsc());
     assertFalse(orderByExpressionContext.isNullsLast());
   }
 
@@ -776,7 +777,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertTrue(orderByExpressionContext.isDesc());
+    assertFalse(orderByExpressionContext.isAsc());
     assertTrue(orderByExpressionContext.isNullsLast());
   }
 
@@ -790,7 +791,7 @@ public class BrokerRequestToQueryContextConverterTest {
     List<OrderByExpressionContext> orderByExpressionContexts = queryContext.getOrderByExpressions();
     assertEquals(orderByExpressionContexts.size(), 1);
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
-    assertFalse(orderByExpressionContext.isDesc());
+    assertTrue(orderByExpressionContext.isAsc());
     assertTrue(orderByExpressionContext.isNullsLast());
   }
 }

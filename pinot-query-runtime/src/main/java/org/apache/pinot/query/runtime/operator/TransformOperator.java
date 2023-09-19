@@ -29,10 +29,8 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
-import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,8 +45,8 @@ import org.slf4j.LoggerFactory;
  */
 public class TransformOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "TRANSFORM";
+
   private final MultiStageOperator _upstreamOperator;
-  private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
@@ -65,7 +63,7 @@ public class TransformOperator extends MultiStageOperator {
     _resultColumnSize = transforms.size();
     _transformOperandsList = new ArrayList<>(_resultColumnSize);
     for (RexExpression rexExpression : transforms) {
-      _transformOperandsList.add(TransformOperand.toTransformOperand(rexExpression, upstreamDataSchema));
+      _transformOperandsList.add(TransformOperandFactory.getTransformOperand(rexExpression, upstreamDataSchema));
     }
     _resultSchema = resultSchema;
   }
@@ -86,13 +84,14 @@ public class TransformOperator extends MultiStageOperator {
     try {
       TransferableBlock block = _upstreamOperator.nextBlock();
       return transform(block);
-    } catch (Exception e) {
+    } catch (RuntimeException e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
   }
 
-  private TransferableBlock transform(TransferableBlock block)
-      throws Exception {
+  private TransferableBlock transform(TransferableBlock block) {
+    // TODO: Other operators keep the first erroneous block, while this keep the last.
+    //  We should decide what is what we want to do and be consistent with that.
     if (block.isErrorBlock()) {
       _upstreamErrorBlock = block;
     }
@@ -104,16 +103,12 @@ public class TransformOperator extends MultiStageOperator {
       return block;
     }
 
-    if (TransferableBlockUtils.isNoOpBlock(block)) {
-      return block;
-    }
-
-    List<Object[]> resultRows = new ArrayList<>();
     List<Object[]> container = block.getContainer();
+    List<Object[]> resultRows = new ArrayList<>(container.size());
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
       for (int i = 0; i < _resultColumnSize; i++) {
-        resultRow[i] = TypeUtils.convert(_transformOperandsList.get(i).apply(row), _resultSchema.getColumnDataType(i));
+        resultRow[i] = _transformOperandsList.get(i).apply(row);
       }
       resultRows.add(resultRow);
     }

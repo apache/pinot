@@ -21,11 +21,13 @@ package org.apache.pinot.controller.helix.core.minion;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -51,15 +53,20 @@ public class ClusterInfoAccessor {
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
   private final LeadControllerManager _leadControllerManager;
+  private final Executor _executor;
+  private final PoolingHttpClientConnectionManager _connectionManager;
 
   public ClusterInfoAccessor(PinotHelixResourceManager pinotHelixResourceManager,
       PinotHelixTaskResourceManager pinotHelixTaskResourceManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager) {
+      ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager, Executor executor,
+      PoolingHttpClientConnectionManager connectionManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
     _leadControllerManager = leadControllerManager;
+    _executor = executor;
+    _connectionManager = connectionManager;
   }
 
   /**
@@ -95,6 +102,20 @@ public class ClusterInfoAccessor {
   }
 
   /**
+   * Get shared executor
+   */
+  public Executor getExecutor() {
+    return _executor;
+  }
+
+  /**
+   * Get shared connection manager
+   */
+  public PoolingHttpClientConnectionManager getConnectionManager() {
+    return _connectionManager;
+  }
+
+  /**
    * Fetches the ZNRecord under MINION_TASK_METADATA/${tableNameWithType}/${taskType} for the given
    * taskType and tableNameWithType
    *
@@ -114,8 +135,8 @@ public class ClusterInfoAccessor {
    */
   @Nullable
   public SegmentLineage getSegmentLineage(String tableNameWithType) {
-    return SegmentLineageAccessHelper
-        .getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+    return SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(),
+        tableNameWithType);
   }
 
   /**
@@ -127,8 +148,8 @@ public class ClusterInfoAccessor {
    * @param expectedVersion The expected version of data to be overwritten. Set to -1 to override version check.
    */
   public void setMinionTaskMetadata(BaseTaskMetadata taskMetadata, String taskType, int expectedVersion) {
-    MinionTaskMetadataUtils
-        .persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType, taskMetadata, expectedVersion);
+    MinionTaskMetadataUtils.persistTaskMetadata(_pinotHelixResourceManager.getPropertyStore(), taskType, taskMetadata,
+        expectedVersion);
   }
 
   /**
@@ -175,8 +196,9 @@ public class ClusterInfoAccessor {
    * @return cluster config
    */
   public String getClusterConfig(String configName) {
-    HelixConfigScope helixConfigScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
-        .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
+    HelixConfigScope helixConfigScope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
+            _pinotHelixResourceManager.getHelixClusterName()).build();
     Map<String, String> configMap =
         _pinotHelixResourceManager.getHelixAdmin().getConfig(helixConfigScope, Collections.singletonList(configName));
     return configMap != null ? configMap.get(configName) : null;

@@ -39,7 +39,7 @@ public class ParquetNativeRecordReaderFullTest {
     testParquetFile("test-data/test-null.parquet");
     testParquetFile("test-data/test-null-dictionary.parquet");
     testParquetFile("test-data/airlines_parquet/4345e5eef217aa1b-c8f16177f35fd983_1150363067_data.1.parq");
-    //testParquetFile("test-data/dir_metadata/empty.parquet");
+    testParquetFile("test-data/dir_metadata/empty.parquet");
     testParquetFile("test-data/multi_rgs_pyarrow/b=hi/a97cc141d16f4014a59e5b234dddf07c.parquet");
     testParquetFile("test-data/multi_rgs_pyarrow/b=lo/01bc139247874a0aa9e0e541f2eec497.parquet");
     for (int i = 1; i < 4; i++) {
@@ -54,7 +54,7 @@ public class ParquetNativeRecordReaderFullTest {
     testParquetFile("test-data/customer.impala.parquet");
     testParquetFile("test-data/datapage_v2.snappy.parquet");
     testParquetFile("test-data/decimals.parquet");
-    //testParquetFile("test-data/empty.parquet");
+    testParquetFile("test-data/empty.parquet");
     testParquetFile("test-data/foo.parquet");
     testParquetFile("test-data/gzip-nation.impala.parquet");
     testParquetFile("test-data/map-test.snappy.parquet");
@@ -129,6 +129,11 @@ public class ParquetNativeRecordReaderFullTest {
     while (recordReader.hasNext()) {
       recordReader.next();
     }
+    recordReader.rewind();
+    while (recordReader.hasNext()) {
+      recordReader.next();
+    }
+
     recordReader.close();
   }
 }

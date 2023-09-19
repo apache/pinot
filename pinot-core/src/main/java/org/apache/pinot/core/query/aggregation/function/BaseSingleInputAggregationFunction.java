@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -59,5 +60,11 @@ public abstract class BaseSingleInputAggregationFunction<I, F extends Comparable
       }
     }
     return stringBuilder.append(')').toString();
+  }
+
+  protected static ExpressionContext verifySingleArgument(List<ExpressionContext> arguments, String functionName) {
+    Preconditions.checkArgument(arguments.size() == 1, "%s expects 1 argument, got: %s", functionName,
+        arguments.size());
+    return arguments.get(0);
   }
 }

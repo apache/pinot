@@ -56,7 +56,6 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -73,8 +72,8 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
-import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
+import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -91,7 +90,6 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -167,6 +165,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final Lock[] _idealStateUpdateLocks;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
   private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
+  private final boolean _isTmpSegmentAsyncDeletionEnabled;
   private final int _deepstoreUploadRetryTimeoutMs;
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
@@ -192,12 +191,17 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
+    _isTmpSegmentAsyncDeletionEnabled = controllerConf.isTmpSegmentAsyncDeletionEnabled();
     _deepstoreUploadRetryTimeoutMs = controllerConf.getDeepStoreRetryUploadTimeoutMs();
     _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
     return _isDeepStoreLLCSegmentUploadRetryEnabled;
+  }
+
+  public boolean isTmpSegmentAsyncDeletionEnabled() {
+    return _isTmpSegmentAsyncDeletionEnabled;
   }
 
   @VisibleForTesting
@@ -302,18 +306,10 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = tableConfig.getTableName();
     LOGGER.info("Setting up new LLC table: {}", realtimeTableName);
 
-    // Make sure all the existing segments are HLC segments
-    List<String> currentSegments = getAllSegments(realtimeTableName);
-    for (String segmentName : currentSegments) {
-      // TODO: Should return 4xx HTTP status code. Currently all exceptions are returning 500
-      Preconditions.checkState(SegmentName.isHighLevelConsumerSegmentName(segmentName),
-          "Cannot set up new LLC table: %s with existing non-HLC segment: %s", realtimeTableName, segmentName);
-    }
-
     _flushThresholdUpdateManager.clearFlushThresholdUpdater(realtimeTableName);
 
-    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
-        IngestionConfigUtils.getStreamConfigMap(tableConfig));
+    StreamConfig streamConfig =
+        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     List<PartitionGroupMetadata> newPartitionGroupMetadataList =
         getNewPartitionGroupMetadataList(streamConfig, Collections.emptyList());
@@ -336,24 +332,6 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     setIdealState(realtimeTableName, idealState);
-  }
-
-  /**
-   * Removes all LLC segments from the given IdealState.
-   */
-  public void removeLLCSegments(IdealState idealState) {
-    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
-
-    String realtimeTableName = idealState.getResourceName();
-    LOGGER.info("Removing LLC segments for table: {}", realtimeTableName);
-
-    List<String> segmentsToRemove = new ArrayList<>();
-    for (String segmentName : idealState.getRecord().getMapFields().keySet()) {
-      if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        segmentsToRemove.add(segmentName);
-      }
-    }
-    _helixResourceManager.deleteSegments(realtimeTableName, segmentsToRemove);
   }
 
   // TODO: Consider using TableCache to read the table config
@@ -488,19 +466,17 @@ public class PinotLLCRealtimeSegmentManager {
     PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
     String uriToMoveTo = moveSegmentFile(rawTableName, segmentName, segmentLocation, pinotFS);
 
-    // Cleans up tmp segment files under table dir.
-    // We only clean up tmp segment files in table level dir, so there's no need to list recursively.
-    // See LLCSegmentCompletionHandlers.uploadSegment().
-    // TODO: move tmp file logic into SegmentCompletionUtils.
-    try {
-      for (String uri : pinotFS.listFiles(tableDirURI, false)) {
-        if (uri.contains(SegmentCompletionUtils.getSegmentNamePrefix(segmentName))) {
-          LOGGER.warn("Deleting temporary segment file: {}", uri);
-          Preconditions.checkState(pinotFS.delete(new URI(uri), true), "Failed to delete file: %s", uri);
+    if (!isTmpSegmentAsyncDeletionEnabled()) {
+      try {
+        for (String uri : pinotFS.listFiles(tableDirURI, false)) {
+          if (uri.contains(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName))) {
+            LOGGER.warn("Deleting temporary segment file: {}", uri);
+            Preconditions.checkState(pinotFS.delete(new URI(uri), true), "Failed to delete file: %s", uri);
+          }
         }
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while deleting temporary segment files for segment: {}", segmentName, e);
       }
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while deleting temporary segment files for segment: {}", segmentName, e);
     }
     committingSegmentDescriptor.setSegmentLocation(uriToMoveTo);
   }
@@ -551,8 +527,8 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, committingSegmentName, false, true);
 
     // Using the latest segment of each partition group, creates a list of {@link PartitionGroupConsumptionStatus}
-    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableConfig.getTableName(),
-        IngestionConfigUtils.getStreamConfigMap(tableConfig));
+    StreamConfig streamConfig =
+        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
     List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
         getPartitionGroupConsumptionStatusList(idealState, streamConfig);
 
@@ -673,7 +649,7 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * Creates and persists segment ZK metadata for the new CONSUMING segment.
    */
-  private void createNewSegmentZKMetadata(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+  private void createNewSegmentZKMetadata(TableConfig tableConfig, StreamConfig streamConfig,
       LLCSegmentName newLLCSegmentName, long creationTimeMs, CommittingSegmentDescriptor committingSegmentDescriptor,
       @Nullable SegmentZKMetadata committingSegmentZKMetadata, InstancePartitions instancePartitions,
       int numPartitionGroups, int numReplicas, List<PartitionGroupMetadata> partitionGroupMetadataList) {
@@ -694,7 +670,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Add the partition metadata if available
     SegmentPartitionMetadata partitionMetadata =
-        getPartitionMetadataFromTableConfig(tableConfig, newLLCSegmentName.getPartitionGroupId());
+        getPartitionMetadataFromTableConfig(tableConfig, newLLCSegmentName.getPartitionGroupId(), numPartitionGroups);
     if (partitionMetadata != null) {
       newSegmentZKMetadata.setPartitionMetadata(partitionMetadata);
     }
@@ -710,7 +686,8 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @Nullable
-  private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId) {
+  private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId,
+      int numPartitionGroups) {
     SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (partitionConfig == null) {
       return null;
@@ -719,8 +696,14 @@ public class PinotLLCRealtimeSegmentManager {
     if (columnPartitionMap.size() == 1) {
       Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
       ColumnPartitionConfig columnPartitionConfig = entry.getValue();
+      if (numPartitionGroups != columnPartitionConfig.getNumPartitions()) {
+        LOGGER.warn("Number of partition groups fetched from the stream '{}' is different than "
+                + "columnPartitionConfig.numPartitions '{}' in the table config. The stream partition count is used. "
+                + "Please update the table config accordingly.", numPartitionGroups,
+            columnPartitionConfig.getNumPartitions());
+      }
       ColumnPartitionMetadata columnPartitionMetadata =
-          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), columnPartitionConfig.getNumPartitions(),
+          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), numPartitionGroups,
               Collections.singleton(partitionId), columnPartitionConfig.getFunctionConfig());
       return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
     } else {
@@ -878,7 +861,7 @@ public class PinotLLCRealtimeSegmentManager {
    * (this operation is done only if @param recreateDeletedConsumingSegment is set to true,
    * which means it's manually triggered by admin not by automatic periodic task)
    */
-  public void ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+  public void ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig,
       boolean recreateDeletedConsumingSegment, OffsetCriteria offsetCriteria) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
@@ -1059,9 +1042,9 @@ public class PinotLLCRealtimeSegmentManager {
    * TODO: split this method into multiple smaller methods
    */
   @VisibleForTesting
-  IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
-      IdealState idealState, List<PartitionGroupMetadata> newPartitionGroupMetadataList,
-      boolean recreateDeletedConsumingSegment, OffsetCriteria offsetCriteria) {
+  IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig, IdealState idealState,
+      List<PartitionGroupMetadata> newPartitionGroupMetadataList, boolean recreateDeletedConsumingSegment,
+      OffsetCriteria offsetCriteria) {
     String realtimeTableName = tableConfig.getTableName();
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
@@ -1254,7 +1237,7 @@ public class PinotLLCRealtimeSegmentManager {
     return idealState;
   }
 
-  private void createNewConsumingSegment(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+  private void createNewConsumingSegment(TableConfig tableConfig, StreamConfig streamConfig,
       SegmentZKMetadata latestSegmentZKMetadata, long currentTimeMs,
       List<PartitionGroupMetadata> newPartitionGroupMetadataList, InstancePartitions instancePartitions,
       Map<String, Map<String, String>> instanceStatesMap, SegmentAssignment segmentAssignment,
@@ -1316,7 +1299,7 @@ public class PinotLLCRealtimeSegmentManager {
    * Sets up a new partition group.
    * <p>Persists the ZK metadata for the first CONSUMING segment, and returns the segment name.
    */
-  private String setupNewPartitionGroup(TableConfig tableConfig, PartitionLevelStreamConfig streamConfig,
+  private String setupNewPartitionGroup(TableConfig tableConfig, StreamConfig streamConfig,
       PartitionGroupMetadata partitionGroupMetadata, long creationTimeMs, InstancePartitions instancePartitions,
       int numPartitionGroups, int numReplicas, List<PartitionGroupMetadata> partitionGroupMetadataList) {
     String realtimeTableName = tableConfig.getTableName();
@@ -1418,7 +1401,7 @@ public class PinotLLCRealtimeSegmentManager {
       String segmentName = segmentZKMetadata.getSegmentName();
       try {
         // Only fix the committed (DONE) LLC segment without deep store copy (empty download URL)
-        if (!SegmentName.isLowLevelConsumerSegmentName(segmentName) || segmentZKMetadata.getStatus() != Status.DONE
+        if (segmentZKMetadata.getStatus() != Status.DONE
             || !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
           continue;
         }
@@ -1463,6 +1446,71 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Failed to upload segment {} to deep store", segmentName, e);
       }
     }
+  }
+
+  /**
+   * Delete tmp segments for realtime table with low level consumer, split commit and async deletion is enabled.
+   * @param tableNameWithType
+   * @param segmentsZKMetadata
+   * @return number of deleted orphan temporary segments
+   *
+   */
+  public long deleteTmpSegments(String tableNameWithType, List<SegmentZKMetadata> segmentsZKMetadata) {
+    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
+
+    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+      return 0L;
+    }
+
+    TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      LOGGER.warn("Failed to find table config for table: {}, skipping deletion of tmp segments", tableNameWithType);
+      return 0L;
+    }
+
+    if (!getIsSplitCommitEnabled() || !isTmpSegmentAsyncDeletionEnabled()) {
+      return 0L;
+    }
+
+    Set<String> deepURIs = segmentsZKMetadata.stream().filter(meta -> meta.getStatus() == Status.DONE
+        && !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(meta.getDownloadUrl())).map(
+        SegmentZKMetadata::getDownloadUrl).collect(
+        Collectors.toSet());
+
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
+    PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
+    long deletedTmpSegments = 0;
+    try {
+      for (String filePath : pinotFS.listFiles(tableDirURI, false)) {
+        // prepend scheme
+        URI uri = URIUtils.getUri(filePath);
+        if (isTmpAndCanDelete(uri, deepURIs, pinotFS)) {
+          LOGGER.info("Deleting temporary segment file: {}", uri);
+          if (pinotFS.delete(uri, true)) {
+            LOGGER.info("Succeed to delete file: {}", uri);
+            deletedTmpSegments++;
+          } else {
+            LOGGER.warn("Failed to delete file: {}", uri);
+          }
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while deleting temporary files for table: {}", rawTableName, e);
+    }
+    return deletedTmpSegments;
+  }
+
+  private boolean isTmpAndCanDelete(URI uri, Set<String> deepURIs, PinotFS pinotFS)
+      throws Exception {
+    long lastModified = pinotFS.lastModified(uri);
+    if (lastModified <= 0) {
+      LOGGER.warn("file {} modification time {} is not positive, ineligible for delete", uri.toString(), lastModified);
+      return false;
+    }
+    String uriString = uri.toString();
+    return SegmentCompletionUtils.isTmpFile(uriString) && !deepURIs.contains(uriString)
+        && getCurrentTimeMs() - lastModified > _controllerConf.getTmpSegmentRetentionInSeconds() * 1000L;
   }
 
   /**

@@ -47,7 +47,12 @@ import static org.testng.Assert.assertTrue;
 public class CombineErrorOperatorsTest {
   private static final int NUM_OPERATORS = 10;
   private static final int NUM_THREADS = 2;
-  private static final long TIMEOUT_MS = 1000L;
+  private static final QueryContext QUERY_CONTEXT =
+      QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
+
+  static {
+    QUERY_CONTEXT.setEndTimeMs(Long.MAX_VALUE);
+  }
 
   private ExecutorService _executorService;
 
@@ -63,10 +68,8 @@ public class CombineErrorOperatorsTest {
       operators.add(new RegularOperator());
     }
     operators.add(new ExceptionOperator());
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
-    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
     SelectionOnlyCombineOperator combineOperator =
-        new SelectionOnlyCombineOperator(operators, queryContext, _executorService);
+        new SelectionOnlyCombineOperator(operators, QUERY_CONTEXT, _executorService);
     BaseResultsBlock resultsBlock = combineOperator.nextBlock();
     assertTrue(resultsBlock instanceof ExceptionResultsBlock);
     List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
@@ -84,10 +87,8 @@ public class CombineErrorOperatorsTest {
       operators.add(new RegularOperator());
     }
     operators.add(new ErrorOperator());
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
-    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
     SelectionOnlyCombineOperator combineOperator =
-        new SelectionOnlyCombineOperator(operators, queryContext, _executorService);
+        new SelectionOnlyCombineOperator(operators, QUERY_CONTEXT, _executorService);
     BaseResultsBlock resultsBlock = combineOperator.nextBlock();
     assertTrue(resultsBlock instanceof ExceptionResultsBlock);
     List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
@@ -106,10 +107,8 @@ public class CombineErrorOperatorsTest {
     }
     operators.add(new ExceptionOperator());
     operators.add(new ErrorOperator());
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable");
-    queryContext.setEndTimeMs(System.currentTimeMillis() + TIMEOUT_MS);
     SelectionOnlyCombineOperator combineOperator =
-        new SelectionOnlyCombineOperator(operators, queryContext, _executorService);
+        new SelectionOnlyCombineOperator(operators, QUERY_CONTEXT, _executorService);
     BaseResultsBlock resultsBlock = combineOperator.nextBlock();
     assertTrue(resultsBlock instanceof ExceptionResultsBlock);
     List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
@@ -176,7 +175,7 @@ public class CombineErrorOperatorsTest {
     protected Block getNextBlock() {
       return new SelectionResultsBlock(
           new DataSchema(new String[]{"myColumn"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}),
-          new ArrayList<>());
+          new ArrayList<>(), QUERY_CONTEXT);
     }
 
     @Override

@@ -219,6 +219,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
 
     for (String column : existingAllColumns) {
+      if (_schema != null && !_schema.hasColumn(column)) {
+        // _schema will be null only in tests
+        LOGGER.info("Column {} is not in schema, skipping updating forward index", column);
+        continue;
+      }
       FieldIndexConfigs newConf = _fieldIndexConfigs.get(column);
       boolean newIsFwd = newConf.getConfig(StandardIndexes.forward()).isEnabled();
       boolean newIsDict = newConf.getConfig(StandardIndexes.dictionary()).isEnabled();

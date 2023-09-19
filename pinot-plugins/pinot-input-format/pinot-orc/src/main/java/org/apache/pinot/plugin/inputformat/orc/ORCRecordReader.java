@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.DecimalColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ListColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
@@ -164,6 +165,7 @@ public class ORCRecordReader implements RecordReader {
       case BINARY:
       case VARCHAR:
       case CHAR:
+      case DECIMAL:
         return true;
       default:
         return false;
@@ -365,6 +367,16 @@ public class ORCRecordReader implements RecordReader {
           byte[] bytes = new byte[length];
           System.arraycopy(bytesColumnVector.vector[rowId], bytesColumnVector.start[rowId], bytes, 0, length);
           return bytes;
+        } else {
+          return null;
+        }
+      case DECIMAL:
+        // Extract to string
+        DecimalColumnVector decimalColumnVector = (DecimalColumnVector) columnVector;
+        if (decimalColumnVector.noNulls || !decimalColumnVector.isNull[rowId]) {
+          StringBuilder stringBuilder = new StringBuilder();
+          decimalColumnVector.stringifyValue(stringBuilder, rowId);
+          return stringBuilder.toString();
         } else {
           return null;
         }

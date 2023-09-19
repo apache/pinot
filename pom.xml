@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.13.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -122,17 +122,17 @@
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.9.2</avro.version>
-    <parquet.version>1.11.2</parquet.version>
+    <parquet.version>1.12.3</parquet.version>
     <helix.version>1.0.4</helix.version>
     <zkclient.version>0.7</zkclient.version>
-    <jackson.version>2.13.5</jackson.version>
+    <jackson.version>2.12.7.20221012</jackson.version>
     <zookeeper.version>3.6.3</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
     <jersey.version>2.39</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.9</swagger.version>
-    <hadoop.version>2.10.1</hadoop.version>
+    <hadoop.version>3.2.4</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <jsonpath.version>2.7.0</jsonpath.version>
     <jsonsmart.version>2.4.10</jsonsmart.version>
@@ -154,12 +154,14 @@
     <log4j.version>2.17.1</log4j.version>
     <netty.version>4.1.94.Final</netty.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
-    <jts.version>1.16.1</jts.version>
+    <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.26</jmh.version>
     <audienceannotations.version>0.13.0</audienceannotations.version>
     <clp-ffi.version>0.4.3</clp-ffi.version>
-    <aws.sdk.version>2.20.87</aws.sdk.version>
+    <stax2-api.version>4.1</stax2-api.version>
+    <aws.sdk.version>2.20.94</aws.sdk.version>
+    <joda-time.version>2.12.5</joda-time.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
 
@@ -178,6 +180,7 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
+    <surefire.version>3.0.0-M5</surefire.version>
   </properties>
 
   <profiles>
@@ -223,76 +226,6 @@
             </executions>
           </plugin>
         </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>jdk-8-maven-compiler-plugin</id>
-      <activation>
-        <property>
-          <name>jdk.version</name>
-          <value>8</value>
-        </property>
-      </activation>
-      <build>
-        <pluginManagement>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-compiler-plugin</artifactId>
-              <version>3.8.0</version>
-              <configuration>
-                <source>8</source>
-                <target>8</target>
-                <fork>true</fork>
-                <encoding>${project.build.sourceEncoding}</encoding>
-              </configuration>
-            </plugin>
-          </plugins>
-        </pluginManagement>
-      </build>
-      <dependencyManagement>
-        <!-- The updated version of these plugins don't work on Java 8 -->
-        <dependencies>
-          <dependency>
-            <groupId>nl.jqno.equalsverifier</groupId>
-            <artifactId>equalsverifier</artifactId>
-            <version>3.6</version>
-            <scope>test</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>3.12.4</version>
-            <scope>test</scope>
-          </dependency>
-        </dependencies>
-      </dependencyManagement>
-    </profile>
-    <profile>
-      <id>other-jdk-maven-compiler-plugin</id>
-      <activation>
-        <property>
-          <name>jdk.version</name>
-          <value>!8</value>
-        </property>
-      </activation>
-      <build>
-        <pluginManagement>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-compiler-plugin</artifactId>
-              <version>3.8.0</version>
-              <configuration>
-                <release>${jdk.version}</release>
-                <source>${jdk.version}</source>
-                <target>${jdk.version}</target>
-                <fork>true</fork>
-                <encoding>${project.build.sourceEncoding}</encoding>
-              </configuration>
-            </plugin>
-          </plugins>
-        </pluginManagement>
       </build>
     </profile>
   </profiles>
@@ -481,7 +414,7 @@
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>30.1.1-jre</version>
+        <version>32.0.1-jre</version>
         <exclusions>
           <exclusion>
             <groupId>com.google.errorprone</groupId>
@@ -520,11 +453,6 @@
         <version>1.10</version>
       </dependency>
       <dependency>
-        <groupId>commons-httpclient</groupId>
-        <artifactId>commons-httpclient</artifactId>
-        <version>3.1</version>
-      </dependency>
-      <dependency>
         <groupId>commons-io</groupId>
         <artifactId>commons-io</artifactId>
         <version>2.11.0</version>
@@ -557,7 +485,7 @@
       <dependency>
         <groupId>joda-time</groupId>
         <artifactId>joda-time</artifactId>
-        <version>2.11.2</version>
+        <version>${joda-time.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -743,6 +671,18 @@
         <scope>provided</scope>
         <exclusions>
           <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
           </exclusion>
@@ -770,6 +710,14 @@
             <groupId>org.apache.yetus</groupId>
             <artifactId>audience-annotations</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.woodstox</groupId>
+            <artifactId>stax2-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -778,6 +726,22 @@
         <version>${hadoop.version}</version>
         <scope>provided</scope>
         <exclusions>
+          <exclusion>
+            <groupId>xml-apis</groupId>
+            <artifactId>xml-apis</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util-ajax</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
@@ -802,6 +766,10 @@
         <version>${hadoop.version}</version>
         <scope>provided</scope>
         <exclusions>
+            <exclusion>
+              <groupId>com.zaxxer</groupId>
+              <artifactId>HikariCP-java7</artifactId>
+            </exclusion>
           <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
@@ -835,6 +803,46 @@
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-mapreduce-client-core</artifactId>
+        <version>${hadoop.version}</version>
+        <scope>provided</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-core-asl</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-jaxrs</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-mapper-asl</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-xc</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-servlet</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdfs-client</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
       </dependency>
@@ -900,7 +908,7 @@
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>4.0.0</version>
+        <version>4.1.0</version>
       </dependency>
       <dependency>
         <groupId>com.tdunning</groupId>
@@ -1109,7 +1117,7 @@
       <dependency>
         <groupId>org.apache.maven.surefire</groupId>
         <artifactId>surefire-testng</artifactId>
-        <version>3.0.0-M5</version>
+        <version>${surefire.versino}</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -1126,7 +1134,7 @@
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-csv</artifactId>
-        <version>1.0</version>
+        <version>1.10.0</version>
       </dependency>
       <dependency>
         <groupId>com.h2database</groupId>
@@ -1244,7 +1252,7 @@
         <!-- Older versions fail with Java >= 16 -->
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
-        <version>1.18.26</version>
+        <version>1.18.28</version>
       </dependency>
 
       <dependency>
@@ -1272,6 +1280,22 @@
         <groupId>com.yscope.clp</groupId>
         <artifactId>clp-ffi</artifactId>
         <version>${clp-ffi.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.codehaus.woodstox</groupId>
+        <artifactId>stax2-api</artifactId>
+        <version>${stax2-api.version}</version>
+      </dependency>
+
+      <!-- This configures all aws sdk dependencies. -->
+      <!-- See https://reflectoring.io/maven-bom/ to understand how this work -->
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${aws.sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -1392,9 +1416,8 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>3.0.0-M5</version>
+          <version>${surefire.version}</version>
           <configuration>
-            <!-- Do not set argLine here, it will break the code coverage plugin. Set it in the properties section. -->
             <forkCount>1</forkCount>
             <reuseForks>false</reuseForks>
             <!-- 60 minutes -->
@@ -1406,7 +1429,7 @@
             <trimStackTrace>false</trimStackTrace>
             <reportFormat>plain</reportFormat>
             <argLine>
-              ${argLine}
+              @{argLine}
               --add-opens=java.base/java.nio=ALL-UNNAMED
               --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
               --add-opens=java.base/java.lang=ALL-UNNAMED
@@ -1415,6 +1438,14 @@
               --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
             </argLine>
           </configuration>
+          <!-- Explicitly select the test provider, instead of relying on the classpath -->
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.maven.surefire</groupId>
+              <artifactId>surefire-testng</artifactId>
+              <version>${surefire.version}</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1476,6 +1507,18 @@
               </goals>
             </execution>
           </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.8.0</version>
+          <configuration>
+            <release>${jdk.version}</release>
+            <source>${jdk.version}</source>
+            <target>${jdk.version}</target>
+            <fork>true</fork>
+            <encoding>${project.build.sourceEncoding}</encoding>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -1573,7 +1616,7 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.6</version>
+        <version>0.8.9</version>
         <executions>
           <execution>
             <goals>
@@ -1586,6 +1629,9 @@
             <goals>
               <goal>report-aggregate</goal>
             </goals>
+            <configuration>
+              <includeCurrentProject>true</includeCurrentProject>
+            </configuration>
           </execution>
         </executions>
         <configuration>
@@ -1597,7 +1643,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
-        <version>2.5</version>
+        <version>2.7.1</version>
       </plugin>
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
@@ -1780,6 +1826,7 @@
             <exclude>**/*.v1</exclude>
             <exclude>**/*.v2</exclude>
             <exclude>**/appAssemblerScriptTemplate</exclude>
+            <exclude>doap_Pinot.rdf</exclude>
 
             <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
             be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
@@ -1832,7 +1879,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>versions-maven-plugin</artifactId>
-        <version>2.13.0</version>
+        <version>2.16.0</version>
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>

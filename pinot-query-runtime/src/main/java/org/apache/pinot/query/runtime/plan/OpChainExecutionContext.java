@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.util.function.Consumer;
+import java.util.Collections;
+import java.util.Map;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -38,42 +39,34 @@ public class OpChainExecutionContext {
   private final int _stageId;
   private final VirtualServerAddress _server;
   private final long _deadlineMs;
+  private final Map<String, String> _opChainMetadata;
   private final StageMetadata _stageMetadata;
   private final OpChainId _id;
   private final OpChainStats _stats;
+  private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
 
-  @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
-      VirtualServerAddress server, long deadlineMs, StageMetadata stageMetadata,
-      PipelineBreakerResult pipelineBreakerResult, boolean traceEnabled) {
+      VirtualServerAddress server, long deadlineMs, Map<String, String> opChainMetadata, StageMetadata stageMetadata,
+      PipelineBreakerResult pipelineBreakerResult) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _stageId = stageId;
     _server = server;
     _deadlineMs = deadlineMs;
+    _opChainMetadata = Collections.unmodifiableMap(opChainMetadata);
     _stageMetadata = stageMetadata;
     _id = new OpChainId(requestId, server.workerId(), stageId);
     _stats = new OpChainStats(_id.toString());
+    _pipelineBreakerResult = pipelineBreakerResult;
     if (pipelineBreakerResult != null && pipelineBreakerResult.getOpChainStats() != null) {
-      _stats.getOperatorStatsMap().putAll(
-          pipelineBreakerResult.getOpChainStats().getOperatorStatsMap());
+      _stats.getOperatorStatsMap().putAll(pipelineBreakerResult.getOpChainStats().getOperatorStatsMap());
     }
-    _traceEnabled = traceEnabled;
-  }
-
-  public OpChainExecutionContext(PhysicalPlanContext physicalPlanContext) {
-    this(physicalPlanContext.getMailboxService(), physicalPlanContext.getRequestId(), physicalPlanContext.getStageId(),
-        physicalPlanContext.getServer(), physicalPlanContext.getDeadlineMs(), physicalPlanContext.getStageMetadata(),
-        physicalPlanContext.getPipelineBreakerResult(), physicalPlanContext.isTraceEnabled());
+    _traceEnabled = Boolean.parseBoolean(opChainMetadata.get(CommonConstants.Broker.Request.TRACE));
   }
 
   public MailboxService getMailboxService() {
     return _mailboxService;
-  }
-
-  public Consumer<OpChainId> getCallback() {
-    return _mailboxService.getCallback();
   }
 
   public long getRequestId() {
@@ -92,6 +85,10 @@ public class OpChainExecutionContext {
     return _deadlineMs;
   }
 
+  public Map<String, String> getOpChainMetadata() {
+    return _opChainMetadata;
+  }
+
   public StageMetadata getStageMetadata() {
     return _stageMetadata;
   }
@@ -102,6 +99,10 @@ public class OpChainExecutionContext {
 
   public OpChainStats getStats() {
     return _stats;
+  }
+
+  public PipelineBreakerResult getPipelineBreakerResult() {
+    return _pipelineBreakerResult;
   }
 
   public boolean isTraceEnabled() {

@@ -211,6 +211,11 @@ public class ZKOperator {
           // If no modifier is provided, use the custom map from the segment metadata
           segmentZKMetadata.setCustomMap(segmentMetadata.getCustomMap());
         }
+        if (!segmentZKMetadata.getDownloadUrl().equals(segmentDownloadURIStr)) {
+          LOGGER.info("Updating segment download url from: {} to: {} even though crc is the same",
+                  segmentZKMetadata.getDownloadUrl(), segmentDownloadURIStr);
+          segmentZKMetadata.setDownloadUrl(segmentDownloadURIStr);
+        }
         if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata, expectedVersion)) {
           throw new RuntimeException(
               String.format("Failed to update ZK metadata for segment: %s, table: %s, expected version: %d",

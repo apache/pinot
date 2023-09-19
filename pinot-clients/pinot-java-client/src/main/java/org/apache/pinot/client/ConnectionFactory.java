@@ -226,6 +226,7 @@ public class ConnectionFactory {
   }
 
   private static PinotClientTransport getDefault(Properties connectionProperties) {
+    // TODO: This code incorrectly assumes that connection properties are always the same
     if (_defaultTransport == null) {
       synchronized (ConnectionFactory.class) {
         if (_defaultTransport == null) {

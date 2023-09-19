@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -170,13 +171,40 @@ public class FilePerIndexDirectoryTest {
   }
 
   @Test
+  public void nativeTextIndexIsRecognized()
+      throws IOException {
+    // See https://github.com/apache/pinot/issues/11529
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
+        NativeTextIndexCreator fooCreator = new NativeTextIndexCreator("foo", TEMP_DIR)) {
+
+      fooCreator.add("{\"clean\":\"this\"}");
+      fooCreator.seal();
+
+      assertTrue(fpi.hasIndexFor("foo", StandardIndexes.text()), "Native text index not found");
+    }
+  }
+
+  @Test
+  public void nativeTextIndexIsDeleted()
+      throws IOException {
+    // See https://github.com/apache/pinot/issues/11529
+    nativeTextIndexIsRecognized();
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      fpi.removeIndex("foo", StandardIndexes.text());
+    }
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      assertFalse(fpi.hasIndexFor("foo", StandardIndexes.text()), "Native text index was not deleted");
+    }
+  }
+
+  @Test
   public void testRemoveTextIndices()
       throws IOException {
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true,
-            null, null);
+            null, null, true, 500);
         LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true,
-            null, null)) {
+            null, null, true, 500)) {
       PinotDataBuffer buf = fpi.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 1);
 
@@ -237,9 +265,9 @@ public class FilePerIndexDirectoryTest {
     // Write sth to buffers and flush them to index files on disk
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true,
-            null, null);
+            null, null, true, 500);
         LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true,
-            null, null)) {
+            null, null, true, 500)) {
       PinotDataBuffer buf = fpi.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 111);
       buf = fpi.newBuffer("col2", StandardIndexes.dictionary(), 1024);

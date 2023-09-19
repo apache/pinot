@@ -39,6 +39,9 @@ import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -58,6 +61,7 @@ public class PinotBrokerHealthCheck {
   @GET
   @Produces(MediaType.TEXT_PLAIN)
   @Path("health")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
   @ApiOperation(value = "Checking broker health")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Broker is healthy"),

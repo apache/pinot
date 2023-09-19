@@ -32,10 +32,10 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.InstanceType;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -48,10 +48,8 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.RebalanceConfigConstants;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +64,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentRelocator.class);
 
   private final ExecutorService _executorService;
-  private final HttpConnectionManager _connectionManager;
+  private final HttpClientConnectionManager _connectionManager;
   private final boolean _enableLocalTierMigration;
   private final int _serverAdminRequestTimeoutMs;
   private final long _externalViewCheckIntervalInMs;
@@ -76,7 +74,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
 
   public SegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
-      ExecutorService executorService, HttpConnectionManager connectionManager) {
+      ExecutorService executorService, HttpClientConnectionManager connectionManager) {
     super(SegmentRelocator.class.getSimpleName(), config.getSegmentRelocatorFrequencyInSeconds(),
         config.getSegmentRelocatorInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
@@ -152,19 +150,13 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
 
-    // Segment relocation doesn't apply to HLC
-    boolean isRealtimeTable = TableNameBuilder.isRealtimeTableResource(tableNameWithType);
-    if (isRealtimeTable && new StreamConfig(tableNameWithType,
-        IngestionConfigUtils.getStreamConfigMap(tableConfig)).hasHighLevelConsumerType()) {
-      return;
-    }
-
     boolean relocate = false;
     if (TierConfigUtils.shouldRelocateToTiers(tableConfig)) {
       relocate = true;
       LOGGER.info("Relocating segments to tiers for table: {}", tableNameWithType);
     }
-    if (isRealtimeTable && InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
+    if (tableConfig.getTableType() == TableType.REALTIME
+        && InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
       relocate = true;
       LOGGER.info("Relocating COMPLETED segments for table: {}", tableNameWithType);
     }

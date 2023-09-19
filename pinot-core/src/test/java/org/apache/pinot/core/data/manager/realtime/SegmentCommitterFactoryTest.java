@@ -52,10 +52,7 @@ public class SegmentCommitterFactoryTest {
   }
 
   private TableConfigBuilder createRealtimeTableConfig(String tableName, Map<String, String> realtimeStreamConfig) {
-    return new TableConfigBuilder(TableType.REALTIME)
-        .setTableName(tableName)
-        .setLLC(true)
-        .setStreamConfigs(realtimeStreamConfig);
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setStreamConfigs(realtimeStreamConfig);
   }
 
   @Test (description = "if controller doesn't support split commit, it should return default segment committer")

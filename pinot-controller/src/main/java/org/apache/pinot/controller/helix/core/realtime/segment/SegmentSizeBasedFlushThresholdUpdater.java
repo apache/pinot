@@ -23,7 +23,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,14 +51,12 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
 
   // synchronized since this method could be called for multiple partitions of the same table in different threads
   @Override
-  public synchronized void updateFlushThreshold(PartitionLevelStreamConfig streamConfig,
-      SegmentZKMetadata newSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
-      @Nullable SegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance,
-      List<PartitionGroupMetadata> partitionGroupMetadataList) {
-
-    int threshold = _flushThresholdComputer.computeThreshold(streamConfig, committingSegmentDescriptor,
-        committingSegmentZKMetadata, partitionGroupMetadataList, newSegmentZKMetadata.getSegmentName());
-
+  public synchronized void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
+      CommittingSegmentDescriptor committingSegmentDescriptor, @Nullable SegmentZKMetadata committingSegmentZKMetadata,
+      int maxNumPartitionsPerInstance, List<PartitionGroupMetadata> partitionGroupMetadataList) {
+    int threshold =
+        _flushThresholdComputer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
+            partitionGroupMetadataList, newSegmentZKMetadata.getSegmentName());
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(threshold);
   }
 }

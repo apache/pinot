@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -33,8 +34,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 public class DistinctSumMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
-  public DistinctSumMVAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTSUMMV);
+  public DistinctSumMVAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifySingleArgument(arguments, "DISTINCT_SUM_MV"), AggregationFunctionType.DISTINCTSUMMV, false);
   }
 
   @Override

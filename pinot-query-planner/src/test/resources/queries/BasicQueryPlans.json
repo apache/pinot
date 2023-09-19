@@ -11,6 +11,30 @@
         ]
       },
       {
+        "description": "Select * with limit 0",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d LIMIT 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[0])",
+          "\n      LogicalTableScan(table=[[d]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Select * with limit 0 offset 0",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d LIMIT 0 OFFSET 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[0])",
+          "\n      LogicalTableScan(table=[[d]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Select with filters",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col3 + a.ts FROM a WHERE a.col3 >= 0 AND a.col2 = 'a'",
         "output": [
@@ -37,10 +61,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', ts) FROM a LIMIT 10",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[dateTrunc('DAY', $6)])",
-          "\n  LogicalSort(offset=[0], fetch=[10])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
-          "\n      LogicalSort(fetch=[10])",
+          "\nLogicalSort(offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[10])",
+          "\n      LogicalProject(EXPR$0=[DATETRUNC('DAY', $6)])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -50,11 +74,39 @@
         "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', ts) AS day FROM a LIMIT 10",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(day=[dateTrunc('DAY', $6)])",
-          "\n  LogicalSort(offset=[0], fetch=[10])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
-          "\n      LogicalSort(fetch=[10])",
+          "\nLogicalSort(offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[10])",
+          "\n      LogicalProject(day=[DATETRUNC('DAY', $6)])",
           "\n        LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "case when with cast",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(CASE WHEN col3 > 10 THEN 1 WHEN col3 > 20 THEN 2 WHEN col3 > 30 THEN 3 WHEN col3 > 40 THEN 4 WHEN col3 > 50 THEN '5' ELSE 0 END) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:DECIMAL(1000, 500), $0)])",
+          "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()])",
+          "\n        LogicalProject($f0=[CAST(CASE(>($2, 10), '1':VARCHAR, >($2, 20), '2':VARCHAR, >($2, 30), '3':VARCHAR, >($2, 40), '4':VARCHAR, >($2, 50), '5':VARCHAR, '0':VARCHAR)):DECIMAL(1000, 500) NOT NULL])",
+          "\n          LogicalTableScan(table=[[a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Valid arrayToMV 2",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(col3) as sumCol3, arrayToMv(mcol1) FROM e GROUP BY arrayToMv(e.mcol1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(sumCol3=[$1], EXPR$1=[$0])",
+          "\n  LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n        LogicalProject(EXPR$1=[ARRAYTOMV($6)], col3=[$2])",
+          "\n          LogicalTableScan(table=[[e]])",
           "\n"
         ]
       }

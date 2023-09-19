@@ -26,7 +26,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
@@ -66,7 +65,7 @@ public class FlushThresholdUpdaterTest {
         StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
 
     // Flush threshold rows set to 0 - SegmentSizeBasedFlushThresholdUpdater should be returned
-    PartitionLevelStreamConfig autotuneStreamConfig = mockDefaultAutotuneStreamConfig();
+    StreamConfig autotuneStreamConfig = mockDefaultAutotuneStreamConfig();
     FlushThresholdUpdater autotuneFlushThresholdUpdater =
         flushThresholdUpdateManager.getFlushThresholdUpdater(autotuneStreamConfig);
     assertTrue(autotuneFlushThresholdUpdater instanceof SegmentSizeBasedFlushThresholdUpdater);
@@ -92,16 +91,16 @@ public class FlushThresholdUpdaterTest {
         autotuneFlushThresholdUpdater);
   }
 
-  private PartitionLevelStreamConfig mockStreamConfig(int flushThresholdRows) {
-    PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
+  private StreamConfig mockStreamConfig(int flushThresholdRows) {
+    StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getTableNameWithType()).thenReturn(REALTIME_TABLE_NAME);
     when(streamConfig.getFlushThresholdRows()).thenReturn(flushThresholdRows);
     return streamConfig;
   }
 
-  private PartitionLevelStreamConfig mockAutotuneStreamConfig(long flushSegmentDesiredSizeBytes,
+  private StreamConfig mockAutotuneStreamConfig(long flushSegmentDesiredSizeBytes,
       long flushThresholdTimeMillis, int flushAutotuneInitialRows) {
-    PartitionLevelStreamConfig streamConfig = mock(PartitionLevelStreamConfig.class);
+    StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getTableNameWithType()).thenReturn(REALTIME_TABLE_NAME);
     when(streamConfig.getFlushThresholdRows()).thenReturn(0);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(flushSegmentDesiredSizeBytes);
@@ -110,7 +109,7 @@ public class FlushThresholdUpdaterTest {
     return streamConfig;
   }
 
-  private PartitionLevelStreamConfig mockDefaultAutotuneStreamConfig() {
+  private StreamConfig mockDefaultAutotuneStreamConfig() {
     return mockAutotuneStreamConfig(StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES,
         StreamConfig.DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS, StreamConfig.DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS);
   }
@@ -123,7 +122,7 @@ public class FlushThresholdUpdaterTest {
    */
   @Test
   public void testSegmentSizeBasedFlushThreshold() {
-    PartitionLevelStreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
+    StreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
     long desiredSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
     long segmentSizeLowerLimit = (long) (desiredSegmentSizeBytes * 0.99);
     long segmentSizeHigherLimit = (long) (desiredSegmentSizeBytes * 1.01);
@@ -161,7 +160,7 @@ public class FlushThresholdUpdaterTest {
 
   @Test
   public void testSegmentSizeBasedFlushThresholdMinPartition() {
-    PartitionLevelStreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
+    StreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
     long desiredSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
     long segmentSizeLowerLimit = (long) (desiredSegmentSizeBytes * 0.99);
     long segmentSizeHigherLimit = (long) (desiredSegmentSizeBytes * 1.01);
@@ -240,7 +239,7 @@ public class FlushThresholdUpdaterTest {
   @Test
   public void testTimeThreshold() {
     SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
-    PartitionLevelStreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
+    StreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
 
     // Start consumption
     SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
@@ -273,7 +272,7 @@ public class FlushThresholdUpdaterTest {
   @Test
   public void testMinThreshold() {
     SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
-    PartitionLevelStreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
+    StreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
 
     // Start consumption
     SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
@@ -305,7 +304,7 @@ public class FlushThresholdUpdaterTest {
   @Test
   public void testNonZeroPartitionUpdates() {
     SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
-    PartitionLevelStreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
+    StreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
 
     // Start consumption for 2 partitions
     SegmentZKMetadata newSegmentZKMetadataForPartition0 = getNewSegmentZKMetadata(0);
@@ -362,7 +361,7 @@ public class FlushThresholdUpdaterTest {
     long flushSegmentDesiredSizeBytes = StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES / 2;
     long flushThresholdTimeMillis = StreamConfig.DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS / 2;
     int flushAutotuneInitialRows = StreamConfig.DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS / 2;
-    PartitionLevelStreamConfig streamConfig =
+    StreamConfig streamConfig =
         mockAutotuneStreamConfig(flushSegmentDesiredSizeBytes, flushThresholdTimeMillis, flushAutotuneInitialRows);
 
     // Start consumption

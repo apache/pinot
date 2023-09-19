@@ -20,6 +20,7 @@
 package org.apache.pinot.segment.local.segment.index.text;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -70,6 +71,11 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   protected static final Logger LOGGER = LoggerFactory.getLogger(TextIndexType.class);
 
   public static final String INDEX_DISPLAY_NAME = "text";
+  // TODO: Should V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION be added here?
+  private static final List<String> EXTENSIONS = Lists.newArrayList(
+      V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION
+  );
 
   protected TextIndexType() {
     super(StandardIndexes.TEXT_ID);
@@ -146,8 +152,8 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   }
 
   @Override
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    return V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    return EXTENSIONS;
   }
 
   private static class ReaderFactory implements IndexReaderFactory<TextIndexReader> {
@@ -183,9 +189,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     if (config.isDisabled()) {
       return null;
     }
-    if (!context.getFieldSpec().isSingleValueField()) {
-      return null;
-    }
     if (config.getFstType() == FSTType.NATIVE) {
       return new NativeMutableTextIndex(context.getFieldSpec().getName());
     }
@@ -193,6 +196,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       throw new IllegalArgumentException("A consumer directory is required");
     }
     return new RealtimeLuceneTextIndex(context.getFieldSpec().getName(), context.getConsumerDir(),
-        context.getSegmentName(), config.getStopWordsInclude(), config.getStopWordsExclude());
+        context.getSegmentName(), config.getStopWordsInclude(), config.getStopWordsExclude(),
+        config.isLuceneUseCompoundFile(), config.getLuceneMaxBufferSizeMB());
   }
 }

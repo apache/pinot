@@ -138,8 +138,8 @@ public class S3PinotFS extends BasePinotFS {
                 .asyncCredentialUpdateEnabled(s3Config.isAsyncSessionUpdateEnabled()).build();
       }
 
-      S3ClientBuilder s3ClientBuilder =
-          S3Client.builder().region(Region.of(s3Config.getRegion())).credentialsProvider(awsCredentialsProvider);
+      S3ClientBuilder s3ClientBuilder = S3Client.builder().forcePathStyle(true).region(Region.of(s3Config.getRegion()))
+          .credentialsProvider(awsCredentialsProvider);
       if (StringUtils.isNotEmpty(s3Config.getEndpoint())) {
         try {
           s3ClientBuilder.endpointOverride(new URI(s3Config.getEndpoint()));
@@ -184,7 +184,7 @@ public class S3PinotFS extends BasePinotFS {
   private void setServerSideEncryption(@Nullable String serverSideEncryption, S3Config s3Config) {
     if (serverSideEncryption != null) {
       try {
-        _serverSideEncryption = ServerSideEncryption.valueOf(serverSideEncryption);
+        _serverSideEncryption = ServerSideEncryption.fromValue(serverSideEncryption);
       } catch (Exception e) {
         throw new UnsupportedOperationException(
             String.format("Unknown value '%s' for S3PinotFS config: 'serverSideEncryption'. Supported values are: %s",

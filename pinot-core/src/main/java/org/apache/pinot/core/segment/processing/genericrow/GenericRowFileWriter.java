@@ -66,7 +66,11 @@ public class GenericRowFileWriter implements Closeable {
   @Override
   public void close()
       throws IOException {
-    _offsetStream.close();
-    _dataStream.close();
+    try {
+      // Wrapping around try block to make sure dataStream is closed, despite failures while closing offsetStream.
+      _offsetStream.close();
+    } finally {
+      _dataStream.close();
+    }
   }
 }

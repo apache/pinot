@@ -34,6 +34,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.operator.docvalsets.RowBasedBlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
@@ -272,7 +273,8 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     for (int i = 1; i < dataSchema.getColumnNames().length; i++) {
       blockValSetMap.put(ExpressionContext.forIdentifier(dataSchema.getColumnName(i)),
-          new RowBasedBlockValSet(dataSchema.getColumnDataType(i), bucketedRows, i));
+          new RowBasedBlockValSet(dataSchema.getColumnDataType(i), bucketedRows, i,
+              _queryContext.isNullHandlingEnabled()));
     }
 
     for (int i = 0; i < _queryContext.getSelectExpressions().size(); i++) {

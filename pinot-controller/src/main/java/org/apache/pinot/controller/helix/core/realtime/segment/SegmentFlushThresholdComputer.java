@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 class SegmentFlushThresholdComputer {
@@ -57,10 +57,9 @@ class SegmentFlushThresholdComputer {
     return _latestSegmentRowsToSizeRatio;
   }
 
-  public int computeThreshold(PartitionLevelStreamConfig streamConfig,
-      CommittingSegmentDescriptor committingSegmentDescriptor,
-      @Nullable SegmentZKMetadata committingSegmentZKMetadata,
-      List<PartitionGroupMetadata> partitionGroupMetadataList, String newSegmentName) {
+  public int computeThreshold(StreamConfig streamConfig, CommittingSegmentDescriptor committingSegmentDescriptor,
+      @Nullable SegmentZKMetadata committingSegmentZKMetadata, List<PartitionGroupMetadata> partitionGroupMetadataList,
+      String newSegmentName) {
     final long desiredSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
     final long optimalSegmentSizeBytesMin = desiredSegmentSizeBytes / 2;
     final double optimalSegmentSizeBytesMax = desiredSegmentSizeBytes * 1.5;

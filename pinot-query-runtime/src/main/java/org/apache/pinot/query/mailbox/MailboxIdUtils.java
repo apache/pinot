@@ -21,9 +21,7 @@ package org.apache.pinot.query.mailbox;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
 // TODO: De-couple mailbox id from query information
@@ -40,13 +38,8 @@ public class MailboxIdUtils {
         + receiverStageId + SEPARATOR + receiverWorkerId;
   }
 
-  public static OpChainId toOpChainId(String mailboxId) {
-    String[] parts = StringUtils.split(mailboxId, SEPARATOR);
-    return new OpChainId(Long.parseLong(parts[0]), Integer.parseInt(parts[4]), Integer.parseInt(parts[3]));
-  }
-
-  public static List<String> toMailboxIds(long requestId, MailboxMetadata senderMailBoxMetadata) {
-    return toMailboxIds(requestId, senderMailBoxMetadata.getMailBoxIdList());
+  public static List<String> toMailboxIds(long requestId, MailboxMetadata mailBoxMetadata) {
+    return toMailboxIds(requestId, mailBoxMetadata.getMailBoxIdList());
   }
 
   public static List<String> toMailboxIds(long requestId, List<String> mailboxMetadataIdList) {

@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
-import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.TableTierInfo;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -41,9 +41,9 @@ public class ServerTableTierReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableTierReader.class);
 
   private final Executor _executor;
-  private final HttpConnectionManager _connectionManager;
+  private final HttpClientConnectionManager _connectionManager;
 
-  public ServerTableTierReader(Executor executor, HttpConnectionManager connectionManager) {
+  public ServerTableTierReader(Executor executor, HttpClientConnectionManager connectionManager) {
     _executor = executor;
     _connectionManager = connectionManager;
   }

@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -45,6 +46,7 @@ public class AggregationFunctionFactory {
       String upperCaseFunctionName =
           AggregationFunctionType.getNormalizedAggregationFunctionName(function.getFunctionName());
       List<ExpressionContext> arguments = function.getArguments();
+      int numArguments = arguments.size();
       ExpressionContext firstArgument = arguments.get(0);
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {
         String remainingFunctionName = upperCaseFunctionName.substring(10);
@@ -63,7 +65,6 @@ public class AggregationFunctionFactory {
         if (remainingFunctionName.equals("RAWKLLMV")) {
           return new PercentileRawKLLMVAggregationFunction(arguments);
         }
-        int numArguments = arguments.size();
         if (numArguments == 1) {
           // Single argument percentile (e.g. Percentile99(foo), PercentileTDigest95(bar), etc.)
           // NOTE: This convention is deprecated. DO NOT add new functions here
@@ -180,88 +181,85 @@ public class AggregationFunctionFactory {
         }
         throw new IllegalArgumentException("Invalid percentile function: " + function);
       } else {
-        switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
+        AggregationFunctionType functionType = AggregationFunctionType.valueOf(upperCaseFunctionName);
+        switch (functionType) {
           case COUNT:
-            return new CountAggregationFunction(firstArgument, nullHandlingEnabled);
+            return new CountAggregationFunction(arguments, nullHandlingEnabled);
           case MIN:
-            return new MinAggregationFunction(firstArgument, nullHandlingEnabled);
+            return new MinAggregationFunction(arguments, nullHandlingEnabled);
           case MAX:
-            return new MaxAggregationFunction(firstArgument, nullHandlingEnabled);
+            return new MaxAggregationFunction(arguments, nullHandlingEnabled);
           case SUM:
           case SUM0:
-            return new SumAggregationFunction(firstArgument, nullHandlingEnabled);
+            return new SumAggregationFunction(arguments, nullHandlingEnabled);
           case SUMPRECISION:
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case AVG:
-            return new AvgAggregationFunction(firstArgument, nullHandlingEnabled);
+            return new AvgAggregationFunction(arguments, nullHandlingEnabled);
           case MODE:
             return new ModeAggregationFunction(arguments);
-          case FIRSTWITHTIME:
-            if (arguments.size() == 3) {
-              ExpressionContext timeCol = arguments.get(1);
-              ExpressionContext dataType = arguments.get(2);
-              if (dataType.getType() != ExpressionContext.Type.LITERAL) {
-                throw new IllegalArgumentException("Third argument of firstWithTime Function should be literal."
-                    + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
-              }
-              DataType fieldDataType = DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
-              switch (fieldDataType) {
-                case BOOLEAN:
-                case INT:
-                  return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol,
-                      fieldDataType == DataType.BOOLEAN);
-                case LONG:
-                  return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol);
-                case FLOAT:
-                  return new FirstFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
-                case DOUBLE:
-                  return new FirstDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
-                case STRING:
-                  return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol);
-                default:
-                  throw new IllegalArgumentException("Unsupported Value Type for firstWithTime Function:" + dataType);
-              }
-            } else {
-              throw new IllegalArgumentException("Three arguments are required for firstWithTime Function."
-                  + " The function can be used as firstWithTime(dataColumn, timeColumn, 'dataType')");
+          case FIRSTWITHTIME: {
+            Preconditions.checkArgument(numArguments == 3,
+                "FIRST_WITH_TIME expects 3 arguments, got: %s. The function can be used as "
+                    + "firstWithTime(dataColumn, timeColumn, 'dataType')", numArguments);
+            ExpressionContext timeCol = arguments.get(1);
+            ExpressionContext dataTypeExp = arguments.get(2);
+            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
+                "FIRST_WITH_TIME expects the 3rd argument to be literal, got: %s. The function can be used as "
+                    + "firstWithTime(dataColumn, timeColumn, 'dataType')", dataTypeExp.getType());
+            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
+            switch (dataType) {
+              case BOOLEAN:
+                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, true);
+              case INT:
+                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, false);
+              case LONG:
+                return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol);
+              case FLOAT:
+                return new FirstFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
+              case DOUBLE:
+                return new FirstDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
+              case STRING:
+                return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol);
+              default:
+                throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
             }
-          case LASTWITHTIME:
-            if (arguments.size() == 3) {
-              ExpressionContext timeCol = arguments.get(1);
-              ExpressionContext dataType = arguments.get(2);
-              if (dataType.getType() != ExpressionContext.Type.LITERAL) {
-                throw new IllegalArgumentException("Third argument of lastWithTime Function should be literal."
-                    + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
-              }
-              DataType fieldDataType = DataType.valueOf(dataType.getLiteral().getStringValue().toUpperCase());
-              switch (fieldDataType) {
-                case BOOLEAN:
-                case INT:
-                  return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol,
-                      fieldDataType == DataType.BOOLEAN);
-                case LONG:
-                  return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
-                case FLOAT:
-                  return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
-                case DOUBLE:
-                  return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
-                case STRING:
-                  return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol);
-                default:
-                  throw new IllegalArgumentException("Unsupported Value Type for lastWithTime Function:" + dataType);
-              }
-            } else {
-              throw new IllegalArgumentException("Three arguments are required for lastWithTime Function."
-                  + " The function can be used as lastWithTime(dataColumn, timeColumn, 'dataType')");
+          }
+          case LASTWITHTIME: {
+            Preconditions.checkArgument(numArguments == 3,
+                "LAST_WITH_TIME expects 3 arguments, got: %s. The function can be used as "
+                    + "lastWithTime(dataColumn, timeColumn, 'dataType')", numArguments);
+            ExpressionContext timeCol = arguments.get(1);
+            ExpressionContext dataTypeExp = arguments.get(2);
+            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
+                "LAST_WITH_TIME expects the 3rd argument to be literal, got: %s. The function can be used as "
+                    + "lastWithTime(dataColumn, timeColumn, 'dataType')", dataTypeExp.getType());
+            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
+            switch (dataType) {
+              case BOOLEAN:
+                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, true);
+              case INT:
+                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, false);
+              case LONG:
+                return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
+              case FLOAT:
+                return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
+              case DOUBLE:
+                return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
+              case STRING:
+                return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol);
+              default:
+                throw new IllegalArgumentException("Unsupported data type for LAST_WITH_TIME: " + dataType);
             }
+          }
           case MINMAXRANGE:
-            return new MinMaxRangeAggregationFunction(firstArgument);
+            return new MinMaxRangeAggregationFunction(arguments);
           case DISTINCTCOUNT:
-            return new DistinctCountAggregationFunction(firstArgument);
+            return new DistinctCountAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
-            return new DistinctCountBitmapAggregationFunction(firstArgument);
+            return new DistinctCountBitmapAggregationFunction(arguments);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
-            return new SegmentPartitionedDistinctCountAggregationFunction(firstArgument);
+            return new SegmentPartitionedDistinctCountAggregationFunction(arguments);
           case DISTINCTCOUNTHLL:
             return new DistinctCountHLLAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLL:
@@ -269,43 +267,43 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTSMARTHLL:
             return new DistinctCountSmartHLLAggregationFunction(arguments);
           case FASTHLL:
-            return new FastHLLAggregationFunction(firstArgument);
+            return new FastHLLAggregationFunction(arguments);
           case DISTINCTCOUNTTHETASKETCH:
             return new DistinctCountThetaSketchAggregationFunction(arguments);
           case DISTINCTCOUNTRAWTHETASKETCH:
             return new DistinctCountRawThetaSketchAggregationFunction(arguments);
           case DISTINCTSUM:
-            return new DistinctSumAggregationFunction(firstArgument);
+            return new DistinctSumAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTAVG:
-            return new DistinctAvgAggregationFunction(firstArgument);
+            return new DistinctAvgAggregationFunction(arguments, nullHandlingEnabled);
           case IDSET:
             return new IdSetAggregationFunction(arguments);
           case COUNTMV:
-            return new CountMVAggregationFunction(firstArgument);
+            return new CountMVAggregationFunction(arguments);
           case MINMV:
-            return new MinMVAggregationFunction(firstArgument);
+            return new MinMVAggregationFunction(arguments);
           case MAXMV:
-            return new MaxMVAggregationFunction(firstArgument);
+            return new MaxMVAggregationFunction(arguments);
           case SUMMV:
-            return new SumMVAggregationFunction(firstArgument);
+            return new SumMVAggregationFunction(arguments);
           case AVGMV:
-            return new AvgMVAggregationFunction(firstArgument);
+            return new AvgMVAggregationFunction(arguments);
           case MINMAXRANGEMV:
-            return new MinMaxRangeMVAggregationFunction(firstArgument);
+            return new MinMaxRangeMVAggregationFunction(arguments);
           case DISTINCTCOUNTMV:
-            return new DistinctCountMVAggregationFunction(firstArgument);
+            return new DistinctCountMVAggregationFunction(arguments);
           case DISTINCTCOUNTBITMAPMV:
-            return new DistinctCountBitmapMVAggregationFunction(firstArgument);
+            return new DistinctCountBitmapMVAggregationFunction(arguments);
           case DISTINCTCOUNTHLLMV:
             return new DistinctCountHLLMVAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLLMV:
             return new DistinctCountRawHLLMVAggregationFunction(arguments);
           case DISTINCTSUMMV:
-            return new DistinctSumMVAggregationFunction(firstArgument);
+            return new DistinctSumMVAggregationFunction(arguments);
           case DISTINCTAVGMV:
-            return new DistinctAvgMVAggregationFunction(firstArgument);
+            return new DistinctAvgMVAggregationFunction(arguments);
           case STUNION:
-            return new StUnionAggregationFunction(firstArgument);
+            return new StUnionAggregationFunction(arguments);
           case HISTOGRAM:
             return new HistogramAggregationFunction(arguments);
           case COVARPOP:
@@ -313,23 +311,23 @@ public class AggregationFunctionFactory {
           case COVARSAMP:
             return new CovarianceAggregationFunction(arguments, true);
           case BOOLAND:
-            return new BooleanAndAggregationFunction(firstArgument, nullHandlingEnabled);
+            return new BooleanAndAggregationFunction(arguments, nullHandlingEnabled);
           case BOOLOR:
-            return new BooleanOrAggregationFunction(firstArgument, nullHandlingEnabled);
+            return new BooleanOrAggregationFunction(arguments, nullHandlingEnabled);
           case VARPOP:
-            return new VarianceAggregationFunction(firstArgument, false, false);
+            return new VarianceAggregationFunction(arguments, false, false, nullHandlingEnabled);
           case VARSAMP:
-            return new VarianceAggregationFunction(firstArgument, true, false);
+            return new VarianceAggregationFunction(arguments, true, false, nullHandlingEnabled);
           case STDDEVPOP:
-            return new VarianceAggregationFunction(firstArgument, false, true);
+            return new VarianceAggregationFunction(arguments, false, true, nullHandlingEnabled);
           case STDDEVSAMP:
-            return new VarianceAggregationFunction(firstArgument, true, true);
+            return new VarianceAggregationFunction(arguments, true, true, nullHandlingEnabled);
           case SKEWNESS:
-            return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.SKEWNESS);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.SKEWNESS);
           case KURTOSIS:
-            return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.KURTOSIS);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.KURTOSIS);
           case FOURTHMOMENT:
-            return new FourthMomentAggregationFunction(firstArgument, FourthMomentAggregationFunction.Type.MOMENT);
+            return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.MOMENT);
           case DISTINCTCOUNTTUPLESKETCH:
             // mode actually doesn't matter here because we only care about keys, not values
             return new DistinctCountIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
@@ -339,27 +337,27 @@ public class AggregationFunctionFactory {
             return new SumValuesIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
           case AVGVALUEINTEGERSUMTUPLESKETCH:
             return new AvgValueIntegerTupleSketchAggregationFunction(arguments, IntegerSummary.Mode.Sum);
-          case PARENTARGMAX:
-            return new ParentArgMinMaxAggregationFunction(arguments, true);
-          case PARENTARGMIN:
-            return new ParentArgMinMaxAggregationFunction(arguments, false);
-          case CHILDARGMAX:
-            return new ChildArgMinMaxAggregationFunction(arguments, true);
-          case CHILDARGMIN:
-            return new ChildArgMinMaxAggregationFunction(arguments, false);
-          case ARGMAX:
-          case ARGMIN:
+          case PARENTEXPRMAX:
+            return new ParentExprMinMaxAggregationFunction(arguments, true);
+          case PARENTEXPRMIN:
+            return new ParentExprMinMaxAggregationFunction(arguments, false);
+          case CHILDEXPRMAX:
+            return new ChildExprMinMaxAggregationFunction(arguments, true);
+          case CHILDEXPRMIN:
+            return new ChildExprMinMaxAggregationFunction(arguments, false);
+          case EXPRMAX:
+          case EXPRMIN:
             throw new IllegalArgumentException(
-                "Aggregation function: " + function + " is only supported in selection without alias.");
+                "Aggregation function: " + functionType + " is only supported in selection without alias.");
           case FUNNELCOUNT:
-            return new FunnelCountAggregationFunction(arguments);
+            return new FunnelCountAggregationFunctionFactory(arguments).get();
           case FREQUENTSTRINGSSKETCH:
             return new FrequentStringsSketchAggregationFunction(arguments);
           case FREQUENTLONGSSKETCH:
             return new FrequentLongsSketchAggregationFunction(arguments);
 
           default:
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);
         }
       }
     } catch (Exception e) {

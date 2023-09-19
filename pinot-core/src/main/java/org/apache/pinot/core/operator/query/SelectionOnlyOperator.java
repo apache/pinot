@@ -39,17 +39,17 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
-
   private static final String EXPLAIN_NAME = "SELECT";
 
   private final IndexSegment _indexSegment;
+  private final QueryContext _queryContext;
   private final boolean _nullHandlingEnabled;
   private final BaseProjectOperator<?> _projectOperator;
   private final List<ExpressionContext> _expressions;
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _numRowsToKeep;
-  private final List<Object[]> _rows;
+  private final ArrayList<Object[]> _rows;
   private final RoaringBitmap[] _nullBitmaps;
 
   private int _numDocsScanned = 0;
@@ -57,6 +57,7 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
   public SelectionOnlyOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator) {
     _indexSegment = indexSegment;
+    _queryContext = queryContext;
     _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
     _projectOperator = projectOperator;
     _expressions = expressions;
@@ -102,6 +103,7 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(_blockValSets);
 
       int numDocsToAdd = Math.min(_numRowsToKeep - _rows.size(), valueBlock.getNumDocs());
+      _rows.ensureCapacity(_rows.size() + numDocsToAdd);
       _numDocsScanned += numDocsToAdd;
       if (_nullHandlingEnabled) {
         for (int i = 0; i < numExpressions; i++) {
@@ -126,7 +128,7 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
       }
     }
 
-    return new SelectionResultsBlock(_dataSchema, _rows);
+    return new SelectionResultsBlock(_dataSchema, _rows, _queryContext);
   }
 
   @Override

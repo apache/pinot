@@ -82,7 +82,7 @@ public class AggregationPlanNode implements PlanNode {
   private FilteredAggregationOperator buildFilteredAggOperator() {
     List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators =
         AggregationFunctionUtils.buildFilteredAggregateProjectOperators(_indexSegment, _queryContext);
-    return new FilteredAggregationOperator(_queryContext.getAggregationFunctions(), projectOperators,
+    return new FilteredAggregationOperator(_queryContext, projectOperators,
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
@@ -101,7 +101,7 @@ public class AggregationPlanNode implements PlanNode {
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
     if (canOptimizeFilteredCount(filterOperator, aggregationFunctions) && !_queryContext.isNullHandlingEnabled()) {
-      return new FastFilteredCountOperator(aggregationFunctions, filterOperator, _indexSegment.getSegmentMetadata());
+      return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
     }
 
     if (filterOperator.isResultMatchingAll() && !_queryContext.isNullHandlingEnabled()) {
@@ -114,7 +114,7 @@ public class AggregationPlanNode implements PlanNode {
             dataSources[i] = _indexSegment.getDataSource(column);
           }
         }
-        return new NonScanBasedAggregationOperator(aggregationFunctions, dataSources, numTotalDocs);
+        return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
       }
     }
 
@@ -134,7 +134,7 @@ public class AggregationPlanNode implements PlanNode {
               BaseProjectOperator<?> projectOperator =
                   new StarTreeProjectPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs, null,
                       predicateEvaluatorsMap).run();
-              return new AggregationOperator(aggregationFunctions, projectOperator, numTotalDocs, true);
+              return new AggregationOperator(_queryContext, projectOperator, numTotalDocs, true);
             }
           }
         }
@@ -146,7 +146,7 @@ public class AggregationPlanNode implements PlanNode {
     BaseProjectOperator<?> projectOperator =
         new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
-    return new AggregationOperator(aggregationFunctions, projectOperator, numTotalDocs, false);
+    return new AggregationOperator(_queryContext, projectOperator, numTotalDocs, false);
   }
 
   /**

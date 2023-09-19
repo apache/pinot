@@ -32,6 +32,7 @@ import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
+
 /**
  * Zookeeper Basic Authentication based on Pinot Controller UI.
  * The user role has been distinguished by user and admin. Only admin can have access to the
@@ -42,80 +43,82 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  *
  */
 public class ZkBasicAuthAccessFactory implements AccessControlFactory {
-    private static final String AUTHORIZATION_KEY = "authorization";
+  private static final String AUTHORIZATION_KEY = "authorization";
 
-    private HelixManager _helixManager;
-    private AccessControl _accessControl;
+  private HelixManager _helixManager;
+  private AccessControl _accessControl;
 
-    @Override
-    public void init(PinotConfiguration configuration, HelixManager helixManager) {
-        _helixManager = helixManager;
+  @Override
+  public void init(PinotConfiguration configuration, HelixManager helixManager) {
+    _helixManager = helixManager;
+  }
+
+  @Override
+  public AccessControl create() {
+    if (_accessControl == null) {
+      _accessControl = new BasicAuthAccessControl(_helixManager);
+    }
+    return _accessControl;
+  }
+
+  /**
+   * Access Control using metadata-based basic grpc authentication
+   */
+  private static class BasicAuthAccessControl implements AccessControl {
+    private Map<String, ZkBasicAuthPrincipal> _name2principal;
+    private AccessControlUserCache _userCache;
+    private HelixManager _innerHelixManager;
+
+    public BasicAuthAccessControl(HelixManager helixManager) {
+      _innerHelixManager = helixManager;
+    }
+
+    public void initUserCache() {
+      if (_userCache == null) {
+        _userCache = new AccessControlUserCache(_innerHelixManager.getHelixPropertyStore());
+      }
     }
 
     @Override
-    public AccessControl create() {
-        if (_accessControl == null) {
-            _accessControl = new BasicAuthAccessControl(_helixManager);
-        }
-        return _accessControl;
+    public boolean isAuthorizedChannel(ChannelHandlerContext channelHandlerContext) {
+      return true;
     }
 
-    /**
-     * Access Control using metadata-based basic grpc authentication
-     */
-    private static class BasicAuthAccessControl implements AccessControl {
-        private Map<String, ZkBasicAuthPrincipal> _name2principal;
-        private AccessControlUserCache _userCache;
-        private HelixManager _innerHelixManager;
+    @Override
+    public boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName) {
+      if (_userCache == null) {
+        initUserCache();
+      }
+      Collection<String> tokens = getTokens(requesterIdentity);
+      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllServerUserConfig())
+          .stream().collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
 
-        public BasicAuthAccessControl(HelixManager helixManager) {
-            _innerHelixManager = helixManager;
-        }
-
-        public void initUserCache() {
-            if (_userCache == null) {
-                _userCache = new AccessControlUserCache(_innerHelixManager.getHelixPropertyStore());
-            }
-        }
-
-        @Override
-        public boolean isAuthorizedChannel(ChannelHandlerContext channelHandlerContext) {
-            return true;
-        }
-
-        @Override
-        public boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName) {
-            if (_userCache == null) {
-                initUserCache();
-            }
-            Collection<String> tokens = getTokens(requesterIdentity);
-            _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllServerUserConfig())
-                .stream().collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
-
-            Map<String, String> name2password = tokens.stream().collect(Collectors
-              .toMap(BasicAuthUtils::extractUsername, BasicAuthUtils::extractPassword));
-            Map<String, ZkBasicAuthPrincipal> password2principal = name2password.keySet().stream()
-              .collect(Collectors.toMap(name2password::get, _name2principal::get));
-            return password2principal.entrySet().stream()
-                .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
-                .map(u -> u.getValue())
-                .filter(Objects::nonNull)
-                .findFirst()
-                .map(zkprincipal -> StringUtils.isEmpty(tableName) || zkprincipal.hasTable(
-                    TableNameBuilder.extractRawTableName(tableName)))
-                .orElse(false);
-        }
-
-        private Collection<String> getTokens(RequesterIdentity requesterIdentity) {
-            if (requesterIdentity instanceof GrpcRequesterIdentity) {
-                GrpcRequesterIdentity identity = (GrpcRequesterIdentity) requesterIdentity;
-                return identity.getGrpcMetadata().get(AUTHORIZATION_KEY);
-            }
-            if (requesterIdentity instanceof HttpRequesterIdentity) {
-                HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
-                return identity.getHttpHeaders().get(AUTHORIZATION_KEY);
-            }
-            throw new UnsupportedOperationException("GrpcRequesterIdentity or HttpRequesterIdentity is required");
-        }
+      Map<String, String> name2password = tokens.stream().collect(Collectors
+          .toMap(
+              org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
+              org.apache.pinot.common.auth.BasicAuthUtils::extractPassword));
+      Map<String, ZkBasicAuthPrincipal> password2principal = name2password.keySet().stream()
+          .collect(Collectors.toMap(name2password::get, _name2principal::get));
+      return password2principal.entrySet().stream()
+          .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
+          .map(u -> u.getValue())
+          .filter(Objects::nonNull)
+          .findFirst()
+          .map(zkprincipal -> StringUtils.isEmpty(tableName) || zkprincipal.hasTable(
+              TableNameBuilder.extractRawTableName(tableName)))
+          .orElse(false);
     }
+
+    private Collection<String> getTokens(RequesterIdentity requesterIdentity) {
+      if (requesterIdentity instanceof GrpcRequesterIdentity) {
+        GrpcRequesterIdentity identity = (GrpcRequesterIdentity) requesterIdentity;
+        return identity.getGrpcMetadata().get(AUTHORIZATION_KEY);
+      }
+      if (requesterIdentity instanceof HttpRequesterIdentity) {
+        HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
+        return identity.getHttpHeaders().get(AUTHORIZATION_KEY);
+      }
+      throw new UnsupportedOperationException("GrpcRequesterIdentity or HttpRequesterIdentity is required");
+    }
+  }
 }

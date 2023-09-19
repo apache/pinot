@@ -96,11 +96,11 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
     Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
-    Function equalsFunc = caseFunc.getOperands().get(1).getFunctionCall();
+    Assert.assertEquals(caseFunc.getOperands().get(1).getLiteral().getFieldValue(), "The quantity is greater than 30");
+    Function equalsFunc = caseFunc.getOperands().get(2).getFunctionCall();
     Assert.assertEquals(equalsFunc.getOperator(), FilterKind.EQUALS.name());
     Assert.assertEquals(equalsFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(equalsFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
-    Assert.assertEquals(caseFunc.getOperands().get(2).getLiteral().getFieldValue(), "The quantity is greater than 30");
     Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), "The quantity is 30");
     Assert.assertEquals(caseFunc.getOperands().get(4).getLiteral().getFieldValue(), "The quantity is under 30");
 
@@ -127,16 +127,16 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
     Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 30L);
-    greatThanFunc = caseFunc.getOperands().get(1).getFunctionCall();
-    Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
-    Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
-    Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 20L);
+    Assert.assertEquals(caseFunc.getOperands().get(1).getLiteral().getFieldValue(), 3L);
     greatThanFunc = caseFunc.getOperands().get(2).getFunctionCall();
     Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
     Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
+    Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 20L);
+    Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), 2L);
+    greatThanFunc = caseFunc.getOperands().get(4).getFunctionCall();
+    Assert.assertEquals(greatThanFunc.getOperator(), FilterKind.GREATER_THAN.name());
+    Assert.assertEquals(greatThanFunc.getOperands().get(0).getIdentifier().getName(), "Quantity");
     Assert.assertEquals(greatThanFunc.getOperands().get(1).getLiteral().getFieldValue(), 10L);
-    Assert.assertEquals(caseFunc.getOperands().get(3).getLiteral().getFieldValue(), 3L);
-    Assert.assertEquals(caseFunc.getOperands().get(4).getLiteral().getFieldValue(), 2L);
     Assert.assertEquals(caseFunc.getOperands().get(5).getLiteral().getFieldValue(), 1L);
     Assert.assertEquals(caseFunc.getOperands().get(6).getLiteral().getFieldValue(), 0L);
   }
@@ -1418,16 +1418,11 @@ public class CalciteSqlCompilerTest {
         + " limit 50";
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
+    // Alias should not be applied to filter
     Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), FilterKind.EQUALS.name());
     Assert.assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
-        "divide");
-    Assert.assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
-            .getIdentifier().getName(), "secondsSinceEpoch");
-    Assert.assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
-            .getLiteral().getLongValue(), 86400);
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "daysSinceEpoch");
     Assert.assertEquals(
         pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 18523);
     Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
@@ -1441,7 +1436,7 @@ public class CalciteSqlCompilerTest {
 
     // Invalid groupBy clause shouldn't contain aggregate expression, like sum(rsvp_count), count(*).
     try {
-      sql = "select  sum(rsvp_count), count(*) as cnt from meetupRsvp group by group_country, cnt limit 50";
+      sql = "select sum(rsvp_count), count(*) as cnt from meetupRsvp group by group_country, cnt limit 50";
       CalciteSqlParser.compileToPinotQuery(sql);
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
@@ -1452,10 +1447,9 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testAliasInSelection() {
-    String sql;
-    PinotQuery pinotQuery;
-    sql = "SELECT C1 AS ALIAS_C1, C2 AS ALIAS_C2, ADD(C1, C2) FROM Foo";
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    // Alias should not be applied
+    String sql = "SELECT C1 AS ALIAS_C1, C2 AS ALIAS_C2, ALIAS_C1 + ALIAS_C2 FROM Foo";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
     Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "as");
     Assert.assertEquals(
@@ -1469,19 +1463,11 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         pinotQuery.getSelectList().get(1).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "ALIAS_C2");
 
-    Assert.assertEquals(pinotQuery.getSelectList().get(2).getFunctionCall().getOperator(), "add");
+    Assert.assertEquals(pinotQuery.getSelectList().get(2).getFunctionCall().getOperator(), "plus");
     Assert.assertEquals(
-        pinotQuery.getSelectList().get(2).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "C1");
+        pinotQuery.getSelectList().get(2).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ALIAS_C1");
     Assert.assertEquals(
-        pinotQuery.getSelectList().get(2).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "C2");
-
-    // Invalid groupBy clause shouldn't contain aggregate expression, like sum(rsvp_count), count(*).
-    try {
-      sql = "SELECT C1 AS ALIAS_C1, C2 AS ALIAS_C2, ADD(alias_c1, alias_c2) FROM Foo";
-      CalciteSqlParser.compileToPinotQuery(sql);
-    } catch (Exception e) {
-      Assert.fail("Query compilation shouldn't fail");
-    }
+        pinotQuery.getSelectList().get(2).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "ALIAS_C2");
   }
 
   @Test
@@ -1493,6 +1479,26 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getSelectListSize(), 2);
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "C1");
     Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "C2");
+  }
+
+  @Test
+  public void testAliasInFilter() {
+    // Alias should not be applied
+    String sql = "SELECT C1 AS ALIAS_CI FROM Foo WHERE ALIAS_CI > 10";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ALIAS_CI");
+  }
+
+  @Test
+  public void testColumnOverride() {
+    String sql = "SELECT C1 + 1 AS C1, COUNT(*) AS cnt FROM Foo GROUP BY 1";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "plus");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "C1");
+    Assert.assertEquals(
+        pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 1);
   }
 
   @Test
@@ -2978,10 +2984,10 @@ public class CalciteSqlCompilerTest {
     // Then:
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
     Function fun = pinotQuery.getSelectList().get(0).getFunctionCall();
-    Assert.assertEquals(fun.operator, "attimezone");
-    Assert.assertEquals(fun.operands.size(), 2);
-    Assert.assertEquals(fun.operands.get(0).getIdentifier().name, "ts");
-    Assert.assertEquals(fun.operands.get(1).getLiteral().getStringValue(), "pst");
+    Assert.assertEquals(fun.getOperator(), "attimezone");
+    Assert.assertEquals(fun.getOperands().size(), 2);
+    Assert.assertEquals(fun.getOperands().get(0).getIdentifier().getName(), "ts");
+    Assert.assertEquals(fun.getOperands().get(1).getLiteral().getStringValue(), "pst");
   }
 
   @Test
@@ -2995,13 +3001,15 @@ public class CalciteSqlCompilerTest {
     // Then:
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
     Function fun = pinotQuery.getSelectList().get(0).getFunctionCall();
-    Assert.assertEquals(fun.operator, "attimezone");
-    Assert.assertEquals(fun.operands.size(), 2);
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operator, "plus");
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.size(), 2);
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(0).getIdentifier().getName(), "ts");
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(1).getLiteral().getLongValue(), 123L);
-    Assert.assertEquals(fun.operands.get(1).getLiteral().getStringValue(), "pst");
+    Assert.assertEquals(fun.getOperator(), "attimezone");
+    Assert.assertEquals(fun.getOperands().size(), 2);
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperator(), "plus");
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "ts");
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(),
+        123L);
+    Assert.assertEquals(fun.getOperands().get(1).getLiteral().getStringValue(), "pst");
   }
 
   @Test
@@ -3015,12 +3023,14 @@ public class CalciteSqlCompilerTest {
     // Then:
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
     Function fun = pinotQuery.getSelectList().get(0).getFunctionCall();
-    Assert.assertEquals(fun.operator, "GREATER_THAN");
-    Assert.assertEquals(fun.operands.size(), 2);
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operator, "attimezone");
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.size(), 2);
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(0).getIdentifier().getName(), "ts");
-    Assert.assertEquals(fun.operands.get(0).getFunctionCall().operands.get(1).getLiteral().getStringValue(), "pst");
+    Assert.assertEquals(fun.getOperator(), "GREATER_THAN");
+    Assert.assertEquals(fun.getOperands().size(), 2);
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperator(), "attimezone");
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
+        "ts");
+    Assert.assertEquals(fun.getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
+        "pst");
   }
 
   @Test
@@ -3120,8 +3130,72 @@ public class CalciteSqlCompilerTest {
     right = join.getRight();
     Assert.assertEquals(right.getTableName(), "self");
     rightSubquery = right.getSubquery();
-    Assert.assertEquals(rightSubquery,
-        CalciteSqlParser.compileToPinotQuery("SELECT key FROM T1"));
+    Assert.assertEquals(rightSubquery, CalciteSqlParser.compileToPinotQuery("SELECT key FROM T1"));
     Assert.assertEquals(join.getCondition(), CalciteSqlParser.compileToExpression("T1.key = self.key"));
+  }
+
+  @Test
+  public void testInPredicateWithOutNullPasses() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2) AND column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
+      + "filter is not supported")
+  public void testSingleInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2, NULL)");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in NOT_IN "
+      + "filter is not supported")
+  public void testSingleNotInPredicateWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 NOT IN (1, 2, NULL)");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
+      + "filter is not supported")
+  public void testAndFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 IN (1, 2, NULL) AND column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in NOT_IN "
+      + "filter is not supported")
+  public void testOrFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 NOT IN (1, 2, NULL) OR column2 = 1");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in IN "
+      + "filter is not supported")
+  public void testNotFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE NOT(column1 IN (NULL, 1, 2))");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
+      + "GREATER_THAN filter is not supported")
+  public void testGreaterThanNullFilterFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 > null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
+      + "LESS_THAN_OR_EQUAL filter is not supported")
+  public void testLessThanOrEqualNullFilterFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 <= null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in LIKE "
+      + "filter is not supported")
+  public void testLikeFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 LIKE null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in EQUALS "
+      + "filter is not supported")
+  public void testEqualFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 = null");
+  }
+
+  @Test(expectedExceptions = {IllegalStateException.class}, expectedExceptionsMessageRegExp = "Using NULL in "
+      + "NOT_EQUALS filter is not supported")
+  public void testInEqualFilterWithNullFails() {
+    CalciteSqlParser.compileToPinotQuery("SELECT * FROM testTable WHERE column1 != null");
   }
 }

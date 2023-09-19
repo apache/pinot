@@ -59,6 +59,8 @@ import org.apache.pinot.spi.data.Schema;
 public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator>
   implements ConfigurableFromIndexLoadingConfig<RangeIndexConfig> {
   public static final String INDEX_DISPLAY_NAME = "range";
+  private static final List<String> EXTENSIONS =
+      Collections.singletonList(V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
 
   protected RangeIndexType() {
     super(StandardIndexes.RANGE_ID);
@@ -138,8 +140,8 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   }
 
   @Override
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    return V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION;
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    return EXTENSIONS;
   }
 
   @Override

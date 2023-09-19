@@ -68,6 +68,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONSOLE_SWAGGER_USE_HTTPS = "controller.swagger.use.https";
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
+  public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = "controller.resource.rebalance.delay_ms";
 
   // Comma separated list of packages that contain TableConfigTuners to be added to the registry
   public static final String TABLE_CONFIG_TUNER_PACKAGES = "controller.table.config.tuner.packages";
@@ -215,9 +216,15 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtime.segment.deepStoreUploadRetryEnabled";
     public static final String DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS =
         "controller.realtime.segment.deepStoreUploadRetry.timeoutMs";
+    public static final String ENABLE_TMP_SEGMENT_ASYNC_DELETION =
+        "controller.realtime.segment.tmpFileAsyncDeletionEnabled";
+    // temporary segments within expiration won't be deleted so that ongoing split commit won't be impacted.
+    public static final String TMP_SEGMENT_RETENTION_IN_SECONDS =
+        "controller.realtime.segment.tmpFileRetentionInSeconds";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
+    public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
 
     private static final Random RANDOM = new Random();
 
@@ -298,10 +305,12 @@ public class ControllerConf extends PinotConfiguration {
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
-  private static final boolean DEFAULT_ALLOW_HLC_TABLES = true;
+  // Disallow any high level consumer (HLC) table
+  private static final boolean DEFAULT_ALLOW_HLC_TABLES = false;
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
   private static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
+  private static final int DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = 300_000; // 5 minutes
   private static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
@@ -921,8 +930,17 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, false);
   }
 
+  public boolean isTmpSegmentAsyncDeletionEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION, false);
+  }
+
   public int getDeepStoreRetryUploadTimeoutMs() {
     return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS, -1);
+  }
+
+  public int getTmpSegmentRetentionInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {
@@ -992,12 +1010,17 @@ public class ControllerConf extends PinotConfiguration {
         DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY);
   }
 
-  public boolean getHLCTablesAllowed() {
-    return getProperty(ALLOW_HLC_TABLES, DEFAULT_ALLOW_HLC_TABLES);
+  public void setLeadControllerResourceRebalanceDelayMs(long rebalanceDelayMs) {
+    setProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS, rebalanceDelayMs);
   }
 
-  public void setHLCTablesAllowed(boolean allowHLCTables) {
-    setProperty(ALLOW_HLC_TABLES, allowHLCTables);
+  public int getLeadControllerResourceRebalanceDelayMs() {
+    return getProperty(
+        LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS);
+  }
+
+  public boolean getHLCTablesAllowed() {
+    return DEFAULT_ALLOW_HLC_TABLES;
   }
 
   public String getMetricsPrefix() {

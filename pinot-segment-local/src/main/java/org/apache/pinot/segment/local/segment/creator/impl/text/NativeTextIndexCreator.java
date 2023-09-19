@@ -67,6 +67,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   private final File _tempDir;
   private final File _fstIndexFile;
   private final File _invertedIndexFile;
+  private final Analyzer _analyzer;
   private final Map<String, RoaringBitmapWriter<RoaringBitmap>> _postingListMap = new TreeMap<>();
   private final RoaringBitmapWriter.Wizard<Container, RoaringBitmap> _bitmapWriterWizard = RoaringBitmapWriter.writer();
   private int _nextDocId = 0;
@@ -86,13 +87,27 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
     }
     _fstIndexFile = new File(_tempDir, FST_FILE_NAME);
     _invertedIndexFile = new File(_tempDir, INVERTED_INDEX_FILE_NAME);
+    _analyzer = new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET);
   }
 
   @Override
   public void add(String document) {
+    addHelper(document);
+    _nextDocId++;
+  }
+
+  @Override
+  public void add(String[] documents, int length) {
+    for (int i = 0; i < length; i++) {
+      addHelper(documents[i]);
+    }
+    _nextDocId++;
+  }
+
+  private void addHelper(String document) {
     List<String> tokens;
     try {
-      tokens = analyze(document, new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET));
+      tokens = analyze(document);
     } catch (IOException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -100,13 +115,6 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
     for (String token : tokens) {
       addToPostingList(token);
     }
-
-    _nextDocId++;
-  }
-
-  @Override
-  public void add(String[] documents, int length) {
-    throw new UnsupportedOperationException("Native text index is not supported on MV column: " + _columnName);
   }
 
   @Override
@@ -132,17 +140,22 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   @Override
   public void close()
       throws IOException {
+    _analyzer.close();
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  public List<String> analyze(String text, Analyzer analyzer)
+  public List<String> analyze(String text)
       throws IOException {
     List<String> result = new ArrayList<>();
-    TokenStream tokenStream = analyzer.tokenStream(_columnName, text);
-    CharTermAttribute attr = tokenStream.addAttribute(CharTermAttribute.class);
-    tokenStream.reset();
-    while (tokenStream.incrementToken()) {
-      result.add(attr.toString());
+    try (TokenStream tokenStream = _analyzer.tokenStream(_columnName, text)) {
+      CharTermAttribute attr = tokenStream.addAttribute(CharTermAttribute.class);
+      tokenStream.reset();
+      while (tokenStream.incrementToken()) {
+        result.add(attr.toString());
+      }
+      tokenStream.end();
+    } catch (IOException e) {
+      throw new RuntimeException("Caught exception while tokenizing the document for column: " + _columnName, e);
     }
     return result;
   }
@@ -175,8 +188,9 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
         FileChannel invertedIndexFileChannel = new RandomAccessFile(_invertedIndexFile, "r").getChannel();
         FileChannel fstFileChannel = new RandomAccessFile(_fstIndexFile, "rw").getChannel()) {
       indexFileChannel.write(headerBuffer);
-      fstFileChannel.transferTo(0, _fstDataSize, indexFileChannel);
-      invertedIndexFileChannel.transferTo(0, invertedIndexFileLength, indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(fstFileChannel, 0, _fstDataSize, indexFileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(invertedIndexFileChannel, 0, invertedIndexFileLength,
+          indexFileChannel);
     }
   }
 }

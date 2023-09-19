@@ -27,6 +27,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -46,17 +47,22 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.methods.DeleteMethod;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.params.HttpClientParams;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.http.MultiHttpRequest;
+import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,10 +87,11 @@ public class PinotRunningQueryResource {
   private Executor _executor;
 
   @Inject
-  private HttpConnectionManager _httpConnMgr;
+  private HttpClientConnectionManager _httpConnMgr;
 
   @DELETE
   @Path("query/{brokerId}/{queryId}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Cancel a query as identified by the queryId", notes = "No effect if no query exists for the "
       + "given queryId on the requested broker. Query may continue to run for a short while after calling cancel as "
@@ -106,21 +113,26 @@ public class PinotRunningQueryResource {
           Response.status(Response.Status.BAD_REQUEST).entity("Unknown broker: " + brokerId).build());
     }
     try {
-      HttpClientParams clientParams = new HttpClientParams();
-      clientParams.setConnectionManagerTimeout(timeoutMs);
-      HttpClient client = new HttpClient(clientParams, _httpConnMgr);
+      RequestConfig defaultRequestConfig = RequestConfig.custom()
+          .setConnectionRequestTimeout(timeoutMs)
+          .setSocketTimeout(timeoutMs).build();
+
+      CloseableHttpClient client = HttpClients.custom().setConnectionManager(_httpConnMgr)
+          .setDefaultRequestConfig(defaultRequestConfig).build();
+
       String protocol = _controllerConf.getControllerBrokerProtocol();
       int portOverride = _controllerConf.getControllerBrokerPortOverride();
       int port = portOverride > 0 ? portOverride : Integer.parseInt(broker.getPort());
-      DeleteMethod deleteMethod = new DeleteMethod(
+      HttpDelete deleteMethod = new HttpDelete(
           String.format("%s://%s:%d/query/%d?verbose=%b", protocol, broker.getHostName(), port, queryId, verbose));
       try {
         Map<String, String> requestHeaders = createRequestHeaders(httpHeaders);
-        requestHeaders.forEach(deleteMethod::setRequestHeader);
-        client.executeMethod(deleteMethod);
-        int status = deleteMethod.getStatusCode();
+        requestHeaders.forEach(deleteMethod::setHeader);
+        CloseableHttpResponse response = client.execute(deleteMethod);
+        int status = response.getStatusLine().getStatusCode();
+        String responseContent = EntityUtils.toString(response.getEntity());
         if (status == 200) {
-          return deleteMethod.getResponseBodyAsString();
+          return responseContent;
         }
         if (status == 404) {
           throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
@@ -128,7 +140,7 @@ public class PinotRunningQueryResource {
         }
         throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(String
             .format("Failed to cancel query: %s on the broker: %s with unexpected status=%d and resp='%s'", queryId,
-                brokerId, status, deleteMethod.getResponseBodyAsString())).build());
+                brokerId, status, responseContent)).build());
       } finally {
         deleteMethod.releaseConnection();
       }
@@ -143,6 +155,7 @@ public class PinotRunningQueryResource {
 
   @GET
   @Path("/queries")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get running queries from all brokers", notes = "The queries are returned with brokers "
       + "running them")
@@ -164,8 +177,7 @@ public class PinotRunningQueryResource {
   }
 
   private Map<String, Map<String, String>> getRunningQueries(Map<String, InstanceInfo> brokers, int timeoutMs,
-      Map<String, String> requestHeaders)
-      throws Exception {
+      Map<String, String> requestHeaders) throws Exception {
     String protocol = _controllerConf.getControllerBrokerProtocol();
     int portOverride = _controllerConf.getControllerBrokerPortOverride();
     List<String> brokerUrls = new ArrayList<>();
@@ -174,32 +186,33 @@ public class PinotRunningQueryResource {
       brokerUrls.add(String.format("%s://%s:%d/queries", protocol, broker.getHost(), port));
     }
     LOGGER.debug("Getting running queries via broker urls: {}", brokerUrls);
-    CompletionService<GetMethod> completionService =
+    CompletionService<MultiHttpRequestResponse> completionService =
         new MultiHttpRequest(_executor, _httpConnMgr).execute(brokerUrls, requestHeaders, timeoutMs);
     Map<String, Map<String, String>> queriesByBroker = new HashMap<>();
     List<String> errMsgs = new ArrayList<>(brokerUrls.size());
     for (int i = 0; i < brokerUrls.size(); i++) {
-      GetMethod getMethod = null;
+      MultiHttpRequestResponse httpRequestResponse = null;
       try {
         // The completion order is different from brokerUrls, thus use uri in the response.
-        getMethod = completionService.take().get();
-        URI uri = getMethod.getURI();
-        int status = getMethod.getStatusCode();
+        httpRequestResponse = completionService.take().get();
+        URI uri = httpRequestResponse.getURI();
+        int status = httpRequestResponse.getResponse().getStatusLine().getStatusCode();
+        String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
         // Unexpected server responses are collected and returned as exception.
         if (status != 200) {
           throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,
-              getMethod.getResponseBodyAsString(), uri));
+              responseString, uri));
         }
         queriesByBroker.put(brokers.get(getInstanceKey(uri)).getInstanceName(),
-            JsonUtils.stringToObject(getMethod.getResponseBodyAsString(), Map.class));
+            JsonUtils.stringToObject(responseString, Map.class));
       } catch (Exception e) {
         LOGGER.error("Failed to get queries", e);
         // Can't just throw exception from here as there is a need to release the other connections.
         // So just collect the error msg to throw them together after the for-loop.
         errMsgs.add(e.getMessage());
       } finally {
-        if (getMethod != null) {
-          getMethod.releaseConnection();
+        if (httpRequestResponse != null) {
+          httpRequestResponse.close();
         }
       }
     }

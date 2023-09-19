@@ -53,12 +53,20 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     }
   }
 
+  private Object getFieldValue(Descriptors.FieldDescriptor fieldDescriptor, Message message) {
+    if (fieldDescriptor.isRepeated() || !fieldDescriptor.hasOptionalKeyword() || message.hasField(fieldDescriptor)) {
+      return message.getField(fieldDescriptor);
+    } else {
+      return null;
+    }
+  }
+
   @Override
   public GenericRow extract(Message from, GenericRow to) {
     Descriptors.Descriptor descriptor = from.getDescriptorForType();
     if (_extractAll) {
       for (Descriptors.FieldDescriptor fieldDescriptor : descriptor.getFields()) {
-        Object fieldValue = from.getField(fieldDescriptor);
+        Object fieldValue = getFieldValue(fieldDescriptor, from);
         if (fieldValue != null) {
           fieldValue = convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor));
         }
@@ -67,7 +75,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     } else {
       for (String fieldName : _fields) {
         Descriptors.FieldDescriptor fieldDescriptor = descriptor.findFieldByName(fieldName);
-        Object fieldValue = fieldDescriptor != null ? from.getField(fieldDescriptor) : null;
+        Object fieldValue = fieldDescriptor == null ? null : getFieldValue(fieldDescriptor, from);
         if (fieldValue != null) {
           fieldValue = convert(new ProtoBufFieldInfo(fieldValue, descriptor.findFieldByName(fieldName)));
         }

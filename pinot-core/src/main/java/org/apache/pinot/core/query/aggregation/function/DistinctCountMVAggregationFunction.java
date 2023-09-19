@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -33,10 +34,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 public class DistinctCountMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
 
-  public DistinctCountMVAggregationFunction(ExpressionContext expression) {
-    super(expression, AggregationFunctionType.DISTINCTCOUNTMV);
+  public DistinctCountMVAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifySingleArgument(arguments, "DISTINCT_COUNT_MV"), AggregationFunctionType.DISTINCTCOUNTMV, false);
   }
-
 
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,

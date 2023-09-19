@@ -20,12 +20,10 @@ package org.apache.pinot.query.runtime.operator.exchange;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.operator.OpChainId;
 
 
 /**
@@ -38,24 +36,33 @@ class HashExchange extends BlockExchange {
   // TODO: ensure that server instance list is sorted using same function in sender.
   private final KeySelector<Object[], Object[]> _keySelector;
 
-  HashExchange(OpChainId opChainId, List<SendingMailbox> sendingMailboxes, KeySelector<Object[], Object[]> selector,
-      BlockSplitter splitter, Consumer<OpChainId> callback, long deadlineMs) {
-    super(opChainId, sendingMailboxes, splitter, callback, deadlineMs);
+  HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<Object[], Object[]> selector,
+      BlockSplitter splitter) {
+    super(sendingMailboxes, splitter);
     _keySelector = selector;
   }
 
   @Override
   protected void route(List<SendingMailbox> destinations, TransferableBlock block)
       throws Exception {
-    List<Object[]>[] destIdxToRows = new List[destinations.size()];
-    for (Object[] row : block.getContainer()) {
-      int partition = _keySelector.computeHash(row) % destinations.size();
-      if (destIdxToRows[partition] == null) {
-        destIdxToRows[partition] = new ArrayList<>();
-      }
-      destIdxToRows[partition].add(row);
+    int numMailboxes = destinations.size();
+    if (numMailboxes == 1) {
+      sendBlock(destinations.get(0), block);
+      return;
     }
-    for (int i = 0; i < destinations.size(); i++) {
+
+    List<Object[]>[] destIdxToRows = new List[numMailboxes];
+    List<Object[]> container = block.getContainer();
+    for (Object[] row : container) {
+      int index = _keySelector.computeHash(row) % numMailboxes;
+      List<Object[]> rows = destIdxToRows[index];
+      if (rows == null) {
+        rows = new ArrayList<>();
+        destIdxToRows[index] = rows;
+      }
+      rows.add(row);
+    }
+    for (int i = 0; i < numMailboxes; i++) {
       if (destIdxToRows[i] != null) {
         sendBlock(destinations.get(i), new TransferableBlock(destIdxToRows[i], block.getDataSchema(), block.getType()));
       }

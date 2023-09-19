@@ -26,6 +26,8 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class FilterOperatorUtils {
@@ -44,8 +46,8 @@ public class FilterOperatorUtils {
     /**
      * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
      */
-    BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
-        int numDocs, boolean nullHandlingEnabled);
+    BaseFilterOperator getLeafFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
+        DataSource dataSource, int numDocs);
 
     /**
      * Returns the AND filter operator or equivalent filter operator.
@@ -68,11 +70,20 @@ public class FilterOperatorUtils {
 
   public static class DefaultImplementation implements Implementation {
     @Override
-    public BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
-        int numDocs, boolean nullHandlingEnabled) {
+    public BaseFilterOperator getLeafFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
+        DataSource dataSource, int numDocs) {
       if (predicateEvaluator.isAlwaysFalse()) {
         return EmptyFilterOperator.getInstance();
       } else if (predicateEvaluator.isAlwaysTrue()) {
+        if (queryContext.isNullHandlingEnabled()) {
+          NullValueVectorReader nullValueVectorReader = dataSource.getNullValueVector();
+          if (nullValueVectorReader != null) {
+            ImmutableRoaringBitmap nullBitmap = nullValueVectorReader.getNullBitmap();
+            if (nullBitmap != null && !nullBitmap.isEmpty()) {
+              return new BitmapBasedFilterOperator(nullBitmap, true, numDocs);
+            }
+          }
+        }
         return new MatchAllFilterOperator(numDocs);
       }
 
@@ -85,31 +96,31 @@ public class FilterOperatorUtils {
       Predicate.Type predicateType = predicateEvaluator.getPredicateType();
       if (predicateType == Predicate.Type.RANGE) {
         if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
-          return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
-          return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new RangeIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
-        return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
+        return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
         if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()) {
-          return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null) {
-          return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
-        return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
+        return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else {
         if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
-          return new SortedIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         if (dataSource.getInvertedIndex() != null) {
-          return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
-          return new RangeIndexBasedFilterOperator(predicateEvaluator, dataSource, numDocs);
+          return new RangeIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
-        return new ScanBasedFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
+        return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       }
     }
 
@@ -134,7 +145,8 @@ public class FilterOperatorUtils {
       } else {
         // Return the AND filter operator with re-ordered child filter operators
         reorderAndFilterChildOperators(queryContext, childFilterOperators);
-        return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions());
+        return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
+            queryContext.isNullHandlingEnabled());
       }
     }
 
@@ -158,7 +170,8 @@ public class FilterOperatorUtils {
         return childFilterOperators.get(0);
       } else {
         // Return the OR filter operator with child filter operators
-        return new OrFilterOperator(childFilterOperators, numDocs);
+        return new OrFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
+            queryContext.isNullHandlingEnabled());
       }
     }
 
@@ -171,7 +184,7 @@ public class FilterOperatorUtils {
         return new MatchAllFilterOperator(numDocs);
       }
 
-      return new NotFilterOperator(filterOperator, numDocs);
+      return new NotFilterOperator(filterOperator, numDocs, queryContext.isNullHandlingEnabled());
     }
 
 
@@ -247,17 +260,9 @@ public class FilterOperatorUtils {
   /**
    * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
    */
-  public static BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
-      int numDocs) {
-    return getLeafFilterOperator(predicateEvaluator, dataSource, numDocs, false);
-  }
-
-  /**
-   * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
-   */
-  public static BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
-      int numDocs, boolean nullHandlingEnabled) {
-    return _instance.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs, nullHandlingEnabled);
+  public static BaseFilterOperator getLeafFilterOperator(QueryContext queryContext,
+      PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+    return _instance.getLeafFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
   }
 
   /**

@@ -19,6 +19,7 @@
 package org.apache.pinot.query.parser;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -50,11 +51,13 @@ import org.slf4j.LoggerFactory;
 public class CalciteRexExpressionParser {
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteRexExpressionParser.class);
   private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
+  private static final String ARRAY_TO_MV_FUNCTION_NAME = "arraytomv";
 
   static {
     CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();
     for (FilterKind filterKind : FilterKind.values()) {
-      CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(canonicalizeFunctionNameInternal(filterKind.name()), filterKind.name());
+      CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(RequestUtils.canonicalizeFunctionName(filterKind.name()),
+          filterKind.name());
     }
   }
 
@@ -66,18 +69,29 @@ public class CalciteRexExpressionParser {
   // Relational conversion Utils
   // --------------------------------------------------------------------------
 
-  public static List<Expression> overwriteSelectList(List<RexExpression> rexNodeList, PinotQuery pinotQuery) {
-    return addSelectList(new ArrayList<>(), rexNodeList, pinotQuery);
-  }
-
-  public static List<Expression> addSelectList(List<Expression> existingList, List<RexExpression> rexNodeList,
-      PinotQuery pinotQuery) {
-    List<Expression> selectExpr = new ArrayList<>(existingList);
-
-    final Iterator<RexExpression> iterator = rexNodeList.iterator();
+  public static List<Expression> convertProjectList(List<RexExpression> projectList, PinotQuery pinotQuery) {
+    List<Expression> selectExpr = new ArrayList<>();
+    final Iterator<RexExpression> iterator = projectList.iterator();
     while (iterator.hasNext()) {
       final RexExpression next = iterator.next();
       selectExpr.add(toExpression(next, pinotQuery));
+    }
+    return selectExpr;
+  }
+
+  public static List<Expression> convertAggregateList(List<Expression> groupSetList, List<RexExpression> aggCallList,
+      List<Integer> filterArgIndices, PinotQuery pinotQuery) {
+    List<Expression> selectExpr = new ArrayList<>(groupSetList);
+
+    for (int idx = 0; idx < aggCallList.size(); idx++) {
+      final RexExpression aggCall = aggCallList.get(idx);
+      int filterArgIdx = filterArgIndices.get(idx);
+      if (filterArgIdx == -1) {
+        selectExpr.add(toExpression(aggCall, pinotQuery));
+      } else {
+        selectExpr.add(toExpression(new RexExpression.FunctionCall(SqlKind.FILTER, aggCall.getDataType(), "FILTER",
+            Arrays.asList(aggCall, new RexExpression.InputRef(filterArgIdx))), pinotQuery));
+      }
     }
 
     return selectExpr;
@@ -172,16 +186,10 @@ public class CalciteRexExpressionParser {
       case INPUT_REF:
         return inputRefToIdentifier((RexExpression.InputRef) rexNode, pinotQuery);
       case LITERAL:
-        return rexLiteralToExpression((RexExpression.Literal) rexNode);
+        return RequestUtils.getLiteralExpression(((RexExpression.Literal) rexNode).getValue());
       default:
         return compileFunctionExpression((RexExpression.FunctionCall) rexNode, pinotQuery);
     }
-  }
-
-  private static Expression rexLiteralToExpression(RexExpression.Literal rexLiteral) {
-    // TODO: currently literals are encoded as strings for V1, remove this and use directly literal type when it
-    // supports strong-type in V1.
-    return RequestUtils.getLiteralExpression(rexLiteral.getValue());
   }
 
   private static Expression inputRefToIdentifier(RexExpression.InputRef inputRef, PinotQuery pinotQuery) {
@@ -199,16 +207,25 @@ public class CalciteRexExpressionParser {
         return compileOrExpression(rexCall, pinotQuery);
       case OTHER_FUNCTION:
         functionName = rexCall.getFunctionName();
+        // Special handle for leaf stage multi-value columns, as the default behavior for filter and group by is not
+        // sql standard, so need to use `array_to_mv` to convert the array to v1 multi-value column for behavior
+        // consistency meanwhile not violating the sql standard.
+        if (ARRAY_TO_MV_FUNCTION_NAME.equals(canonicalizeFunctionName(functionName))) {
+          return toExpression(rexCall.getFunctionOperands().get(0), pinotQuery);
+        }
         break;
       default:
         functionName = functionKind.name();
         break;
     }
-    // When there is no argument, set an empty list as the operands
     List<RexExpression> childNodes = rexCall.getFunctionOperands();
     List<Expression> operands = new ArrayList<>(childNodes.size());
     for (RexExpression childNode : childNodes) {
       operands.add(toExpression(childNode, pinotQuery));
+    }
+    // for COUNT, add a star (*) identifier to operand list b/c V1 doesn't handle empty operand functions.
+    if (functionKind == SqlKind.COUNT && operands.isEmpty()) {
+      operands.add(RequestUtils.getIdentifierExpression("*"));
     }
     ParserUtils.validateFunction(functionName, operands);
     Expression functionExpression = getFunctionExpression(functionName);
@@ -260,18 +277,7 @@ public class CalciteRexExpressionParser {
   }
 
   private static String canonicalizeFunctionName(String functionName) {
-    String canonicalizeName = canonicalizeFunctionNameInternal(functionName);
+    String canonicalizeName = RequestUtils.canonicalizeFunctionName(functionName);
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalizeName, canonicalizeName);
-  }
-
-  /**
-   * Canonicalize Calcite generated Logical function names.
-   */
-  private static String canonicalizeFunctionNameInternal(String functionName) {
-    if (functionName.endsWith("0")) {
-      return functionName.substring(0, functionName.length() - 1).replace("_", "").toLowerCase();
-    } else {
-      return functionName.replace("_", "").toLowerCase();
-    }
   }
 }

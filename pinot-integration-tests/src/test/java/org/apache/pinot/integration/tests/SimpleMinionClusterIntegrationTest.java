@@ -20,6 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
@@ -79,10 +81,13 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
 
     // Set task timeout in cluster config
     PinotHelixResourceManager helixResourceManager = _controllerStarter.getHelixResourceManager();
+    Map<String, String> properties = new HashMap<>();
+    properties.put(TASK_TYPE + MinionConstants.TIMEOUT_MS_KEY_SUFFIX, Long.toString(600_000L));
+    properties.put(TASK_TYPE + MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX, "2");
+
     helixResourceManager.getHelixAdmin().setConfig(
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
-            .forCluster(helixResourceManager.getHelixClusterName()).build(),
-        Collections.singletonMap(TASK_TYPE + MinionConstants.TIMEOUT_MS_KEY_SUFFIX, Long.toString(600_000L)));
+            .forCluster(helixResourceManager.getHelixClusterName()).build(), properties);
 
     // Add 3 offline tables, where 2 of them have TestTask enabled
     TableTaskConfig taskConfig = new TableTaskConfig(Collections.singletonMap(TASK_TYPE, Collections.emptyMap()));
@@ -103,6 +108,13 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     assertEquals(taskGenerator.getTaskTimeoutMs(), 600_000L);
   }
 
+  @Test
+  public void testTaskMaxAttempts() {
+    PinotTaskGenerator taskGenerator = _taskManager.getTaskGeneratorRegistry().getTaskGenerator(TASK_TYPE);
+    assertNotNull(taskGenerator);
+    assertEquals(taskGenerator.getMaxAttemptsPerTask(), 2);
+  }
+
   private void verifyTaskCount(String task, int errors, int waiting, int running, int total) {
     // Wait for at most 10 seconds for Helix to generate the tasks
     TestUtils.waitForCondition((aVoid) -> {
@@ -118,7 +130,6 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     HOLD.set(true);
     // No tasks before we start.
     assertEquals(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).size(), 0);
-    verifyTaskCount("Task_" + TASK_TYPE + "_1624403781879", 0, 0, 0, 0);
 
     // Should create the task queues and generate a task
     String task1 = _taskManager.scheduleTasks().get(TASK_TYPE);
@@ -154,11 +165,11 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
           return false;
         }
       }
-      assertTrue(TASK_START_NOTIFIED.get());
       assertFalse(TASK_SUCCESS_NOTIFIED.get());
       assertFalse(TASK_CANCELLED_NOTIFIED.get());
       assertFalse(TASK_ERROR_NOTIFIED.get());
-      return true;
+      // Task start callback is triggered shortly after the task start execution asynchronously
+      return TASK_START_NOTIFIED.get();
     }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks IN_PROGRESS");
 
     // Wait at most 30 seconds for ZK callback to update the controller gauges
@@ -188,9 +199,9 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       }
       assertTrue(TASK_START_NOTIFIED.get());
       assertFalse(TASK_SUCCESS_NOTIFIED.get());
-      assertTrue(TASK_CANCELLED_NOTIFIED.get());
       assertFalse(TASK_ERROR_NOTIFIED.get());
-      return true;
+      // Task cancelled callback is triggered shortly after the task framework cancels the task asynchronously
+      return TASK_CANCELLED_NOTIFIED.get();
     }, STATE_TRANSITION_TIMEOUT_MS, "Failed to get all tasks STOPPED");
 
     // Wait at most 30 seconds for ZK callback to update the controller gauges

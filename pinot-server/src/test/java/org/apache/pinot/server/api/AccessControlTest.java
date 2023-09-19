@@ -31,9 +31,9 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.auth.BasicAuthUtils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.server.access.AccessControl;
@@ -145,7 +145,8 @@ public class AccessControlTest {
   public void testHttpBasicAuth() {
     HttpHeaders headers = new ContainerRequest(null, null, null, null, new MapPropertiesDelegate());
     headers.getRequestHeaders()
-        .put("authorization", Arrays.asList(BasicAuthUtils.toBasicAuthToken("admin123", "verysecret")));
+        .put("authorization", Arrays.asList(
+            org.apache.pinot.common.auth.BasicAuthUtils.toBasicAuthToken("admin123", "verysecret")));
     testBasicAuth(new HttpRequesterIdentity(headers), true);
     headers.getRequestHeaders()
         .put("authorization", Arrays.asList(BasicAuthUtils.toBasicAuthToken("user456", "kindasecret")));

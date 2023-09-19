@@ -28,7 +28,6 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.query.service.QueryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -39,6 +38,7 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
 
 public class MultiStageBrokerRequestHandlerTest {
 
@@ -61,11 +61,11 @@ public class MultiStageBrokerRequestHandlerTest {
   public void setUp() {
     MockitoAnnotations.openMocks(this);
     _config = new PinotConfiguration();
-    _config.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, "10000");
-    _config.setProperty(QueryConfig.KEY_OF_QUERY_RUNNER_PORT, "12345");
+    _config.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
+    _config.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, "12345");
     _accessControlFactory = new AllowAllAccessControlFactory();
     _requestHandler =
-        new MultiStageBrokerRequestHandler(_config, "testBrokerId", _routingManager, _accessControlFactory,
+        new MultiStageBrokerRequestHandler(_config, "Broker_localhost", _routingManager, _accessControlFactory,
             _queryQuotaManager, _tableCache, _brokerMetrics);
   }
 
@@ -81,7 +81,7 @@ public class MultiStageBrokerRequestHandlerTest {
     List<Long> requestIds = new ArrayList<>();
     // Request id should be unique each time, and there should be a difference of 1 between consecutive requestIds.
     for (int iteration = 0; iteration < 10; iteration++) {
-      _requestHandler.handleRequest(jsonRequest, null, null, requestContext);
+      _requestHandler.handleRequest(jsonRequest, null, null, requestContext, null);
       Assert.assertTrue(requestContext.getRequestId() >= 0, "Request ID should be non-negative");
       requestIds.add(requestContext.getRequestId());
       if (iteration != 0) {

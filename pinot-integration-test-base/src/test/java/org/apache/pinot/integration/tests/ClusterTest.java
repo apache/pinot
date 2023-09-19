@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -76,7 +77,11 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.SkipException;
+import org.testng.annotations.DataProvider;
 
+import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -96,12 +101,26 @@ public abstract class ClusterTest extends ControllerTest {
 
   private String _brokerBaseApiUrl;
 
+  private boolean _useMultiStageQueryEngine = false;
+
   protected String getBrokerBaseApiUrl() {
     return _brokerBaseApiUrl;
   }
 
   protected boolean useMultiStageQueryEngine() {
-    return false;
+    return _useMultiStageQueryEngine;
+  }
+
+  protected void setUseMultiStageQueryEngine(boolean useMultiStageQueryEngine) {
+    _useMultiStageQueryEngine = useMultiStageQueryEngine;
+  }
+
+  protected void disableMultiStageQueryEngine() {
+    setUseMultiStageQueryEngine(false);
+  }
+
+  protected void enableMultiStageQueryEngine() {
+    setUseMultiStageQueryEngine(true);
   }
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
@@ -432,20 +451,18 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(query, getBrokerBaseApiUrl(), null, getExtraQueryProperties());
+    return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
+        getExtraQueryProperties());
   }
 
   protected Map<String, String> getExtraQueryProperties() {
-    if (!useMultiStageQueryEngine()) {
-      return Collections.emptyMap();
-    }
-    return ImmutableMap.of("queryOptions", "useMultistageEngine=true");
+    return Collections.emptyMap();
   }
 
   /**
-   * Queries the broker's sql query endpoint (/sql)
+   * Queries the broker's sql query endpoint (/query or /query/sql)
    */
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, Map<String, String> headers,
+  public static JsonNode postQuery(String query, String brokerQueryApiUrl, Map<String, String> headers,
       Map<String, String> extraJsonProperties)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
@@ -455,7 +472,7 @@ public abstract class ClusterTest extends ControllerTest {
         payload.put(extraProperty.getKey(), extraProperty.getValue());
       }
     }
-    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString(), headers));
+    return JsonUtils.stringToJsonNode(sendPostRequest(brokerQueryApiUrl, payload.toString(), headers));
   }
 
   /**
@@ -463,7 +480,8 @@ public abstract class ClusterTest extends ControllerTest {
    */
   protected JsonNode postQueryWithOptions(String query, String queryOptions)
       throws Exception {
-    return postQuery(query, getBrokerBaseApiUrl(), null, ImmutableMap.of("queryOptions", queryOptions));
+    return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
+        ImmutableMap.of("queryOptions", queryOptions));
   }
 
   /**
@@ -471,7 +489,14 @@ public abstract class ClusterTest extends ControllerTest {
    */
   public JsonNode postQueryToController(String query)
       throws Exception {
-    return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryProperties());
+    return postQueryToController(query, getControllerBaseApiUrl(), null, getExtraQueryPropertiesForController());
+  }
+
+  private Map<String, String> getExtraQueryPropertiesForController() {
+    if (!useMultiStageQueryEngine()) {
+      return Collections.emptyMap();
+    }
+    return ImmutableMap.of("queryOptions", "useMultistageEngine=true");
   }
 
   /**
@@ -489,5 +514,69 @@ public abstract class ClusterTest extends ControllerTest {
     }
     return JsonUtils.stringToJsonNode(
         sendPostRequest(controllerBaseApiUrl + "/sql", JsonUtils.objectToString(payload), headers));
+  }
+
+  public List<String> getColumns(JsonNode response) {
+    JsonNode resultTableJson = response.get("resultTable");
+    Assert.assertNotNull(resultTableJson, "'resultTable' is null");
+    JsonNode dataSchemaJson = resultTableJson.get("dataSchema");
+    Assert.assertNotNull(resultTableJson, "'resultTable.dataSchema' is null");
+    JsonNode colNamesJson = dataSchemaJson.get("columnNames");
+    Assert.assertNotNull(resultTableJson, "'resultTable.dataSchema.columnNames' is null");
+
+    List<String> cols = new ArrayList<>();
+    int i = 0;
+    for (JsonNode jsonNode : colNamesJson) {
+      String colName = jsonNode.textValue();
+      Assert.assertNotNull(colName, "Column at index " + i + " is not a string");
+      cols.add(colName);
+      i++;
+    }
+    return cols;
+  }
+
+  public void assertNoError(JsonNode response) {
+    JsonNode exceptionsJson = response.get("exceptions");
+    Iterator<JsonNode> exIterator = exceptionsJson.iterator();
+    if (exIterator.hasNext()) {
+      Assert.fail("There is at least one exception: " + exIterator.next());
+    }
+  }
+
+  @DataProvider(name = "systemColumns")
+  public Object[][] systemColumns() {
+    return new Object[][] {
+        {"$docId"},
+        {"$hostName"},
+        {"$segmentName"}
+    };
+  }
+
+  @DataProvider(name = "useBothQueryEngines")
+  public Object[][] useBothQueryEngines() {
+    return new Object[][]{
+        {false},
+        {true}
+    };
+  }
+
+  @DataProvider(name = "useV1QueryEngine")
+  public Object[][] useV1QueryEngine() {
+    return new Object[][]{
+        {false}
+    };
+  }
+
+  @DataProvider(name = "useV2QueryEngine")
+  public Object[][] useV2QueryEngine() {
+    return new Object[][]{
+        {true}
+    };
+  }
+
+  protected void notSupportedInV2() {
+    if (useMultiStageQueryEngine()) {
+      throw new SkipException("Some queries fail when using multi-stage engine");
+    }
   }
 }

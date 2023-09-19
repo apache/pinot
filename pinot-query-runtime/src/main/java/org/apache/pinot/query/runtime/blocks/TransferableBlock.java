@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
-import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,12 +27,14 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+
 
 /**
  * A {@code TransferableBlock} is a wrapper around {@link DataBlock} for transferring data using
@@ -43,20 +45,18 @@ public class TransferableBlock implements Block {
   private final DataSchema _dataSchema;
   private final int _numRows;
 
-  private DataBlock _dataBlock;
   private List<Object[]> _container;
+  private DataBlock _dataBlock;
+  private Map<Integer, String> _errCodeToExceptionMap;
 
-  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType) {
-    this(container, dataSchema, containerType, false);
-  }
-
-  @VisibleForTesting
-  TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type containerType,
-      boolean isErrorBlock) {
+  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type type) {
     _container = container;
     _dataSchema = dataSchema;
-    _type = containerType;
+    Preconditions.checkArgument(type == DataBlock.Type.ROW || type == DataBlock.Type.COLUMNAR,
+        "Container cannot be used to construct block of type: %s", type);
+    _type = type;
     _numRows = _container.size();
+    _errCodeToExceptionMap = new HashMap<>();
   }
 
   public TransferableBlock(DataBlock dataBlock) {
@@ -65,6 +65,7 @@ public class TransferableBlock implements Block {
     _type = dataBlock instanceof ColumnarDataBlock ? DataBlock.Type.COLUMNAR
         : dataBlock instanceof RowDataBlock ? DataBlock.Type.ROW : DataBlock.Type.METADATA;
     _numRows = _dataBlock.getNumberOfRows();
+    _errCodeToExceptionMap = null;
   }
 
   public Map<String, OperatorStats> getResultMetadata() {
@@ -83,6 +84,13 @@ public class TransferableBlock implements Block {
   }
 
   /**
+   * Returns whether the container is already constructed.
+   */
+  public boolean isContainerConstructed() {
+    return _container != null;
+  }
+
+  /**
    * Retrieve the extracted {@link TransferableBlock#_container} of the transferable block.
    * If not already constructed. It will use {@link DataBlockUtils} to extract the row/columnar data from the
    * binary-packed format.
@@ -93,7 +101,7 @@ public class TransferableBlock implements Block {
     if (_container == null) {
       switch (_type) {
         case ROW:
-          _container = DataBlockUtils.extractRows(_dataBlock, ObjectSerDeUtils::deserialize);
+          _container = DataBlockExtractUtils.extractRows(_dataBlock);
           break;
         case COLUMNAR:
         case METADATA:
@@ -102,6 +110,13 @@ public class TransferableBlock implements Block {
       }
     }
     return _container;
+  }
+
+  /**
+   * Returns whether the data block is already constructed.
+   */
+  public boolean isDataBlockConstructed() {
+    return _dataBlock != null;
   }
 
   /**
@@ -114,23 +129,34 @@ public class TransferableBlock implements Block {
   public DataBlock getDataBlock() {
     if (_dataBlock == null) {
       try {
-        switch (_type) {
-          case ROW:
-            _dataBlock = DataBlockBuilder.buildFromRows(_container, _dataSchema);
-            break;
-          case COLUMNAR:
-            _dataBlock = DataBlockBuilder.buildFromColumns(_container, _dataSchema);
-            break;
-          case METADATA:
-            throw new UnsupportedOperationException("Metadata block cannot be constructed from container");
-          default:
-            throw new UnsupportedOperationException("Unable to build from container with type: " + _type);
+        if (_type == DataBlock.Type.ROW) {
+          _dataBlock = DataBlockBuilder.buildFromRows(_container, _dataSchema);
+        } else {
+          _dataBlock = DataBlockBuilder.buildFromColumns(_container, _dataSchema);
         }
+        _dataBlock.getExceptions().putAll(_errCodeToExceptionMap);
+        _errCodeToExceptionMap = null;
       } catch (Exception e) {
         throw new RuntimeException("Unable to create DataBlock", e);
       }
     }
     return _dataBlock;
+  }
+
+  public Map<Integer, String> getExceptions() {
+    return _dataBlock != null ? _dataBlock.getExceptions() : _errCodeToExceptionMap;
+  }
+
+  public void addException(ProcessingException processingException) {
+    addException(processingException.getErrorCode(), processingException.getMessage());
+  }
+
+  public void addException(int errCode, String errMsg) {
+    if (_dataBlock != null) {
+      _dataBlock.addException(errCode, errMsg);
+    } else {
+      _errCodeToExceptionMap.put(errCode, errMsg);
+    }
   }
 
   /**
@@ -164,11 +190,8 @@ public class TransferableBlock implements Block {
     return isType(MetadataBlock.MetadataBlockType.EOS);
   }
 
-  /**
-   * @return whether this block represents a NOOP block
-   */
-  public boolean isNoOpBlock() {
-    return isType(MetadataBlock.MetadataBlockType.NOOP);
+  public boolean isDataBlock() {
+    return _type != DataBlock.Type.METADATA;
   }
 
   /**
@@ -187,5 +210,11 @@ public class TransferableBlock implements Block {
 
     MetadataBlock metadata = (MetadataBlock) _dataBlock;
     return metadata.getType() == type;
+  }
+
+  @Override
+  public String toString() {
+    String blockType = isErrorBlock() ? "error" : isSuccessfulEndOfStreamBlock() ? "eos" : "data";
+    return "TransferableBlock{blockType=" + blockType + ", _numRows=" + _numRows + '}';
   }
 }

@@ -66,10 +66,6 @@ public class TypeFactoryTest {
           checkPrecisionScale(field, bigIntBasicSqlType);
           break;
         case "FLOAT_COL":
-          BasicSqlType floatBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.REAL);
-          Assert.assertEquals(field.getType(), floatBasicSqlType);
-          checkPrecisionScale(field, floatBasicSqlType);
-          break;
         case "DOUBLE_COL":
           BasicSqlType doubleBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE);
           Assert.assertEquals(field.getType(), doubleBasicSqlType);

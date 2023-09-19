@@ -36,7 +36,6 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
-import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -49,6 +48,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.BeforeMethod;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -68,6 +68,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       "On_Time_On_Time_Performance_2014_100k_subset.test_queries_200.sql";
   private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
 
+  @BeforeMethod
+  public void resetMultiStage() {
+    setUseMultiStageQueryEngine(false);
+  }
+
   /**
    * Can be overridden to change default setting
    */
@@ -83,43 +88,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   /**
-   * Test server table data manager deletion after the table is dropped
-   */
-  protected void cleanupTestTableDataManager(String tableNameWithType) {
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        for (BaseServerStarter serverStarter : _serverStarters) {
-          if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType)
-              != null) {
-            return false;
-          }
-        }
-        return true;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 600_000L, "Failed to delete table data managers");
-  }
-
-  /**
-   * Test features supported in V2 Multi-stage Engine.
-   * - Some V1 features will not be supported.
-   * - Some V1 features will be added as V2 engine feature development progresses.
-   * @throws Exception
-   */
-  public void testHardcodedQueriesMultiStage()
-      throws Exception {
-    testHardcodedQueriesCommon();
-  }
-
-  /**
    * Test hard-coded queries.
    * @throws Exception
    */
   public void testHardcodedQueries()
       throws Exception {
     testHardcodedQueriesCommon();
-    testHardCodedQueriesV1();
+    if (useMultiStageQueryEngine()) {
+      testHardcodedQueriesV2();
+    } else {
+      testHardCodedQueriesV1();
+    }
   }
 
   /**
@@ -145,10 +124,22 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws Exception {
     String query;
     String h2Query;
+
+    // SUM INTEGER result will be BIGINT
+    query = "SELECT SUM(ActualElapsedTime) FROM mytable";
+    testQuery(query);
+    // SUM FLOAT result will be FLOAT
+    query = "SELECT SUM(CAST(ActualElapsedTime AS FLOAT)) FROM mytable";
+    testQuery(query);
+    // SUM DOUBLE result will be DOUBLE
+    query = "SELECT SUM(CAST(ActualElapsedTime AS DOUBLE)) FROM mytable";
+    testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE CarrierDelay=15 AND ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
-    query = "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE CarrierDelay=15 AND "
-        + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
+    query =
+        "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff, substring(DestStateName, 4, 8) as "
+            + "stateSubStr FROM mytable WHERE CarrierDelay=15 AND "
+            + "ArrDelay > CarrierDelay ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
     testQuery(query);
     query = "SELECT COUNT(*) FROM mytable WHERE ArrDelay > CarrierDelay LIMIT 1";
     testQuery(query);
@@ -252,6 +243,54 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         + "'1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', '1:DAYS') = '2014-09-05T00:00:00.000Z'";
     h2Query = "SELECT DistanceGroup FROM mytable WHERE DaysSinceEpoch = 16318 LIMIT 10000";
     testQuery(query, h2Query);
+
+    // DateTimeConverter
+    query = "SELECT dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS'), COUNT(*) FROM mytable "
+        + "GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS') "
+        + "ORDER BY COUNT(*), dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS') DESC";
+    h2Query = "SELECT DaysSinceEpoch * 24, COUNT(*) FROM mytable "
+        + "GROUP BY DaysSinceEpoch * 24 "
+        + "ORDER BY COUNT(*), DaysSinceEpoch DESC";
+    testQuery(query, h2Query);
+
+    // TimeConvert
+    query = "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS'), COUNT(*) FROM mytable "
+        + "GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS') "
+        + "ORDER BY COUNT(*), timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC";
+    h2Query = "SELECT DaysSinceEpoch * 86400, COUNT(*) FROM mytable "
+        + "GROUP BY DaysSinceEpoch * 86400"
+        + "ORDER BY COUNT(*), DaysSinceEpoch * 86400 DESC";
+    testQuery(query, h2Query);
+
+    // test arithmetic operations on date time columns
+    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable " + "GROUP BY sub(DaysSinceEpoch,25) "
+        + "ORDER BY COUNT(*),sub(DaysSinceEpoch,25) DESC";
+    h2Query = "SELECT DaysSinceEpoch - 25, COUNT(*) FROM mytable " + "GROUP BY DaysSinceEpoch "
+        + "ORDER BY COUNT(*), DaysSinceEpoch DESC";
+    testQuery(query, h2Query);
+  }
+
+  private void testHardcodedQueriesV2()
+      throws Exception {
+    String query;
+    String h2Query;
+
+    query =
+        "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND arrayToMV(DivAirportSeqIDs) IN "
+            + "(1078102, 1142303, 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
+    h2Query =
+        "SELECT DistanceGroup FROM mytable WHERE `Month` BETWEEN 1 AND 1 AND (DivAirportSeqIDs[1] IN (1078102, "
+            + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[2] IN (1078102, 1142303, 1530402, 1172102, "
+            + "1291503) OR DivAirportSeqIDs[3] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
+            + "DivAirportSeqIDs[4] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[5] IN "
+            + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
+    testQuery(query, h2Query);
+
+    query = "SELECT MIN(ArrDelayMinutes), AVG(CAST(DestCityMarketID AS DOUBLE)) FROM mytable WHERE DivArrDelay < 196";
+    h2Query =
+        "SELECT MIN(CAST(`ArrDelayMinutes` AS DOUBLE)), AVG(CAST(`DestCityMarketID` AS DOUBLE)) FROM mytable WHERE "
+            + "`DivArrDelay` < 196";
+    testQuery(query, h2Query);
   }
 
   private void testHardCodedQueriesV1()
@@ -267,17 +306,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
             + "ORDER BY ArrTime DESC";
     testQuery(query);
-    // TODO: move to common when multistage support MV columns
-    query =
-        "SELECT DistanceGroup FROM mytable WHERE \"Month\" BETWEEN 1 AND 1 AND DivAirportSeqIDs IN (1078102, 1142303,"
-            + " 1530402, 1172102, 1291503) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10";
-    h2Query =
-        "SELECT DistanceGroup FROM mytable WHERE `Month` BETWEEN 1 AND 1 AND (DivAirportSeqIDs[1] IN (1078102, "
-            + "1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[2] IN (1078102, 1142303, 1530402, 1172102, "
-            + "1291503) OR DivAirportSeqIDs[3] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR "
-            + "DivAirportSeqIDs[4] IN (1078102, 1142303, 1530402, 1172102, 1291503) OR DivAirportSeqIDs[5] IN "
-            + "(1078102, 1142303, 1530402, 1172102, 1291503)) OR SecurityDelay IN (1, 0, 14, -9999) LIMIT 10000";
-    testQuery(query, h2Query);
 
     // Non-Standard SQL syntax:
     // IN_ID_SET
@@ -444,8 +472,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     for (int i = 0; i < numQueriesToGenerate; i++) {
       QueryGenerator.Query query = queryGenerator.generateQuery();
       if (useMultistageEngine) {
-        // multistage engine follows standard SQL thus should use H2 query string for testing.
-        testQuery(query.generateH2Query().replace("`", "\""), query.generateH2Query());
+        if (withMultiValues) {
+          // For multistage query with MV columns, we need to use Pinot query string for testing.
+          testQuery(query.generatePinotQuery().replace("`", "\""), query.generateH2Query());
+        } else {
+          // multistage engine follows standard SQL thus should use H2 query string for testing.
+          testQuery(query.generateH2Query().replace("`", "\""), query.generateH2Query());
+        }
       } else {
         testQuery(query.generatePinotQuery(), query.generateH2Query());
       }

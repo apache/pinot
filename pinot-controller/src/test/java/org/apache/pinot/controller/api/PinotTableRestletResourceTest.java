@@ -72,7 +72,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // add schema for realtime table
     DEFAULT_INSTANCE.addDummySchema(REALTIME_TABLE_NAME);
-    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs();
+    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
     _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setSchemaName(REALTIME_TABLE_NAME)
         .setStreamConfigs(streamConfig.getStreamConfigsMap());

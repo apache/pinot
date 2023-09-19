@@ -21,7 +21,7 @@ import { AxiosResponse } from 'axios';
 import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
   IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
   BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig,
-  SegmentDebugDetails, QuerySchemas
+  SegmentDebugDetails, QuerySchemas, TableType, InstanceState
 } from 'Models';
 
 const headers = {
@@ -86,11 +86,11 @@ export const putInstance = (name: string, params: string): Promise<AxiosResponse
 export const updateInstanceTags = (name: string, params: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.put(`/instances/${name}/updateTags?tags=${params}`, null, { headers });
 
-export const setInstanceState = (name: string, stateName: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.post(`/instances/${name}/state`, stateName, { headers: {'Content-Type': 'text/plain', 'Accept': 'application/json'} });
+export const setInstanceState = (name: string, state: InstanceState): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/instances/${name}/state?state=${state}`, { headers: {'Content-Type': 'text/plain', 'Accept': 'application/json'} });
 
-export const setTableState = (name: string, stateName: string, tableType: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.get(`/tables/${name}?state=${stateName}&type=${tableType}`);
+export const setTableState = (tableName: string, state: InstanceState, tableType: TableType): Promise<AxiosResponse<OperationResponse>> =>
+  baseApi.put(`/tables/${tableName}/state?state=${state}&type=${tableType}`);
 
 export const dropInstance = (name: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`instances/${name}`, { headers });
@@ -119,7 +119,7 @@ export const cleanupTasks = (taskType: string): Promise<AxiosResponse<OperationR
 export const deleteTasks = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.delete(`/tasks/${taskType}`, { headers: { ...headers, Accept: 'application/json' } });
 
-export const sheduleTask = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+export const scheduleTask = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/tasks/schedule?tableName=${tableName}&taskType=${taskType}`, null, { headers: { ...headers, Accept: 'application/json' } });
 
 export const executeTask = (data): Promise<AxiosResponse<OperationResponse>> =>
@@ -229,13 +229,13 @@ export const rebalanceBrokersForTable = (tableName: string): Promise<AxiosRespon
   baseApi.post(`/tables/${tableName}/rebuildBrokerResourceFromHelixTags`, null, {headers});
 
 export const validateSchema = (schemaObject: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.post(`/schemas/validate`, JSON.stringify(schemaObject), {headers});
+  baseApi.post(`/schemas/validate`, schemaObject, {headers});
 
 export const validateTable = (tableObject: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/tables/validate`, JSON.stringify(tableObject), {headers});
 
 export const saveSchema = (schemaObject: string): Promise<AxiosResponse<OperationResponse>> =>
-  baseApi.post(`/schemas`, JSON.stringify(schemaObject), {headers});
+  baseApi.post(`/schemas`, schemaObject, {headers});
 
 export const saveTable = (tableObject: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.post(`/tables`, JSON.stringify(tableObject), {headers});

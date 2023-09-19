@@ -32,6 +32,7 @@ import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
@@ -44,6 +45,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 public class FilteredAggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private static final String EXPLAIN_NAME = "AGGREGATE_FILTERED";
 
+  private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final List<Pair<AggregationFunction[], BaseProjectOperator<?>>> _projectOperators;
   private final long _numTotalDocs;
@@ -52,9 +54,10 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
 
-  public FilteredAggregationOperator(AggregationFunction[] aggregationFunctions,
+  public FilteredAggregationOperator(QueryContext queryContext,
       List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators, long numTotalDocs) {
-    _aggregationFunctions = aggregationFunctions;
+    _queryContext = queryContext;
+    _aggregationFunctions = queryContext.getAggregationFunctions();
     _projectOperators = projectOperators;
     _numTotalDocs = numTotalDocs;
   }
@@ -87,7 +90,7 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
       _numEntriesScannedInFilter += projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * projectOperator.getNumColumnsProjected();
     }
-    return new AggregationResultsBlock(_aggregationFunctions, Arrays.asList(result));
+    return new AggregationResultsBlock(_aggregationFunctions, Arrays.asList(result), _queryContext);
   }
 
   @Override

@@ -62,7 +62,6 @@ public class TableConfigBuilder {
   private final TableType _tableType;
   private String _tableName;
   private boolean _isDimTable;
-  private boolean _isLLC;
 
   // Segments config related
   private String _schemaName;
@@ -141,9 +140,10 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @Deprecated
   public TableConfigBuilder setLLC(boolean isLLC) {
     Preconditions.checkState(_tableType == TableType.REALTIME);
-    _isLLC = isLLC;
+    Preconditions.checkArgument(isLLC, "Real-time table must use LLC");
     return this;
   }
 
@@ -437,9 +437,6 @@ public class TableConfigBuilder {
     validationConfig.setSchemaName(_schemaName);
     validationConfig.setReplication(_numReplicas);
     validationConfig.setPeerSegmentDownloadScheme(_peerSegmentDownloadScheme);
-    if (_isLLC) {
-      validationConfig.setReplicasPerPartition(_numReplicas);
-    }
     validationConfig.setCrypterClassName(_crypterClassName);
 
     // Tenant config

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -32,13 +33,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -53,7 +58,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -81,12 +85,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz";
   protected static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
   protected static final int DEFAULT_LLC_SEGMENT_FLUSH_SIZE = 5000;
-  protected static final int DEFAULT_HLC_SEGMENT_FLUSH_SIZE = 20000;
   protected static final int DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS = 3;
   protected static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
-  protected static final int DEFAULT_HLC_NUM_KAFKA_BROKERS = 1;
   protected static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
-  protected static final int DEFAULT_HLC_NUM_KAFKA_PARTITIONS = 10;
   protected static final int DEFAULT_MAX_NUM_KAFKA_MESSAGES_PER_BATCH = 10000;
   protected static final List<String> DEFAULT_NO_DICTIONARY_COLUMNS =
       Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
@@ -103,6 +104,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected List<StreamDataServerStartable> _kafkaStarters;
 
   protected org.apache.pinot.client.Connection _pinotConnection;
+  protected org.apache.pinot.client.Connection _pinotConnectionV2;
   protected Connection _h2Connection;
   protected QueryGenerator _queryGenerator;
 
@@ -135,10 +137,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return DEFAULT_COUNT_STAR_RESULT;
   }
 
-  protected boolean useLlc() {
-    return true;
-  }
-
   protected boolean useKafkaTransaction() {
     return false;
   }
@@ -148,22 +146,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected int getRealtimeSegmentFlushSize() {
-    if (useLlc()) {
-      return DEFAULT_LLC_SEGMENT_FLUSH_SIZE;
-    } else {
-      return DEFAULT_HLC_SEGMENT_FLUSH_SIZE;
-    }
+    return DEFAULT_LLC_SEGMENT_FLUSH_SIZE;
   }
 
   protected int getNumKafkaBrokers() {
-    if (useKafkaTransaction()) {
-      return DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS;
-    }
-    if (useLlc()) {
-      return DEFAULT_LLC_NUM_KAFKA_BROKERS;
-    } else {
-      return DEFAULT_HLC_NUM_KAFKA_BROKERS;
-    }
+    return useKafkaTransaction() ? DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS : DEFAULT_LLC_NUM_KAFKA_BROKERS;
   }
 
   protected int getKafkaPort() {
@@ -176,11 +163,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected int getNumKafkaPartitions() {
-    if (useLlc()) {
-      return DEFAULT_LLC_NUM_KAFKA_PARTITIONS;
-    } else {
-      return DEFAULT_HLC_NUM_KAFKA_PARTITIONS;
-    }
+    return DEFAULT_LLC_NUM_KAFKA_PARTITIONS;
   }
 
   protected String getKafkaTopic() {
@@ -341,30 +324,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     Map<String, String> streamConfigMap = new HashMap<>();
     String streamType = "kafka";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    boolean useLlc = useLlc();
-    if (useLlc) {
-      // LLC
-      streamConfigMap.put(
-          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-          StreamConfig.ConsumerType.LOWLEVEL.toString());
+    streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
+            KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
+        "localhost:" + _kafkaStarters.get(0).getPort());
+    if (useKafkaTransaction()) {
       streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
-              KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST),
-          "localhost:" + _kafkaStarters.get(0).getPort());
-      if (useKafkaTransaction()) {
-        streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
-                KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),
-            KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED);
-      }
-    } else {
-      // HLC
-      streamConfigMap.put(
-          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-          StreamConfig.ConsumerType.HIGHLEVEL.toString());
-      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
-          KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING), getKafkaZKAddress());
-      streamConfigMap.put(KafkaStreamConfigProperties.constructStreamProperty(
-              KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER),
-          "localhost:" + _kafkaStarters.get(0).getPort());
+              KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL),
+          KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED);
     }
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
         StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), getStreamConsumerFactoryClassName());
@@ -393,7 +359,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
         .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
-        .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
   /**
@@ -412,7 +378,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled())
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
@@ -466,7 +432,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setLLC(useLlc()).setStreamConfigs(streamConfigsMap)
+        .setStreamConfigs(streamConfigsMap)
         .setNullHandlingEnabled(UpsertConfig.Mode.PARTIAL.equals(upsertConfig.getMode()) || getNullHandlingEnabled())
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
@@ -486,7 +452,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
         .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
         .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled())
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
@@ -506,9 +472,24 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @return Pinot connection
    */
   protected org.apache.pinot.client.Connection getPinotConnection() {
+    // TODO: This code is assuming getPinotConnectionProperties() will always return the same values
+    if (useMultiStageQueryEngine()) {
+      if (_pinotConnectionV2 == null) {
+        Properties properties = getPinotConnectionProperties();
+        properties.put("useMultiStageEngine", "true");
+        _pinotConnectionV2 = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
+            new JsonAsyncHttpPinotClientTransportFactory()
+                .withConnectionProperties(properties)
+                .buildTransport());
+      }
+      return _pinotConnectionV2;
+    }
     if (_pinotConnection == null) {
       _pinotConnection =
-          ConnectionFactory.fromZookeeper(getPinotConnectionProperties(), getZkUrl() + "/" + getHelixClusterName());
+          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
+              new JsonAsyncHttpPinotClientTransportFactory()
+                  .withConnectionProperties(getPinotConnectionProperties())
+                  .buildTransport());
     }
     return _pinotConnection;
   }
@@ -582,8 +563,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected List<File> unpackTarData(String tarFileName, File outputDir)
       throws Exception {
-    InputStream inputStream =
-        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(tarFileName);
+    InputStream inputStream = BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(tarFileName);
     Assert.assertNotNull(inputStream);
     return TarGzCompressionUtils.untar(inputStream, outputDir);
   }
@@ -609,9 +589,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     String kafkaBroker = "localhost:" + getKafkaPort();
     StreamDataProducer producer = null;
     try {
-      producer =
-          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
-              getDefaultKafkaProducerProperties(kafkaBroker));
+      producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+          getDefaultKafkaProducerProperties(kafkaBroker));
       ClusterIntegrationTestUtils.pushCsvIntoKafka(csvFile, kafkaTopic, partitionColumnIndex, injectTombstones(),
           producer);
     } catch (Exception e) {
@@ -626,9 +605,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     String kafkaBroker = "localhost:" + getKafkaPort();
     StreamDataProducer producer = null;
     try {
-      producer =
-          StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
-              getDefaultKafkaProducerProperties(kafkaBroker));
+      producer = StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME,
+          getDefaultKafkaProducerProperties(kafkaBroker));
       ClusterIntegrationTestUtils.pushCsvIntoKafka(csvRecords, kafkaTopic, partitionColumnIndex, injectTombstones(),
           producer);
     } catch (Exception e) {
@@ -709,7 +687,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected long getCurrentCountStarResult(String tableName) {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getResultSet(0).getLong(0);
+    ResultSetGroup resultSetGroup = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName);
+    if (resultSetGroup.getResultSetCount() > 0) {
+      return resultSetGroup.getResultSet(0).getLong(0);
+    }
+    return 0;
   }
 
   /**
@@ -725,9 +707,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     final long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(
-        () -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
         "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
+  }
+
+  /**
+   * Wait for servers to remove the table data manager after the table is deleted.
+   */
+  protected void waitForTableDataManagerRemoved(String tableNameWithType) {
+    TestUtils.waitForCondition(aVoid -> {
+      for (BaseServerStarter serverStarter : _serverStarters) {
+        if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(tableNameWithType) != null) {
+          return false;
+        }
+      }
+      return true;
+    }, 60_000L, "Failed to remove table data manager for table: " + tableNameWithType);
   }
 
   /**
@@ -753,7 +748,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
-        getH2Connection(), null, getExtraQueryProperties());
+        getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());
   }
 
   /**
@@ -762,6 +757,19 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testQueryWithMatchingRowCount(String pinotQuery, String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
-        h2Query, getH2Connection(), null, getExtraQueryProperties());
+        h2Query, getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());
+  }
+
+  protected String getType(JsonNode jsonNode, int colIndex) {
+    return jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(colIndex).asText();
+  }
+
+  protected <T> T getCellValue(JsonNode jsonNode, int colIndex, int rowIndex, Function<JsonNode, T> extract) {
+    JsonNode cellResult = jsonNode.get("resultTable").get("rows").get(rowIndex).get(colIndex);
+    return extract.apply(cellResult);
+  }
+
+  protected long getLongCellValue(JsonNode jsonNode, int colIndex, int rowIndex) {
+    return getCellValue(jsonNode, colIndex, rowIndex, JsonNode::asLong).longValue();
   }
 }

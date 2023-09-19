@@ -149,7 +149,8 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     // Process the query
     InstanceResponseBlock instanceResponse;
     try {
-      instanceResponse = _queryExecutor.execute(queryRequest, _executorService, responseObserver);
+      instanceResponse =
+          _queryExecutor.execute(queryRequest, _executorService, new GrpcResultsBlockStreamer(responseObserver));
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing request {}: {} from broker: {}", queryRequest.getRequestId(),
           queryRequest.getQueryContext(), queryRequest.getBrokerId(), e);

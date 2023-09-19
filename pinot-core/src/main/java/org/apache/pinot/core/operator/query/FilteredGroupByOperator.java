@@ -82,11 +82,12 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
 
     // Extract column names and data types for group-by columns
+    BaseProjectOperator<?> projectOperator = projectOperators.get(0).getRight();
     for (int i = 0; i < numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = _groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
       columnDataTypes[i] = DataSchema.ColumnDataType.fromDataTypeSV(
-          projectOperators.get(i).getRight().getResultColumnContext(groupByExpression).getDataType());
+          projectOperator.getResultColumnContext(groupByExpression).getDataType());
     }
 
     // Extract column names and data types for aggregation functions
@@ -175,7 +176,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords =
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
-        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords);
+        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         return resultsBlock;
       }
@@ -183,7 +184,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
     AggregationGroupByResult aggGroupByResult =
         new AggregationGroupByResult(groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
-    GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult);
+    GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult, _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     return resultsBlock;
   }

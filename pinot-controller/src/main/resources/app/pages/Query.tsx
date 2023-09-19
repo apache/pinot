@@ -20,10 +20,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Grid, Checkbox, Button, FormControl, Input, InputLabel } from '@material-ui/core';
+import { Grid, Checkbox, Button, FormControl, Input, InputLabel, Box, Typography } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
-import { TableData } from 'Models';
+import { SqlException, TableData } from 'Models';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
@@ -88,7 +88,8 @@ const useStyles = makeStyles((theme) => ({
     paddingBottom: '48px',
   },
   sqlError: {
-    whiteSpace: 'pre-wrap',
+    whiteSpace: 'pre',
+    overflow: "auto"
   },
   timeoutControl: {
     bottom: 10
@@ -165,6 +166,7 @@ const QueryPage = () => {
     columns: [],
     records: [],
   });
+  const [showException, setShowException] = useState<boolean>(false);
 
   const [tableSchema, setTableSchema] = useState<TableData>({
     columns: [],
@@ -183,7 +185,7 @@ const QueryPage = () => {
 
   const [outputResult, setOutputResult] = useState('');
 
-  const [resultError, setResultError] = useState('');
+  const [resultError, setResultError] = useState<SqlException[]>([]);
 
   const [queryStats, setQueryStats] = useState<TableData>({
     columns: [],
@@ -271,18 +273,18 @@ const QueryPage = () => {
     setQueryLoader(true);
     queryExecuted.current = true;
     let params;
-    let queryOptions = '';
+    let queryOptions = [];
     if(queryTimeout){
-      queryOptions += `timeoutMs=${queryTimeout}`;
+      queryOptions.push(`timeoutMs=${queryTimeout}`);
     }
     if(checked.useMSE){
-      queryOptions += `useMultistageEngine=true`;
+      queryOptions.push(`useMultistageEngine=true`);
     }
     const finalQuery = `${query || inputQuery.trim()}`;
     params = JSON.stringify({
       sql: `${finalQuery}`,
       trace: checked.tracing,
-      queryOptions: `${queryOptions}`,
+      queryOptions: `${queryOptions.join(";")}`,
     });
 
     if(finalQuery !== ''){
@@ -299,7 +301,7 @@ const QueryPage = () => {
     }
 
     const results = await PinotMethodUtils.getQueryResults(params);
-    setResultError(results.error || '');
+    setResultError(results.exceptions || []);
     setResultData(results.result || { columns: [], records: [] });
     setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
@@ -315,10 +317,6 @@ const QueryPage = () => {
       warnings.push(`There are ${numSegmentsPrunedInvalid} invalid segment/s. This usually means that they were `
          + `created with an older schema. `
          + `Please reload the table in order to refresh these segments to the new schema.`);
-    }
-    if (checked.useMSE) {
-      warnings.push(`Using V2 Multi-Stage Query Engine. This is an experimental feature. Please report any bugs to `
-          + `Apache Pinot Slack channel.`);
     }
     return warnings;
   }
@@ -503,14 +501,14 @@ const QueryPage = () => {
                 Tracing
               </Grid>
 
-              <Grid item xs={2}>
+              <Grid item xs={3}>
                 <Checkbox
                     name="useMSE"
                     color="primary"
                     onChange={handleChange}
                     checked={checked.useMSE}
                 />
-                Use V2 Engine
+                Use Multi-Stage Engine
               </Grid>
 
               <Grid item xs={3}>
@@ -555,11 +553,41 @@ const QueryPage = () => {
                 }
         
                 {/* Sql result errors */}
-                {resultError && (
-                  <Alert severity="error" className={classes.sqlError}>
-                    {resultError}
-                  </Alert>
-                )}
+                {resultError && resultError.length > 0 && (
+                    <>
+                      <Alert 
+                        className={classes.sqlError} 
+                        severity="error" 
+                        action={
+                          <FormControlLabel
+                            control={<Switch color="primary" checked={showException} onChange={(e) => setShowException(e.target.checked)} name="checkedA" />}
+                            label={<Typography variant='body2'>Show Exceptions</Typography>}
+                          />
+                        }
+                      >
+                        {
+                          resultData.columns.length > 0 ? (
+                            <Typography variant='body2'>Partial results due to exceptions. Please toggle the switch to view details.</Typography>
+                          ) : (
+                            <Typography variant='body2'>Query failed with exceptions. Please toggle the switch to view details.</Typography>
+                          )
+                        }
+                      </Alert>
+                      <Box m={"16px"}></Box>
+
+                      {
+                        showException && resultError.map((error) => (
+                          <Box style={{paddingBottom: "10px"}}>
+                            <Alert className={classes.sqlError} severity="error">
+                              {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode}</Typography>}
+                              {error.message}
+                            </Alert>
+                          </Box>
+                        ))
+                      }
+                    </>
+                  )
+                }
         
                 <Grid item xs style={{ backgroundColor: 'white' }}>
                   {resultData.columns.length ? (

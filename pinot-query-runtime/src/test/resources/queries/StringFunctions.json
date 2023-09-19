@@ -23,8 +23,6 @@
       { "sql": "SELECT concat(strCol, strCol) FROM {stringTbl}" },
       { "sql": "SELECT concat_ws(',', strCol, strCol) FROM {stringTbl} WHERE strCol <> ''" },
       {
-        "ignored": true,
-        "comment": "standard SQL treats '' as null and ignores it, but pinot does not",
         "sql": "SELECT concat_ws(',', strCol, strCol) FROM {stringTbl}"
       },
       {
@@ -125,7 +123,7 @@
       },
       {
         "comment": "h2 only supports SUBSTRING(input FROM x TO y) syntax, which we don't support",
-        "sql": "SELECT substring(strCol, 0) FROM {stringTbl}",
+        "sql": "SELECT substring(strCol, 1) FROM {stringTbl}",
         "outputs": [
           [ "Hello" ],
           [ "hello" ],

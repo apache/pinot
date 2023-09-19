@@ -78,6 +78,7 @@ union Literal {
   8: optional binary binaryValue;
   // Set to true when the literal value is a null.
   9: optional bool nullValue;
+  10: optional binary bigDecimalValue;
 }
 
 struct Identifier {

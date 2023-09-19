@@ -113,6 +113,49 @@ public class ObjectFunctionsTest {
         "coalesce(value1,value2,value3,value4,value5)", Lists.newArrayList("value1", "value2", "value3", "value4",
         "value5"), allValues, "1"
     });
+
+    // Adding a test for case when
+    GenericRow caseWhenCaseValueOne = new GenericRow();
+    caseWhenCaseValueOne.putValue("value1", 1);
+    inputs.add(new Object[]{
+        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', 'other')", Lists.newArrayList("value1",
+        "value1"), caseWhenCaseValueOne, "one"
+    });
+
+    GenericRow caseWhenCaseValueTwo = new GenericRow();
+    caseWhenCaseValueTwo.putValue("value1", 2);
+    inputs.add(new Object[]{
+        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', 'other')", Lists.newArrayList("value1",
+        "value1"), caseWhenCaseValueTwo, "two"
+    });
+
+    GenericRow caseWhenCaseValueThree = new GenericRow();
+    caseWhenCaseValueThree.putValue("value1", 3);
+    inputs.add(new Object[]{
+        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', 'other')", Lists.newArrayList("value1",
+        "value1"), caseWhenCaseValueThree, "other"
+    });
+
+    GenericRow caseWhenCaseMultipleExpression = new GenericRow();
+    caseWhenCaseMultipleExpression.putValue("value1", 10);
+    inputs.add(new Object[]{
+        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', value1 = 3, 'three', value1 = 4, 'four', value1 = 5, 'five', "
+            + "value1 = 6, 'six', value1 = 7, 'seven', value1 = 8, 'eight', value1 = 9, 'nine', value1 = 10, 'ten', "
+            + "'other')", Lists.newArrayList("value1", "value1", "value1", "value1", "value1", "value1", "value1",
+        "value1", "value1", "value1"), caseWhenCaseMultipleExpression, "ten"
+    });
+
+    GenericRow caseWhenCaseMultipleExpression2 = new GenericRow();
+    caseWhenCaseMultipleExpression2.putValue("value1", 15);
+    inputs.add(new Object[]{
+        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', value1 = 3, 'three', value1 = 4, 'four', value1 = 5, 'five', "
+            + "value1 = 6, 'six', value1 = 7, 'seven', value1 = 8, 'eight', value1 = 9, 'nine', value1 = 10, 'ten', "
+            + "value1 = 11, 'eleven', value1 = 12, 'twelve', value1 = 13, 'thirteen', value1 = 14, 'fourteen', value1"
+            + " = 15, 'fifteen'," + "'other')", Lists.newArrayList("value1", "value1", "value1", "value1", "value1",
+        "value1", "value1", "value1", "value1", "value1", "value1", "value1", "value1", "value1",
+        "value1"), caseWhenCaseMultipleExpression2, "fifteen"
+    });
+
     return inputs.toArray(new Object[0][]);
   }
 }

@@ -102,7 +102,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   NUM_SEGMENTS_PRUNED_INVALID("numSegmentsPrunedInvalid", false),
   NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", false),
-  NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),;
+  NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),
+  LARGE_QUERY_RESPONSES_SENT("largeResponses", false);
 
   private final String _meterName;
   private final String _unit;

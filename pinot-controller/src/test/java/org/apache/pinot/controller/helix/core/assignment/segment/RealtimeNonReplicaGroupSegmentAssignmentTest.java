@@ -83,7 +83,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setLLC(true).setStreamConfigs(streamConfigs).build();
+            .setStreamConfigs(streamConfigs).build();
     _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig);
 
     _instancePartitionsMap = new TreeMap<>();
@@ -118,7 +118,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setLLC(true).setStreamConfigs(streamConfigs).build();
+            .setStreamConfigs(streamConfigs).build();
     // Update the replication by changing the NUM_REPLICAS_PER_PARTITION
     tableConfig.getValidationConfig().setReplicasPerPartition(NUM_REPLICAS_PER_PARTITION);
     SegmentAssignment segmentAssignment =

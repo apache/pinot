@@ -38,6 +38,7 @@ public class StreamConfigProperties {
    */
   public static final String STREAM_TYPE = "streamType";
   public static final String STREAM_TOPIC_NAME = "topic.name";
+  @Deprecated
   public static final String STREAM_CONSUMER_TYPES = "consumer.type";
   public static final String STREAM_CONSUMER_FACTORY_CLASS = "consumer.factory.class.name";
   public static final String STREAM_CONSUMER_OFFSET_CRITERIA = "consumer.prop.auto.offset.reset";
@@ -124,6 +125,7 @@ public class StreamConfigProperties {
   }
 
   public static String getPropertySuffix(String incoming, String propertyPrefix) {
-    return incoming.split(propertyPrefix + ".")[1];
+    String prefix = propertyPrefix + DOT_SEPARATOR;
+    return incoming.substring(prefix.length());
   }
 }

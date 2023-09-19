@@ -52,6 +52,9 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +74,7 @@ public class PinotClusterConfigs {
 
   @GET
   @Path("/cluster/info")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_CLUSTER_CONFIG)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get cluster Info", notes = "Get cluster Info")
   @ApiResponses(value = {
@@ -85,6 +89,7 @@ public class PinotClusterConfigs {
 
   @GET
   @Path("/cluster/configs")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_CLUSTER_CONFIG)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List cluster configurations", notes = "List cluster level configurations")
   @ApiResponses(value = {
@@ -106,6 +111,7 @@ public class PinotClusterConfigs {
 
   @POST
   @Path("/cluster/configs")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_CLUSTER_CONFIG)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)
@@ -140,6 +146,7 @@ public class PinotClusterConfigs {
 
   @DELETE
   @Path("/cluster/configs/{configName}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_CLUSTER_CONFIG)
   @Authenticate(AccessType.DELETE)
   @ApiOperation(value = "Delete cluster configuration")
   @Produces(MediaType.APPLICATION_JSON)

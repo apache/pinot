@@ -27,11 +27,14 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionUtils;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 
 
 /**
@@ -40,7 +43,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
   private final String _name;
   private final FunctionInvoker _functionInvoker;
-  private final PinotDataType _resultType;
+  private final ColumnDataType _resultType;
   private final TransformResultMetadata _resultMetadata;
 
   private Object[] _scalarArguments;
@@ -60,14 +63,13 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           parameterClasses[i], functionInfo.getMethod());
     }
     Class<?> resultClass = _functionInvoker.getResultClass();
-    PinotDataType resultType = FunctionUtils.getParameterType(resultClass);
+    ColumnDataType resultType = FunctionUtils.getColumnDataType(resultClass);
     if (resultType != null) {
       _resultType = resultType;
-      _resultMetadata =
-          new TransformResultMetadata(FunctionUtils.getDataType(resultClass), _resultType.isSingleValue(), false);
+      _resultMetadata = new TransformResultMetadata(resultType.toDataType(), !_resultType.isArray(), false);
     } else {
       // Handle unrecognized result class with STRING
-      _resultType = PinotDataType.STRING;
+      _resultType = ColumnDataType.STRING;
       _resultMetadata = new TransformResultMetadata(DataType.STRING, true, false);
     }
   }
@@ -116,10 +118,18 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
                 parameterTypes[i].convert(literalTransformFunction.getDoubleLiteral(), PinotDataType.DOUBLE);
             break;
           case BIG_DECIMAL:
+            if (parameterTypes[i] == PinotDataType.STRING) {
+              _scalarArguments[i] = literalTransformFunction.getStringLiteral();
+              break;
+            }
             _scalarArguments[i] =
                 parameterTypes[i].convert(literalTransformFunction.getBigDecimalLiteral(), PinotDataType.BIG_DECIMAL);
             break;
           case TIMESTAMP:
+            if (parameterTypes[i] == PinotDataType.STRING) {
+              _scalarArguments[i] = literalTransformFunction.getStringLiteral();
+              break;
+            }
             _scalarArguments[i] =
                 parameterTypes[i].convert(literalTransformFunction.getLongLiteral(), PinotDataType.TIMESTAMP);
             break;
@@ -159,7 +169,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _intValuesSV[i] = (int) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _intValuesSV[i] = value != null ? (int) _resultType.toInternal(value) : NullValuePlaceHolder.INT;
     }
     return _intValuesSV;
   }
@@ -176,7 +187,8 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _longValuesSV[i] = (long) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _longValuesSV[i] = value != null ? (long) _resultType.toInternal(value) : NullValuePlaceHolder.LONG;
     }
     return _longValuesSV;
   }
@@ -193,7 +205,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _floatValuesSV[i] = (float) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _floatValuesSV[i] =
+          value != null ? (float) _resultType.toInternal(value) : NullValuePlaceHolder.FLOAT;
     }
     return _floatValuesSV;
   }
@@ -210,7 +224,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _doubleValuesSV[i] = (double) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _doubleValuesSV[i] =
+          value != null ? (double) _resultType.toInternal(value) : NullValuePlaceHolder.DOUBLE;
     }
     return _doubleValuesSV;
   }
@@ -227,7 +243,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _bigDecimalValuesSV[i] = (BigDecimal) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      _bigDecimalValuesSV[i] =
+          value != null ? (BigDecimal) _resultType.toInternal(value) : NullValuePlaceHolder.BIG_DECIMAL;
     }
     return _bigDecimalValuesSV;
   }
@@ -244,9 +262,9 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      Object result = _functionInvoker.invoke(_scalarArguments);
+      Object value = _functionInvoker.invoke(_scalarArguments);
       _stringValuesSV[i] =
-          _resultType == PinotDataType.STRING ? (String) result : (String) _resultType.toInternal(result);
+          value != null ? (String) _resultType.toInternal(value) : NullValuePlaceHolder.STRING;
     }
     return _stringValuesSV;
   }
@@ -263,7 +281,10 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
       for (int j = 0; j < _numNonLiteralArguments; j++) {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
-      _bytesValuesSV[i] = (byte[]) _resultType.toInternal(_functionInvoker.invoke(_scalarArguments));
+      Object value = _functionInvoker.invoke(_scalarArguments);
+      byte[] bytes =
+          value != null ? ((ByteArray) _resultType.toInternal(value)).getBytes() : NullValuePlaceHolder.BYTES;
+      _bytesValuesSV[i] = bytes;
     }
     return _bytesValuesSV;
   }

@@ -88,11 +88,11 @@ public class BaseBrokerRequestHandlerTest {
     Map<String, String> columnNameMap = new HashMap<>();
     columnNameMap.put("student_name", "student_name");
     String actualColumnName =
-        BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable.student_name", columnNameMap, null, false);
+        BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable.student_name", columnNameMap, false);
     Assert.assertEquals(actualColumnName, "student_name");
     boolean exceptionThrown = false;
     try {
-      BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable2.student_name", columnNameMap, null, false);
+      BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable2.student_name", columnNameMap, false);
       Assert.fail("should throw exception if column is not known");
     } catch (BadQueryRequestException ex) {
       exceptionThrown = true;
@@ -100,7 +100,7 @@ public class BaseBrokerRequestHandlerTest {
     Assert.assertTrue(exceptionThrown, "should throw exception if column is not known");
     exceptionThrown = false;
     try {
-      BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE.student_name", columnNameMap, null, false);
+      BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE.student_name", columnNameMap, false);
       Assert.fail("should throw exception if case sensitive and table name different");
     } catch (BadQueryRequestException ex) {
       exceptionThrown = true;
@@ -108,12 +108,12 @@ public class BaseBrokerRequestHandlerTest {
     Assert.assertTrue(exceptionThrown, "should throw exception if column is not known");
     columnNameMap.put("mytable_student_name", "mytable_student_name");
     String wrongColumnName2 =
-        BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable_student_name", columnNameMap, null, false);
+        BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable_student_name", columnNameMap, false);
     Assert.assertEquals(wrongColumnName2, "mytable_student_name");
 
     columnNameMap.put("mytable", "mytable");
     String wrongColumnName3 =
-        BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable", columnNameMap, null, false);
+        BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable", columnNameMap, false);
     Assert.assertEquals(wrongColumnName3, "mytable");
   }
 
@@ -122,11 +122,11 @@ public class BaseBrokerRequestHandlerTest {
     Map<String, String> columnNameMap = new HashMap<>();
     columnNameMap.put("student_name", "student_name");
     String actualColumnName =
-        BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE.student_name", columnNameMap, null, true);
+        BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE.student_name", columnNameMap, true);
     Assert.assertEquals(actualColumnName, "student_name");
     boolean exceptionThrown = false;
     try {
-      BaseBrokerRequestHandler.getActualColumnName("student", "MYTABLE2.student_name", columnNameMap, null, true);
+      BaseBrokerRequestHandler.getActualColumnName("student", "MYTABLE2.student_name", columnNameMap, true);
       Assert.fail("should throw exception if column is not known");
     } catch (BadQueryRequestException ex) {
       exceptionThrown = true;
@@ -134,12 +134,12 @@ public class BaseBrokerRequestHandlerTest {
     Assert.assertTrue(exceptionThrown, "should throw exception if column is not known");
     columnNameMap.put("mytable_student_name", "mytable_student_name");
     String wrongColumnName2 =
-        BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE_student_name", columnNameMap, null, true);
+        BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE_student_name", columnNameMap, true);
     Assert.assertEquals(wrongColumnName2, "mytable_student_name");
 
     columnNameMap.put("mytable", "mytable");
     String wrongColumnName3 =
-        BaseBrokerRequestHandler.getActualColumnName("MYTABLE", "mytable", columnNameMap, null, true);
+        BaseBrokerRequestHandler.getActualColumnName("MYTABLE", "mytable", columnNameMap, true);
     Assert.assertEquals(wrongColumnName3, "mytable");
   }
 
@@ -237,7 +237,7 @@ public class BaseBrokerRequestHandlerTest {
         JsonNode request = JsonUtils.stringToJsonNode(
             String.format("{\"sql\":\"select * from %s limit 10\",\"queryOptions\":\"timeoutMs=10000\"}", tableName));
         RequestContext requestStats = Tracing.getTracer().createRequestScope();
-        requestHandler.handleRequest(request, null, requestStats);
+        requestHandler.handleRequest(request, null, requestStats, null);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

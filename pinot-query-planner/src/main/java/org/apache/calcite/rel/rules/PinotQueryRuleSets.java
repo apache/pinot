@@ -60,13 +60,15 @@ public class PinotQueryRuleSets {
           CoreRules.PROJECT_MERGE,
           // remove identity project
           CoreRules.PROJECT_REMOVE,
-          // reorder sort and projection
-          CoreRules.SORT_PROJECT_TRANSPOSE,
 
           // convert OVER aggregate to logical WINDOW
           CoreRules.PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW,
           // push project through WINDOW
           CoreRules.PROJECT_WINDOW_TRANSPOSE,
+
+          // TODO: Revisit and see if they can be replaced with CoreRules.PROJECT_REDUCE_EXPRESSIONS and
+          //       CoreRules.FILTER_REDUCE_EXPRESSIONS
+          PinotEvaluateLiteralRule.Project.INSTANCE, PinotEvaluateLiteralRule.Filter.INSTANCE,
 
           // TODO: evaluate the SORT_JOIN_TRANSPOSE and SORT_JOIN_COPY rules
 
@@ -108,7 +110,13 @@ public class PinotQueryRuleSets {
       PruneEmptyRules.UNION_INSTANCE
   );
 
-  // Pinot specific rules that should be run after all other rules
+  // Pinot specific rules that should be run BEFORE all other rules
+  public static final Collection<RelOptRule> PINOT_PRE_RULES = ImmutableList.of(
+      PinotAggregateLiteralAttachmentRule.INSTANCE
+  );
+
+
+  // Pinot specific rules that should be run AFTER all other rules
   public static final Collection<RelOptRule> PINOT_POST_RULES = ImmutableList.of(
       // Evaluate the Literal filter nodes
       CoreRules.FILTER_REDUCE_EXPRESSIONS,
@@ -120,6 +128,7 @@ public class PinotQueryRuleSets {
       // copy exchanges down, this must be done after SortExchangeNodeInsertRule
       PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY,
 
+      PinotSingleValueAggregateRemoveRule.INSTANCE,
       PinotJoinExchangeNodeInsertRule.INSTANCE,
       PinotAggregateExchangeNodeInsertRule.INSTANCE,
       PinotWindowExchangeNodeInsertRule.INSTANCE,

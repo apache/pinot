@@ -45,4 +45,9 @@ public class OrOperatorTransformFunction extends LogicalOperatorTransformFunctio
     }
     return 1;
   }
+
+  @Override
+  boolean valueSupersedesNull(int i) {
+    return i != 0;
+  }
 }

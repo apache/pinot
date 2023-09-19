@@ -30,7 +30,6 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -144,13 +143,10 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     for (SegmentZKMetadata segmentZKMetadata : _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)) {
       String segmentName = segmentZKMetadata.getSegmentName();
       if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
-        // In progress segment, only check LLC segment
-        if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-          // Delete old LLC segment that hangs around. Do not delete segment that are current since there may be a race
-          // with RealtimeSegmentValidationManager trying to auto-create the LLC segment
-          if (shouldDeleteInProgressLLCSegment(segmentName, idealState, segmentZKMetadata)) {
-            segmentsToDelete.add(segmentName);
-          }
+        // Delete old LLC segment that hangs around. Do not delete segment that are current since there may be a race
+        // with RealtimeSegmentValidationManager trying to auto-create the LLC segment
+        if (shouldDeleteInProgressLLCSegment(segmentName, idealState, segmentZKMetadata)) {
+          segmentsToDelete.add(segmentName);
         }
       } else {
         // Sealed segment

@@ -129,14 +129,14 @@ public class ClusterChangeMediator
     long startTime = System.currentTimeMillis();
     LOGGER.info("Start processing {} change", changeType);
     for (ClusterChangeHandler changeHandler : changeHandlers) {
+      String handlerName = changeHandler.getClass().getSimpleName();
       try {
         long handlerStartTime = System.currentTimeMillis();
         changeHandler.processClusterChange(changeType);
-        LOGGER.info("Finish handling {} change for handler: {} in {}ms", changeType, changeHandler.getClass().getName(),
+        LOGGER.info("Finish handling {} change for handler: {} in {}ms", changeType, handlerName,
             System.currentTimeMillis() - handlerStartTime);
       } catch (Exception e) {
-        LOGGER.error("Caught exception while handling {} change for handler: {}", changeType,
-            changeHandler.getClass().getName(), e);
+        LOGGER.error("Caught exception while handling {} change for handler: {}", changeType, handlerName, e);
       }
     }
     long endTime = System.currentTimeMillis();

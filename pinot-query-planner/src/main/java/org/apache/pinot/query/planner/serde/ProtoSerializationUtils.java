@@ -19,8 +19,10 @@
 package org.apache.pinot.query.planner.serde;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,6 +129,10 @@ public class ProtoSerializationUtils {
     return Plan.LiteralField.newBuilder().setStringField(val).build();
   }
 
+  private static Plan.LiteralField bytesField(ByteString val) {
+    return Plan.LiteralField.newBuilder().setBytesField(val).build();
+  }
+
   private static Plan.MemberVariableField serializeMemberVariable(Object fieldObject) {
     Plan.MemberVariableField.Builder builder = Plan.MemberVariableField.newBuilder();
     if (fieldObject instanceof Boolean) {
@@ -141,6 +147,10 @@ public class ProtoSerializationUtils {
       builder.setLiteralField(doubleField((Double) fieldObject));
     } else if (fieldObject instanceof String) {
       builder.setLiteralField(stringField((String) fieldObject));
+    } else if (fieldObject instanceof byte[]) {
+      builder.setLiteralField(bytesField(ByteString.copyFrom((byte[]) fieldObject)));
+    } else if (fieldObject instanceof GregorianCalendar) {
+      builder.setLiteralField(longField(((GregorianCalendar) fieldObject).getTimeInMillis()));
     } else if (fieldObject instanceof List) {
       builder.setListField(serializeListMemberVariable(fieldObject));
     } else if (fieldObject instanceof Map) {
@@ -204,6 +214,8 @@ public class ProtoSerializationUtils {
         return literalField.getDoubleField();
       case STRINGFIELD:
         return literalField.getStringField();
+      case BYTESFIELD:
+        return literalField.getBytesField();
       case LITERALFIELD_NOT_SET:
       default:
         return null;

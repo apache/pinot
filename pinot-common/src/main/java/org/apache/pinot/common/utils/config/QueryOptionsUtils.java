@@ -27,7 +27,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
-import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 
 
 /**
@@ -36,7 +36,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValu
 public class QueryOptionsUtils {
   private QueryOptionsUtils() {
   }
-
 
   private static final Map<String, String> CONFIG_RESOLVER;
   private static final RuntimeException CLASS_LOAD_ERROR;
@@ -118,11 +117,6 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_STAR_TREE));
   }
 
-  public static boolean isRoutingForceHLC(Map<String, String> queryOptions) {
-    String routingOptions = queryOptions.get(QueryOptionKey.ROUTING_OPTIONS);
-    return routingOptions != null && routingOptions.toUpperCase().contains(QueryOptionValue.ROUTING_FORCE_HLC);
-  }
-
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }
@@ -194,5 +188,23 @@ public class QueryOptionsUtils {
 
   public static boolean shouldDropResults(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.DROP_RESULTS));
+  }
+
+  @Nullable
+  public static Integer getMaxStreamingPendingBlocks(Map<String, String> queryOptions) {
+    String maxStreamingPendingBlocks = queryOptions.get(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS);
+    return maxStreamingPendingBlocks != null ? Integer.parseInt(maxStreamingPendingBlocks) : null;
+  }
+
+  @Nullable
+  public static Integer getMaxRowsInJoin(Map<String, String> queryOptions) {
+    String maxRowsInJoin = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_JOIN);
+    return maxRowsInJoin != null ? Integer.parseInt(maxRowsInJoin) : null;
+  }
+
+  @Nullable
+  public static JoinOverFlowMode getJoinOverflowMode(Map<String, String> queryOptions) {
+    String joinOverflowModeStr = queryOptions.get(QueryOptionKey.JOIN_OVERFLOW_MODE);
+    return joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
   }
 }

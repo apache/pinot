@@ -52,11 +52,11 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.junit.Assert;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 
 /**
  * Integration test for heap size based broker query killing, this works only for xmx4G
+ * TODO: re-enable or remove this after we resolve https://github.com/apache/pinot/issues/11099
  */
 public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterIntegrationTestSet {
 
@@ -69,8 +69,8 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 3;
   private static final String OOM_QUERY =
-      "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest, intDimSV1 FROM mytable GROUP BY intDimSV1"
-          + " ORDER BY digest LIMIT 15000";
+      "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest, intDimSV1 FROM mytable WHERE intDimSV1 > 450000 GROUP BY"
+          + " intDimSV1 ORDER BY digest LIMIT 15000";
 
   private static final String DIGEST_QUERY_1 =
       "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest FROM mytable";
@@ -154,6 +154,8 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.40f);
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
+        + CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO, 0.0025f);
+    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_INSTANCE_TYPE, InstanceType.BROKER);
     brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
         + CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, 1.1f);
@@ -205,8 +207,6 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
         .build();
   }
 
-
-  @Test
   public void testDigestOOMMultipleQueries()
       throws Exception {
     AtomicReference<JsonNode> queryResponse1 = new AtomicReference<>();

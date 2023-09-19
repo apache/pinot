@@ -31,7 +31,6 @@ import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -65,10 +64,7 @@ public class PinotCatalog implements Schema {
     String tableName = TableNameBuilder.extractRawTableName(name);
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
     if (schema == null) {
-      throw new IllegalArgumentException("Could not find schema for table: '" + tableName
-          + "'. This is likely indicative of some kind of corruption and should not happen! "
-          + "If you are running this via the a test environment, check to make sure you're "
-          + "specifying the correct tables.");
+      throw new IllegalArgumentException(String.format("Could not find schema for table: '%s'", tableName));
     }
     return new PinotTable(schema);
   }
@@ -92,14 +88,22 @@ public class PinotCatalog implements Schema {
     return Collections.emptySet();
   }
 
+  /**
+   * {@code PinotCatalog} doesn't need to return function collections b/c they are already registered.
+   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema)}
+   */
   @Override
   public Collection<Function> getFunctions(String name) {
-    return FunctionRegistry.getRegisteredCalciteFunctions(name);
+    return Collections.emptyList();
   }
 
+  /**
+   * {@code PinotCatalog} doesn't need to return function name set b/c they are already registered.
+   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema)}
+   */
   @Override
   public Set<String> getFunctionNames() {
-    return FunctionRegistry.getRegisteredCalciteFunctionNames();
+    return Collections.emptySet();
   }
 
   @Override

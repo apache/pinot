@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
@@ -72,17 +73,6 @@ public class Connection {
   }
 
   /**
-   * Creates a prepared statement, to escape query parameters.
-   *
-   * @param request The request for which to create a prepared statement.
-   * @return A prepared statement for this connection.
-   */
-  @Deprecated
-  public PreparedStatement prepareStatement(Request request) {
-    return new PreparedStatement(this, request);
-  }
-
-  /**
    * Executes a query.
    *
    * @param query The query to execute
@@ -91,18 +81,6 @@ public class Connection {
    */
   public ResultSetGroup execute(String query) {
     return execute(null, query);
-  }
-
-  /**
-   * Executes a Pinot Request.
-   * @param request The request to execute
-   * @return The result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
-  @Deprecated
-  public ResultSetGroup execute(Request request)
-      throws PinotClientException {
-    return execute(null, request);
   }
 
   /**
@@ -118,26 +96,13 @@ public class Connection {
     String[] tableNames = (tableName == null) ? resolveTableName(query) : new String[]{tableName};
     String brokerHostPort = _brokerSelector.selectBroker(tableNames);
     if (brokerHostPort == null) {
-      throw new PinotClientException("Could not find broker to query for table: " + tableName);
+      throw new PinotClientException("Could not find broker to query for table(s): " + Arrays.asList(tableNames));
     }
     BrokerResponse response = _transport.executeQuery(brokerHostPort, query);
     if (response.hasExceptions() && _failOnExceptions) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
     }
     return new ResultSetGroup(response);
-  }
-
-  /**
-   * Executes a Pinot Request.
-   *
-   * @param request The request to execute
-   * @return The result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
-  @Deprecated
-  public ResultSetGroup execute(@Nullable String tableName, Request request)
-      throws PinotClientException {
-    return execute(tableName, request.getQuery());
   }
 
   /**
@@ -150,19 +115,6 @@ public class Connection {
   public CompletableFuture<ResultSetGroup> executeAsync(String query)
       throws PinotClientException {
     return executeAsync(null, query);
-  }
-
-  /**
-   * Executes a Pinot Request asynchronously.
-   *
-   * @param request The request to execute
-   * @return A future containing the result of the query
-   * @throws PinotClientException If an exception occurs while processing the query
-   */
-  @Deprecated
-  public CompletableFuture<ResultSetGroup> executeAsync(Request request)
-      throws PinotClientException {
-    return executeAsync(null, request.getQuery());
   }
 
   /**

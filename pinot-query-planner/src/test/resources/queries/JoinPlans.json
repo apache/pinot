@@ -6,10 +6,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 ORDER BY a.col1",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col1=[$0], ts=[$1], col3=[$3])",
-          "\n  LogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalProject(col1=[$0], ts=[$1], col3=[$3])",
           "\n        LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], ts=[$6])",
@@ -25,10 +25,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1 AS value1, a.ts AS ts1, b.col3 FROM a JOIN b ON a.col1 = b.col2 ORDER BY a.col1",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(value1=[$0], ts1=[$1], col3=[$3])",
-          "\n  LogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
-          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\nLogicalSort(sort0=[$0], dir0=[ASC], offset=[0])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[ASC])",
+          "\n      LogicalProject(value1=[$0], ts1=[$1], col3=[$3])",
           "\n        LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], ts=[$6])",
@@ -137,7 +137,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT dateTrunc('DAY', a.ts + b.ts) FROM a JOIN b on a.col1 = b.col1 AND a.col2 = b.col2",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[dateTrunc('DAY', +($2, $5))])",
+          "\nLogicalProject(EXPR$0=[DATETRUNC('DAY', +($2, $5))])",
           "\n  LogicalJoin(condition=[AND(=($0, $3), =($1, $4))], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], ts=[$6])",
@@ -321,10 +321,66 @@
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalTableScan(table=[[a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col10=[CAST($0):VARCHAR], col20=[CAST($1):VARCHAR], $f2=[CAST($2):INTEGER], EXPR$3=[*(0.5:DECIMAL(2, 1), $2)])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col10=[CAST($0):VARCHAR], col20=[CAST($1):VARCHAR], $f2=[CAST($2):BIGINT], EXPR$3=[*(0.5:DECIMAL(2, 1), $2)])",
           "\n        LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n            LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
+          "\n              LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Correlated join 2",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 FROM a WHERE a.col4 > (SELECT SUM(0.5 * b.col3) FROM b WHERE b.col2 = a.col2 AND b.col1 = a.col1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalJoin(condition=[AND(=($0, $7), =($1, $8), >($3, $9))], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n      LogicalTableScan(table=[[a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[$2], col10=[CAST($0):VARCHAR], col20=[CAST($1):VARCHAR], EXPR$05=[CAST($2):DECIMAL(12, 1)])",
+          "\n        LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
+          "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n            LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], $f0=[*(0.5:DECIMAL(2, 1), $2)])",
+          "\n                LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Correlated join 3",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 FROM a WHERE a.col4 > (SELECT AVG(0.5 * b.col3) FROM b WHERE b.col2 = a.col2 AND b.col1 = a.col1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalJoin(condition=[AND(=($0, $7), =($1, $8), >($3, $9))], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n      LogicalTableScan(table=[[a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], EXPR$0=[CAST(/($2, $3)):DECIMAL(12, 1) NOT NULL], col10=[CAST($0):VARCHAR], col20=[CAST($1):VARCHAR], EXPR$05=[CAST(CAST(/($2, $3)):DECIMAL(12, 1) NOT NULL):DECIMAL(12, 1)])",
+          "\n        LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT($3)])",
+          "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n            LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n              LogicalProject(col1=[$0], col2=[$1], $f0=[*(0.5:DECIMAL(2, 1), $2)])",
+          "\n                LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Correlated join 4",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1 FROM a WHERE a.col4 > (SELECT  0.5 * AVG(b.col3) FROM b WHERE b.col2 = a.col2 AND b.col1 = a.col1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0])",
+          "\n  LogicalJoin(condition=[AND(=($0, $7), =($1, $8), >($3, $12))], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n      LogicalTableScan(table=[[a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col10=[CAST($0):VARCHAR], col20=[CAST($1):VARCHAR], $f2=[CAST(/(CAST($2):DOUBLE NOT NULL, $3)):DOUBLE], EXPR$3=[*(0.5:DECIMAL(2, 1), /(CAST($2):DOUBLE NOT NULL, $3))])",
+          "\n        LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT($3)])",
+          "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n            LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
           "\n              LogicalTableScan(table=[[b]])",
           "\n"
         ]
@@ -344,6 +400,25 @@
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{1}], agg#0=[$SUM0($2)])",
           "\n            LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Inner join with limit",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.ts, b.col3 FROM a JOIN b ON a.col1 = b.col2 LIMIT 100",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[100])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[100])",
+          "\n      LogicalProject(col1=[$0], ts=[$1], col3=[$3])",
+          "\n        LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col1=[$0], ts=[$6])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[b]])",
           "\n"
         ]
       }

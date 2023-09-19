@@ -51,7 +51,6 @@ public class SortOperator extends MultiStageOperator {
   private final ArrayList<Object[]> _rows;
   private final int _numRowsToKeep;
 
-  private boolean _readyToConstruct;
   private boolean _isSortedBlockConstructed;
   private TransferableBlock _upstreamErrorBlock;
 
@@ -84,7 +83,7 @@ public class SortOperator extends MultiStageOperator {
     // - 'isInputSorted' is set to true indicating that the data was already sorted
     if (collationKeys.isEmpty() || isInputSorted) {
       _priorityQueue = null;
-      _rows = new ArrayList<>();
+      _rows = new ArrayList<>(Math.min(defaultHolderCapacity, _numRowsToKeep));
     } else {
       // Use the opposite direction as specified by the collation directions since we need the PriorityQueue to decide
       // which elements to keep and which to remove based on the limits.
@@ -122,8 +121,6 @@ public class SortOperator extends MultiStageOperator {
   private TransferableBlock produceSortedBlock() {
     if (_upstreamErrorBlock != null) {
       return _upstreamErrorBlock;
-    } else if (!_readyToConstruct) {
-      return TransferableBlockUtils.getNoOpTransferableBlock();
     }
 
     if (!_isSortedBlockConstructed) {
@@ -155,24 +152,19 @@ public class SortOperator extends MultiStageOperator {
   private void consumeInputBlocks() {
     if (!_isSortedBlockConstructed) {
       TransferableBlock block = _upstreamOperator.nextBlock();
-      while (!block.isNoOpBlock()) {
-        // setting upstream error block
-        if (block.isErrorBlock()) {
-          _upstreamErrorBlock = block;
-          return;
-        } else if (TransferableBlockUtils.isEndOfStream(block)) {
-          _readyToConstruct = true;
-          return;
-        }
-
+      while (block.isDataBlock()) {
         List<Object[]> container = block.getContainer();
         if (_priorityQueue == null) {
           // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
-          if (_rows.size() <= _numRowsToKeep) {
-            if (_rows.size() + container.size() <= _numRowsToKeep) {
+          int numRows = _rows.size();
+          if (numRows < _numRowsToKeep) {
+            if (numRows + container.size() < _numRowsToKeep) {
               _rows.addAll(container);
             } else {
-              _rows.addAll(container.subList(0, _numRowsToKeep - _rows.size()));
+              _rows.addAll(container.subList(0, _numRowsToKeep - numRows));
+              LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
+                  _context.getId());
+              break;
             }
           }
         } else {
@@ -181,6 +173,9 @@ public class SortOperator extends MultiStageOperator {
           }
         }
         block = _upstreamOperator.nextBlock();
+      }
+      if (block.isErrorBlock()) {
+        _upstreamErrorBlock = block;
       }
     }
   }

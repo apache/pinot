@@ -85,8 +85,6 @@
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Test fails with existing code because existing code returns INT 0. But H2 returns a double.",
         "description": "aggregate int column and filter by int column",
         "sql": "SELECT sum(1 / int_col) FROM {tbl} WHERE int_col > 0",
         "h2Sql": "SELECT sum(1.0 / int_col) FROM {tbl} WHERE int_col > 0"
@@ -98,8 +96,6 @@
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Test fails with existing code but is fixed with this patch",
         "description": "aggregations on double column with filters",
         "sql": "SELECT min(double_col), max(double_col), avg(double_col), sum(double_col), count(double_col), count(distinct(double_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75"
       },
@@ -160,8 +156,6 @@
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Test fails with existing code but is fixed with this patch.",
         "description": "aggregations on string column with filters",
         "sql": "SELECT count(string_col), count(distinct(string_col)), count(*) FROM {tbl} WHERE int_col > 100 and double_col = 1.75"
       }
@@ -427,15 +421,11 @@
     "queries": [
       {
         "psql": "9.21.0",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Test fails with existing code but is fixed with this patch",
         "description": "JOIN with simple aggregations on int and double columns",
         "sql": "SELECT min(double_col), min(int_col), min(double_col2), min(int_col2), max(double_col), max(int_col), max(double_col2), max(int_col2), avg(int_col), avg(double_col), avg(double_col2), avg(int_col2), sum(int_col), sum(double_col), sum(double_col2), sum(int_col2), count(*), count(distinct int_col), count(distinct double_col), count(distinct int_col2), count(distinct double_col2) from {tbl1} JOIN {tbl2} ON string_col = string_col2"
       },
       {
         "psql": "9.21.0",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Test fails with existing code but is fixed with this patch",
         "description": "JOIN with simple aggregations on boolean columns",
         "sql": "SELECT count(bool_col), count(distinct bool_col), bool_and(bool_col), bool_or(bool_col) from {tbl1} JOIN {tbl2} ON string_col = string_col2"
       },
@@ -446,15 +436,11 @@
       },
       {
         "psql": "9.21.0",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Test fails with existing code but is fixed with this patch",
         "description": "JOIN with simple aggregations on int and double columns and group by on bool_col",
         "sql": "SELECT bool_col, min(double_col), min(int_col), min(double_col2), min(int_col2), max(double_col), max(int_col), max(double_col2), max(int_col2), avg(int_col), avg(double_col), avg(double_col2), avg(int_col2), sum(int_col), sum(double_col), sum(double_col2), sum(int_col2), count(*), count(distinct int_col), count(distinct double_col), count(distinct int_col2), count(distinct double_col2) from {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY bool_col"
       },
       {
         "psql": "9.21.0",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Test fails with existing code but is fixed with this patch",
         "description": "JOIN with aggregations on int and double columns and group by on bool_col and string_col",
         "sql": "SELECT bool_col, string_col, min(double_col), min(int_col), min(double_col2), min(int_col2), max(double_col), max(int_col), max(double_col2), max(int_col2), avg(int_col), avg(double_col), avg(double_col2), avg(int_col2), sum(int_col), sum(double_col), sum(double_col2), sum(int_col2), count(*), count(distinct int_col), count(distinct double_col), count(distinct int_col2), count(distinct double_col2) from {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY bool_col, string_col"
       },
@@ -465,8 +451,6 @@
       },
       {
         "psql": "9.21.0",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Test fails with existing code but is fixed with this patch",
         "description": "JOIN with  aggregations on boolean columns and group by on string and int",
         "sql": "SELECT string_col, int_col, count(bool_col), count(distinct bool_col), bool_and(bool_col), bool_or(bool_col) from {tbl1} JOIN {tbl2} ON string_col = string_col2 GROUP BY string_col, int_col"
       },
@@ -533,8 +517,6 @@
       {
         "psql": "9.21.0",
         "description": "distinct count on all columns",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT distinctcount(int_col), distinctcount(double_col), distinctcount(bool_col), distinctcount(string_col) FROM {tbl}",
         "outputs": [
           [12, 16, 2, 3]
@@ -543,8 +525,6 @@
       {
         "psql": "9.21.0",
         "description": "distinct count with filter",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT distinctcount(int_col), distinctcount(double_col), distinctcount(bool_col), distinctcount(string_col) FROM {tbl} where string_col='c'",
         "outputs": [
           [5, 5, 2, 1]
@@ -553,8 +533,6 @@
       {
         "psql": "9.21.0",
         "description": "distintcount with group by",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT string_col, distinctcount(int_col), distinctcount(double_col), distinctcount(bool_col) FROM {tbl} group by string_col",
         "outputs": [
           ["a", 5, 6, 1],
@@ -565,8 +543,6 @@
       {
         "psql": "9.21.0",
         "description": "distinctcount with multiple group by columns",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT string_col, bool_col, distinctcount(int_col), distinctcount(double_col) FROM {tbl} group by string_col, bool_col",
         "outputs": [
           ["a", true, 5, 6],
@@ -578,8 +554,6 @@
       {
         "psql": "9.21.0",
         "description": "JOIN with distinct count on columns",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT distinctcount(double_col), distinctcount(int_col), distinctcount(double_col2), distinctcount(int_col2), distinctcount(bool_col), distinctcount(string_col), distinctcount(string_col2) from {tbl} JOIN {tbl2} ON string_col = string_col2",
         "outputs": [
           [11, 7, 2, 2, 2, 2, 2]
@@ -588,8 +562,6 @@
       {
         "psql": "9.21.0",
         "description": "JOIN with distinct count and group by on columns",
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Current code doesn't support distinctcount on numeric operands",
         "sql": "SELECT string_col, distinctcount(double_col), distinctcount(int_col), distinctcount(double_col2), distinctcount(int_col2), distinctcount(bool_col) from {tbl} JOIN {tbl2} ON string_col = string_col2 GROUP BY string_col",
         "outputs": [
           ["a", 6, 5, 1, 1, 1],
@@ -666,13 +638,13 @@
         "description": "nested aggregation",
         "sql": "SELECT min(max(int_col)) FROM {tbl}",
         "comments": ".*Aggregate expressions cannot be nested.",
-        "expectedException": ".*Error composing query plan for.*"
+        "expectedException": "Error composing query plan for.*"
       },
       {
         "psql": "4.2.7",
         "description": "nested aggregation",
         "sql": "SELECT (SELECT max(min(int_col)) FROM {tbl}) from {tbl};",
-        "expectedException": ".*Error composing query plan for.*"
+        "expectedException": "Error composing query plan for.*"
       },
       {
         "psql": "4.2.7",
@@ -690,23 +662,19 @@
       },
       {
         "psql": "4.2.7",
-        "ignored": true,
-        "comments": "class java.lang.Double cannot be cast to class java.lang.Boolean",
         "description": "aggregate boolean column",
         "sql": "SELECT min(bool_col) FROM {tbl}"
       },
       {
-        "ignored": true,
-        "comment": "issue with converting data types:  Unexpected RelDataTypeField: ANY for column: EXPR$0",
         "psql": "9.21.0",
         "description": "aggregate boolean column no group by with inner function",
-        "sql": "SELECT bool_and(startsWith(string_col, 'a')), bool_or(startsWith(string_col, 'a')) FROM {tbl}"
+        "sql": "SELECT bool_and(startsWith(string_col, 'a')), bool_or(startsWith(string_col, 'a')) FROM {tbl}",
+        "h2Sql": "SELECT bool_and(CASE WHEN string_col LIKE 'a%' THEN TRUE ELSE FALSE END), bool_or(CASE WHEN string_col LIKE 'a%' THEN TRUE ELSE FALSE END) FROM {tbl}"
       },
       {
-        "ignored": true,
-        "comment": "issue with converting data types:  Unexpected RelDataTypeField: ANY for column: EXPR$0",
         "description": "sum with inner function",
-        "sql": "SELECT sum(pow(int_col, 2)) FROM {tbl}"
+        "sql": "SELECT sum(pow(int_col, 2)) FROM {tbl}",
+        "h2Sql": "SELECT sum(int_col * int_col) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
@@ -725,8 +693,8 @@
       {
         "psql": "4.2.7",
         "comments": "parse error:Encountered HAVING",
-        "description": "aggregate query with having clause",
         "ignored": true,
+        "description": "aggregate query with having clause",
         "sql": "select string_col, count(int_col) from {tbl} a group by string_col order by string_col having (select count(*) from {tbl} b where count(int_col) = b.int_col) > 0;"
       }
     ]
@@ -753,8 +721,6 @@
     },
     "queries": [
       {
-        "ignored": true,
-        "comment": "sum empty returns [0] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
         "description": "Return empty for sum",
         "sql": "SELECT sum(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
       },
@@ -814,8 +780,6 @@
         "sql": "SELECT bool_and(bool_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
       },
       {
-        "ignored": true,
-        "comment": "bool_and empty returns [0 which gets converted to false] instead of [null] when leaf aggregation is performed by Intermediate Stage",
         "description": "Return empty for bool_and with subquery",
         "sql": "SELECT bool_and(bool_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
@@ -826,8 +790,6 @@
         "sql": "SELECT bool_or(bool_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
       },
       {
-        "ignored": true,
-        "comment": "bool_or empty returns [false] instead of [null] at the moment when leaf aggregation is performed by Intermediate Stage",
         "description": "Return empty for bool_or with subquery",
         "sql": "SELECT bool_or(bool_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
@@ -836,8 +798,6 @@
         "sql": "SELECT count(distinct int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
       },
       {
-        "ignored": true,
-        "comments": "TODO(Sonam): Remove ignore check. Test fails with existing code because H2 expects 0. But we return null",
         "description": "Return empty for count distinct with subquery",
         "sql": "SELECT count(distinct int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
@@ -926,8 +886,6 @@
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ bool_and(bool_col), bool_or(bool_col) FROM {tbl}"
       },
       {
-        "ignored": true,
-        "comment": "sum empty returns [0] instead of [null] at the moment",
         "description": "sum empty input after filter with subquery",
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ sum(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },

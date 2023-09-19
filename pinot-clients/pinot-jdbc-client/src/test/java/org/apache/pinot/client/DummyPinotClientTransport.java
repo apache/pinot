@@ -38,20 +38,6 @@ public class DummyPinotClientTransport implements PinotClientTransport {
     return null;
   }
 
-  @Override
-  public BrokerResponse executeQuery(String brokerAddress, Request request)
-      throws PinotClientException {
-    _lastQuery = request.getQuery();
-    return BrokerResponse.empty();
-  }
-
-  @Override
-  public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-      throws PinotClientException {
-    _lastQuery = request.getQuery();
-    return null;
-  }
-
   public String getLastQuery() {
     return _lastQuery;
   }
