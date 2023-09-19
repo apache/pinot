@@ -23,13 +23,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -104,7 +104,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
 
   protected void fillResultUnknown(int length) {
     for (int i = 0; i < length; i++) {
-      _intValuesSV[i] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+      _intValuesSV[i] = NullValuePlaceHolder.INT;
     }
   }
 
@@ -184,7 +184,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _intValuesSV[i] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+            _intValuesSV[i] = NullValuePlaceHolder.INT;
           }
           break;
         default:
@@ -234,7 +234,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _longValuesSV[i] = (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+            _longValuesSV[i] = NullValuePlaceHolder.LONG;
           }
           break;
         default:
@@ -284,7 +284,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _floatValuesSV[i] = (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+            _floatValuesSV[i] = NullValuePlaceHolder.FLOAT;
           }
           break;
         default:
@@ -334,7 +334,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _doubleValuesSV[i] = (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+            _doubleValuesSV[i] = NullValuePlaceHolder.DOUBLE;
           }
           break;
         default:
@@ -388,7 +388,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _bigDecimalValuesSV[i] = (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder();
+            _bigDecimalValuesSV[i] = NullValuePlaceHolder.BIG_DECIMAL;
           }
           break;
         default:
@@ -442,7 +442,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _stringValuesSV[i] = (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+            _stringValuesSV[i] = NullValuePlaceHolder.STRING;
           }
           break;
         default:
@@ -480,7 +480,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _bytesValuesSV[i] = (byte[]) DataSchema.ColumnDataType.BYTES.getNullPlaceholder();
+            _bytesValuesSV[i] = NullValuePlaceHolder.BYTES;
           }
           break;
         default:
@@ -532,7 +532,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _intValuesMV[i] = (int[]) DataSchema.ColumnDataType.INT_ARRAY.getNullPlaceholder();
+            _intValuesMV[i] = NullValuePlaceHolder.INT_ARRAY;
           }
           break;
         default:
@@ -584,7 +584,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _longValuesMV[i] = (long[]) DataSchema.ColumnDataType.LONG_ARRAY.getNullPlaceholder();
+            _longValuesMV[i] = NullValuePlaceHolder.LONG_ARRAY;
           }
           break;
         default:
@@ -636,7 +636,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _floatValuesMV[i] = (float[]) DataSchema.ColumnDataType.FLOAT_ARRAY.getNullPlaceholder();
+            _floatValuesMV[i] = NullValuePlaceHolder.FLOAT_ARRAY;
           }
           break;
         default:
@@ -688,7 +688,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _doubleValuesMV[i] = (double[]) DataSchema.ColumnDataType.DOUBLE_ARRAY.getNullPlaceholder();
+            _doubleValuesMV[i] = NullValuePlaceHolder.DOUBLE_ARRAY;
           }
           break;
         default:
@@ -740,7 +740,7 @@ public abstract class BaseTransformFunction implements TransformFunction {
         case UNKNOWN:
           // Copy the values to ensure behaviour consistency with non null-handling.
           for (int i = 0; i < length; i++) {
-            _stringValuesMV[i] = (String[]) DataSchema.ColumnDataType.STRING_ARRAY.getNullPlaceholder();
+            _stringValuesMV[i] = NullValuePlaceHolder.STRING_ARRAY;
           }
           break;
         default:
