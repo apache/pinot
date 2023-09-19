@@ -31,8 +31,8 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
-import org.apache.pinot.query.runtime.operator.block.DataBlockExtractUtils;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
 

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.reduce;
+package org.apache.pinot.core.operator.docvalsets;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
