@@ -37,34 +37,34 @@ import org.roaringbitmap.RoaringBitmap;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MultistageAggregationExecutor {
-  private final AggType _aggType;
-  // The identifier operands for the aggregation function only store the column name. This map contains mapping
-  // from column name to their index.
-  private final Map<String, Integer> _colNameToIndexMap;
-  private final DataSchema _resultSchema;
-
   private final AggregationFunction[] _aggFunctions;
   private final int[] _filterArgIds;
   private final int _maxFilterArgId;
+  private final AggType _aggType;
+  private final DataSchema _resultSchema;
 
   // Result holders for each mode.
   private final AggregationResultHolder[] _aggregateResultHolder;
   private final Object[] _mergeResultHolder;
 
   public MultistageAggregationExecutor(AggregationFunction[] aggFunctions, int[] filterArgIds, int maxFilterArgId,
-      AggType aggType, Map<String, Integer> colNameToIndexMap, DataSchema resultSchema) {
+      AggType aggType, DataSchema resultSchema) {
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
     _maxFilterArgId = maxFilterArgId;
     _aggType = aggType;
-    _colNameToIndexMap = colNameToIndexMap;
     _resultSchema = resultSchema;
 
-    _aggregateResultHolder = new AggregationResultHolder[aggFunctions.length];
-    _mergeResultHolder = new Object[aggFunctions.length];
-
-    for (int i = 0; i < _aggFunctions.length; i++) {
-      _aggregateResultHolder[i] = _aggFunctions[i].createAggregationResultHolder();
+    int numFunctions = aggFunctions.length;
+    if (!aggType.isInputIntermediateFormat()) {
+      _aggregateResultHolder = new AggregationResultHolder[numFunctions];
+      for (int i = 0; i < numFunctions; i++) {
+        _aggregateResultHolder[i] = aggFunctions[i].createAggregationResultHolder();
+      }
+      _mergeResultHolder = null;
+    } else {
+      _mergeResultHolder = new Object[numFunctions];
+      _aggregateResultHolder = null;
     }
   }
 
@@ -116,8 +116,7 @@ public class MultistageAggregationExecutor {
       // No filter for any aggregation function
       for (int i = 0; i < _aggFunctions.length; i++) {
         AggregationFunction aggFunction = _aggFunctions[i];
-        Map<ExpressionContext, BlockValSet> blockValSetMap =
-            AggregateOperator.getBlockValSetMap(aggFunction, block, _colNameToIndexMap);
+        Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(aggFunction, block);
         aggFunction.aggregate(block.getNumRows(), _aggregateResultHolder[i], blockValSetMap);
       }
     } else {
@@ -125,13 +124,12 @@ public class MultistageAggregationExecutor {
       RoaringBitmap[] matchedBitmaps = new RoaringBitmap[_maxFilterArgId + 1];
       int[] numMatchedRowsArray = new int[_maxFilterArgId + 1];
       for (int i = 0; i < _aggFunctions.length; i++) {
-        AggregationFunction aggregationFunction = _aggFunctions[i];
+        AggregationFunction aggFunction = _aggFunctions[i];
         int filterArgId = _filterArgIds[i];
         if (filterArgId < 0) {
           // No filter for this aggregation function
-          Map<ExpressionContext, BlockValSet> blockValSetMap =
-              AggregateOperator.getBlockValSetMap(aggregationFunction, block, _colNameToIndexMap);
-          aggregationFunction.aggregate(block.getNumRows(), _aggregateResultHolder[i], blockValSetMap);
+          Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(aggFunction, block);
+          aggFunction.aggregate(block.getNumRows(), _aggregateResultHolder[i], blockValSetMap);
         } else {
           // Need to filter the block before aggregation
           RoaringBitmap matchedBitmap = matchedBitmaps[filterArgId];
@@ -142,9 +140,8 @@ public class MultistageAggregationExecutor {
           }
           int numMatchedRows = numMatchedRowsArray[filterArgId];
           Map<ExpressionContext, BlockValSet> blockValSetMap =
-              AggregateOperator.getFilteredBlockValSetMap(aggregationFunction, block, _colNameToIndexMap,
-                  numMatchedRows, matchedBitmap);
-          aggregationFunction.aggregate(numMatchedRows, _aggregateResultHolder[i], blockValSetMap);
+              AggregateOperator.getFilteredBlockValSetMap(aggFunction, block, numMatchedRows, matchedBitmap);
+          aggFunction.aggregate(numMatchedRows, _aggregateResultHolder[i], blockValSetMap);
         }
       }
     }
@@ -153,7 +150,7 @@ public class MultistageAggregationExecutor {
   private void processMerge(TransferableBlock block) {
     for (int i = 0; i < _aggFunctions.length; i++) {
       AggregationFunction aggFunction = _aggFunctions[i];
-      Object[] intermediateResults = AggregateOperator.getIntermediateResults(aggFunction, block, _colNameToIndexMap);
+      Object[] intermediateResults = AggregateOperator.getIntermediateResults(aggFunction, block);
       for (Object intermediateResult : intermediateResults) {
         // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
         // TODO: Fix it

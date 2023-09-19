@@ -29,7 +29,6 @@ import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -75,11 +74,10 @@ public class AggregateOperatorTest {
     Mockito.when(_input.nextBlock())
         .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("foo!")));
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.DIRECT, Collections.singletonList(-1), null);
+        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, calls, group, AggType.DIRECT,
+            Collections.singletonList(-1), null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock(); // build
@@ -97,11 +95,10 @@ public class AggregateOperatorTest {
 
     Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.DIRECT, Collections.singletonList(-1), null);
+        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, calls, group, AggType.DIRECT,
+            Collections.singletonList(-1), null);
 
     // When:
     TransferableBlock block = operator.nextBlock();
@@ -123,8 +120,8 @@ public class AggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.DIRECT, Collections.singletonList(-1), null);
+        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, calls, group, AggType.DIRECT,
+            Collections.singletonList(-1), null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -151,8 +148,8 @@ public class AggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.DIRECT, Collections.singletonList(-1), null);
+        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, calls, group, AggType.DIRECT,
+            Collections.singletonList(-1), null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -183,8 +180,8 @@ public class AggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "sum", "sumWithFilter"}, new ColumnDataType[]{INT, DOUBLE, DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-            AggType.DIRECT, filterArgIds, null);
+        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, calls, group, AggType.DIRECT,
+            filterArgIds, null);
 
     // When:
     TransferableBlock block1 = operator.nextBlock();
@@ -202,10 +199,9 @@ public class AggregateOperatorTest {
     MultiStageOperator upstreamOperator = OperatorTestUtil.getOperator(OperatorTestUtil.OP_1);
     // Create an aggregation call with sum for first column and group by second column.
     RexExpression.FunctionCall agg = getSum(new RexExpression.InputRef(0));
-    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{STRING, INT});
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{STRING, DOUBLE});
     AggregateOperator sum0GroupBy1 =
-        new AggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator, outSchema, inSchema,
+        new AggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator, outSchema,
             Collections.singletonList(agg), Collections.singletonList(new RexExpression.InputRef(1)), AggType.DIRECT,
             Collections.singletonList(-1), null);
     TransferableBlock result = sum0GroupBy1.getNextBlock();
@@ -220,18 +216,17 @@ public class AggregateOperatorTest {
     }
   }
 
-  @Test(expectedExceptions = BadQueryRequestException.class, expectedExceptionsMessageRegExp = ".*average.*")
+  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*AVERAGE.*")
   public void shouldThrowOnUnknownAggFunction() {
     // Given:
     List<RexExpression> calls = ImmutableList.of(
         new RexExpression.FunctionCall(SqlKind.AVG, ColumnDataType.INT, "AVERAGE", ImmutableList.of()));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
     DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
-    DataSchema inSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
 
     // When:
-    new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
-        AggType.DIRECT, Collections.singletonList(-1), null);
+    new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, calls, group, AggType.DIRECT,
+        Collections.singletonList(-1), null);
   }
 
   @Test
@@ -249,7 +244,7 @@ public class AggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, inSchema, calls, group,
+        new AggregateOperator(OperatorTestUtil.getDefaultContext(), _input, outSchema, calls, group,
             AggType.INTERMEDIATE, Collections.singletonList(-1), null);
 
     // When:
