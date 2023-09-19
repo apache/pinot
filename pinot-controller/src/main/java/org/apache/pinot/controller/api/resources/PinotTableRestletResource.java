@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -85,7 +84,6 @@ import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -379,87 +377,15 @@ public class PinotTableRestletResource {
   @ManualAuthorization
   @Path("/tables/{tableName}")
   @ApiOperation(value = "Lists the table configs")
-  public String alterTableStateOrListTableConfig(
+  public String listTableConfig(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "enable|disable|drop") @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    try {
-      if (StringUtils.isBlank(stateStr)) {
-        if (!_accessControlFactory.create()
-            .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.GET_TABLE_CONFIG)) {
-          throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-        }
-        return listTableConfigs(tableName, tableTypeStr);
-      }
-
-      // TODO: DO NOT allow toggling state with GET request
-
-      StateType stateType = Constants.validateState(stateStr);
-      TableType tableType = Constants.validateTableType(tableTypeStr);
-
-      // validate if user has permission to change the table state
-      String endpointUrl = request.getRequestURL().toString();
-      AccessControlUtils.validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl,
-          _accessControlFactory.create());
-
-      // Check access for different state types
-      AccessControl accessControl = _accessControlFactory.create();
-      switch (stateType) {
-        case ENABLE:
-          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.ENABLE_TABLE)) {
-            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-          }
-          break;
-        case DISABLE:
-          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DISABLE_TABLE)) {
-            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-          }
-          break;
-        case DROP:
-          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DELETE_TABLE)) {
-            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-          }
-          break;
-        default:
-          throw new ControllerApplicationException(LOGGER, "Invalid state type: " + stateType,
-              Response.Status.BAD_REQUEST);
-      }
-
-      ArrayNode ret = JsonUtils.newArrayNode();
-      boolean tableExists = false;
-
-      if (tableType != TableType.REALTIME && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-        String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-        ObjectNode offline = JsonUtils.newObjectNode();
-        tableExists = true;
-
-        offline.put("tableName", offlineTableName);
-        offline.set("state",
-            JsonUtils.objectToJsonNode(_pinotHelixResourceManager.toggleTableState(offlineTableName, stateType)));
-        ret.add(offline);
-      }
-
-      if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-        ObjectNode realtime = JsonUtils.newObjectNode();
-        tableExists = true;
-
-        realtime.put("tableName", realtimeTableName);
-        realtime.set("state",
-            JsonUtils.objectToJsonNode(_pinotHelixResourceManager.toggleTableState(realtimeTableName, stateType)));
-        ret.add(realtime);
-      }
-
-      if (tableExists) {
-        return ret.toString();
-      } else {
-        throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist",
-            Response.Status.BAD_REQUEST);
-      }
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    if (!_accessControlFactory.create()
+        .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.GET_TABLE_CONFIG)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
+    return listTableConfigs(tableName, tableTypeStr);
   }
 
   @DELETE
