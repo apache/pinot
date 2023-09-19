@@ -37,6 +37,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.api.resources.PauseStatus;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -57,7 +58,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-
 
 public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_SERVERS = 1;
@@ -170,6 +170,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   public void testReload()
       throws Exception {
     pushAvroIntoKafka(_avroFiles);
+    waitForAllDocsLoaded(600_000L, 300);
+
     String statusResponse = reloadRealtimeTable(getTableName());
     Map<String, String> statusResponseJson =
         JsonUtils.stringToObject(statusResponse, new TypeReference<Map<String, String>>() {
@@ -183,19 +185,29 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     String reloadJobId = reloadStatus.get(REALTIME_TABLE_NAME).get("reloadJobId");
     waitForReloadToComplete(reloadJobId, 600_000L);
     waitForAllDocsLoaded(600_000L, 300);
-    verifyIdealState(4, NUM_SERVERS);
+    verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
   }
 
   @AfterMethod
   public void afterMethod()
       throws Exception {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    getControllerRequestClient().pauseConsumption(realtimeTableName);
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        PauseStatus pauseStatus = getControllerRequestClient().getPauseStatus(realtimeTableName);
+        return pauseStatus.getConsumingSegments().isEmpty();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to drop the segments");
 
     // Test dropping all segments one by one
     List<String> segments = listSegments(realtimeTableName);
     for (String segment : segments) {
       dropSegment(realtimeTableName, segment);
     }
+
     // NOTE: There is a delay to remove the segment from property store
     TestUtils.waitForCondition((aVoid) -> {
       try {
@@ -209,6 +221,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     stopKafka(); // to clean up the topic
     startServers(NUM_SERVERS);
     startKafka();
+    getControllerRequestClient().resumeConsumption(realtimeTableName);
   }
 
   protected void verifySegmentAssignment(Map<String, Map<String, String>> segmentAssignment, int numSegmentsExpected,
@@ -334,7 +347,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       } catch (Exception e) {
         return null;
       }
-    }, 100L, timeoutMs, "Failed to load all documents");
+    }, 1000L, timeoutMs, "Failed to load all documents");
   }
 
   private static int getSegmentPartitionId(String segmentName) {
@@ -402,14 +415,16 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return getCurrentCountStarResultWithoutUpsert() == getCountStarResultWithoutUpsert();
+        boolean c1 = getCurrentCountStarResultWithoutUpsert() == getCountStarResultWithoutUpsert();
+        boolean c2 = getCurrentCountStarResult() == getCountStarResult();
+        // verify there are no null rows
+        boolean c3 =
+            getCurrentCountStarResultWithoutNulls(getTableName(), _schema) == getCountStarResultWithoutUpsert();
+        return c1 && c2 && c3;
       } catch (Exception e) {
         return null;
       }
     }, 100L, timeoutMs, "Failed to load all documents");
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
-    // verify there are no null rows
-    assertEquals(getCurrentCountStarResultWithoutNulls(getTableName(), _schema), getCountStarResultWithoutUpsert());
   }
 
   private long getCurrentCountStarResultWithoutUpsert() {
