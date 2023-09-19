@@ -216,9 +216,15 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtime.segment.deepStoreUploadRetryEnabled";
     public static final String DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS =
         "controller.realtime.segment.deepStoreUploadRetry.timeoutMs";
+    public static final String ENABLE_TMP_SEGMENT_ASYNC_DELETION =
+        "controller.realtime.segment.tmpFileAsyncDeletionEnabled";
+    // temporary segments within expiration won't be deleted so that ongoing split commit won't be impacted.
+    public static final String TMP_SEGMENT_RETENTION_IN_SECONDS =
+        "controller.realtime.segment.tmpFileRetentionInSeconds";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
+    public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
 
     private static final Random RANDOM = new Random();
 
@@ -924,8 +930,17 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, false);
   }
 
+  public boolean isTmpSegmentAsyncDeletionEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION, false);
+  }
+
   public int getDeepStoreRetryUploadTimeoutMs() {
     return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS, -1);
+  }
+
+  public int getTmpSegmentRetentionInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND);
   }
 
   public long getPinotTaskManagerInitialDelaySeconds() {

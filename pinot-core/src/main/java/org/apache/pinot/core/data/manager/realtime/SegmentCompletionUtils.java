@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.util;
+package org.apache.pinot.core.data.manager.realtime;
 
 import java.util.UUID;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,11 +38,24 @@ public class SegmentCompletionUtils {
    * @param segmentName segment name
    * @return
    */
-  public static String getSegmentNamePrefix(String segmentName) {
+  public static String getTmpSegmentNamePrefix(String segmentName) {
     return segmentName + TMP;
   }
 
-  public static String generateSegmentFileName(String segmentNameStr) {
-    return getSegmentNamePrefix(segmentNameStr) + UUID.randomUUID().toString();
+  public static String generateTmpSegmentFileName(String segmentNameStr) {
+    return getTmpSegmentNamePrefix(segmentNameStr) + UUID.randomUUID();
+  }
+
+  public static boolean isTmpFile(String uri) {
+    String[] splits = StringUtils.splitByWholeSeparator(uri, TMP);
+    if (splits.length < 2) {
+      return false;
+    }
+    try {
+      UUID.fromString(splits[splits.length - 1]);
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 }

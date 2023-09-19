@@ -47,10 +47,10 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
-import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -378,7 +378,7 @@ public class LLCSegmentCompletionHandlers {
       String rawTableName = new LLCSegmentName(segmentName).getTableName();
       URI segmentFileURI = URIUtils
           .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
-              URIUtils.encode(SegmentCompletionUtils.generateSegmentFileName(segmentName)));
+              URIUtils.encode(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName)));
       PinotFSFactory.create(segmentFileURI.getScheme()).copyFromLocalFile(localTempFile, segmentFileURI);
       SegmentCompletionProtocol.Response.Params responseParams = new SegmentCompletionProtocol.Response.Params()
           .withStreamPartitionMsgOffset(requestParams.getStreamPartitionMsgOffset())

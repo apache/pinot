@@ -156,6 +156,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected HelixManager _helixParticipantManager;
   protected PinotMetricsRegistry _metricsRegistry;
   protected ControllerMetrics _controllerMetrics;
+  protected ValidationMetrics _validationMetrics;
   protected SqlQueryExecutor _sqlQueryExecutor;
   // Can only be constructed after resource manager getting started
   protected OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
@@ -586,6 +587,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
     _controllerMetrics.initializeGlobalMeters();
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    _validationMetrics = new ValidationMetrics(_metricsRegistry);
   }
 
   private void initPinotFSFactory() {
@@ -705,7 +707,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     periodicTasks.add(_offlineSegmentIntervalChecker);
     _realtimeSegmentValidationManager =
         new RealtimeSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
-            _pinotLLCRealtimeSegmentManager, new ValidationMetrics(_metricsRegistry), _controllerMetrics);
+            _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics);
     periodicTasks.add(_realtimeSegmentValidationManager);
     _brokerResourceValidationManager =
         new BrokerResourceValidationManager(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics);

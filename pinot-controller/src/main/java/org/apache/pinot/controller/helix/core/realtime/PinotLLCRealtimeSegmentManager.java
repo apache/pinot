@@ -72,8 +72,8 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
-import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
+import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -165,6 +165,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final Lock[] _idealStateUpdateLocks;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
   private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
+  private final boolean _isTmpSegmentAsyncDeletionEnabled;
   private final int _deepstoreUploadRetryTimeoutMs;
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
@@ -190,12 +191,17 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
     _isDeepStoreLLCSegmentUploadRetryEnabled = controllerConf.isDeepStoreRetryUploadLLCSegmentEnabled();
+    _isTmpSegmentAsyncDeletionEnabled = controllerConf.isTmpSegmentAsyncDeletionEnabled();
     _deepstoreUploadRetryTimeoutMs = controllerConf.getDeepStoreRetryUploadTimeoutMs();
     _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
     return _isDeepStoreLLCSegmentUploadRetryEnabled;
+  }
+
+  public boolean isTmpSegmentAsyncDeletionEnabled() {
+    return _isTmpSegmentAsyncDeletionEnabled;
   }
 
   @VisibleForTesting
@@ -460,19 +466,17 @@ public class PinotLLCRealtimeSegmentManager {
     PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
     String uriToMoveTo = moveSegmentFile(rawTableName, segmentName, segmentLocation, pinotFS);
 
-    // Cleans up tmp segment files under table dir.
-    // We only clean up tmp segment files in table level dir, so there's no need to list recursively.
-    // See LLCSegmentCompletionHandlers.uploadSegment().
-    // TODO: move tmp file logic into SegmentCompletionUtils.
-    try {
-      for (String uri : pinotFS.listFiles(tableDirURI, false)) {
-        if (uri.contains(SegmentCompletionUtils.getSegmentNamePrefix(segmentName))) {
-          LOGGER.warn("Deleting temporary segment file: {}", uri);
-          Preconditions.checkState(pinotFS.delete(new URI(uri), true), "Failed to delete file: %s", uri);
+    if (!isTmpSegmentAsyncDeletionEnabled()) {
+      try {
+        for (String uri : pinotFS.listFiles(tableDirURI, false)) {
+          if (uri.contains(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName))) {
+            LOGGER.warn("Deleting temporary segment file: {}", uri);
+            Preconditions.checkState(pinotFS.delete(new URI(uri), true), "Failed to delete file: %s", uri);
+          }
         }
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while deleting temporary segment files for segment: {}", segmentName, e);
       }
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while deleting temporary segment files for segment: {}", segmentName, e);
     }
     committingSegmentDescriptor.setSegmentLocation(uriToMoveTo);
   }
@@ -1442,6 +1446,78 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Failed to upload segment {} to deep store", segmentName, e);
       }
     }
+  }
+
+  /**
+   * Delete tmp segments for realtime table with low level consumer, split commit and async deletion is enabled.
+   * @param tableNameWithType
+   * @param segmentsZKMetadata
+   * @return number of deleted orphan temporary segments
+   *
+   */
+  public long deleteTmpSegments(String tableNameWithType, List<SegmentZKMetadata> segmentsZKMetadata) {
+    Preconditions.checkState(!_isStopping, "Segment manager is stopping");
+
+    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
+      return 0L;
+    }
+
+    TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      LOGGER.warn("Failed to find table config for table: {}, skipping deletion of tmp segments", tableNameWithType);
+      return 0L;
+    }
+
+    if (!isLowLevelConsumer(tableNameWithType, tableConfig)
+        || !getIsSplitCommitEnabled()
+        || !isTmpSegmentAsyncDeletionEnabled()) {
+      return 0L;
+    }
+
+    Set<String> deepURIs = segmentsZKMetadata.stream().filter(meta -> meta.getStatus() == Status.DONE
+        && !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(meta.getDownloadUrl())).map(
+        SegmentZKMetadata::getDownloadUrl).collect(
+        Collectors.toSet());
+
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
+    PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
+    long deletedTmpSegments = 0;
+    try {
+      for (String filePath : pinotFS.listFiles(tableDirURI, false)) {
+        // prepend scheme
+        URI uri = URIUtils.getUri(filePath);
+        if (isTmpAndCanDelete(uri, deepURIs, pinotFS)) {
+          LOGGER.info("Deleting temporary segment file: {}", uri);
+          if (pinotFS.delete(uri, true)) {
+            LOGGER.info("Succeed to delete file: {}", uri);
+            deletedTmpSegments++;
+          } else {
+            LOGGER.warn("Failed to delete file: {}", uri);
+          }
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while deleting temporary files for table: {}", rawTableName, e);
+    }
+    return deletedTmpSegments;
+  }
+
+  private boolean isTmpAndCanDelete(URI uri, Set<String> deepURIs, PinotFS pinotFS) throws Exception {
+    long lastModified = pinotFS.lastModified(uri);
+    if (lastModified <= 0) {
+      LOGGER.warn("file {} modification time {} is not positive, ineligible for delete", uri.toString(), lastModified);
+      return false;
+    }
+    String uriString = uri.toString();
+    return SegmentCompletionUtils.isTmpFile(uriString) && !deepURIs.contains(uriString)
+        && getCurrentTimeMs() - lastModified > _controllerConf.getTmpSegmentRetentionInSeconds() * 1000L;
+  }
+
+  private boolean isLowLevelConsumer(String tableNameWithType, TableConfig tableConfig) {
+    PartitionLevelStreamConfig streamConfig = new PartitionLevelStreamConfig(tableNameWithType,
+        IngestionConfigUtils.getStreamConfigMap(tableConfig));
+    return streamConfig.hasLowLevelConsumerType();
   }
 
   /**

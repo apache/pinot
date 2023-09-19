@@ -16,27 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api;
+package org.apache.pinot.core.data.manager.realtime;
 
-import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
-
 
 public class SegmentCompletionUtilsTest {
 
   @Test
   public void testGenerateSegmentFilePrefix() {
     String segmentName = "segment";
-    assertEquals(SegmentCompletionUtils.getSegmentNamePrefix(segmentName), "segment.tmp.");
+    assertEquals(SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName), "segment.tmp.");
   }
 
   @Test
   public void testGenerateSegmentLocation() {
     String segmentName = "segment";
-    String segmentNamePrefix = SegmentCompletionUtils.getSegmentNamePrefix(segmentName);
-    assertTrue(SegmentCompletionUtils.generateSegmentFileName(segmentName).startsWith(segmentNamePrefix));
+    String segmentNamePrefix = SegmentCompletionUtils.getTmpSegmentNamePrefix(segmentName);
+    assertTrue(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName).startsWith(segmentNamePrefix));
+  }
+
+  @Test
+  public void testIsTmpFile() {
+    assertTrue(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.550e8400-e29b-41d4-a716-446655440000"));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp."));
+    assertFalse(SegmentCompletionUtils.isTmpFile(".tmp.550e8400-e29b-41d4-a716-446655440000"));
+    assertFalse(SegmentCompletionUtils.isTmpFile("hdfs://foo.tmp.55"));
   }
 }
