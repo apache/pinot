@@ -36,9 +36,9 @@ import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.pinot.common.auth.BasicAuthUtils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.TlsUtils;
-import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,7 +125,7 @@ public class DriverUtils {
     List<NameValuePair> params = URLEncodedUtils.parse(uri, StandardCharsets.UTF_8);
 
     Map<String, String> paramsMap = new HashMap<>();
-    for (NameValuePair param: params) {
+    for (NameValuePair param : params) {
       paramsMap.put(param.getName(), param.getValue());
     }
 
@@ -220,7 +220,7 @@ public class DriverUtils {
 
   public static String enableQueryOptions(String sql, Map<String, Object> options) {
     StringBuilder optionsBuilder = new StringBuilder();
-    for (Map.Entry<String, Object> optionEntry: options.entrySet()) {
+    for (Map.Entry<String, Object> optionEntry : options.entrySet()) {
       if (!sql.contains(optionEntry.getKey())) {
         optionsBuilder.append(DriverUtils.createSetQueryOptionString(optionEntry.getKey(), optionEntry.getValue()));
       }
@@ -244,7 +244,7 @@ public class DriverUtils {
         optionBuilder.append(((Number) optionValue).doubleValue());
       } else {
         throw new IllegalArgumentException(
-          "Option Type " + optionValue.getClass().getSimpleName() + " is not supported.");
+            "Option Type " + optionValue.getClass().getSimpleName() + " is not supported.");
       }
     }
 

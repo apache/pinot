@@ -128,7 +128,8 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
 
       Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
       Optional<BasicAuthPrincipal> principalOpt =
-          tokens.stream().map(BasicAuthUtils::normalizeBase64Token).map(_token2principal::get).filter(Objects::nonNull)
+          tokens.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+              .map(_token2principal::get).filter(Objects::nonNull)
               .findFirst();
       return principalOpt;
     }
