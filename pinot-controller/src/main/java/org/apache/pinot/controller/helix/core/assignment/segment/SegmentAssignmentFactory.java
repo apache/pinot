@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
 /**
@@ -35,7 +36,12 @@ public class SegmentAssignmentFactory {
     if (tableConfig.getTableType() == TableType.OFFLINE) {
       segmentAssignment = new OfflineSegmentAssignment();
     } else {
-      segmentAssignment = new RealtimeSegmentAssignment();
+      UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+      if (upsertConfig != null && upsertConfig.getMode() != UpsertConfig.Mode.NONE) {
+        segmentAssignment = new StrictRealtimeSegmentAssignment();
+      } else {
+        segmentAssignment = new RealtimeSegmentAssignment();
+      }
     }
     segmentAssignment.init(helixManager, tableConfig);
     return segmentAssignment;

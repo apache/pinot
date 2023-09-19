@@ -106,8 +106,13 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
    * Helper method to assign instances for CONSUMING segment based on the segment partition id and instance partitions.
    */
   private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
-    int segmentPartitionId = SegmentAssignmentUtils
-        .getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
+    int segmentPartitionId =
+        SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager,
+            _partitionColumn);
+    return assignConsumingSegment(segmentPartitionId, instancePartitions);
+  }
+
+  protected List<String> assignConsumingSegment(int segmentPartitionId, InstancePartitions instancePartitions) {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     int numPartitions = instancePartitions.getNumPartitions();
 
