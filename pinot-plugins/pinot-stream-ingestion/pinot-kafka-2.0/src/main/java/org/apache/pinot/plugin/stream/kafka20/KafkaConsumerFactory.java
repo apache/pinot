@@ -25,9 +25,9 @@ import org.apache.pinot.spi.stream.StreamMetadataProvider;
 
 public class KafkaConsumerFactory extends StreamConsumerFactory {
 
-  private static final String _PARTITION_LEVEL_CONSUMER = "_partition_level_consumer";
-  private static final String _PARTITION_METADATA_PROVIDER = "_partition_metadata_provider";
-  private static final String _STREAM_METADATA_PROVIDER = "_stream_metadata_provider";
+  private static final String _PARTITION_LEVEL_CONSUMER = ".partition_level_consumer";
+  private static final String _PARTITION_METADATA_PROVIDER = ".partition_metadata_provider";
+  private static final String _STREAM_METADATA_PROVIDER = ".stream_metadata_provider";
 
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {

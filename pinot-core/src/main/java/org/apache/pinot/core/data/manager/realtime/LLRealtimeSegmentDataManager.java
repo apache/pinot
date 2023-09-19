@@ -1436,7 +1436,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
       throw e;
     }
-    _clientId = streamTopic + "-" + _partitionGroupId;
+    _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId;
     _transformPipeline = new TransformPipeline(tableConfig, schema);
     // Acquire semaphore to create stream consumers
     try {
