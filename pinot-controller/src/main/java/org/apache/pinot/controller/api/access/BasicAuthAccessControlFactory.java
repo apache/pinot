@@ -105,7 +105,8 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
         return Optional.empty();
       }
 
-      return authHeaders.stream().map(BasicAuthUtils::normalizeBase64Token).map(_token2principal::get)
+      return authHeaders.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+          .map(_token2principal::get)
           .filter(Objects::nonNull).findFirst();
     }
 
