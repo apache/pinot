@@ -965,8 +965,13 @@ public class PinotLLCRealtimeSegmentManager {
         }
       }
       // Assign instances to the new segment and add instances as state CONSUMING
-      List<String> instancesAssigned =
-          segmentAssignment.assignSegment(newSegmentName, instanceStatesMap, instancePartitionsMap);
+      List<String> instancesAssigned = new ArrayList<>();
+      boolean consistent =
+          segmentAssignment.assignSegment(newSegmentName, instanceStatesMap, instancePartitionsMap, instancesAssigned);
+      if (!consistent) {
+        _controllerMetrics.addMeteredTableValue(newLLCSegmentName.getTableName(),
+            ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_MISMATCH, 1L);
+      }
       instanceStatesMap.put(newSegmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
       LOGGER.info("Adding new CONSUMING segment: {} to instances: {}", newSegmentName, instancesAssigned);

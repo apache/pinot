@@ -47,6 +47,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -139,10 +140,14 @@ public class StrictRealtimeSegmentAssignmentTest {
     int numInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
     // Add segments for partition 0/1/2, but add no segment for partition 3.
+    List<String> instancesAssigned;
+    boolean consistent;
     for (int segmentId = 0; segmentId < 3; segmentId++) {
       String segmentName = _segments.get(segmentId);
-      List<String> instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
+      instancesAssigned = new ArrayList<>();
+      consistent = _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap,
+          instancesAssigned);
+      assertTrue(consistent);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
       // Segment 0 (partition 0) should be assigned to instance 0, 3, 6
       // Segment 1 (partition 1) should be assigned to instance 1, 4, 7
@@ -168,16 +173,21 @@ public class StrictRealtimeSegmentAssignmentTest {
     // So segment 3 (partition 3) should be assigned to instance new_0, new_3, new_6
     int segmentId = 3;
     String segmentName = _segments.get(segmentId);
-    List<String> instancesAssigned =
-        _segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap);
+    instancesAssigned = new ArrayList<>();
+    consistent = _segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap,
+        instancesAssigned);
+    assertTrue(consistent);
     assertEquals(instancesAssigned,
         Arrays.asList("new_consumingInstance_0", "new_consumingInstance_3", "new_consumingInstance_6"));
+    addToAssignment(currentAssignment, segmentId, instancesAssigned);
 
     // Use existing assignment for partition 0/1/2, instead of the one decided by new instancePartition.
     for (segmentId = 4; segmentId < 7; segmentId++) {
       segmentName = _segments.get(segmentId);
-      instancesAssigned =
-          _segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap);
+      instancesAssigned = new ArrayList<>();
+      consistent = _segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap,
+          instancesAssigned);
+      assertFalse(consistent);
       assertEquals(instancesAssigned.size(), NUM_REPLICAS);
 
       // Those segments are assigned according to the assignment from idealState, instead of using new_xxx instances
@@ -192,6 +202,69 @@ public class StrictRealtimeSegmentAssignmentTest {
       }
       addToAssignment(currentAssignment, segmentId, instancesAssigned);
     }
+  }
+
+  @Test
+  public void testAssignSegmentWithOfflineSegment() {
+    assertTrue(_segmentAssignment instanceof StrictRealtimeSegmentAssignment);
+    Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
+        ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
+    int numInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    // Add segments for partition 0/1/2, but add no segment for partition 3.
+    List<String> instancesAssigned;
+    boolean consistent;
+    for (int segmentId = 0; segmentId < 3; segmentId++) {
+      String segmentName = _segments.get(segmentId);
+      instancesAssigned = new ArrayList<>();
+      consistent = _segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap,
+          instancesAssigned);
+      assertTrue(consistent);
+      assertEquals(instancesAssigned.size(), NUM_REPLICAS);
+      // Segment 0 (partition 0) should be assigned to instance 0, 3, 6
+      // Segment 1 (partition 1) should be assigned to instance 1, 4, 7
+      // Segment 2 (partition 2) should be assigned to instance 2, 5, 8
+      // Following segments are assigned to those instances if continue to use the same instancePartition
+      // Segment 3 (partition 3) should be assigned to instance 0, 3, 6
+      // Segment 4 (partition 0) should be assigned to instance 0, 3, 6
+      // Segment 5 (partition 1) should be assigned to instance 1, 4, 7
+      // ...
+      for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+        int partitionId = segmentId % NUM_PARTITIONS;
+        int expectedAssignedInstanceId =
+            partitionId % numInstancesPerReplicaGroup + replicaGroupId * numInstancesPerReplicaGroup;
+        assertEquals(instancesAssigned.get(replicaGroupId), CONSUMING_INSTANCES.get(expectedAssignedInstanceId));
+      }
+      currentAssignment.put(segmentName,
+          SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.OFFLINE));
+    }
+    // Use new instancePartition to assign the new segments below.
+    ImmutableMap<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
+        ImmutableMap.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
+
+    // No existing segments for partition 3, so use the assignment decided by new instancePartition. All existing
+    // segments for partition 0/1/2 are offline, thus skipped, so use the assignment decided by new instancePartition.
+    for (int segmentId = 3; segmentId < 7; segmentId++) {
+      String segmentName = _segments.get(segmentId);
+      instancesAssigned = new ArrayList<>();
+      consistent = _segmentAssignment.assignSegment(segmentName, currentAssignment, newConsumingInstancePartitionMap,
+          instancesAssigned);
+      assertTrue(consistent);
+      assertEquals(instancesAssigned.size(), NUM_REPLICAS);
+
+      // Those segments are assigned according to the assignment from idealState, instead of using new_xxx instances
+      // Segment 4 (partition 0) should be assigned to instance 0, 3, 6
+      // Segment 5 (partition 1) should be assigned to instance 1, 4, 7
+      // Segment 6 (partition 2) should be assigned to instance 2, 5, 8
+      for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
+        int partitionId = segmentId % NUM_PARTITIONS;
+        int expectedAssignedInstanceId =
+            partitionId % numInstancesPerReplicaGroup + replicaGroupId * numInstancesPerReplicaGroup;
+        assertEquals(instancesAssigned.get(replicaGroupId), NEW_CONSUMING_INSTANCES.get(expectedAssignedInstanceId));
+      }
+      addToAssignment(currentAssignment, segmentId, instancesAssigned);
+    }
+    System.out.println(currentAssignment);
   }
 
   @Test(expectedExceptions = IllegalStateException.class)

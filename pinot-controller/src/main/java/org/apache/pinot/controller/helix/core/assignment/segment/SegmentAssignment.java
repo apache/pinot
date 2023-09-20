@@ -53,6 +53,22 @@ public interface SegmentAssignment {
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap);
 
   /**
+   * Assign new segment but check if the assignment calculated with instancePartition is consistent with the one set
+   * in the current idealState. If not, use the one from idealState to stay consistent with the source of truth.
+   *
+   * @param segmentName Name of the segment to be assigned
+   * @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)
+   * @param instancePartitionsMap Map from type (OFFLINE|CONSUMING|COMPLETED) to instance partitions
+   * @param instancesAssigned returns the list of instances to assign the segment
+   * @return true if consistent or found no existing assignment from idealState; false otherwise.
+   */
+  default boolean assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, List<String> instancesAssigned) {
+    instancesAssigned.addAll(assignSegment(segmentName, currentAssignment, instancePartitionsMap));
+    return true;
+  }
+
+  /**
    * Rebalances the segment assignment for a table.
    *
    * @param currentAssignment Current segment assignment of the table (map from segment name to instance state map)

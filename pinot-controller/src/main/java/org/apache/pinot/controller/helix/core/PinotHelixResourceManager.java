@@ -111,6 +111,8 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
@@ -167,6 +169,7 @@ import org.apache.pinot.spi.config.user.RoleType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.BrokerResourceStateModel;
@@ -2108,10 +2111,11 @@ public class PinotHelixResourceManager {
         "Failed to set segment ZK metadata for table: " + tableNameWithType + ", segment: " + segmentName);
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
 
-    assignTableSegment(tableNameWithType, segmentName);
+    assignTableSegment(tableNameWithType, segmentName,
+        new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
   }
 
-  public void assignTableSegment(String tableNameWithType, String segmentName) {
+  public void assignTableSegment(String tableNameWithType, String segmentName, ControllerMetrics controllerMetrics) {
     String segmentZKMetadataPath =
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
 
@@ -2152,9 +2156,14 @@ public class PinotHelixResourceManager {
             LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
                 tableNameWithType);
           } else {
-            List<String> assignedInstances =
-                segmentAssignment.assignSegment(segmentName, currentAssignment,
-                    finalInstancePartitionsMap);
+            List<String> assignedInstances = new ArrayList<>();
+            boolean consistent =
+                segmentAssignment.assignSegment(segmentName, currentAssignment, finalInstancePartitionsMap,
+                    assignedInstances);
+            if (!consistent) {
+              controllerMetrics.addMeteredTableValue(tableNameWithType,
+                  ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_MISMATCH, 1L);
+            }
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 tableNameWithType);
             currentAssignment.put(segmentName,

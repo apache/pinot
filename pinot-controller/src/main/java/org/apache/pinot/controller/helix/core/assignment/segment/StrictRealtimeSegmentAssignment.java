@@ -27,6 +27,7 @@ import java.util.Set;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -54,6 +55,14 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
+    List<String> instancesAssigned = new ArrayList<>();
+    assignSegment(segmentName, currentAssignment, instancePartitionsMap, instancesAssigned);
+    return instancesAssigned;
+  }
+
+  @Override
+  public boolean assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, List<String> instancesAssigned) {
     Preconditions.checkState(instancePartitionsMap.size() == 1, "One instance partition type should be provided");
     Map.Entry<InstancePartitionsType, InstancePartitions> typeToInstancePartitions =
         instancePartitionsMap.entrySet().iterator().next();
@@ -66,12 +75,16 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
     int segmentPartitionId =
         SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager,
             _partitionColumn);
-    List<String> instancesAssigned = assignConsumingSegment(segmentPartitionId, instancePartitions);
-    List<String> idealAssignment = new ArrayList<>(instancesAssigned.size());
+    List<String> candidateInstances = assignConsumingSegment(segmentPartitionId, instancePartitions);
+    List<String> idealAssignment = new ArrayList<>(candidateInstances.size());
     // Iterate the idealState to find the first segment that's in the same table partition with the new segment, and
     // check if their assignments are same. We try to derive the partition id from segment name to avoid ZK reads.
     Set<String> nonStandardSegments = new HashSet<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
+      // Skip OFFLINE segments as they are not rebalanced, so their assignment in idealState can be stale.
+      if (isSegmentOffline(entry.getValue())) {
+        continue;
+      }
       LLCSegmentName llcSegmentName = LLCSegmentName.of(entry.getKey());
       if (llcSegmentName == null) {
         nonStandardSegments.add(entry.getKey());
@@ -94,15 +107,23 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
         }
       }
     }
+    boolean consistent = true;
     if (idealAssignment.isEmpty()) {
       _logger.info("Found no existing assignment from idealState, using the one decided by instancePartitions");
-    } else if (!idealAssignment.equals(instancesAssigned)) {
-      _logger.info("Assignment: {} is inconsistent with idealState: {}, using the one as from idealState",
-          instancesAssigned, idealAssignment);
-      instancesAssigned = idealAssignment;
+    } else if (!idealAssignment.equals(candidateInstances)) {
+      _logger.warn("Assignment: {} is inconsistent with idealState: {}, using the one as from idealState",
+          candidateInstances, idealAssignment);
+      candidateInstances = idealAssignment;
+      consistent = false;
     }
-    _logger.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
+    _logger.info("Assigned segment: {} to instances: {} for table: {}", segmentName, candidateInstances,
         _tableNameWithType);
-    return instancesAssigned;
+    instancesAssigned.addAll(candidateInstances);
+    return consistent;
+  }
+
+  private boolean isSegmentOffline(Map<String, String> instanceStateMap) {
+    return !instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)
+        && !instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
   }
 }
