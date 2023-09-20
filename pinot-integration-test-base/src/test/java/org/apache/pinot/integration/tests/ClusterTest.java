@@ -213,9 +213,12 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + serverId);
     serverConf.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
         Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + serverId);
-    serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, Server.DEFAULT_ADMIN_API_PORT - serverId);
-    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + serverId);
-    serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT,
+        NetUtils.findOpenPort(Server.DEFAULT_ADMIN_API_PORT - serverId));
+    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT,
+        NetUtils.findOpenPort(Helix.DEFAULT_SERVER_NETTY_PORT + serverId));
+    serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, NetUtils.findOpenPort(Server.DEFAULT_GRPC_PORT + serverId));
+
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
@@ -545,7 +548,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   @DataProvider(name = "systemColumns")
   public Object[][] systemColumns() {
-    return new Object[][] {
+    return new Object[][]{
         {"$docId"},
         {"$hostName"},
         {"$segmentName"}
