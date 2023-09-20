@@ -26,8 +26,6 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.PlanFragmentMetadata;
-import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -132,23 +130,20 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     int nextPlanFragmentId = ++context._currentPlanFragmentId;
     PlanNode nextPlanFragmentRoot = node.getInputs().get(0).visit(this, context);
 
-    List<Integer> distributionKeys = node.getDistributionKeys();
-    RelDistribution.Type distributionType = node.getDistributionType();
     PinotRelExchangeType exchangeType = node.getExchangeType();
-
-    // make an exchange sender and receiver node pair
-    // only HASH_DISTRIBUTED requires a partition key selector; so all other types (SINGLETON and BROADCAST)
-    // of exchange will not carry a partition key selector.
-    KeySelector<Object[], Object[]> keySelector = distributionType == RelDistribution.Type.HASH_DISTRIBUTED
-        ? new FieldSelectionKeySelector(distributionKeys) : null;
+    RelDistribution.Type distributionType = node.getDistributionType();
+    // NOTE: Only HASH_DISTRIBUTED requires distribution keys
+    // TODO: Revisit ExchangeNode creation logic to avoid using HASH_DISTRIBUTED with empty distribution keys
+    List<Integer> distributionKeys =
+        distributionType == RelDistribution.Type.HASH_DISTRIBUTED ? node.getDistributionKeys() : null;
 
     PlanNode mailboxSender =
-        new MailboxSendNode(nextPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
-            currentPlanFragmentId, distributionType, exchangeType, keySelector, node.getCollations(),
-            node.isSortOnSender());
-    PlanNode mailboxReceiver = new MailboxReceiveNode(currentPlanFragmentId, nextPlanFragmentRoot.getDataSchema(),
-        nextPlanFragmentId, distributionType, exchangeType, keySelector,
-        node.getCollations(), node.isSortOnSender(), node.isSortOnReceiver(), mailboxSender);
+        new MailboxSendNode(nextPlanFragmentId, nextPlanFragmentRoot.getDataSchema(), currentPlanFragmentId,
+            distributionType, exchangeType, distributionKeys, node.getCollations(), node.isSortOnSender());
+    PlanNode mailboxReceiver =
+        new MailboxReceiveNode(currentPlanFragmentId, nextPlanFragmentRoot.getDataSchema(), nextPlanFragmentId,
+            distributionType, exchangeType, distributionKeys, node.getCollations(), node.isSortOnSender(),
+            node.isSortOnReceiver(), mailboxSender);
     mailboxSender.addInput(nextPlanFragmentRoot);
 
     context._planFragmentIdToRootNodeMap.put(nextPlanFragmentId,

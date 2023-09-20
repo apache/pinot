@@ -48,7 +48,6 @@ import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -180,8 +179,7 @@ public final class RelToPlanNodeConverter {
 
     // Parse out all equality JOIN conditions
     JoinInfo joinInfo = node.analyzeCondition();
-    JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(new FieldSelectionKeySelector(joinInfo.leftKeys),
-        new FieldSelectionKeySelector(joinInfo.rightKeys));
+    JoinNode.JoinKeys joinKeys = new JoinNode.JoinKeys(joinInfo.leftKeys, joinInfo.rightKeys);
     List<RexExpression> joinClause =
         joinInfo.nonEquiConditions.stream().map(RexExpressionUtils::fromRexNode).collect(Collectors.toList());
     return new JoinNode(currentStageId, toDataSchema(node.getRowType()), toDataSchema(node.getLeft().getRowType()),

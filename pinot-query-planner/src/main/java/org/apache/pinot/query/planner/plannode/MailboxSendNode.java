@@ -29,7 +29,6 @@ import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -41,7 +40,7 @@ public class MailboxSendNode extends AbstractPlanNode {
   @ProtoProperties
   private PinotRelExchangeType _exchangeType;
   @ProtoProperties
-  private KeySelector<Object[], Object[]> _partitionKeySelector;
+  private List<Integer> _distributionKeys;
   @ProtoProperties
   private List<RexExpression> _collationKeys;
   @ProtoProperties
@@ -55,13 +54,13 @@ public class MailboxSendNode extends AbstractPlanNode {
 
   public MailboxSendNode(int planFragmentId, DataSchema dataSchema, int receiverStageId,
       RelDistribution.Type distributionType, PinotRelExchangeType exchangeType,
-      @Nullable KeySelector<Object[], Object[]> partitionKeySelector,
-      @Nullable List<RelFieldCollation> fieldCollations, boolean isSortOnSender) {
+      @Nullable List<Integer> distributionKeys, @Nullable List<RelFieldCollation> fieldCollations,
+      boolean isSortOnSender) {
     super(planFragmentId, dataSchema);
     _receiverStageId = receiverStageId;
     _distributionType = distributionType;
     _exchangeType = exchangeType;
-    _partitionKeySelector = partitionKeySelector;
+    _distributionKeys = distributionKeys;
     // TODO: Support ordering here if the 'fieldCollations' aren't empty and 'sortOnSender' is true
     Preconditions.checkState(!isSortOnSender, "Ordering is not yet supported on Mailbox Send");
     if (!CollectionUtils.isEmpty(fieldCollations) && isSortOnSender) {
@@ -102,8 +101,8 @@ public class MailboxSendNode extends AbstractPlanNode {
     return _exchangeType;
   }
 
-  public KeySelector<Object[], Object[]> getPartitionKeySelector() {
-    return _partitionKeySelector;
+  public List<Integer> getDistributionKeys() {
+    return _distributionKeys;
   }
 
   public List<RexExpression> getCollationKeys() {

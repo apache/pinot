@@ -83,9 +83,7 @@ public class HashExchangeTest {
     Assert.assertEquals(captor.getValue().getContainer().get(0), new Object[]{2});
   }
 
-  private static class TestSelector implements KeySelector<Object[], Object[]> {
-    private static final String HASH_ALGORITHM = "dummyHash";
-
+  private static class TestSelector implements KeySelector<Object> {
     private final Iterator<Integer> _hashes;
 
     public TestSelector(Iterator<Integer> hashes) {
@@ -93,18 +91,13 @@ public class HashExchangeTest {
     }
 
     @Override
-    public Object[] getKey(Object[] input) {
+    public Object getKey(Object[] input) {
       throw new UnsupportedOperationException("Should not be called");
     }
 
     @Override
     public int computeHash(Object[] input) {
       return _hashes.next();
-    }
-
-    @Override
-    public String hashAlgorithm() {
-      return HASH_ALGORITHM;
     }
   }
 }

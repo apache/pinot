@@ -264,7 +264,7 @@ public class QueryRunner {
             _leafQueryExecutor, _executorService);
     MailboxSendOperator mailboxSendOperator =
         new MailboxSendOperator(executionContext, leafStageOperator, sendNode.getDistributionType(),
-            sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
+            sendNode.getDistributionKeys(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
             sendNode.isSortOnSender(), sendNode.getReceiverStageId());
     return new OpChain(executionContext, mailboxSendOperator);
   }
