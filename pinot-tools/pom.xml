@@ -143,7 +143,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-kafka-${kafka.version}</artifactId>
+      <artifactId>pinot-kafka-2.0</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
@@ -588,7 +588,7 @@
               <resources>
                 <resource>
                   <!-- source -->
-                  <directory>src/main/resources/sample_data/kafka_${kafka.version}</directory>
+                  <directory>src/main/resources/sample_data/kafka_2.0</directory>
                 </resource>
               </resources>
             </configuration>
