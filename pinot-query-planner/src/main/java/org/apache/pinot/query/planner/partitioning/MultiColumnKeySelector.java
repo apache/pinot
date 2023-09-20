@@ -18,51 +18,24 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import org.apache.pinot.query.planner.serde.ProtoProperties;
+import org.apache.pinot.core.data.table.Key;
 
 
-/**
- * The {@code FieldSelectionKeySelector} simply extract a column value out from a row array {@link Object[]}.
- */
-public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]> {
-  private static final String HASH_ALGORITHM = "absHashCode";
+public class MultiColumnKeySelector implements KeySelector<Key> {
+  private final int[] _keyIds;
 
-  @ProtoProperties
-  private List<Integer> _columnIndices;
-
-  public FieldSelectionKeySelector() {
-  }
-
-  public FieldSelectionKeySelector(int columnIndex) {
-    _columnIndices = Collections.singletonList(columnIndex);
-  }
-
-  public FieldSelectionKeySelector(List<Integer> columnIndices) {
-    _columnIndices = new ArrayList<>();
-    _columnIndices.addAll(columnIndices);
-  }
-
-  public FieldSelectionKeySelector(int... columnIndices) {
-    _columnIndices = new ArrayList<>();
-    for (int columnIndex : columnIndices) {
-      _columnIndices.add(columnIndex);
-    }
-  }
-
-  public List<Integer> getColumnIndices() {
-    return _columnIndices;
+  public MultiColumnKeySelector(int[] keyIds) {
+    _keyIds = keyIds;
   }
 
   @Override
-  public Object[] getKey(Object[] input) {
-    Object[] key = new Object[_columnIndices.size()];
-    for (int i = 0; i < _columnIndices.size(); i++) {
-      key[i] = input[_columnIndices.get(i)];
+  public Key getKey(Object[] row) {
+    int numKeys = _keyIds.length;
+    Object[] values = new Object[numKeys];
+    for (int i = 0; i < numKeys; i++) {
+      values[i] = row[_keyIds[i]];
     }
-    return key;
+    return new Key(values);
   }
 
   @Override
@@ -84,8 +57,8 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]
     //
     // TODO: consider better hashing algorithms than hashCode sum, such as XOR'ing
     int hashCode = 0;
-    for (int columnIndex : _columnIndices) {
-      Object value = input[columnIndex];
+    for (int keyId : _keyIds) {
+      Object value = input[keyId];
       if (value != null) {
         hashCode += value.hashCode();
       }
@@ -93,10 +66,5 @@ public class FieldSelectionKeySelector implements KeySelector<Object[], Object[]
 
     // return a positive number because this is used directly to modulo-index
     return hashCode & Integer.MAX_VALUE;
-  }
-
-  @Override
-  public String hashAlgorithm() {
-    return HASH_ALGORITHM;
   }
 }

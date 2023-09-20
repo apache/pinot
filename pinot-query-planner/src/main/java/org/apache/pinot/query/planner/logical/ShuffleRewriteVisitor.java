@@ -23,9 +23,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -105,14 +104,14 @@ public class ShuffleRewriteVisitor implements PlanNodeVisitor<Set<Integer>, Void
     Set<Integer> rightPks = node.getInputs().get(1).visit(this, context);
 
     // Currently, JOIN criteria is guaranteed to only have one FieldSelectionKeySelector
-    FieldSelectionKeySelector leftJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getLeftJoinKeySelector();
-    FieldSelectionKeySelector rightJoinKey = (FieldSelectionKeySelector) node.getJoinKeys().getRightJoinKeySelector();
+    List<Integer> leftJoinKeys = node.getJoinKeys().getLeftKeys();
+    List<Integer> rightJoinKeys = node.getJoinKeys().getRightKeys();
 
     int leftDataSchemaSize = node.getInputs().get(0).getDataSchema().size();
     Set<Integer> partitionKeys = new HashSet<>();
-    for (int i = 0; i < leftJoinKey.getColumnIndices().size(); i++) {
-      int leftIdx = leftJoinKey.getColumnIndices().get(i);
-      int rightIdx = rightJoinKey.getColumnIndices().get(i);
+    for (int i = 0; i < leftJoinKeys.size(); i++) {
+      int leftIdx = leftJoinKeys.get(i);
+      int rightIdx = rightJoinKeys.get(i);
       if (leftPKs.contains(leftIdx)) {
         partitionKeys.add(leftIdx);
       }
@@ -133,24 +132,24 @@ public class ShuffleRewriteVisitor implements PlanNodeVisitor<Set<Integer>, Void
   @Override
   public Set<Integer> visitMailboxReceive(MailboxReceiveNode node, Void context) {
     Set<Integer> oldPartitionKeys = node.getSender().visit(this, context);
-    KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
+    List<Integer> distributionKeys = node.getDistributionKeys();
 
-    if (canSkipShuffle(oldPartitionKeys, selector)) {
+    if (canSkipShuffle(oldPartitionKeys, distributionKeys)) {
       node.setDistributionType(RelDistribution.Type.SINGLETON);
       return oldPartitionKeys;
-    } else if (selector == null) {
+    } else if (distributionKeys == null) {
       return new HashSet<>();
     } else {
-      return new HashSet<>(((FieldSelectionKeySelector) selector).getColumnIndices());
+      return new HashSet<>(distributionKeys);
     }
   }
 
   @Override
   public Set<Integer> visitMailboxSend(MailboxSendNode node, Void context) {
     Set<Integer> oldPartitionKeys = node.getInputs().get(0).visit(this, context);
-    KeySelector<Object[], Object[]> selector = node.getPartitionKeySelector();
+    List<Integer> distributionKeys = node.getDistributionKeys();
 
-    if (canSkipShuffle(oldPartitionKeys, selector)) {
+    if (canSkipShuffle(oldPartitionKeys, distributionKeys)) {
       node.setDistributionType(RelDistribution.Type.SINGLETON);
       return oldPartitionKeys;
     } else {
@@ -185,10 +184,9 @@ public class ShuffleRewriteVisitor implements PlanNodeVisitor<Set<Integer>, Void
     return new HashSet<>();
   }
 
-  private static boolean canSkipShuffle(Set<Integer> partitionKeys, KeySelector<Object[], Object[]> keySelector) {
-    if (!partitionKeys.isEmpty() && keySelector != null) {
-      Set<Integer> targetSet = new HashSet<>(((FieldSelectionKeySelector) keySelector).getColumnIndices());
-      return targetSet.containsAll(partitionKeys);
+  private static boolean canSkipShuffle(Set<Integer> partitionKeys, @Nullable List<Integer> distributionKeys) {
+    if (!partitionKeys.isEmpty() && distributionKeys != null) {
+      return distributionKeys.containsAll(partitionKeys);
     }
     return false;
   }

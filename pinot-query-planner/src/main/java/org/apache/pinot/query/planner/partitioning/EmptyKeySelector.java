@@ -18,30 +18,20 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
-/**
- * The {@code KeySelector} provides a partitioning function to encode a specific input data type into a key.
- *
- * <p>This key selector is used for computation such as GROUP BY or equality JOINs.
- *
- * <p>Key selector should always produce the same selection hash key when the same input is provided.
- */
-public interface KeySelector<T> {
-  String DEFAULT_HASH_ALGORITHM = "absHashCode";
+public class EmptyKeySelector implements KeySelector<Integer> {
+  private EmptyKeySelector() {
+  }
 
-  /**
-   * Extracts the key out of the given row.
-   */
-  T getKey(Object[] row);
+  public static final EmptyKeySelector INSTANCE = new EmptyKeySelector();
+  private static final Integer PLACE_HOLDER = 0;
 
-  /**
-   * Computes the hash of the given row.
-   */
-  int computeHash(Object[] input);
+  @Override
+  public Integer getKey(Object[] row) {
+    return PLACE_HOLDER;
+  }
 
-  /**
-   * Returns the hash algorithm used to compute the hash.
-   */
-  default String hashAlgorithm() {
-    return DEFAULT_HASH_ALGORITHM;
+  @Override
+  public int computeHash(Object[] input) {
+    return 0;
   }
 }

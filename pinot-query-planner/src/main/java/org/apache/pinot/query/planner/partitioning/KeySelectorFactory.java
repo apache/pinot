@@ -18,30 +18,25 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
-/**
- * The {@code KeySelector} provides a partitioning function to encode a specific input data type into a key.
- *
- * <p>This key selector is used for computation such as GROUP BY or equality JOINs.
- *
- * <p>Key selector should always produce the same selection hash key when the same input is provided.
- */
-public interface KeySelector<T> {
-  String DEFAULT_HASH_ALGORITHM = "absHashCode";
+import java.util.List;
 
-  /**
-   * Extracts the key out of the given row.
-   */
-  T getKey(Object[] row);
 
-  /**
-   * Computes the hash of the given row.
-   */
-  int computeHash(Object[] input);
+public class KeySelectorFactory {
+  private KeySelectorFactory() {
+  }
 
-  /**
-   * Returns the hash algorithm used to compute the hash.
-   */
-  default String hashAlgorithm() {
-    return DEFAULT_HASH_ALGORITHM;
+  public static KeySelector<?> getKeySelector(List<Integer> keyIds) {
+    int numKeys = keyIds.size();
+    if (numKeys == 0) {
+      return EmptyKeySelector.INSTANCE;
+    } else if (numKeys == 1) {
+      return new SingleColumnKeySelector(keyIds.get(0));
+    } else {
+      int[] ids = new int[numKeys];
+      for (int i = 0; i < numKeys; i++) {
+        ids[i] = keyIds.get(i);
+      }
+      return new MultiColumnKeySelector(ids);
+    }
   }
 }
