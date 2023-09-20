@@ -23,7 +23,9 @@ import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -72,6 +74,85 @@ public class ArrayFunctions {
   @ScalarFunction
   public static int arrayIndexOfString(String[] values, String valueToFind) {
     return ArrayUtils.indexOf(values, valueToFind);
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexOfAllInt(int[] value, int valueToFind) {
+    List<Integer> indices = new ArrayList<>();
+    for (int i = 0; i < value.length; i++) {
+      if (value[i] == valueToFind) {
+        indices.add(i);
+      }
+    }
+    return indices.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexOfAllLong(long[] value, long valueToFind) {
+    List<Integer> indices = new ArrayList<>();
+    for (int i = 0; i < value.length; i++) {
+      if (value[i] == valueToFind) {
+        indices.add(i);
+      }
+    }
+    return indices.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexOfAllFloat(float[] value, float valueToFind) {
+    List<Integer> indices = new ArrayList<>();
+    for (int i = 0; i < value.length; i++) {
+      if (value[i] == valueToFind) {
+        indices.add(i);
+      }
+    }
+    return indices.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexOfAllDouble(double[] value, double valueToFind) {
+    List<Integer> indices = new ArrayList<>();
+    for (int i = 0; i < value.length; i++) {
+      if (value[i] == valueToFind) {
+        indices.add(i);
+      }
+    }
+    return indices.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexOfAllString(String[] value, String valueToFind) {
+    List<Integer> indices = new ArrayList<>();
+    for (int i = 0; i < value.length; i++) {
+      if (valueToFind.equals(value[i])) {
+        indices.add(i);
+      }
+    }
+    return indices.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  /**
+   * Assume values1, and values2 are monotonous increasing indices of MV cols.
+   * Here is the common usage:
+   * col1: ["a", "b", "a", "b"]
+   * col2: ["c", "d", "d", "c"]
+   * The user want to get the first index called idx, s.t. col1[idx] == "b" && col2[idx] == "d"
+   * arrayElementAtInt(0, intersectIndices(arrayIndexOfAllString(col1, "b"), arrayIndexOfAllString(col2, "d")))
+   */
+  @ScalarFunction
+  public static int[] intersectIndices(int[] values1, int[] values2) {
+    // TODO: if values1.length << values2.length. Use binary search can speed up the query
+    int i = 0;
+    int j = 0;
+    List<Integer> indices = new ArrayList<>();
+    while (i < values1.length && j < values2.length) {
+      if (values1[i] == values2[j]) {
+        indices.add(values1[i]);
+        j++;
+      }
+      i++;
+    }
+    return indices.stream().mapToInt(Integer::intValue).toArray();
   }
 
   @ScalarFunction
