@@ -36,6 +36,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -87,6 +88,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -119,7 +121,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       ImmutableMap.<String, String>builder().put("distinctcount", "distinctcountmv")
           .put("distinctcountbitmap", "distinctcountbitmapmv").put("distinctcounthll", "distinctcounthllmv")
           .put("distinctcountrawhll", "distinctcountrawhllmv").put("distinctsum", "distinctsummv")
-          .put("distinctavg", "distinctavgmv").build();
+          .put("distinctavg", "distinctavgmv").put("count", "countmv").put("min", "minmv").put("max", "maxmv")
+          .put("avg", "avgmv").put("sum", "summv").put("minmaxrange", "minmaxrangemv").build();
 
   protected final PinotConfiguration _config;
   protected final BrokerRoutingManager _routingManager;
@@ -386,7 +389,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (_enableDistinctCountBitmapOverride) {
         handleDistinctCountBitmapOverride(serverPinotQuery);
       }
-      handleDistinctMultiValuedOverride(serverPinotQuery, getMultiValuedColumns(_tableCache, tableName));
+
+      final Schema tableSchema = _tableCache.getSchema(tableName);
+      if (tableSchema != null) {
+        handleDistinctMultiValuedOverride(serverPinotQuery, tableSchema);
+      }
 
       long compilationEndTimeNs = System.nanoTime();
       // full request compile time = compilationTimeNs + parserTimeNs
@@ -956,20 +963,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * @param tableName
    * @return multivalued columns of the table .
    */
-  private static Set<String> getMultiValuedColumns(TableCache tableCache, String tableName) {
+  private static boolean checkIfColumnIsMultiValued(@Nonnull Schema tableSchema, @Nonnull String columnName) {
 
-    Set<String> multiValuedColumns = new HashSet<>();
-    final Schema tableSchema = tableCache.getSchema(tableName);
-    if (tableSchema == null) {
-      return multiValuedColumns;
+    DimensionFieldSpec dimensionFieldSpec = tableSchema.getDimensionSpec(columnName);
+    if (dimensionFieldSpec == null || dimensionFieldSpec.isSingleValueField()) {
+      return false;
     }
-    for (FieldSpec dimFieldSpec : tableSchema.getDimensionFieldSpecs()) {
-      if (!dimFieldSpec.isSingleValueField()) {
-        multiValuedColumns.add(dimFieldSpec.getName());
-      }
-    }
-
-    return multiValuedColumns;
+    return true;
   }
 
   /**
@@ -1109,40 +1109,42 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
    */
   @VisibleForTesting
-  static void handleDistinctMultiValuedOverride(PinotQuery pinotQuery, Set<String> multiValuedDimColumns) {
+  static void handleDistinctMultiValuedOverride(PinotQuery pinotQuery, Schema tableSchema) {
     for (Expression expression : pinotQuery.getSelectList()) {
-      handleDistinctMultiValuedOverride(expression, multiValuedDimColumns);
+      handleDistinctMultiValuedOverride(expression, tableSchema);
     }
     List<Expression> orderByExpressions = pinotQuery.getOrderByList();
     if (orderByExpressions != null) {
       for (Expression expression : orderByExpressions) {
         // NOTE: Order-by is always a Function with the ordering of the Expression
-        handleDistinctMultiValuedOverride(expression.getFunctionCall().getOperands().get(0), multiValuedDimColumns);
+        handleDistinctMultiValuedOverride(expression.getFunctionCall().getOperands().get(0), tableSchema);
       }
     }
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      handleDistinctMultiValuedOverride(havingExpression, multiValuedDimColumns);
+      handleDistinctMultiValuedOverride(havingExpression, tableSchema);
     }
   }
 
   /**
    * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
    */
-  private static void handleDistinctMultiValuedOverride(Expression expression, Set<String> multiValuedDimColumns) {
+  private static void handleDistinctMultiValuedOverride(Expression expression, Schema tableSchema) {
     Function function = expression.getFunctionCall();
     if (function == null) {
       return;
     }
-    if (function.getOperator() != null && DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.containsKey(function.getOperator())) {
+    if (DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.containsKey(function.getOperator())) {
       List<Expression> operands = function.getOperands();
-      if (operands.size() == 1 && operands.get(0).isSetIdentifier() && multiValuedDimColumns
-          .contains(operands.get(0).getIdentifier().getName())) {
+      if (operands.size() >= 1 && operands.get(0).isSetIdentifier() && checkIfColumnIsMultiValued(tableSchema,
+          operands.get(0).getIdentifier().getName())) {
+        // we are only checking the first operand that if its a MV column as all the overriding agg. fn.'s have
+        // first operator is column name
         function.setOperator(DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator()));
       }
     } else {
       for (Expression operand : function.getOperands()) {
-        handleSegmentPartitionedDistinctCountOverride(operand, multiValuedDimColumns);
+        handleDistinctMultiValuedOverride(operand, tableSchema);
       }
     }
   }
