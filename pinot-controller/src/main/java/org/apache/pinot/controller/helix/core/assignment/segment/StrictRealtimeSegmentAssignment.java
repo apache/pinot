@@ -20,10 +20,12 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -75,14 +77,14 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
     int segmentPartitionId =
         SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager,
             _partitionColumn);
-    List<String> candidateInstances = assignConsumingSegment(segmentPartitionId, instancePartitions);
-    List<String> idealAssignment = new ArrayList<>(candidateInstances.size());
+    Collection<String> candidateInstances = assignConsumingSegment(segmentPartitionId, instancePartitions);
     // Iterate the idealState to find the first segment that's in the same table partition with the new segment, and
     // check if their assignments are same. We try to derive the partition id from segment name to avoid ZK reads.
+    Set<String> idealAssignment = null;
     Set<String> nonStandardSegments = new HashSet<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       // Skip OFFLINE segments as they are not rebalanced, so their assignment in idealState can be stale.
-      if (isSegmentOffline(entry.getValue())) {
+      if (isOfflineSegment(entry.getValue())) {
         continue;
       }
       LLCSegmentName llcSegmentName = LLCSegmentName.of(entry.getKey());
@@ -91,26 +93,27 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
         continue;
       }
       if (llcSegmentName.getPartitionGroupId() == segmentPartitionId) {
-        idealAssignment.addAll(entry.getValue().keySet());
+        idealAssignment = entry.getValue().keySet();
         break;
       }
     }
-    if (idealAssignment.isEmpty()) {
+    if (CollectionUtils.isEmpty(idealAssignment)) {
       _logger.debug("Check ZK metadata of segments: {} for any one from partition: {}", nonStandardSegments.size(),
           segmentPartitionId);
       // Check ZK metadata for segments with non-standard LLC segment names.
       for (String nonStandardSegment : nonStandardSegments) {
         if (SegmentAssignmentUtils.getRealtimeSegmentPartitionId(nonStandardSegment, _tableNameWithType, _helixManager,
             _partitionColumn) == segmentPartitionId) {
-          idealAssignment.addAll(currentAssignment.get(nonStandardSegment).keySet());
+          idealAssignment = currentAssignment.get(nonStandardSegment).keySet();
           break;
         }
       }
     }
+    // Check if the candidate assignment is consistent with idealState. Use idealState if not.
     boolean consistent = true;
-    if (idealAssignment.isEmpty()) {
-      _logger.info("Found no existing assignment from idealState, using the one decided by instancePartitions");
-    } else if (!idealAssignment.equals(candidateInstances)) {
+    if (CollectionUtils.isEmpty(idealAssignment)) {
+      _logger.info("No existing assignment from idealState, using the one decided by instancePartitions");
+    } else if (!isSameAssignment(idealAssignment, candidateInstances)) {
       _logger.warn("Assignment: {} is inconsistent with idealState: {}, using the one as from idealState",
           candidateInstances, idealAssignment);
       candidateInstances = idealAssignment;
@@ -122,7 +125,11 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
     return consistent;
   }
 
-  private boolean isSegmentOffline(Map<String, String> instanceStateMap) {
+  private boolean isSameAssignment(Set<String> idealAssignment, Collection<String> candidateInstances) {
+    return idealAssignment.size() == candidateInstances.size() && idealAssignment.containsAll(candidateInstances);
+  }
+
+  private boolean isOfflineSegment(Map<String, String> instanceStateMap) {
     return !instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)
         && !instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING);
   }
