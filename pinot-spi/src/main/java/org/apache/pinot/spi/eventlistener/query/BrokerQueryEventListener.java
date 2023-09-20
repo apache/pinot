@@ -19,10 +19,11 @@
 package org.apache.pinot.spi.eventlistener.query;
 
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.RequestContext;
 
 
 public interface BrokerQueryEventListener {
 
   void init(PinotConfiguration eventListenerConfiguration);
-  void onQueryCompletion();
+  void onQueryCompletion(RequestContext requestContext);
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.eventlistener.query;
 
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.RequestContext;
 
 
 public class NoOpBrokerQueryEventListener implements BrokerQueryEventListener {
@@ -29,7 +30,7 @@ public class NoOpBrokerQueryEventListener implements BrokerQueryEventListener {
   }
 
   @Override
-  public void onQueryCompletion() {
+  public void onQueryCompletion(RequestContext requestContext) {
     // Not implemented method
   }
 }

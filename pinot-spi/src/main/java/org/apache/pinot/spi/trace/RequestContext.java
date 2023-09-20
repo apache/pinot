@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.trace;
 
 public interface RequestContext {
-  RequestContext getRequestContext();
   long getOfflineSystemActivitiesCpuTimeNs();
 
   void setOfflineSystemActivitiesCpuTimeNs(long offlineSystemActivitiesCpuTimeNs);
