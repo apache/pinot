@@ -28,7 +28,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -60,15 +59,14 @@ public class PeerServerSegmentFinder {
    * @return a list of uri strings of the form http(s)://hostname:port/segments/tablenameWithType/segmentName
    * for the servers hosting ONLINE segments; empty list if no such server found.
    */
-  public static List<URI> getPeerServerURIs(String segmentName, String downloadScheme, HelixManager helixManager) {
-    LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    String tableNameWithType =
-        TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(llcSegmentName.getTableName());
+  public static List<URI> getPeerServerURIs(String rawTableName, String segmentName, String downloadScheme,
+      HelixManager helixManager) {
+    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
     return getPeerServerURIs(segmentName, downloadScheme, helixManager, tableNameWithType);
   }
 
-  public static List<URI> getPeerServerURIs(String segmentName, String downloadScheme,
-      HelixManager helixManager, String tableNameWithType) {
+  public static List<URI> getPeerServerURIs(String segmentName, String downloadScheme, HelixManager helixManager,
+      String tableNameWithType) {
     HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
     String clusterName = helixManager.getClusterName();
     if (clusterName == null) {
@@ -107,8 +105,9 @@ public class PeerServerSegmentFinder {
         String hostName = instanceConfig.getHostName();
         int port = getServerAdminPort(helixAdmin, clusterName, instanceId);
         try {
-          onlineServerURIs.add(new URI(StringUtil
-              .join("/", downloadScheme + "://" + hostName + ":" + port, "segments", tableNameWithType, segmentName)));
+          onlineServerURIs.add(new URI(
+              StringUtil.join("/", downloadScheme + "://" + hostName + ":" + port, "segments", tableNameWithType,
+                  segmentName)));
         } catch (URISyntaxException e) {
           _logger.warn("Error in uri syntax: ", e);
         }

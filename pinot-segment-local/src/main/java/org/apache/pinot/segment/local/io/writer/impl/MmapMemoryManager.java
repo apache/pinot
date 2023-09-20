@@ -27,6 +27,7 @@ import java.io.RandomAccessFile;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -50,6 +51,7 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   private static final long DEFAULT_FILE_LENGTH = 512 * 1024 * 1024L; // 0.5G per segment
 
   private final String _dirPathName;
+  private final String _tableName;
   private final String _segmentName;
 
   // It is possible that one thread stops consumption, and another thread takes over consumption, in LLC.
@@ -77,9 +79,10 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
    * @param serverMetrics Server metrics
    * @see RealtimeIndexOffHeapMemoryManager
    */
-  public MmapMemoryManager(String dirPathName, String segmentName, ServerMetrics serverMetrics) {
-    super(serverMetrics, segmentName);
+  public MmapMemoryManager(String dirPathName, String tableName, String segmentName, ServerMetrics serverMetrics) {
+    super(serverMetrics, tableName, segmentName);
     _dirPathName = dirPathName;
+    _tableName = tableName;
     _segmentName = segmentName;
     File dirFile = new File(_dirPathName);
     if (dirFile.exists()) {
@@ -101,7 +104,8 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
 
   @VisibleForTesting
   public MmapMemoryManager(String dirPathName, String segmentName) {
-    this(dirPathName, segmentName, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    this(dirPathName, LLCSegmentName.of(segmentName).getSegmentName(), segmentName,
+        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
   }
 
   private String getFilePrefix() {

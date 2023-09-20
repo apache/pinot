@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.segment.local.io.writer.impl;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -31,13 +31,17 @@ public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   /**
    * @see RealtimeIndexOffHeapMemoryManager
    */
-  public DirectMemoryManager(final String segmentName, ServerMetrics serverMetrics) {
-    super(serverMetrics, segmentName);
+  public DirectMemoryManager(final String tableName, final String segmentName, ServerMetrics serverMetrics) {
+    super(serverMetrics, tableName, segmentName);
   }
 
-  @VisibleForTesting
+  public DirectMemoryManager(final String tableName, final String segmentName) {
+    this(tableName, segmentName, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+  }
+
   public DirectMemoryManager(final String segmentName) {
-    this(segmentName, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    this(LLCSegmentName.of(segmentName) == null ? "NoSuchTable" : LLCSegmentName.of(segmentName).getTableName(),
+        segmentName, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
   }
 
   /**

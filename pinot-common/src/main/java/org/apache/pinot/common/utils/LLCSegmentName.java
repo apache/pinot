@@ -105,6 +105,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return Integer.parseInt(StringUtils.splitByWholeSeparator(segmentName, SEPARATOR)[2]);
   }
 
+  @Deprecated
   public String getTableName() {
     return _tableName;
   }

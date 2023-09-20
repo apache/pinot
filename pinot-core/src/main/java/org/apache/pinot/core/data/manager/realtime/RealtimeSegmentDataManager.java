@@ -36,14 +36,14 @@ public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
   @Override
   public abstract MutableSegment getSegment();
 
-  protected static PinotDataBufferMemoryManager getMemoryManager(String consumerDir, String segmentName,
-      boolean offHeap, boolean directOffHeap, ServerMetrics serverMetrics) {
+  protected static PinotDataBufferMemoryManager getMemoryManager(String consumerDir, String tableName,
+      String segmentName, boolean offHeap, boolean directOffHeap, ServerMetrics serverMetrics) {
     if (offHeap && !directOffHeap) {
-      return new MmapMemoryManager(consumerDir, segmentName, serverMetrics);
+      return new MmapMemoryManager(consumerDir, tableName, segmentName, serverMetrics);
     } else {
       // For on-heap allocation, we still need a memory manager for forward index.
       // Dictionary will be allocated on heap.
-      return new DirectMemoryManager(segmentName, serverMetrics);
+      return new DirectMemoryManager(tableName, segmentName, serverMetrics);
     }
   }
 

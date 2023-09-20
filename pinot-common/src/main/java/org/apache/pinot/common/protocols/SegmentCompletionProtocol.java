@@ -127,6 +127,7 @@ public class SegmentCompletionProtocol {
 
   public static final String PARAM_SEGMENT_LOCATION = "location";
   public static final String PARAM_SEGMENT_NAME = "name";
+  public static final String PARAM_TABLE_NAME = "tableName";
   public static final String PARAM_OFFSET = "offset";
   public static final String PARAM_STREAM_PARTITION_MSG_OFFSET = "streamPartitionMsgOffset";
   public static final String PARAM_INSTANCE_ID = "instance";
@@ -232,6 +233,7 @@ public class SegmentCompletionProtocol {
 
     public static class Params {
       private long _offset;
+      private String _tableName;
       private String _segmentName;
       private String _instanceId;
       private String _reason;
@@ -246,6 +248,7 @@ public class SegmentCompletionProtocol {
 
       public Params() {
         _offset = -1L;
+        _tableName = "UNKNOWN_TABLE";
         _segmentName = "UNKNOWN_SEGMENT";
         _instanceId = "UNKNOWN_INSTANCE";
         _numRows = NUM_ROWS_DEFAULT;
@@ -260,6 +263,7 @@ public class SegmentCompletionProtocol {
 
       public Params(Params params) {
         _offset = params.getOffset();
+        _tableName = params.getTableName();
         _segmentName = params.getSegmentName();
         _instanceId = params.getInstanceId();
         _numRows = params.getNumRows();
@@ -275,6 +279,11 @@ public class SegmentCompletionProtocol {
       @Deprecated
       public Params withOffset(long offset) {
         _offset = offset;
+        return this;
+      }
+
+      public Params withTableName(String tableName) {
+        _tableName = tableName;
         return this;
       }
 
@@ -333,6 +342,10 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public String getTableName() {
+        return _tableName;
+      }
+
       public String getSegmentName() {
         return _segmentName;
       }
@@ -383,10 +396,10 @@ public class SegmentCompletionProtocol {
       }
 
       public String toString() {
-        return "Offset: " + _offset + ",Segment name: " + _segmentName + ",Instance Id: " + _instanceId + ",Reason: "
-            + _reason + ",NumRows: " + _numRows + ",BuildTimeMillis: " + _buildTimeMillis + ",WaitTimeMillis: "
-            + _waitTimeMillis + ",ExtraTimeSec: " + _extraTimeSec + ",SegmentLocation: " + _segmentLocation
-            + ",MemoryUsedBytes: " + _memoryUsedBytes + ",SegmentSizeBytes: " + _segmentSizeBytes
+        return "Offset: " + _offset + ",Table name: " + _tableName + ",Segment name: " + _segmentName + ",Instance Id: "
+            + _instanceId + ",Reason: " + _reason + ",NumRows: " + _numRows + ",BuildTimeMillis: " + _buildTimeMillis
+            + ",WaitTimeMillis: " + _waitTimeMillis + ",ExtraTimeSec: " + _extraTimeSec + ",SegmentLocation: "
+            + _segmentLocation + ",MemoryUsedBytes: " + _memoryUsedBytes + ",SegmentSizeBytes: " + _segmentSizeBytes
             + ",StreamPartitionMsgOffset: " + _streamPartitionMsgOffset;
       }
     }

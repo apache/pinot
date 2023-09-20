@@ -25,7 +25,6 @@ import java.util.List;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 
@@ -50,16 +49,10 @@ public abstract class RealtimeIndexOffHeapMemoryManager implements PinotDataBuff
 
   private long _totalAllocatedBytes = 0;
 
-  protected RealtimeIndexOffHeapMemoryManager(ServerMetrics serverMetrics, String segmentName) {
+  protected RealtimeIndexOffHeapMemoryManager(ServerMetrics serverMetrics, String rawTableName, String segmentName) {
     _serverMetrics = serverMetrics;
     _segmentName = segmentName;
-    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-    if (llcSegmentName != null) {
-      _rawTableName = llcSegmentName.getTableName();
-    } else {
-      // For testing only
-      _rawTableName = "NoSuchTable";
-    }
+    _rawTableName = rawTableName;
   }
 
   /**

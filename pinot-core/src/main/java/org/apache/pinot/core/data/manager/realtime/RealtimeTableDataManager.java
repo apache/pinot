@@ -630,7 +630,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "." + System.currentTimeMillis());
       File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
       // First find servers hosting the segment in a ONLINE state.
-      List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
+      List<URI> peerSegmentURIs =
+          PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager, _tableNameWithType);
       // Next download the segment from a randomly chosen server using configured scheme.
       SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(peerSegmentURIs, segmentTarFile);
       _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURIs, segmentTarFile,

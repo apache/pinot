@@ -181,8 +181,8 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
         .withSegmentName(_segmentNameStr).withSegmentLocation("location");
-    response = _segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = _segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -258,8 +258,8 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
         .withSegmentName(_segmentNameStr).withSegmentLocation("location");
-    response = _segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = _segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -392,8 +392,8 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
         .withSegmentName(_segmentNameStr).withSegmentLocation("doNotCommitMe");
-    response = _segmentCompletionMgr
-        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = _segmentCompletionMgr.segmentCommitEnd(params, true, true,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
 
     // Now the FSM should have aborted
@@ -430,8 +430,8 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_3).withStreamPartitionMsgOffset(_s2Offset.toString())
         .withSegmentName(_segmentNameStr).withSegmentLocation("location");
-    response = _segmentCompletionMgr
-        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = _segmentCompletionMgr.segmentCommitEnd(params, true, true,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT_SUCCESS);
     // And the FSM should be removed.
     Assert.assertFalse(_fsmMap.containsKey(_segmentNameStr));
@@ -490,8 +490,8 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
         .withSegmentName(_segmentNameStr).withSegmentLocation(segmentLocation);
-    response = _segmentCompletionMgr
-        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = _segmentCompletionMgr.segmentCommitEnd(params, true, true,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     Assert.assertEquals(_segmentManager.getSegmentZKMetadata(null, null, null).getDownloadUrl(), downloadURL);
 
@@ -546,8 +546,8 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_3).withStreamPartitionMsgOffset(_s3Offset.toString())
         .withSegmentName(_segmentNameStr).withSegmentLocation("location");
-    response = _segmentCompletionMgr
-        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = _segmentCompletionMgr.segmentCommitEnd(params, true, true,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
 
     // Now the FSM should have disappeared from the map
@@ -615,8 +615,8 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
         .withSegmentName(_segmentNameStr).withSegmentLocation("location");
-    response = _segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = _segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -713,8 +713,8 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
         .withSegmentName(_segmentNameStr).withSegmentLocation("location");
-    response = _segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = _segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // S3 comes back at the latest offset
@@ -766,8 +766,8 @@ public class SegmentCompletionTest {
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
         .withSegmentName(_segmentNameStr).withSegmentLocation("location");
-    response = _segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = _segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // We ask S2 to keep the segment
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s1Offset.toString())
@@ -1058,8 +1058,8 @@ public class SegmentCompletionTest {
     long commitTimeMs = (_segmentCompletionMgr._seconds - startTime) * 1000;
     Assert.assertEquals(_commitTimeMap.get(tableName).longValue(), commitTimeMs);
     _segmentCompletionMgr._seconds += 55;
-    response = _segmentCompletionMgr
-        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
+    response = _segmentCompletionMgr.segmentCommitEnd(params, true, false,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // now FSM should be out of the map.
     Assert.assertFalse((_fsmMap.containsKey(_segmentNameStr)));
@@ -1175,8 +1175,8 @@ public class SegmentCompletionTest {
 
     final int leaseTimeSec = 20;
     // Lease will not be granted if the time taken so far plus lease time exceeds the max allowabale.
-    while (_segmentCompletionMgr._seconds + leaseTimeSec <= startTime + SegmentCompletionManager
-        .getMaxCommitTimeForAllSegmentsSeconds()) {
+    while (_segmentCompletionMgr._seconds + leaseTimeSec
+        <= startTime + SegmentCompletionManager.getMaxCommitTimeForAllSegmentsSeconds()) {
       params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
           .withSegmentName(_segmentNameStr).withExtraTimeSec(leaseTimeSec);
       response = _segmentCompletionMgr.extendBuildTime(params);
@@ -1420,7 +1420,8 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    protected StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(LLCSegmentName llcSegmentName) {
+    protected StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(LLCSegmentName llcSegmentName,
+        String tableName) {
       return new LongMsgOffsetFactory();
     }
 

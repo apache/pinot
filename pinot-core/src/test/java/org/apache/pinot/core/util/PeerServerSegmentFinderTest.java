@@ -97,25 +97,30 @@ public class PeerServerSegmentFinderTest {
       throws Exception {
     // SEGMENT_1 has only 2 online replicas.
     List<URI> httpServerURIs =
-        PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_1, CommonConstants.HTTP_PROTOCOL, _helixManager);
+        PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_1, CommonConstants.HTTP_PROTOCOL, _helixManager,
+            TABLE_NAME_WITH_TYPE);
     assertEquals(2, httpServerURIs.size());
     httpServerURIs.contains(new URI(
         StringUtil.join("/", "http://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
     httpServerURIs.contains(new URI(
         StringUtil.join("/", "http://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
     List<URI> httpsServerURIs =
-        PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_1, CommonConstants.HTTPS_PROTOCOL, _helixManager);
+        PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_1, CommonConstants.HTTPS_PROTOCOL, _helixManager,
+            TABLE_NAME_WITH_TYPE);
     assertEquals(2, httpsServerURIs.size());
-    httpServerURIs.contains(new URI(StringUtil
-        .join("/", "https://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
-    httpServerURIs.contains(new URI(StringUtil
-        .join("/", "https://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE, SEGMENT_1)));
+    httpServerURIs.contains(new URI(
+        StringUtil.join("/", "https://" + HOST_1_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE,
+            SEGMENT_1)));
+    httpServerURIs.contains(new URI(
+        StringUtil.join("/", "https://" + HOST_3_NAME + ":" + ADMIN_PORT, "segments", TABLE_NAME_WITH_TYPE,
+            SEGMENT_1)));
   }
 
   @Test
   public void testSegmentNotFound()
       throws Exception {
     Assert.assertEquals(0,
-        PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_2, CommonConstants.HTTP_PROTOCOL, _helixManager).size());
+        PeerServerSegmentFinder.getPeerServerURIs(SEGMENT_2, CommonConstants.HTTP_PROTOCOL, _helixManager,
+            TABLE_NAME_WITH_TYPE).size());
   }
 }

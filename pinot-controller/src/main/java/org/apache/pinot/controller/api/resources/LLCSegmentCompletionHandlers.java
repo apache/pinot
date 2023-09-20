@@ -272,6 +272,7 @@ public class LLCSegmentCompletionHandlers {
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommit(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
+      @QueryParam(SegmentCompletionProtocol.PARAM_TABLE_NAME) String tableName,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
@@ -301,7 +302,7 @@ public class LLCSegmentCompletionHandlers {
         localTempFile = extractSegmentFromFormToLocalTempFile(multiPart, segmentName);
         SegmentMetadataImpl segmentMetadata = extractMetadataFromLocalSegmentFile(localTempFile);
         // Store the segment file to Pinot FS.
-        String rawTableName = new LLCSegmentName(segmentName).getTableName();
+        String rawTableName = tableName == null ? new LLCSegmentName(segmentName).getTableName() : tableName;
         URI segmentFileURI = URIUtils
             .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
                 URIUtils.encode(segmentName));
@@ -362,6 +363,7 @@ public class LLCSegmentCompletionHandlers {
   @TrackInflightRequestMetrics
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
   public String segmentUpload(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
+      @QueryParam(SegmentCompletionProtocol.PARAM_TABLE_NAME) String tableName,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
@@ -375,7 +377,7 @@ public class LLCSegmentCompletionHandlers {
     File localTempFile = null;
     try {
       localTempFile = extractSegmentFromFormToLocalTempFile(multiPart, segmentName);
-      String rawTableName = new LLCSegmentName(segmentName).getTableName();
+      String rawTableName = tableName == null ? new LLCSegmentName(segmentName).getTableName() : tableName;
       URI segmentFileURI = URIUtils
           .getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
               URIUtils.encode(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName)));
