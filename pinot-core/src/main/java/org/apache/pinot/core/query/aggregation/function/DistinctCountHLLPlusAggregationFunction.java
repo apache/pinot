@@ -96,16 +96,14 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
         HyperLogLogPlus hyperLogLogPlus = aggregationResultHolder.getResult();
-        if (hyperLogLogPlus != null) {
-          for (int i = 0; i < length; i++) {
-            hyperLogLogPlus.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[i]));
-          }
-        } else {
+        if (hyperLogLogPlus == null) {
           hyperLogLogPlus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[0]);
           aggregationResultHolder.setValue(hyperLogLogPlus);
-          for (int i = 1; i < length; i++) {
-            hyperLogLogPlus.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[i]));
-          }
+        } else {
+          hyperLogLogPlus.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[0]));
+        }
+        for (int i = 1; i < length; i++) {
+          hyperLogLogPlus.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(bytesValues[i]));
         }
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while merging HyperLogLogPlus", e);
