@@ -38,7 +38,9 @@ public class SimpleSegmentNameGeneratorTest {
   @Test
   public void testWithoutSegmentNamePostfix() {
     SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, null);
-    assertEquals(segmentNameGenerator.toString(), "SimpleSegmentNameGenerator: tableName=testTable");
+    assertEquals(segmentNameGenerator.toString(),
+        "SimpleSegmentNameGenerator: tableName=testTable, appendUUIDToSegmentName=false, "
+            + "omitTimestampsInSegmentName=false");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "testTable");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
         "testTable_1234_5678");
@@ -51,7 +53,8 @@ public class SimpleSegmentNameGeneratorTest {
   public void testWithSegmentNamePostfix() {
     SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_POSTFIX);
     assertEquals(segmentNameGenerator.toString(),
-        "SimpleSegmentNameGenerator: tableName=testTable, segmentNamePostfix=postfix");
+        "SimpleSegmentNameGenerator: tableName=testTable, segmentNamePostfix=postfix, appendUUIDToSegmentName=false, "
+            + "omitTimestampsInSegmentName=false");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "testTable_postfix");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
         "testTable_1234_5678_postfix");
@@ -82,5 +85,20 @@ public class SimpleSegmentNameGeneratorTest {
       // Expected
       assertEquals(e.getMessage(), "Invalid partial or full segment name: 12|34");
     }
+  }
+
+  @Test
+  public void testWithOmitTimestampsInSegmentName() {
+    SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, null, false, true);
+    segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE);
+    assertEquals(segmentNameGenerator.toString(),
+        "SimpleSegmentNameGenerator: tableName=testTable, appendUUIDToSegmentName=false, "
+            + "omitTimestampsInSegmentName=true");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "testTable");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
+        "testTable");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, null), "testTable_0");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
+        "testTable_0");
   }
 }

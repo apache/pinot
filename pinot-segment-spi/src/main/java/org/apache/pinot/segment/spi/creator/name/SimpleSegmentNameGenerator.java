@@ -40,13 +40,14 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;
   private final boolean _appendUUIDToSegmentName;
+  private final boolean _omitTimestampsInSegmentName;
 
   public SimpleSegmentNameGenerator(String segmentNamePrefix, @Nullable String segmentNamePostfix) {
-    this(segmentNamePrefix, segmentNamePostfix, false);
+    this(segmentNamePrefix, segmentNamePostfix, false, false);
   }
 
   public SimpleSegmentNameGenerator(String segmentNamePrefix, @Nullable String segmentNamePostfix,
-      boolean appendUUIDToSegmentName) {
+      boolean appendUUIDToSegmentName, boolean omitTimestampsInSegmentName) {
     Preconditions.checkArgument(segmentNamePrefix != null, "Missing segmentNamePrefix for SimpleSegmentNameGenerator");
     SegmentNameUtils.validatePartialOrFullSegmentName(segmentNamePrefix);
     if (segmentNamePostfix != null) {
@@ -55,6 +56,7 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
     _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;
     _appendUUIDToSegmentName = appendUUIDToSegmentName;
+    _omitTimestampsInSegmentName = omitTimestampsInSegmentName;
   }
 
   @Override
@@ -66,8 +68,9 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
       SegmentNameUtils.validatePartialOrFullSegmentName(maxTimeValue.toString());
     }
 
-    return JOINER.join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix,
-        sequenceId >= 0 ? sequenceId : null, _appendUUIDToSegmentName ? UUID.randomUUID() : null);
+    return JOINER.join(_segmentNamePrefix, _omitTimestampsInSegmentName ? null : minTimeValue,
+        _omitTimestampsInSegmentName ? null : maxTimeValue, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null,
+        _appendUUIDToSegmentName ? UUID.randomUUID() : null);
   }
 
   @Override
@@ -77,6 +80,8 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
     if (_segmentNamePostfix != null) {
       stringBuilder.append(", segmentNamePostfix=").append(_segmentNamePostfix);
     }
+    stringBuilder.append(", appendUUIDToSegmentName=").append(_appendUUIDToSegmentName);
+    stringBuilder.append(", omitTimestampsInSegmentName=").append(_omitTimestampsInSegmentName);
     return stringBuilder.toString();
   }
 }
