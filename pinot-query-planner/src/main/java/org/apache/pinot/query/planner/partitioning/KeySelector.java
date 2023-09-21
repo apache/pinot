@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
+import javax.annotation.Nullable;
+
+
 /**
  * The {@code KeySelector} provides a partitioning function to encode a specific input data type into a key.
  *
@@ -31,6 +34,7 @@ public interface KeySelector<T> {
   /**
    * Extracts the key out of the given row.
    */
+  @Nullable
   T getKey(Object[] row);
 
   /**

@@ -18,16 +18,19 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
+import javax.annotation.Nullable;
+
+
 public class EmptyKeySelector implements KeySelector<Integer> {
   private EmptyKeySelector() {
   }
 
   public static final EmptyKeySelector INSTANCE = new EmptyKeySelector();
-  private static final Integer PLACE_HOLDER = 0;
 
+  @Nullable
   @Override
   public Integer getKey(Object[] row) {
-    return PLACE_HOLDER;
+    return null;
   }
 
   @Override
