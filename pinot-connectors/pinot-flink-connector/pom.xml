@@ -119,18 +119,6 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.2.1</version>
-        <executions>
-        </executions>
-        <configuration>
-          <rules>
-            <dependencyConvergence/>
-          </rules>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <!--
           Configuration for unit/integration tests section 2 of 3 (plugins) STARTS HERE.
