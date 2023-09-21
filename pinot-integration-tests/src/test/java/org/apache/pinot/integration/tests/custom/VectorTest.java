@@ -37,7 +37,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-@Test(suiteName = "CustomClusterIntegrationTest")
+@Test(suiteName = "CustomClusterIntegrationTest", groups = {"custom-integration-suite"})
 public class VectorTest extends CustomDataQueryClusterIntegrationTest {
 
   private static final String DEFAULT_TABLE_NAME = "VectorTest";
@@ -173,12 +173,12 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public String getTableName() {
+  protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
   @Override
-  public Schema createSchema() {
+  protected Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addMultiValueDimension(VECTOR_1, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(VECTOR_2, FieldSpec.DataType.FLOAT)
@@ -195,7 +195,7 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  protected File createAvroFile()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);

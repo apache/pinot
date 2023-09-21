@@ -207,7 +207,7 @@ public class ControllerTest {
     return _zookeeperInstance.getZkUrl();
   }
 
-  public Map<String, Object> getDefaultControllerConfiguration() {
+  protected Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> properties = new HashMap<>();
 
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
@@ -226,12 +226,12 @@ public class ControllerTest {
     // do nothing, to be overridden by tests if they need something specific
   }
 
-  public void startController()
+  protected void startController()
       throws Exception {
     startController(getDefaultControllerConfiguration());
   }
 
-  public void startController(Map<String, Object> properties)
+  protected void startController(Map<String, Object> properties)
       throws Exception {
     Preconditions.checkState(_controllerStarter == null);
 
@@ -620,7 +620,7 @@ public class ControllerTest {
     return schema;
   }
 
-  public void addDummySchema(String tableName)
+  protected void addDummySchema(String tableName)
       throws IOException {
     addSchema(createDummySchema(tableName));
   }
@@ -628,44 +628,44 @@ public class ControllerTest {
   /**
    * Add a schema to the controller.
    */
-  public void addSchema(Schema schema)
+  protected void addSchema(Schema schema)
       throws IOException {
     getControllerRequestClient().addSchema(schema);
   }
 
-  public void updateSchema(Schema schema)
+  protected void updateSchema(Schema schema)
       throws IOException {
     getControllerRequestClient().updateSchema(schema);
   }
 
-  public Schema getSchema(String schemaName) {
+  protected Schema getSchema(String schemaName) {
     Schema schema = _helixResourceManager.getSchema(schemaName);
     assertNotNull(schema);
     return schema;
   }
 
-  public void deleteSchema(String schemaName)
+  protected void deleteSchema(String schemaName)
       throws IOException {
     getControllerRequestClient().deleteSchema(schemaName);
   }
 
-  public void addTableConfig(TableConfig tableConfig)
+  protected void addTableConfig(TableConfig tableConfig)
       throws IOException {
     getControllerRequestClient().addTableConfig(tableConfig);
   }
 
-  public void updateTableConfig(TableConfig tableConfig)
+  protected void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     getControllerRequestClient().updateTableConfig(tableConfig);
   }
 
-  public TableConfig getOfflineTableConfig(String tableName) {
+  protected TableConfig getOfflineTableConfig(String tableName) {
     TableConfig offlineTableConfig = _helixResourceManager.getOfflineTableConfig(tableName);
     assertNotNull(offlineTableConfig);
     return offlineTableConfig;
   }
 
-  public TableConfig getRealtimeTableConfig(String tableName) {
+  protected TableConfig getRealtimeTableConfig(String tableName) {
     TableConfig realtimeTableConfig = _helixResourceManager.getRealtimeTableConfig(tableName);
     assertNotNull(realtimeTableConfig);
     return realtimeTableConfig;
@@ -676,62 +676,62 @@ public class ControllerTest {
     getControllerRequestClient().deleteTable(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
   }
 
-  public void dropRealtimeTable(String tableName)
+  protected void dropRealtimeTable(String tableName)
       throws IOException {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
-  public void waitForEVToAppear(String tableNameWithType) {
+  protected void waitForEVToAppear(String tableNameWithType) {
     TestUtils.waitForCondition(aVoid -> _helixResourceManager.getTableExternalView(tableNameWithType) != null, 60_000L,
         "Failed to create the external view for table: " + tableNameWithType);
   }
 
-  public void waitForEVToDisappear(String tableNameWithType) {
+  protected void waitForEVToDisappear(String tableNameWithType) {
     TestUtils.waitForCondition(aVoid -> _helixResourceManager.getTableExternalView(tableNameWithType) == null, 60_000L,
         "Failed to clean up the external view for table: " + tableNameWithType);
   }
 
-  public List<String> listSegments(String tableName)
+  protected List<String> listSegments(String tableName)
       throws IOException {
     return listSegments(tableName, null, false);
   }
 
-  public List<String> listSegments(String tableName, @Nullable String tableType, boolean excludeReplacedSegments)
+  protected List<String> listSegments(String tableName, @Nullable String tableType, boolean excludeReplacedSegments)
       throws IOException {
     return getControllerRequestClient().listSegments(tableName, tableType, excludeReplacedSegments);
   }
 
-  public void dropSegment(String tableName, String segmentName)
+  protected void dropSegment(String tableName, String segmentName)
       throws IOException {
     getControllerRequestClient().deleteSegment(tableName, segmentName);
   }
 
-  public void dropAllSegments(String tableName, TableType tableType)
+  protected void dropAllSegments(String tableName, TableType tableType)
       throws IOException {
     getControllerRequestClient().deleteSegments(tableName, tableType);
   }
 
-  public long getTableSize(String tableName)
+  protected long getTableSize(String tableName)
       throws IOException {
     return getControllerRequestClient().getTableSize(tableName);
   }
 
-  public String reloadOfflineTable(String tableName)
+  protected String reloadOfflineTable(String tableName)
       throws IOException {
     return reloadOfflineTable(tableName, false);
   }
 
-  public String reloadOfflineTable(String tableName, boolean forceDownload)
+  protected String reloadOfflineTable(String tableName, boolean forceDownload)
       throws IOException {
     return getControllerRequestClient().reloadTable(tableName, TableType.OFFLINE, forceDownload);
   }
 
-  public void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
+  protected String reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
       throws IOException {
-    getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
+    return getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
   }
 
-  public String reloadRealtimeTable(String tableName)
+  protected String reloadRealtimeTable(String tableName)
       throws IOException {
     return getControllerRequestClient().reloadTable(tableName, TableType.REALTIME, false);
   }

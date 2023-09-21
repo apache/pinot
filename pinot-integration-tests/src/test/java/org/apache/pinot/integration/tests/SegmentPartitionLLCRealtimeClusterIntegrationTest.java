@@ -54,6 +54,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test that enables segment partition for the LLC real-time table.
  */
+@Test(groups = {"integration-suite-2"})
 public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PARTITION_COLUMN = "DestState";
   // Number of documents in the first and second Avro file

@@ -39,7 +39,7 @@ public class ControllerStarterStatelessTest extends ControllerTest {
   private final Map<String, Object> _configOverride = new HashMap<>();
 
   @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
+  protected Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> defaultConfig = super.getDefaultControllerConfiguration();
     defaultConfig.putAll(_configOverride);
     return defaultConfig;

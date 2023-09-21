@@ -70,8 +70,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
 
     // add schema for realtime table
-    DEFAULT_INSTANCE.addDummySchema(REALTIME_TABLE_NAME);
-    DEFAULT_INSTANCE.addDummySchema(OFFLINE_TABLE_NAME);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(REALTIME_TABLE_NAME));
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(OFFLINE_TABLE_NAME));
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
     _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
@@ -116,7 +116,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
 
     // Create an OFFLINE table with a valid name which should succeed
-    DEFAULT_INSTANCE.addDummySchema("valid_table_name");
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema("valid_table_name"));
     offlineTableConfig = _offlineBuilder.setTableName("valid_table_name").build();
     String offlineTableConfigString = offlineTableConfig.toJsonString();
     sendPostRequest(_createTableUrl, offlineTableConfigString);
@@ -184,7 +184,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void testTableCronSchedule()
       throws IOException {
     String rawTableName = "test_table_cron_schedule";
-    DEFAULT_INSTANCE.addDummySchema(rawTableName);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(rawTableName));
     // Failed to create a table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTaskConfig(
         new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
@@ -233,7 +233,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   private void testTableMinReplicationInternal(String tableName, int tableReplication)
       throws Exception {
-    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(tableName));
     String tableJSONConfigString =
         _offlineBuilder.setTableName(tableName).setNumReplicas(tableReplication).build().toJsonString();
     sendPostRequest(_createTableUrl, tableJSONConfigString);
@@ -242,6 +242,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     assertEquals(tableConfig.getReplication(),
         Math.max(tableReplication, DEFAULT_MIN_NUM_REPLICAS));
 
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(tableName));
     tableJSONConfigString =
         _realtimeBuilder.setTableName(tableName).setNumReplicas(tableReplication).build().toJsonString();
     sendPostRequest(_createTableUrl, tableJSONConfigString);
@@ -260,7 +261,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
-    DEFAULT_INSTANCE.addSchema(schema);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(schema);
 
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIsDimTable(true).build();
@@ -274,7 +275,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     schema =
         new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
-    DEFAULT_INSTANCE.addSchema(schema);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(schema);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIsDimTable(true)
         .setQuotaConfig(new QuotaConfig("500G", null)).build();
     try {
@@ -289,7 +290,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     schema =
         new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
-    DEFAULT_INSTANCE.addSchema(schema);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(schema);
     String goodQuota = "100M";
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIsDimTable(true)
         .setQuotaConfig(new QuotaConfig(goodQuota, null)).build();
@@ -308,7 +309,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void testUpdateTableConfig()
       throws Exception {
     String tableName = "updateTC";
-    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(tableName));
     String tableConfigString = _offlineBuilder.setTableName(tableName).setNumReplicas(2).build().toJsonString();
     sendPostRequest(_createTableUrl, tableConfigString);
     // table creation should succeed
@@ -329,7 +330,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     assertEquals(modifiedConfig.getValidationConfig().getRetentionTimeValue(), "10");
 
     // Realtime
-    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(tableName));
     tableConfigString = _realtimeBuilder.setTableName(tableName).setNumReplicas(2).build().toJsonString();
     sendPostRequest(_createTableUrl, tableConfigString);
     tableConfig = getTableConfig(tableName, "REALTIME");
@@ -375,13 +376,13 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // post 2 offline, 1 realtime
     String rawTableName1 = "pqr";
-    DEFAULT_INSTANCE.addDummySchema(rawTableName1);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(rawTableName1));
     TableConfig offlineTableConfig1 = _offlineBuilder.setTableName(rawTableName1).build();
     sendPostRequest(_createTableUrl, offlineTableConfig1.toJsonString());
     TableConfig realtimeTableConfig1 = _realtimeBuilder.setTableName(rawTableName1).setNumReplicas(2).build();
     sendPostRequest(_createTableUrl, realtimeTableConfig1.toJsonString());
     String rawTableName2 = "abc";
-    DEFAULT_INSTANCE.addDummySchema(rawTableName2);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(rawTableName2));
     TableConfig offlineTableConfig2 = _offlineBuilder.setTableName(rawTableName2).build();
     sendPostRequest(_createTableUrl, offlineTableConfig2.toJsonString());
 
@@ -490,7 +491,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void testDeleteTable()
       throws IOException {
     // Case 1: Create a REALTIME table and delete it directly w/o using query param.
-    DEFAULT_INSTANCE.addDummySchema("table0");
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema("table0"));
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("table0").build();
     String creationResponse = sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     assertEquals(creationResponse,
@@ -513,7 +514,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     assertEquals(deleteResponse, "{\"status\":\"Tables: [table0_OFFLINE] deleted\"}");
 
     // Case 3: Create REALTIME and OFFLINE tables and delete both of them.
-    DEFAULT_INSTANCE.addDummySchema("table1");
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema("table1"));
     TableConfig rtConfig1 = _realtimeBuilder.setTableName("table1").build();
     creationResponse = sendPostRequest(_createTableUrl, rtConfig1.toJsonString());
     assertEquals(creationResponse,
@@ -529,7 +530,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     assertEquals(deleteResponse, "{\"status\":\"Tables: [table1_OFFLINE, table1_REALTIME] deleted\"}");
 
     // Case 4: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params.
-    DEFAULT_INSTANCE.addDummySchema("table2");
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema("table2"));
     TableConfig rtConfig2 = _realtimeBuilder.setTableName("table2").build();
     creationResponse = sendPostRequest(_createTableUrl, rtConfig2.toJsonString());
     assertEquals(creationResponse,
@@ -567,7 +568,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
 
     // Case 6: Create REALTIME and OFFLINE tables and delete the realtime/offline table using query params and suffixes.
-    DEFAULT_INSTANCE.addDummySchema("table3");
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema("table3"));
     TableConfig rtConfig3 = _realtimeBuilder.setTableName("table3").build();
     creationResponse = sendPostRequest(_createTableUrl, rtConfig3.toJsonString());
     assertEquals(creationResponse,
@@ -593,7 +594,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Create a valid REALTIME table
     String tableName = "testTable";
-    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(tableName));
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName(tableName).build();
     String creationResponse = sendPostRequest(_createTableUrl, realtimeTableConfig.toJsonString());
     assertEquals(creationResponse,
@@ -644,7 +645,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       throws IOException {
     String tableName = "verificationTest";
     // Create a dummy schema
-    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(tableName));
 
     // Create a valid OFFLINE table config
     TableConfig offlineTableConfig =
@@ -677,7 +678,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       throws IOException {
     String tableName = "verificationTestTableAndSchema";
     // Create a dummy schema
-    Schema schema = DEFAULT_INSTANCE.createDummySchema(tableName);
+    Schema schema = createDummySchema(tableName);
 
     // Create a valid OFFLINE table config
     TableConfig offlineTableConfig =
@@ -693,7 +694,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
 
     // Add a dummy schema to Pinot
-    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(tableName));
     tableAndSchemaConfig = new TableAndSchemaConfig(offlineTableConfig, null);
     try {
       sendPostRequest(
@@ -725,13 +726,13 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Create an OFFLINE table with a valid name but with unrecognizedProperties which should succeed
     // Should have unrecognizedProperties set correctly
     String tableName = "valid_table_name_extra_props";
-    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(tableName));
     TableConfig offlineTableConfig = _realtimeBuilder.setTableName("valid_table_name_extra_props").build();
     JsonNode jsonNode = JsonUtils.objectToJsonNode(offlineTableConfig);
     ((ObjectNode) jsonNode).put("illegalKey1", 1);
     ObjectNode internalObj = JsonUtils.newObjectNode();
     internalObj.put("illegalKey3", 2);
-    ((ObjectNode) jsonNode).put("illegalKey2", internalObj);
+    ((ObjectNode) jsonNode).set("illegalKey2", internalObj);
 
     String creationResponse = sendPostRequest(_createTableUrl, jsonNode.toString());
     assertEquals(creationResponse,

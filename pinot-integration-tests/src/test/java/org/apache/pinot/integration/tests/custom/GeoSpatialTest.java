@@ -39,7 +39,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-@Test(suiteName = "CustomClusterIntegrationTest")
+@Test(suiteName = "CustomClusterIntegrationTest", groups = {"custom-integration-suite"})
 public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
 
   protected static final String DEFAULT_TABLE_NAME = "GeoSpatialTest";
@@ -103,11 +103,11 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
   };
 
   @Override
-  public String getTableName() {
+  protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
-  public Schema createSchema() {
+  protected Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(DIM_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(ST_POINT, FieldSpec.DataType.BYTES)
@@ -130,7 +130,7 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  protected File createAvroFile()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);

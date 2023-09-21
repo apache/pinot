@@ -40,6 +40,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
 
+@Test(groups = {"integration-suite-2"})
 public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_SERVERS = 2;
   private static final String PRIMARY_KEY_COL = "clientId";

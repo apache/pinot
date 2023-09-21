@@ -50,6 +50,7 @@ import static org.testng.Assert.*;
  * Integration test that provides example of {@link PinotTaskGenerator} and {@link PinotTaskExecutor} and tests simple
  * minion functionality.
  */
+@Test(groups = {"integration-suite-2"})
 public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   // Accessed by the plug-in classes
   public static final String TASK_TYPE = "TestTask";

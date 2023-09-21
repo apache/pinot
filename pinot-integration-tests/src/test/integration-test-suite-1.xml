@@ -19,10 +19,15 @@
 
 -->
 <!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
-<suite name="CustomDataQueryClusterIntegrationTestSuite">
-  <test name="CustomDataQueryClusterIntegrationTest">
+<suite name="integration-suite-1">
+  <test name="integration-suite-1">
+    <groups>
+      <run>
+        <include name="integration-suite-1"/>
+      </run>
+    </groups>
     <packages>
-      <package name="org.apache.pinot.integration.tests.custom"/>
+      <package name="org.apache.pinot.integration.tests.*"/>
     </packages>
   </test>
 </suite>

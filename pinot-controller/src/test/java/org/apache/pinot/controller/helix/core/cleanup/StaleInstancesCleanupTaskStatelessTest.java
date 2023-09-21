@@ -125,7 +125,7 @@ public class StaleInstancesCleanupTaskStatelessTest extends ControllerTest {
   }
 
   @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
+  protected Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> properties = super.getDefaultControllerConfiguration();
     // Override the cleanup before deletion period so that test can avoid stuck failure
     properties.put(ControllerConf.ControllerPeriodicTasksConf.

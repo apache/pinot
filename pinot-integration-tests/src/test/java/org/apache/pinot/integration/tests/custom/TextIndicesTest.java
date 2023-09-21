@@ -47,7 +47,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.AssertJUnit.fail;
 
 
-@Test(suiteName = "CustomClusterIntegrationTest")
+@Test(suiteName = "CustomClusterIntegrationTest", groups = {"custom-integration-suite"})
 public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
 
   private static final String DEFAULT_TABLE_NAME = "TextIndicesTest";
@@ -114,12 +114,12 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public String getTableName() {
+  protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
   @Override
-  public Schema createSchema() {
+  protected Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(TEXT_COLUMN_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TEXT_COLUMN_NAME_NATIVE, FieldSpec.DataType.STRING)
@@ -132,7 +132,7 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  protected File createAvroFile()
       throws Exception {
     // Read all skills from the skill file
     InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/text_search_data/skills.txt");
@@ -168,7 +168,7 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public TableConfig createOfflineTableConfig() {
+  protected TableConfig createOfflineTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())

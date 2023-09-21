@@ -45,11 +45,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -234,7 +230,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
         .setNumReplicas(2).build();
     // create table with replication as 2 so that DefaultTenant has a minimum server requirement as 2.
-    DEFAULT_INSTANCE.addTableConfig(tableConfig);
+    DEFAULT_INSTANCE.getControllerRequestClient().addTableConfig(tableConfig);
     Map<String, List<String>> currentInstanceTagsMap = getCurrentInstanceTagsMap();
     List<InstanceTagUpdateRequest> request = new ArrayList<>();
     currentInstanceTagsMap.forEach((instance, tags) -> {

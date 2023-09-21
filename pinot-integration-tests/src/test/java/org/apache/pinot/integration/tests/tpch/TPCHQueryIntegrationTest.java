@@ -52,6 +52,7 @@ import org.testng.annotations.Test;
  * REAME.md to generate a larger dataset for better testing.
  * Queries are executed against Pinot and H2, and the results are compared.
  */
+@Test(groups = {"integration-suite-2"})
 public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_TPCH_QUERIES = 24;
 

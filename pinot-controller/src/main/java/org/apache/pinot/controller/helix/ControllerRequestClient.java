@@ -57,6 +57,7 @@ public class ControllerRequestClient {
   public ControllerRequestURLBuilder getControllerRequestURLBuilder() {
     return _controllerRequestURLBuilder;
   }
+
   /**
    * Add a schema to the controller.
    */
@@ -180,18 +181,20 @@ public class ControllerRequestClient {
     try {
       SimpleHttpResponse simpleHttpResponse =
           HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload)).toURI(), null));
+              _controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload)).toURI(), null));
       return simpleHttpResponse.getResponse();
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
   }
 
-  public void reloadSegment(String tableName, String segmentName, boolean forceReload)
+  public String reloadSegment(String tableName, String segmentName, boolean forceReload)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
-          _controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceReload)).toURI(), null));
+      SimpleHttpResponse simpleHttpResponse =
+          HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
+              _controllerRequestURLBuilder.forSegmentReload(tableName, segmentName, forceReload)).toURI(), null));
+      return simpleHttpResponse.getResponse();
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -297,7 +300,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URL(
-              _controllerRequestURLBuilder.forBrokerTenantDelete(tenantName)).toURI()));
+          _controllerRequestURLBuilder.forBrokerTenantDelete(tenantName)).toURI()));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

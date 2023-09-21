@@ -41,7 +41,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-@Test(suiteName = "CustomClusterIntegrationTest")
+@Test(suiteName = "CustomClusterIntegrationTest", groups = {"custom-integration-suite"})
 public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
 
   private static final String DEFAULT_TABLE_NAME = "TupleSketchTest";
@@ -266,12 +266,12 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public String getTableName() {
+  protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
   @Override
-  public Schema createSchema() {
+  protected Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(ID, FieldSpec.DataType.INT)
         .addMetric(MET_TUPLE_SKETCH_BYTES, FieldSpec.DataType.BYTES)
@@ -279,7 +279,7 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  protected File createAvroFile()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);

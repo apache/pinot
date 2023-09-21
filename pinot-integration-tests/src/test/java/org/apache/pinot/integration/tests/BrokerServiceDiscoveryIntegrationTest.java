@@ -30,6 +30,7 @@ import org.testng.annotations.Test;
 /**
  * Integration test that starts one broker with auto-discovered echo service and test it
  */
+@Test(groups = {"integration-suite-1"})
 public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TENANT_NAME = "TestTenant";
 

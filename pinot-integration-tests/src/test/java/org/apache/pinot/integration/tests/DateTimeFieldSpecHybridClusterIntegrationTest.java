@@ -20,11 +20,13 @@ package org.apache.pinot.integration.tests;
 
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 /**
  * Hybrid cluster integration test that uses one of the DateTimeFieldSpec as primary time column
  */
+@Test(groups = {"integration-suite-1"})
 public class DateTimeFieldSpecHybridClusterIntegrationTest extends HybridClusterIntegrationTest {
   private static final String SCHEMA_WITH_DATETIME_FIELDSPEC_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_datetimefieldspecs.schema";

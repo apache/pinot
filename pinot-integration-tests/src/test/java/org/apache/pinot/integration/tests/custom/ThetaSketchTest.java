@@ -42,7 +42,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-@Test(suiteName = "CustomClusterIntegrationTest")
+@Test(suiteName = "CustomClusterIntegrationTest", groups = {"custom-integration-suite"})
 public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
 
   private static final String DEFAULT_TABLE_NAME = "ThetaSketchTest";
@@ -52,12 +52,12 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
   private static final String THETA_SKETCH = "thetaSketchCol";
 
   @Override
-  public String getTableName() {
+  protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
   @Override
-  public Schema createSchema() {
+  protected Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(DIM_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(DIM_VALUE, FieldSpec.DataType.STRING)
@@ -87,7 +87,7 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  protected File createAvroFile()
       throws IOException {
 
     // create avro schema

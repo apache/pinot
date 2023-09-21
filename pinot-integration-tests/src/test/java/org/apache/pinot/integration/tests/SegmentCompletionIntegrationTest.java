@@ -54,6 +54,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
+@Test(groups = {"integration-suite-2"})
 public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_KAFKA_PARTITIONS = 1;
 

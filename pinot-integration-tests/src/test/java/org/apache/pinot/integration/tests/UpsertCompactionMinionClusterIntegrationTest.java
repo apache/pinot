@@ -47,6 +47,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
+@Test(groups = {"integration-suite-2"})
 public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
   protected PinotTaskManager _taskManager;

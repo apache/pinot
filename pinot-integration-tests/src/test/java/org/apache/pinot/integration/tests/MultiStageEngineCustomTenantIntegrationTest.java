@@ -21,8 +21,10 @@ package org.apache.pinot.integration.tests;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.controller.ControllerConf;
+import org.testng.annotations.Test;
 
 
+@Test(groups = {"integration-suite-1"})
 public class MultiStageEngineCustomTenantIntegrationTest extends MultiStageEngineIntegrationTest {
   private static final String TEST_TENANT = "TestTenant";
 
@@ -43,7 +45,7 @@ public class MultiStageEngineCustomTenantIntegrationTest extends MultiStageEngin
   }
 
   @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
+  protected Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> properties = super.getDefaultControllerConfiguration();
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
     return properties;

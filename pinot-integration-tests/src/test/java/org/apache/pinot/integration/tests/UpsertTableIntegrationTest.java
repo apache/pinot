@@ -49,6 +49,7 @@ import static org.testng.Assert.assertEquals;
  *  - Metric fields: score:float
  *  - DataTime fields: timestampInEpoch:long
  */
+@Test(groups = {"integration-suite-2"})
 public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String INPUT_DATA_TAR_FILE = "gameScores_csv.tar.gz";
   private static final String CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";

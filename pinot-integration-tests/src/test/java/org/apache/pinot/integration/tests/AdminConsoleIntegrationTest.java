@@ -33,6 +33,7 @@ import org.testng.annotations.Test;
 /**
  * Tests that the controller, broker and server admin consoles return the expected pages.
  */
+@Test(groups = {"integration-suite-1"})
 public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
 
   @BeforeClass

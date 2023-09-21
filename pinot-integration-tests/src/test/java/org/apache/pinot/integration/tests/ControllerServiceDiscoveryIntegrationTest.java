@@ -32,6 +32,7 @@ import org.testng.annotations.Test;
 /**
  * Integration test that starts one broker with auto-discovered echo service and test it
  */
+@Test(groups = {"integration-suite-1"})
 public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TENANT_NAME = "TestTenant";
 
@@ -46,7 +47,7 @@ public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegr
   }
 
   @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
+  protected Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> retVal = super.getDefaultControllerConfiguration();
     retVal.put(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, true);
     return retVal;

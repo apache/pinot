@@ -25,8 +25,10 @@ import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.testng.annotations.Test;
 
 
+@Test(groups = {"integration-suite-2"})
 public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerIntegrationTest {
   private static final String JKS = "JKS";
   private static final String JDK = "JDK";
@@ -47,7 +49,7 @@ public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerInt
   }
 
   @Override
-  public GrpcQueryClient getGrpcQueryClient() {
+  protected GrpcQueryClient getGrpcQueryClient() {
     Map<String, Object> configMap = new HashMap<>();
     configMap.put("usePlainText", "false");
     configMap.put("tls.keystore.path", _tlsStoreJKS.getFile());

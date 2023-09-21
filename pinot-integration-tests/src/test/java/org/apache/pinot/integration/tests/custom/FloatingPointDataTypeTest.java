@@ -39,7 +39,7 @@ import static org.testng.Assert.assertEquals;
 /**
  * Integration test for floating point data type (float & double) filter queries.
  */
-@Test(suiteName = "CustomClusterIntegrationTest")
+@Test(suiteName = "CustomClusterIntegrationTest", groups = {"custom-integration-suite"})
 public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegrationTest {
   private static final String DEFAULT_TABLE_NAME = "FloatingPointDataTypeTest";
   private static final int NUM_DOCS = 10;
@@ -53,12 +53,12 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
   private static final String MET_FLOAT_UNSORTED_NO_DIC = "metFloatUnsortedNoDic";
 
   @Override
-  public String getTableName() {
+  protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
   @Override
-  public Schema createSchema() {
+  protected Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addMetric(MET_DOUBLE_SORTED, FieldSpec.DataType.DOUBLE)
         .addMetric(MET_FLOAT_SORTED, FieldSpec.DataType.FLOAT)
@@ -72,7 +72,7 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
   }
 
   @Override
-  public File createAvroFile()
+  protected File createAvroFile()
       throws IOException {
 
     // create avro schema
@@ -133,7 +133,7 @@ public class FloatingPointDataTypeTest extends CustomDataQueryClusterIntegration
   }
 
   @Override
-  public TableConfig createOfflineTableConfig() {
+  protected TableConfig createOfflineTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
         .setNoDictionaryColumns(getNoDictionaryColumns()).build();
   }

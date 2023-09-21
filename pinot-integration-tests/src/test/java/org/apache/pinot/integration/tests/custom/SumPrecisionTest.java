@@ -36,7 +36,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-@Test(suiteName = "CustomClusterIntegrationTest")
+@Test(suiteName = "CustomClusterIntegrationTest", groups = {"custom-integration-suite"})
 public class SumPrecisionTest extends CustomDataQueryClusterIntegrationTest {
 
   private static final String DEFAULT_TABLE_NAME = "SumPrecisionTest";
@@ -49,12 +49,12 @@ public class SumPrecisionTest extends CustomDataQueryClusterIntegrationTest {
   private static final String MET_LONG = "metLong";
 
   @Override
-  public String getTableName() {
+  protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
   @Override
-  public Schema createSchema() {
+  protected Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(DIM_NAME, FieldSpec.DataType.STRING)
         .addMetric(MET_BIG_DECIMAL_BYTES, FieldSpec.DataType.BIG_DECIMAL)
@@ -64,7 +64,7 @@ public class SumPrecisionTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  protected File createAvroFile()
       throws IOException {
 
     // create avro schema

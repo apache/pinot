@@ -53,6 +53,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -65,6 +66,7 @@ import static org.testng.Assert.assertTrue;
  * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
  * TODO: Add separate module-level tests and remove the randomness of this test
  */
+@Test(groups = {"integration-suite-1"})
 public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest
     extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
@@ -184,7 +186,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegr
   }
 
   @Override
-  public void startController()
+  protected void startController()
       throws Exception {
     super.startController();
     enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);

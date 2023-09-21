@@ -41,7 +41,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 
 
-@Test(suiteName = "CustomClusterIntegrationTest")
+@Test(suiteName = "CustomClusterIntegrationTest", groups = {"custom-integration-suite"})
 public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
 
   // Default settings
@@ -59,12 +59,12 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public String getTableName() {
+  protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
   @Override
-  public Schema createSchema() {
+  protected Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addMultiValueDimension(STRING_KEY_MAP_FIELD_NAME + SchemaUtils.MAP_KEY_COLUMN_SUFFIX,
             FieldSpec.DataType.STRING)
@@ -76,7 +76,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public TableConfig createOfflineTableConfig() {
+  protected TableConfig createOfflineTableConfig() {
     List<TransformConfig> transformConfigs = Arrays.asList(
         new TransformConfig(STRING_KEY_MAP_STR_FIELD_NAME, "toJsonMapStr(" + STRING_KEY_MAP_FIELD_NAME + ")"),
         new TransformConfig(INT_KEY_MAP_STR_FIELD_NAME, "toJsonMapStr(" + INT_KEY_MAP_FIELD_NAME + ")"));
@@ -86,7 +86,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
         .build();
   }
 
-  public File createAvroFile()
+  protected File createAvroFile()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     org.apache.avro.Schema stringKeyMapAvroSchema =

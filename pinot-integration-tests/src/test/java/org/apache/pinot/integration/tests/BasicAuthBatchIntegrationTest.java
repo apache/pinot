@@ -48,6 +48,7 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
  * Integration test that provides example of {@link PinotTaskGenerator} and {@link PinotTaskExecutor} and tests simple
  * minion functionality.
  */
+@Test(groups = {"integration-suite-1"})
 public class BasicAuthBatchIntegrationTest extends ClusterTest {
   private static final String BOOTSTRAP_DATA_DIR = "/examples/batch/baseballStats";
   private static final String SCHEMA_FILE = "baseballStats_schema.json";
@@ -78,7 +79,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   }
 
   @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
+  protected Map<String, Object> getDefaultControllerConfiguration() {
     return BasicAuthTestUtils.addControllerConfiguration(super.getDefaultControllerConfiguration());
   }
 

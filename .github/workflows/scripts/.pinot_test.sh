@@ -32,8 +32,6 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   cd pinot-integration-tests || exit 1
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn test \
-        -P github-actions,custom-cluster-integration-test-suite || exit 1
-    mvn test \
         -P github-actions,integration-tests-set-1 && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then

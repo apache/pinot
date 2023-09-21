@@ -52,12 +52,14 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.junit.Assert;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 /**
  * Integration test for heap size based broker query killing, this works only for xmx4G
  * TODO: re-enable or remove this after we resolve https://github.com/apache/pinot/issues/11099
  */
+@Test(groups = {"integration-suite-2"})
 public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterIntegrationTestSet {
 
   public static final String STRING_DIM_SV1 = "stringDimSV1";
