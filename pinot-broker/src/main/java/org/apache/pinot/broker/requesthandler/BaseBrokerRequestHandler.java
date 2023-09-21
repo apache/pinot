@@ -958,8 +958,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Retrieve multivalued columns for a table.
    * From the table Schema , we get the multi valued columns of dimension fields.
    *
-   * @param tableCache
-   * @param tableName
+   * @param tableSchema
+   * @param columnName
    * @return multivalued columns of the table .
    */
   private static boolean checkIfColumnIsMultiValued(@Nonnull Schema tableSchema, @Nonnull String columnName) {
