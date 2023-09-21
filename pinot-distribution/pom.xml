@@ -90,7 +90,7 @@
         </exclusion>
         <exclusion>
           <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-kafka-${kafka.version}</artifactId>
+          <artifactId>pinot-kafka-2.0</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.pinot</groupId>

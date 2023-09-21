@@ -164,12 +164,6 @@
     <joda-time.version>2.12.5</joda-time.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
-
-    <!-- handle kafka imports
-    kafka dependency is still explicitly defined in pinot-integration-tests, pinot-tools and pinot-perf pom files.
-    To change kafka connector dependency, we only need to update this version number config.
-    TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
-    <kafka.version>2.0</kafka.version>
     <protobuf.version>3.22.0</protobuf.version>
     <grpc.version>1.53.0</grpc.version>
     <confluent.version>5.5.3</confluent.version>
