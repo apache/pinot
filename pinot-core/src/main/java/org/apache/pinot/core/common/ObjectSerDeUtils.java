@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.clearspring.analytics.stream.cardinality.RegisterSet;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -139,7 +140,9 @@ public class ObjectSerDeUtils {
     KllDataSketch(36),
     IntegerTupleSketch(37),
     FrequentStringsSketch(38),
-    FrequentLongsSketch(39);
+    FrequentLongsSketch(39),
+    HyperLogLogPlus(40);
+
 
     private final int _value;
 
@@ -235,6 +238,8 @@ public class ObjectSerDeUtils {
         return ObjectType.FrequentStringsSketch;
       } else if (value instanceof LongsSketch) {
         return ObjectType.FrequentLongsSketch;
+      } else if (value instanceof HyperLogLogPlus) {
+        return ObjectType.HyperLogLogPlus;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -560,6 +565,34 @@ public class ObjectSerDeUtils {
       } catch (RuntimeException e) {
         throw new RuntimeException("Caught exception while deserializing HyperLogLog", e);
       }
+    }
+  };
+
+  public static final ObjectSerDe<HyperLogLogPlus> HYPER_LOG_LOG_PLUS_SER_DE = new ObjectSerDe<HyperLogLogPlus>() {
+
+    @Override
+    public byte[] serialize(HyperLogLogPlus hyperLogLogPlus) {
+      try {
+        return hyperLogLogPlus.getBytes();
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+      }
+    }
+
+    @Override
+    public HyperLogLogPlus deserialize(byte[] bytes) {
+      try {
+        return HyperLogLogPlus.Builder.build(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+      }
+    }
+
+    @Override
+    public HyperLogLogPlus deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return deserialize(bytes);
     }
   };
 
@@ -1377,6 +1410,7 @@ public class ObjectSerDeUtils {
       DATA_SKETCH_INT_TUPLE_SER_DE,
       FREQUENT_STRINGS_SKETCH_SER_DE,
       FREQUENT_LONGS_SKETCH_SER_DE,
+      HYPER_LOG_LOG_PLUS_SER_DE,
   };
   //@formatter:on
 

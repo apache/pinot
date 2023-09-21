@@ -70,6 +70,9 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTTHETASKETCH:
       case DISTINCTCOUNTRAWTHETASKETCH:
         return new DistinctCountThetaSketchValueAggregator();
+      case DISTINCTCOUNTHLLPLUS:
+      case DISTINCTCOUNTRAWHLLPLUS:
+        return new DistinctCountHLLPlusValueAggregator(arguments);
       case DISTINCTCOUNTTUPLESKETCH:
       case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
       case AVGVALUEINTEGERSUMTUPLESKETCH:
@@ -116,6 +119,9 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTTHETASKETCH:
       case DISTINCTCOUNTRAWTHETASKETCH:
         return DistinctCountThetaSketchValueAggregator.AGGREGATED_VALUE_TYPE;
+      case DISTINCTCOUNTHLLPLUS:
+      case DISTINCTCOUNTRAWHLLPLUS:
+        return DistinctCountHLLPlusValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTTUPLESKETCH:
       case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
       case AVGVALUEINTEGERSUMTUPLESKETCH:

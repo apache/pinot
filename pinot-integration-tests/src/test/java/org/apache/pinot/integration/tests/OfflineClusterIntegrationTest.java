@@ -2632,7 +2632,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // The Accurate value is 6538.
     query = "SELECT distinctCount(FlightNum) FROM mytable ";
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), 6538);
-    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), 6538);
 
     // Expected distinctCountHll with different log2m value from 2 to 19. The Accurate value is 6538.
     long[] expectedResults = new long[]{
@@ -2641,7 +2640,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     for (int i = 2; i < 20; i++) {
       query = String.format("SELECT distinctCountHLL(FlightNum, %d) FROM mytable ", i);
-      assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[i - 2]);
       assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[i - 2]);
     }
 
@@ -2654,7 +2652,31 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       expectedDefault = expectedResults[10];
     }
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedDefault);
-    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedDefault);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctCountHllPlus(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query;
+
+    // The Accurate value is 6538.
+    query = "SELECT distinctCount(FlightNum) FROM mytable ";
+    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), 6538);
+
+    // Expected distinctCountHllPlus with different P value from 4 (minimal value) to 19. The Accurate value is 6538.
+    long[] expectedResults = new long[]{
+        4901, 5755, 6207, 5651, 6318, 6671, 6559, 6425, 6490, 6486, 6489, 6516, 6532, 6526, 6525, 6534
+    };
+
+    for (int i = 4; i < 20; i++) {
+      query = String.format("SELECT distinctCountHLLPlus(FlightNum, %d) FROM mytable ", i);
+      assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[i - 4]);
+    }
+
+    // Default HLL Plus is set as p=14
+    query = "SELECT distinctCountHLLPlus(FlightNum) FROM mytable ";
+    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
   }
 
   @Test
