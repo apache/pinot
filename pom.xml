@@ -1713,7 +1713,6 @@
             <exclude>pinot-*/target/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
-            <exclude>kubernetes/**</exclude>
             <exclude>docker/**</exclude>
             <exclude>helm/**</exclude>
 
@@ -1842,7 +1841,6 @@
             <exclude>.externalToolBuilders/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
-            <exclude>kubernetes/**</exclude>
             <exclude>helm/**</exclude>
             <exclude>docker/**</exclude>
             <exclude>.trivyignore</exclude>
