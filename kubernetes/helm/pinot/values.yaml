@@ -21,7 +21,17 @@
 
 image:
   repository: apachepinot/pinot
-  tag: latest # release-0.12.0
+  # Pinot docker images are available at https://hub.docker.com/r/apachepinot/pinot/tags
+  #   - `latest` tag is always available and points to the nightly pinot master branch build
+  #   - `release-x.y.z` or `x.y.z` tags are available for each release, e.g. release-1.0.0, release-0.12.1, 1.0.0, 0.12.1, etc.
+  #
+  # Default JDK comes with Amazon Corretto 11, here are also images with different JDKs:
+  #   - Amazon Corretto 11, e.g. `latest-11`, `1.0.0-11`, `latest-11-amazoncorretto`, `1.0.0-11-amazoncorretto`
+  #   - Amazon Corretto 17, e.g. `latest-17-amazoncorretto`, `1.0.0-17-amazoncorretto`
+  #   - MS OpenJDK 11, e.g. `latest-11-ms-openjdk`, `1.0.0-11-ms-openjdk`
+  #   - MS OpenJDK 17, e.g. `latest-17-ms-openjdk`, `1.0.0-17-ms-openjdk`
+  #   - OpenJDK 21, e.g. `latest-21-openjdk`, `1.0.0-21-openjdk`
+  tag: latest # 1.0.0, 0.12.1, latest
   pullPolicy: Always # Use IfNotPresent when you pinged a version of image tag
 
 cluster:
