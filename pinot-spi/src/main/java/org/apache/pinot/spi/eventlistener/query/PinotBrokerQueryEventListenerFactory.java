@@ -30,11 +30,11 @@ import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_BROKER_EVENT_
 import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME;
 
 
-public class PinotBrokerQueryEventListenerUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotBrokerQueryEventListenerUtils.class);
+public class PinotBrokerQueryEventListenerFactory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotBrokerQueryEventListenerFactory.class);
   private static BrokerQueryEventListener _brokerQueryEventListener = null;
 
-  private PinotBrokerQueryEventListenerUtils() {
+  private PinotBrokerQueryEventListenerFactory() {
   }
 
   /**

@@ -31,7 +31,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.eventlistener.query.PinotBrokerQueryEventListenerUtils;
+import org.apache.pinot.spi.eventlistener.query.PinotBrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
@@ -185,7 +185,7 @@ public class LiteralOnlyBrokerRequestTest {
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
             null, null, new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
             null, null, mock(ServerRoutingStatsManager.class),
-                PinotBrokerQueryEventListenerUtils.getBrokerQueryEventListener());
+                PinotBrokerQueryEventListenerFactory.getBrokerQueryEventListener());
 
     long randNum = RANDOM.nextLong();
     byte[] randBytes = new byte[12];
@@ -214,7 +214,7 @@ public class LiteralOnlyBrokerRequestTest {
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
             null, null, new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
             null, null, mock(ServerRoutingStatsManager.class),
-                PinotBrokerQueryEventListenerUtils.getBrokerQueryEventListener());
+                PinotBrokerQueryEventListenerFactory.getBrokerQueryEventListener());
     long currentTsMin = System.currentTimeMillis();
     JsonNode request = JsonUtils.stringToJsonNode(
         "{\"sql\":\"SELECT now() as currentTs, fromDateTime('2020-01-01 UTC', 'yyyy-MM-dd z') as firstDayOf2020\"}");
@@ -422,7 +422,7 @@ public class LiteralOnlyBrokerRequestTest {
         new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
             null, null, new BrokerMetrics("", PinotMetricUtils.getPinotMetricsRegistry(), true, Collections.emptySet()),
             null, null, mock(ServerRoutingStatsManager.class),
-                PinotBrokerQueryEventListenerUtils.getBrokerQueryEventListener());
+                PinotBrokerQueryEventListenerFactory.getBrokerQueryEventListener());
 
     // Test 1: select constant
     JsonNode request = JsonUtils.stringToJsonNode("{\"sql\":\"EXPLAIN PLAN FOR SELECT 1.5, 'test'\"}");

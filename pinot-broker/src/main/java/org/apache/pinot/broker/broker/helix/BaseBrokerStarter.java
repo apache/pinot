@@ -71,7 +71,7 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
-import org.apache.pinot.spi.eventlistener.query.PinotBrokerQueryEventListenerUtils;
+import org.apache.pinot.spi.eventlistener.query.PinotBrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -288,7 +288,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
 
     LOGGER.info("Initializing Broker Event Listener Factory");
-    _brokerQueryEventListener = PinotBrokerQueryEventListenerUtils.getBrokerQueryEventListener(
+    _brokerQueryEventListener = PinotBrokerQueryEventListenerFactory.getBrokerQueryEventListener(
         _brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
 
     // Create Broker request handler.
