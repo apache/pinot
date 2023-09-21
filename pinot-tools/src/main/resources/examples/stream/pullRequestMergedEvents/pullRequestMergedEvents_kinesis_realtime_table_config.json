@@ -1,35 +1,37 @@
 {
   "tableName": "pullRequestMergedEvents",
   "tableType": "REALTIME",
+  "tenants": {},
   "segmentsConfig": {
     "timeColumnName": "mergedTimeMillis",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "60",
-    "schemaName": "pullRequestMergedEvents",
-    "replication": "1",
-    "replicasPerPartition": "1"
+    "replication": "1"
   },
-  "tenants": {},
   "tableIndexConfig": {
-    "loadMode": "MMAP",
     "invertedIndexColumns": [
       "organization",
       "repo"
-    ],
-    "streamConfigs": {
-      "streamType": "kinesis",
-      "stream.kinesis.consumer.type": "lowlevel",
-      "stream.kinesis.topic.name": "pullRequestMergedEvents",
-      "stream.kinesis.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder",
-      "stream.kinesis.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kinesis.KinesisConsumerFactory",
-      "realtime.segment.flush.threshold.time": "12h",
-      "realtime.segment.flush.threshold.size": "100000",
-      "stream.kinesis.consumer.prop.auto.offset.reset": "smallest",
-      "region": "us-east-1",
-      "shardIteratorType": "TRIM_HORIZON",
-      "endpoint" : "http://localhost:4566",
-      "accessKey" : "access",
-      "secretKey": "secret"
+    ]
+  },
+  "ingestionConfig": {
+    "streamIngestionConfig": {
+      "streamConfigMaps": [
+        {
+          "streamType": "kinesis",
+          "stream.kinesis.topic.name": "pullRequestMergedEvents",
+          "stream.kinesis.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder",
+          "stream.kinesis.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kinesis.KinesisConsumerFactory",
+          "stream.kinesis.consumer.prop.auto.offset.reset": "smallest",
+          "region": "us-east-1",
+          "shardIteratorType": "TRIM_HORIZON",
+          "endpoint": "http://localhost:4566",
+          "accessKey": "access",
+          "secretKey": "secret",
+          "realtime.segment.flush.threshold.time": "12h",
+          "realtime.segment.flush.threshold.size": "100000"
+        }
+      ]
     }
   },
   "metadata": {

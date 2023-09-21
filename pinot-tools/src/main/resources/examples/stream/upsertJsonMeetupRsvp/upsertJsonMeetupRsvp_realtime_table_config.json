@@ -4,21 +4,57 @@
   "tenants": {},
   "segmentsConfig": {
     "timeColumnName": "mtime",
-    "timeType": "MILLISECONDS",
-    "segmentPushType": "APPEND",
-    "replicasPerPartition": "1",
     "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "1"
+    "retentionTimeValue": "1",
+    "replication": "1"
+  },
+  "tableIndexConfig": {
+    "noDictionaryColumns": [
+      "event_json",
+      "group_json",
+      "member_json",
+      "venue_json"
+    ],
+    "jsonIndexColumns": [
+      "event_json",
+      "group_json",
+      "member_json",
+      "venue_json"
+    ],
+    "columnPartitionMap": {
+      "rsvp_id": {
+        "functionName": "Hashcode",
+        "numPartitions": 2
+      }
+    }
+  },
+  "instanceAssignmentConfigMap": {
+    "CONSUMING": {
+      "tagPoolConfig": {
+        "tag": "DefaultTenant_REALTIME"
+      },
+      "replicaGroupPartitionConfig": {
+        "replicaGroupBased": true,
+        "numReplicaGroups": 1,
+        "partitionColumn": "rsvp_id",
+        "numPartitions": 2,
+        "numInstancesPerPartition": 1
+      }
+    }
+  },
+  "routing": {
+    "segmentPrunerTypes": [
+      "partition"
+    ],
+    "instanceSelectorType": "strictReplicaGroup"
   },
   "ingestionConfig": {
     "streamIngestionConfig": {
       "streamConfigMaps": [
         {
           "streamType": "kafka",
-          "stream.kafka.consumer.type": "lowLevel",
           "stream.kafka.topic.name": "upsertJsonMeetupRSVPEvents",
           "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-          "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
           "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
           "stream.kafka.zk.broker.url": "localhost:2191/kafka",
           "stream.kafka.broker.list": "localhost:19092"
@@ -44,20 +80,8 @@
       }
     ]
   },
-  "tableIndexConfig": {
-    "loadMode": "MMAP",
-    "noDictionaryColumns": [
-      "event_json",
-      "group_json",
-      "member_json",
-      "venue_json"
-    ],
-    "jsonIndexColumns": [
-      "event_json",
-      "group_json",
-      "member_json",
-      "venue_json"
-    ]
+  "upsertConfig": {
+    "mode": "FULL"
   },
   "fieldConfigList": [
     {
@@ -89,12 +113,6 @@
       ]
     }
   ],
-  "routing": {
-    "instanceSelectorType": "strictReplicaGroup"
-  },
-  "upsertConfig": {
-    "mode": "FULL"
-  },
   "metadata": {
     "customConfigs": {}
   }
