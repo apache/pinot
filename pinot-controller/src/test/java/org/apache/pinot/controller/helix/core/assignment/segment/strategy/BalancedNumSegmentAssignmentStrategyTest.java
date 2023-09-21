@@ -65,7 +65,7 @@ public class BalancedNumSegmentAssignmentStrategyTest {
   public void setUp() {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig);
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig, null);
 
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5, instance_6, instance_7,

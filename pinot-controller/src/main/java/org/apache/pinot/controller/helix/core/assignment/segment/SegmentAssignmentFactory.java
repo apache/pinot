@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
+import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -31,7 +33,8 @@ public class SegmentAssignmentFactory {
   private SegmentAssignmentFactory() {
   }
 
-  public static SegmentAssignment getSegmentAssignment(HelixManager helixManager, TableConfig tableConfig) {
+  public static SegmentAssignment getSegmentAssignment(HelixManager helixManager, TableConfig tableConfig,
+      @Nullable ControllerMetrics controllerMetrics) {
     SegmentAssignment segmentAssignment;
     if (tableConfig.getTableType() == TableType.OFFLINE) {
       segmentAssignment = new OfflineSegmentAssignment();
@@ -43,7 +46,7 @@ public class SegmentAssignmentFactory {
         segmentAssignment = new RealtimeSegmentAssignment();
       }
     }
-    segmentAssignment.init(helixManager, tableConfig);
+    segmentAssignment.init(helixManager, tableConfig, controllerMetrics);
     return segmentAssignment;
   }
 }

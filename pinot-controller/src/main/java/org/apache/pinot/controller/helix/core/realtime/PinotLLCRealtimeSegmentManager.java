@@ -316,7 +316,8 @@ public class PinotLLCRealtimeSegmentManager {
     int numPartitionGroups = newPartitionGroupMetadataList.size();
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
-    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 
@@ -555,7 +556,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Step-3
-    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 
@@ -965,13 +967,8 @@ public class PinotLLCRealtimeSegmentManager {
         }
       }
       // Assign instances to the new segment and add instances as state CONSUMING
-      List<String> instancesAssigned = new ArrayList<>();
-      boolean consistent =
-          segmentAssignment.assignSegment(newSegmentName, instanceStatesMap, instancePartitionsMap, instancesAssigned);
-      if (!consistent) {
-        _controllerMetrics.addMeteredTableValue(newLLCSegmentName.getTableName(),
-            ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_MISMATCH, 1L);
-      }
+      List<String> instancesAssigned =
+          segmentAssignment.assignSegment(newSegmentName, instanceStatesMap, instancePartitionsMap);
       instanceStatesMap.put(newSegmentName,
           SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING));
       LOGGER.info("Adding new CONSUMING segment: {} to instances: {}", newSegmentName, instancesAssigned);
@@ -1059,7 +1056,8 @@ public class PinotLLCRealtimeSegmentManager {
         newPartitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
             .collect(Collectors.toSet());
 
-    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 

@@ -95,7 +95,7 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
             .setNumReplicas(NUM_REPLICAS)
             .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
     _segmentAssignmentWithoutPartition =
-        SegmentAssignmentFactory.getSegmentAssignment(null, tableConfigWithoutPartitions);
+        SegmentAssignmentFactory.getSegmentAssignment(null, tableConfigWithoutPartitions, null);
 
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5],
@@ -146,7 +146,7 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
             .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
             .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig).build();
     _segmentAssignmentWithPartition =
-        SegmentAssignmentFactory.getSegmentAssignment(helixManagerWithPartitions, tableConfigWithPartitions);
+        SegmentAssignmentFactory.getSegmentAssignment(helixManagerWithPartitions, tableConfigWithPartitions, null);
 
     // {
     //   0_0=[instance_0, instance_1], 1_0=[instance_2, instance_3], 2_0=[instance_4, instance_5],
@@ -404,7 +404,7 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
             .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY).build();
     tableConfigWithPartitions.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
     SegmentAssignment segmentAssignment =
-        SegmentAssignmentFactory.getSegmentAssignment(helixManager, tableConfigWithPartitions);
+        SegmentAssignmentFactory.getSegmentAssignment(helixManager, tableConfigWithPartitions, null);
 
     // {
     //   0_0=[instance_0, instance_1, instance_2, instance_3, instance_4, instance_5],

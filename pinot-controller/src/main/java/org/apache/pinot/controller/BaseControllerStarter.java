@@ -421,7 +421,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _leadControllerManager.start();
 
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
-    _helixResourceManager.start(_helixParticipantManager);
+    _helixResourceManager.start(_helixParticipantManager, _controllerMetrics);
 
     // Initialize segment lifecycle event listeners
     PinotSegmentLifecycleEventListenerManager.getInstance().init(_helixParticipantManager);

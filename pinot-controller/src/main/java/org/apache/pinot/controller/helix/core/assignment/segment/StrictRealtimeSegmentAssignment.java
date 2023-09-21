@@ -19,14 +19,13 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -57,14 +56,6 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    List<String> instancesAssigned = new ArrayList<>();
-    assignSegment(segmentName, currentAssignment, instancePartitionsMap, instancesAssigned);
-    return instancesAssigned;
-  }
-
-  @Override
-  public boolean assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, List<String> instancesAssigned) {
     Preconditions.checkState(instancePartitionsMap.size() == 1, "One instance partition type should be provided");
     Map.Entry<InstancePartitionsType, InstancePartitions> typeToInstancePartitions =
         instancePartitionsMap.entrySet().iterator().next();
@@ -77,7 +68,7 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
     int segmentPartitionId =
         SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager,
             _partitionColumn);
-    Collection<String> candidateInstances = assignConsumingSegment(segmentPartitionId, instancePartitions);
+    List<String> instancesAssigned = assignConsumingSegment(segmentPartitionId, instancePartitions);
     // Iterate the idealState to find the first segment that's in the same table partition with the new segment, and
     // check if their assignments are same. We try to derive the partition id from segment name to avoid ZK reads.
     Set<String> idealAssignment = null;
@@ -110,23 +101,25 @@ public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
       }
     }
     // Check if the candidate assignment is consistent with idealState. Use idealState if not.
-    boolean consistent = true;
     if (CollectionUtils.isEmpty(idealAssignment)) {
       _logger.info("No existing assignment from idealState, using the one decided by instancePartitions");
-    } else if (!isSameAssignment(idealAssignment, candidateInstances)) {
+    } else if (!isSameAssignment(idealAssignment, instancesAssigned)) {
       _logger.warn("Assignment: {} is inconsistent with idealState: {}, using the one as from idealState",
-          candidateInstances, idealAssignment);
-      candidateInstances = idealAssignment;
-      consistent = false;
+          instancesAssigned, idealAssignment);
+      instancesAssigned.clear();
+      instancesAssigned.addAll(idealAssignment);
+      if (_controllerMetrics != null) {
+        _controllerMetrics.addMeteredTableValue(_tableNameWithType,
+            ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_MISMATCH, 1L);
+      }
     }
-    _logger.info("Assigned segment: {} to instances: {} for table: {}", segmentName, candidateInstances,
+    _logger.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
         _tableNameWithType);
-    instancesAssigned.addAll(candidateInstances);
-    return consistent;
+    return instancesAssigned;
   }
 
-  private boolean isSameAssignment(Set<String> idealAssignment, Collection<String> candidateInstances) {
-    return idealAssignment.size() == candidateInstances.size() && idealAssignment.containsAll(candidateInstances);
+  private boolean isSameAssignment(Set<String> idealAssignment, List<String> instancesAssigned) {
+    return idealAssignment.size() == instancesAssigned.size() && idealAssignment.containsAll(instancesAssigned);
   }
 
   private boolean isOfflineSegment(Map<String, String> instanceStateMap) {
