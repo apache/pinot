@@ -127,7 +127,7 @@ public class PinotQueryResource {
       throw wae;
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing post request", e);
-      return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
+      return constructQueryExceptionResponse(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
   }
 
@@ -147,7 +147,7 @@ public class PinotQueryResource {
       throw wae;
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
-      return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
+      return constructQueryExceptionResponse(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
   }
 
@@ -476,6 +476,7 @@ public class PinotQueryResource {
     try {
       return new BrokerResponseNative(pe).toJsonString();
     } catch (IOException ioe) {
+      Utils.rethrowException(ioe);
       throw new AssertionError("Should not reach this");
     }
   }
