@@ -349,7 +349,14 @@ public class PinotTableRestletResource {
     NAME, CREATIONTIME, LASTMODIFIEDTIME
   }
 
-  private String listTableConfigs(String tableName, @Nullable String tableTypeStr) {
+  @GET
+  @Path("/tables/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIG)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Lists the table configs")
+  public String listTableConfigs(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
       ObjectNode ret = JsonUtils.newObjectNode();
 
@@ -370,22 +377,6 @@ public class PinotTableRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-  }
-
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @ManualAuthorization
-  @Path("/tables/{tableName}")
-  @ApiOperation(value = "Lists the table configs")
-  public String listTableConfig(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders httpHeaders,
-      @Context Request request) {
-    if (!_accessControlFactory.create()
-        .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.GET_TABLE_CONFIG)) {
-      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-    }
-    return listTableConfigs(tableName, tableTypeStr);
   }
 
   @DELETE
