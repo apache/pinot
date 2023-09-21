@@ -42,6 +42,7 @@ import static org.testng.Assert.assertEquals;
 /**
  * Tests ingestion configs on a hybrid table
  */
+@Test(groups = {"integration-suite-1"})
 public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;

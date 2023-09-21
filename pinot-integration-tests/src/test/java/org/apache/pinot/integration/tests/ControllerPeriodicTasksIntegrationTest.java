@@ -59,6 +59,7 @@ import static org.testng.Assert.assertTrue;
  * The intention of these tests is not to test functionality of daemons, but simply to check that they run as expected
  * and process the tables when the controller starts.
  */
+@Test(groups = {"integration-suite-1"})
 public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int PERIODIC_TASK_INITIAL_DELAY_SECONDS = 30;
   private static final int PERIODIC_TASK_FREQUENCY_SECONDS = 5;

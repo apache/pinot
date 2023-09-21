@@ -20,8 +20,10 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.util.List;
+import org.testng.annotations.Test;
 
 
+@Test(groups = {"integration-suite-1"})
 public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
 
   @Override

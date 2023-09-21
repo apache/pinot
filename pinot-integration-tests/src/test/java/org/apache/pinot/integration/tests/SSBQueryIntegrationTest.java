@@ -43,6 +43,7 @@ import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
 
 
+@Test(groups = {"integration-suite-2"})
 public class SSBQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(SSBQueryIntegrationTest.class);
   private static final Map<String, String> SSB_QUICKSTART_TABLE_RESOURCES = ImmutableMap.of(

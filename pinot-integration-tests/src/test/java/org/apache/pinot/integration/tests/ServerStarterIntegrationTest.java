@@ -34,6 +34,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_INSTAN
 import static org.testng.Assert.assertEquals;
 
 
+@Test(groups = {"integration-suite-2"})
 public class ServerStarterIntegrationTest extends ControllerTest {
   private static final String CUSTOM_INSTANCE_ID = "CustomInstance";
   private static final String CUSTOM_HOST = "CustomHost";

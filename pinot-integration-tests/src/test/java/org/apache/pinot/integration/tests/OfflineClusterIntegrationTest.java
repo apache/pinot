@@ -98,6 +98,7 @@ import static org.testng.Assert.*;
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
+@Test(groups = {"integration-suite-2"})
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
@@ -2352,6 +2353,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
   }
 
+  @Test(dataProvider = "useV1QueryEngine")
   public void testCaseInsensitivityV1(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);

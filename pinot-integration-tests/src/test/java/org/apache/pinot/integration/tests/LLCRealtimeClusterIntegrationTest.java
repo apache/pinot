@@ -65,6 +65,7 @@ import static org.testng.Assert.assertTrue;
  * Integration test for low-level Kafka consumer.
  * TODO: Add separate module-level tests and remove the randomness of this test
  */
+@Test(groups = {"integration-suite-1"})
 public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
   private static final long RANDOM_SEED = System.currentTimeMillis();
@@ -86,7 +87,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   }
 
   @Override
-  public void startController()
+  protected void startController()
       throws Exception {
     super.startController();
     enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
@@ -338,7 +339,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     }, 60000L, "Error verifying force commit operation on table!");
   }
 
-  public Set<String> getConsumingSegmentsFromIdealState(String tableNameWithType) {
+  protected Set<String> getConsumingSegmentsFromIdealState(String tableNameWithType) {
     IdealState tableIdealState = _controllerStarter.getHelixResourceManager().getTableIdealState(tableNameWithType);
     Map<String, Map<String, String>> segmentAssignment = tableIdealState.getRecord().getMapFields();
     Set<String> matchingSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
@@ -351,7 +352,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     return matchingSegments;
   }
 
-  public boolean isForceCommitJobCompleted(String forceCommitJobId)
+  protected boolean isForceCommitJobCompleted(String forceCommitJobId)
       throws Exception {
     String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forForceCommitJobStatus(forceCommitJobId));
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);

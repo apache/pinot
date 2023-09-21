@@ -116,16 +116,16 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   }
 
   @Override
-  public TableConfig createOfflineTableConfig() {
+  protected TableConfig createOfflineTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).build();
   }
 
   @Override
-  public abstract String getTableName();
+  protected abstract String getTableName();
 
   @Override
-  public abstract Schema createSchema();
+  protected abstract Schema createSchema();
 
-  public abstract File createAvroFile()
+  protected abstract File createAvroFile()
       throws Exception;
 }

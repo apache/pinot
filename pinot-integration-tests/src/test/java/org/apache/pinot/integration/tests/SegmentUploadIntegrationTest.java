@@ -58,6 +58,7 @@ import org.testng.annotations.Test;
  * Currently only tests METADATA push type.
  * todo: add test for URI push
  */
+@Test(groups = {"integration-suite-2"})
 public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
   @Override

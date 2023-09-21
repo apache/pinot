@@ -43,6 +43,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
+@Test(groups = {"integration-suite-2"})
 public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationMinionClusterIntegrationTest.class);
 

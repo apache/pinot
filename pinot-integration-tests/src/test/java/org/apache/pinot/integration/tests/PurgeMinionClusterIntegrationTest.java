@@ -57,6 +57,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test for minion task of type "PurgeTask"
  */
+@Test(groups = {"integration-suite-2"})
 public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PURGE_FIRST_RUN_TABLE = "myTable1";
   private static final String PURGE_DELTA_PASSED_TABLE = "myTable2";
@@ -167,11 +168,11 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
   }
 
   @Override
-  public String getTableName() {
+  protected String getTableName() {
     return _tableName;
   }
 
-  public void setTableName(String tableName) {
+  protected void setTableName(String tableName) {
     _tableName = tableName;
   }
 

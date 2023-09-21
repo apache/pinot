@@ -44,6 +44,7 @@ import static org.testng.Assert.fail;
 /**
  * Integration test that extends OfflineClusterIntegrationTest but start multiple brokers and servers.
  */
+@Test(groups = {"integration-suite-1"})
 public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiNodesOfflineClusterIntegrationTest.class);
   private static final int NUM_BROKERS = 2;

@@ -50,6 +50,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 
 
+@Test(groups = {"integration-suite-2"})
 public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   final static String AUTH_PROVIDER_CLASS = UrlAuthProvider.class.getCanonicalName();
   final static URL AUTH_URL = UrlAuthRealtimeIntegrationTest.class.getResource("/url-auth-token.txt");
@@ -97,7 +98,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
+  protected Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> conf = BasicAuthTestUtils.addControllerConfiguration(super.getDefaultControllerConfiguration());
     conf.put("controller.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
     conf.put("controller.segment.fetcher.auth.url", AUTH_URL);
@@ -153,7 +154,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public void addSchema(Schema schema)
+  protected void addSchema(Schema schema)
       throws IOException {
     SimpleHttpResponse response =
         sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
@@ -162,7 +163,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public void addTableConfig(TableConfig tableConfig)
+  protected void addTableConfig(TableConfig tableConfig)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
   }
@@ -180,7 +181,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public void dropRealtimeTable(String tableName)
+  protected void dropRealtimeTable(String tableName)
       throws IOException {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),

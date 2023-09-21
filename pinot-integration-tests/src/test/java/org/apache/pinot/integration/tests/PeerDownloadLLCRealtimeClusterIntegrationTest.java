@@ -68,6 +68,7 @@ import static org.testng.Assert.assertTrue;
  * (1) All the segments on all servers are in either ONLINE or CONSUMING states
  * (2) For segments failed during deep store upload, the corresponding segment download url string is empty in Zk.
  */
+@Test(groups = {"integration-suite-2"})
 public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeerDownloadLLCRealtimeClusterIntegrationTest.class);
 
@@ -110,13 +111,13 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   }
 
   @Override
-  public void startServer()
+  protected void startServer()
       throws Exception {
     startServers(NUM_SERVERS);
   }
 
   @Override
-  public void addTableConfig(TableConfig tableConfig)
+  protected void addTableConfig(TableConfig tableConfig)
       throws IOException {
     SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
         new SegmentsValidationAndRetentionConfig();
@@ -132,7 +133,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   }
 
   @Override
-  public void startController()
+  protected void startController()
       throws Exception {
     Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
     // Override the data dir config.

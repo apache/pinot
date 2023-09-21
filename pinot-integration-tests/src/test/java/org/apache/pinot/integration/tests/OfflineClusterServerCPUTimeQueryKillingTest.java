@@ -56,6 +56,7 @@ import org.testng.annotations.Test;
 /**
  * Integration test for heap size based server query killing, this works only for xmx4G
  */
+@Test(groups = {"integration-suite-2"})
 public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterIntegrationTestSet {
   public static final String STRING_DIM_SV1 = "stringDimSV1";
   public static final String STRING_DIM_SV2 = "stringDimSV2";

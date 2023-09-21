@@ -57,6 +57,7 @@ import static org.mockito.Mockito.mock;
 import static org.testng.Assert.*;
 
 
+@Test(groups = {"integration-suite-2"})
 public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest {
   private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
   private static final DataTableReducerContext DATATABLE_REDUCER_CONTEXT = new DataTableReducerContext(
@@ -96,7 +97,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     waitForAllDocsLoaded(600_000L);
   }
 
-  public GrpcQueryClient getGrpcQueryClient() {
+  protected GrpcQueryClient getGrpcQueryClient() {
     return new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
   }
 

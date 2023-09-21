@@ -63,31 +63,6 @@
 
   <profiles>
     <profile>
-      <id>integration-tests-only</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>false</skipTests>
-              <excludes>
-                <!-- Covered by FlakyConsumerRealtimeClusterIntegrationTest -->
-                <exclude>**/RealtimeClusterIntegrationTest.java</exclude>
-                <!-- Covered by ConvertToRawIndexMinionClusterIntegrationTest -->
-                <exclude>**/HybridClusterIntegrationTest.java</exclude>
-                <!-- Covered by TlsIntegrationTest -->
-                <exclude>**/BasicAuthRealtimeIntegrationTest.java</exclude>
-              </excludes>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
       <id>integration-tests-set-1</id>
       <activation>
         <activeByDefault>false</activeByDefault>
@@ -97,24 +72,14 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
+            <configuration combine.children="override">
+              <forkCount>1</forkCount>
+              <reuseForks>false</reuseForks>
               <skipTests>false</skipTests>
-              <includes>
-                <include>**/org/apache/pinot/integration/tests/A*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/B*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/C*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/D*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/E*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/F*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/G*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/H*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/I*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/J*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/K*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/L*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/M*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
-              </includes>
+              <suiteXmlFiles>
+                <suiteXmlFile>src/test/integration-test-suite-1.xml</suiteXmlFile>
+                <suiteXmlFile>src/test/custom-data-integration-test-suite.xml</suiteXmlFile>
+              </suiteXmlFiles>
             </configuration>
           </plugin>
         </plugins>
@@ -130,41 +95,12 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>false</skipTests>
-              <includes>
-                <include>**/org/apache/pinot/integration/tests/O*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/P*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/Q*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/R*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/S*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/T*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/U*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/V*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/W*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/X*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/Y*Test.java</include>
-                <include>**/org/apache/pinot/integration/tests/Z*Test.java</include>
-              </includes>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>custom-cluster-integration-test-suite</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
+            <configuration combine.children="override">
+              <forkCount>1</forkCount>
+              <reuseForks>false</reuseForks>
               <skipTests>false</skipTests>
               <suiteXmlFiles>
-                <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
+                <suiteXmlFile>src/test/integration-test-suite-2.xml</suiteXmlFile>
               </suiteXmlFiles>
             </configuration>
           </plugin>

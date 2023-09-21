@@ -35,6 +35,7 @@ import org.testng.annotations.Test;
  * compression, it cannot be updated anymore. Somehow this test can also make sure in future we will support
  * large IdealStates
  */
+@Test(groups = {"integration-suite-1"})
 public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
 
   @BeforeClass

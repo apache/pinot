@@ -75,6 +75,7 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
 
 
+@Test(groups = {"integration-suite-2"})
 public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PASSWORD = "changeit";
   private static final char[] PASSWORD_CHAR = PASSWORD.toCharArray();
@@ -131,7 +132,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public Map<String, Object> getDefaultControllerConfiguration() {
+  protected Map<String, Object> getDefaultControllerConfiguration() {
     Map<String, Object> prop = super.getDefaultControllerConfiguration();
 
     // NOTE: defaults must be suitable for cluster-internal communication
@@ -243,7 +244,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public void addSchema(Schema schema)
+  protected void addSchema(Schema schema)
       throws IOException {
     SimpleHttpResponse response =
         sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
@@ -252,7 +253,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public void addTableConfig(TableConfig tableConfig)
+  protected void addTableConfig(TableConfig tableConfig)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
   }
@@ -272,7 +273,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  public void dropRealtimeTable(String tableName)
+  protected void dropRealtimeTable(String tableName)
       throws IOException {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),

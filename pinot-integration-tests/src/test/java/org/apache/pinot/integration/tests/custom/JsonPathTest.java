@@ -47,7 +47,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-@Test(suiteName = "CustomClusterIntegrationTest")
+@Test(suiteName = "CustomClusterIntegrationTest", groups = {"custom-integration-suite"})
 public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
 
   protected static final String DEFAULT_TABLE_NAME = "JsonPathTest";
@@ -67,7 +67,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public Schema createSchema() {
+  protected Schema createSchema() {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
         .addSingleValueDimension(MY_MAP_STR_FIELD_NAME, FieldSpec.DataType.STRING)
@@ -78,12 +78,12 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public String getTableName() {
+  protected String getTableName() {
     return DEFAULT_TABLE_NAME;
   }
 
   @Override
-  public TableConfig createOfflineTableConfig() {
+  protected TableConfig createOfflineTableConfig() {
     List<TransformConfig> transformConfigs = Arrays.asList(
         new TransformConfig(MY_MAP_STR_K1_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k1')"),
         new TransformConfig(MY_MAP_STR_K2_FIELD_NAME, "jsonPathString(" + MY_MAP_STR_FIELD_NAME + ", '$.k2')"),
@@ -96,7 +96,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  protected File createAvroFile()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     List<org.apache.avro.Schema.Field> fields =

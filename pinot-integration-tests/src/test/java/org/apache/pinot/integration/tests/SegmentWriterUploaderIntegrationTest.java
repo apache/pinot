@@ -55,6 +55,7 @@ import org.testng.annotations.Test;
 /**
  * Tests creating segments via the {@link SegmentWriter} implementations
  */
+@Test(groups = {"integration-suite-2"})
 public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegrationTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWriterUploaderIntegrationTest.class);

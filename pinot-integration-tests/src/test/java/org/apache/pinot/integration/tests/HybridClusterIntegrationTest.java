@@ -43,6 +43,7 @@ import org.testng.annotations.Test;
  * Hybrid cluster integration test that uploads 8 months of data as offline and 6 months of data as realtime (with a
  * two month overlap).
  */
+@Test(groups = {"integration-suite-1"})
 public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;

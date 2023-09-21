@@ -67,7 +67,7 @@ public class TableViewsTest extends ControllerTest {
     DEFAULT_INSTANCE.getHelixResourceManager().addTable(tableConfig);
 
     // add schema for realtime table
-    DEFAULT_INSTANCE.addDummySchema(HYBRID_TABLE_NAME);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(createDummySchema(HYBRID_TABLE_NAME));
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(4);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(HYBRID_TABLE_NAME)
         .setNumReplicas(DEFAULT_MIN_NUM_REPLICAS).setStreamConfigs(streamConfig.getStreamConfigsMap()).build();

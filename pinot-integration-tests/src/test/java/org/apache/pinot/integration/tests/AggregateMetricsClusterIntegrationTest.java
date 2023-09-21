@@ -37,6 +37,7 @@ import org.testng.annotations.Test;
 /**
  * Integration test that enables aggregate metrics for the LLC real-time table.
  */
+@Test(groups = {"integration-suite-1"})
 public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @BeforeClass

@@ -33,7 +33,7 @@ class Table {
     _relatedTables = new ArrayList<>();
   }
 
-  public String getTableName() {
+  protected String getTableName() {
     return _tableName;
   }
 
