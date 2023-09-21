@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
+import javax.annotation.Nullable;
+
+
 public class SingleColumnKeySelector implements KeySelector<Object> {
   private final int _keyId;
 
@@ -25,6 +28,7 @@ public class SingleColumnKeySelector implements KeySelector<Object> {
     _keyId = keyId;
   }
 
+  @Nullable
   @Override
   public Object getKey(Object[] row) {
     return row[_keyId];
@@ -32,6 +36,7 @@ public class SingleColumnKeySelector implements KeySelector<Object> {
 
   @Override
   public int computeHash(Object[] input) {
-    return input[_keyId].hashCode() & Integer.MAX_VALUE;
+    Object key = input[_keyId];
+    return key != null ? key.hashCode() & Integer.MAX_VALUE : 0;
   }
 }
