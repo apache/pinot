@@ -4,37 +4,29 @@
   "tenants": {},
   "segmentsConfig": {
     "timeColumnName": "mtime",
-    "timeType": "MILLISECONDS",
-    "segmentPushType": "APPEND",
-    "replicasPerPartition": "1",
     "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "1"
+    "retentionTimeValue": "1",
+    "replication": "1"
   },
+  "tableIndexConfig": {},
   "ingestionConfig": {
     "streamIngestionConfig": {
       "streamConfigMaps": [
         {
           "streamType": "kafka",
-          "stream.kafka.consumer.type": "lowLevel",
           "stream.kafka.topic.name": "meetupRSVPComplexTypeEvents",
           "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-          "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
           "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
           "stream.kafka.zk.broker.url": "localhost:2191/kafka",
           "stream.kafka.broker.list": "localhost:19092"
         }
       ]
     },
-    "transformConfigs": [
-    ],
     "complexTypeConfig": {
       "fieldsToUnnest": [
         "group.group_topics"
       ]
     }
-  },
-  "tableIndexConfig": {
-    "loadMode": "MMAP"
   },
   "metadata": {
     "customConfigs": {}
