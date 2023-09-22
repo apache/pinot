@@ -35,12 +35,10 @@ import org.roaringbitmap.RoaringBitmap;
  * The results are BOOLEAN type.
  */
 public abstract class LogicalOperatorTransformFunction extends BaseTransformFunction {
-  protected List<TransformFunction> _arguments;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    _arguments = arguments;
     int numArguments = arguments.size();
     if (numArguments <= 1) {
       throw new IllegalArgumentException(

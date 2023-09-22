@@ -51,6 +51,7 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 2,
         "2 arguments are required for IN_ID_SET transform function: expression, base64 encoded IdSet");
     Preconditions.checkArgument(arguments.get(0).getResultMetadata().isSingleValue(),
