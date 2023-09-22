@@ -143,7 +143,7 @@ public class StarTreeIndexSeparator implements Closeable {
       throws IOException {
     try (FileChannel dest = new RandomAccessFile(destFile, "rw").getChannel()) {
       org.apache.pinot.common.utils.FileUtils.transferBytes(_indexFileChannel, value._offset, value._size, dest);
-      _indexFileChannel.force(true);
+      dest.force(true);
     }
   }
 
