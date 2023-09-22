@@ -23,9 +23,7 @@ import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -77,58 +75,28 @@ public class ArrayFunctions {
   }
 
   @ScalarFunction
-  public static int[] arrayIndexOfAllInt(int[] value, int valueToFind) {
-    List<Integer> indices = new ArrayList<>();
-    for (int i = 0; i < value.length; i++) {
-      if (value[i] == valueToFind) {
-        indices.add(i);
-      }
-    }
-    return indices.stream().mapToInt(Integer::intValue).toArray();
+  public static int[] arrayIndexesOfInt(int[] value, int valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
   }
 
   @ScalarFunction
-  public static int[] arrayIndexOfAllLong(long[] value, long valueToFind) {
-    List<Integer> indices = new ArrayList<>();
-    for (int i = 0; i < value.length; i++) {
-      if (value[i] == valueToFind) {
-        indices.add(i);
-      }
-    }
-    return indices.stream().mapToInt(Integer::intValue).toArray();
+  public static int[] arrayIndexesOfLong(long[] value, long valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
   }
 
   @ScalarFunction
-  public static int[] arrayIndexOfAllFloat(float[] value, float valueToFind) {
-    List<Integer> indices = new ArrayList<>();
-    for (int i = 0; i < value.length; i++) {
-      if (value[i] == valueToFind) {
-        indices.add(i);
-      }
-    }
-    return indices.stream().mapToInt(Integer::intValue).toArray();
+  public static int[] arrayIndexesOfFloat(float[] value, float valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
   }
 
   @ScalarFunction
-  public static int[] arrayIndexOfAllDouble(double[] value, double valueToFind) {
-    List<Integer> indices = new ArrayList<>();
-    for (int i = 0; i < value.length; i++) {
-      if (value[i] == valueToFind) {
-        indices.add(i);
-      }
-    }
-    return indices.stream().mapToInt(Integer::intValue).toArray();
+  public static int[] arrayIndexesOfDouble(double[] value, double valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
   }
 
   @ScalarFunction
-  public static int[] arrayIndexOfAllString(String[] value, String valueToFind) {
-    List<Integer> indices = new ArrayList<>();
-    for (int i = 0; i < value.length; i++) {
-      if (valueToFind.equals(value[i])) {
-        indices.add(i);
-      }
-    }
-    return indices.stream().mapToInt(Integer::intValue).toArray();
+  public static int[] arrayIndexesOfString(String[] value, String valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
   }
 
   /**
@@ -144,7 +112,7 @@ public class ArrayFunctions {
     // TODO: if values1.length << values2.length. Use binary search can speed up the query
     int i = 0;
     int j = 0;
-    List<Integer> indices = new ArrayList<>();
+    IntArrayList indices = new IntArrayList();
     while (i < values1.length && j < values2.length) {
       if (values1[i] == values2[j]) {
         indices.add(values1[i]);
@@ -152,7 +120,7 @@ public class ArrayFunctions {
       }
       i++;
     }
-    return indices.stream().mapToInt(Integer::intValue).toArray();
+    return indices.toIntArray();
   }
 
   @ScalarFunction

@@ -956,7 +956,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testArrayIndexOfAllInt() {
     ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("array_index_of_all_int(%s, 0)", INT_MONO_INCREASING_MV_1));
+        String.format("array_indexes_of_int(%s, 0)", INT_MONO_INCREASING_MV_1));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
@@ -972,7 +972,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testArrayIndexOfAllLong() {
     ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("array_index_of_all_long(%s, 1)", LONG_MV_COLUMN_2));
+        String.format("array_indexes_of_long(%s, 1)", LONG_MV_COLUMN_2));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
@@ -992,7 +992,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testArrayIndexOfAllFloat() {
     ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("array_index_of_all_float(%s, 1.0)", FLOAT_MV_COLUMN_2));
+        String.format("array_indexes_of_float(%s, 1.0)", FLOAT_MV_COLUMN_2));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
@@ -1012,7 +1012,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testArrayIndexOfAllDouble() {
     ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("array_index_of_all_double(%s, 1.0)", DOUBLE_MV_COLUMN_2));
+        String.format("array_indexes_of_double(%s, 1.0)", DOUBLE_MV_COLUMN_2));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
@@ -1032,7 +1032,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   @Test
   public void testArrayIndexOfAllString() {
     ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("array_index_of_all_string(%s, 'a')", STRING_ALPHANUM_MV_COLUMN_2));
+        String.format("array_indexes_of_string(%s, 'a')", STRING_ALPHANUM_MV_COLUMN_2));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
     assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
