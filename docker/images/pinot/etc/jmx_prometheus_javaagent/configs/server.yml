@@ -129,6 +129,7 @@ rules:
   name: "pinot_$1_version"
   cache: true
   labels:
+    version: "$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertValidDocSnapshotCount.([^\\.]*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
   name: "pinot_server_upsertValidDocSnapshotCount_$4"
   cache: true
