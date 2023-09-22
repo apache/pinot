@@ -130,6 +130,20 @@ rules:
   cache: true
   labels:
     version: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertValidDocSnapshotCount.([^\\.]*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
+  name: "pinot_server_upsertValidDocSnapshotCount_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    partition: "$3"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysInSnapshotCount.([^\\.]*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
+  name: "pinot_server_upsertPrimaryKeysInSnapshotCount_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    partition: "$3"
 
   ## Metrics that fit the catch-all patterns above should not be added to this file.
   ## In case a metric does not fit the catch-all patterns, add them before this comment
