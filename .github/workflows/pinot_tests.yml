@@ -76,16 +76,23 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17, 20 ]
+        java: [ 11, 17 ]
         distribution: [ "temurin" ]
+        prioritize_bytebuffer: [false]
+        include:
+          - distribution: corretto
+            java: 21
+          - distribution: corretto
+            java: 21
+            prioritize_bytebuffer: true
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
-      - name: Set up JDK ${{ matrix.java }}
+      - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
-          java-version: ${{ matrix.java }}
-          distribution: ${{ matrix.distribution }}
+          java-version: 11
+          distribution: temurin
           cache: 'maven'
       # Step that does that actual cache save and restore
       - uses: actions/cache@v3
@@ -96,10 +103,31 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - name: Unit Test
+      - name: Compile Test
         env:
           RUN_INTEGRATION_TESTS: false
           RUN_TEST_SET: ${{ matrix.testset }}
+          MAVEN_OPTS: >
+            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+        run: .github/workflows/scripts/.pinot_compile.sh
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: ${{ matrix.distribution }}
+          cache: 'maven'
+      - name: Unit Test with ${{ matrix.distribution }} ${{ matrix.java }}
+        env:
+          RUN_INTEGRATION_TESTS: false
+          RUN_TEST_SET: ${{ matrix.testset }}
+          PINOT_OFFHEAP_PRIORITIZE_BYTEBUFFER: ${{ matrix.prioritize_bytebuffer }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
@@ -128,16 +156,23 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17, 20 ]
+        java: [ 11, 17 ]
         distribution: [ "temurin" ]
+        prioritize_bytebuffer: [false]
+        include:
+          - distribution: corretto
+            java: 21
+          - distribution: corretto
+            java: 21
+            prioritize_bytebuffer: true
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
-      - name: Set up JDK ${{ matrix.java }}
+      - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
-          java-version: ${{ matrix.java }}
-          distribution: ${{ matrix.distribution }}
+          java-version: 11
+          distribution: temurin
           cache: 'maven'
       # Step that does that actual cache save and restore
       - uses: actions/cache@v3
@@ -148,10 +183,31 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
+      - name: Compile Test
+        env:
+          RUN_INTEGRATION_TESTS: false
+          RUN_TEST_SET: ${{ matrix.testset }}
+          MAVEN_OPTS: >
+            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+        run: .github/workflows/scripts/.pinot_compile.sh
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: ${{ matrix.distribution }}
+          cache: 'maven'
       - name: Integration Test
         env:
           RUN_INTEGRATION_TESTS: true
           RUN_TEST_SET: ${{ matrix.testset }}
+          PINOT_OFFHEAP_PRIORITIZE_BYTEBUFFER: ${{ matrix.prioritize_bytebuffer }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
             -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
@@ -234,9 +290,16 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        java: [ 11, 17, 20 ]
+        java: [ 11, 17 ]
         distribution: [ "temurin" ]
-    name: Pinot Quickstart on JDK ${{ matrix.java }}
+        prioritize_bytebuffer: [false]
+        include:
+          - distribution: corretto
+            java: 21
+          - distribution: corretto
+            java: 21
+            prioritize_bytebuffer: true
+    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}
@@ -254,5 +317,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      - name: Quickstart on JDK ${{ matrix.java }}
+      - name: Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
+        env:
+          PINOT_OFFHEAP_PRIORITIZE_BYTEBUFFER: ${{ matrix.prioritize_bytebuffer }}
         run: .github/workflows/scripts/.pinot_quickstart.sh

@@ -67,6 +67,7 @@ public abstract class PinotDataBuffer implements Closeable {
   // With number of bytes less than this threshold, we get/put bytes one by one
   // With number of bytes more than this threshold, we create a ByteBuffer from the buffer and use bulk get/put method
   public static final int BULK_BYTES_PROCESSING_THRESHOLD = 10;
+  private static final String PRIORITIZE_BYTEBUFFER_ENV = "PINOT_OFFHEAP_PRIORITIZE_BYTEBUFFER";
 
   private static class BufferContext {
     enum Type {
@@ -152,17 +153,22 @@ public abstract class PinotDataBuffer implements Closeable {
   }
 
   public static PinotBufferFactory createDefaultFactory() {
-    return createDefaultFactory(true);
+    String prioritizeBbEnvValue = System.getenv(PRIORITIZE_BYTEBUFFER_ENV);
+    boolean prioritizeByteBuffer = prioritizeBbEnvValue == null || Boolean.parseBoolean(prioritizeBbEnvValue);
+    return createDefaultFactory(prioritizeByteBuffer);
   }
 
   public static PinotBufferFactory createDefaultFactory(boolean prioritizeByteBuffer) {
     String factoryClassName;
-    if (JavaVersion.VERSION < 16) {
-      LOGGER.info("Using LArray as buffer on JVM version {}", JavaVersion.VERSION);
-      factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
-    } else {
-      LOGGER.info("Using Unsafe as buffer on JVM version {}", JavaVersion.VERSION);
-      factoryClassName = UnsafePinotBufferFactory.class.getCanonicalName();
+    factoryClassName = System.getenv("PINOT_BUFFER_LIBRARY");
+    if (factoryClassName == null) {
+      if (JavaVersion.VERSION < 16) {
+        LOGGER.info("Using LArray as buffer on JVM version {}", JavaVersion.VERSION);
+        factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
+      } else {
+        LOGGER.info("Using Unsafe as buffer on JVM version {}", JavaVersion.VERSION);
+        factoryClassName = UnsafePinotBufferFactory.class.getCanonicalName();
+      }
     }
     return createFactory(factoryClassName, prioritizeByteBuffer);
   }
