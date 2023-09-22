@@ -102,7 +102,8 @@ public class GcsPinotFS extends BasePinotFS {
       if (existsDirectoryOrBucket(gcsUri)) {
         return true;
       }
-      Blob blob = getBucket(gcsUri).create(directoryPath, new byte[0]);
+      Blob blob =
+          _storage.create(BlobInfo.newBuilder(BlobId.of(gcsUri.getBucketName(), directoryPath)).build(), new byte[0]);
       return blob.exists();
     } catch (Exception e) {
       throw new IOException(e);
@@ -274,7 +275,7 @@ public class GcsPinotFS extends BasePinotFS {
   private Blob getBlob(GcsUri gcsUri)
       throws IOException {
     try {
-      return getBucket(gcsUri).get(gcsUri.getPath());
+      return _storage.get(BlobId.of(gcsUri.getBucketName(), gcsUri.getPath()));
     } catch (StorageException e) {
       throw new IOException(e);
     }
@@ -306,7 +307,7 @@ public class GcsPinotFS extends BasePinotFS {
     if (prefix.isEmpty()) {
       return true;
     }
-    Blob blob = getBucket(gcsUri).get(prefix);
+    Blob blob = _storage.get(BlobId.of(gcsUri.getBucketName(), gcsUri.getPath()));
     if (existsBlob(blob)) {
       return true;
     }
