@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
@@ -35,6 +36,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -443,5 +445,11 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);
       }
     }
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    return super.getNullBitmap(valueBlock);
   }
 }

@@ -47,6 +47,7 @@ public class StPointFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 2 || arguments.size() == 3,
         "2 or 3 arguments are required for transform function: %s", getName());
     TransformFunction transformFunction = arguments.get(0);
