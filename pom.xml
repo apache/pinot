@@ -229,6 +229,16 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>scala-2.12</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <properties>
+        <scala.version>2.12.18</scala.version>
+        <scala.compat.version>2.12</scala.compat.version>
+      </properties>
+    </profile>
 
     <profile>
       <id>scala-2.13</id>
