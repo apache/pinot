@@ -307,7 +307,7 @@ public class GcsPinotFS extends BasePinotFS {
     if (prefix.isEmpty()) {
       return true;
     }
-    Blob blob = _storage.get(BlobId.of(gcsUri.getBucketName(), gcsUri.getPath()));
+    Blob blob = _storage.get(BlobId.of(gcsUri.getBucketName(), prefix));
     if (existsBlob(blob)) {
       return true;
     }
