@@ -77,12 +77,19 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17, 20 ]
+        java: [ 11, 17 ]
         distribution: [ "temurin" ]
+        prioritize_bytebuffer: [false]
+        include:
+          - distribution: corretto
+            java: 21
+          - distribution: corretto
+            java: 21
+            prioritize_bytebuffer: true
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
-      - name: Set up JDK ${{ matrix.java }}
+      - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
         uses: actions/setup-java@v3
         with:
           java-version: ${{ matrix.java }}
@@ -116,6 +123,7 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: false
           RUN_TEST_SET: ${{ matrix.testset }}
+          PINOT_OFFHEAP_PRIORITIZE_BYTEBUFFER: ${{ matrix.prioritize_bytebuffer }}
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
@@ -145,12 +153,19 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17, 20 ]
+        java: [ 11, 17 ]
         distribution: [ "temurin" ]
+        prioritize_bytebuffer: [false]
+        include:
+          - distribution: corretto
+            java: 21
+          - distribution: corretto
+            java: 21
+            prioritize_bytebuffer: true
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
-      - name: Set up JDK ${{ matrix.java }}
+      - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
         uses: actions/setup-java@v3
         with:
           java-version: ${{ matrix.java }}
@@ -183,6 +198,7 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: true
           RUN_TEST_SET: ${{ matrix.testset }}
+          PINOT_OFFHEAP_PRIORITIZE_BYTEBUFFER: ${{ matrix.prioritize_bytebuffer }}
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
@@ -292,9 +308,16 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        java: [ 11, 17, 20 ]
+        java: [ 11, 17 ]
         distribution: [ "temurin" ]
-    name: Pinot Quickstart on JDK ${{ matrix.java }}
+        prioritize_bytebuffer: [false]
+        include:
+          - distribution: corretto
+            java: 21
+          - distribution: corretto
+            java: 21
+            prioritize_bytebuffer: true
+    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}
@@ -314,4 +337,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
       - name: Quickstart on JDK ${{ matrix.java }}
+        env:
+          PINOT_OFFHEAP_PRIORITIZE_BYTEBUFFER: ${{ matrix.prioritize_bytebuffer }}
         run: .github/workflows/scripts/.pinot_quickstart.sh
