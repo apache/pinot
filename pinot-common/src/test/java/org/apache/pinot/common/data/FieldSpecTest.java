@@ -384,6 +384,32 @@ public class FieldSpecTest {
     Assert.assertEquals(first, second, ERROR_MESSAGE);
   }
 
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testDoubleNaNConvertRefused() {
+    DOUBLE.convert("NaN");
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testFloatNaNConvertRefused() {
+    FLOAT.convert("NaN");
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testDoubleNaNDefaultRefused() {
+    FieldSpec fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("nanTest");
+    fieldSpec1.setDataType(DOUBLE);
+    fieldSpec1.setDefaultNullValue("NaN");
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testFloatNaNDefaultRefused() {
+    FieldSpec fieldSpec1 = new DimensionFieldSpec();
+    fieldSpec1.setName("nanTest");
+    fieldSpec1.setDataType(FLOAT);
+    fieldSpec1.setDefaultNullValue("NaN");
+  }
+
   /**
    * Helper function to generate JSON string with random order of fields passed in.
    */
