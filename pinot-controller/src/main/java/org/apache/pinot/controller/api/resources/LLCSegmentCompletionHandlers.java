@@ -42,7 +42,6 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
@@ -211,57 +210,6 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Response response = _segmentCompletionManager.segmentCommitStart(requestParams);
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentCommitStart for segment:{} is:{}", segmentName, responseStr);
-    return responseStr;
-  }
-
-  // TODO: remove this API. Should not allow committing without metadata
-  @GET
-  @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
-  @Produces(MediaType.APPLICATION_JSON)
-  public String segmentCommitEnd(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION) String segmentLocation,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
-      @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
-      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes) {
-    if (instanceId == null || segmentName == null || segmentLocation == null || (offset == -1
-        && streamPartitionMsgOffset == null)) {
-      LOGGER.error(
-          "Invalid call: offset={}, segmentName={}, instanceId={}, segmentLocation={}, streamPartitionMsgOffset={}",
-          offset, segmentName, instanceId, segmentLocation, streamPartitionMsgOffset);
-      // TODO: memoryUsedInBytes = 0 if not present in params. Add validation when we start using it
-      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
-    }
-
-    SegmentMetadataImpl segmentMetadata;
-    try {
-      segmentMetadata = extractMetadataFromSegmentFileURI(new URI(segmentLocation), segmentName);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while extracting metadata from segment: {} at location: {} from instance: {}",
-          segmentName, segmentLocation, instanceId, e);
-      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
-    }
-    SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
-    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withSegmentLocation(segmentLocation)
-        .withSegmentSizeBytes(segmentSizeBytes).withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis)
-        .withNumRows(numRows).withMemoryUsedBytes(memoryUsedBytes);
-    extractOffsetFromParams(requestParams, streamPartitionMsgOffset, offset);
-    LOGGER.info("Processing segmentCommitEnd:{}", requestParams.toString());
-
-    final boolean isSuccess = true;
-    final boolean isSplitCommit = true;
-
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-        CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata);
-    SegmentCompletionProtocol.Response response = _segmentCompletionManager
-        .segmentCommitEnd(requestParams, isSuccess, isSplitCommit, committingSegmentDescriptor);
-    final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentCommitEnd for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
   }
 
@@ -539,25 +487,6 @@ public class LLCSegmentCompletionHandlers {
 
     try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
       Files.copy(inputStream, new File(outputDir, fileName).toPath());
-    }
-  }
-
-  /**
-   * Extracts the segment metadata from the segment file URI (could be remote). Copy the segment file to local under
-   * file upload temporary directory first, then use the untarred file temporary directory to store the metadata files
-   * temporarily.
-   */
-  private static SegmentMetadataImpl extractMetadataFromSegmentFileURI(URI segmentFileURI, String segmentName)
-      throws Exception {
-    File localTempFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
-        ControllerFilePathProvider.getInstance().getFileUploadTempDir(), getTempSegmentFileName(segmentName),
-        "Invalid segment name: %s", segmentName);
-
-    try {
-      SegmentFetcherFactory.fetchSegmentToLocal(segmentFileURI, localTempFile);
-      return extractMetadataFromLocalSegmentFile(localTempFile);
-    } finally {
-      FileUtils.deleteQuietly(localTempFile);
     }
   }
 
