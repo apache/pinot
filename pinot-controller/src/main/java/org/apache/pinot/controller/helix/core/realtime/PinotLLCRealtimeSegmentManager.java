@@ -209,10 +209,6 @@ public class PinotLLCRealtimeSegmentManager {
     return new FileUploadDownloadClient();
   }
 
-  public boolean getIsSplitCommitEnabled() {
-    return _controllerConf.getAcceptSplitCommit();
-  }
-
   /**
    * Using the ideal state and segment metadata, return a list of {@link PartitionGroupConsumptionStatus}
    * for latest segment of each partition group.
@@ -1471,7 +1467,7 @@ public class PinotLLCRealtimeSegmentManager {
       return 0L;
     }
 
-    if (!getIsSplitCommitEnabled() || !isTmpSegmentAsyncDeletionEnabled()) {
+    if (!isTmpSegmentAsyncDeletionEnabled()) {
       return 0L;
     }
 

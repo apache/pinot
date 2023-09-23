@@ -108,7 +108,6 @@ public class SegmentCompletionProtocol {
   }
 
   public static final String STATUS_KEY = "status";
-  public static final String OFFSET_KEY = "offset";
   // Sent by controller in COMMIT message
   public static final String BUILD_TIME_KEY = "buildTimeSec";
   public static final String COMMIT_TYPE_KEY = "isSplitCommitType";
@@ -443,9 +442,7 @@ public class SegmentCompletionProtocol {
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class Response {
     private ControllerResponseStatus _status;
-    private long _offset = -1;
     private long _buildTimeSeconds = -1;
-    private boolean _splitCommit;
     private String _segmentLocation;
     private String _controllerVipUrl;
     private String _streamPartitionMsgOffset;
@@ -455,9 +452,7 @@ public class SegmentCompletionProtocol {
 
     public Response(Params params) {
       _status = params.getStatus();
-      _offset = params.getOffset();
       _buildTimeSeconds = params.getBuildTimeSeconds();
-      _splitCommit = params.isSplitCommit();
       _segmentLocation = params.getSegmentLocation();
       _controllerVipUrl = params.getControllerVipUrl();
       _streamPartitionMsgOffset = params.getStreamPartitionMsgOffset();
@@ -473,12 +468,6 @@ public class SegmentCompletionProtocol {
       _status = status;
     }
 
-    @Deprecated
-    @JsonProperty(OFFSET_KEY)
-    public long getOffset() {
-      return _offset;
-    }
-
     // This method is called in the server when the controller responds with
     // CATCH_UP response to segmentConsumed() API.
     @JsonProperty(STREAM_PARTITION_MSG_OFFSET_KEY)
@@ -488,12 +477,6 @@ public class SegmentCompletionProtocol {
 
     public void setStreamPartitionMsgOffset(String streamPartitionMsgOffset) {
       _streamPartitionMsgOffset = streamPartitionMsgOffset;
-    }
-
-    @Deprecated
-    @JsonProperty(OFFSET_KEY)
-    public void setOffset(long offset) {
-      _offset = offset;
     }
 
     @JsonProperty(BUILD_TIME_KEY)
@@ -506,14 +489,11 @@ public class SegmentCompletionProtocol {
       _buildTimeSeconds = buildTimeSeconds;
     }
 
+    // Always return true for backward compatibility. Deprecated in 1.0
+    @Deprecated
     @JsonProperty(COMMIT_TYPE_KEY)
     public boolean isSplitCommit() {
-      return _splitCommit;
-    }
-
-    @JsonProperty(COMMIT_TYPE_KEY)
-    public void setSplitCommit(boolean splitCommit) {
-      _splitCommit = splitCommit;
+      return true;
     }
 
     @JsonProperty(CONTROLLER_VIP_URL_KEY)
@@ -556,18 +536,14 @@ public class SegmentCompletionProtocol {
 
     public static class Params {
       private ControllerResponseStatus _status;
-      private long _offset;
       private long _buildTimeSeconds;
-      private boolean _splitCommit;
       private String _segmentLocation;
       private String _controllerVipUrl;
       private String _streamPartitionMsgOffset;
 
       public Params() {
-        _offset = -1L;
         _status = ControllerResponseStatus.FAILED;
         _buildTimeSeconds = -1;
-        _splitCommit = false;
         _segmentLocation = null;
         _controllerVipUrl = null;
         _streamPartitionMsgOffset = null;
@@ -583,11 +559,6 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      public Params withSplitCommit(boolean splitCommit) {
-        _splitCommit = splitCommit;
-        return this;
-      }
-
       public Params withControllerVipUrl(String controllerVipUrl) {
         _controllerVipUrl = controllerVipUrl;
         return this;
@@ -598,14 +569,8 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      public Params withStreamPartitionMsgOffset(String offset) {
-        _streamPartitionMsgOffset = offset;
-        // TODO Issue 5359 Remove the block below once we have both parties be fine without _offset being present.
-        try {
-          _offset = Long.parseLong(_streamPartitionMsgOffset);
-        } catch (Exception e) {
-          // Ignore. If the receiver expects _offset, it will return an error to the sender.
-        }
+      public Params withStreamPartitionMsgOffset(String streamPartitionMsgOffset) {
+        _streamPartitionMsgOffset = streamPartitionMsgOffset;
         return this;
       }
 
@@ -613,17 +578,8 @@ public class SegmentCompletionProtocol {
         return _status;
       }
 
-      @Deprecated
-      private long getOffset() {
-        return _offset;
-      }
-
       public long getBuildTimeSeconds() {
         return _buildTimeSeconds;
-      }
-
-      public boolean isSplitCommit() {
-        return _splitCommit;
       }
 
       public String getSegmentLocation() {

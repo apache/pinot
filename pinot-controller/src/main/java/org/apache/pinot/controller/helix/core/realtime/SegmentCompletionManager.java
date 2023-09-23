@@ -106,10 +106,6 @@ public class SegmentCompletionManager {
     }
   }
 
-  public boolean isSplitCommitEnabled() {
-    return _segmentManager.getIsSplitCommitEnabled();
-  }
-
   public String getControllerVipUrl() {
     return _segmentManager.getControllerVipUrl();
   }
@@ -391,7 +387,6 @@ public class SegmentCompletionManager {
     // We may need to add some time here to allow for getting the lock? For now 0
     // We may need to add some time for the committer come back to us (after the build)? For now 0.
     private long _maxTimeAllowedToCommitMs;
-    private final boolean _isSplitCommitEnabled;
     private final String _controllerVipUrl;
 
     public static SegmentCompletionFSM fsmInHolding(PinotLLCRealtimeSegmentManager segmentManager,
@@ -445,7 +440,6 @@ public class SegmentCompletionManager {
       }
       _initialCommitTimeMs = initialCommitTimeMs;
       _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
-      _isSplitCommitEnabled = segmentCompletionManager.isSplitCommitEnabled();
       _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
     }
 
@@ -463,7 +457,7 @@ public class SegmentCompletionManager {
     @Override
     public String toString() {
       return "{" + _segmentName.getSegmentName() + "," + _state + "," + _startTimeMs + "," + _winner + ","
-          + _winningOffset + "," + _isSplitCommitEnabled + "," + _controllerVipUrl + "}";
+          + _winningOffset + "," + _controllerVipUrl + "}";
     }
 
     // SegmentCompletionManager releases the FSM from the hashtable when it is done.
@@ -680,10 +674,7 @@ public class SegmentCompletionManager {
           new SegmentCompletionProtocol.Response.Params().withStreamPartitionMsgOffset(offset.toString())
               .withBuildTimeSeconds(allowedBuildTimeSec)
               .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT)
-              .withSplitCommit(_isSplitCommitEnabled);
-      if (_isSplitCommitEnabled) {
-        params.withControllerVipUrl(_controllerVipUrl);
-      }
+              .withControllerVipUrl(_controllerVipUrl);
       return new SegmentCompletionProtocol.Response(params);
     }
 

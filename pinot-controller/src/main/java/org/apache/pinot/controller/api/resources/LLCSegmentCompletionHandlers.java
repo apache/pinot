@@ -343,8 +343,8 @@ public class LLCSegmentCompletionHandlers {
     }
 
     response = segmentCompletionManager.segmentCommitEnd(requestParams, success, false, committingSegmentDescriptor);
-    LOGGER.info("Response to segmentCommit: instance={}  segment={} status={} offset={}, streamMsgOffset={}",
-        requestParams.getInstanceId(), requestParams.getSegmentName(), response.getStatus(), response.getOffset(),
+    LOGGER.info("Response to segmentCommit: instance={}, segment={}, status={}, streamMsgOffset={}",
+        requestParams.getInstanceId(), requestParams.getSegmentName(), response.getStatus(),
         response.getStreamPartitionMsgOffset());
 
     return response.toJsonString();
