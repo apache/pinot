@@ -86,7 +86,7 @@ public class AllServersSegmentAssignmentStrategyTest {
 
     _instancePartitionsMap.put(InstancePartitionsType.OFFLINE, instancePartitions);
     _instancePartitionsMap.put(InstancePartitionsType.COMPLETED, completedInstancePartitions);
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, null);
   }
 
   @Test

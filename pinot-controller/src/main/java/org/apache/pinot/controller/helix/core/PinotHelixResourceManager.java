@@ -111,6 +111,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
@@ -225,6 +226,7 @@ public class PinotHelixResourceManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private HelixDataAccessor _helixDataAccessor;
   private Builder _keyBuilder;
+  private ControllerMetrics _controllerMetrics;
   private SegmentDeletionManager _segmentDeletionManager;
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
@@ -274,12 +276,13 @@ public class PinotHelixResourceManager {
    * TODO:For the <a href="https://github.com/apache/pinot/pull/10451">backwards incompatible change</a>, this is a
    * reminder to clean up old Zk nodes when the controller starts up.
    */
-  public synchronized void start(HelixManager helixZkManager) {
+  public synchronized void start(HelixManager helixZkManager, @Nullable ControllerMetrics controllerMetrics) {
     _helixZkManager = helixZkManager;
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
+    _controllerMetrics = controllerMetrics;
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore,
         _deletedSegmentsRetentionInDays);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
@@ -2142,7 +2145,8 @@ public class PinotHelixResourceManager {
         }
       }
 
-      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
+      SegmentAssignment segmentAssignment =
+          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
       synchronized (getTableUpdaterLock(tableNameWithType)) {
         Map<InstancePartitionsType, InstancePartitions> finalInstancePartitionsMap = instancePartitionsMap;
         HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
@@ -2153,8 +2157,7 @@ public class PinotHelixResourceManager {
                 tableNameWithType);
           } else {
             List<String> assignedInstances =
-                segmentAssignment.assignSegment(segmentName, currentAssignment,
-                    finalInstancePartitionsMap);
+                segmentAssignment.assignSegment(segmentName, currentAssignment, finalInstancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 tableNameWithType);
             currentAssignment.put(segmentName,
@@ -3107,7 +3110,8 @@ public class PinotHelixResourceManager {
     if (trackRebalanceProgress) {
       zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId, this);
     }
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver);
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics);
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig);
   }
 

@@ -90,7 +90,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
             .setStreamConfigs(streamConfigs)
             .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
             .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(PARTITION_COLUMN, 1)).build();
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig);
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
 
     _instancePartitionsMap = new TreeMap<>();
     // CONSUMING instances:

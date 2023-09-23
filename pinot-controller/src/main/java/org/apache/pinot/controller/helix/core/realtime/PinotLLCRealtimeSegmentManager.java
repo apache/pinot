@@ -316,7 +316,8 @@ public class PinotLLCRealtimeSegmentManager {
     int numPartitionGroups = newPartitionGroupMetadataList.size();
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
-    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 
@@ -555,7 +556,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Step-3
-    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 
@@ -1054,7 +1056,8 @@ public class PinotLLCRealtimeSegmentManager {
         newPartitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
             .collect(Collectors.toSet());
 
-    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 

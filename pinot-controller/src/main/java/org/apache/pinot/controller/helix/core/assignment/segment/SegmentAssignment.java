@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -39,7 +40,7 @@ public interface SegmentAssignment {
    * @param helixManager Helix manager
    * @param tableConfig Table config
    */
-  void init(HelixManager helixManager, TableConfig tableConfig);
+  void init(HelixManager helixManager, TableConfig tableConfig, @Nullable ControllerMetrics controllerMetrics);
 
   /**
    * Assigns segment to instances.
