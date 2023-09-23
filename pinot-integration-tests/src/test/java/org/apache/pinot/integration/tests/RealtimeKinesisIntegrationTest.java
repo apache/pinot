@@ -113,6 +113,7 @@ public class RealtimeKinesisIntegrationTest extends BaseClusterIntegrationTestSe
   @BeforeClass(enabled = false)
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     try {
       DockerInfoCommand dockerInfoCommand = new DockerInfoCommand();
       dockerInfoCommand.execute();

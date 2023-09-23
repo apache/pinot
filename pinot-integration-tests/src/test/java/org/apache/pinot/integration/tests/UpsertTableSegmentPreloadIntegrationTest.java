@@ -46,7 +46,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 
 
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_SERVERS = 1;
   private static final String PRIMARY_KEY_COL = "clientId";
@@ -62,6 +62,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("Start setUp(): " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -75,6 +76,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     startKafka();
 
     populateTables();
+    System.out.println("Finished setUp(): " + this.getClass().getName());
   }
 
   protected void populateTables()
@@ -110,6 +112,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   @AfterClass
   public void tearDown()
       throws IOException {
+    System.out.println("Start tearDown(): " + this.getClass().getName());
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
 
     // Test dropping all segments one by one
@@ -134,6 +137,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
+    System.out.println("Finished tearDown(): " + this.getClass().getName());
   }
 
   @Override

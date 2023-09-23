@@ -217,9 +217,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     }, 60_000L, "Failed to drop the segments");
 
     stopServer();
-    stopKafka(); // to clean up the topic
     startServers(NUM_SERVERS);
-    startKafka();
     getControllerRequestClient().resumeConsumption(realtimeTableName);
   }
 
@@ -304,6 +302,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
   @AfterClass
   public void tearDown() {
+    stopKafka();
     stopServer();
     stopBroker();
     stopController();

@@ -57,7 +57,7 @@ import static org.testng.Assert.assertEquals;
  *   </li>
  * </ul>
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
@@ -89,6 +89,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster

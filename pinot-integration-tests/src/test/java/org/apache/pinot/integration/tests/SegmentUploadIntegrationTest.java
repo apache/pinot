@@ -58,7 +58,7 @@ import org.testng.annotations.Test;
  * Currently only tests METADATA push type.
  * todo: add test for URI push
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
   @Override
@@ -100,6 +100,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     // Start Zk and Kafka
     startZk();
 

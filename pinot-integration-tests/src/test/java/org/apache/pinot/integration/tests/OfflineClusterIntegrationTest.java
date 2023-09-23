@@ -98,7 +98,7 @@ import static org.testng.Assert.*;
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
@@ -172,6 +172,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("Start setUp(): " + this.getClass().getName());
     DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
@@ -250,6 +251,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Try to reload all the segments with force download from the controller URI.
     reloadAllSegments(TEST_UPDATED_INVERTED_INDEX_QUERY, true, getCountStarResult());
+
+    System.out.println("Finish setUp(): " + this.getClass().getName());
   }
 
   private void reloadAllSegments(String testQuery, boolean forceDownload, long numTotalDocs)
@@ -2211,6 +2214,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @AfterClass
   public void tearDown()
       throws Exception {
+    System.out.println("Start tearDown(): " + this.getClass().getName());
     // Test instance decommission before tearing down
     testInstanceDecommission();
 
@@ -2299,6 +2303,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Check if '/CONFIGS/PARTICIPANT/<serverName>' has been erased correctly
     String configPath = "/" + getHelixClusterName() + "/CONFIGS/PARTICIPANT/" + serverName;
     assertFalse(_propertyStore.exists(configPath, 0));
+
+    System.out.println("Finish tearDown(): " + this.getClass().getName());
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -2854,11 +2860,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response.get("numDocsScanned").asLong(), response.get("totalDocs").asLong());
   }
 
-  @Test
+  @Test(dataProvider = "useV1QueryEngine")
   @Override
-  public void testHardcodedServerPartitionedSqlQueries()
+  public void testHardcodedServerPartitionedSqlQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testHardcodedServerPartitionedSqlQueries();
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    super.testHardcodedServerPartitionedSqlQueries(useMultiStageQueryEngine);
   }
 
   @Test
@@ -2971,13 +2978,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testJDBCClient()
       throws Exception {
     String query = "SELECT count(*) FROM " + getTableName();
-    java.sql.Connection connection = getJDBCConnectionFromController(DEFAULT_CONTROLLER_PORT);
+    java.sql.Connection connection = getJDBCConnectionFromController(getControllerPort());
     Statement statement = connection.createStatement();
     ResultSet resultSet = statement.executeQuery(query);
     resultSet.first();
     Assert.assertTrue(resultSet.getLong(1) > 0);
 
-    connection = getJDBCConnectionFromBrokers(RANDOM.nextInt(), DEFAULT_BROKER_PORT);
+    connection = getJDBCConnectionFromBrokers(RANDOM.nextInt(), getRandomBrokerPort());
     statement = connection.createStatement();
     resultSet = statement.executeQuery(query);
     resultSet.first();

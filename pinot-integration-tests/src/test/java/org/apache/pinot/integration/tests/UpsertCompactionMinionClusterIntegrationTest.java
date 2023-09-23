@@ -47,7 +47,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
   protected PinotTaskManager _taskManager;
@@ -84,6 +84,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("Start setUp(): " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -109,6 +110,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     startMinion();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
+    System.out.println("Finished setUp(): " + this.getClass().getName());
   }
 
   @BeforeMethod
@@ -172,6 +174,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
   @AfterClass
   public void tearDown()
       throws IOException {
+    System.out.println("Start tearDown(): " + this.getClass().getName());
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
     dropRealtimeTable(realtimeTableName);
     stopMinion();
@@ -181,6 +184,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
+    System.out.println("Finished tearDown(): " + this.getClass().getName());
   }
 
   @Test

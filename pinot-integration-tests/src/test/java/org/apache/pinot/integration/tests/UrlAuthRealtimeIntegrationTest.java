@@ -50,7 +50,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 
 
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   final static String AUTH_PROVIDER_CLASS = UrlAuthProvider.class.getCanonicalName();
   final static URL AUTH_URL = UrlAuthRealtimeIntegrationTest.class.getResource("/url-auth-token.txt");
@@ -60,6 +60,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("Start setUp(): " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start Zookeeper
@@ -82,11 +83,13 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
     // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
     waitForAllDocsLoaded(600_000L);
+    System.out.println("Finished setUp(): " + this.getClass().getName());
   }
 
-  @AfterClass(alwaysRun = true)
+  @AfterClass
   public void tearDown()
       throws Exception {
+    System.out.println("Start tearDown(): " + this.getClass().getName());
     dropRealtimeTable(getTableName());
     stopMinion();
     stopServer();
@@ -95,6 +98,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
     stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
+    System.out.println("Finished tearDown(): " + this.getClass().getName());
   }
 
   @Override

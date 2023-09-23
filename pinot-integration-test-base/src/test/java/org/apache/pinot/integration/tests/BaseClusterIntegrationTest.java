@@ -98,7 +98,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final int DEFAULT_NUM_REPLICAS = 1;
   protected static final boolean DEFAULT_NULL_HANDLING_ENABLED = false;
 
-  protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
+  protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "_" + System
+      .currentTimeMillis());
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
   protected final File _tarDir = new File(_tempDir, "tarDir");
   protected List<StreamDataServerStartable> _kafkaStarters;
@@ -649,7 +650,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void startKafka() {
-    startKafka(KafkaStarterUtils.DEFAULT_KAFKA_PORT);
+    startKafka(KafkaStarterUtils.DEFAULT_KAFKA_PORT + RANDOM.nextInt(1000));
   }
 
   protected void startKafka(int port) {
@@ -662,6 +663,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void stopKafka() {
     for (StreamDataServerStartable kafkaStarter : _kafkaStarters) {
       kafkaStarter.stop();
+    }
+  }
+
+  protected void cleanupKafka() {
+    for (StreamDataServerStartable kafkaStarter : _kafkaStarters) {
+      kafkaStarter.deleteTopic(getKafkaTopic());
     }
   }
 

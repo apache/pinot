@@ -47,7 +47,7 @@ public class PinotFileUploadTest {
     TEST_INSTANCE.setupSharedStateAndValidate();
 
     // Create schema
-    TEST_INSTANCE.addDummySchema(TABLE_NAME);
+    TEST_INSTANCE.getControllerRequestClient().addSchema(TEST_INSTANCE.createDummySchema(TABLE_NAME));
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(2).build();

@@ -55,6 +55,14 @@ public interface StreamDataServerStartable {
   void createTopic(String topic, Properties topicProps);
 
   /**
+   * Delete a data stream (e.g Kafka topic) in the server.
+   *
+   * @param topic
+   */
+  void deleteTopic(String topic);
+
+
+  /**
    * Get the port of the server.
    */
   int getPort();

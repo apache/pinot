@@ -68,7 +68,7 @@ import static org.testng.Assert.assertTrue;
  * (1) All the segments on all servers are in either ONLINE or CONSUMING states
  * (2) For segments failed during deep store upload, the corresponding segment download url string is empty in Zk.
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeerDownloadLLCRealtimeClusterIntegrationTest.class);
 
@@ -87,6 +87,7 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   @Override
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     System.out.println(String.format(
         "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));

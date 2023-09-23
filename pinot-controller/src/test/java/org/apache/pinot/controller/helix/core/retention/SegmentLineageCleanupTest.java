@@ -68,8 +68,10 @@ public class SegmentLineageCleanupTest {
         mock(ControllerMetrics.class));
 
     // Create a schema
-    TEST_INSTANCE.addDummySchema(TableNameBuilder.extractRawTableName(OFFLINE_TABLE_NAME));
-    TEST_INSTANCE.addDummySchema(TableNameBuilder.extractRawTableName(REFRESH_OFFLINE_TABLE_NAME));
+    TEST_INSTANCE.getControllerRequestClient()
+        .addSchema(TEST_INSTANCE.createDummySchema(TableNameBuilder.extractRawTableName(OFFLINE_TABLE_NAME)));
+    TEST_INSTANCE.getControllerRequestClient()
+        .addSchema(TEST_INSTANCE.createDummySchema(TableNameBuilder.extractRawTableName(REFRESH_OFFLINE_TABLE_NAME)));
 
     // Update table config
     TableConfig tableConfig =

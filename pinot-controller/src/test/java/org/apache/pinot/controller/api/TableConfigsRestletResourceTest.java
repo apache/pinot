@@ -601,7 +601,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
   public void testGetConfigCompatibility()
       throws IOException {
     String tableName = "table1";
-    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(DEFAULT_INSTANCE.createDummySchema(tableName));
     TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
     validationConfig.setReplication("1");

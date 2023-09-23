@@ -57,7 +57,7 @@ import static org.mockito.Mockito.mock;
 import static org.testng.Assert.*;
 
 
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest {
   private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
   private static final DataTableReducerContext DATATABLE_REDUCER_CONTEXT = new DataTableReducerContext(
@@ -66,6 +66,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("Start setUp(): " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -95,10 +96,11 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+    System.out.println("Finish setUp(): " + this.getClass().getName());
   }
 
   protected GrpcQueryClient getGrpcQueryClient() {
-    return new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
+    return new GrpcQueryClient("localhost", getServerGrpcPort());
   }
 
   @Test
@@ -158,12 +160,16 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
 
     // distinct
     entries.add(new Object[]{"SELECT DISTINCT(AirlineID) FROM mytable_OFFLINE LIMIT 1000000"});
-    entries.add(new Object[]{"SELECT AirlineID, ArrTime FROM mytable_OFFLINE "
-        + "GROUP BY AirlineID, ArrTime LIMIT 1000000"});
+    entries.add(new Object[]{
+        "SELECT AirlineID, ArrTime FROM mytable_OFFLINE "
+            + "GROUP BY AirlineID, ArrTime LIMIT 1000000"
+    });
 
     // order by
-    entries.add(new Object[]{"SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') "
-        + "FROM mytable_OFFLINE ORDER BY DaysSinceEpoch limit 1000000"});
+    entries.add(new Object[]{
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') "
+            + "FROM mytable_OFFLINE ORDER BY DaysSinceEpoch limit 1000000"
+    });
 
     return entries.toArray(new Object[entries.size()][]);
   }
@@ -264,6 +270,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   @AfterClass
   public void tearDown()
       throws Exception {
+    System.out.println("Start tearDown(): " + this.getClass().getName());
     dropOfflineTable(getTableName());
 
     stopServer();
@@ -272,5 +279,6 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     stopZk();
 
     FileUtils.deleteDirectory(_tempDir);
+    System.out.println("Finish tearDown(): " + this.getClass().getName());
   }
 }

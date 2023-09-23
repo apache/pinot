@@ -32,7 +32,7 @@ import org.testng.annotations.Test;
 /**
  * Integration test that starts one broker with auto-discovered echo service and test it
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String TENANT_NAME = "TestTenant";
 
@@ -63,6 +63,7 @@ public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegr
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster

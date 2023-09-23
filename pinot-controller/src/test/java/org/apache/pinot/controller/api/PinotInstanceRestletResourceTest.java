@@ -226,7 +226,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
   public void instanceRetagServerDeficiencyTest()
       throws Exception {
     String tableName = "testTable";
-    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.getControllerRequestClient().addSchema(DEFAULT_INSTANCE.createDummySchema(tableName));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
         .setNumReplicas(2).build();
     // create table with replication as 2 so that DefaultTenant has a minimum server requirement as 2.

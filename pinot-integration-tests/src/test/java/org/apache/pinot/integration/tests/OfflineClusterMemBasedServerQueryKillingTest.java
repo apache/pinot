@@ -57,7 +57,7 @@ import org.testng.annotations.Test;
 /**
  * Integration test for heap size based server query killing, this works only for xmx4G
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterIntegrationTestSet {
   public static final String STRING_DIM_SV1 = "stringDimSV1";
   public static final String STRING_DIM_SV2 = "stringDimSV2";
@@ -99,6 +99,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
         .setLevel(Level.ERROR);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);

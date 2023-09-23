@@ -37,7 +37,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
   private static final long TIMEOUT_IN_MS = 10_000L;
   private HashMap<Integer, String> _partitionToTableMap;
@@ -45,6 +45,7 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     startZk();
     startController();
 

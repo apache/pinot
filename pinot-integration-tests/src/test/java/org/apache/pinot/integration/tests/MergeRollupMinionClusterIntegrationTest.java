@@ -71,7 +71,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test for minion task of type "MergeRollupTask"
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String SINGLE_LEVEL_CONCAT_TEST_TABLE = "myTable1";
   private static final String SINGLE_LEVEL_ROLLUP_TEST_TABLE = "myTable2";
@@ -100,6 +100,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir1, _segmentDir2, _segmentDir3, _segmentDir4,
         _segmentDir5, _tarDir1, _tarDir2, _tarDir3, _tarDir4, _tarDir5);
 

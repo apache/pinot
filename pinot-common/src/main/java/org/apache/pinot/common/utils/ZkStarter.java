@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -139,7 +140,7 @@ public class ZkStarter {
    * Starts an empty local Zk instance on the default port
    */
   public static ZookeeperInstance startLocalZkServer() {
-    return startLocalZkServer(NetUtils.findOpenPort(DEFAULT_ZK_TEST_PORT));
+    return startLocalZkServer(NetUtils.findOpenPort(DEFAULT_ZK_TEST_PORT + new Random().nextInt(10000)));
   }
 
   public static String getDefaultZkStr() {

@@ -24,7 +24,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.testng.annotations.Test;
 
 
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class MultiStageEngineCustomTenantIntegrationTest extends MultiStageEngineIntegrationTest {
   private static final String TEST_TENANT = "TestTenant";
 

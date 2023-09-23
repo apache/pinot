@@ -89,7 +89,7 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
 
   @Override
   public void stop() {
-    _serverStartable.shutdown();
+    _serverStartable.awaitShutdown();
     FileUtils.deleteQuietly(new File(_serverStartable.config().logDirs().apply(0)));
   }
 
@@ -110,6 +110,24 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
         }
       }
     }, 1000L, 30000, "Kafka topic " + topic + " is not created yet");
+  }
+
+  @Override
+  public void deleteTopic(String topic) {
+    Collection<String> topicList = Arrays.asList(topic);
+    _adminClient.deleteTopics(topicList);
+    waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          return !_adminClient.listTopics().names().get().contains(topic);
+        } catch (Exception e) {
+          LOGGER.warn("Could not fetch Kafka topics", e);
+          return null;
+        }
+      }
+    }, 1000L, 30000, "Kafka topic " + topic + " is not deleted yet");
   }
 
   @Override

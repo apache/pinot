@@ -33,12 +33,13 @@ import org.testng.annotations.Test;
 /**
  * Tests that the controller, broker and server admin consoles return the expected pages.
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
 
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
     // Start an empty Pinot cluster
     startZk();

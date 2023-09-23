@@ -67,7 +67,7 @@ import static org.testng.Assert.assertTrue;
  * With every task run, a new segment is created in the offline table for 1 day. Watermark also keeps progressing
  * accordingly.
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private PinotHelixTaskResourceManager _taskResourceManager;
   private PinotTaskManager _taskManager;
@@ -92,6 +92,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster

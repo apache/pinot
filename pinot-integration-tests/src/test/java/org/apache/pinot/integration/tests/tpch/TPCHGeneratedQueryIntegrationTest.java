@@ -52,7 +52,7 @@ import org.testng.annotations.Test;
  * REAME.md to generate a larger dataset for better testing.
  * Queries are executed against Pinot and H2, and the results are compared.
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_TPCH_QUERIES = 1000;
   private static TPCHQueryGeneratorV2 _tpchQueryGeneratorV2;
@@ -61,6 +61,7 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster

@@ -65,9 +65,9 @@ import static org.testng.Assert.assertTrue;
  * Integration test for low-level Kafka consumer.
  * TODO: Add separate module-level tests and remove the randomness of this test
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
-  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test-" + System.currentTimeMillis();
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
 
@@ -198,6 +198,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   @Override
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     System.out.println(String.format(
         "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
@@ -368,10 +369,11 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
   }
 
-  @Test
+  @Test(dataProvider = "useV1QueryEngine")
   @Override
-  public void testHardcodedServerPartitionedSqlQueries()
+  public void testHardcodedServerPartitionedSqlQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    super.testHardcodedServerPartitionedSqlQueries();
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    super.testHardcodedServerPartitionedSqlQueries(useMultiStageQueryEngine);
   }
 }

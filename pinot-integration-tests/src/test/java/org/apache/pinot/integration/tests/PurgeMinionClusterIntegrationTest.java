@@ -57,7 +57,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test for minion task of type "PurgeTask"
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PURGE_FIRST_RUN_TABLE = "myTable1";
   private static final String PURGE_DELTA_PASSED_TABLE = "myTable2";
@@ -76,6 +76,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDataDir, _segmentTarDir);
 
     // Start the Pinot cluster

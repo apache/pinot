@@ -347,8 +347,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   /**
    * Test hardcoded queries on server partitioned data (all the segments for a partition is served by a single server).
    */
-  public void testHardcodedServerPartitionedSqlQueries()
+  protected void testHardcodedServerPartitionedSqlQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // IN_PARTITIONED_SUBQUERY
     {
       String inPartitionedSubqueryQuery =
@@ -680,7 +681,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String rawTableName = getTableName();
     Schema schema = getSchema(getTableName());
 
-    String selectStarQuery = "SELECT * FROM " + rawTableName;
+    String selectStarQuery = "SELECT * FROM " + rawTableName + " LIMIT 10";
     JsonNode queryResponse = postQuery(selectStarQuery);
     assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), schema.size());
     long numTotalDocs = queryResponse.get("totalDocs").asLong();

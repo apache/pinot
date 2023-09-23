@@ -23,6 +23,7 @@ import cloud.localstack.ServiceName;
 import cloud.localstack.docker.annotation.LocalstackDockerConfiguration;
 import com.google.common.base.Function;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -56,6 +57,7 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
   LocalstackDockerConfiguration _dockerConfig;
   Properties _serverProperties;
   private String _localStackKinesisEndpoint = "http://localhost:%s";
+  private KinesisClient _kinesisClient;
 
   @Override
   public void init(Properties props) {
@@ -69,6 +71,16 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
 
     _localStackKinesisEndpoint =
         String.format(_localStackKinesisEndpoint, _serverProperties.getProperty("port", DEFAULT_PORT));
+
+    try {
+      _kinesisClient = KinesisClient.builder().httpClient(
+              new ApacheSdkHttpService().createHttpClientBuilder().buildWithDefaults(
+                  AttributeMap.builder().put(SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, Boolean.TRUE).build()))
+          .credentialsProvider(getLocalAWSCredentials()).region(Region.of(DEFAULT_REGION))
+          .endpointOverride(new URI(_localStackKinesisEndpoint)).build();
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -84,13 +96,7 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
   @Override
   public void createTopic(String topic, Properties topicProps) {
     try {
-      KinesisClient kinesisClient = KinesisClient.builder().httpClient(
-              new ApacheSdkHttpService().createHttpClientBuilder().buildWithDefaults(
-                  AttributeMap.builder().put(SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, Boolean.TRUE).build()))
-          .credentialsProvider(getLocalAWSCredentials()).region(Region.of(DEFAULT_REGION))
-          .endpointOverride(new URI(_localStackKinesisEndpoint)).build();
-
-      kinesisClient.createStream(
+      _kinesisClient.createStream(
           CreateStreamRequest.builder().streamName(topic).shardCount((Integer) topicProps.get(NUM_SHARDS_PROPERTY))
               .build());
 
@@ -100,7 +106,7 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
         public Boolean apply(@Nullable Void aVoid) {
           try {
             String kinesisStreamStatus =
-                kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(topic).build())
+                _kinesisClient.describeStream(DescribeStreamRequest.builder().streamName(topic).build())
                     .streamDescription().streamStatusAsString();
 
             return kinesisStreamStatus.contentEquals("ACTIVE");
@@ -115,6 +121,23 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
     } catch (Exception e) {
       LOGGER.warn("Error occurred while creating topic: " + topic, e);
     }
+  }
+
+  public void deleteTopic(String topic) {
+    _kinesisClient.deleteStream(software.amazon.awssdk.services.kinesis.model.DeleteStreamRequest.builder()
+        .streamName(topic).build());
+    waitForCondition(new Function<Void, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          return !_kinesisClient.listStreams().streamNames().contains(topic);
+        } catch (Exception e) {
+          LOGGER.warn("Could not fetch Kinesis topics", e);
+          return null;
+        }
+      }
+    }, 1000L, 30000, "Kinesis topic " + topic + " is not deleted yet");
   }
 
   @Override

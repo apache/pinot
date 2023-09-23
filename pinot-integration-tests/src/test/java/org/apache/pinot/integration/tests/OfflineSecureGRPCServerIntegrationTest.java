@@ -28,7 +28,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.annotations.Test;
 
 
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerIntegrationTest {
   private static final String JKS = "JKS";
   private static final String JDK = "JDK";
@@ -62,6 +62,6 @@ public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerInt
     PinotConfiguration brokerConfig = new PinotConfiguration(configMap);
     // This mimics how pinot broker instantiates GRPCQueryClient.
     GrpcConfig config = GrpcConfig.buildGrpcQueryConfig(brokerConfig);
-    return new GrpcQueryClient("localhost", Server.DEFAULT_GRPC_PORT, config);
+    return new GrpcQueryClient("localhost", getServerGrpcPort(), config);
   }
 }

@@ -117,6 +117,7 @@ public class QueryServer {
 
   public void start() {
     try {
+      LOGGER.error("Starting server on port: {}", _port);
       ServerBootstrap serverBootstrap = new ServerBootstrap();
 
       PooledByteBufAllocator bufAllocator = PooledByteBufAllocator.DEFAULT;

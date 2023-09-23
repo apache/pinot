@@ -66,7 +66,7 @@ import static org.testng.Assert.assertTrue;
  * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
  * TODO: Add separate module-level tests and remove the randomness of this test
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest
     extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
@@ -284,6 +284,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegr
   @Override
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     System.out.println(format(
         "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));

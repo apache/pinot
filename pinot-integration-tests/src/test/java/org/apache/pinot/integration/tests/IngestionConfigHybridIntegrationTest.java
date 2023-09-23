@@ -42,7 +42,7 @@ import static org.testng.Assert.assertEquals;
 /**
  * Tests ingestion configs on a hybrid table
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
@@ -119,6 +119,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     // Start Zk and Kafka
     startZk();

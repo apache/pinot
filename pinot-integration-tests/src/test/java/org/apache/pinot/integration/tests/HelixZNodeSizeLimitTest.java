@@ -27,6 +27,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 
@@ -35,19 +36,22 @@ import org.testng.annotations.Test;
  * compression, it cannot be updated anymore. Somehow this test can also make sure in future we will support
  * large IdealStates
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
+  @BeforeSuite
+  public void setUpSuite() {
     // This line of code has to be executed before the org.apache.helix.zookeeper.zkclient.ZkClient.WRITE_SIZE_LIMIT
     // is initialized. The code is in:
     // https://github.com/apache/helix/blob/master/zookeeper-api/
     // src/main/java/org/apache/helix/zookeeper/zkclient/ZkClient.java#L105
     // The below line gets executed before ZkClient.WRITE_SIZE_LIMIT is created
     System.setProperty(ZkSystemPropertyKeys.JUTE_MAXBUFFER, "4000000");
+  }
 
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    System.out.println("setUp this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start Zookeeper
@@ -59,9 +63,10 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
     addTableConfig(createOfflineTableConfig());
   }
 
-  @AfterClass(alwaysRun = true)
+  @AfterClass
   public void tearDown()
       throws Exception {
+    System.out.println("tearDown this.getClass().getName() = " + this.getClass().getName());
     stopServer();
     stopBroker();
     stopController();
@@ -94,6 +99,8 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
       });
     } catch (Exception e) {
       Assert.fail("Exception shouldn't be thrown even if the data size of the ideal state is larger than 1M");
+    } finally {
+      System.clearProperty(ZkSystemPropertyKeys.ZK_SERIALIZER_ZNRECORD_WRITE_SIZE_LIMIT_BYTES);
     }
   }
 }

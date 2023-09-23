@@ -55,7 +55,7 @@ import org.testng.annotations.Test;
 /**
  * Tests creating segments via the {@link SegmentWriter} implementations
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegrationTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWriterUploaderIntegrationTest.class);
@@ -67,6 +67,7 @@ public class SegmentWriterUploaderIntegrationTest extends BaseClusterIntegration
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster

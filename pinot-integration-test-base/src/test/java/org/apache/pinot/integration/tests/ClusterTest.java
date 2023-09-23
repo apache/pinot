@@ -69,9 +69,9 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
-import org.apache.pinot.spi.utils.CommonConstants.Minion;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -102,6 +102,25 @@ public abstract class ClusterTest extends ControllerTest {
   private String _brokerBaseApiUrl;
 
   private boolean _useMultiStageQueryEngine = false;
+
+  private String _baseInstanceDataDir =
+      System.getProperty("java.io.tmpdir") + File.separator + System.currentTimeMillis();
+
+  private int _serverGrpcPort;
+  private int _serverAdminApiPort;
+  private int _serverNettyPort;
+
+  protected int getServerGrpcPort() {
+    return _serverGrpcPort;
+  }
+
+  protected int getServerAdminApiPort() {
+    return _serverAdminApiPort;
+  }
+
+  protected int getServerNettyPort() {
+    return _serverNettyPort;
+  }
 
   protected String getBrokerBaseApiUrl() {
     return _brokerBaseApiUrl;
@@ -136,7 +155,8 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
     brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
-    brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, NetUtils.findOpenPort(DEFAULT_BROKER_PORT + brokerId));
+    brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT,
+        NetUtils.findOpenPort(DEFAULT_BROKER_PORT + RANDOM.nextInt(10000) + brokerId));
     brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
     overrideBrokerConf(brokerConf);
     return brokerConf;
@@ -186,8 +206,8 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerStarters.add(brokerStarter);
 
     // TLS configs require hard-coding
-    _brokerPorts.add(DEFAULT_BROKER_PORT);
-    _brokerBaseApiUrl = "https://localhost:" + DEFAULT_BROKER_PORT;
+    _brokerPorts.add(NetUtils.findOpenPort(DEFAULT_BROKER_PORT + RANDOM.nextInt(10000)));
+    _brokerBaseApiUrl = "https://localhost:" + _brokerPorts.get(_brokerPorts.size() - 1);
   }
 
   protected int getRandomBrokerPort() {
@@ -210,12 +230,17 @@ public abstract class ClusterTest extends ControllerTest {
     PinotConfiguration serverConf = getDefaultServerConfiguration();
     serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
-    serverConf.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR,
+        _baseInstanceDataDir + File.separator + "PinotServer" + File.separator + "dataDir-" + serverId);
     serverConf.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
-        Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + serverId);
-    serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, Server.DEFAULT_ADMIN_API_PORT - serverId);
-    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + serverId);
-    serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT + serverId);
+        _baseInstanceDataDir + File.separator + "PinotServer" + File.separator + "segmentTar-" + serverId);
+    _serverAdminApiPort = NetUtils.findOpenPort(Server.DEFAULT_ADMIN_API_PORT + new Random().nextInt(10000) + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, _serverAdminApiPort);
+    _serverNettyPort = NetUtils.findOpenPort(Helix.DEFAULT_SERVER_NETTY_PORT + new Random().nextInt(10000) + serverId);
+    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, _serverNettyPort);
+    _serverGrpcPort =
+        NetUtils.findOpenPort(Server.DEFAULT_GRPC_PORT + new Random().nextInt(10000) + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, _serverGrpcPort);
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
@@ -230,7 +255,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startServers(int numServers)
       throws Exception {
-    FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
+    FileUtils.deleteQuietly(new File(_baseInstanceDataDir + File.separator + "PinotServer"));
     _serverStarters = new ArrayList<>(numServers);
     for (int i = 0; i < numServers; i++) {
       _serverStarters.add(startOneServer(i));
@@ -245,9 +270,17 @@ public abstract class ClusterTest extends ControllerTest {
     return serverStarter;
   }
 
+  protected BaseServerStarter startOneServer(PinotConfiguration serverConfig)
+      throws Exception {
+    HelixServerStarter serverStarter = new HelixServerStarter();
+    serverStarter.init(serverConfig);
+    serverStarter.start();
+    return serverStarter;
+  }
+
   protected void startServerHttps()
       throws Exception {
-    FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
+    FileUtils.deleteQuietly(new File(_baseInstanceDataDir + File.separator + "PinotServer"));
     _serverStarters = new ArrayList<>();
 
     PinotConfiguration serverConf = getDefaultServerConfiguration();
@@ -269,10 +302,12 @@ public abstract class ClusterTest extends ControllerTest {
   //       to manage the instance level configs
   protected void startMinion()
       throws Exception {
-    FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
+    FileUtils.deleteQuietly(new File(_baseInstanceDataDir + File.separator + "PinotMinion"));
     PinotConfiguration minionConf = getDefaultMinionConfiguration();
     minionConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    minionConf.setProperty(CommonConstants.Helix.KEY_OF_MINION_PORT,
+        NetUtils.findOpenPort(CommonConstants.Minion.DEFAULT_HELIX_PORT));
     _minionStarter = new MinionStarter();
     _minionStarter.init(minionConf);
     _minionStarter.start();
@@ -284,6 +319,8 @@ public abstract class ClusterTest extends ControllerTest {
       brokerStarter.stop();
     }
     _brokerStarters = null;
+    _brokerPorts = null;
+    _brokerBaseApiUrl = null;
   }
 
   protected void stopServer() {
@@ -291,28 +328,36 @@ public abstract class ClusterTest extends ControllerTest {
     for (BaseServerStarter serverStarter : _serverStarters) {
       serverStarter.stop();
     }
-    FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
+    FileUtils.deleteQuietly(new File(_baseInstanceDataDir + File.separator + "PinotServer"));
     _serverStarters = null;
+    _serverGrpcPort = 0;
+    _serverAdminApiPort = 0;
+    _serverNettyPort = 0;
   }
 
   protected void stopMinion() {
     assertNotNull(_minionStarter, "Minion is not started");
     _minionStarter.stop();
-    FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
+    FileUtils.deleteQuietly(new File(_baseInstanceDataDir + File.separator + "PinotMinion"));
     _minionStarter = null;
   }
 
   protected void restartServers()
       throws Exception {
     assertNotNull(_serverStarters, "Servers are not started");
-    for (BaseServerStarter serverStarter : _serverStarters) {
-      serverStarter.stop();
-    }
+    List<BaseServerStarter> oldServers = new ArrayList<>(_serverStarters);
     int numServers = _serverStarters.size();
     _serverStarters.clear();
     for (int i = 0; i < numServers; i++) {
-      _serverStarters.add(startOneServer(i));
+      _serverStarters.add(restartServer(oldServers.get(i)));
     }
+  }
+
+  protected BaseServerStarter restartServer(BaseServerStarter serverStarter)
+      throws Exception {
+    PinotConfiguration serverConfig = serverStarter.getConfig();
+    serverStarter.stop();
+    return startOneServer(serverConfig);
   }
 
   /**

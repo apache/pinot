@@ -35,7 +35,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
 
   private List<File> _avroFiles;
@@ -43,6 +43,7 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster

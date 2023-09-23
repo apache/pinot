@@ -23,7 +23,7 @@ import java.util.List;
 import org.testng.annotations.Test;
 
 
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
 
   @Override

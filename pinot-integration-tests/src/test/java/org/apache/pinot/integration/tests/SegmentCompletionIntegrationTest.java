@@ -54,7 +54,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_KAFKA_PARTITIONS = 1;
 
@@ -70,6 +70,7 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster

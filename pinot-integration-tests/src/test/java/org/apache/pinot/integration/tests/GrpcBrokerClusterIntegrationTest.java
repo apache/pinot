@@ -37,7 +37,7 @@ import org.testng.annotations.Test;
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;
@@ -66,6 +66,7 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start Zk, Kafka and Pinot
@@ -137,6 +138,7 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     dropOfflineTable(getTableName());
 
+    stopKafka();
     stopServer();
     stopBroker();
     stopController();

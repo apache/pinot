@@ -22,7 +22,7 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class OfflineGRPCServerMultiStageIntegrationTest extends OfflineGRPCServerIntegrationTest {
   @BeforeTest
   void enableMultiStage() {

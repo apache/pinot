@@ -37,12 +37,13 @@ import static org.testng.AssertJUnit.assertTrue;
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
  * The data pushed to Kafka includes null values.
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster

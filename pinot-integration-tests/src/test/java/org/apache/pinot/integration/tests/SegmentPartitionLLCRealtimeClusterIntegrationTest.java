@@ -54,7 +54,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test that enables segment partition for the LLC real-time table.
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PARTITION_COLUMN = "DestState";
   // Number of documents in the first and second Avro file
@@ -69,6 +69,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster

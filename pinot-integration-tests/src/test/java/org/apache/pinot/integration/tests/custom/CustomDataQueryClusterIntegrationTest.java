@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests.custom;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -71,6 +70,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     LOGGER.warn("Setting up integration test class: {}", getClass().getSimpleName());
     if (_controllerRequestURLBuilder == null) {
       _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl("http://localhost:" + DEFAULT_CONTROLLER_PORT);
@@ -101,18 +101,8 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   }
 
   @Override
-  public String getZkUrl() {
-    return ZkStarter.getDefaultZkStr();
-  }
-
-  @Override
   public String getHelixClusterName() {
     return "CustomDataQueryClusterIntegrationTest";
-  }
-
-  @Override
-  protected String getBrokerBaseApiUrl() {
-    return "http://localhost:" + DEFAULT_BROKER_PORT;
   }
 
   @Override

@@ -262,4 +262,12 @@ public class ControllerLeaderLocator {
   protected long getMinInvalidateIntervalMs() {
     return MIN_INVALIDATE_INTERVAL_MS;
   }
+
+  @VisibleForTesting
+  public static void clear() {
+    if (_instance != null) {
+      _instance._cachedControllerLeaderMap.clear();
+    }
+    _instance = null;
+  }
 }

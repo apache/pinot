@@ -59,7 +59,7 @@ import org.testng.annotations.Test;
  * Integration test for heap size based broker query killing, this works only for xmx4G
  * TODO: re-enable or remove this after we resolve https://github.com/apache/pinot/issues/11099
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterIntegrationTestSet {
 
   public static final String STRING_DIM_SV1 = "stringDimSV1";
@@ -96,6 +96,7 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
         .setLevel(Level.ERROR);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);

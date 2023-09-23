@@ -44,7 +44,7 @@ import static org.testng.Assert.fail;
 /**
  * Integration test that extends OfflineClusterIntegrationTest but start multiple brokers and servers.
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiNodesOfflineClusterIntegrationTest.class);
   private static final int NUM_BROKERS = 2;
@@ -154,8 +154,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
       testCountStarQuery(NUM_SERVERS - 1, false);
     } finally {
       // Restart the failed server, and it should be included in the routing again
-      serverStarter.stop();
-      serverStarter = startOneServer(NUM_SERVERS - 1);
+      serverStarter = restartServer(serverStarter);
       _serverStarters.set(NUM_SERVERS - 1, serverStarter);
       TestUtils.waitForCondition((aVoid) -> {
         try {
@@ -229,7 +228,8 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
   @Test(enabled = false)
   @Override
-  public void testHardcodedServerPartitionedSqlQueries() {
+  public void testHardcodedServerPartitionedSqlQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
     // Ignored
   }
 }

@@ -49,7 +49,7 @@ import static org.testng.Assert.assertEquals;
  *  - Metric fields: score:float
  *  - DataTime fields: timestampInEpoch:long
  */
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String INPUT_DATA_TAR_FILE = "gameScores_csv.tar.gz";
   private static final String CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";
@@ -63,6 +63,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("Start setUp(): " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -93,11 +94,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     // Create partial upsert table schema
     Schema partialUpsertSchema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
     addSchema(partialUpsertSchema);
+    System.out.println("Finished setUp(): " + this.getClass().getName());
   }
 
   @AfterClass
   public void tearDown()
       throws IOException {
+    System.out.println("Start tearDown(): " + this.getClass().getName());
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
     dropRealtimeTable(realtimeTableName);
     stopServer();
@@ -106,6 +109,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
+    System.out.println("Finished tearDown(): " + this.getClass().getName());
   }
 
   @Override

@@ -37,12 +37,13 @@ import org.testng.annotations.Test;
 /**
  * Integration test that enables aggregate metrics for the LLC real-time table.
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster

@@ -48,7 +48,7 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
  * Integration test that provides example of {@link PinotTaskGenerator} and {@link PinotTaskExecutor} and tests simple
  * minion functionality.
  */
-@Test(groups = {"integration-suite-1"})
+@Test(suiteName = "integration-suite-1", groups = {"integration-suite-1"})
 public class BasicAuthBatchIntegrationTest extends ClusterTest {
   private static final String BOOTSTRAP_DATA_DIR = "/examples/batch/baseballStats";
   private static final String SCHEMA_FILE = "baseballStats_schema.json";
@@ -59,6 +59,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     // Start Zookeeper
     startZk();
     // Start the Pinot cluster
@@ -68,7 +69,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     startMinion();
   }
 
-  @AfterClass(alwaysRun = true)
+  @AfterClass
   public void tearDown()
       throws Exception {
     stopMinion();

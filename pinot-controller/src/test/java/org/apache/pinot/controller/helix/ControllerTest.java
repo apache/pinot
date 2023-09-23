@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
@@ -66,6 +67,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -85,7 +87,6 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
-import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -211,7 +212,8 @@ public class ControllerTest {
     Map<String, Object> properties = new HashMap<>();
 
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
-    properties.put(ControllerConf.CONTROLLER_PORT, NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT));
+    properties.put(ControllerConf.CONTROLLER_PORT,
+        NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT + new Random().nextInt(10000)));
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
     properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
     properties.put(ControllerConf.ZK_STR, getZkUrl());
@@ -242,7 +244,7 @@ public class ControllerTest {
       controllerScheme = _controllerConfig.getControllerVipProtocol();
     }
 
-    _controllerPort = DEFAULT_CONTROLLER_PORT;
+    _controllerPort = NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT + new Random().nextInt(10000));
     if (StringUtils.isNotBlank(_controllerConfig.getControllerPort())) {
       _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
     }
@@ -289,7 +291,9 @@ public class ControllerTest {
     Preconditions.checkState(_controllerStarter != null);
     _controllerStarter.stop();
     _controllerStarter = null;
+    _controllerRequestClient = null;
     FileUtils.deleteQuietly(new File(_controllerDataDir));
+    ControllerLeaderLocator.clear();
   }
 
   public int getFakeBrokerInstanceCount() {
@@ -392,7 +396,8 @@ public class ControllerTest {
   public void addFakeServerInstancesToAutoJoinHelixCluster(int numInstances, boolean isSingleTenant, int baseAdminPort)
       throws Exception {
     for (int i = 0; i < numInstances; i++) {
-      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, isSingleTenant, baseAdminPort + i);
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, isSingleTenant,
+          NetUtils.findOpenPort(baseAdminPort + i));
     }
   }
 
@@ -403,7 +408,8 @@ public class ControllerTest {
 
   public void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
-    addFakeServerInstanceToAutoJoinHelixCluster(instanceId, isSingleTenant, Server.DEFAULT_ADMIN_API_PORT);
+    addFakeServerInstanceToAutoJoinHelixCluster(instanceId, isSingleTenant,
+        NetUtils.findOpenPort(Server.DEFAULT_ADMIN_API_PORT));
   }
 
   public void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant, int adminPort)
@@ -431,7 +437,8 @@ public class ControllerTest {
   /** Add fake server instances until total number of server instances reaches maxCount */
   public void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {
-    addMoreFakeServerInstancesToAutoJoinHelixCluster(maxCount, isSingleTenant, DEFAULT_ADMIN_API_PORT);
+    addMoreFakeServerInstancesToAutoJoinHelixCluster(maxCount, isSingleTenant,
+        NetUtils.findOpenPort(Server.DEFAULT_ADMIN_API_PORT));
   }
 
   /** Add fake server instances until total number of server instances reaches maxCount */

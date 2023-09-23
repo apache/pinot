@@ -34,7 +34,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_INSTAN
 import static org.testng.Assert.assertEquals;
 
 
-@Test(groups = {"integration-suite-2"})
+@Test(suiteName = "integration-suite-2", groups = {"integration-suite-2"})
 public class ServerStarterIntegrationTest extends ControllerTest {
   private static final String CUSTOM_INSTANCE_ID = "CustomInstance";
   private static final String CUSTOM_HOST = "CustomHost";
@@ -43,6 +43,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    System.out.println("this.getClass().getName() = " + this.getClass().getName());
     startZk();
     startController();
   }
@@ -74,65 +75,72 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   public void testDefaultServerConf()
       throws Exception {
     String expectedHost = NetUtils.getHostAddress();
-    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
+    int customPort = NetUtils.findOpenPort(CUSTOM_PORT);
+    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + customPort;
 
-    verifyInstanceConfig(new PinotConfiguration(), expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
+    verifyInstanceConfig(new PinotConfiguration(), expectedInstanceId, expectedHost, customPort);
   }
 
   @Test
   public void testSetInstanceIdToHostname()
       throws Exception {
     String expectedHost = NetUtils.getHostnameOrAddress();
-    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
+    int customPort = NetUtils.findOpenPort(CUSTOM_PORT);
+    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + customPort;
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(SET_INSTANCE_ID_TO_HOSTNAME_KEY, true);
 
-    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost,
-        DEFAULT_SERVER_NETTY_PORT);
+    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost, customPort);
   }
 
   @Test
   public void testCustomInstanceId()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
-    properties.put(CONFIG_OF_INSTANCE_ID, CUSTOM_INSTANCE_ID);
+    String customInstanceId = CUSTOM_INSTANCE_ID + "_" + System.currentTimeMillis();
+    properties.put(CONFIG_OF_INSTANCE_ID, customInstanceId);
 
-    verifyInstanceConfig(new PinotConfiguration(properties), CUSTOM_INSTANCE_ID, NetUtils.getHostAddress(),
+    verifyInstanceConfig(new PinotConfiguration(properties), customInstanceId, NetUtils.getHostAddress(),
         DEFAULT_SERVER_NETTY_PORT);
   }
 
   @Test
   public void testCustomHost()
       throws Exception {
-    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + CUSTOM_HOST + "_" + DEFAULT_SERVER_NETTY_PORT;
+
+    int customPort = NetUtils.findOpenPort(CUSTOM_PORT);
+    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + CUSTOM_HOST + "_" + customPort;
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(KEY_OF_SERVER_NETTY_HOST, CUSTOM_HOST);
 
-    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, CUSTOM_HOST,
-        DEFAULT_SERVER_NETTY_PORT);
+    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, CUSTOM_HOST, customPort);
   }
 
   @Test
   public void testCustomPort()
       throws Exception {
     String expectedHost = NetUtils.getHostAddress();
-    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + CUSTOM_PORT;
+    int customPort = NetUtils.findOpenPort(CUSTOM_PORT);
+    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + customPort;
 
     Map<String, Object> properties = new HashMap<>();
-    properties.put(KEY_OF_SERVER_NETTY_PORT, CUSTOM_PORT);
+    properties.put(KEY_OF_SERVER_NETTY_PORT, customPort);
 
-    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost, CUSTOM_PORT);
+    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost, customPort);
   }
 
   @Test
   public void testAllCustomServerConf()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
-    properties.put(CONFIG_OF_INSTANCE_ID, CUSTOM_INSTANCE_ID);
-    properties.put(KEY_OF_SERVER_NETTY_HOST, CUSTOM_HOST);
-    properties.put(KEY_OF_SERVER_NETTY_PORT, CUSTOM_PORT);
-    verifyInstanceConfig(new PinotConfiguration(properties), CUSTOM_INSTANCE_ID, CUSTOM_HOST, CUSTOM_PORT);
+    String customInstanceId = CUSTOM_INSTANCE_ID + "_" + System.currentTimeMillis();
+    String customHost = CUSTOM_HOST + "_" + System.currentTimeMillis();
+    int customPort = NetUtils.findOpenPort(CUSTOM_PORT);
+    properties.put(CONFIG_OF_INSTANCE_ID, customInstanceId);
+    properties.put(KEY_OF_SERVER_NETTY_HOST, customHost);
+    properties.put(KEY_OF_SERVER_NETTY_PORT, customPort);
+    verifyInstanceConfig(new PinotConfiguration(properties), customInstanceId, customHost, customPort);
   }
 }
