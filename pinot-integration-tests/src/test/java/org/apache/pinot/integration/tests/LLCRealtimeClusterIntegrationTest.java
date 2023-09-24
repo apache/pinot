@@ -39,7 +39,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -68,7 +67,6 @@ import static org.testng.Assert.assertTrue;
  */
 public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
-  private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS = Collections.singletonList("DivActualElapsedTime");
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
 
@@ -91,12 +89,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   @Override
   public void startController()
       throws Exception {
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-
-    properties.put(ControllerConf.ALLOW_HLC_TABLES, false);
-    properties.put(ControllerConf.ENABLE_SPLIT_COMMIT, _enableSplitCommit);
-
-    startController(properties);
+    super.startController();
     enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
   }
 

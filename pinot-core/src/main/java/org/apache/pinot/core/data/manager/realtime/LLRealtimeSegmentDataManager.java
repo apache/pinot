@@ -757,8 +757,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 _state = State.ERROR;
                 _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
               } else {
-                success = commitSegment(response.getControllerVipUrl(),
-                    response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit());
+                success = commitSegment(response.getControllerVipUrl(), _indexLoadingConfig.isEnableSplitCommit());
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
@@ -808,12 +807,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   @VisibleForTesting
   protected StreamPartitionMsgOffset extractOffset(SegmentCompletionProtocol.Response response) {
-    if (response.getStreamPartitionMsgOffset() != null) {
-      return _streamPartitionMsgOffsetFactory.create(response.getStreamPartitionMsgOffset());
-    } else {
-      // TODO Issue 5359 Remove this once the protocol is upgraded on server and controller
-      return _streamPartitionMsgOffsetFactory.create(Long.toString(response.getOffset()));
-    }
+    return _streamPartitionMsgOffsetFactory.create(response.getStreamPartitionMsgOffset());
   }
 
   // Side effect: Modifies _segmentBuildDescriptor if we do not have a valid built segment file and we

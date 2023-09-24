@@ -164,42 +164,6 @@ public class LLRealtimeSegmentDataManagerTest {
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
   }
 
-  @Test
-  public void testOffsetParsing()
-      throws Exception {
-    final String offset = "34";
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    {
-      //  Controller sends catchup response with both offset and streamPartitionMsgOffset
-      String responseStr =
-          "{" + "  \"streamPartitionMsgOffset\" : \"" + offset + "\"," + "  \"offset\" : " + offset + ","
-              + "  \"buildTimeSec\" : -1," + "  \"isSplitCommitType\" : false,"
-              + "  \"segmentLocation\" : \"file:///a/b\"," + "  \"status\" : \"CATCH_UP\"" + "}";
-      SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
-      StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
-      Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
-    }
-    {
-      //  Controller sends catchup response with offset only
-      String responseStr =
-          "{" + "  \"offset\" : " + offset + "," + "  \"buildTimeSec\" : -1," + "  \"isSplitCommitType\" : false,"
-              + "  \"segmentLocation\" : \"file:///a/b\"," + "  \"status\" : \"CATCH_UP\"" + "}";
-      SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
-      StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
-      Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
-    }
-    {
-      //  Controller sends catchup response streamPartitionMsgOffset only
-      String responseStr = "{" + "  \"streamPartitionMsgOffset\" : \"" + offset + "\"," + "  \"buildTimeSec\" : -1,"
-          + "  \"isSplitCommitType\" : false," + "  \"segmentLocation\" : \"file:///a/b\","
-          + "  \"status\" : \"CATCH_UP\"" + "}";
-      SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
-      StreamPartitionMsgOffset extractedOffset = segmentDataManager.extractOffset(response);
-      Assert.assertEquals(extractedOffset.compareTo(new LongMsgOffset(offset)), 0);
-    }
-    segmentDataManager.destroy();
-  }
-
   // Test that we are in HOLDING state as long as the controller responds HOLD to our segmentConsumed() message.
   // we should not consume when holding.
   @Test
@@ -1026,8 +990,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     public PartitionConsumer createPartitionConsumer() {
-      PartitionConsumer consumer = new PartitionConsumer();
-      return consumer;
+      return new PartitionConsumer();
     }
 
     public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime) {
@@ -1036,9 +999,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     public boolean invokeCommit() {
-      SegmentCompletionProtocol.Response response = mock(SegmentCompletionProtocol.Response.class);
-      when(response.isSplitCommit()).thenReturn(false);
-      return super.commitSegment(response.getControllerVipUrl(), false);
+      return super.commitSegment("dummyUrl", false);
     }
 
     private void terminateLoopIfNecessary() {

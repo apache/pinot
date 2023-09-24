@@ -41,7 +41,6 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.integration.tests.kafka.schemaregistry.SchemaRegistryStarter;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.plugin.inputformat.avro.confluent.KafkaConfluentSchemaRegistryAvroMessageDecoder;
@@ -193,12 +192,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegr
   @Override
   public void startController()
       throws Exception {
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-
-    properties.put(ControllerConf.ALLOW_HLC_TABLES, false);
-    properties.put(ControllerConf.ENABLE_SPLIT_COMMIT, _enableSplitCommit);
-
-    startController(properties);
+    super.startController();
     enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
   }
 

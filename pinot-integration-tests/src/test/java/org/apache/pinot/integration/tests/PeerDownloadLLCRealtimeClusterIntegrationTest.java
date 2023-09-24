@@ -53,8 +53,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.controller.ControllerConf.ALLOW_HLC_TABLES;
-import static org.apache.pinot.controller.ControllerConf.ENABLE_SPLIT_COMMIT;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -139,8 +137,6 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   public void startController()
       throws Exception {
     Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
-    controllerConfig.put(ALLOW_HLC_TABLES, false);
-    controllerConfig.put(ENABLE_SPLIT_COMMIT, _enableSplitCommit);
     // Override the data dir config.
     controllerConfig.put(ControllerConf.DATA_DIR, "mockfs://" + getHelixClusterName());
     controllerConfig.put(ControllerConf.LOCAL_TEMP_DIR, FileUtils.getTempDirectory().getAbsolutePath());
