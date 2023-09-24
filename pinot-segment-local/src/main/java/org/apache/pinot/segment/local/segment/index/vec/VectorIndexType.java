@@ -20,7 +20,9 @@ package org.apache.pinot.segment.local.segment.index.vec;
 
 import com.clearspring.analytics.util.Preconditions;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.realtime.impl.vec.MutableVectorIndex;
@@ -47,8 +49,6 @@ import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.VectorIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -58,6 +58,8 @@ import org.apache.pinot.spi.data.Schema;
 public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<VectorIndexConfig> {
   public static final String INDEX_DISPLAY_NAME = "vector";
+  private static final List<String> EXTENSIONS =
+      Collections.singletonList(V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION);
 
   protected VectorIndexType() {
     super(StandardIndexes.VECTOR_ID);
@@ -110,8 +112,6 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
             context.getFieldSpec().getVectorLength(), context.getFieldSpec().getVectorDataType().size());
   }
 
-
-
   @Override
   protected IndexReaderFactory<VectorIndexReader> createReaderFactory() {
     return ReaderFactory.INSTANCE;
@@ -124,8 +124,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
   }
 
   @Override
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    return V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION;
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    return EXTENSIONS;
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<VectorIndexConfig, VectorIndexReader> {

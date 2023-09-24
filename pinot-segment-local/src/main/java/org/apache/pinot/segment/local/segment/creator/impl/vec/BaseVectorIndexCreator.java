@@ -64,7 +64,8 @@ public abstract class BaseVectorIndexCreator implements VectorIndexCreator {
   int _vectorLength;
   int _vectorValueSize;
 
-  BaseVectorIndexCreator(File indexDir, String columnName, int vectorLength, int vectorValueSize) throws IOException {
+  BaseVectorIndexCreator(File indexDir, String columnName, int vectorLength, int vectorValueSize)
+      throws IOException {
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.VECTOR_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, columnName + TEMP_DIR_SUFFIX);
     if (_tempDir.exists()) {
@@ -91,13 +92,15 @@ public abstract class BaseVectorIndexCreator implements VectorIndexCreator {
     bitmapWriter.add(_nextDocId++);
   }
 
-  void add(Vector vector, BitmapDataProvider bitmap) throws IOException {
+  void add(Vector vector, BitmapDataProvider bitmap)
+      throws IOException {
     _dictionaryStream.write(vector.toBytes()); // Using the toBytes function directly
     _bitmapOffsetStream.writeInt(_bitmapValueStream.size());
     bitmap.serialize(_bitmapValueStream);
   }
 
-  void generateIndexFile() throws IOException {
+  void generateIndexFile()
+      throws IOException {
     _bitmapOffsetStream.writeInt(_bitmapValueStream.size());
 
     _dictionaryStream.close();
@@ -106,7 +109,8 @@ public abstract class BaseVectorIndexCreator implements VectorIndexCreator {
 
     ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);
     headerBuffer.putInt(VERSION);
-    headerBuffer.putInt(_dictionaryStream.size() / (_vectorLength * _vectorValueSize ));  // Adjusted based on the serialized vector length
+    headerBuffer.putInt(_dictionaryStream.size() / (_vectorLength
+        * _vectorValueSize));  // Adjusted based on the serialized vector length
     headerBuffer.putInt(_vectorLength);
     headerBuffer.putInt(_vectorValueSize);
     headerBuffer.position(0);
@@ -125,7 +129,8 @@ public abstract class BaseVectorIndexCreator implements VectorIndexCreator {
     }
   }
 
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _dictionaryStream.close();
     _bitmapOffsetStream.close();
     _bitmapValueStream.close();

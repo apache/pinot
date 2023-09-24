@@ -583,10 +583,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       defaultNullValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(defaultNullValue);
     }
 
-    //TODO: THis is a hack to support vector data type default null. We need to fix this.
-    if (fieldSpec.getDataType().equals(DataType.VECTOR)) {
-      properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), "-1");
-    } else {
+    // Skip setting defaultNullValue property if it is the default value
+    if (!fieldSpec.getDataType().equals(DataType.VECTOR)
+        || (!Vector.getDefaultNullValue(fieldSpec).equals(columnIndexCreationInfo.getDefaultNullValue()))) {
       properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
     }
   }
@@ -651,7 +650,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         } else {
           return BytesUtils.toHexString(Arrays.copyOf(BytesUtils.toBytes(value), (METADATA_PROPERTY_LENGTH_LIMIT / 2)));
         }
-      //TODO: This is a hack to support vector data type. We need to fix this. Not sure if trimming the value is the right thing to do.
+        //TODO: This is a hack to support vector data type. We need to fix this. Not sure if trimming the value is
+        // the right thing to do.
       case VECTOR:
         String trimmedValue = value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
         int lastComma = trimmedValue.lastIndexOf(",");

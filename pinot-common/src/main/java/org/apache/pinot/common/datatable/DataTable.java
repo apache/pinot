@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -68,6 +69,8 @@ public interface DataTable {
   String getString(int rowId, int colId);
 
   ByteArray getBytes(int rowId, int colId);
+
+  Vector getVector(int rowId, int columnId);
 
   int[] getIntArray(int rowId, int colId);
 

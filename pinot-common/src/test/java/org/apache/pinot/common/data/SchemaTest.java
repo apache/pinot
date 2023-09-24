@@ -104,6 +104,12 @@ public class SchemaTest {
     schemaToValidate.addField(
         new DimensionFieldSpec("vec", FieldSpec.DataType.VECTOR, FieldSpec.DataType.FLOAT, 512, null));
     schemaToValidate.validate();
+
+    schemaToValidate = new Schema();
+    float[] defaultNullValue = new float[512];
+    schemaToValidate.addField(
+        new DimensionFieldSpec("vec", FieldSpec.DataType.VECTOR, FieldSpec.DataType.FLOAT, 512, defaultNullValue));
+    schemaToValidate.validate();
   }
 
   @Test

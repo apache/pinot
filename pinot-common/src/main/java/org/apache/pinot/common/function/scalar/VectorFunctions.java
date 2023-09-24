@@ -19,7 +19,6 @@
 package org.apache.pinot.common.function.scalar;
 
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.readers.Vector;
 
@@ -172,6 +171,8 @@ public class VectorFunctions {
         }
         break;
       }
+      default:
+        throw new IllegalArgumentException("Invalid vector type: " + vector.getType());
     }
     return Math.sqrt(norm);
   }
@@ -195,6 +196,7 @@ public class VectorFunctions {
     Preconditions.checkArgument(vector != null, "Null vector passed");
     Preconditions.checkArgument(vector.getDimension() > 0, "Empty vector passed");
   }
+
   @ScalarFunction(names = {"cosinedistance_vec", "cosine_distance_vec"})
   public static double cosineDistance(Vector vector1, Vector vector2) {
     return cosineDistance(vector1, vector2, Double.NaN);
@@ -274,5 +276,4 @@ public class VectorFunctions {
     }
     return distance;
   }
-
 }

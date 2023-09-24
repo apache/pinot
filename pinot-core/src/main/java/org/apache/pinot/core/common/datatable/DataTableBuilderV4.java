@@ -27,6 +27,7 @@ import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.datatable.DataTableImplV4;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -51,6 +52,16 @@ public class DataTableBuilderV4 extends BaseDataTableBuilder {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     byte[] bytes = value.getBytes();
+    _currentRowDataByteBuffer.putInt(bytes.length);
+    _variableSizeDataByteArrayOutputStream.write(bytes);
+  }
+
+  @Override
+  public void setColumn(int colId, Vector value)
+      throws IOException {
+    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    byte[] bytes = value.toBytes();
     _currentRowDataByteBuffer.putInt(bytes.length);
     _variableSizeDataByteArrayOutputStream.write(bytes);
   }

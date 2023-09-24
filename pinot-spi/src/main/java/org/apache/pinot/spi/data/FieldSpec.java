@@ -60,8 +60,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
   public static final BigDecimal DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
-  public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_VECTOR = "-1";
-
+  private static final Vector DEFAULT_DIMENSION_NULL_VALUE_OF_VECTOR = new Vector(0, new float[0]);
 
   public static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   public static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
@@ -70,7 +69,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final BigDecimal DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL = BigDecimal.ZERO;
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
-  public static final String DEFAULT_METRIC_NULL_VALUE_OF_VECTOR = "-1";
+  private static final Vector DEFAULT_METRIC_NULL_VALUE_OF_VECTOR = new Vector(0, new float[0]);
 
   public static final FieldSpecMetadata FIELD_SPEC_METADATA;
 
@@ -141,12 +140,29 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     setDefaultNullValue(defaultNullValue);
   }
 
+  /**
+   * Constructor for vector field.
+   */
   public FieldSpec(String name, DataType dataType, DataType vectorDataType, int vectorLength,
       @Nullable Object defaultNullValue) {
     _name = name;
     _dataType = DataType.VECTOR;
     _vectorLength = vectorLength;
     _vectorDataType = vectorDataType;
+    if (defaultNullValue != null) {
+      if (defaultNullValue instanceof int[]) {
+        defaultNullValue = new Vector(vectorLength, (int[]) defaultNullValue);
+      } else if (defaultNullValue instanceof float[]) {
+        defaultNullValue = new Vector(vectorLength, (float[]) defaultNullValue);
+      } else if (defaultNullValue instanceof byte[]) {
+        defaultNullValue = new Vector(vectorLength, (byte[]) defaultNullValue);
+      } else if (!(defaultNullValue instanceof Vector)) {
+        throw new IllegalArgumentException(
+            "Invalid default null value for vector field: " + defaultNullValue.getClass().getName());
+      }
+    } else {
+      defaultNullValue = Vector.getDefaultNullValue(vectorDataType, vectorLength);
+    }
     setDefaultNullValue(defaultNullValue);
   }
 
@@ -252,12 +268,75 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       _stringDefaultNullValue = getStringValue(defaultNullValue);
     }
     if (_dataType != null) {
-      _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
+      _defaultNullValue = getDefaultNullValue(this, _dataType, _stringDefaultNullValue);
     }
   }
 
   public static Object getDefaultNullValue(FieldType fieldType, DataType dataType,
       @Nullable String stringDefaultNullValue) {
+    if (stringDefaultNullValue != null) {
+      return dataType.convert(stringDefaultNullValue);
+    } else {
+      switch (fieldType) {
+        case METRIC:
+          switch (dataType) {
+            case INT:
+              return DEFAULT_METRIC_NULL_VALUE_OF_INT;
+            case LONG:
+              return DEFAULT_METRIC_NULL_VALUE_OF_LONG;
+            case FLOAT:
+              return DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
+            case DOUBLE:
+              return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+            case BIG_DECIMAL:
+              return DEFAULT_METRIC_NULL_VALUE_OF_BIG_DECIMAL;
+            case STRING:
+              return DEFAULT_METRIC_NULL_VALUE_OF_STRING;
+            case BYTES:
+              return DEFAULT_METRIC_NULL_VALUE_OF_BYTES;
+            case VECTOR:
+              return DEFAULT_METRIC_NULL_VALUE_OF_VECTOR;
+            default:
+              throw new IllegalStateException("Unsupported metric data type: " + dataType);
+          }
+        case DIMENSION:
+        case TIME:
+        case DATE_TIME:
+          switch (dataType) {
+            case INT:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_INT;
+            case LONG:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_LONG;
+            case FLOAT:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT;
+            case DOUBLE:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE;
+            case BOOLEAN:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN;
+            case TIMESTAMP:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP;
+            case STRING:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
+            case JSON:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_JSON;
+            case BYTES:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+            case BIG_DECIMAL:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BIG_DECIMAL;
+            case VECTOR:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_VECTOR;
+            default:
+              throw new IllegalStateException("Unsupported dimension/time data type: " + dataType);
+          }
+        default:
+          throw new IllegalStateException("Unsupported field type: " + fieldType);
+      }
+    }
+  }
+
+  public static Object getDefaultNullValue(FieldSpec fieldSpec, DataType dataType,
+      @Nullable String stringDefaultNullValue) {
+    FieldType fieldType = fieldSpec.getFieldType();
     if (stringDefaultNullValue != null) {
       return dataType.convert(stringDefaultNullValue);
     } else {
@@ -366,7 +445,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected void appendDefaultNullValue(ObjectNode jsonNode) {
     assert _defaultNullValue != null;
     String key = "defaultNullValue";
-    if (!_defaultNullValue.equals(getDefaultNullValue(getFieldType(), _dataType, null))) {
+    if (!_defaultNullValue.equals(getDefaultNullValue(this, _dataType, null))) {
       switch (_dataType) {
         case INT:
           jsonNode.put(key, (Integer) _defaultNullValue);
@@ -646,8 +725,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public boolean isBackwardCompatibleWith(FieldSpec oldFieldSpec) {
 
     return EqualityUtils.isEqual(_name, oldFieldSpec._name)
-            && EqualityUtils.isEqual(_dataType, oldFieldSpec._dataType)
-            && EqualityUtils.isEqual(_isSingleValueField, oldFieldSpec._isSingleValueField);
+        && EqualityUtils.isEqual(_dataType, oldFieldSpec._dataType)
+        && EqualityUtils.isEqual(_isSingleValueField, oldFieldSpec._isSingleValueField);
   }
 
   public static class FieldSpecMetadata {

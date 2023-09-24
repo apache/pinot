@@ -28,7 +28,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
@@ -98,16 +97,6 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
   }
 
   @Override
-  public void setColumn(int colId, Vector value)
-      throws IOException {
-    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
-    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
-    byte[] bytes = value.toBytes();
-    _currentRowDataByteBuffer.putInt(bytes.length);
-    _variableSizeDataByteArrayOutputStream.write(bytes);
-  }
-
-  @Override
   public void setColumn(int colId, @Nullable Object value)
       throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
@@ -116,16 +105,10 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
       _currentRowDataByteBuffer.putInt(0);
       _variableSizeDataOutputStream.writeInt(CustomObject.NULL_TYPE_VALUE);
     } else {
-      ObjectSerDeUtils.ObjectType objectType = ObjectSerDeUtils.ObjectType.getObjectType(value);
-      int objectTypeValue = objectType.getValue();
+      int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
       byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
-      //TODO: Remove this if clause we integrate vector type into the data table like BigDecimal
-      // Currently we are using int to store objectTypeValue but we don't add 4 to byte array length which messes up the vector deserialization
-      // Is this a bug? Should we fix it?
       _currentRowDataByteBuffer.putInt(bytes.length);
-      if (objectType != ObjectSerDeUtils.ObjectType.Vector) {
-        _variableSizeDataOutputStream.writeInt(objectTypeValue);
-      }
+      _variableSizeDataOutputStream.writeInt(objectTypeValue);
       _variableSizeDataByteArrayOutputStream.write(bytes);
     }
   }

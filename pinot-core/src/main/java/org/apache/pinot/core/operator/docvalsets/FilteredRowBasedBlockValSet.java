@@ -27,6 +27,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -227,6 +228,25 @@ public class FilteredRowBasedBlockValSet implements BlockValSet {
         default:
           throw new IllegalStateException("Cannot read BigDecimal values from data type: " + _dataType);
       }
+    }
+    return values;
+  }
+
+  @Override
+  public Vector[] getVectorValuesSV() {
+    Vector[] values = new Vector[_numMatchedRows];
+    if (_numMatchedRows == 0) {
+      return values;
+    }
+    if (_dataType == DataType.UNKNOWN) {
+      Arrays.fill(values, NullValuePlaceHolder.OBJECT_VECTOR);
+      return values;
+    }
+    PeekableIntIterator iterator = _matchedBitmap.getIntIterator();
+    for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
+      int rowId = iterator.next();
+      boolean isNull = _matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId);
+      values[matchedRowId] = !isNull ? (Vector) _rows.get(rowId)[_colId] : NullValuePlaceHolder.OBJECT_VECTOR;
     }
     return values;
   }

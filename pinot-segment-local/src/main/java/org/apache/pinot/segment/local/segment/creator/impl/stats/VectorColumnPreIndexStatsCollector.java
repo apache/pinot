@@ -24,8 +24,6 @@ import java.util.Set;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.spi.data.readers.Vector;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 
 public class VectorColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
   private Set<Vector> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
@@ -47,7 +45,7 @@ public class VectorColumnPreIndexStatsCollector extends AbstractColumnStatistics
     if (_values.add(value)) {
       updatePartition(value);
       int valueLength = value.getDimension();
-      switch(value.getType()) {
+      switch (value.getType()) {
         case INT: {
           valueLength *= Integer.BYTES;
           break;
@@ -56,12 +54,11 @@ public class VectorColumnPreIndexStatsCollector extends AbstractColumnStatistics
           valueLength *= Float.BYTES;
           break;
         }
-        default: {
-
-        }
+        default:
+          throw new IllegalStateException("Unsupported vector type: " + value.getType());
       }
 
-      valueLength += (2 *Integer.BYTES); // for vector type and dimension length
+      valueLength += (2 * Integer.BYTES); // for vector type and dimension length
       _minLength = Math.min(_minLength, valueLength);
       _maxLength = Math.max(_maxLength, valueLength);
       _maxRowLength = _maxLength;

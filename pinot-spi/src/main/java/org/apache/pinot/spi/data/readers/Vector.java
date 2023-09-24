@@ -25,8 +25,27 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import org.apache.pinot.spi.data.FieldSpec;
+
 
 public class Vector implements Comparable<Vector> {
+
+  public static Vector getDefaultNullValue(FieldSpec.DataType vectorDataType, int vectorLength) {
+    switch (vectorDataType) {
+      case INT:
+        return new Vector(vectorLength, new int[vectorLength]);
+      case FLOAT:
+        return new Vector(vectorLength, new float[vectorLength]);
+      case BYTES:
+        return new Vector(vectorLength, new byte[vectorLength]);
+      default:
+        throw new IllegalArgumentException("Unsupported vector data type: " + vectorDataType);
+    }
+  }
+
+  public static Vector getDefaultNullValue(FieldSpec fieldSpec) {
+    return getDefaultNullValue(fieldSpec.getVectorDataType(), fieldSpec.getVectorLength());
+  }
 
   public enum VectorType {
     FLOAT(0), INT(1), BYTE(2);
@@ -145,12 +164,6 @@ public class Vector implements Comparable<Vector> {
 
   public static Vector fromString(String value) {
     String[] tokens = value.split(",");
-
-    //TODO: This is a hack to support null vectors.
-    if (Integer.parseInt(tokens[0].toUpperCase()) == -1) {
-      return new Vector(0, new float[0]);
-    }
-
     VectorType vectorType = VectorType.fromId(Integer.parseInt(tokens[0].toUpperCase()));
     int dimension = Integer.parseInt(tokens[1]);
     switch (vectorType) {
@@ -307,12 +320,22 @@ public class Vector implements Comparable<Vector> {
 
   @Override
   public boolean equals(Object other) {
-    if (this == other) return true;
-    if (other == null || getClass() != other.getClass()) return false;
+    if (this == other) {
+      return true;
+    }
+    if (other == null || getClass() != other.getClass()) {
+      return false;
+    }
     Vector vector = (Vector) other;
-    if (_dimension != vector._dimension || _type != vector._type) return false;
-    if (_type == VectorType.FLOAT) return Arrays.equals(_floatValues, vector._floatValues);
-    if (_type == VectorType.INT) return Arrays.equals(_intValues, vector._intValues);
+    if (_dimension != vector._dimension || _type != vector._type) {
+      return false;
+    }
+    if (_type == VectorType.FLOAT) {
+      return Arrays.equals(_floatValues, vector._floatValues);
+    }
+    if (_type == VectorType.INT) {
+      return Arrays.equals(_intValues, vector._intValues);
+    }
     return Arrays.equals(_byteValues, vector._byteValues);
   }
 

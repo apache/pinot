@@ -26,7 +26,6 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.Vector;
 import org.roaringbitmap.RoaringBitmap;
 

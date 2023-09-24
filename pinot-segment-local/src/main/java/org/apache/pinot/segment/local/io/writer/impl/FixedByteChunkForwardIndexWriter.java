@@ -24,6 +24,7 @@ import java.io.IOException;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
+
 /**
  * Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains fixed number of docs, and
  * each entry has fixed number of bytes.

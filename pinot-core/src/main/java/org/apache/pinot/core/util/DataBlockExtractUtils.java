@@ -83,6 +83,8 @@ public final class DataBlockExtractUtils {
         return dataBlock.getString(rowId, colId);
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
+      case VECTOR:
+        return dataBlock.getVector(rowId, colId);
 
       // Multi-value column
       case INT_ARRAY:
@@ -936,6 +938,28 @@ public final class DataBlockExtractUtils {
       int rowId = iterator.next();
       boolean isNull = matchedNullBitmap != null && matchedNullBitmap.contains(matchedRowId);
       values[matchedRowId] = !isNull ? dataBlock.getBytes(rowId, colId).getBytes() : NullValuePlaceHolder.BYTES;
+    }
+    return values;
+  }
+
+  public static Vector[] extractVectorColumn(DataType storedType, DataBlock dataBlock, int colId, int numMatchedRows,
+      RoaringBitmap matchedBitmap, RoaringBitmap matchedNullBitmap) {
+    Vector[] values = new Vector[numMatchedRows];
+    if (numMatchedRows == 0) {
+      return values;
+    }
+    if (storedType == DataType.UNKNOWN) {
+      Arrays.fill(values, null);
+      return values;
+    }
+    Preconditions.checkState(storedType == DataType.VECTOR,
+        "Cannot extract Vector values for column: %s with stored type: %s",
+        dataBlock.getDataSchema().getColumnName(colId), storedType);
+    PeekableIntIterator iterator = matchedBitmap.getIntIterator();
+    for (int matchedRowId = 0; matchedRowId < numMatchedRows; matchedRowId++) {
+      int rowId = iterator.next();
+      boolean isNull = matchedNullBitmap != null && matchedNullBitmap.contains(matchedRowId);
+      values[matchedRowId] = !isNull ? dataBlock.getVector(rowId, colId) : null;
     }
     return values;
   }

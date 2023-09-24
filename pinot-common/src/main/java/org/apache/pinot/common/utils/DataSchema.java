@@ -203,7 +203,7 @@ public class DataSchema {
     STRING(NullValuePlaceHolder.STRING),
     JSON(STRING, NullValuePlaceHolder.STRING),
     BYTES(NullValuePlaceHolder.INTERNAL_BYTES),
-    VECTOR(null),
+    VECTOR(NullValuePlaceHolder.OBJECT_VECTOR),
     OBJECT(null),
     INT_ARRAY(NullValuePlaceHolder.INT_ARRAY),
     LONG_ARRAY(NullValuePlaceHolder.LONG_ARRAY),

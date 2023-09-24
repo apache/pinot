@@ -93,6 +93,8 @@ public class TypeFactory extends JavaTypeFactoryImpl {
             : createArrayType(createSqlType(SqlTypeName.DECIMAL), -1);
       case JSON:
         return createSqlType(SqlTypeName.VARCHAR);
+      case VECTOR:
+        return createSqlType(SqlTypeName.VARBINARY);
       case LIST:
         // TODO: support LIST, MV column should go fall into this category.
       case STRUCT:

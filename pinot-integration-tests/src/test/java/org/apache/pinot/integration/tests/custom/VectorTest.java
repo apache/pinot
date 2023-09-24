@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests.custom;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.stream.IntStream;
@@ -32,6 +33,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -44,6 +46,9 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
   private static final String VECTOR_1 = "vector1";
   private static final String VECTOR_2 = "vector2";
   private static final String ZERO_VECTOR = "zeroVector";
+  private static final String VECTOR_1_NEW = "vector1New";
+  private static final String VECTOR_2_NEW = "vector2New";
+  private static final String ZERO_VECTOR_NEW = "zeroVectorNew";
   private static final String VECTOR_1_NORM = "vector1Norm";
   private static final String VECTOR_2_NORM = "vector2Norm";
   private static final String VECTORS_COSINE_DIST = "vectorsCosineDist";
@@ -172,6 +177,119 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(l2Distance, 22.627416997969522);
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueriesNew(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "cosineDistance(vector1New, vector2New), "
+            + VECTORS_COSINE_DIST + ", "
+            + "innerProduct(vector1New, vector2New), "
+            + VECTORS_INNER_PRODUCT + ", "
+            + "l1Distance(vector1New, vector2New), "
+            + VECTORS_L1_DIST + ", "
+            + "l2Distance(vector1New, vector2New), "
+            + VECTORS_L2_DIST + ", "
+            + "vectorDims(vector1New), vectorDims(vector2New), "
+            + "vectorNorm(vector1New), "
+            + VECTOR_1_NORM + ", "
+            + "vectorNorm(vector2New), "
+            + VECTOR_2_NORM + ", "
+            + "cosineDistance(vector1New, zeroVectorNew), "
+            + "cosineDistance(vector1New, zeroVectorNew, 0) "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    for (int i = 0; i < getCountStarResult(); i++) {
+      double cosineDistance = jsonNode.get("resultTable").get("rows").get(i).get(0).asDouble();
+      assertEquals(cosineDistance, jsonNode.get("resultTable").get("rows").get(i).get(1).asDouble());
+      double innerProduce = jsonNode.get("resultTable").get("rows").get(i).get(2).asDouble();
+      assertEquals(innerProduce, jsonNode.get("resultTable").get("rows").get(i).get(3).asDouble());
+      double l1Distance = jsonNode.get("resultTable").get("rows").get(i).get(4).asDouble();
+      assertEquals(l1Distance, jsonNode.get("resultTable").get("rows").get(i).get(5).asDouble());
+      double l2Distance = jsonNode.get("resultTable").get("rows").get(i).get(6).asDouble();
+      assertEquals(l2Distance, jsonNode.get("resultTable").get("rows").get(i).get(7).asDouble());
+      int vectorDimsVector1 = jsonNode.get("resultTable").get("rows").get(i).get(8).asInt();
+      assertEquals(vectorDimsVector1, VECTOR_DIM_SIZE);
+      int vectorDimsVector2 = jsonNode.get("resultTable").get("rows").get(i).get(9).asInt();
+      assertEquals(vectorDimsVector2, VECTOR_DIM_SIZE);
+      double vectorNormVector1 = jsonNode.get("resultTable").get("rows").get(i).get(10).asDouble();
+      assertEquals(vectorNormVector1, jsonNode.get("resultTable").get("rows").get(i).get(11).asDouble());
+      double vectorNormVector2 = jsonNode.get("resultTable").get("rows").get(i).get(12).asDouble();
+      assertEquals(vectorNormVector2, jsonNode.get("resultTable").get("rows").get(i).get(13).asDouble());
+      cosineDistance = jsonNode.get("resultTable").get("rows").get(i).get(14).asDouble();
+      assertEquals(cosineDistance, Double.NaN);
+      cosineDistance = jsonNode.get("resultTable").get("rows").get(i).get(15).asDouble();
+      assertEquals(cosineDistance, 0.0);
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueriesWithLiteralsNew(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String zeroVectorStringLiteral = "ARRAY[0.0"
+        + StringUtils.repeat(", 0.0", VECTOR_DIM_SIZE - 1)
+        + "]";
+    String oneVectorStringLiteral = "ARRAY[1.0"
+        + StringUtils.repeat(", 1.0", VECTOR_DIM_SIZE - 1)
+        + "]";
+    String query =
+        String.format("SELECT "
+                + "cosineDistance(vector1New, %s), "
+                + "innerProduct(vector1New, %s), "
+                + "l1Distance(vector1New, %s), "
+                + VECTOR_ZERO_L1_DIST + ", "
+                + "l2Distance(vector1New, %s), "
+                + VECTOR_ZERO_L2_DIST + ", "
+                + "vectorDims(%s), "
+                + "vectorNorm(%s) "
+                + "FROM %s LIMIT %d",
+            zeroVectorStringLiteral, zeroVectorStringLiteral, zeroVectorStringLiteral, zeroVectorStringLiteral,
+            zeroVectorStringLiteral, zeroVectorStringLiteral, getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    for (int i = 0; i < getCountStarResult(); i++) {
+      double cosineDistance = jsonNode.get("resultTable").get("rows").get(i).get(0).asDouble();
+      assertEquals(cosineDistance, Double.NaN);
+      double innerProduce = jsonNode.get("resultTable").get("rows").get(i).get(1).asDouble();
+      assertEquals(innerProduce, 0.0);
+      double l1Distance = jsonNode.get("resultTable").get("rows").get(i).get(2).asDouble();
+      assertEquals(l1Distance, jsonNode.get("resultTable").get("rows").get(i).get(3).asDouble());
+      double l2Distance = jsonNode.get("resultTable").get("rows").get(i).get(4).asDouble();
+      assertEquals(l2Distance, jsonNode.get("resultTable").get("rows").get(i).get(5).asDouble());
+      int vectorDimsVector = jsonNode.get("resultTable").get("rows").get(i).get(6).asInt();
+      assertEquals(vectorDimsVector, VECTOR_DIM_SIZE);
+      double vectorNormVector = jsonNode.get("resultTable").get("rows").get(i).get(7).asDouble();
+      assertEquals(vectorNormVector, 0.0);
+    }
+
+    query =
+        String.format("SELECT "
+                + "cosineDistance(%s, %s), "
+                + "cosineDistance(%s, %s, 0.0), "
+                + "innerProduct(%s, %s), "
+                + "l1Distance(%s, %s), "
+                + "l2Distance(%s, %s)"
+                + "FROM %s LIMIT 1",
+            zeroVectorStringLiteral, oneVectorStringLiteral,
+            zeroVectorStringLiteral, oneVectorStringLiteral,
+            zeroVectorStringLiteral, oneVectorStringLiteral,
+            zeroVectorStringLiteral, oneVectorStringLiteral,
+            zeroVectorStringLiteral, oneVectorStringLiteral,
+            getTableName());
+    jsonNode = postQuery(query);
+    double cosineDistance = jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble();
+    assertEquals(cosineDistance, Double.NaN);
+    cosineDistance = jsonNode.get("resultTable").get("rows").get(0).get(1).asDouble();
+    assertEquals(cosineDistance, 0.0);
+    double innerProduce = jsonNode.get("resultTable").get("rows").get(0).get(2).asDouble();
+    assertEquals(innerProduce, 0.0);
+    double l1Distance = jsonNode.get("resultTable").get("rows").get(0).get(3).asDouble();
+    assertEquals(l1Distance, 512.0);
+    double l2Distance = jsonNode.get("resultTable").get("rows").get(0).get(4).asDouble();
+    assertEquals(l2Distance, 22.627416997969522);
+  }
+
   @Override
   public String getTableName() {
     return DEFAULT_TABLE_NAME;
@@ -183,6 +301,10 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
         .addMultiValueDimension(VECTOR_1, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(VECTOR_2, FieldSpec.DataType.FLOAT)
         .addMultiValueDimension(ZERO_VECTOR, FieldSpec.DataType.FLOAT)
+        .addDimension(VECTOR_1_NEW, FieldSpec.DataType.VECTOR, FieldSpec.DataType.FLOAT, VECTOR_DIM_SIZE, null)
+        .addDimension(VECTOR_2_NEW, FieldSpec.DataType.VECTOR, FieldSpec.DataType.FLOAT, VECTOR_DIM_SIZE, null)
+        // ZERO_VECTOR_NEW is defined in schema, but not in avro, so we can test default null vector.
+        .addDimension(ZERO_VECTOR_NEW, FieldSpec.DataType.VECTOR, FieldSpec.DataType.FLOAT, VECTOR_DIM_SIZE, null)
         .addSingleValueDimension(VECTOR_1_NORM, FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension(VECTOR_2_NORM, FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension(VECTORS_COSINE_DIST, FieldSpec.DataType.DOUBLE)
@@ -209,6 +331,11 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
         new org.apache.avro.Schema.Field(ZERO_VECTOR, org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(
             org.apache.avro.Schema.Type.FLOAT)), null,
             null),
+        new org.apache.avro.Schema.Field(VECTOR_1_NEW, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES),
+            null, null),
+        new org.apache.avro.Schema.Field(VECTOR_2_NEW, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES),
+            null, null),
+        // Skip field definition for ZERO_VECTOR_NEW, let it be null to test null vector
         new org.apache.avro.Schema.Field(VECTOR_1_NORM,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE),
             null, null),
@@ -250,6 +377,9 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
         record.put(VECTOR_1, convertToFloatCollection(vector1));
         record.put(VECTOR_2, convertToFloatCollection(vector2));
         record.put(ZERO_VECTOR, convertToFloatCollection(zeroVector));
+        record.put(VECTOR_1_NEW, ByteBuffer.wrap(new Vector(VECTOR_DIM_SIZE, vector1).toBytes()));
+        record.put(VECTOR_2_NEW, ByteBuffer.wrap(new Vector(VECTOR_DIM_SIZE, vector2).toBytes()));
+        // Skip field definition for ZERO_VECTOR_NEW, let it be null to test null vector
         record.put(VECTOR_1_NORM, VectorFunctions.vectorNorm(vector1));
         record.put(VECTOR_2_NORM, VectorFunctions.vectorNorm(vector2));
         record.put(VECTORS_COSINE_DIST, VectorFunctions.cosineDistance(vector1, vector2));

@@ -30,7 +30,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import javax.xml.crypto.Data;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -50,8 +49,8 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.data.readers.Vector;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -241,7 +240,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
           DataType vectorDataType =
               DataType.valueOf(config.getString(Column.getKeyFor(column, Column.VECTOR_DATATYPE)).toUpperCase());
           int vectorLength = config.getInt(Column.getKeyFor(column, Column.VECTOR_LENGTH));
-          fieldSpec = new DimensionFieldSpec(column, dataType, vectorDataType, vectorLength, defaultNullValueString);
+          Vector defaultNullVector =
+              (defaultNullValueString == null) ? Vector.getDefaultNullValue(vectorDataType, vectorLength)
+                  : Vector.fromString(defaultNullValueString);
+          fieldSpec = new DimensionFieldSpec(column, dataType, vectorDataType, vectorLength, defaultNullVector);
           break;
         }
 

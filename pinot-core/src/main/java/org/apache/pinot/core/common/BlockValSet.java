@@ -100,9 +100,10 @@ public interface BlockValSet {
    */
   BigDecimal[] getBigDecimalValuesSV();
 
-
-  /*
-
+  /**
+   * Returns the Vector values for a single-valued column.
+   *
+   * @return Array of vector values
    */
   Vector[] getVectorValuesSV();
 

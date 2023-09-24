@@ -28,6 +28,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -188,6 +189,11 @@ public abstract class BaseDataTable implements DataTable {
   public ByteArray getBytes(int rowId, int colId) {
     // NOTE: DataTable V2/V3 uses String to store BYTES value
     return BytesUtils.toByteArray(getString(rowId, colId));
+  }
+
+  @Override
+  public Vector getVector(int rowId, int colId) {
+    return Vector.fromBytes(BytesUtils.toBytes(getString(rowId, colId)));
   }
 
   @Override

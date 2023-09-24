@@ -36,6 +36,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -153,7 +154,9 @@ public class DataBlockBuilder {
           case BYTES:
             setColumn(rowBuilder, byteBuffer, (ByteArray) value);
             break;
-
+          case VECTOR:
+            setColumn(rowBuilder, byteBuffer, (Vector) value);
+            break;
           // Multi-value column
           case INT_ARRAY:
             setColumn(rowBuilder, byteBuffer, (int[]) value);
@@ -290,7 +293,16 @@ public class DataBlockBuilder {
             setColumn(columnarBuilder, byteBuffer, (ByteArray) value);
           }
           break;
-
+        case VECTOR:
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            value = column[rowId];
+            if (value == null) {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
+            setColumn(columnarBuilder, byteBuffer, (Vector) value);
+          }
+          break;
         // Multi-value column
         case INT_ARRAY:
           for (int rowId = 0; rowId < numRows; rowId++) {
@@ -409,6 +421,14 @@ public class DataBlockBuilder {
       throws IOException {
     byteBuffer.putInt(builder._variableSizeDataByteArrayOutputStream.size());
     byte[] bytes = value.getBytes();
+    byteBuffer.putInt(bytes.length);
+    builder._variableSizeDataByteArrayOutputStream.write(bytes);
+  }
+
+  private static void setColumn(DataBlockBuilder builder, ByteBuffer byteBuffer, Vector value)
+      throws IOException {
+    byteBuffer.putInt(builder._variableSizeDataByteArrayOutputStream.size());
+    byte[] bytes = value.toBytes();
     byteBuffer.putInt(bytes.length);
     builder._variableSizeDataByteArrayOutputStream.write(bytes);
   }
