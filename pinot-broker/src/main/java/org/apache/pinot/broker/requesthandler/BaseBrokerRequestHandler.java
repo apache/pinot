@@ -36,7 +36,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -121,7 +120,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           .put("distinctcountbitmap", "distinctcountbitmapmv").put("distinctcounthll", "distinctcounthllmv")
           .put("distinctcountrawhll", "distinctcountrawhllmv").put("distinctsum", "distinctsummv")
           .put("distinctavg", "distinctavgmv").put("count", "countmv").put("min", "minmv").put("max", "maxmv")
-          .put("avg", "avgmv").put("sum", "summv").put("minmaxrange", "minmaxrangemv").build();
+          .put("avg", "avgmv").put("sum", "summv").put("minmaxrange", "minmaxrangemv")
+          .put("distinctcounthllplus", "distinctcounthllplusmv")
+          .put("distinctcountrawhllplus", "distinctcountrawhllplusmv").build();
 
   protected final PinotConfiguration _config;
   protected final BrokerRoutingManager _routingManager;
@@ -389,9 +390,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         handleDistinctCountBitmapOverride(serverPinotQuery);
       }
 
-      final Schema tableSchema = _tableCache.getSchema(tableName);
-      if (tableSchema != null) {
-        handleDistinctMultiValuedOverride(serverPinotQuery, tableSchema);
+      Schema schema = _tableCache.getSchema(rawTableName);
+      if (schema != null) {
+        handleDistinctMultiValuedOverride(serverPinotQuery, schema);
       }
 
       long compilationEndTimeNs = System.nanoTime();
@@ -503,7 +504,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       BrokerRequest offlineBrokerRequest = null;
       BrokerRequest realtimeBrokerRequest = null;
       TimeBoundaryInfo timeBoundaryInfo = null;
-      Schema schema = _tableCache.getSchema(rawTableName);
       if (offlineTableName != null && realtimeTableName != null) {
         // Time boundary info might be null when there is no segment in the offline table, query real-time side only
         timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
@@ -962,13 +962,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * @param columnName
    * @return multivalued columns of the table .
    */
-  private static boolean checkIfColumnIsMultiValued(@Nonnull Schema tableSchema, @Nonnull String columnName) {
+  private static boolean isMultiValueColumn(Schema tableSchema, String columnName) {
 
     DimensionFieldSpec dimensionFieldSpec = tableSchema.getDimensionSpec(columnName);
-    if (dimensionFieldSpec == null || dimensionFieldSpec.isSingleValueField()) {
-      return false;
-    }
-    return true;
+    return dimensionFieldSpec != null && !dimensionFieldSpec.isSingleValueField();
   }
 
   /**
@@ -1133,13 +1130,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (function == null) {
       return;
     }
-    if (DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.containsKey(function.getOperator())) {
+
+    String _operator = DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
+    if (_operator != null) {
       List<Expression> operands = function.getOperands();
-      if (operands.size() >= 1 && operands.get(0).isSetIdentifier() && checkIfColumnIsMultiValued(tableSchema,
+      if (operands.size() >= 1 && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
           operands.get(0).getIdentifier().getName())) {
         // we are only checking the first operand that if its a MV column as all the overriding agg. fn.'s have
         // first operator is column name
-        function.setOperator(DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator()));
+        function.setOperator(_operator);
       }
     } else {
       for (Expression operand : function.getOperands()) {
