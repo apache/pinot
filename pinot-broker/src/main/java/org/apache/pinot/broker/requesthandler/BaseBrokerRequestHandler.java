@@ -1131,14 +1131,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return;
     }
 
-    String _operator = DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
-    if (_operator != null) {
+    String overrideOperator = DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
+    if (overrideOperator != null) {
       List<Expression> operands = function.getOperands();
       if (operands.size() >= 1 && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
           operands.get(0).getIdentifier().getName())) {
         // we are only checking the first operand that if its a MV column as all the overriding agg. fn.'s have
         // first operator is column name
-        function.setOperator(_operator);
+        function.setOperator(overrideOperator);
       }
     } else {
       for (Expression operand : function.getOperands()) {
