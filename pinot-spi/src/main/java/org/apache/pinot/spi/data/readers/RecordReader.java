@@ -71,4 +71,10 @@ public interface RecordReader extends Closeable, Serializable {
    */
   void rewind()
       throws IOException;
+
+  /**
+   * Return the total time this RecordReader spent generating the next record when iterating over a record set.
+   * @return long
+   */
+  //long duration();
 }

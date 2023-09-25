@@ -103,6 +103,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int _totalDocs;
   private int _docIdCounter;
   private boolean _nullHandlingEnabled;
+  private long _durationNS = 0;
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
@@ -308,6 +309,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void indexRow(GenericRow row)
       throws IOException {
+    long startNS = System.nanoTime();
+
     for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
       String columnName = byColEntry.getKey();
 
@@ -339,6 +342,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     _docIdCounter++;
+    _durationNS += System.nanoTime() - startNS;
   }
 
   private void indexSingleValueRow(SegmentDictionaryCreator dictionaryCreator, Object value,
@@ -646,6 +650,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void close()
       throws IOException {
+    LOGGER.info("(built segment) Closing Index Creator. Time Spent Indexing (ms): {}", ((float)_durationNS)/1000000.0);
     List<IndexCreator> creators =
         _creatorsByColAndIndex.values().stream().flatMap(map -> map.values().stream()).collect(Collectors.toList());
     creators.addAll(_nullValueVectorCreatorMap.values());
