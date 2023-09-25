@@ -966,13 +966,13 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
 
     /**
      * Returns whether the forward index is fixed type.
-     * @return
+     * @return true if fixed length type, false otherwise
      */
     boolean isFixedLengthType();
 
     /**
      * Returns the base offset for the forward index if it's fixed type
-     * @return
+     * @return base offset if fixed length type
      */
     long getBaseOffset();
 

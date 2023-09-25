@@ -65,6 +65,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
 
   private final long _bitmapReaderStartOffset;
   private final long _rawDataReaderStartOffset;
+  private final int _numBitsPerValue;
 
   public FixedBitMVForwardIndexReader(PinotDataBuffer dataBuffer, int numDocs, int numValues, int numBitsPerValue) {
     _numDocs = numDocs;
@@ -78,6 +79,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     _bitmapReader = new PinotDataBitSet(dataBuffer.view(endOffset, endOffset + bitmapSize));
     endOffset += bitmapSize;
     _rawDataReaderStartOffset = endOffset;
+    _numBitsPerValue = numBitsPerValue;
     int rawDataSize = (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
     _rawDataReader =
         new FixedBitIntReaderWriter(dataBuffer.view(endOffset, endOffset + rawDataSize), numValues, numBitsPerValue);
@@ -238,7 +240,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
       if (docId > contextDocId && chunkId == contextDocId / _numDocsPerChunk) {
         // Same chunk
         startIndex =
-            _bitmapReader.getNextNthSetBitOffsetOffsetAndRecordRanges(contextEndOffset + 1, docId - contextDocId - 1,
+            _bitmapReader.getNextNthSetBitOffsetAndRecordRanges(contextEndOffset + 1, docId - contextDocId - 1,
                 _bitmapReaderStartOffset, ranges);
       } else {
         // Different chunk
@@ -248,7 +250,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
         if (indexInChunk == 0) {
           startIndex = chunkOffset;
         } else {
-          startIndex = _bitmapReader.getNextNthSetBitOffsetOffsetAndRecordRanges(chunkOffset + 1, indexInChunk,
+          startIndex = _bitmapReader.getNextNthSetBitOffsetAndRecordRanges(chunkOffset + 1, indexInChunk,
               _bitmapReaderStartOffset, ranges);
         }
       }
@@ -260,7 +262,11 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
       endIndex = _bitmapReader.getNextSetBitOffsetRanges(startIndex + 1, _bitmapReaderStartOffset, ranges);
     }
     int numValues = endIndex - startIndex;
-    _rawDataReader.recordRangesForData(startIndex, numValues, _rawDataReaderStartOffset, ranges);
+    long startBitOffset = (long) startIndex * _numBitsPerValue;
+    long byteStartOffset = (startBitOffset / Byte.SIZE);
+    int size = (int) (((long) numValues * _numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
+
+    ranges.add(ForwardIndexReader.ValueRange.newByteRange(_rawDataReaderStartOffset + byteStartOffset, size));
 
     // Update context
     context._docId = docId;

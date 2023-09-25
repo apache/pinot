@@ -255,7 +255,7 @@ public final class PinotDataBitSet implements Closeable {
     }
   }
 
-  public int getNextNthSetBitOffsetOffsetAndRecordRanges(int bitOffset, int n, long baseOffset,
+  public int getNextNthSetBitOffsetAndRecordRanges(int bitOffset, int n, long baseOffset,
       List<ForwardIndexReader.ValueRange> ranges) {
     long startOffset = baseOffset + (bitOffset / Byte.SIZE);
     int size = Byte.SIZE;
