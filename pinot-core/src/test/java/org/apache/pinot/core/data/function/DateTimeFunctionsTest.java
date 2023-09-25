@@ -241,6 +241,14 @@ public class DateTimeFunctionsTest {
         "fromDateTime(dateTime, 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''')", Lists.newArrayList("dateTime"), row113, null
     });
 
+    // fromDateTime with malformed dateTime and default Value should return -1
+    GenericRow row114 = new GenericRow();
+    row114.putValue("dateTime", "malformed_string");
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', 'UTC', -1)", Lists.newArrayList("dateTime"),
+        row114, -1L
+    });
+
     // timezone_hour and timezone_minute
     List<String> expectedArguments = Collections.singletonList("tz");
     GenericRow row120 = new GenericRow();
