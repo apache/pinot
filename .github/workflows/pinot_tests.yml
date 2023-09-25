@@ -82,7 +82,13 @@ jobs:
         prioritize_bytebuffer: [false]
         include:
           - java: 21
-          - prioritize_bytebuffer: true
+            testset: 1
+            distribution: "corretto"
+            prioritize_bytebuffer: true
+          - java: 21
+            testset: 2
+            distribution: "corretto"
+            prioritize_bytebuffer: true
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
@@ -155,7 +161,13 @@ jobs:
         prioritize_bytebuffer: [false]
         include:
           - java: 21
-          - prioritize_bytebuffer: true
+            testset: 1
+            distribution: "corretto"
+            prioritize_bytebuffer: true
+          - java: 21
+            testset: 2
+            distribution: "corretto"
+            prioritize_bytebuffer: true
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
@@ -308,7 +320,13 @@ jobs:
         prioritize_bytebuffer: [false]
         include:
           - java: 21
-          - prioritize_bytebuffer: true
+            testset: 1
+            distribution: "corretto"
+            prioritize_bytebuffer: true
+          - java: 21
+            testset: 2
+            distribution: "corretto"
+            prioritize_bytebuffer: true
     name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
     steps:
       - uses: actions/checkout@v3
