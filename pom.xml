@@ -178,6 +178,10 @@
     <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
     <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
 
+    <!-- Configuration for Scala -->
+    <scala.version>2.12.18</scala.version>
+    <scala.compat.version>2.12</scala.compat.version>
+
     <flink.version>1.12.0</flink.version>
   </properties>
 
@@ -225,16 +229,6 @@
           </plugin>
         </plugins>
       </build>
-    </profile>
-    <profile>
-      <id>scala-2.12</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <properties>
-        <scala.version>2.12.18</scala.version>
-        <scala.compat.version>2.12</scala.compat.version>
-      </properties>
     </profile>
 
     <profile>
