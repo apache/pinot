@@ -77,15 +77,12 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17 ]
-        distribution: [ "temurin" ]
+        java: [ 11, 17, 21 ]
+        distribution: [ "corretto" ]
         prioritize_bytebuffer: [false]
         include:
-          - distribution: corretto
-            java: 21
-          - distribution: corretto
-            java: 21
-            prioritize_bytebuffer: true
+          - java: 21
+          - prioritize_bytebuffer: true
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
@@ -153,15 +150,12 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17 ]
-        distribution: [ "temurin" ]
+        java: [ 11, 17, 21 ]
+        distribution: [ "corretto" ]
         prioritize_bytebuffer: [false]
         include:
-          - distribution: corretto
-            java: 21
-          - distribution: corretto
-            java: 21
-            prioritize_bytebuffer: true
+          - java: 21
+          - prioritize_bytebuffer: true
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
@@ -308,15 +302,13 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        java: [ 11, 17 ]
-        distribution: [ "temurin" ]
+        testset: [ 1, 2 ]
+        java: [ 11, 17, 21 ]
+        distribution: [ "corretto" ]
         prioritize_bytebuffer: [false]
         include:
-          - distribution: corretto
-            java: 21
-          - distribution: corretto
-            java: 21
-            prioritize_bytebuffer: true
+          - java: 21
+          - prioritize_bytebuffer: true
     name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
     steps:
       - uses: actions/checkout@v3
