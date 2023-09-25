@@ -96,7 +96,7 @@ public class MultistageGroupByExecutor {
     _groupKeyToIdMap.defaultReturnValue(GroupKeyGenerator.INVALID_ID);
   }
 
-  private int getNumGroupsLimit(Map<String, String> customProperties, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+  private int getNumGroupsLimit(Map<String, String> opChainMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> aggregateOptions = nodeHint._hintOptions.get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
       if (aggregateOptions != null) {
@@ -106,11 +106,11 @@ public class MultistageGroupByExecutor {
         }
       }
     }
-    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(customProperties);
+    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
     return numGroupsLimit != null ? numGroupsLimit : InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
   }
 
-  private int getMaxInitialResultHolderCapacity(Map<String, String> customProperties,
+  private int getMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
       @Nullable AbstractPlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> aggregateOptions = nodeHint._hintOptions.get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
@@ -122,7 +122,7 @@ public class MultistageGroupByExecutor {
         }
       }
     }
-    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(customProperties);
+    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(opChainMetadata);
     return maxInitialResultHolderCapacity != null ? maxInitialResultHolderCapacity
         : InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
   }
