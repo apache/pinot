@@ -574,9 +574,8 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void notSupportedInV2() {
-    if (useMultiStageQueryEngine()) {
-      //throw new SkipException("Some queries fail when using multi-stage engine");
-      Assert.fail("Some queries fail when using multi-stage engine");
-    }
+    //if (useMultiStageQueryEngine()) {
+    //  throw new SkipException("Some queries fail when using multi-stage engine");
+    //}
   }
 }
