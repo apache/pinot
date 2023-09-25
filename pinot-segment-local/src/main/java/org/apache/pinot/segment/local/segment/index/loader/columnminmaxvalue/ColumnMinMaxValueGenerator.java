@@ -24,20 +24,18 @@ import java.util.List;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.BytesDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.DoubleDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.FloatDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.IntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.LongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
-import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
-import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
@@ -139,47 +137,48 @@ public class ColumnMinMaxValueGenerator {
       return;
     }
 
-    DataType dataType = columnMetadata.getDataType().getStoredType();
+    DataType dataType = columnMetadata.getDataType();
+    DataType storedType = dataType.getStoredType();
     if (columnMetadata.hasDictionary()) {
       PinotDataBuffer dictionaryBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.dictionary());
       int length = columnMetadata.getCardinality();
-      switch (dataType) {
+      switch (storedType) {
         case INT:
           try (IntDictionary intDictionary = new IntDictionary(dictionaryBuffer, length)) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                intDictionary.getStringValue(0), intDictionary.getStringValue(length - 1), dataType);
+                intDictionary.getStringValue(0), intDictionary.getStringValue(length - 1), storedType);
           }
           break;
         case LONG:
           try (LongDictionary longDictionary = new LongDictionary(dictionaryBuffer, length)) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                longDictionary.getStringValue(0), longDictionary.getStringValue(length - 1), dataType);
+                longDictionary.getStringValue(0), longDictionary.getStringValue(length - 1), storedType);
           }
           break;
         case FLOAT:
           try (FloatDictionary floatDictionary = new FloatDictionary(dictionaryBuffer, length)) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                floatDictionary.getStringValue(0), floatDictionary.getStringValue(length - 1), dataType);
+                floatDictionary.getStringValue(0), floatDictionary.getStringValue(length - 1), storedType);
           }
           break;
         case DOUBLE:
           try (DoubleDictionary doubleDictionary = new DoubleDictionary(dictionaryBuffer, length)) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                doubleDictionary.getStringValue(0), doubleDictionary.getStringValue(length - 1), dataType);
+                doubleDictionary.getStringValue(0), doubleDictionary.getStringValue(length - 1), storedType);
           }
           break;
         case STRING:
           try (StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, length,
               columnMetadata.getColumnMaxLength())) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                stringDictionary.getStringValue(0), stringDictionary.getStringValue(length - 1), dataType);
+                stringDictionary.getStringValue(0), stringDictionary.getStringValue(length - 1), storedType);
           }
           break;
         case BYTES:
           try (BytesDictionary bytesDictionary = new BytesDictionary(dictionaryBuffer, length,
               columnMetadata.getColumnMaxLength())) {
             SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                bytesDictionary.getStringValue(0), bytesDictionary.getStringValue(length - 1), dataType);
+                bytesDictionary.getStringValue(0), bytesDictionary.getStringValue(length - 1), storedType);
           }
           break;
         default:
@@ -188,129 +187,117 @@ public class ColumnMinMaxValueGenerator {
     } else {
       // setting min/max for non-dictionary columns.
       int numDocs = columnMetadata.getTotalDocs();
-      boolean isSingleValueField = _segmentMetadata.getSchema().getFieldSpecFor(columnName).isSingleValueField();
-      PinotDataBuffer forwardBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.forward());
-      switch (dataType) {
-        case INT: {
-          int min = Integer.MAX_VALUE;
-          int max = Integer.MIN_VALUE;
-          if (isSingleValueField) {
-            try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(
-                forwardBuffer, DataType.INT); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  int value = rawIndexReader.getInt(docId, readerContext);
+      PinotDataBuffer rawIndexBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.forward());
+      boolean isSingleValue = _segmentMetadata.getSchema().getFieldSpecFor(columnName).isSingleValueField();
+      try (
+          ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.createRawIndexReader(rawIndexBuffer, storedType,
+              isSingleValue); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
+        switch (storedType) {
+          case INT: {
+            int min = Integer.MAX_VALUE;
+            int max = Integer.MIN_VALUE;
+            if (isSingleValue) {
+              for (int docId = 0; docId < numDocs; docId++) {
+                int value = rawIndexReader.getInt(docId, readerContext);
+                min = Math.min(min, value);
+                max = Math.max(max, value);
+              }
+            } else {
+              for (int docId = 0; docId < numDocs; docId++) {
+                int[] values = rawIndexReader.getIntMV(docId, readerContext);
+                for (int value : values) {
                   min = Math.min(min, value);
                   max = Math.max(max, value);
                 }
+              }
             }
-          } else {
-            try (FixedByteChunkMVForwardIndexReader rawIndexReader = new FixedByteChunkMVForwardIndexReader(
-                forwardBuffer, DataType.INT); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  int[] value = rawIndexReader.getIntMV(docId, readerContext);
-                  for (int i = 0; i < value.length; i++) {
-                    min = Math.min(min, value[i]);
-                    max = Math.max(max, value[i]);
-                  }
-                }
-            }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, String.valueOf(min),
+                String.valueOf(max), storedType);
+            break;
           }
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              String.valueOf(min), String.valueOf(max), dataType);
-         }
-         break;
-        case LONG: {
-          long min = Long.MAX_VALUE;
-          long max = Long.MIN_VALUE;
-          if (isSingleValueField) {
-            try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(
-                forwardBuffer, DataType.LONG); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  long value = rawIndexReader.getLong(docId, readerContext);
+          case LONG: {
+            long min = Long.MAX_VALUE;
+            long max = Long.MIN_VALUE;
+            if (isSingleValue) {
+              for (int docId = 0; docId < numDocs; docId++) {
+                long value = rawIndexReader.getLong(docId, readerContext);
+                min = Math.min(min, value);
+                max = Math.max(max, value);
+              }
+            } else {
+              for (int docId = 0; docId < numDocs; docId++) {
+                long[] values = rawIndexReader.getLongMV(docId, readerContext);
+                for (long value : values) {
                   min = Math.min(min, value);
                   max = Math.max(max, value);
                 }
+              }
             }
-          } else {
-            try (FixedByteChunkMVForwardIndexReader rawIndexReader = new FixedByteChunkMVForwardIndexReader(
-                forwardBuffer, DataType.LONG); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  long[] value = rawIndexReader.getLongMV(docId, readerContext);
-                  for (int i = 0; i < value.length; i++) {
-                    min = Math.min(min, value[i]);
-                    max = Math.max(max, value[i]);
-                  }
-                }
-            }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, String.valueOf(min),
+                String.valueOf(max), storedType);
+            break;
           }
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                String.valueOf(min), String.valueOf(max), dataType);
-         }
-         break;
-        case FLOAT: {
-          float min = Float.MAX_VALUE;
-          float max = Float.MIN_VALUE;
-          if (isSingleValueField) {
-            try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(
-                forwardBuffer, DataType.FLOAT); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  float value = rawIndexReader.getFloat(docId, readerContext);
+          case FLOAT: {
+            float min = Float.POSITIVE_INFINITY;
+            float max = Float.NEGATIVE_INFINITY;
+            if (isSingleValue) {
+              for (int docId = 0; docId < numDocs; docId++) {
+                float value = rawIndexReader.getFloat(docId, readerContext);
+                min = Math.min(min, value);
+                max = Math.max(max, value);
+              }
+            } else {
+              for (int docId = 0; docId < numDocs; docId++) {
+                float[] values = rawIndexReader.getFloatMV(docId, readerContext);
+                for (float value : values) {
                   min = Math.min(min, value);
                   max = Math.max(max, value);
                 }
+              }
             }
-          } else {
-            try (FixedByteChunkMVForwardIndexReader rawIndexReader = new FixedByteChunkMVForwardIndexReader(
-                forwardBuffer, DataType.FLOAT); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  float[] value = rawIndexReader.getFloatMV(docId, readerContext);
-                  for (int i = 0; i < value.length; i++) {
-                    min = Math.min(min, value[i]);
-                    max = Math.max(max, value[i]);
-                  }
-                }
-            }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, String.valueOf(min),
+                String.valueOf(max), storedType);
+            break;
           }
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                String.valueOf(min), String.valueOf(max), dataType);
-         }
-         break;
-        case DOUBLE: {
-          double min = Double.MAX_VALUE;
-          double max = Double.MIN_VALUE;
-          if (isSingleValueField) {
-            try (FixedByteChunkSVForwardIndexReader rawIndexReader = new FixedByteChunkSVForwardIndexReader(
-                forwardBuffer, DataType.DOUBLE); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  double value = rawIndexReader.getDouble(docId, readerContext);
+          case DOUBLE: {
+            double min = Double.POSITIVE_INFINITY;
+            double max = Double.NEGATIVE_INFINITY;
+            if (isSingleValue) {
+              for (int docId = 0; docId < numDocs; docId++) {
+                double value = rawIndexReader.getDouble(docId, readerContext);
+                min = Math.min(min, value);
+                max = Math.max(max, value);
+              }
+            } else {
+              for (int docId = 0; docId < numDocs; docId++) {
+                double[] values = rawIndexReader.getDoubleMV(docId, readerContext);
+                for (double value : values) {
                   min = Math.min(min, value);
                   max = Math.max(max, value);
                 }
+              }
             }
-          } else {
-            try (FixedByteChunkMVForwardIndexReader rawIndexReader = new FixedByteChunkMVForwardIndexReader(
-                forwardBuffer, DataType.DOUBLE); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  double[] value = rawIndexReader.getDoubleMV(docId, readerContext);
-                  for (int i = 0; i < value.length; i++) {
-                    min = Math.min(min, value[i]);
-                    max = Math.max(max, value[i]);
-                  }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, String.valueOf(min),
+                String.valueOf(max), storedType);
+            break;
+          }
+          case STRING: {
+            String min = null;
+            String max = null;
+            if (isSingleValue) {
+              for (int docId = 0; docId < numDocs; docId++) {
+                String value = rawIndexReader.getString(docId, readerContext);
+                if (min == null || StringUtils.compare(min, value) > 0) {
+                  min = value;
                 }
-            }
-          }
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-                String.valueOf(min), String.valueOf(max), dataType);
-          }
-          break;
-        case STRING: {
-          String min = null;
-          String max = null;
-          if (isSingleValueField) {
-            try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(forwardBuffer,
-                DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  String value = rawIndexReader.getString(docId, readerContext);
+                if (max == null || StringUtils.compare(max, value) < 0) {
+                  max = value;
+                }
+              }
+            } else {
+              for (int docId = 0; docId < numDocs; docId++) {
+                String[] values = rawIndexReader.getStringMV(docId, readerContext);
+                for (String value : values) {
                   if (min == null || StringUtils.compare(min, value) > 0) {
                     min = value;
                   }
@@ -318,34 +305,28 @@ public class ColumnMinMaxValueGenerator {
                     max = value;
                   }
                 }
+              }
             }
-          } else {
-            try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(forwardBuffer,
-                DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  String[] value = rawIndexReader.getStringMV(docId, readerContext);
-                  for (int i = 0; i < value.length; i++) {
-                    if (min == null || StringUtils.compare(min, value[i]) > 0) {
-                      min = value[i];
-                    }
-                    if (max == null || StringUtils.compare(max, value[i]) < 0) {
-                      max = value[i];
-                    }
-                  }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, min, max, storedType);
+            break;
+          }
+          case BYTES: {
+            byte[] min = null;
+            byte[] max = null;
+            if (isSingleValue) {
+              for (int docId = 0; docId < numDocs; docId++) {
+                byte[] value = rawIndexReader.getBytes(docId, readerContext);
+                if (min == null || ByteArray.compare(value, min) > 0) {
+                  min = value;
                 }
-            }
-          }
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, min, max, dataType);
-          }
-          break;
-        case BYTES: {
-          byte[] min = null;
-          byte[] max = null;
-          if (isSingleValueField) {
-            try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(forwardBuffer,
-                DataType.BYTES); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  byte[] value = rawIndexReader.getBytes(docId, readerContext);
+                if (max == null || ByteArray.compare(value, max) < 0) {
+                  max = value;
+                }
+              }
+            } else {
+              for (int docId = 0; docId < numDocs; docId++) {
+                byte[][] values = rawIndexReader.getBytesMV(docId, readerContext);
+                for (byte[] value : values) {
                   if (min == null || ByteArray.compare(value, min) > 0) {
                     min = value;
                   }
@@ -353,29 +334,15 @@ public class ColumnMinMaxValueGenerator {
                     max = value;
                   }
                 }
+              }
             }
-          } else {
-            try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(forwardBuffer,
-                DataType.BYTES); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
-                for (int docId = 0; docId < numDocs; docId++) {
-                  byte[][] value = rawIndexReader.getBytesMV(docId, readerContext);
-                  for (int i = 0; i < value.length; i++) {
-                    if (min == null || ByteArray.compare(value[i], min) > 0) {
-                      min = value[i];
-                    }
-                    if (max == null || ByteArray.compare(value[i], max) < 0) {
-                      max = value[i];
-                    }
-                  }
-                }
-            }
+            SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
+                BytesUtils.toHexString(min), BytesUtils.toHexString(max), storedType);
+            break;
           }
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              BytesUtils.toHexString(min), BytesUtils.toHexString(max), dataType);
-          }
-          break;
-        default:
-          throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
+          default:
+            throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
+        }
       }
     }
     _minMaxValueAdded = true;

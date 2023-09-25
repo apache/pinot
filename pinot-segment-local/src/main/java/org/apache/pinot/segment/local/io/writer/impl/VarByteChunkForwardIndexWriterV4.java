@@ -39,16 +39,43 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Class to write out variable length bytes into a single column.
+ * Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains variable number of docs, and
+ * the entries are variable length.
  *
- *
- * Only sequential writes are supported.
+ * <p>The layout of the file is as follows:
+ * <ul>
+ *   <li>Header Section
+ *   <ul>
+ *     <li>File format version (int)</li>
+ *     <li>Target decompressed chunk size (int)</li>
+ *     <li>Compression type enum value (int)</li>
+ *     <li>Start offset of chunk data (int)</li>
+ *     <li>Data header (for each chunk)
+ *     <ul>
+ *       <li>First docId in the chunk (int), where MSB is used to mark huge chunk</li>
+ *       <li>Start offset of the chunk (unsigned int)</li>
+ *     </ul>
+ *     </li>
+ *   </ul>
+ *   </li>
+ *   <li>Individual Chunks
+ *   <ul>
+ *     <li>Regular chunk
+ *     <ul>
+ *       <li>Header Section: start offsets (stored as int) of the entry within the data section</li>
+ *       <li>Data Section</li>
+ *     </ul>
+ *     </li>
+ *     <li>Huge chunk: contains one single value</li>
+ *   </ul>
+ *   </li>
+ * </ul>
  */
 @NotThreadSafe
-public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
-
+public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   public static final int VERSION = 4;
-  private static final Logger LOGGER = LoggerFactory.getLogger(VarByteChunkSVForwardIndexWriterV4.class);
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(VarByteChunkForwardIndexWriterV4.class);
   private static final String DATA_BUFFER_SUFFIX = ".buf";
 
   private final File _dataBuffer;
@@ -63,15 +90,15 @@ public class VarByteChunkSVForwardIndexWriterV4 implements VarByteChunkWriter {
   private int _metadataSize = 0;
   private long _chunkOffset = 0;
 
-  public VarByteChunkSVForwardIndexWriterV4(File file, ChunkCompressionType compressionType, int chunkSize)
+  public VarByteChunkForwardIndexWriterV4(File file, ChunkCompressionType compressionType, int chunkSize)
       throws IOException {
     _dataBuffer = new File(file.getName() + DATA_BUFFER_SUFFIX);
     _output = new RandomAccessFile(file, "rw");
     _dataChannel = new RandomAccessFile(_dataBuffer, "rw").getChannel();
     _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType, true);
     _chunkBuffer = ByteBuffer.allocateDirect(chunkSize).order(ByteOrder.LITTLE_ENDIAN);
-    _compressionBuffer = ByteBuffer.allocateDirect(_chunkCompressor.maxCompressedSize(chunkSize))
-        .order(ByteOrder.LITTLE_ENDIAN);
+    _compressionBuffer =
+        ByteBuffer.allocateDirect(_chunkCompressor.maxCompressedSize(chunkSize)).order(ByteOrder.LITTLE_ENDIAN);
     // reserve space for numDocs
     _chunkBuffer.position(Integer.BYTES);
     writeHeader(_chunkCompressor.compressionType(), chunkSize);

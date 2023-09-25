@@ -25,8 +25,8 @@ import java.util.SplittableRandom;
 import java.util.UUID;
 import java.util.function.LongSupplier;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
@@ -137,7 +137,7 @@ public class BenchmarkRawForwardIndexReader {
         throws IOException {
       super.setup();
       _file = new File(TARGET_DIR, UUID.randomUUID().toString());
-      try (VarByteChunkSVForwardIndexWriterV4 writer = new VarByteChunkSVForwardIndexWriterV4(_file,
+      try (VarByteChunkForwardIndexWriterV4 writer = new VarByteChunkForwardIndexWriterV4(_file,
           _chunkCompressionType, _maxChunkSize)) {
         for (int i = 0; i < _records; i++) {
           writer.putBytes(_bytes[i]);
@@ -163,7 +163,7 @@ public class BenchmarkRawForwardIndexReader {
         throws IOException {
       super.setup();
       _file = new File(TARGET_DIR, UUID.randomUUID().toString());
-      try (VarByteChunkSVForwardIndexWriter writer = new VarByteChunkSVForwardIndexWriter(_file, _chunkCompressionType,
+      try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(_file, _chunkCompressionType,
           _records, _maxChunkSize / _maxLength, _maxLength, 3)) {
         for (int i = 0; i < _records; i++) {
           writer.putBytes(_bytes[i]);
