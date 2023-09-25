@@ -53,8 +53,8 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
@@ -171,7 +171,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       File[] tableDataDirs = instanceDataDir.listFiles((dir, name) -> TableNameBuilder.isTableResource(name));
       if (tableDataDirs != null) {
         for (File tableDataDir : tableDataDirs) {
-          File resourceTempDir = new File(tableDataDir, LLRealtimeSegmentDataManager.RESOURCE_TEMP_DIR_NAME);
+          File resourceTempDir = new File(tableDataDir, RealtimeSegmentDataManager.RESOURCE_TEMP_DIR_NAME);
           try {
             FileUtils.deleteDirectory(resourceTempDir);
           } catch (IOException e) {
@@ -447,10 +447,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
               tableNameWithType);
           return;
         }
-        if (segmentDataManager instanceof LLRealtimeSegmentDataManager) {
+        if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           LOGGER.info("Reloading (force committing) consuming segment: {} in table: {}", segmentName,
               tableNameWithType);
-          ((LLRealtimeSegmentDataManager) segmentDataManager).forceCommit();
+          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
         }
         return;
       } finally {
@@ -600,8 +600,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
         if (segmentDataManager != null) {
           try {
-            if (segmentDataManager instanceof LLRealtimeSegmentDataManager) {
-              ((LLRealtimeSegmentDataManager) segmentDataManager).forceCommit();
+            if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+              ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
             }
           } finally {
             tableDataManager.releaseSegment(segmentDataManager);

@@ -76,7 +76,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -309,7 +309,7 @@ public class TablesResource {
       int totalSegmentCount = 0;
       Map<String, Map<String, Integer>> columnToIndexesCount = new HashMap<>();
       for (SegmentDataManager segmentDataManager : allSegments) {
-        if (segmentDataManager instanceof LLRealtimeSegmentDataManager) {
+        if (segmentDataManager instanceof RealtimeSegmentDataManager) {
           // REALTIME segments may not have indexes since not all indexes have mutable implementations
           continue;
         }
@@ -685,8 +685,8 @@ public class TablesResource {
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        if (segmentDataManager instanceof LLRealtimeSegmentDataManager) {
-          LLRealtimeSegmentDataManager realtimeSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
+        if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+          RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
           Map<String, ConsumerPartitionState> partitionStateMap =
               realtimeSegmentDataManager.getConsumerPartitionState();
           Map<String, String> recordsLagMap = new HashMap<>();

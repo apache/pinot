@@ -45,7 +45,7 @@ import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -166,7 +166,7 @@ public class DebugResource {
   private SegmentConsumerInfo getSegmentConsumerInfo(SegmentDataManager segmentDataManager, TableType tableType) {
     SegmentConsumerInfo segmentConsumerInfo = null;
     if (tableType == TableType.REALTIME) {
-      LLRealtimeSegmentDataManager realtimeSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
+      RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
       Map<String, ConsumerPartitionState> partitionStateMap = realtimeSegmentDataManager.getConsumerPartitionState();
       Map<String, String> currentOffsets = realtimeSegmentDataManager.getPartitionToCurrentOffset();
       Map<String, String> upstreamLatest = partitionStateMap.entrySet().stream().collect(
