@@ -54,7 +54,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   }
 
   private Object getFieldValue(Descriptors.FieldDescriptor fieldDescriptor, Message message) {
-    if (fieldDescriptor.isRepeated() || !fieldDescriptor.hasOptionalKeyword() || message.hasField(fieldDescriptor)) {
+    if (fieldDescriptor.isRepeated() || !fieldDescriptor.isOptional() || message.hasField(fieldDescriptor)) {
       return message.getField(fieldDescriptor);
     } else {
       return null;

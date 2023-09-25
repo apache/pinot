@@ -166,7 +166,7 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(LONG_FIELD, 100L);
     record.put(DOUBLE_FIELD, 1.1);
     record.put(FLOAT_FIELD, 2.2f);
-    record.put(BOOL_FIELD, "false");
+    record.put(BOOL_FIELD, "true");
     record.put(BYTES_FIELD, "hello world!".getBytes(UTF_8));
     record.put(NULLABLE_STRING_FIELD, "");
     record.put(NULLABLE_INT_FIELD, 0);
