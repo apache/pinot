@@ -163,6 +163,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
           indexFileChannel);
       org.apache.pinot.common.utils.FileUtils.transferBytes(bitmapValueFileChannel, 0, _bitmapValueFile.length(),
           indexFileChannel);
+      indexFileChannel.force(true);
     }
   }
 
