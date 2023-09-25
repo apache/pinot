@@ -26,6 +26,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChu
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
@@ -85,9 +86,12 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
             storedType) : new VarByteChunkSVForwardIndexReader(dataBuffer, storedType);
       }
     } else {
-      // TODO: Support V4 MV reader
-      return storedType.isFixedWidth() ? new FixedByteChunkMVForwardIndexReader(dataBuffer, storedType)
-          : new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
+      if (storedType.isFixedWidth()) {
+        return new FixedByteChunkMVForwardIndexReader(dataBuffer, storedType);
+      } else {
+        return version == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkMVForwardIndexReaderV4(dataBuffer,
+            storedType) : new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
+      }
     }
   }
 }

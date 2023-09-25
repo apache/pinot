@@ -37,6 +37,8 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 
 /**
  * Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains variable number of docs, and
@@ -119,6 +121,38 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   @Override
   public void putBigDecimal(BigDecimal bigDecimal) {
     putBytes(BigDecimalUtils.serialize(bigDecimal));
+  }
+
+  @Override
+  public void putByteArrays(byte[][] values) {
+    int size = Integer.SIZE;
+    for (byte[] value : values) {
+      size += value.length;
+    }
+    byte[] serializedBytes = new byte[size];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(serializedBytes);
+    byteBuffer.putInt(values.length);
+
+    for (byte[] value : values) {
+      byteBuffer.putInt(value.length).put(value);
+    }
+    putBytes(byteBuffer.array());
+  }
+
+  public void putStrings(String[] values) {
+    int size = Integer.SIZE;
+    for (String value : values) {
+      size += value.getBytes(UTF_8).length;
+    }
+    byte[] serializedBytes = new byte[size];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(serializedBytes);
+    byteBuffer.putInt(values.length);
+
+    for (String value : values) {
+      byte[] utf8 = value.getBytes(UTF_8);
+      byteBuffer.putInt(utf8.length).put(utf8);
+    }
+    putBytes(byteBuffer.array());
   }
 
   @Override
