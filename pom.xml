@@ -1499,6 +1499,7 @@
               --add-opens=java.base/java.util=ALL-UNNAMED
               --add-exports=java.base/jdk.internal.util.random=ALL-UNNAMED
               --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+              -Dnet.bytebuddy.experimental=true
             </argLine>
           </configuration>
           <!-- Explicitly select the test provider, instead of relying on the classpath -->
