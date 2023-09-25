@@ -1671,74 +1671,87 @@
         <artifactId>license-maven-plugin</artifactId>
         <version>4.2</version>
         <configuration>
-          <header>${pinot.root}/HEADER</header>
-          <headerDefinitions>
-            <headerDefinition>${pinot.root}/headerdefinition.xml</headerDefinition>
-          </headerDefinitions>
-          <excludes>
-            <!-- Text and log files -->
-            <exclude>**/*.txt</exclude>
-            <exclude>**/*.log</exclude>
-            <exclude>**/*.list</exclude>
-            <exclude>**/*.out</exclude>
-            <exclude>**/*.generated</exclude>
-            <exclude>**/*.json</exclude>
-            <exclude>**/*.schema</exclude>
-            <exclude>**/*.sql</exclude>
+          <licenseSets>
+            <licenseSet>
+              <header>${pinot.root}/HEADER</header>
+              <headerDefinitions>
+                <headerDefinition>${pinot.root}/headerdefinition.xml</headerDefinition>
+              </headerDefinitions>
+              <excludes>
+                <!-- Text and log files -->
+                <exclude>**/*.txt</exclude>
+                <exclude>**/*.log</exclude>
+                <exclude>**/*.list</exclude>
+                <exclude>**/*.out</exclude>
+                <exclude>**/*.generated</exclude>
+                <exclude>**/*.json</exclude>
+                <exclude>**/*.schema</exclude>
+                <exclude>**/*.sql</exclude>
 
-            <!-- JDBC Drivers -->
-            <exclude>**/java.sql.*</exclude>
+                <!-- JDBC Drivers -->
+                <exclude>**/java.sql.*</exclude>
 
-            <!-- Spark datasource register -->
-            <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
+                <!-- Spark datasource register -->
+                <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
 
-            <!-- Binary files -->
-            <exclude>**/*.avro</exclude>
-            <exclude>**/*.avsc</exclude>
-            <exclude>**/*.csv</exclude>
-            <exclude>**/*.desc</exclude>
-            <exclude>**/*.fst</exclude>
-            <exclude>**/*.parquet</exclude>
-            <exclude>**/*.gz</exclude>
-            <exclude>**/*.orc</exclude>
-            <exclude>**/*.dict</exclude>
-            <exclude>**/*.raw</exclude>
-            <exclude>**/*.mapping</exclude>
-            <exclude>**/*.ser</exclude>
-            <exclude>**/*.v1</exclude>
-            <exclude>**/*.v2</exclude>
+                <!-- Binary files -->
+                <exclude>**/*.avro</exclude>
+                <exclude>**/*.avsc</exclude>
+                <exclude>**/*.csv</exclude>
+                <exclude>**/*.desc</exclude>
+                <exclude>**/*.fst</exclude>
+                <exclude>**/*.parquet</exclude>
+                <exclude>**/*.gz</exclude>
+                <exclude>**/*.gzip</exclude>
+                <exclude>**/*.orc</exclude>
+                <exclude>**/*.dict</exclude>
+                <exclude>**/*.raw</exclude>
+                <exclude>**/*.mapping</exclude>
+                <exclude>**/*.ser</exclude>
+                <exclude>**/*.v1</exclude>
+                <exclude>**/*.v2</exclude>
+                <exclude>**/*.parq</exclude>
+                <exclude>**/*.parquet.encrypted</exclude>
 
-            <!-- Auto-generated target directories -->
-            <exclude>target/**</exclude>
-            <exclude>pinot-*/target/**</exclude>
+                <!-- Pinot index files -->
+                <exclude>**/index_map</exclude>
+                <exclude>**/star_tree_index</exclude>
+                <exclude>**/star_tree_index_map</exclude>
 
-            <!-- Docker and Kubernetes (not part of the distribution) -->
-            <exclude>docker/**</exclude>
-            <exclude>helm/**</exclude>
+                <!-- Auto-generated target directories -->
+                <exclude>target/**</exclude>
+                <exclude>pinot-*/target/**</exclude>
 
-            <!-- Pinot-Druid Benchmark (not part of the distribution) -->
-            <exclude>contrib/**</exclude>
+                <!-- Docker and Kubernetes (not part of the distribution) -->
+                <exclude>docker/**</exclude>
+                <exclude>helm/**</exclude>
 
-            <!-- Top level files -->
-            <exclude>HEADER</exclude>
-            <exclude>LICENSE*</exclude>
-            <exclude>NOTICE*</exclude>
-            <exclude>.trivyignore</exclude>
+                <!-- Pinot-Druid Benchmark (not part of the distribution) -->
+                <exclude>contrib/**</exclude>
 
-            <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
-            be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
-            -->
-            <exclude>**/node_modules/**</exclude>
-            <exclude>**/dist/**</exclude>
-            <exclude>**/src/main/resources/*.*rc</exclude>
+                <!-- Top level files -->
+                <exclude>HEADER</exclude>
+                <exclude>LICENSE*</exclude>
+                <exclude>NOTICE*</exclude>
+                <exclude>.trivyignore</exclude>
+                <exclude>doap_Pinot.rdf</exclude>
 
-            <!-- files from Eclipse -->
-            <exclude>**/maven-eclipse.xml</exclude>
-            <exclude>**/.settings/**</exclude>
-            <exclude>**/.project</exclude>
-            <exclude>**/.classpath</exclude>
-            <exclude>.externalToolBuilders/**</exclude>
-          </excludes>
+                <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
+                be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
+                -->
+                <exclude>**/node_modules/**</exclude>
+                <exclude>**/dist/**</exclude>
+                <exclude>**/src/main/resources/*.*rc</exclude>
+
+                <!-- files from Eclipse -->
+                <exclude>**/maven-eclipse.xml</exclude>
+                <exclude>**/.settings/**</exclude>
+                <exclude>**/.project</exclude>
+                <exclude>**/.classpath</exclude>
+                <exclude>.externalToolBuilders/**</exclude>
+              </excludes>
+            </licenseSet>
+          </licenseSets>
           <mapping>
             <java>JAVADOC_STYLE</java>
             <scala>JAVADOC_STYLE</scala>
@@ -1753,6 +1766,7 @@
             <ftl>FTL_STYLE</ftl>
             <MockMaker>SCRIPT_STYLE</MockMaker>
             <appAssemblerScriptTemplate>SCRIPT_STYLE</appAssemblerScriptTemplate>
+            <inc>SCRIPT_STYLE</inc>
             <sql>SCRIPT_STYLE</sql>
             <conf>DOUBLESLASH_STYLE</conf>
             <cfg>DOUBLESLASH_STYLE</cfg>
