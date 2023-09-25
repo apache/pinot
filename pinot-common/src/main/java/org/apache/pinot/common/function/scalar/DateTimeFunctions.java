@@ -513,6 +513,11 @@ public class DateTimeFunctions {
   }
 
   @ScalarFunction
+  public static long fromDateTime(String dateTimeString, String pattern, String timeZoneId, long defaultVal) {
+    return DateTimePatternHandler.parseDateTimeStringToEpochMillis(dateTimeString, pattern, timeZoneId, defaultVal);
+  }
+
+  @ScalarFunction
   public static long[] fromDateTimeMV(String[] dateTimeString, String pattern, String timeZoneId) {
     long[] results = new long[dateTimeString.length];
     for (int i = 0; i < dateTimeString.length; i++) {
