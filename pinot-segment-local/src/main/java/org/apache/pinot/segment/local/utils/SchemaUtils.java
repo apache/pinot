@@ -164,7 +164,7 @@ public class SchemaUtils {
   private static void validateDefaultIsNotNaN(FieldSpec fieldSpec) {
     Preconditions.checkState(!fieldSpec.getDefaultNullValueString().equals("NaN"),
             "NaN as null default value is not managed yet for %s",
-            fieldSpec);
+            fieldSpec.getName());
   }
 
   /**
