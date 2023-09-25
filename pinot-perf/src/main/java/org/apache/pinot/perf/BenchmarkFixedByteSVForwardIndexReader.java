@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
@@ -69,18 +69,17 @@ public class BenchmarkFixedByteSVForwardIndexReader {
     File pow2CompressedIndexFile = new File(INDEX_DIR, UUID.randomUUID().toString());
     _doubleBuffer = new double[_blockSize];
     _longBuffer = new long[_blockSize];
-    try (FixedByteChunkSVForwardIndexWriter writer = new FixedByteChunkSVForwardIndexWriter(compressedIndexFile,
+    try (FixedByteChunkForwardIndexWriter writer = new FixedByteChunkForwardIndexWriter(compressedIndexFile,
         ChunkCompressionType.LZ4, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
-        FixedByteChunkSVForwardIndexWriter passthroughWriter = new FixedByteChunkSVForwardIndexWriter(
-            uncompressedIndexFile,
+        FixedByteChunkForwardIndexWriter passThroughWriter = new FixedByteChunkForwardIndexWriter(uncompressedIndexFile,
             ChunkCompressionType.PASS_THROUGH, _numBlocks * _blockSize, 1000, Long.BYTES, 3);
-        FixedByteChunkSVForwardIndexWriter pow2Writer = new FixedByteChunkSVForwardIndexWriter(pow2CompressedIndexFile,
+        FixedByteChunkForwardIndexWriter pow2Writer = new FixedByteChunkForwardIndexWriter(pow2CompressedIndexFile,
             ChunkCompressionType.LZ4, _numBlocks * _blockSize, 1000, Long.BYTES, 4)) {
       for (int i = 0; i < _numBlocks * _blockSize; i++) {
         long next = ThreadLocalRandom.current().nextLong();
         writer.putLong(next);
         pow2Writer.putLong(next);
-        passthroughWriter.putLong(next);
+        passThroughWriter.putLong(next);
       }
     }
     _compressedReader = new FixedByteChunkSVForwardIndexReader(PinotDataBuffer.loadBigEndianFile(compressedIndexFile),

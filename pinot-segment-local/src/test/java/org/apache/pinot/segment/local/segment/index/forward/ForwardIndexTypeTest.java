@@ -32,7 +32,9 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
 
 
 public class ForwardIndexTypeTest {
@@ -152,7 +154,7 @@ public class ForwardIndexTypeTest {
           new ForwardIndexConfig.Builder()
               .withCompressionType(null)
               .withDeriveNumDocsPerChunk(false)
-              .withRawIndexWriterVersion(2)
+              .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
               .build()
       );
     }
@@ -174,7 +176,7 @@ public class ForwardIndexTypeTest {
             new ForwardIndexConfig.Builder()
                 .withCompressionType(compression == null ? null : ChunkCompressionType.valueOf(compression))
                 .withDeriveNumDocsPerChunk(false)
-                .withRawIndexWriterVersion(2)
+                .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
                 .build()
       );
     }
@@ -195,7 +197,7 @@ public class ForwardIndexTypeTest {
       assertEquals(new ForwardIndexConfig.Builder()
           .withCompressionType(null)
           .withDeriveNumDocsPerChunk(true)
-          .withRawIndexWriterVersion(2)
+          .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
           .build());
     }
 
