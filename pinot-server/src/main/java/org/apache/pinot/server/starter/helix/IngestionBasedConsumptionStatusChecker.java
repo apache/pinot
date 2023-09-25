@@ -68,7 +68,7 @@ public abstract class IngestionBasedConsumptionStatusChecker {
         }
         if (!(segmentDataManager instanceof LLRealtimeSegmentDataManager)) {
           // There's a possibility that a consuming segment has converted to a committed segment. If that's the case,
-          // segment data manager will not be of type LLRealtime.
+          // segment data manager will not be of type RealtimeSegmentDataManager.
           _logger.info("Segment {} is already committed and is considered caught up.", segName);
           _caughtUpSegments.add(segName);
           continue;

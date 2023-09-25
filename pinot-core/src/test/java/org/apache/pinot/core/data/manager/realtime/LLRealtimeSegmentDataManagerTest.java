@@ -953,7 +953,6 @@ public class LLRealtimeSegmentDataManagerTest {
       when(dataManagerConfig.getReadMode()).thenReturn(null);
       when(dataManagerConfig.getAvgMultiValueCount()).thenReturn(null);
       when(dataManagerConfig.getSegmentFormatVersion()).thenReturn(null);
-      when(dataManagerConfig.isEnableSplitCommit()).thenReturn(false);
       when(dataManagerConfig.isRealtimeOffHeapAllocation()).thenReturn(false);
       when(dataManagerConfig.getConfig()).thenReturn(new PinotConfiguration());
       return dataManagerConfig;
@@ -999,7 +998,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     public boolean invokeCommit() {
-      return super.commitSegment("dummyUrl", false);
+      return super.commitSegment("dummyUrl");
     }
 
     private void terminateLoopIfNecessary() {
@@ -1039,9 +1038,8 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected SegmentCompletionProtocol.Response commit(String controllerVipUrl, boolean isSplitCommit) {
-      SegmentCompletionProtocol.Response response = _responses.remove();
-      return response;
+    protected SegmentCompletionProtocol.Response commit(String controllerVipUrl) {
+      return _responses.remove();
     }
 
     @Override
@@ -1051,9 +1049,9 @@ public class LLRealtimeSegmentDataManagerTest {
 
     // TODO: Some of the tests rely on specific number of calls to the `now()` method in the SegmentDataManager.
     // This is not a good coding practice and makes the code very fragile. This needs to be fixed.
-    // Invoking now() in any part of LLRealtimeSegmentDataManager code will break the following tests:
-    // 1. LLRealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReached
-    // 2. LLRealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndTimeThresholdIsReached
+    // Invoking now() in any part of RealtimeSegmentDataManager code will break the following tests:
+    // 1. RealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReached
+    // 2. RealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndTimeThresholdIsReached
     @Override
     protected long now() {
       // now() is called in the constructor before _timeSupplier is set
@@ -1093,7 +1091,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean commitSegment(String controllerVipUrl, boolean isSplitCommit) {
+    protected boolean commitSegment(String controllerVipUrl) {
       _commitSegmentCalled = true;
       return true;
     }

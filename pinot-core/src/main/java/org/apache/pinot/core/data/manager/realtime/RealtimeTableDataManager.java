@@ -267,7 +267,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   /*
-   * Method used by LLRealtimeSegmentManagers to update their partition delays
+   * Method used by RealtimeSegmentManagers to update their partition delays
    *
    * @param ingestionTimeMs Ingestion delay being reported.
    * @param partitionGroupId Partition ID for which delay is being updated.
