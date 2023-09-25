@@ -184,6 +184,10 @@
     <scala.version>2.12.18</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
+    <!-- Configuration for Scala -->
+    <scala.version>2.12.18</scala.version>
+    <scala.compat.version>2.12</scala.compat.version>
+
     <flink.version>1.12.0</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
   </properties>
@@ -228,16 +232,6 @@
           </plugin>
         </plugins>
       </build>
-    </profile>
-    <profile>
-      <id>scala-2.12</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <properties>
-        <scala.version>2.12.18</scala.version>
-        <scala.compat.version>2.12</scala.compat.version>
-      </properties>
     </profile>
 
     <profile>
