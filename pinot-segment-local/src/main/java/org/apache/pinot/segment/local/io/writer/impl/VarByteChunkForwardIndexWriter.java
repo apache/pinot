@@ -30,33 +30,20 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Class to write out variable length bytes into a single column.
+ * Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains fixed number of docs, and
+ * the entries are variable length.
  *
- * The layout of the file is as follows:
- * <p> Header Section: </p>
+ * <p>The layout of each chunk is as follows:
  * <ul>
- *   <li> Integer: File format version. </li>
- *   <li> Integer: Total number of chunks. </li>
- *   <li> Integer: Number of docs per chunk. </li>
- *   <li> Integer: Length of longest entry (in bytes). </li>
- *   <li> Integer: Total number of docs (version 2 onwards). </li>
- *   <li> Integer: Compression type enum value (version 2 onwards). </li>
- *   <li> Integer: Start offset of data header (version 2 onwards). </li>
- *   <li> Integer array: Integer offsets for all chunks in the data (upto version 2),
- *   Long array: Long offsets for all chunks in the data (version 3 onwards) </li>
+ *   <li>
+ *     Header Section: start offsets (stored as int) of the entry within the data section. For partial chunks, offset
+ *     values are 0 for missing entries.
+ *   </li>
+ *   <li>Data Section</li>
  * </ul>
- *
- * <p> Individual Chunks: </p>
- * <ul>
- *   <li> Integer offsets to start position of rows: For partial chunks, offset values are 0 for missing rows. </li>
- *   <li> Data bytes. </li>
- * </ul>
- *
- * Only sequential writes are supported.
  */
 @NotThreadSafe
-public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWriter implements VarByteChunkWriter {
-
+public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter implements VarByteChunkWriter {
   public static final int CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE = Integer.BYTES;
 
   private final int _chunkHeaderSize;
@@ -75,8 +62,8 @@ public class VarByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWri
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is
    *     not found.
    */
-  public VarByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType,
-      int totalDocs, int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion)
+  public VarByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
+      int numDocsPerChunk, int lengthOfLongestEntry, int writerVersion)
       throws IOException {
     super(file, compressionType, totalDocs, numDocsPerChunk,
         numDocsPerChunk * (CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE + (long) lengthOfLongestEntry),
