@@ -21,6 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -86,6 +87,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -113,6 +115,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
+  private static final Map<String, String> DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP =
+      ImmutableMap.<String, String>builder().put("distinctcount", "distinctcountmv")
+          .put("distinctcountbitmap", "distinctcountbitmapmv").put("distinctcounthll", "distinctcounthllmv")
+          .put("distinctcountrawhll", "distinctcountrawhllmv").put("distinctsum", "distinctsummv")
+          .put("distinctavg", "distinctavgmv").put("count", "countmv").put("min", "minmv").put("max", "maxmv")
+          .put("avg", "avgmv").put("sum", "summv").put("minmaxrange", "minmaxrangemv")
+          .put("distinctcounthllplus", "distinctcounthllplusmv")
+          .put("distinctcountrawhllplus", "distinctcountrawhllplusmv").build();
 
   protected final PinotConfiguration _config;
   protected final BrokerRoutingManager _routingManager;
@@ -380,6 +390,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         handleDistinctCountBitmapOverride(serverPinotQuery);
       }
 
+      Schema schema = _tableCache.getSchema(rawTableName);
+      if (schema != null) {
+        handleDistinctMultiValuedOverride(serverPinotQuery, schema);
+      }
+
       long compilationEndTimeNs = System.nanoTime();
       // full request compile time = compilationTimeNs + parserTimeNs
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
@@ -489,7 +504,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       BrokerRequest offlineBrokerRequest = null;
       BrokerRequest realtimeBrokerRequest = null;
       TimeBoundaryInfo timeBoundaryInfo = null;
-      Schema schema = _tableCache.getSchema(rawTableName);
       if (offlineTableName != null && realtimeTableName != null) {
         // Time boundary info might be null when there is no segment in the offline table, query real-time side only
         timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
@@ -941,6 +955,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Retrieve multivalued columns for a table.
+   * From the table Schema , we get the multi valued columns of dimension fields.
+   *
+   * @param tableSchema
+   * @param columnName
+   * @return multivalued columns of the table .
+   */
+  private static boolean isMultiValueColumn(Schema tableSchema, String columnName) {
+
+    DimensionFieldSpec dimensionFieldSpec = tableSchema.getDimensionSpec(columnName);
+    return dimensionFieldSpec != null && !dimensionFieldSpec.isSingleValueField();
+  }
+
+  /**
    * Sets the table name in the given broker request.
    * NOTE: Set table name in broker request because it is used for access control, query routing etc.
    */
@@ -1070,6 +1098,52 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
       handleDistinctCountBitmapOverride(havingExpression);
+    }
+  }
+
+  /**
+   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   */
+  @VisibleForTesting
+  static void handleDistinctMultiValuedOverride(PinotQuery pinotQuery, Schema tableSchema) {
+    for (Expression expression : pinotQuery.getSelectList()) {
+      handleDistinctMultiValuedOverride(expression, tableSchema);
+    }
+    List<Expression> orderByExpressions = pinotQuery.getOrderByList();
+    if (orderByExpressions != null) {
+      for (Expression expression : orderByExpressions) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        handleDistinctMultiValuedOverride(expression.getFunctionCall().getOperands().get(0), tableSchema);
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleDistinctMultiValuedOverride(havingExpression, tableSchema);
+    }
+  }
+
+  /**
+   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   */
+  private static void handleDistinctMultiValuedOverride(Expression expression, Schema tableSchema) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+
+    String overrideOperator = DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
+    if (overrideOperator != null) {
+      List<Expression> operands = function.getOperands();
+      if (operands.size() >= 1 && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
+          operands.get(0).getIdentifier().getName())) {
+        // we are only checking the first operand that if its a MV column as all the overriding agg. fn.'s have
+        // first operator is column name
+        function.setOperator(overrideOperator);
+      }
+    } else {
+      for (Expression operand : function.getOperands()) {
+        handleDistinctMultiValuedOverride(operand, tableSchema);
+      }
     }
   }
 
