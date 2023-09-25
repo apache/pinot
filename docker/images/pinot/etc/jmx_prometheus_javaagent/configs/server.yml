@@ -85,6 +85,9 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeConsumptionExceptions\"><>(\\w+)"
   name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.invalidRealtimeRowsDropped\"><>(\\w+)"
+  name: "pinot_server_realtime_invalidRealtimeRowsDropped_$1"
+  cache: true
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.([^\\.]*?)\"><>(\\w+)"
   name: "pinot_server_realtime_offheapMemoryUsed_$2"
   cache: true
