@@ -161,6 +161,33 @@ public class SchemaUtilsTest {
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
         .addSingleValueDimension("colA", DataType.STRING).build();
     SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+            .addMetric("double", DataType.DOUBLE, "NaN").build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME) .build();
+    try {
+      SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+      Assert.fail("Should fail schema validation, as double has NaN default value");
+    } catch (IllegalStateException e) {
+      // expected
+      Assert.assertTrue(e.getMessage().startsWith("NaN as null default value is not managed yet for"));
+    }
+
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+            .addMetric("float", DataType.FLOAT, "NaN").build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME) .build();
+    try {
+      SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+      Assert.fail("Should fail schema validation, as float has NaN default value");
+    } catch (IllegalStateException e) {
+      // expected
+      Assert.assertTrue(e.getMessage().startsWith("NaN as null default value is not managed yet for"));
+    }
+
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+            .addSingleValueDimension("string", DataType.STRING, "NaN").build();
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME) .build();
+    SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
   }
 
   private Map<String, String> getStreamConfigs() {
