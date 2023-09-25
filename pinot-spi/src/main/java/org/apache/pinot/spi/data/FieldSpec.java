@@ -511,10 +511,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case LONG:
             return Long.valueOf(value);
           case FLOAT:
-            checkNotNaN(value);
             return Float.valueOf(value);
           case DOUBLE:
-            checkNotNaN(value);
             return Double.valueOf(value);
           case BIG_DECIMAL:
             return new BigDecimal(value);
@@ -531,12 +529,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             throw new IllegalStateException();
         }
       } catch (Exception e) {
-        throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this), e);
-      }
-    }
-    private void checkNotNaN(String value) {
-      if (value.equals("NaN")) {
-        throw new IllegalArgumentException(String.format("NaN value is not managed yet", value, this));
+        throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
       }
     }
 
