@@ -43,10 +43,6 @@ public interface InstanceDataManagerConfig {
 
   String getAvgMultiValueCount();
 
-  boolean isEnableSplitCommit();
-
-  boolean isEnableSplitCommitEndWithMetadata();
-
   boolean isRealtimeOffHeapAllocation();
 
   boolean isDirectRealtimeOffHeapAllocation();

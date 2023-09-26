@@ -72,7 +72,6 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
 
   private final boolean _isDirectAlloc = RANDOM.nextBoolean();
   private final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
-  private final boolean _enableSplitCommit = RANDOM.nextBoolean();
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
   private final long _startTime = System.currentTimeMillis();
 
@@ -99,10 +98,6 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, _isDirectAlloc);
     if (_isConsumerDirConfigured) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
-    }
-    if (_enableSplitCommit) {
-      configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
-      configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, true);
     }
   }
 
@@ -203,9 +198,8 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   public void setUp()
       throws Exception {
     System.out.println(String.format(
-        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, "
-            + "enableLeadControllerResource: %s", RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured,
-        _enableSplitCommit, _enableLeadControllerResource));
+        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
+        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
 
     // Remove the consumer directory
     FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));

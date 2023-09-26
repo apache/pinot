@@ -213,6 +213,8 @@ public class LLCSegmentCompletionHandlers {
     return responseStr;
   }
 
+  // Remove after releasing 1.1 (server always use split commit)
+  @Deprecated
   @POST
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT)
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)

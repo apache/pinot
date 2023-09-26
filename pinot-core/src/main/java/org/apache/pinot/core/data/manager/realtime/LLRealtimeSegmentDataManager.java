@@ -47,8 +47,11 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
 import org.apache.pinot.segment.local.realtime.converter.ColumnIndicesForRealtimeTable;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
@@ -104,8 +107,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Segment data manager for low level consumer realtime segments, which manages consumption and segment completion.
  */
-public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
-  protected enum State {
+public class LLRealtimeSegmentDataManager extends SegmentDataManager {
+
+  @VisibleForTesting
+  public enum State {
     // The state machine starts off with this state. While in this state we consume stream events
     // and index them in memory. We continue to be in this state until the end criteria is satisfied
     // (time or number of rows)
@@ -153,8 +158,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       return this.equals(ERROR) || this.equals(COMMITTED) || this.equals(RETAINED) || this.equals(DISCARDED);
     }
   }
-
-  private static final int MINIMUM_CONSUME_TIME_MINUTES = 10;
 
   @VisibleForTesting
   public class SegmentBuildDescriptor {
@@ -208,6 +211,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
+  public static final String RESOURCE_TEMP_DIR_NAME = "_tmp";
+
+  private static final int MINIMUM_CONSUME_TIME_MINUTES = 10;
   private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
   private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
@@ -757,7 +763,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 _state = State.ERROR;
                 _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
               } else {
-                success = commitSegment(response.getControllerVipUrl(), _indexLoadingConfig.isEnableSplitCommit());
+                success = commitSegment(response.getControllerVipUrl());
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
@@ -839,31 +845,39 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  @Override
+  /**
+   * Returns the current offset for the partition group.
+   */
   public Map<String, String> getPartitionToCurrentOffset() {
-    Map<String, String> partitionToCurrentOffset = new HashMap<>();
-    partitionToCurrentOffset.put(String.valueOf(_partitionGroupId), _currentOffset.toString());
-    return partitionToCurrentOffset;
+    return Collections.singletonMap(String.valueOf(_partitionGroupId), _currentOffset.toString());
   }
 
-  @Override
+  /**
+   * Returns the state of the consumer.
+   */
   public ConsumerState getConsumerState() {
     return _state == State.ERROR ? ConsumerState.NOT_CONSUMING : ConsumerState.CONSUMING;
   }
 
-  @Override
+  /**
+   * Returns the timestamp of the last consumed message.
+   */
   public long getLastConsumedTimestamp() {
     return _lastConsumedTimestampMs;
   }
 
-  @Override
+  /**
+   * Returns the {@link ConsumerPartitionState} for the partition group.
+   */
   public Map<String, ConsumerPartitionState> getConsumerPartitionState() {
     String partitionGroupId = String.valueOf(_partitionGroupId);
     return Collections.singletonMap(partitionGroupId, new ConsumerPartitionState(partitionGroupId, getCurrentOffset(),
         getLastConsumedTimestamp(), fetchLatestStreamOffset(5_000), _lastRowMetadata));
   }
 
-  @Override
+  /**
+   * Returns the {@link PartitionLagState} for the partition group.
+   */
   public Map<String, PartitionLagState> getPartitionToLagState(
       Map<String, ConsumerPartitionState> consumerPartitionStateMap) {
     if (_partitionMetadataProvider == null) {
@@ -881,21 +895,22 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @VisibleForTesting
-  protected SegmentBuildDescriptor getSegmentBuildDescriptor() {
+  SegmentBuildDescriptor getSegmentBuildDescriptor() {
     return _segmentBuildDescriptor;
   }
 
   @VisibleForTesting
-  protected Semaphore getPartitionGroupConsumerSemaphore() {
+  Semaphore getPartitionGroupConsumerSemaphore() {
     return _partitionGroupConsumerSemaphore;
   }
 
   @VisibleForTesting
-  protected AtomicBoolean getAcquiredConsumerSemaphore() {
+  AtomicBoolean getAcquiredConsumerSemaphore() {
     return _acquiredConsumerSemaphore;
   }
 
-  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+  @VisibleForTesting
+  SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
     closeStreamConsumers();
     // Do not allow building segment when table data manager is already shut down
     if (_realtimeTableDataManager.isShutDown()) {
@@ -1021,25 +1036,24 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  protected boolean commitSegment(String controllerVipUrl, boolean isSplitCommit) {
+  @VisibleForTesting
+  boolean commitSegment(String controllerVipUrl) {
     File segmentTarFile = _segmentBuildDescriptor.getSegmentTarFile();
-    if (segmentTarFile == null || !segmentTarFile.exists()) {
-      throw new RuntimeException("Segment file does not exist: " + segmentTarFile);
-    }
-    SegmentCompletionProtocol.Response commitResponse = commit(controllerVipUrl, isSplitCommit);
-
-    if (!commitResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
+    Preconditions.checkState(segmentTarFile != null && segmentTarFile.exists(), "Segment tar file: %s does not exist",
+        segmentTarFile);
+    SegmentCompletionProtocol.Response commitResponse = commit(controllerVipUrl);
+    if (commitResponse.getStatus() != SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS) {
       _segmentLogger.warn("Controller response was {} and not {}", commitResponse.getStatus(),
           SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
       return false;
     }
-
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     removeSegmentFile();
     return true;
   }
 
-  protected SegmentCompletionProtocol.Response commit(String controllerVipUrl, boolean isSplitCommit) {
+  @VisibleForTesting
+  SegmentCompletionProtocol.Response commit(String controllerVipUrl) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
@@ -1053,7 +1067,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     SegmentCommitter segmentCommitter;
     try {
-      segmentCommitter = _segmentCommitterFactory.createSegmentCommitter(isSplitCommit, params, controllerVipUrl);
+      segmentCommitter = _segmentCommitterFactory.createSegmentCommitter(params, controllerVipUrl);
     } catch (URISyntaxException e) {
       _segmentLogger.error("Failed to create a segment committer: ", e);
       return SegmentCompletionProtocol.RESP_NOT_SENT;
@@ -1274,7 +1288,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     cleanupMetrics();
   }
 
-  @Override
   public void startConsumption() {
     _consumerThread = new Thread(new PartitionConsumer(), _segmentNameStr);
     _segmentLogger.info("Created new consumer thread {} for {}", _consumerThread, this);
@@ -1346,9 +1359,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId;
     _segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
-    _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
-        indexLoadingConfig.isRealtimeOffHeapAllocation(), indexLoadingConfig.isDirectRealtimeOffHeapAllocation(),
-        serverMetrics);
+    if (_indexLoadingConfig.isRealtimeOffHeapAllocation() && !_indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
+      _memoryManager =
+          new MmapMemoryManager(_realtimeTableDataManager.getConsumerDir(), _segmentNameStr, _serverMetrics);
+    } else {
+      // For on-heap allocation, we still need a memory manager for forward index.
+      // Dictionary will be allocated on heap.
+      _memoryManager = new DirectMemoryManager(_segmentNameStr, _serverMetrics);
+    }
 
     _rateLimiter = RealtimeConsumptionRateManager.getInstance()
         .createRateLimiter(_streamConfig, _tableNameWithType, _serverMetrics, _clientId);
