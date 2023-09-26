@@ -144,8 +144,8 @@ public class SchemaUtils {
         if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.DATE_TIME)) {
           validateDateTimeFieldSpec((DateTimeFieldSpec) fieldSpec);
         }
-        if (fieldSpec.getDataType().equals(FieldSpec.DataType.FLOAT)
-                || fieldSpec.getDataType().equals(FieldSpec.DataType.DOUBLE)) {
+        if (fieldSpec.getDataType().equals(FieldSpec.DataType.FLOAT) || fieldSpec.getDataType()
+            .equals(FieldSpec.DataType.DOUBLE)) {
           validateDefaultIsNotNaN(fieldSpec);
         }
       }
