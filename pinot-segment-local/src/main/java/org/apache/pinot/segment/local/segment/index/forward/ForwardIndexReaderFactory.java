@@ -20,15 +20,14 @@
 package org.apache.pinot.segment.local.segment.index.forward;
 
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.segment.index.readers.forward.BaseVarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -82,15 +81,16 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
             ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
             : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
       } else {
-        return version == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkSVForwardIndexReaderV4(dataBuffer,
-            storedType) : new VarByteChunkSVForwardIndexReader(dataBuffer, storedType);
+        return version == VarByteChunkForwardIndexWriterV4.VERSION ? new BaseVarByteChunkForwardIndexReaderV4(
+            dataBuffer, storedType, true) : new VarByteChunkSVForwardIndexReader(dataBuffer, storedType);
       }
     } else {
       if (storedType.isFixedWidth()) {
-        return new FixedByteChunkMVForwardIndexReader(dataBuffer, storedType);
+        return version == VarByteChunkForwardIndexWriterV4.VERSION ? new BaseVarByteChunkForwardIndexReaderV4(
+            dataBuffer, storedType, false) : new FixedByteChunkMVForwardIndexReader(dataBuffer, storedType);
       } else {
-        return version == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkMVForwardIndexReaderV4(dataBuffer,
-            storedType) : new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
+        return version == VarByteChunkForwardIndexWriterV4.VERSION ? new BaseVarByteChunkForwardIndexReaderV4(
+            dataBuffer, storedType, false) : new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
       }
     }
   }
