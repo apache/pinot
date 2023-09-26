@@ -125,7 +125,8 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
 
   @Override
   public void putByteArrays(byte[][] values) {
-    int size = Integer.SIZE;
+    // num values + length of each value
+    int size = Integer.BYTES + Integer.BYTES * values.length;
     for (byte[] value : values) {
       size += value.length;
     }
@@ -134,14 +135,16 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     byteBuffer.putInt(values.length);
 
     for (byte[] value : values) {
-      byteBuffer.putInt(value.length).put(value);
+      byteBuffer.putInt(value.length);
+      byteBuffer.put(value);
     }
     putBytes(byteBuffer.array());
   }
 
   @Override
   public void putStrings(String[] values) {
-    int size = Integer.SIZE;
+    // num values + length of each value
+    int size = Integer.BYTES + Integer.BYTES * values.length;
     for (String value : values) {
       size += value.getBytes(UTF_8).length;
     }

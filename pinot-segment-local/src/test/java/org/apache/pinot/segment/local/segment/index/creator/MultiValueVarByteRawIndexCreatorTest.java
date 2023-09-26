@@ -30,10 +30,11 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.Assert;
@@ -56,12 +57,12 @@ public class MultiValueVarByteRawIndexCreatorTest {
 
   @DataProvider
   public Object[][] params() {
-    return Arrays.stream(ChunkCompressionType.values())
-        .flatMap(chunkCompressionType -> IntStream.of(10, 15, 20, 1000).boxed()
-            .flatMap(useFullSize -> Stream.of(true, false)
-                .flatMap(maxLength -> IntStream.range(1, 20).map(i -> i * 2 - 1).boxed()
-                    .map(maxNumEntries -> new Object[]{chunkCompressionType, useFullSize, maxLength,
-                        maxNumEntries}))))
+    return Arrays.stream(ChunkCompressionType.values()).flatMap(chunkCompressionType -> IntStream.of(2, 4).boxed()
+            .flatMap(writerVersion -> IntStream.of(10, 15, 20, 1000).boxed().flatMap(maxLength -> Stream.of(true, false)
+                .flatMap(
+                    useFullSize -> IntStream.range(1, 20).map(i -> i * 2 - 1).boxed().map(maxNumEntries -> new Object[]{
+                        chunkCompressionType, useFullSize, writerVersion, maxLength, maxNumEntries
+                    })))))
         .toArray(Object[][]::new);
   }
 
@@ -86,7 +87,8 @@ public class MultiValueVarByteRawIndexCreatorTest {
   }
 
   @Test(dataProvider = "params")
-  public void testMVString(ChunkCompressionType compressionType, int maxLength, boolean useFullSize, int maxNumEntries)
+  public void testMVString(ChunkCompressionType compressionType, boolean useFullSize, int writerVersion, int maxLength,
+      int maxNumEntries)
       throws IOException {
     String column = "testCol-" + UUID.randomUUID();
     int numDocs = 1000;
@@ -117,18 +119,16 @@ public class MultiValueVarByteRawIndexCreatorTest {
       inputs.add(values);
     }
     try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
-        column, numDocs, DataType.STRING, maxTotalLength, maxElements)) {
+        column, numDocs, DataType.STRING, maxTotalLength, maxElements, writerVersion)) {
       for (String[] input : inputs) {
         creator.putStringMV(input);
       }
     }
 
     //read
-    final PinotDataBuffer buffer = PinotDataBuffer
-        .mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-    VarByteChunkMVForwardIndexReader reader = new VarByteChunkMVForwardIndexReader(buffer,
-        DataType.STRING);
-    final ChunkReaderContext context = reader.createContext();
+    final PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
+    ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.STRING, false);
+    final ForwardIndexReaderContext context = reader.createContext();
     String[] values = new String[maxElements];
     for (int i = 0; i < numDocs; i++) {
       int length = reader.getStringMV(i, values, context);
@@ -138,7 +138,8 @@ public class MultiValueVarByteRawIndexCreatorTest {
   }
 
   @Test(dataProvider = "params")
-  public void testMVBytes(ChunkCompressionType compressionType, int maxLength, boolean useFullSize, int maxNumEntries)
+  public void testMVBytes(ChunkCompressionType compressionType, boolean useFullSize, int writerVersion, int maxLength,
+      int maxNumEntries)
       throws IOException {
     String column = "testCol-" + UUID.randomUUID();
     int numDocs = 1000;
@@ -169,18 +170,16 @@ public class MultiValueVarByteRawIndexCreatorTest {
       inputs.add(values);
     }
     try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
-        column, numDocs, DataType.STRING, maxTotalLength, maxElements)) {
+        column, numDocs, DataType.BYTES, maxTotalLength, maxElements, writerVersion)) {
       for (byte[][] input : inputs) {
         creator.putBytesMV(input);
       }
     }
 
     //read
-    final PinotDataBuffer buffer = PinotDataBuffer
-        .mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-    VarByteChunkMVForwardIndexReader reader = new VarByteChunkMVForwardIndexReader(buffer,
-        DataType.BYTES);
-    final ChunkReaderContext context = reader.createContext();
+    final PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
+    ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.BYTES, false);
+    final ForwardIndexReaderContext context = reader.createContext();
     byte[][] values = new byte[maxElements][];
     for (int i = 0; i < numDocs; i++) {
       int length = reader.getBytesMV(i, values, context);

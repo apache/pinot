@@ -204,14 +204,11 @@ public class BaseVarByteChunkForwardIndexReaderV4
   public int getStringMV(int docId, String[] valueBuffer, BaseVarByteChunkForwardIndexReaderV4.ReaderContext context) {
     ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
     int numValues = byteBuffer.getInt();
-    int contentOffset = (numValues + 1) * Integer.BYTES;
     for (int i = 0; i < numValues; i++) {
-      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
+      int length = byteBuffer.getInt();
       byte[] bytes = new byte[length];
-      byteBuffer.position(contentOffset);
       byteBuffer.get(bytes, 0, length);
       valueBuffer[i] = new String(bytes, StandardCharsets.UTF_8);
-      contentOffset += length;
     }
     return numValues;
   }
@@ -221,14 +218,11 @@ public class BaseVarByteChunkForwardIndexReaderV4
     ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
     int numValues = byteBuffer.getInt();
     String[] valueBuffer = new String[numValues];
-    int contentOffset = (numValues + 1) * Integer.BYTES;
     for (int i = 0; i < numValues; i++) {
-      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
+      int length = byteBuffer.getInt();
       byte[] bytes = new byte[length];
-      byteBuffer.position(contentOffset);
       byteBuffer.get(bytes, 0, length);
       valueBuffer[i] = new String(bytes, StandardCharsets.UTF_8);
-      contentOffset += length;
     }
     return valueBuffer;
   }
@@ -237,14 +231,11 @@ public class BaseVarByteChunkForwardIndexReaderV4
   public int getBytesMV(int docId, byte[][] valueBuffer, BaseVarByteChunkForwardIndexReaderV4.ReaderContext context) {
     ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
     int numValues = byteBuffer.getInt();
-    int contentOffset = (numValues + 1) * Integer.BYTES;
     for (int i = 0; i < numValues; i++) {
-      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
+      int length = byteBuffer.getInt();
       byte[] bytes = new byte[length];
-      byteBuffer.position(contentOffset);
       byteBuffer.get(bytes, 0, length);
       valueBuffer[i] = bytes;
-      contentOffset += length;
     }
     return numValues;
   }
@@ -254,14 +245,11 @@ public class BaseVarByteChunkForwardIndexReaderV4
     ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
     int numValues = byteBuffer.getInt();
     byte[][] valueBuffer = new byte[numValues][];
-    int contentOffset = (numValues + 1) * Integer.BYTES;
     for (int i = 0; i < numValues; i++) {
-      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
+      int length = byteBuffer.getInt();
       byte[] bytes = new byte[length];
-      byteBuffer.position(contentOffset);
       byteBuffer.get(bytes, 0, length);
       valueBuffer[i] = bytes;
-      contentOffset += length;
     }
     return valueBuffer;
   }
