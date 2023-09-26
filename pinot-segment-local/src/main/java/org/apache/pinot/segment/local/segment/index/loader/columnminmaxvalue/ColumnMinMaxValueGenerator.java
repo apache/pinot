@@ -344,7 +344,7 @@ public class ColumnMinMaxValueGenerator {
             throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
         }
       }
-      _minMaxValueAdded = true;
     }
+    _minMaxValueAdded = true;
   }
 }

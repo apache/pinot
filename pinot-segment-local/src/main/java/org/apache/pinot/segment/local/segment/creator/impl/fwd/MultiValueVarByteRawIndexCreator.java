@@ -81,13 +81,9 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
     int numDocsPerChunk = Math.max(
         TARGET_MAX_CHUNK_SIZE / (totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE),
         1);
-    // TODO: Support V4 MV reader
-    // Currently fall back to V2 for backward compatible
-    if (writerVersion == VarByteChunkForwardIndexWriterV4.VERSION) {
-      writerVersion = 2;
-    }
-    _indexWriter = new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
-        writerVersion);
+    _indexWriter = writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(file,
+        compressionType, totalDocs, numDocsPerChunk, totalMaxLength, writerVersion)
+        : new VarByteChunkForwardIndexWriterV4(file, compressionType, TARGET_MAX_CHUNK_SIZE);
     _valueType = valueType;
   }
 
