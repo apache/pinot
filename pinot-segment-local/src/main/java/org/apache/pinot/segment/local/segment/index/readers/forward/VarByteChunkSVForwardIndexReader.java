@@ -23,8 +23,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -35,11 +35,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
  * (BIG_DECIMAL, STRING, BYTES).
- * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
+ * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriter}
  */
 public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardIndexReader
     implements ForwardIndexReader.ValueRangeProvider<ChunkReaderContext> {
-  private static final int ROW_OFFSET_SIZE = VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+  private static final int ROW_OFFSET_SIZE = VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
   private final int _maxChunkSize;
 

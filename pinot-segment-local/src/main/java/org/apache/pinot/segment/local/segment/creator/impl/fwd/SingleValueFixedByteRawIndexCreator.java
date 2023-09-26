@@ -20,22 +20,22 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
-import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
- * Forward index creator for raw (non-dictionary-encoded) single-value column of fixed length data type (INT, LONG,
+ * Raw (non-dictionary-encoded) forward index creator for single-value column of fixed length data type (INT, LONG,
  * FLOAT, DOUBLE).
  */
 public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   private static final int NUM_DOCS_PER_CHUNK = 1000; // TODO: Auto-derive this based on metadata.
 
-  private final FixedByteChunkSVForwardIndexWriter _indexWriter;
+  private final FixedByteChunkForwardIndexWriter _indexWriter;
   private final DataType _valueType;
 
   /**
@@ -51,7 +51,7 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION);
   }
 
   /**
@@ -70,7 +70,7 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     _indexWriter =
-        new FixedByteChunkSVForwardIndexWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, valueType.size(),
+        new FixedByteChunkForwardIndexWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, valueType.size(),
             writerVersion);
     _valueType = valueType;
   }

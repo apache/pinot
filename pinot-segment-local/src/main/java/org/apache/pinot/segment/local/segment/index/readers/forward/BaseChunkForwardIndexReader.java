@@ -28,7 +28,6 @@ import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -59,7 +58,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   protected final int _dataHeaderStart;
   protected final int _rawDataStart;
 
-  public BaseChunkForwardIndexReader(PinotDataBuffer dataBuffer, DataType storedType, boolean isSingleValue) {
+  protected BaseChunkForwardIndexReader(PinotDataBuffer dataBuffer, DataType storedType, boolean isSingleValue) {
     _dataBuffer = dataBuffer;
     _storedType = storedType;
 
@@ -96,7 +95,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
       _chunkDecompressor = ChunkCompressorFactory.getDecompressor(_compressionType);
     }
 
-    _headerEntryChunkOffsetSize = BaseChunkSVForwardIndexWriter.getHeaderEntryChunkOffsetSize(version);
+    _headerEntryChunkOffsetSize = version <= 2 ? Integer.BYTES : Long.BYTES;
 
     // Slice out the header from the data buffer.
     int dataHeaderLength = _numChunks * _headerEntryChunkOffsetSize;

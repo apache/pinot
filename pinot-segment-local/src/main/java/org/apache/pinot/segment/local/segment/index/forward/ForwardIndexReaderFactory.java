@@ -19,7 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
@@ -37,11 +37,10 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<ForwardIndexConfig, ForwardIndexReader> {
-
   public static ForwardIndexReaderFactory _instance = new ForwardIndexReaderFactory();
 
   public static void setInstance(ForwardIndexReaderFactory factory) {
@@ -73,22 +72,26 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
             metadata.getBitsPerElement());
       }
     } else {
-      FieldSpec.DataType storedType = metadata.getDataType().getStoredType();
-      if (metadata.isSingleValue()) {
-        int version = dataBuffer.getInt(0);
-        if (storedType.isFixedWidth()) {
-          return version >= FixedBytePower2ChunkSVForwardIndexReader.VERSION
-              ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
-              : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
-        }
-        if (version >= VarByteChunkSVForwardIndexWriterV4.VERSION) {
-          return new VarByteChunkSVForwardIndexReaderV4(dataBuffer, storedType);
-        }
-        return new VarByteChunkSVForwardIndexReader(dataBuffer, storedType);
+      return createRawIndexReader(dataBuffer, metadata.getDataType().getStoredType(), metadata.isSingleValue());
+    }
+  }
+
+  public static ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
+      boolean isSingleValue) {
+    int version = dataBuffer.getInt(0);
+    if (isSingleValue) {
+      if (storedType.isFixedWidth()) {
+        return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION
+            ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
+            : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
       } else {
-        return storedType.isFixedWidth() ? new FixedByteChunkMVForwardIndexReader(dataBuffer, storedType)
-            : new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
+        return version == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkSVForwardIndexReaderV4(dataBuffer,
+            storedType) : new VarByteChunkSVForwardIndexReader(dataBuffer, storedType);
       }
+    } else {
+      // TODO: Support V4 MV reader
+      return storedType.isFixedWidth() ? new FixedByteChunkMVForwardIndexReader(dataBuffer, storedType)
+          : new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
     }
   }
 }

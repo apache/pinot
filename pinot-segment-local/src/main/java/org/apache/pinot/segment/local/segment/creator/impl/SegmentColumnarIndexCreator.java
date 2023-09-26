@@ -78,6 +78,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.*;
 
+
 /**
  * Segment creator which writes data in a columnar form.
  */
@@ -149,6 +150,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       IndexType<ForwardIndexConfig, ?, ForwardIndexCreator> forwardIdx = StandardIndexes.forward();
       boolean forwardIndexDisabled = !originalConfig.getConfig(forwardIdx).isEnabled();
 
+      //@formatter:off
       IndexCreationContext.Common context = IndexCreationContext.builder()
           .withIndexDir(_indexDir)
           .withDictionary(dictEnabledColumn)
@@ -161,6 +163,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withForwardIndexDisabled(forwardIndexDisabled)
           .withTextCommitOnClose(true)
           .build();
+      //@formatter:on
 
       FieldIndexConfigs config = adaptConfig(columnName, originalConfig, columnIndexCreationInfo, segmentCreationSpec);
 
@@ -175,8 +178,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           LOGGER.info("Creating dictionary index in column {}.{} even when it is disabled in config",
               segmentCreationSpec.getTableName(), columnName);
         }
-        SegmentDictionaryCreator creator = new DictionaryIndexPlugin().getIndexType()
-            .createIndexCreator(context, dictConfig);
+        SegmentDictionaryCreator creator =
+            new DictionaryIndexPlugin().getIndexType().createIndexCreator(context, dictConfig);
 
         try {
           creator.build(context.getSortedUniqueElementsArray());
@@ -229,9 +232,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     // Sorted columns treat the 'forwardIndexDisabled' flag as a no-op
     ForwardIndexConfig fwdConfig = config.getConfig(StandardIndexes.forward());
     if (!fwdConfig.isEnabled() && columnIndexCreationInfo.isSorted()) {
-      builder.add(StandardIndexes.forward(), new ForwardIndexConfig.Builder(fwdConfig)
-          .withLegacyProperties(segmentCreationSpec.getColumnProperties(), columnName)
-          .build());
+      builder.add(StandardIndexes.forward(),
+          new ForwardIndexConfig.Builder(fwdConfig).withLegacyProperties(segmentCreationSpec.getColumnProperties(),
+              columnName).build());
     }
     // Initialize inverted index creator; skip creating inverted index if sorted
     if (columnIndexCreationInfo.isSorted()) {
@@ -281,8 +284,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
     if (DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),
-        config.isOptimizeDictionaryForMetrics(), config.getNoDictionarySizeRatioThreshold(), spec,
-        fieldIndexConfigs, info.getDistinctValueCount(), info.getTotalNumberOfEntries())) {
+        config.isOptimizeDictionaryForMetrics(), config.getNoDictionarySizeRatioThreshold(), spec, fieldIndexConfigs,
+        info.getDistinctValueCount(), info.getTotalNumberOfEntries())) {
       // Ignore overrides and pick from config
       createDictionary = info.isCreateDictionary();
     }
@@ -552,7 +555,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Object min = columnIndexCreationInfo.getMin();
       Object max = columnIndexCreationInfo.getMax();
       if (min != null && max != null) {
-        addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString(), fieldSpec.getDataType());
+        addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString(), dataType.getStoredType());
       }
     }
 
@@ -566,19 +569,18 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
-      String maxValue, DataType dataType) {
-    properties.setProperty(getKeyFor(column, MIN_VALUE), getValidPropertyValue(minValue, false, dataType));
-    properties.setProperty(getKeyFor(column, MAX_VALUE), getValidPropertyValue(maxValue, true, dataType));
+      String maxValue, DataType storedType) {
+    properties.setProperty(getKeyFor(column, MIN_VALUE), getValidPropertyValue(minValue, false, storedType));
+    properties.setProperty(getKeyFor(column, MAX_VALUE), getValidPropertyValue(maxValue, true, storedType));
   }
 
   /**
    * Helper method to get the valid value for setting min/max.
    */
-  private static String getValidPropertyValue(String value, boolean isMax, DataType dataType) {
-    String valueWithinLengthLimit = getValueWithinLengthLimit(value, isMax, dataType);
-    return dataType.getStoredType() == DataType.STRING
-        ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(valueWithinLengthLimit)
-        : valueWithinLengthLimit;
+  private static String getValidPropertyValue(String value, boolean isMax, DataType storedType) {
+    String valueWithinLengthLimit = getValueWithinLengthLimit(value, isMax, storedType);
+    return storedType == DataType.STRING ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(
+        valueWithinLengthLimit) : valueWithinLengthLimit;
   }
 
   /**
@@ -586,12 +588,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * returns a truncated version of the string with maintaining min or max value.
    */
   @VisibleForTesting
-  static String getValueWithinLengthLimit(String value, boolean isMax, DataType dataType) {
+  static String getValueWithinLengthLimit(String value, boolean isMax, DataType storedType) {
     int length = value.length();
     if (length <= METADATA_PROPERTY_LENGTH_LIMIT) {
       return value;
     }
-    switch (dataType.getStoredType()) {
+    switch (storedType) {
       case STRING:
         if (isMax) {
           int trimIndexValue = METADATA_PROPERTY_LENGTH_LIMIT - 1;
@@ -627,7 +629,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           return BytesUtils.toHexString(Arrays.copyOf(BytesUtils.toBytes(value), (METADATA_PROPERTY_LENGTH_LIMIT / 2)));
         }
       default:
-        throw new IllegalStateException("Unsupported data type for property value length reduction: " + dataType);
+        throw new IllegalStateException("Unsupported stored type for property value length reduction: " + storedType);
     }
   }
 

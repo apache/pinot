@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -27,7 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -40,12 +41,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
+ * (BIG_DECIMAL, STRING, BYTES).
+ * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriterV4}
+ */
 public class VarByteChunkSVForwardIndexReaderV4
     implements ForwardIndexReader<VarByteChunkSVForwardIndexReaderV4.ReaderContext>,
                ForwardIndexReader.ValueRangeProvider<VarByteChunkSVForwardIndexReaderV4.ReaderContext> {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(VarByteChunkSVForwardIndexReaderV4.class);
-
   private static final int METADATA_ENTRY_SIZE = 8;
 
   private final FieldSpec.DataType _storedType;
@@ -59,10 +63,8 @@ public class VarByteChunkSVForwardIndexReaderV4
   private final long _chunksStartOffset;
 
   public VarByteChunkSVForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType) {
-    if (dataBuffer.getInt(0) < VarByteChunkSVForwardIndexWriterV4.VERSION) {
-      throw new IllegalStateException(
-          "version " + dataBuffer.getInt(0) + " < " + VarByteChunkSVForwardIndexWriterV4.VERSION);
-    }
+    int version = dataBuffer.getInt(0);
+    Preconditions.checkState(version == VarByteChunkForwardIndexWriterV4.VERSION, "Illegal index version: %s", version);
     _storedType = storedType;
     _targetDecompressedChunkSize = dataBuffer.getInt(4);
     _chunkCompressionType = ChunkCompressionType.valueOf(dataBuffer.getInt(8));
@@ -87,6 +89,13 @@ public class VarByteChunkSVForwardIndexReaderV4
   @Override
   public FieldSpec.DataType getStoredType() {
     return _storedType;
+  }
+
+  @Override
+  public ChunkCompressionType getCompressionType() {
+    // NOTE: Treat LZ4_LENGTH_PREFIXED as LZ4 because VarByteChunkForwardIndexWriterV4 implicitly override it
+    return _chunkCompressionType == ChunkCompressionType.LZ4_LENGTH_PREFIXED ? ChunkCompressionType.LZ4
+        : _chunkCompressionType;
   }
 
   @Override
@@ -291,8 +300,7 @@ public class VarByteChunkSVForwardIndexReaderV4
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() {
     }
   }
 
@@ -371,8 +379,7 @@ public class VarByteChunkSVForwardIndexReaderV4
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() {
       CleanerUtil.cleanQuietly(_decompressedBuffer);
     }
   }

@@ -331,6 +331,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
       } else if (existingNoDictColumns.contains(column) && !newIsDict) {
         // Both existing and new column is RAW forward index encoded. Check if compression needs to be changed.
+        // TODO: Also check if raw index version needs to be changed
         if (shouldChangeCompressionType(column, segmentReader)) {
           columnOperationsMap.put(column, Collections.singletonList(Operation.CHANGE_RAW_INDEX_COMPRESSION_TYPE));
         }

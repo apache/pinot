@@ -23,23 +23,20 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 /**
- * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of
- * variable
- * length data type
+ * Chunk-based multi-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
  * (STRING, BYTES).
- * <p>For data layout, please refer to the documentation for {@link VarByteChunkSVForwardIndexWriter}
+ * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriter}
  */
 public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader
     implements ForwardIndexReader.ValueRangeProvider<ChunkReaderContext> {
-
-  private static final int ROW_OFFSET_SIZE = VarByteChunkSVForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
+  private static final int ROW_OFFSET_SIZE = VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
   private final int _maxChunkSize;
 
@@ -104,8 +101,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
   }
 
   @Override
-  public int getBytesMV(final int docId, final byte[][] valueBuffer,
-      final ChunkReaderContext context) {
+  public int getBytesMV(final int docId, final byte[][] valueBuffer, final ChunkReaderContext context) {
     byte[] compressedBytes;
     if (_isCompressed) {
       compressedBytes = getBytesCompressed(docId, context);
@@ -277,8 +273,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
         // Last row in the last chunk
         return _dataBuffer.size();
       } else {
-        int valueEndOffsetInChunk = _dataBuffer
-            .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
+        int valueEndOffsetInChunk = _dataBuffer.getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
         if (valueEndOffsetInChunk == 0) {
           // Last row in the last chunk (chunk is incomplete, which stores 0 as the offset for the absent rows)
           return _dataBuffer.size();
@@ -291,8 +286,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
         // Last row in the chunk
         return getChunkPosition(chunkId + 1);
       } else {
-        return chunkStartOffset + _dataBuffer
-            .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
+        return chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
       }
     }
   }

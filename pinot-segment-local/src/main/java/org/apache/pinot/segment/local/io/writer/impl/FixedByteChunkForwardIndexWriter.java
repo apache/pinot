@@ -26,34 +26,11 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
 
 /**
- * Class to write out fixed length bytes into a single column.
- * Client responsible to ensure that they call the correct set method that
- * matches the sizeOfEntry. Avoiding checks here, as they can be expensive
- * when called for each row.
- *
- * The layout of the file is as follows:
- * <p> Header Section: </p>
- * <ul>
- *   <li> Integer: File format version. </li>
- *   <li> Integer: Total number of chunks. </li>
- *   <li> Integer: Number of docs per chunk. </li>
- *   <li> Integer: Length of entry (in bytes). </li>
- *   <li> Integer: Total number of docs (version 2 onwards). </li>
- *   <li> Integer: Compression type enum value (version 2 onwards). </li>
- *   <li> Integer: Start offset of data header (version 2 onwards). </li>
- *   <li> Integer array: Integer offsets for all chunks in the data (upto version 2),
- *   Long array: Long offsets for all chunks in the data (version 3 onwards) </li>
- * </ul>
- *
- * <p> Individual Chunks: </p>
- * <ul>
- *   <li> Data bytes. </li>
- * </ul>
- *
- * Only sequential writes are supported.
+ * Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains fixed number of docs, and
+ * each entry has fixed number of bytes.
  */
 @NotThreadSafe
-public class FixedByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexWriter {
+public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter {
   private int _chunkDataOffset;
 
   /**
@@ -68,12 +45,11 @@ public class FixedByteChunkSVForwardIndexWriter extends BaseChunkSVForwardIndexW
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
    * @throws IOException Throws {@link IOException} if there are any errors mapping the underlying ByteBuffer.
    */
-  public FixedByteChunkSVForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
+  public FixedByteChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, int sizeOfEntry, int writerVersion)
       throws IOException {
     super(file, compressionType, totalDocs, normalizeDocsPerChunk(writerVersion, numDocsPerChunk),
-        (sizeOfEntry * normalizeDocsPerChunk(writerVersion, numDocsPerChunk)), sizeOfEntry,
-        writerVersion, true);
+        (sizeOfEntry * normalizeDocsPerChunk(writerVersion, numDocsPerChunk)), sizeOfEntry, writerVersion, true);
     _chunkDataOffset = 0;
   }
 
