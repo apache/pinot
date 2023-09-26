@@ -181,7 +181,8 @@ public enum TransformFunctionType {
 
   // special functions
   INIDSET("inIdSet"),
-  LOOKUP("lookUp"),
+  LOOKUP("lookUp", ReturnTypes.explicit(SqlTypeName.ANY), OperandTypes.family(
+      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.ANY))),
   GROOVY("groovy"),
 
   // CLP functions
