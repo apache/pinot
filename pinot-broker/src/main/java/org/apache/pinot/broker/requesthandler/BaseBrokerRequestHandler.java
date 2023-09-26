@@ -90,6 +90,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
@@ -138,6 +139,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final long _brokerTimeoutMs;
   protected final int _queryResponseLimit;
   protected final QueryLogger _queryLogger;
+  protected final BrokerQueryEventListener _brokerQueryEventListener;
 
   private final boolean _disableGroovy;
   private final boolean _useApproximateFunction;
@@ -148,7 +150,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics) {
+      BrokerMetrics brokerMetrics, BrokerQueryEventListener brokerQueryEventListener) {
     _brokerId = brokerId;
     _brokerIdGenerator = new BrokerRequestIdGenerator(brokerId);
     _config = config;
@@ -172,6 +174,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     boolean enableQueryCancellation =
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
     _queriesById = enableQueryCancellation ? new ConcurrentHashMap<>() : null;
+    _brokerQueryEventListener = brokerQueryEventListener;
     LOGGER.info(
         "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps, "
             + "enabling query cancellation: {}", _brokerId, _brokerTimeoutMs, _queryResponseLimit,
@@ -222,8 +225,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         // Unexpected server responses are collected and returned as exception.
         if (status != 200 && status != 404) {
           String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
-          throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,
-              responseString, uri));
+          throw new Exception(
+              String.format("Unexpected status=%d and response='%s' from uri='%s'", status, responseString, uri));
         }
         if (serverResponses != null) {
           serverResponses.put(uri.getHost() + ":" + uri.getPort(), status);
@@ -251,19 +254,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       throws Exception {
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
+    long requestId = _brokerIdGenerator.get();
+    requestContext.setRequestId(requestId);
+
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.
     boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity);
     if (!hasAccess) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      _brokerQueryEventListener.onQueryCompletion(requestContext);
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
-    long requestId = _brokerIdGenerator.get();
-    requestContext.setRequestId(requestId);
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null) {
+      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+      _brokerQueryEventListener.onQueryCompletion(requestContext);
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
     String query = sql.asText();
@@ -282,6 +289,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     brokerResponse.setRequestId(String.valueOf(requestId));
     brokerResponse.setBrokerId(_brokerId);
     brokerResponse.setBrokerReduceTimeMs(requestContext.getReduceTimeMillis());
+    _brokerQueryEventListener.onQueryCompletion(requestContext);
     return brokerResponse;
   }
 
