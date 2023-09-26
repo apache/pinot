@@ -53,7 +53,15 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     }
   }
 
+  /**
+   * For fields that are not set, we want to populate a null, instead of proto default.
+   * @param fieldDescriptor
+   * @param message
+   */
   private Object getFieldValue(Descriptors.FieldDescriptor fieldDescriptor, Message message) {
+    // Note w.r.t proto3 - If a field is not declared with optional keyword, there's no way to distinguish
+    // if its explicitly set to a proto default or not been set at all i.e hasField() returns false
+    // and we would use null.
     if (fieldDescriptor.isRepeated() || !fieldDescriptor.isOptional() || message.hasField(fieldDescriptor)) {
       return message.getField(fieldDescriptor);
     } else {
