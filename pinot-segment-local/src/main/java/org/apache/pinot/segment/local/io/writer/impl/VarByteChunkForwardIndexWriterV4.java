@@ -139,6 +139,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     putBytes(byteBuffer.array());
   }
 
+  @Override
   public void putStrings(String[] values) {
     int size = Integer.SIZE;
     for (String value : values) {
