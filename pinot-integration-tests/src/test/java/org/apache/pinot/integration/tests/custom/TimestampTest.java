@@ -370,6 +370,30 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).textValue(), "2019-01-01 12:00:00");
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testLastWithTimeQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT LASTWITHTIME(longBase, longBase, 'long'), LASTWITHTIME(longBase, tsBase, 'long') FROM %s\n",
+        getTableName());
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).longValue(), 1632614400000L);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).longValue(), 1632614400000L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFirstWithTimeQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = String.format(
+        "SELECT FIRSTWITHTIME(longBase, longBase, 'long'), FIRSTWITHTIME(longBase, tsBase, 'long') FROM %s\n",
+        getTableName());
+    JsonNode jsonNode = postQuery(query);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).longValue(), 1546300800000L);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).longValue(), 1546300800000L);
+  }
+
   @Override
   public String getTableName() {
     return DEFAULT_TABLE_NAME;
