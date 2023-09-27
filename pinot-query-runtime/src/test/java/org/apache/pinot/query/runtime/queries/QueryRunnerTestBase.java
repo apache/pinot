@@ -36,10 +36,15 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
@@ -51,6 +56,7 @@ import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -112,33 +118,51 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
     }
 
+    // Submission Stub logic are mimic {@link QueryServer}
     List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+    List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
     for (int stageId = 0; stageId < stagePlans.size(); stageId++) {
       if (stageId != 0) {
-        processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
+        submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap));
       }
       if (executionStatsAggregatorMap != null) {
         executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
+    try {
+      CompletableFuture.allOf(submissionStubs.toArray(new CompletableFuture[]{})).get(timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      // wrap and throw the exception here is for assert purpose on dispatch-time error
+      throw new RuntimeException("Error occurred during stage submission: " + QueryException.getTruncatedStackTrace(e));
+    } finally {
+      // Cancel all ongoing submission
+      for (CompletableFuture<?> future : submissionStubs) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
+    }
+    // exception will be propagated through for assert purpose on runtime error
     ResultTable resultTable =
         QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
             executionStatsAggregatorMap, _mailboxService);
     return resultTable.getRows();
   }
 
-  protected void processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan, int stageId,
-      Map<String, String> requestMetadataMap) {
+  protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,
+      int stageId, Map<String, String> requestMetadataMap) {
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
         dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap();
+    List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverInstanceToWorkerIdMap.entrySet()) {
       QueryServerInstance server = entry.getKey();
       for (int workerId : entry.getValue()) {
         DistributedStagePlan distributedStagePlan =
             constructDistributedStagePlan(dispatchableSubPlan, stageId, new VirtualServerAddress(server, workerId));
-        _servers.get(server).processQuery(distributedStagePlan, requestMetadataMap);
+        submissionStubs.add(_servers.get(server).processQuery(distributedStagePlan, requestMetadataMap));
       }
     }
+    return submissionStubs;
   }
 
   protected static DistributedStagePlan constructDistributedStagePlan(DispatchableSubPlan dispatchableSubPlan,

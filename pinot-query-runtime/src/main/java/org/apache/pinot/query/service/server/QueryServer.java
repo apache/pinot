@@ -25,8 +25,10 @@ import io.grpc.stub.StreamObserver;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
@@ -35,7 +37,6 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
-import org.apache.pinot.query.service.SubmissionService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -112,21 +113,31 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
     }
-    // 2. Submit distributed stage plans
-    SubmissionService submissionService = new SubmissionService(_querySubmissionExecutorService);
-    distributedStagePlans.forEach(distributedStagePlan -> submissionService.submit(() -> {
-      _queryRunner.processQuery(distributedStagePlan, requestMetadata);
-    }));
-    // 3. await response successful or any failure which cancels all other tasks.
+    // 2. Submit distributed stage plans, await response successful or any failure which cancels all other tasks.
+    int numSubmission = distributedStagePlans.size();
+    CompletableFuture<?>[] submissionStubs = new CompletableFuture[numSubmission];
+    for (int i = 0; i < numSubmission; i++) {
+      DistributedStagePlan distributedStagePlan = distributedStagePlans.get(i);
+      submissionStubs[i] =
+          CompletableFuture.runAsync(() -> _queryRunner.processQuery(distributedStagePlan, requestMetadata),
+              _querySubmissionExecutorService);
+    }
     try {
-      submissionService.awaitFinish(deadlineMs);
-    } catch (Throwable t) {
-      LOGGER.error("error occurred during stage submission for {}:\n{}", requestId, t);
+      CompletableFuture.allOf(submissionStubs).get(deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      LOGGER.error("error occurred during stage submission for {}:\n{}", requestId, e);
       responseObserver.onNext(Worker.QueryResponse.newBuilder()
           .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
-              QueryException.getTruncatedStackTrace(t)).build());
+              QueryException.getTruncatedStackTrace(e)).build());
       responseObserver.onCompleted();
       return;
+    } finally {
+      // Cancel all ongoing submission
+      for (CompletableFuture<?> future : submissionStubs) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
     }
     responseObserver.onNext(
         Worker.QueryResponse.newBuilder().putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK, "")

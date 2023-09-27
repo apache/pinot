@@ -20,6 +20,7 @@ package org.apache.pinot.query;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -108,16 +109,9 @@ public class QueryServerEnclosure {
     _queryRunner.shutDown();
   }
 
-  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadataMap) {
-    _queryRunner.getExecutorService().submit(() -> {
-      try {
-        _queryRunner.processQuery(distributedStagePlan, requestMetadataMap);
-      } catch (Exception e) {
-        // TODO: Find a way to propagate the exception and fail the test
-        System.err.println("Caught exception while executing query");
-        e.printStackTrace(System.err);
-        throw new RuntimeException("Error executing query!", e);
-      }
-    });
+  public CompletableFuture<Void> processQuery(DistributedStagePlan distributedStagePlan,
+      Map<String, String> requestMetadataMap) {
+    return CompletableFuture.runAsync(() -> _queryRunner.processQuery(distributedStagePlan, requestMetadataMap),
+        _queryRunner.getExecutorService());
   }
 }
