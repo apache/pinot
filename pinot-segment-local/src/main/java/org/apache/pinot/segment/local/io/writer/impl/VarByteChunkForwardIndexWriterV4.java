@@ -147,7 +147,8 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   @Override
   public void putStringMV(String[] values) {
     // num values + length of each value
-    int size = Integer.BYTES + Integer.BYTES * values.length;
+    int headerSize = Integer.BYTES + Integer.BYTES * values.length;
+    int size = headerSize;
     for (String value : values) {
       size += value.getBytes(UTF_8).length;
     }
@@ -156,7 +157,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     byte[] serializedBytes = new byte[size];
     ByteBuffer byteBuffer = ByteBuffer.wrap(serializedBytes);
     byteBuffer.putInt(values.length);
-    byteBuffer.position(size);
+    byteBuffer.position(headerSize);
     for (int i = 0; i < values.length; i++) {
       byte[] utf8 = values[i].getBytes(UTF_8);
       byteBuffer.putInt((i + 1) * Integer.BYTES, utf8.length);
@@ -169,7 +170,8 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   @Override
   public void putBytesMV(byte[][] values) {
     // num values + length of each value
-    int size = Integer.BYTES + Integer.BYTES * values.length;
+    int headerSize = Integer.BYTES + Integer.BYTES * values.length;
+    int size = headerSize;
     for (byte[] value : values) {
       size += value.length;
     }
@@ -178,7 +180,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     byte[] serializedBytes = new byte[size];
     ByteBuffer byteBuffer = ByteBuffer.wrap(serializedBytes);
     byteBuffer.putInt(values.length);
-    byteBuffer.position(size);
+    byteBuffer.position(headerSize);
     for (int i = 0; i < values.length; i++) {
       byteBuffer.putInt((i + 1) * Integer.BYTES, values[i].length);
       byteBuffer.put(values[i]);

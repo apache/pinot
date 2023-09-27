@@ -170,7 +170,7 @@ public class MultiValueVarByteRawIndexCreatorTest {
       inputs.add(values);
     }
     try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
-        column, numDocs, DataType.BYTES, maxTotalLength, maxElements, writerVersion)) {
+        column, numDocs, DataType.BYTES, writerVersion, maxTotalLength, maxElements)) {
       for (byte[][] input : inputs) {
         creator.putBytesMV(input);
       }
