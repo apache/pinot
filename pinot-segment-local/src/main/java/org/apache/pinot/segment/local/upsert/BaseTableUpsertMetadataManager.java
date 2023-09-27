@@ -161,13 +161,14 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       throws Exception {
     LOGGER.info("Preload segments from table: {} for fast upsert metadata recovery", _tableNameWithType);
     onPreloadStart();
-    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, _tableNameWithType);
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
     String instanceId = getInstanceId();
     IndexLoadingConfig indexLoadingConfig = createIndexLoadingConfig();
+    Map<String, Map<String, String>> segmentAssignment = getSegmentAssignment();
     List<Future<?>> futures = new ArrayList<>();
-    for (String segmentName : idealState.getPartitionSet()) {
-      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> instanceStateMap = entry.getValue();
       String state = instanceStateMap.get(instanceId);
       if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)) {
         LOGGER.info("Skip segment: {} as its ideal state: {} is not ONLINE", segmentName, state);
@@ -208,16 +209,24 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected void onPreloadFinish() {
   }
 
-  private String getInstanceId() {
+  @VisibleForTesting
+  String getInstanceId() {
     InstanceDataManagerConfig instanceDataManagerConfig =
         _tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig();
     return instanceDataManagerConfig.getInstanceId();
   }
 
   @VisibleForTesting
-  protected IndexLoadingConfig createIndexLoadingConfig() {
+  IndexLoadingConfig createIndexLoadingConfig() {
     return new IndexLoadingConfig(_tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig(),
         _tableConfig, _schema);
+  }
+
+  @VisibleForTesting
+  Map<String, Map<String, String>> getSegmentAssignment() {
+    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, _tableNameWithType);
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", _tableNameWithType);
+    return idealState.getRecord().getMapFields();
   }
 
   private void preloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
@@ -237,7 +246,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   }
 
   @VisibleForTesting
-  protected void preloadSegmentWithSnapshot(String segmentName, IndexLoadingConfig indexLoadingConfig,
+  void preloadSegmentWithSnapshot(String segmentName, IndexLoadingConfig indexLoadingConfig,
       SegmentZKMetadata zkMetadata) {
     // This method might modify the file on disk. Use segment lock to prevent race condition
     Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
