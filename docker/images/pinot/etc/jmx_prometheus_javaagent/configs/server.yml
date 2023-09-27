@@ -78,13 +78,13 @@ rules:
   name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).(invalidRealtimeRowsDropped|incompleteRealtimeRowsConsumed|rowsWithErrors|realtimeRowsConsumed)\"><>(\\w+)"
-  name: "pinot_server_$4_$2"
+  name: "pinot_server_$5_$6"
   cache: true
   labels:
     table: "$1"
     tableType: "$2"
     topic: "$3"
-    partition: "$5"
+    partition: "$4"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.([^\\.]*?)\"><>(\\w+)"
   name: "pinot_server_realtime_offheapMemoryUsed_$2"
   cache: true
