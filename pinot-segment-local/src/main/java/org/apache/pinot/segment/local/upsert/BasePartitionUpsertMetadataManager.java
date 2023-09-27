@@ -86,6 +86,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // If upsertTTL enabled, we will keep track of largestSeenComparisonValue to compute expired segments.
   protected volatile double _largestSeenComparisonValue;
 
+  // The following variables are always accessed within synchronized block
   private boolean _stopped;
   // Initialize with 1 pending operation to indicate the metadata manager can take more operations
   private int _numPendingOperations = 1;
