@@ -85,21 +85,30 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeConsumptionExceptions\"><>(\\w+)"
   name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?).invalidRealtimeRowsDropped\"><>(\\w+)"
-  name: "pinot_server_realtime_invalidRealtimeRowsDropped_$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).invalidRealtimeRowsDropped\"><>(\\w+)"
+  name: "pinot_server_invalidRealtimeRowsDropped_$2"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?).incompleteRealtimeRowsConsumed\"><>(\\w+)"
-  name: "pinot_server_realtime_incompleteRealtimeRowsConsumed_$2"
+    tableType: "$2"
+    topic: "$3"
+    partition: "$4"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).incompleteRealtimeRowsConsumed\"><>(\\w+)"
+  name: "pinot_server_incompleteRealtimeRowsConsumed_$5"
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?).rowsWithErrors\"><>(\\w+)"
-  name: "pinot_server_realtime_rowsWithErrors_$2"
+    tableType: "$2"
+    topic: "$3"
+    partition: "$4"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).rowsWithErrors\"><>(\\w+)"
+  name: "pinot_server_rowsWithErrors_$2"
   cache: true
   labels:
     table: "$1"
+    tableType: "$2"
+    topic: "$3"
+    partition: "$4"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.([^\\.]*?)\"><>(\\w+)"
   name: "pinot_server_realtime_offheapMemoryUsed_$2"
   cache: true
