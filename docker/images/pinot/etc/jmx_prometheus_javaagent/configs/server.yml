@@ -77,7 +77,7 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeConsumptionExceptions\"><>(\\w+)"
   name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).(\\w+)\"><>(\\w+)"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\.]*?)_(OFFLINE|REALTIME)\-(.+)\-(\w+).(invalidRealtimeRowsDropped|incompleteRealtimeRowsConsumed|rowsWithErrors|realtimeRowsConsumed)\"><>(\\w+)"
   name: "pinot_server_$4_$2"
   cache: true
   labels:
