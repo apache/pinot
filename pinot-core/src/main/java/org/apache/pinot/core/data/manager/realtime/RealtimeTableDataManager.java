@@ -406,7 +406,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         return;
       } else {
         // For LLC and uploaded segments, delete the local copy and download a new copy
-        _logger.error("Failed to load LLC segment: {}, downloading a new copy", segmentName);
+        _logger.info("Unable to load local LLC segment: {}, downloading a new copy", segmentName);
         FileUtils.deleteQuietly(segmentDir);
       }
       // Local segment doesn't exist or cannot load, download a new copy
