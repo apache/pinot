@@ -124,42 +124,6 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   }
 
   @Override
-  public void putByteArrays(byte[][] values) {
-    // num values + length of each value
-    int size = Integer.BYTES + Integer.BYTES * values.length;
-    for (byte[] value : values) {
-      size += value.length;
-    }
-    byte[] serializedBytes = new byte[size];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(serializedBytes);
-    byteBuffer.putInt(values.length);
-
-    for (byte[] value : values) {
-      byteBuffer.putInt(value.length);
-      byteBuffer.put(value);
-    }
-    putBytes(byteBuffer.array());
-  }
-
-  @Override
-  public void putStrings(String[] values) {
-    // num values + length of each value
-    int size = Integer.BYTES + Integer.BYTES * values.length;
-    for (String value : values) {
-      size += value.getBytes(UTF_8).length;
-    }
-    byte[] serializedBytes = new byte[size];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(serializedBytes);
-    byteBuffer.putInt(values.length);
-
-    for (String value : values) {
-      byte[] utf8 = value.getBytes(UTF_8);
-      byteBuffer.putInt(utf8.length).put(utf8);
-    }
-    putBytes(byteBuffer.array());
-  }
-
-  @Override
   public void putString(String string) {
     putBytes(string.getBytes(StandardCharsets.UTF_8));
   }
@@ -178,6 +142,49 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     _chunkBuffer.putInt(bytes.length);
     _chunkBuffer.put(bytes);
     _nextDocId++;
+  }
+
+  @Override
+  public void putStringMV(String[] values) {
+    // num values + length of each value
+    int size = Integer.BYTES + Integer.BYTES * values.length;
+    for (String value : values) {
+      size += value.getBytes(UTF_8).length;
+    }
+
+    // Format : [numValues][length1][length2]...[lengthN][value1][value2]...[valueN]
+    byte[] serializedBytes = new byte[size];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(serializedBytes);
+    byteBuffer.putInt(values.length);
+    byteBuffer.position(size);
+    for (int i = 0; i < values.length; i++) {
+      byte[] utf8 = values[i].getBytes(UTF_8);
+      byteBuffer.putInt((i + 1) * Integer.BYTES, utf8.length);
+      byteBuffer.put(utf8);
+    }
+
+    putBytes(byteBuffer.array());
+  }
+
+  @Override
+  public void putBytesMV(byte[][] values) {
+    // num values + length of each value
+    int size = Integer.BYTES + Integer.BYTES * values.length;
+    for (byte[] value : values) {
+      size += value.length;
+    }
+
+    // Format : [numValues][length1][length2]...[lengthN][bytes1][bytes2]...[bytesN]
+    byte[] serializedBytes = new byte[size];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(serializedBytes);
+    byteBuffer.putInt(values.length);
+    byteBuffer.position(size);
+    for (int i = 0; i < values.length; i++) {
+      byteBuffer.putInt((i + 1) * Integer.BYTES, values[i].length);
+      byteBuffer.put(values[i]);
+    }
+
+    putBytes(byteBuffer.array());
   }
 
   private void writeHugeChunk(byte[] bytes) {

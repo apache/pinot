@@ -104,12 +104,12 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
 
   @Override
   public void putStringMV(final String[] values) {
-    _indexWriter.putStrings(values);
+    _indexWriter.putStringMV(values);
   }
 
   @Override
   public void putBytesMV(final byte[][] values) {
-    _indexWriter.putByteArrays(values);
+    _indexWriter.putBytesMV(values);
   }
 
   @Override

@@ -31,7 +31,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
-import org.apache.pinot.segment.local.segment.index.readers.forward.BaseVarByteChunkForwardIndexReaderV4;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -113,8 +113,8 @@ public class VarByteChunkV4Test {
       }
     }
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(_file)) {
-      try (BaseVarByteChunkForwardIndexReaderV4 reader = new BaseVarByteChunkForwardIndexReaderV4(buffer, dataType,
-          true); BaseVarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      try (VarByteChunkForwardIndexReaderV4 reader = new VarByteChunkForwardIndexReaderV4(buffer, dataType,
+          true); VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
         for (int i = 0; i < values.size(); i++) {
           assertEquals(read.read(reader, context, i), values.get(i));
         }
@@ -161,7 +161,7 @@ public class VarByteChunkV4Test {
 
   @FunctionalInterface
   interface Read<T> {
-    T read(BaseVarByteChunkForwardIndexReaderV4 reader, BaseVarByteChunkForwardIndexReaderV4.ReaderContext context,
+    T read(VarByteChunkForwardIndexReaderV4 reader, VarByteChunkForwardIndexReaderV4.ReaderContext context,
         int docId);
   }
 }

@@ -87,7 +87,7 @@ public class VarByteChunkSVForwardIndexWriterTest {
     try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs,
         numDocsPerChunk, maxEntryLengthInBytes, version)) {
       for (String[] array : arrays) {
-        writer.putStrings(array);
+        writer.putStringMV(array);
       }
     }
     try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(
@@ -122,7 +122,7 @@ public class VarByteChunkSVForwardIndexWriterTest {
     try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs,
         numDocsPerChunk, maxEntryLengthInBytes, version)) {
       for (String[] array : arrays) {
-        writer.putByteArrays(Arrays.stream(array).map(str -> str.getBytes(UTF_8)).toArray(byte[][]::new));
+        writer.putBytesMV(Arrays.stream(array).map(str -> str.getBytes(UTF_8)).toArray(byte[][]::new));
       }
     }
     try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(

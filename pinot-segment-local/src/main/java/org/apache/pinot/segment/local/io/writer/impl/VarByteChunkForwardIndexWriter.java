@@ -100,7 +100,7 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
   // Note: some duplication is tolerated between these overloads for the sake of memory efficiency
 
   @Override
-  public void putStrings(String[] values) {
+  public void putStringMV(String[] values) {
     // the entire String[] will be encoded as a single string, write the header here
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
     _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
@@ -124,7 +124,7 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
   }
 
   @Override
-  public void putByteArrays(byte[][] values) {
+  public void putBytesMV(byte[][] values) {
     // the entire byte[][] will be encoded as a single string, write the header here
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
     _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;

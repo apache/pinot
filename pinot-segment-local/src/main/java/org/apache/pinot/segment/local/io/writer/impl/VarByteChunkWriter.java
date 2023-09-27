@@ -29,7 +29,7 @@ public interface VarByteChunkWriter extends Closeable {
 
   void putBytes(byte[] value);
 
-  void putStrings(String[] values);
+  void putStringMV(String[] values);
 
-  void putByteArrays(byte[][] values);
+  void putBytesMV(byte[][] values);
 }
