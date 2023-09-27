@@ -55,12 +55,9 @@ public class MultiValueFixedByteRawIndexCreatorTest {
 
   @DataProvider(name = "compressionTypes")
   public Object[][] compressionTypes() {
-    return new Object[][]{
-        {ChunkCompressionType.LZ4, 3}, {ChunkCompressionType.LZ4, 4}, {ChunkCompressionType.LZ4_LENGTH_PREFIXED, 3},
-        {ChunkCompressionType.LZ4_LENGTH_PREFIXED, 4}, {ChunkCompressionType.PASS_THROUGH, 3},
-        {ChunkCompressionType.PASS_THROUGH, 4}, {ChunkCompressionType.SNAPPY, 3}, {ChunkCompressionType.SNAPPY, 4},
-        {ChunkCompressionType.ZSTANDARD, 3}, {ChunkCompressionType.ZSTANDARD, 4}
-    };
+    return Arrays.stream(ChunkCompressionType.values())
+        .flatMap(ct -> IntStream.of(2, 4).boxed()
+            .map(writerVersion -> new Object[]{ct, writerVersion})).toArray(Object[][]::new);
   }
 
   @BeforeClass
