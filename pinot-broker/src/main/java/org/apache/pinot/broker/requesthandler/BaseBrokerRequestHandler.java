@@ -366,7 +366,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String tableName = getActualTableName(dataSource.getTableName(), _tableCache);
       dataSource.setTableName(tableName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-      requestContext.setTableName(rawTableName);
+      requestContext.setTableNames(Collections.singletonList(rawTableName));
 
       try {
         boolean isCaseInsensitive = _tableCache.isIgnoreCase();
@@ -1747,6 +1747,19 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setOfflineTotalCpuTimeNs(response.getOfflineTotalCpuTimeNs());
     statistics.setRealtimeTotalCpuTimeNs(response.getRealtimeTotalCpuTimeNs());
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());
+    statistics.setNumConsumingSegmentsQueried(response.getNumConsumingSegmentsQueried());
+    statistics.setNumConsumingSegmentsProcessed(response.getNumConsumingSegmentsProcessed());
+    statistics.setNumConsumingSegmentsMatched(response.getNumConsumingSegmentsMatched());
+    statistics.setMinConsumingFreshnessTimeMs(response.getMinConsumingFreshnessTimeMs());
+    statistics.setNumSegmentsPrunedByBroker(response.getNumSegmentsPrunedByBroker());
+    statistics.setNumSegmentsPrunedByServer(response.getNumSegmentsPrunedByServer());
+    statistics.setNumSegmentsPrunedInvalid(response.getNumSegmentsPrunedInvalid());
+    statistics.setNumSegmentsPrunedByLimit(response.getNumSegmentsPrunedByLimit());
+    statistics.setNumSegmentsPrunedByValue(response.getNumSegmentsPrunedByValue());
+    statistics.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
+    statistics.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
+    statistics.setProcessingExceptions(response.getProcessingExceptions().stream().map(Object::toString).collect(
+        Collectors.toList()));
   }
 
   private String getGlobalQueryId(long requestId) {
