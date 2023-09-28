@@ -36,7 +36,7 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
-    <spark.version>3.2.1</spark.version>
+    <spark.version>3.5.0</spark.version>
     <commons-lang3.version>3.11</commons-lang3.version>
   </properties>
 
