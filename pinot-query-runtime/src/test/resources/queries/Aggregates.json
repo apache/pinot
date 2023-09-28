@@ -729,8 +729,6 @@
         "sql": "SELECT sum(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
       {
-        "ignored": true,
-        "comment": "min empty returns [infinity] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
         "description": "Return empty for min",
         "sql": "SELECT min(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
       },
@@ -739,8 +737,6 @@
         "sql": "SELECT min(int_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
       {
-        "ignored": true,
-        "comment": "max empty returns [-infinity] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
         "description": "Return empty for max",
         "sql": "SELECT max(int_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
       },
@@ -774,8 +770,6 @@
         "sql": "SELECT count(*) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
       {
-        "ignored": true,
-        "comment": "bool_and empty returns [true] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
         "description": "Return empty for bool_and",
         "sql": "SELECT bool_and(bool_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
       },
@@ -784,8 +778,6 @@
         "sql": "SELECT bool_and(bool_col) FROM {tbl} WHERE string_col IN ( SELECT string_col FROM {tbl} WHERE int_col BETWEEN 1 AND 0 GROUP BY string_col )"
       },
       {
-        "ignored": true,
-        "comment": "bool_or empty returns [false] instead of [null] at the moment when leaf aggregation is performed by v1 engine.",
         "description": "Return empty for bool_or",
         "sql": "SELECT bool_or(bool_col) FROM {tbl} WHERE string_col IN ('foo', 'bar')"
       },
