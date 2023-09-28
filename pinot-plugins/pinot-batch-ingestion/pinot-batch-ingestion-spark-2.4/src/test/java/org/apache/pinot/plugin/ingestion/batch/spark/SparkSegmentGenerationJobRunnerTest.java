@@ -75,8 +75,8 @@ public class SparkSegmentGenerationJobRunnerTest {
     FileUtils.touch(new File(outputDir, existingFilename));
 
     // Set up schema file.
-    final String schemaName = "mySchema";
-    File schemaFile = new File(testDir, "schema");
+    final String schemaName = "myTable";
+    File schemaFile = new File(testDir, "myTable.schema");
     Schema schema = new SchemaBuilder()
       .setSchemaName(schemaName)
       .addSingleValueDimension("col1", DataType.STRING)
@@ -85,7 +85,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     // Set up table config file.
-    File tableConfigFile = new File(testDir, "tableConfig");
+    File tableConfigFile = new File(testDir, "myTable.table");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
       .setTableName("myTable")
       .setNumReplicas(1)

@@ -1551,12 +1551,15 @@ public class PinotHelixResourceManager {
           + "external view");
     }
     validateTableTenantConfig(tableConfig);
-    validateTableSchemaConfig(tableConfig);
 
     IdealState idealState =
         PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableNameWithType, tableConfig.getReplication(),
             _enableBatchMessageMode);
     TableType tableType = tableConfig.getTableType();
+    // Ensure that table is not created if schema is not present
+    if (ZKMetadataProvider.getSchema(_propertyStore, TableNameBuilder.extractRawTableName(tableNameWithType)) == null) {
+      throw new InvalidTableConfigException("No schema defined for table: " + tableNameWithType);
+    }
     if (tableType == TableType.OFFLINE) {
       try {
         // Add table config
@@ -1597,16 +1600,6 @@ public class PinotHelixResourceManager {
     });
 
     LOGGER.info("Successfully added table: {}", tableNameWithType);
-  }
-
-  private void validateTableSchemaConfig(TableConfig tableConfig) {
-    // Ensure that table is not created if schema is not present
-    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-    String schemaName = tableConfig.getValidationConfig().getSchemaName();
-    if (schemaName != null && !schemaName.equals(rawTableName)) {
-      throw new InvalidTableConfigException(
-          "Schema name: " + schemaName + " does not match table name: " + rawTableName);
-    }
   }
 
   /**
@@ -1795,7 +1788,6 @@ public class PinotHelixResourceManager {
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     validateTableTenantConfig(tableConfig);
-    validateTableSchemaConfig(tableConfig);
     setExistingTableConfig(tableConfig);
   }
 

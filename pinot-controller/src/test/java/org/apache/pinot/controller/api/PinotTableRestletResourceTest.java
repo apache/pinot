@@ -105,6 +105,16 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
 
+    // Creating an OFFLINE table without a valid schema should fail
+    offlineTableConfig = _offlineBuilder.setTableName("no_schema").build();
+    try {
+      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+      fail("Creation of a OFFLINE table without a valid schema does not fail");
+    } catch (IOException e) {
+      // Expected 400 Bad Request
+      assertTrue(e.getMessage().contains("Got error status code: 400"));
+    }
+
     // Create an OFFLINE table with a valid name which should succeed
     DEFAULT_INSTANCE.addDummySchema("valid_table_name");
     offlineTableConfig = _offlineBuilder.setTableName("valid_table_name").build();
