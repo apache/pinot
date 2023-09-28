@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -78,10 +79,11 @@ public class BrokerManagedAsyncExecutorProviderTest {
   @Test
   public void testGet()
       throws InterruptedException {
-    BrokerManagedAsyncExecutorProvider provider = new BrokerManagedAsyncExecutorProvider(1, 1, 1, _brokerMetrics);
-    ExecutorService executorService = provider.getExecutorService();
 
-    // verify that the executor has the expected properties
+    // verify executor has correct properties when queue size is Integer.MAX_VALUE
+    BrokerManagedAsyncExecutorProvider provider =
+        new BrokerManagedAsyncExecutorProvider(1, 1, Integer.MAX_VALUE, _brokerMetrics);
+    ExecutorService executorService = provider.getExecutorService();
     assertNotNull(executorService);
     assertTrue(executorService instanceof ThreadPoolExecutor);
 
@@ -91,6 +93,23 @@ public class BrokerManagedAsyncExecutorProviderTest {
     assertEquals(1, threadPoolExecutor.getMaximumPoolSize());
 
     BlockingQueue<Runnable> blockingQueue = threadPoolExecutor.getQueue();
+    assertNotNull(blockingQueue);
+    assertTrue(blockingQueue instanceof LinkedBlockingQueue);
+    assertEquals(0, blockingQueue.size());
+    assertEquals(Integer.MAX_VALUE, blockingQueue.remainingCapacity());
+
+    // verify that the executor has the expected properties when queue size is 1
+    provider = new BrokerManagedAsyncExecutorProvider(1, 1, 1, _brokerMetrics);
+    executorService = provider.getExecutorService();
+    assertNotNull(executorService);
+    assertTrue(executorService instanceof ThreadPoolExecutor);
+
+    threadPoolExecutor = (ThreadPoolExecutor) executorService;
+
+    assertEquals(1, threadPoolExecutor.getCorePoolSize());
+    assertEquals(1, threadPoolExecutor.getMaximumPoolSize());
+
+    blockingQueue = threadPoolExecutor.getQueue();
     assertNotNull(blockingQueue);
     assertTrue(blockingQueue instanceof ArrayBlockingQueue);
     assertEquals(0, blockingQueue.size());
