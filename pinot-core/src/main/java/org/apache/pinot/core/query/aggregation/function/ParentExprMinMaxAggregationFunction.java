@@ -41,10 +41,10 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   private final List<ExpressionContext> _measuringColumns;
   // list of columns that we project based on the min/max value
   private final List<ExpressionContext> _projectionColumns;
-  // true if we are doing argmax, false if we are doing argmin
+  // true if we are doing exprmax, false if we are doing exprmin
   private final boolean _isMax;
   // the id of the function, this is to associate the result of the parent aggregation function with the
-  // child aggregation functions having the same type(argmin/argmax) and measuring columns
+  // child aggregation functions having the same type(exprmin/exprmax) and measuring columns
   private final ExpressionContext _functionIdContext;
   private final ExpressionContext _numMeasuringColumnContext;
   // number of columns that we do min/max on
@@ -226,7 +226,7 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
             break;
           default:
             throw new IllegalStateException(
-                "Cannot compute ArgMinMax projection on non-comparable type: " + blockValSet.getValueType());
+                "Cannot compute exprminMax projection on non-comparable type: " + blockValSet.getValueType());
         }
       } else {
         switch (blockValSet.getValueType()) {
@@ -272,7 +272,7 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
             break;
           default:
             throw new IllegalStateException(
-                "Cannot compute ArgMinMax projection on non-comparable type: " + blockValSet.getValueType());
+                "Cannot compute exprminMax projection on non-comparable type: " + blockValSet.getValueType());
         }
       }
     }
@@ -334,7 +334,7 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
           break;
         default:
           throw new IllegalStateException(
-              "Cannot compute ArgMinMax measuring on non-comparable type: " + blockValSet.getValueType());
+              "Cannot compute exprminMax measuring on non-comparable type: " + blockValSet.getValueType());
       }
     }
     // setup measuring column schema
