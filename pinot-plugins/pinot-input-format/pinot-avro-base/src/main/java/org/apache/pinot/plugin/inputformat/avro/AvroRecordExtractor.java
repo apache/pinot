@@ -73,10 +73,12 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
         to.putValue(fieldName, value);
       }
     } else {
+      Schema.Field field;
+      Object value;
       for (String fieldName : _fields) {
-        Object value = from.hasField(fieldName) ? from.get(fieldName) : null;
+        field = from.getSchema().getField(fieldName);
+        value = field == null ? null : from.get(field.pos());
         if (_applyLogicalTypes) {
-          Schema.Field field = from.getSchema().getField(fieldName);
           value = AvroSchemaUtil.applyLogicalType(field, value);
         }
         if (value != null) {
