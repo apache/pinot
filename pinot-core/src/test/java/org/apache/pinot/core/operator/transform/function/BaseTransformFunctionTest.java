@@ -580,9 +580,14 @@ public abstract class BaseTransformFunctionTest {
 
   protected void testTransformFunctionWithNull(TransformFunction transformFunction, String[] expectedValues,
       RoaringBitmap expectedNulls) {
+    testTransformFunctionWithNull(transformFunction, expectedValues, expectedNulls, false);
+  }
+
+  protected void testTransformFunctionWithNull(TransformFunction transformFunction, String[] expectedValues,
+      RoaringBitmap expectedNulls, boolean performNullComparison) {
     String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
-      if (expectedNulls.contains(i)) {
+      if (expectedNulls.contains(i) && !performNullComparison) {
         continue;
       }
       assertEquals(stringValues[i], expectedValues[i]);
