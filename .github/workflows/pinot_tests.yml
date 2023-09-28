@@ -97,7 +97,7 @@ jobs:
             testset: 2
             distribution: "corretto"
             prioritize_bytebuffer: false
-    name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
+    name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with bytebuffers:${{matrix.prioritize_bytebuffer}}
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
@@ -184,7 +184,7 @@ jobs:
             testset: 2
             distribution: "corretto"
             prioritize_bytebuffer: false
-    name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
+    name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with bytebuffers:${{matrix.prioritize_bytebuffer}}
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
@@ -340,7 +340,7 @@ jobs:
           - java: 21
             distribution: "corretto"
             prioritize_bytebuffer: false
-    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
+    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }} with bytebuffers:${{matrix.prioritize_bytebuffer}}
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}
