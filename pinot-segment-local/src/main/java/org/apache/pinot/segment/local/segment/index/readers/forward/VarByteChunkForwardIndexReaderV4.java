@@ -39,13 +39,13 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of variable length data type
- * (BIG_DECIMAL, STRING, BYTES).
+ * Chunk-based raw (non-dictionary-encoded) forward index reader for values of SV variable length data types
+ * (BIG_DECIMAL, STRING, BYTES), MV fixed length and MV variable length data types.
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriterV4}
  */
-public class VarByteChunkSVForwardIndexReaderV4
-    implements ForwardIndexReader<VarByteChunkSVForwardIndexReaderV4.ReaderContext> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(VarByteChunkSVForwardIndexReaderV4.class);
+public class VarByteChunkForwardIndexReaderV4
+    implements ForwardIndexReader<VarByteChunkForwardIndexReaderV4.ReaderContext> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(VarByteChunkForwardIndexReaderV4.class);
   private static final int METADATA_ENTRY_SIZE = 8;
 
   private final FieldSpec.DataType _storedType;
@@ -55,8 +55,10 @@ public class VarByteChunkSVForwardIndexReaderV4
 
   private final PinotDataBuffer _metadata;
   private final PinotDataBuffer _chunks;
+  private final boolean _isSingleValue;
 
-  public VarByteChunkSVForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType) {
+  public VarByteChunkForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
+      boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
     Preconditions.checkState(version == VarByteChunkForwardIndexWriterV4.VERSION, "Illegal index version: %s", version);
     _storedType = storedType;
@@ -67,6 +69,7 @@ public class VarByteChunkSVForwardIndexReaderV4
     // the file has a BE header for compatability reasons (version selection) but the content is LE
     _metadata = dataBuffer.view(16, chunksOffset, ByteOrder.LITTLE_ENDIAN);
     _chunks = dataBuffer.view(chunksOffset, dataBuffer.size(), ByteOrder.LITTLE_ENDIAN);
+    _isSingleValue = isSingleValue;
   }
 
   @Override
@@ -76,7 +79,7 @@ public class VarByteChunkSVForwardIndexReaderV4
 
   @Override
   public boolean isSingleValue() {
-    return true;
+    return _isSingleValue;
   }
 
   @Override
@@ -111,6 +114,148 @@ public class VarByteChunkSVForwardIndexReaderV4
   @Override
   public byte[] getBytes(int docId, ReaderContext context) {
     return context.getValue(docId);
+  }
+
+  @Override
+  public int getIntMV(int docId, int[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    for (int i = 0; i < numValues; i++) {
+      valueBuffer[i] = byteBuffer.getInt();
+    }
+    return numValues;
+  }
+
+  @Override
+  public int[] getIntMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    int[] valueBuffer = new int[numValues];
+    for (int i = 0; i < numValues; i++) {
+      valueBuffer[i] = byteBuffer.getInt();
+    }
+    return valueBuffer;
+  }
+
+  @Override
+  public int getLongMV(int docId, long[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    for (int i = 0; i < numValues; i++) {
+      valueBuffer[i] = byteBuffer.getLong();
+    }
+    return numValues;
+  }
+
+  @Override
+  public long[] getLongMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    long[] valueBuffer = new long[numValues];
+    for (int i = 0; i < numValues; i++) {
+      valueBuffer[i] = byteBuffer.getLong();
+    }
+    return valueBuffer;
+  }
+
+  @Override
+  public int getFloatMV(int docId, float[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    for (int i = 0; i < numValues; i++) {
+      valueBuffer[i] = byteBuffer.getFloat();
+    }
+    return numValues;
+  }
+
+  @Override
+  public float[] getFloatMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    float[] valueBuffer = new float[numValues];
+    for (int i = 0; i < numValues; i++) {
+      valueBuffer[i] = byteBuffer.getFloat();
+    }
+    return valueBuffer;
+  }
+
+  @Override
+  public int getDoubleMV(int docId, double[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    for (int i = 0; i < numValues; i++) {
+      valueBuffer[i] = byteBuffer.getDouble();
+    }
+    return numValues;
+  }
+
+  @Override
+  public double[] getDoubleMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    double[] valueBuffer = new double[numValues];
+    for (int i = 0; i < numValues; i++) {
+      valueBuffer[i] = byteBuffer.getFloat();
+    }
+    return valueBuffer;
+  }
+
+  @Override
+  public int getStringMV(int docId, String[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    byteBuffer.position((numValues + 1) * Integer.BYTES);
+    for (int i = 0; i < numValues; i++) {
+      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
+      byte[] bytes = new byte[length];
+      byteBuffer.get(bytes);
+      valueBuffer[i] = new String(bytes, StandardCharsets.UTF_8);
+    }
+    return numValues;
+  }
+
+  @Override
+  public String[] getStringMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    byteBuffer.position((numValues + 1) * Integer.BYTES);
+    String[] valueBuffer = new String[numValues];
+    for (int i = 0; i < numValues; i++) {
+      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
+      byte[] bytes = new byte[length];
+      byteBuffer.get(bytes);
+      valueBuffer[i] = new String(bytes, StandardCharsets.UTF_8);
+    }
+    return valueBuffer;
+  }
+
+  @Override
+  public int getBytesMV(int docId, byte[][] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    byteBuffer.position((numValues + 1) * Integer.BYTES);
+    for (int i = 0; i < numValues; i++) {
+      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
+      byte[] bytes = new byte[length];
+      byteBuffer.get(bytes, 0, length);
+      valueBuffer[i] = bytes;
+    }
+    return numValues;
+  }
+
+  @Override
+  public byte[][] getBytesMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
+    int numValues = byteBuffer.getInt();
+    byteBuffer.position((numValues + 1) * Integer.BYTES);
+    byte[][] valueBuffer = new byte[numValues][];
+    for (int i = 0; i < numValues; i++) {
+      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
+      byte[] bytes = new byte[length];
+      byteBuffer.get(bytes, 0, length);
+      valueBuffer[i] = bytes;
+    }
+    return valueBuffer;
   }
 
   @Override

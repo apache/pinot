@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -37,7 +38,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
   private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
-  private final VarByteChunkForwardIndexWriter _indexWriter;
+  private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
 
   /**
@@ -80,13 +81,9 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
     int numDocsPerChunk = Math.max(
         TARGET_MAX_CHUNK_SIZE / (totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE),
         1);
-    // TODO: Support V4 MV reader
-    // Currently fall back to V2 for backward compatible
-    if (writerVersion == VarByteChunkForwardIndexWriterV4.VERSION) {
-      writerVersion = 2;
-    }
-    _indexWriter = new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs, numDocsPerChunk, totalMaxLength,
-        writerVersion);
+    _indexWriter = writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(file,
+        compressionType, totalDocs, numDocsPerChunk, totalMaxLength, writerVersion)
+        : new VarByteChunkForwardIndexWriterV4(file, compressionType, TARGET_MAX_CHUNK_SIZE);
     _valueType = valueType;
   }
 
@@ -107,12 +104,12 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
 
   @Override
   public void putStringMV(final String[] values) {
-    _indexWriter.putStrings(values);
+    _indexWriter.putStringMV(values);
   }
 
   @Override
   public void putBytesMV(final byte[][] values) {
-    _indexWriter.putByteArrays(values);
+    _indexWriter.putBytesMV(values);
   }
 
   @Override
