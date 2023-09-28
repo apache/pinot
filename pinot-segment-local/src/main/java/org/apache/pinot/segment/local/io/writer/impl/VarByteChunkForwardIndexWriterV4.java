@@ -149,8 +149,10 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     // num values + length of each value
     int headerSize = Integer.BYTES + Integer.BYTES * values.length;
     int size = headerSize;
-    for (String value : values) {
-      size += value.getBytes(UTF_8).length;
+    byte[][] stringBytes = new byte[values.length][];
+    for (int i = 0; i < values.length; i++) {
+      stringBytes[i] = values[i].getBytes(UTF_8);
+      size += stringBytes[i].length;
     }
 
     // Format : [numValues][length1][length2]...[lengthN][value1][value2]...[valueN]
@@ -159,12 +161,11 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     byteBuffer.putInt(values.length);
     byteBuffer.position(headerSize);
     for (int i = 0; i < values.length; i++) {
-      byte[] utf8 = values[i].getBytes(UTF_8);
-      byteBuffer.putInt((i + 1) * Integer.BYTES, utf8.length);
-      byteBuffer.put(utf8);
+      byteBuffer.putInt((i + 1) * Integer.BYTES, stringBytes[i].length);
+      byteBuffer.put(stringBytes[i]);
     }
 
-    putBytes(byteBuffer.array());
+    putBytes(serializedBytes);
   }
 
   @Override
@@ -186,7 +187,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
       byteBuffer.put(values[i]);
     }
 
-    putBytes(byteBuffer.array());
+    putBytes(serializedBytes);
   }
 
   private void writeHugeChunk(byte[] bytes) {
