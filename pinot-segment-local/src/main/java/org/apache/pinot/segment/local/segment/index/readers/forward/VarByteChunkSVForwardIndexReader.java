@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -60,6 +61,11 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
   @Override
   public BigDecimal getBigDecimal(int docId, ChunkReaderContext context) {
     return BigDecimalUtils.deserialize(getBytes(docId, context));
+  }
+
+  @Override
+  public Vector getVector(int docId, ChunkReaderContext context) {
+    return Vector.fromBytes(getBytes(docId, context));
   }
 
   @Override

@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -421,6 +422,12 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
           throw new IllegalStateException();
       }
     }
+  }
+
+  @Override
+  public <T extends ForwardIndexReaderContext> void evaluateBlock(int[] docIds, int length,
+      ForwardIndexReader<T> reader, T context, Dictionary dictionary, int[] dictIdBuffer, Vector[] vector) {
+    throw new UnsupportedOperationException();
   }
 
   @Nullable

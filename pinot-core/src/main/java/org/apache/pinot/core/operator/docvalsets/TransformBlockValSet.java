@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -123,6 +124,14 @@ public class TransformBlockValSet implements BlockValSet {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
       recordTransformValues(scope, DataType.BIG_DECIMAL, true);
       return _transformFunction.transformToBigDecimalValuesSV(_valueBlock);
+    }
+  }
+
+  @Override
+  public Vector[] getVectorValuesSV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {
+      recordTransformValues(scope, DataType.VECTOR, true);
+      return _transformFunction.transformToVectorValuesSV(_valueBlock);
     }
   }
 

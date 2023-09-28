@@ -28,7 +28,9 @@ import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.datatable.DataTableImplV2;
 import org.apache.pinot.common.datatable.DataTableImplV3;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -72,6 +74,12 @@ public class DataTableBuilderV2V3 extends BaseDataTableBuilder {
   public void setColumn(int colId, ByteArray value)
       throws IOException {
     setColumn(colId, value.toHexString());
+  }
+
+  @Override
+  public void setColumn(int colId, Vector value)
+      throws IOException {
+    setColumn(colId, BytesUtils.toHexString(value.toBytes()));
   }
 
   @Override

@@ -52,7 +52,9 @@ import org.apache.pinot.segment.local.segment.index.readers.OnHeapFloatDictionar
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.OnHeapStringDictionary;
+import org.apache.pinot.segment.local.segment.index.readers.OnHeapVectorDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
+import org.apache.pinot.segment.local.segment.index.readers.VectorDictionary;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -310,6 +312,10 @@ public class DictionaryIndexType
         numBytesPerValue = metadata.getColumnMaxLength();
         return loadOnHeap ? new OnHeapStringDictionary(dataBuffer, length, numBytesPerValue)
             : new StringDictionary(dataBuffer, length, numBytesPerValue);
+      case VECTOR:
+        numBytesPerValue = metadata.getColumnMaxLength();
+        return loadOnHeap ? new OnHeapVectorDictionary(dataBuffer, length, numBytesPerValue)
+            : new VectorDictionary(dataBuffer, length, numBytesPerValue);
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();
         return loadOnHeap ? new OnHeapBytesDictionary(dataBuffer, length, numBytesPerValue)

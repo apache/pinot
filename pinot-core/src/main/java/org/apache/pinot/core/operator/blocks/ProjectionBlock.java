@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 /**
@@ -125,6 +126,17 @@ public class ProjectionBlock implements ValueBlock {
    * @param buffer the buffer to write outputs into
    */
   public void fillValues(String column, TransformEvaluator evaluator, String[] buffer) {
+    _dataBlockCache.fillValues(column, evaluator, buffer);
+  }
+
+  /**
+   * Pushes a {@see TransformEvaluator} which will produce a BigDecimal value down
+   * to be evaluated against the column. This is an unstable API.
+   * @param column column to evaluate against
+   * @param evaluator the evaluator which produces values from the storage in the column
+   * @param buffer the buffer to write outputs into
+   */
+  public void fillValues(String column, TransformEvaluator evaluator, Vector[] buffer) {
     _dataBlockCache.fillValues(column, evaluator, buffer);
   }
 

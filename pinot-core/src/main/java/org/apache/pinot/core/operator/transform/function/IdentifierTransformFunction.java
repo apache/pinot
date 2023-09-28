@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -118,6 +119,11 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   }
 
   @Override
+  public Vector[] transformToVectorValuesSV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getVectorValuesSV();
+  }
+
+  @Override
   public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
     return valueBlock.getBlockValueSet(_columnName).getIntValuesMV();
   }
@@ -177,6 +183,12 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   @Override
   public void transformToStringValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator,
       String[] buffer) {
+    projectionBlock.fillValues(_columnName, evaluator, buffer);
+  }
+
+  @Override
+  public void transformToVectorValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator,
+      Vector[] buffer) {
     projectionBlock.fillValues(_columnName, evaluator, buffer);
   }
 

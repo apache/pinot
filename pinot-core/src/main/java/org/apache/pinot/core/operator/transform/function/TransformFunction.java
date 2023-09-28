@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -117,6 +118,13 @@ public interface TransformFunction {
    * Transforms the data from the given value block to single-valued BigDecimal values.
    */
   BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock);
+
+  /**
+   * Transforms the data from the given value block to Vector values.
+   */
+  default Vector[] transformToVectorValuesSV(ValueBlock valueBlock) {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Transforms the data from the given value block to single-valued string values.

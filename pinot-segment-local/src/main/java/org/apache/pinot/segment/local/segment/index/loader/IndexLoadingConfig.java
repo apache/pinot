@@ -54,6 +54,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.VectorIndexConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -84,6 +85,7 @@ public class IndexLoadingConfig {
   private FSTType _fstIndexType = FSTType.LUCENE;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
   private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
+  private Map<String, VectorIndexConfig> _vectorIndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private final Map<String, String> _noDictionaryConfig = new HashMap<>();
   private final Set<String> _varLengthDictionaryColumns = new HashSet<>();
@@ -213,6 +215,7 @@ public class IndexLoadingConfig {
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
     extractH3IndexConfigsFromTableConfig(tableConfig);
+    extractVectorIndexConfigsFromTableConfig(tableConfig, schema);
     extractForwardIndexDisabledColumnsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
@@ -398,6 +401,23 @@ public class IndexLoadingConfig {
     }
   }
 
+  private void extractVectorIndexConfigsFromTableConfig(TableConfig tableConfig, Schema schema) {
+    if (schema == null) {
+      return;
+    }
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (schema.hasColumn(fieldConfig.getName()) && schema.getFieldSpecFor(fieldConfig.getName())
+            .getDataType() == FieldSpec.DataType.VECTOR) {
+          //noinspection ConstantConditions
+          _vectorIndexConfigs.put(fieldConfig.getName(), new VectorIndexConfig(fieldConfig.getProperties()));
+        }
+      }
+    }
+  }
+
+
   private void extractFromInstanceConfig(InstanceDataManagerConfig instanceDataManagerConfig) {
     if (instanceDataManagerConfig == null) {
       return;
@@ -526,6 +546,10 @@ public class IndexLoadingConfig {
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
     return unmodifiable(_h3IndexConfigs);
+  }
+
+  public Map<String, VectorIndexConfig> getVectorIndexConfigs() {
+    return unmodifiable(_vectorIndexConfigs);
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {

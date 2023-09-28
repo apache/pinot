@@ -27,6 +27,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.trace.InvocationRecording;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -143,6 +144,14 @@ public class ProjectionBlockValSet implements BlockValSet {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
       recordReadValues(scope, DataType.BIG_DECIMAL, true);
       return _dataBlockCache.getBigDecimalValuesForSVColumn(_column);
+    }
+  }
+
+  @Override
+  public Vector[] getVectorValuesSV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
+      recordReadValues(scope, DataType.VECTOR, true);
+      return _dataBlockCache.getVectorValuesForSVColumn(_column);
     }
   }
 

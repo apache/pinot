@@ -31,9 +31,10 @@
       "name": "n_tokens"
     },
     {
-      "dataType": "FLOAT",
+      "dataType": "VECTOR",
+      "vectorDataType": "FLOAT",
       "name": "embedding",
-      "singleValueField": false
+      "vectorLength": 1536
     }
   ],
   "schemaName": "fineFoodReviews"

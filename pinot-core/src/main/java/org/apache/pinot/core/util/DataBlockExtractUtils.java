@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
@@ -82,6 +83,8 @@ public final class DataBlockExtractUtils {
         return dataBlock.getString(rowId, colId);
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
+      case VECTOR:
+        return dataBlock.getVector(rowId, colId);
 
       // Multi-value column
       case INT_ARRAY:
@@ -674,6 +677,38 @@ public final class DataBlockExtractUtils {
     return values;
   }
 
+  /**
+   * Given a datablock and the column index, extracts the byte values for the column. Prefer using this function over
+   * extractRowFromDatablock if the desired datatype is known to prevent autoboxing to Object and later unboxing to the
+   * desired type.
+   * This only works on ROW format.
+   * TODO: Add support for COLUMNAR format.
+   * @return byte array of values in the column
+   */
+  public static Vector[] extractVectorValuesForColumn(DataType storedType, DataBlock dataBlock, int colId,
+      @Nullable RoaringBitmap nullBitmap) {
+    // Get null bitmap for the column.
+    int numRows = dataBlock.getNumberOfRows();
+    Vector[] values = new Vector[numRows];
+
+    if (storedType == DataType.UNKNOWN) {
+      //TODO: Fill proper null value
+      Arrays.fill(values, null);
+      return values;
+    }
+    Preconditions.checkState(storedType == DataType.VECTOR,
+        "Cannot extract Vector values for column: %s with stored type: %s",
+        dataBlock.getDataSchema().getColumnName(colId), storedType);
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      if (nullBitmap != null && nullBitmap.contains(rowId)) {
+        continue;
+      }
+      values[rowId] = dataBlock.getVector(rowId, colId);
+    }
+
+    return values;
+  }
+
   public static int[] extractIntColumn(DataType storedType, DataBlock dataBlock, int colId, int numMatchedRows,
       RoaringBitmap matchedBitmap, @Nullable RoaringBitmap matchedNullBitmap) {
     int[] values = new int[numMatchedRows];
@@ -903,6 +938,28 @@ public final class DataBlockExtractUtils {
       int rowId = iterator.next();
       boolean isNull = matchedNullBitmap != null && matchedNullBitmap.contains(matchedRowId);
       values[matchedRowId] = !isNull ? dataBlock.getBytes(rowId, colId).getBytes() : NullValuePlaceHolder.BYTES;
+    }
+    return values;
+  }
+
+  public static Vector[] extractVectorColumn(DataType storedType, DataBlock dataBlock, int colId, int numMatchedRows,
+      RoaringBitmap matchedBitmap, RoaringBitmap matchedNullBitmap) {
+    Vector[] values = new Vector[numMatchedRows];
+    if (numMatchedRows == 0) {
+      return values;
+    }
+    if (storedType == DataType.UNKNOWN) {
+      Arrays.fill(values, null);
+      return values;
+    }
+    Preconditions.checkState(storedType == DataType.VECTOR,
+        "Cannot extract Vector values for column: %s with stored type: %s",
+        dataBlock.getDataSchema().getColumnName(colId), storedType);
+    PeekableIntIterator iterator = matchedBitmap.getIntIterator();
+    for (int matchedRowId = 0; matchedRowId < numMatchedRows; matchedRowId++) {
+      int rowId = iterator.next();
+      boolean isNull = matchedNullBitmap != null && matchedNullBitmap.contains(matchedRowId);
+      values[matchedRowId] = !isNull ? dataBlock.getVector(rowId, colId) : null;
     }
     return values;
   }

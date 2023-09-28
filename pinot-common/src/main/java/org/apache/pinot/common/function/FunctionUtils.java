@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 public class FunctionUtils {
@@ -55,6 +56,7 @@ public class FunctionUtils {
     put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
     put(Object.class, PinotDataType.OBJECT);
+    put(Vector.class, PinotDataType.VECTOR);
   }};
 
   // Types allowed as the function argument (actual value passed into the function) for type conversion
@@ -82,6 +84,7 @@ public class FunctionUtils {
     put(String[].class, PinotDataType.STRING_ARRAY);
     put(Object.class, PinotDataType.OBJECT);
     put(Object[].class, PinotDataType.OBJECT_ARRAY);
+    put(Vector.class, PinotDataType.VECTOR);
   }};
 
   private static final Map<Class<?>, DataType> DATA_TYPE_MAP = new HashMap<Class<?>, DataType>() {{
@@ -98,6 +101,7 @@ public class FunctionUtils {
     put(Boolean.class, DataType.BOOLEAN);
     put(Timestamp.class, DataType.TIMESTAMP);
     put(String.class, DataType.STRING);
+    put(Vector.class, DataType.VECTOR);
     put(byte[].class, DataType.BYTES);
     put(int[].class, DataType.INT);
     put(long[].class, DataType.LONG);

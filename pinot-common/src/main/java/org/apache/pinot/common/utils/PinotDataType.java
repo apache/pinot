@@ -27,6 +27,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -113,6 +114,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public Vector toVector(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to VECTOR");
+    }
+
+    @Override
     public Boolean convert(Object value, PinotDataType sourceType) {
       return sourceType.toBoolean(value);
     }
@@ -168,6 +174,11 @@ public enum PinotDataType {
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from BYTE to BYTES");
     }
+
+    @Override
+    public Vector toVector(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTE to VECTOR");
+    }
   },
 
   CHARACTER {
@@ -214,6 +225,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from CHARACTER to BYTES");
+    }
+
+    @Override
+    public Vector toVector(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from CHARACTER to VECTOR");
     }
   },
 
@@ -262,6 +278,11 @@ public enum PinotDataType {
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from SHORT to BYTES");
     }
+
+    @Override
+    public Vector toVector(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from SHORT to VECTOR");
+    }
   },
 
   INTEGER {
@@ -308,6 +329,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from INTEGER to BYTES");
+    }
+
+    @Override
+    public Vector toVector(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from INTEGER to VECTOR");
     }
 
     @Override
@@ -366,6 +392,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public Vector toVector(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from LONG to VECTOR");
+    }
+
+    @Override
     public Long convert(Object value, PinotDataType sourceType) {
       return sourceType.toLong(value);
     }
@@ -415,6 +446,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from FLOAT to BYTES");
+    }
+
+    @Override
+    public Vector toVector(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from FLOAT to VECTOR");
     }
 
     @Override
@@ -526,6 +562,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public Vector toVector(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BIG_DECIMAL to VECTOR");
+    }
+
+    @Override
     public BigDecimal convert(Object value, PinotDataType sourceType) {
       return sourceType.toBigDecimal(value);
     }
@@ -589,6 +630,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public Vector toVector(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to VECTOR");
+    }
+
+    @Override
     public Timestamp convert(Object value, PinotDataType sourceType) {
       return sourceType.toTimestamp(value);
     }
@@ -645,6 +691,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       return BytesUtils.toBytes(value.toString().trim());
+    }
+
+    @Override
+    public Vector toVector(Object value) {
+      return Vector.fromString(value.toString().trim());
     }
 
     @Override
@@ -707,6 +758,12 @@ public enum PinotDataType {
     }
 
     @Override
+    public Vector toVector(Object value) {
+      //TODO: I think we should support JSON to VECTOR
+      throw new UnsupportedOperationException("Cannot convert value from JSON to VECTOR");
+    }
+
+    @Override
     public String convert(Object value, PinotDataType sourceType) {
       return sourceType.toJson(value);
     }
@@ -756,6 +813,11 @@ public enum PinotDataType {
     @Override
     public byte[] toBytes(Object value) {
       return (byte[]) value;
+    }
+
+    @Override
+    public Vector toVector(Object value) {
+      return Vector.fromBytes((byte[]) value);
     }
 
     @Override
@@ -811,8 +873,65 @@ public enum PinotDataType {
     }
 
     @Override
+    public Vector toVector(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from OBJECT to VECTOR");
+    }
+
+    @Override
     public Object convert(Object value, PinotDataType sourceType) {
       return value;
+    }
+  },
+
+  VECTOR {
+    @Override
+    public int toInt(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from VECTOR to INTEGER");
+    }
+
+    @Override
+    public long toLong(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from VECTOR to LONG");
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from VECTOR to FLOAT");
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from VECTOR to DOUBLE");
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from VECTOR to BIGDECIMAL");
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from VECTOR to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from VECTOR to TIMESTAMP");
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      return ((Vector) value).toBytes();
+    }
+
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      return sourceType.toVector(value);
     }
   },
 
@@ -990,6 +1109,24 @@ public enum PinotDataType {
   public byte[] toBytes(Object value) {
     return getSingleValueType().toBytes(toObjectArray(value)[0]);
   }
+
+  public Vector toVector(Object value) {
+    if (value instanceof Object[]) {
+      switch (getSingleValueType()) {
+        case FLOAT:
+          return new Vector(((Object[]) value).length, toPrimitiveFloatArray(value));
+        case DOUBLE:
+          return new Vector(((Object[]) value).length, toPrimitiveFloatArray(value));
+        case INTEGER:
+          return new Vector(((Object[]) value).length, toPrimitiveIntArray(value));
+        default:
+          throw new IllegalStateException("Unsupported single value type: " + getSingleValueType());
+      }
+    } else {
+      return getSingleValueType().toVector(toObjectArray(value)[0]);
+    }
+  }
+
 
   public int[] toPrimitiveIntArray(Object value) {
     if (value instanceof int[]) {
@@ -1313,6 +1450,8 @@ public enum PinotDataType {
         return BOOLEAN;
       case TIMESTAMP_ARRAY:
         return TIMESTAMP;
+      case VECTOR:
+        return VECTOR;
       default:
         throw new IllegalStateException("There is no single-value type for " + this);
     }
@@ -1444,6 +1583,11 @@ public enum PinotDataType {
         return fieldSpec.isSingleValueField() ? STRING : STRING_ARRAY;
       case BYTES:
         return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
+      case VECTOR:
+        if (fieldSpec.isSingleValueField()) {
+          return VECTOR;
+        }
+        throw new IllegalStateException("There is no multi-value type for Vector");
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());

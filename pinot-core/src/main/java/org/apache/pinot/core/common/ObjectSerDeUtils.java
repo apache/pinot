@@ -83,6 +83,7 @@ import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.locationtech.jts.geom.Geometry;
@@ -141,8 +142,8 @@ public class ObjectSerDeUtils {
     IntegerTupleSketch(37),
     FrequentStringsSketch(38),
     FrequentLongsSketch(39),
-    HyperLogLogPlus(40);
-
+    HyperLogLogPlus(40),
+    Vector(41);
 
     private final int _value;
 
@@ -240,6 +241,8 @@ public class ObjectSerDeUtils {
         return ObjectType.FrequentLongsSketch;
       } else if (value instanceof HyperLogLogPlus) {
         return ObjectType.HyperLogLogPlus;
+      } else if (value instanceof org.apache.pinot.spi.data.readers.Vector) {
+        return ObjectType.Vector;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -1172,6 +1175,26 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<Vector> VECTOR_SER_DE = new ObjectSerDe<Vector>() {
+
+    @Override
+    public byte[] serialize(Vector value) {
+      return value.toBytes();
+    }
+
+    @Override
+    public Vector deserialize(byte[] bytes) {
+      return Vector.fromBytes(bytes);
+    }
+
+    @Override
+    public Vector deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return Vector.fromBytes(bytes);
+    }
+  };
+
   public static final ObjectSerDe<Int2LongMap> INT_2_LONG_MAP_SER_DE = new ObjectSerDe<Int2LongMap>() {
 
     @Override
@@ -1411,6 +1434,7 @@ public class ObjectSerDeUtils {
       FREQUENT_STRINGS_SKETCH_SER_DE,
       FREQUENT_LONGS_SKETCH_SER_DE,
       HYPER_LOG_LOG_PLUS_SER_DE,
+      VECTOR_SER_DE,
   };
   //@formatter:on
 

@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import java.math.BigDecimal;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 public interface PushDownTransformFunction {
@@ -83,6 +84,16 @@ public interface PushDownTransformFunction {
    * @param buffer values to fill
    */
   void transformToStringValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator, String[] buffer);
+
+  /**
+   * Transforms the data from the given projection block to Vector values.
+   *
+   * @param projectionBlock Projection result
+   * @param evaluator transform evaluator
+   * @param buffer values to fill
+   */
+  void transformToVectorValuesSV(ProjectionBlock projectionBlock, TransformEvaluator evaluator,
+      Vector[] buffer);
 
   /**
    * MULTI-VALUED APIs

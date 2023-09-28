@@ -99,6 +99,17 @@ public class SchemaTest {
     schemaToValidate = new Schema();
     schemaToValidate.addField(new MetricFieldSpec("m", FieldSpec.DataType.BIG_DECIMAL, BigDecimal.ZERO));
     schemaToValidate.validate();
+
+    schemaToValidate = new Schema();
+    schemaToValidate.addField(
+        new DimensionFieldSpec("vec", FieldSpec.DataType.VECTOR, FieldSpec.DataType.FLOAT, 512, null));
+    schemaToValidate.validate();
+
+    schemaToValidate = new Schema();
+    float[] defaultNullValue = new float[512];
+    schemaToValidate.addField(
+        new DimensionFieldSpec("vec", FieldSpec.DataType.VECTOR, FieldSpec.DataType.FLOAT, 512, defaultNullValue));
+    schemaToValidate.validate();
   }
 
   @Test
@@ -331,6 +342,17 @@ public class SchemaTest {
             TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
+    String jsonSchema = schema.toSingleLineJsonString();
+    Schema schemaFromJson = Schema.fromString(jsonSchema);
+    Assert.assertEquals(schemaFromJson, schema);
+    Assert.assertEquals(schemaFromJson.hashCode(), schema.hashCode());
+  }
+
+  @Test
+  public void testVectorDataType()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
+        .addDimension("vectorCol", FieldSpec.DataType.VECTOR, FieldSpec.DataType.FLOAT, 512, null).build();
     String jsonSchema = schema.toSingleLineJsonString();
     Schema schemaFromJson = Schema.fromString(jsonSchema);
     Assert.assertEquals(schemaFromJson, schema);

@@ -20,10 +20,13 @@ package org.apache.pinot.segment.local.io.writer.impl;
 
 import java.io.Closeable;
 import java.math.BigDecimal;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 public interface VarByteChunkWriter extends Closeable {
   void putBigDecimal(BigDecimal value);
+
+  void putVector(Vector value);
 
   void putString(String value);
 

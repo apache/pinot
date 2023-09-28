@@ -26,6 +26,7 @@ import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -70,6 +71,13 @@ public class DataBlockTestUtils {
           break;
         case BYTES:
           row[colId] = new ByteArray(RandomStringUtils.random(RANDOM.nextInt(20)).getBytes());
+          break;
+        case VECTOR:
+          float[] floatVec = new float[ARRAY_SIZE];
+          for (int i = 0; i < ARRAY_SIZE; i++) {
+            floatVec[i] = RANDOM.nextFloat();
+          }
+          row[colId] = new Vector(ARRAY_SIZE, floatVec);
           break;
         case INT_ARRAY:
           int length = RANDOM.nextInt(ARRAY_SIZE);
@@ -163,6 +171,8 @@ public class DataBlockTestUtils {
         return dataBlock.getString(rowId, colId);
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
+      case VECTOR:
+        return dataBlock.getVector(rowId, colId);
       case INT_ARRAY:
         return dataBlock.getIntArray(rowId, colId);
       case LONG_ARRAY:

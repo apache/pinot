@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.util;
 
 import java.io.Closeable;
 import java.math.BigDecimal;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 
@@ -39,6 +40,11 @@ public interface ValueReader extends Closeable {
   default BigDecimal getBigDecimal(int index, int numBytesPerValue) {
     return BigDecimalUtils.deserialize(getBytes(index, numBytesPerValue));
   }
+
+  default Vector getVector(int index, int numBytesPerValue) {
+    return Vector.fromBytes(getBytes(index, numBytesPerValue));
+  }
+
 
   /**
    * Returns un-padded bytes for string.

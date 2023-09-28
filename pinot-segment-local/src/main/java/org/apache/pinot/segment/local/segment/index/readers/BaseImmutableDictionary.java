@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.io.util.ValueReader;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.readers.Vector;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -207,6 +208,24 @@ public abstract class BaseImmutableDictionary implements Dictionary {
     return -(low + 1);
   }
 
+  protected int binarySearch(Vector value) {
+    int low = 0;
+    int high = _length - 1;
+    while (low <= high) {
+      int mid = (low + high) >>> 1;
+      Vector midValue = _valueReader.getVector(mid, _numBytesPerValue);
+      int compareResult = midValue.compareTo(value);
+      if (compareResult < 0) {
+        low = mid + 1;
+      } else if (compareResult > 0) {
+        high = mid - 1;
+      } else {
+        return mid;
+      }
+    }
+    return -(low + 1);
+  }
+
   protected int binarySearch(String value) {
     int low = 0;
     int high = _length - 1;
@@ -260,6 +279,10 @@ public abstract class BaseImmutableDictionary implements Dictionary {
 
   protected BigDecimal getBigDecimal(int dictId) {
     return _valueReader.getBigDecimal(dictId, _numBytesPerValue);
+  }
+
+  protected Vector getVector(int dictId) {
+    return _valueReader.getVector(dictId, _numBytesPerValue);
   }
 
   protected byte[] getUnpaddedBytes(int dictId, byte[] buffer) {

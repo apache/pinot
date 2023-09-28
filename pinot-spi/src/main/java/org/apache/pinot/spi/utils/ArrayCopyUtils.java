@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import org.apache.pinot.spi.data.readers.Vector;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -260,6 +261,12 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copy(String[] src, Vector[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = Vector.fromString(src[i]);
+    }
+  }
+
   public static void copyToBoolean(String[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = BooleanUtils.toInt(src[i]);
@@ -299,6 +306,13 @@ public class ArrayCopyUtils {
       dest[i] = BytesUtils.toHexString(src[i]);
     }
   }
+
+  public static void copy(byte[][] src, Vector[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = Vector.fromBytes(src[i]);
+    }
+  }
+
 
   public static void copy(int[][] src, long[][] dest, int length) {
     for (int i = 0; i < length; i++) {

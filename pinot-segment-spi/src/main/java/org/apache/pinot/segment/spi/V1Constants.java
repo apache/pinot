@@ -52,6 +52,7 @@ public class V1Constants {
     public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
     public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
     public static final String LUCENE_TEXT_INDEX_FILE_EXTENSION = ".lucene.index";
+    public static final String VECTOR_INDEX_FILE_EXTENSION = ".vector.idx";
   }
 
   public static class MetadataKeys {
@@ -108,7 +109,9 @@ public class V1Constants {
       public static final String PARTITION_VALUES = "partitionValues";
       public static final String DATETIME_FORMAT = "datetimeFormat";
       public static final String DATETIME_GRANULARITY = "datetimeGranularity";
-
+      public static final String IS_VECTOR = "isVector";
+      public static final String VECTOR_LENGTH = "vectorLength";
+      public static final String VECTOR_DATATYPE = "vectorDataType";
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
 
       public static String getKeyFor(String column, String key) {

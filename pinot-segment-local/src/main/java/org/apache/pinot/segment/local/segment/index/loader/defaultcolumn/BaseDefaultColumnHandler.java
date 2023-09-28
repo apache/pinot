@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.utils.PinotDataType;
@@ -47,6 +48,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreI
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.VectorColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -475,6 +477,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         defaultValue = bytesDefaultValue;
         sortedArray = new ByteArray[]{bytesDefaultValue};
         break;
+      case VECTOR:
+        Preconditions.checkState(defaultValue instanceof Vector);
+        sortedArray = new Vector[]{(Vector) defaultValue};
+        break;
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for column: " + column);
     }
@@ -750,6 +756,21 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
           indexCreationInfo = new ColumnIndexCreationInfo(statsCollector, true, useVarLengthDictionary, true,
               new ByteArray((byte[]) fieldSpec.getDefaultNullValue()));
+          break;
+        }
+        case VECTOR: {
+          for (int i = 0; i < numDocs; i++) {
+            Preconditions.checkState(isSingleValue, "MV VECTOR is not supported");
+            outputValues[i] = outputValueType.toVector(outputValues[i]);
+          }
+          VectorColumnPreIndexStatsCollector statsCollector =
+              new VectorColumnPreIndexStatsCollector(column, statsCollectorConfig);
+          for (Object value : outputValues) {
+            statsCollector.collect(value);
+          }
+          statsCollector.seal();
+          indexCreationInfo =
+              new ColumnIndexCreationInfo(statsCollector, true, false, true, fieldSpec.getDefaultNullValue());
           break;
         }
         default:

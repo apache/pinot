@@ -36,6 +36,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -230,6 +231,14 @@ public class DataTableImplV4 implements DataTable {
     byte[] buffer = new byte[size];
     _variableSizeData.get(buffer);
     return new ByteArray(buffer);
+  }
+
+  @Override
+  public Vector getVector(int rowId, int colId) {
+    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
+    byte[] buffer = new byte[size];
+    _variableSizeData.get(buffer);
+    return Vector.fromBytes(buffer);
   }
 
   // --------------------------------------------------------------------------

@@ -41,6 +41,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
@@ -104,7 +105,8 @@ public final class Schema implements Serializable {
     return JsonUtils.inputStreamToObject(schemaInputStream, Schema.class);
   }
 
-  public static void validate(FieldType fieldType, DataType dataType) {
+  public static void validate(FieldSpec fieldSpec, DataType dataType) {
+    FieldType fieldType = fieldSpec.getFieldType();
     switch (fieldType) {
       case DIMENSION:
       case TIME:
@@ -121,6 +123,9 @@ public final class Schema implements Serializable {
           case JSON:
           case BYTES:
             break;
+          case VECTOR:
+            validateVectorType(fieldSpec);
+            break;
           default:
             throw new IllegalStateException(
                 "Unsupported data type: " + dataType + " in DIMENSION/TIME field");
@@ -134,6 +139,9 @@ public final class Schema implements Serializable {
           case DOUBLE:
           case BIG_DECIMAL:
           case BYTES:
+            break;
+          case VECTOR:
+            validateVectorType(fieldSpec);
             break;
           default:
             throw new IllegalStateException("Unsupported data type: " + dataType + " in METRIC field");
@@ -151,6 +159,92 @@ public final class Schema implements Serializable {
         break;
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType + " for field");
+    }
+  }
+
+  public static void validate(FieldType fieldType, DataType dataType) {
+    switch (fieldType) {
+      case DIMENSION:
+      case TIME:
+      case DATE_TIME:
+        switch (dataType) {
+          case INT:
+          case LONG:
+          case FLOAT:
+          case DOUBLE:
+          case BIG_DECIMAL:
+          case BOOLEAN:
+          case TIMESTAMP:
+          case STRING:
+          case JSON:
+          case BYTES:
+          case VECTOR:
+            break;
+          default:
+            throw new IllegalStateException(
+                "Unsupported data type: " + dataType + " in DIMENSION/TIME field");
+        }
+        break;
+      case METRIC:
+        switch (dataType) {
+          case INT:
+          case LONG:
+          case FLOAT:
+          case DOUBLE:
+          case BIG_DECIMAL:
+          case BYTES:
+          case VECTOR:
+            break;
+          default:
+            throw new IllegalStateException("Unsupported data type: " + dataType + " in METRIC field");
+        }
+        break;
+      case COMPLEX:
+        switch (dataType) {
+          case STRUCT:
+          case MAP:
+          case LIST:
+            break;
+          default:
+            throw new IllegalStateException("Unsupported data type: " + dataType + " in COMPLEX field");
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unsupported data type: " + dataType + " for field");
+    }
+  }
+
+  private static void validateVectorType(FieldSpec fieldSpec) {
+    Object defaultNullValue = fieldSpec.getDefaultNullValue();
+    if (defaultNullValue != null) {
+      int defaultNullValueArrayLength;
+      if (defaultNullValue instanceof Vector) {
+        defaultNullValueArrayLength = ((Vector) defaultNullValue).getDimension();
+      } else {
+        switch (fieldSpec.getDataType()) {
+          case INT:
+            int[] intDefaultNullValue = (int[]) defaultNullValue;
+            defaultNullValueArrayLength = intDefaultNullValue.length;
+            break;
+          case FLOAT:
+            float[] floatDefaultNullValue = (float[]) defaultNullValue;
+            defaultNullValueArrayLength = floatDefaultNullValue.length;
+            break;
+          case BYTES:
+            byte[] byteDefaultNullValue = (byte[]) defaultNullValue;
+            defaultNullValueArrayLength = byteDefaultNullValue.length;
+            break;
+          default:
+            throw new IllegalStateException(
+                "Unsupported vector data type: " + fieldSpec.getDataType() + " in DIMENSION/TIME field");
+        }
+      }
+      if (defaultNullValueArrayLength != fieldSpec.getVectorLength()) {
+        throw new IllegalStateException(
+            "Default null value array length: " + defaultNullValueArrayLength
+                + " does not match vector length: "
+                + fieldSpec.getVectorLength());
+      }
     }
   }
 
@@ -501,7 +595,7 @@ public final class Schema implements Serializable {
       DataType dataType = fieldSpec.getDataType();
       String fieldName = fieldSpec.getName();
       try {
-        validate(fieldType, dataType);
+        validate(fieldSpec, dataType);
       } catch (IllegalStateException e) {
         throw new IllegalStateException(e.getMessage() + ": " + fieldName);
       }
@@ -587,6 +681,14 @@ public final class Schema implements Serializable {
      */
     public SchemaBuilder addMetric(String metricName, DataType dataType, Object defaultNullValue) {
       _schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
+      return this;
+    }
+
+    public SchemaBuilder addDimension(String metricName, DataType dataType, DataType vectorDataType, int vectorLength,
+        Object defaultNullValue) {
+      Preconditions.checkState(vectorDataType != null, "Vector data type must be set to INT/FLOAT/BYTE");
+      Preconditions.checkState(vectorLength > 0, "Vector length must be positive");
+      _schema.addField(new DimensionFieldSpec(metricName, dataType, vectorDataType, vectorLength, defaultNullValue));
       return this;
     }
 

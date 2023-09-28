@@ -42,6 +42,7 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -312,6 +313,9 @@ public class SelectionOperatorUtils {
           case STRING:
             dataTableBuilder.setColumn(i, (String) columnValue);
             break;
+          case VECTOR:
+            dataTableBuilder.setColumn(i, (Vector) columnValue);
+            break;
           case BYTES:
             dataTableBuilder.setColumn(i, (ByteArray) columnValue);
             break;
@@ -387,6 +391,7 @@ public class SelectionOperatorUtils {
         case STRING:
           row[i] = dataTable.getString(rowId, i);
           break;
+        case VECTOR:
         case BYTES:
           row[i] = dataTable.getBytes(rowId, i);
           break;

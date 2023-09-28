@@ -102,6 +102,7 @@ public class TableConfigBuilder {
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
+  private List<String> _vectorIndexColumns;
   private boolean _aggregateMetrics;
   private boolean _optimizeDictionaryForMetrics;
   // This threshold determines if dictionary should be enabled or not for a metric column and is relevant
@@ -313,6 +314,12 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setVectorIndexColumns(List<String> vectorIndexColumns) {
+    _vectorIndexColumns = vectorIndexColumns;
+    return this;
+  }
+
+
   public TableConfigBuilder setAggregateMetrics(boolean aggregateMetrics) {
     _aggregateMetrics = aggregateMetrics;
     return this;
@@ -465,6 +472,7 @@ public class TableConfigBuilder {
     indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
     indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
+    indexingConfig.setVectorIndexColumns(_vectorIndexColumns);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

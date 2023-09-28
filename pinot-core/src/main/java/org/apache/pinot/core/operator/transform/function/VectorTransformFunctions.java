@@ -25,9 +25,14 @@ import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.Vector;
 
 
 public class VectorTransformFunctions {
+  private VectorTransformFunctions() {
+  }
+
   public static class CosineDistanceTransformFunction extends VectorDistanceTransformFunction {
     public static final String FUNCTION_NAME = "cosineDistance";
     private Double _defaultValue = null;
@@ -60,6 +65,14 @@ public class VectorTransformFunctions {
       }
       return VectorFunctions.cosineDistance(vector1, vector2);
     }
+
+    @Override
+    protected double computeDistance(Vector vector1, Vector vector2) {
+      if (_defaultValue != null) {
+        return VectorFunctions.cosineDistance(vector1, vector2, _defaultValue);
+      }
+      return VectorFunctions.cosineDistance(vector1, vector2);
+    }
   }
 
   public static class InnerProductTransformFunction extends VectorDistanceTransformFunction {
@@ -72,6 +85,11 @@ public class VectorTransformFunctions {
 
     @Override
     protected double computeDistance(float[] vector1, float[] vector2) {
+      return VectorFunctions.innerProduct(vector1, vector2);
+    }
+
+    @Override
+    protected double computeDistance(Vector vector1, Vector vector2) {
       return VectorFunctions.innerProduct(vector1, vector2);
     }
   }
@@ -88,6 +106,11 @@ public class VectorTransformFunctions {
     protected double computeDistance(float[] vector1, float[] vector2) {
       return VectorFunctions.l1Distance(vector1, vector2);
     }
+
+    @Override
+    protected double computeDistance(Vector vector1, Vector vector2) {
+      return VectorFunctions.l1Distance(vector1, vector2);
+    }
   }
 
   public static class L2DistanceTransformFunction extends VectorDistanceTransformFunction {
@@ -100,6 +123,11 @@ public class VectorTransformFunctions {
 
     @Override
     protected double computeDistance(float[] vector1, float[] vector2) {
+      return VectorFunctions.l2Distance(vector1, vector2);
+    }
+
+    @Override
+    protected double computeDistance(Vector vector1, Vector vector2) {
       return VectorFunctions.l2Distance(vector1, vector2);
     }
   }
@@ -115,10 +143,8 @@ public class VectorTransformFunctions {
       checkArgumentSize(arguments);
       _leftTransformFunction = arguments.get(0);
       _rightTransformFunction = arguments.get(1);
-      Preconditions.checkArgument(
-          !_leftTransformFunction.getResultMetadata().isSingleValue()
-              && !_rightTransformFunction.getResultMetadata().isSingleValue(),
-          "Argument must be multi-valued float vector for vector distance transform function: %s", getName());
+      checkVectorArgumentMetadata(_leftTransformFunction.getResultMetadata(), getName());
+      checkVectorArgumentMetadata(_rightTransformFunction.getResultMetadata(), getName());
     }
 
     protected void checkArgumentSize(List<TransformFunction> arguments) {
@@ -137,15 +163,44 @@ public class VectorTransformFunctions {
     public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
       int length = valueBlock.getNumDocs();
       initDoubleValuesSV(length);
-      float[][] leftValues = _leftTransformFunction.transformToFloatValuesMV(valueBlock);
-      float[][] rightValues = _rightTransformFunction.transformToFloatValuesMV(valueBlock);
-      for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = computeDistance(leftValues[i], rightValues[i]);
+      TransformResultMetadata leftMetadata = _leftTransformFunction.getResultMetadata();
+      TransformResultMetadata rightMetadata = _rightTransformFunction.getResultMetadata();
+      if (leftMetadata.getDataType() == FieldSpec.DataType.FLOAT) {
+        float[][] leftValues = _leftTransformFunction.transformToFloatValuesMV(valueBlock);
+        if (rightMetadata.getDataType() == FieldSpec.DataType.FLOAT) {
+          float[][] rightValues = _rightTransformFunction.transformToFloatValuesMV(valueBlock);
+          for (int i = 0; i < length; i++) {
+            _doubleValuesSV[i] = computeDistance(leftValues[i], rightValues[i]);
+          }
+        } else {
+          Vector[] rightValues = _rightTransformFunction.transformToVectorValuesSV(valueBlock);
+          for (int i = 0; i < length; i++) {
+            _doubleValuesSV[i] = computeDistance(
+                new Vector(leftValues[i].length, leftValues[i]),
+                rightValues[i]);
+          }
+        }
+      } else {
+        // leftMetadata.getDataType() == FieldSpec.DataType.VECTOR
+        Vector[] leftValues = _leftTransformFunction.transformToVectorValuesSV(valueBlock);
+        if (rightMetadata.getDataType() == FieldSpec.DataType.FLOAT) {
+          float[][] rightValues = _rightTransformFunction.transformToFloatValuesMV(valueBlock);
+          for (int i = 0; i < length; i++) {
+            _doubleValuesSV[i] = computeDistance(leftValues[i], new Vector(rightValues[i].length, rightValues[i]));
+          }
+        } else {
+          Vector[] rightValues = _rightTransformFunction.transformToVectorValuesSV(valueBlock);
+          for (int i = 0; i < length; i++) {
+            _doubleValuesSV[i] = computeDistance(leftValues[i], rightValues[i]);
+          }
+        }
       }
       return _doubleValuesSV;
     }
 
     protected abstract double computeDistance(float[] vector1, float[] vector2);
+
+    protected abstract double computeDistance(Vector vector1, Vector vector2);
   }
 
   public static class VectorDimsTransformFunction extends BaseTransformFunction {
@@ -161,8 +216,7 @@ public class VectorTransformFunctions {
         throw new IllegalArgumentException("Exactly 1 argument is required for Vector transform function");
       }
       _transformFunction = arguments.get(0);
-      Preconditions.checkArgument(!_transformFunction.getResultMetadata().isSingleValue(),
-          "Argument must be multi-valued float vector for vector distance transform function: %s", getName());
+      checkVectorArgumentMetadata(_transformFunction.getResultMetadata(), getName());
     }
 
     @Override
@@ -179,7 +233,14 @@ public class VectorTransformFunctions {
     public int[] transformToIntValuesSV(ValueBlock valueBlock) {
       int length = valueBlock.getNumDocs();
       initIntValuesSV(length);
-      float[][] values = _transformFunction.transformToFloatValuesMV(valueBlock);
+      if (_transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.FLOAT) {
+        float[][] values = _transformFunction.transformToFloatValuesMV(valueBlock);
+        for (int i = 0; i < length; i++) {
+          _intValuesSV[i] = VectorFunctions.vectorDims(values[i]);
+        }
+        return _intValuesSV;
+      }
+      Vector[] values = _transformFunction.transformToVectorValuesSV(valueBlock);
       for (int i = 0; i < length; i++) {
         _intValuesSV[i] = VectorFunctions.vectorDims(values[i]);
       }
@@ -201,8 +262,7 @@ public class VectorTransformFunctions {
       }
 
       _transformFunction = arguments.get(0);
-      Preconditions.checkArgument(!_transformFunction.getResultMetadata().isSingleValue(),
-          "Argument must be multi-valued float vector for vector distance transform function: %s", getName());
+      checkVectorArgumentMetadata(_transformFunction.getResultMetadata(), getName());
     }
 
     @Override
@@ -218,12 +278,27 @@ public class VectorTransformFunctions {
     @Override
     public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
       int length = valueBlock.getNumDocs();
-      initDoubleValuesSV(length);
-      float[][] values = _transformFunction.transformToFloatValuesMV(valueBlock);
-      for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = VectorFunctions.vectorNorm(values[i]);
+      double[] vectors = new double[length];
+      if (_transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.FLOAT) {
+        float[][] values = _transformFunction.transformToFloatValuesMV(valueBlock);
+        for (int i = 0; i < length; i++) {
+          vectors[i] = VectorFunctions.vectorNorm(values[i]);
+        }
+        return vectors;
       }
-      return _doubleValuesSV;
+      Vector[] values = _transformFunction.transformToVectorValuesSV(valueBlock);
+      for (int i = 0; i < length; i++) {
+        vectors[i] = VectorFunctions.vectorNorm(values[i]);
+      }
+      return vectors;
     }
+  }
+
+  protected static void checkVectorArgumentMetadata(TransformResultMetadata metadata, String functionName) {
+    Preconditions.checkArgument(
+        (metadata.getDataType() == FieldSpec.DataType.VECTOR) || (metadata.getDataType() == FieldSpec.DataType.FLOAT
+            && !metadata.isSingleValue()),
+        "Left argument must be multi-valued FLOAT array or VECTOR for vector distance transform function: %s",
+        functionName);
   }
 }

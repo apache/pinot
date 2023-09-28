@@ -40,6 +40,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
@@ -69,6 +70,7 @@ public class DataTableSerDeTest {
   private static final String[] STRINGS = new String[NUM_ROWS];
   private static final String[] JSONS = new String[NUM_ROWS];
   private static final byte[][] BYTES = new byte[NUM_ROWS][];
+  private static final Vector[] VECTORS = new Vector[NUM_ROWS];
   private static final Object[] OBJECTS = new Object[NUM_ROWS];
   private static final int[][] INT_ARRAYS = new int[NUM_ROWS][];
   private static final long[][] LONG_ARRAYS = new long[NUM_ROWS][];
@@ -129,6 +131,7 @@ public class DataTableSerDeTest {
     String emptyString = StringUtils.EMPTY;
     String[] emptyStringArray = {StringUtils.EMPTY};
     ByteArray emptyBytes = new ByteArray(new byte[0]);
+    Vector emptyVector = new Vector(0, new float[0]);
     for (int numRows = 0; numRows < NUM_ROWS; numRows++) {
       testEmptyValues(new DataSchema(new String[]{"STR_SV", "STR_MV"}, new DataSchema.ColumnDataType[]{
           DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING_ARRAY
@@ -145,6 +148,10 @@ public class DataTableSerDeTest {
       testEmptyValues(
           new DataSchema(new String[]{"BYTES"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.BYTES}),
           numRows, new Object[]{emptyBytes});
+
+      testEmptyValues(
+          new DataSchema(new String[]{"VECTORS"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.VECTOR}),
+          numRows, new Object[]{emptyVector});
 
       testEmptyValues(
           new DataSchema(new String[]{"BOOL_ARR"},
@@ -211,6 +218,8 @@ public class DataTableSerDeTest {
           dataTableBuilder.setColumn(columnId, (String) emptyValue);
         } else if (emptyValue instanceof ByteArray) {
           dataTableBuilder.setColumn(columnId, (ByteArray) emptyValue);
+        } else if (emptyValue instanceof Vector) {
+          dataTableBuilder.setColumn(columnId, (Vector) emptyValue);
         } else {
           dataTableBuilder.setColumn(columnId, emptyValue);
         }
@@ -248,6 +257,9 @@ public class DataTableSerDeTest {
             break;
           case BYTES:
             entry = newDataTable.getBytes(rowId, columnId);
+            break;
+          case VECTOR:
+            entry = newDataTable.getVector(rowId, columnId);
             break;
           default:
             entry = newDataTable.getCustomObject(rowId, columnId);
@@ -745,6 +757,15 @@ public class DataTableSerDeTest {
             BYTES[rowId] = isNull ? new byte[0] : RandomStringUtils.random(RANDOM.nextInt(20)).getBytes();
             dataTableBuilder.setColumn(colId, new ByteArray(BYTES[rowId]));
             break;
+          case VECTOR:
+            float[] floatVec = new float[20];
+            for (int i = 0; i < 20; i++) {
+              floatVec[i] = RANDOM.nextFloat();
+            }
+            Vector vector = new Vector(20, floatVec);
+            VECTORS[rowId] = isNull ? new Vector(0, new float[0]) : vector;
+            dataTableBuilder.setColumn(colId, VECTORS[rowId]);
+            break;
           // Just test Double here, all object types will be covered in ObjectCustomSerDeTest.
           case OBJECT:
             OBJECTS[rowId] = isNull ? null : RANDOM.nextDouble();
@@ -877,6 +898,10 @@ public class DataTableSerDeTest {
           case BYTES:
             Assert.assertEquals(newDataTable.getBytes(rowId, colId).getBytes(), isNull ? new byte[0] : BYTES[rowId],
                 ERROR_MESSAGE);
+            break;
+          case VECTOR:
+            Assert.assertEquals(newDataTable.getVector(rowId, colId),
+                isNull ? new Vector(0, new float[0]) : VECTORS[rowId], ERROR_MESSAGE);
             break;
           case OBJECT:
             CustomObject customObject = newDataTable.getCustomObject(rowId, colId);

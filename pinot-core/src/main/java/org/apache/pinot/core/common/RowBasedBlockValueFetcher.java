@@ -20,6 +20,7 @@ package org.apache.pinot.core.common;
 
 import java.math.BigDecimal;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -65,6 +66,8 @@ public class RowBasedBlockValueFetcher {
           return new BigDecimalValueFetcher(blockValSet.getBigDecimalValuesSV());
         case STRING:
           return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
+        case VECTOR:
+          return new VectorValueFetcher(blockValSet.getVectorValuesSV());
         case BYTES:
           return new BytesValueFetcher(blockValSet.getBytesValuesSV());
         case UNKNOWN:
@@ -175,6 +178,25 @@ public class RowBasedBlockValueFetcher {
 
     public ByteArray getValue(int docId) {
       return new ByteArray(_values[docId]);
+    }
+  }
+
+  private static class VectorValueFetcher implements ValueFetcher {
+    private final Vector[] _values;
+
+    VectorValueFetcher(Vector[] values) {
+      _values = values;
+    }
+
+    VectorValueFetcher(byte[][] values) {
+      _values = new Vector[values.length];
+      for (int i = 0; i < values.length; i++) {
+        _values[i] = Vector.fromBytes(values[i]);
+      }
+    }
+
+    public Vector getValue(int docId) {
+      return _values[docId];
     }
   }
 

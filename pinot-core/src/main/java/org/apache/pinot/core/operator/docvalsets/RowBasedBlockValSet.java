@@ -26,6 +26,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -332,6 +333,30 @@ public class RowBasedBlockValSet implements BlockValSet {
           break;
         default:
           throw new IllegalStateException("Cannot read BigDecimal values from data type: " + _dataType);
+      }
+    }
+    return values;
+  }
+
+  @Override
+  public Vector[] getVectorValuesSV() {
+    int numRows = _rows.size();
+    Vector[] values = new Vector[numRows];
+    if (numRows == 0) {
+      return values;
+    }
+    if (_dataType == DataType.UNKNOWN) {
+      Arrays.fill(values, NullValuePlaceHolder.OBJECT_VECTOR);
+      return values;
+    }
+    if (_nullBitmap == null) {
+      for (int i = 0; i < numRows; i++) {
+        values[i] = (Vector) _rows.get(i)[_colId];
+      }
+    } else {
+      for (int i = 0; i < numRows; i++) {
+        Object value = _rows.get(i)[_colId];
+        values[i] = value != null ? (Vector) value : NullValuePlaceHolder.OBJECT_VECTOR;
       }
     }
     return values;

@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.spi.index.metadata;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -47,6 +49,7 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
+import org.apache.pinot.spi.data.readers.Vector;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
@@ -232,6 +235,18 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     FieldSpec fieldSpec;
     switch (fieldType) {
       case DIMENSION:
+        boolean isVector = config.getBoolean(Column.getKeyFor(column, Column.IS_VECTOR), false);
+        if (isVector) {
+          DataType vectorDataType =
+              DataType.valueOf(config.getString(Column.getKeyFor(column, Column.VECTOR_DATATYPE)).toUpperCase());
+          int vectorLength = config.getInt(Column.getKeyFor(column, Column.VECTOR_LENGTH));
+          Vector defaultNullVector =
+              (defaultNullValueString == null) ? Vector.getDefaultNullValue(vectorDataType, vectorLength)
+                  : Vector.fromString(defaultNullValueString);
+          fieldSpec = new DimensionFieldSpec(column, dataType, vectorDataType, vectorLength, defaultNullVector);
+          break;
+        }
+
         boolean isSingleValue = config.getBoolean(Column.getKeyFor(column, Column.IS_SINGLE_VALUED));
         fieldSpec = new DimensionFieldSpec(column, dataType, isSingleValue, defaultNullValueString);
         break;
@@ -256,8 +271,18 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     // NOTE: Use getProperty() instead of getString() to avoid variable substitution ('${anotherKey}'), which can cause
     //       problem for special values such as '$${' where the first '$' is identified as escape character.
     // TODO: Use getProperty() for other properties as well to avoid the overhead of variable substitution
-    String minString = (String) config.getProperty(Column.getKeyFor(column, Column.MIN_VALUE));
-    String maxString = (String) config.getProperty(Column.getKeyFor(column, Column.MAX_VALUE));
+    String minString;
+    String maxString;
+    Object minObject = config.getProperty(Column.getKeyFor(column, Column.MIN_VALUE));
+    Object maxObject = config.getProperty(Column.getKeyFor(column, Column.MAX_VALUE));
+    if (minObject instanceof ArrayList) {
+      minString = Joiner.on(",").join((ArrayList) minObject);
+      maxString = Joiner.on(",").join((ArrayList) maxObject);
+    } else {
+      minString = (String) config.getProperty(Column.getKeyFor(column, Column.MIN_VALUE));
+      maxString = (String) config.getProperty(Column.getKeyFor(column, Column.MAX_VALUE));
+    }
+
     if (minString != null && maxString != null) {
       switch (storedType) {
         case INT:
@@ -287,6 +312,10 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         case BYTES:
           builder.setMinValue(BytesUtils.toByteArray(minString));
           builder.setMaxValue(BytesUtils.toByteArray(maxString));
+          break;
+        case VECTOR:
+          builder.setMinValue(Vector.fromString(minString));
+          builder.setMaxValue(Vector.fromString(maxString));
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + column);
