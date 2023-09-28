@@ -81,14 +81,22 @@ jobs:
         distribution: [ "corretto" ]
         prioritize_bytebuffer: [false]
         include:
-          - java: 21
+          - java: 11
             testset: 1
             distribution: "corretto"
             prioritize_bytebuffer: true
-          - java: 21
+          - java: 11
             testset: 2
             distribution: "corretto"
             prioritize_bytebuffer: true
+          - java: 21
+            testset: 1
+            distribution: "corretto"
+            prioritize_bytebuffer: false
+          - java: 21
+            testset: 2
+            distribution: "corretto"
+            prioritize_bytebuffer: false
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
@@ -160,14 +168,22 @@ jobs:
         distribution: [ "corretto" ]
         prioritize_bytebuffer: [false]
         include:
-          - java: 21
+          - java: 11
             testset: 1
             distribution: "corretto"
             prioritize_bytebuffer: true
-          - java: 21
+          - java: 11
             testset: 2
             distribution: "corretto"
             prioritize_bytebuffer: true
+          - java: 21
+            testset: 1
+            distribution: "corretto"
+            prioritize_bytebuffer: false
+          - java: 21
+            testset: 2
+            distribution: "corretto"
+            prioritize_bytebuffer: false
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
     steps:
       - uses: actions/checkout@v3
@@ -314,19 +330,16 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        testset: [ 1, 2 ]
         java: [ 11, 17, 21 ]
         distribution: [ "corretto" ]
         prioritize_bytebuffer: [false]
         include:
-          - java: 21
-            testset: 1
+          - java: 11
             distribution: "corretto"
             prioritize_bytebuffer: true
           - java: 21
-            testset: 2
             distribution: "corretto"
-            prioritize_bytebuffer: true
+            prioritize_bytebuffer: false
     name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }}
     steps:
       - uses: actions/checkout@v3
