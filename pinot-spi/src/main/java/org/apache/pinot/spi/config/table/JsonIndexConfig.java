@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
  *                 to be excluded.
  * - excludeFields: Exclude the given fields, e.g. "b", "c", even if it is under the included paths.
  * - maxValueLength: Exclude field values which are longer than this length. A value of "0" disables this filter.
+ *                   Excluded values will be replaced with JsonUtils.SKIPPED_VALUE_REPLACEMENT.
  */
 public class JsonIndexConfig extends IndexConfig {
   public static final JsonIndexConfig DISABLED = new JsonIndexConfig(true);
