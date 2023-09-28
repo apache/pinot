@@ -74,6 +74,7 @@ public class JsonUtils {
   public static final String KEY_SEPARATOR = ".";
   public static final String ARRAY_PATH = "[*]";
   public static final String ARRAY_INDEX_KEY = ".$index";
+  public static final String SKIPPED_VALUE_REPLACEMENT = "$SKIPPED$";
   public static final int MAX_COMBINATIONS = 100_000;
 
   // For querying
@@ -377,7 +378,12 @@ public class JsonUtils {
 
     // Value
     if (node.isValueNode()) {
-      return Collections.singletonList(Collections.singletonMap(VALUE_KEY, node.asText()));
+      String valueAsText = node.asText();
+      int maxValueLength = jsonIndexConfig.getMaxValueLength();
+      if (0 < maxValueLength && maxValueLength < valueAsText.length()) {
+        valueAsText = SKIPPED_VALUE_REPLACEMENT;
+      }
+      return Collections.singletonList(Collections.singletonMap(VALUE_KEY, valueAsText));
     }
 
     Preconditions.checkArgument(node.isArray() || node.isObject(), "Unexpected node type: %s", node.getNodeType());

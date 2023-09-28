@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -244,12 +245,19 @@ public class JsonIndexTest {
 
         matchingDocIds = getMatchingDocIds(indexReader, "key2='longValue2'");
         Assert.assertTrue(matchingDocIds.isEmpty());
+        matchingDocIds = getMatchingDocIds(indexReader, "key2='" + JsonUtils.SKIPPED_VALUE_REPLACEMENT + "'");
+        Assert.assertEquals(new int[]{0}, matchingDocIds.toArray());
 
         matchingDocIds = getMatchingDocIds(indexReader, "nestedKey3.key4='longValue4'");
         Assert.assertTrue(matchingDocIds.isEmpty());
+        matchingDocIds =
+            getMatchingDocIds(indexReader, "nestedKey3.key4='" + JsonUtils.SKIPPED_VALUE_REPLACEMENT + "'");
+        Assert.assertEquals(new int[]{0}, matchingDocIds.toArray());
 
         matchingDocIds = getMatchingDocIds(indexReader, "key5='longValue5'");
         Assert.assertTrue(matchingDocIds.isEmpty());
+        matchingDocIds = getMatchingDocIds(indexReader, "key5='" + JsonUtils.SKIPPED_VALUE_REPLACEMENT + "'");
+        Assert.assertEquals(new int[]{1}, matchingDocIds.toArray());
 
         matchingDocIds = getMatchingDocIds(indexReader, "key6='value6'");
         Assert.assertEquals(new int[]{1}, matchingDocIds.toArray());

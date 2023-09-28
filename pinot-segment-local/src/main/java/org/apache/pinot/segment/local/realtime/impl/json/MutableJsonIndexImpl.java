@@ -106,11 +106,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         // Put both key and key-value into the posting list. Key is useful for checking if a key exists in the json.
         String key = entry.getKey();
         _postingListMap.computeIfAbsent(key, k -> new RoaringBitmap()).add(_nextFlattenedDocId);
-        int length = _jsonIndexConfig.getMaxValueLength();
-        if (0 == length || entry.getValue().length() <= length) {
-          String keyValue = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + entry.getValue();
-          _postingListMap.computeIfAbsent(keyValue, k -> new RoaringBitmap()).add(_nextFlattenedDocId);
-        }
+        String keyValue = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + entry.getValue();
+        _postingListMap.computeIfAbsent(keyValue, k -> new RoaringBitmap()).add(_nextFlattenedDocId);
       }
       _nextFlattenedDocId++;
     }
