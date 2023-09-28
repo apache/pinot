@@ -77,18 +77,10 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17, 21 ]
+        java: [ 11, 17 ]
         distribution: [ "corretto" ]
-        prioritize_bytebuffer: [false]
+        prioritize_bytebuffer: [false, true]
         include:
-          - java: 11
-            testset: 1
-            distribution: "corretto"
-            prioritize_bytebuffer: true
-          - java: 11
-            testset: 2
-            distribution: "corretto"
-            prioritize_bytebuffer: true
           - java: 21
             testset: 1
             distribution: "corretto"
@@ -164,18 +156,10 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17, 21 ]
+        java: [ 11, 17 ]
         distribution: [ "corretto" ]
-        prioritize_bytebuffer: [false]
+        prioritize_bytebuffer: [false, true]
         include:
-          - java: 11
-            testset: 1
-            distribution: "corretto"
-            prioritize_bytebuffer: true
-          - java: 11
-            testset: 2
-            distribution: "corretto"
-            prioritize_bytebuffer: true
           - java: 21
             testset: 1
             distribution: "corretto"
@@ -330,13 +314,10 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        java: [ 11, 17, 21 ]
+        java: [ 11, 17 ]
         distribution: [ "corretto" ]
-        prioritize_bytebuffer: [false]
+        prioritize_bytebuffer: [false, true]
         include:
-          - java: 11
-            distribution: "corretto"
-            prioritize_bytebuffer: true
           - java: 21
             distribution: "corretto"
             prioritize_bytebuffer: false
