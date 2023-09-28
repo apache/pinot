@@ -239,7 +239,6 @@ public class JsonIndexTest {
 
       JsonIndexReader[] indexReaders = new JsonIndexReader[]{onHeapIndexReader, offHeapIndexReader, mutableJsonIndex};
       for (JsonIndexReader indexReader : indexReaders) {
-        System.err.println(indexReader);
         MutableRoaringBitmap matchingDocIds = getMatchingDocIds(indexReader, "key1='value1'");
         Assert.assertEquals(new int[]{0}, matchingDocIds.toArray());
 
