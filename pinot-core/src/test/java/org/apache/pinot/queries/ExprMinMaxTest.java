@@ -257,8 +257,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(1)[4], new String[]{"a0", "a01", "a02"});
     assertEquals(rows.get(0)[5], 0);
     assertEquals(rows.get(1)[5], 0);
-    assertEquals(rows.get(0)[6], new BigDecimal(360000));
-    assertEquals(rows.get(1)[6], new BigDecimal(360000));
+    assertEquals(rows.get(0)[6], "360000");
+    assertEquals(rows.get(1)[6], "360000");
     assertEquals(rows.get(0)[7], 600D);
     assertEquals(rows.get(1)[7], 600D);
     assertEquals(rows.get(0)[8], 1683138373879L - 1999L);

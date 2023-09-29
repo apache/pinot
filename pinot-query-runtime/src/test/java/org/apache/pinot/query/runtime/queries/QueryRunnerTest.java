@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -38,6 +38,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -150,8 +151,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    */
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
-    List<Object[]> resultRows = queryRunner(sql, null);
-    Assert.assertEquals(resultRows.size(), expectedRows);
+    ResultTable resultTable = queryRunner(sql, null);
+    Assert.assertEquals(resultTable.getRows().size(), expectedRows);
   }
 
   /**
@@ -163,10 +164,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
-    List<Object[]> resultRows = queryRunner(sql, null);
+    ResultTable resultTable = queryRunner(sql, null);
     // query H2 for data
     List<Object[]> expectedRows = queryH2(sql);
-    compareRowEquals(resultRows, expectedRows);
+    compareRowEquals(resultTable, expectedRows);
   }
 
   /**
@@ -176,10 +177,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
     try {
       // query pinot
-      List<Object[]> resultRows = queryRunner(sql, null);
-      Assert.fail(
-          "Expected error with message '" + exceptionMsg + "'. But instead rows were returned: " + resultRows.stream()
-              .map(Arrays::toString).collect(Collectors.joining(",\n")));
+      ResultTable resultTable = queryRunner(sql, null);
+      Assert.fail("Expected error with message '" + exceptionMsg + "'. But instead rows were returned: "
+          + JsonUtils.objectToPrettyString(resultTable));
     } catch (Exception e) {
       // NOTE: The actual message is (usually) something like:
       //   Received error query execution result block: {200=QueryExecutionError:
