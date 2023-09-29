@@ -263,6 +263,27 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testCaseWhenTransformFunctionNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(
+            String.format("caseWhen(%s IS NULL, 'aa', 'bb')", STRING_ALPHANUM_NULL_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "caseWhen");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+    assertTrue(transformFunction.getResultMetadata().isSingleValue());
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        expectedValues[i] = "aa";
+      } else {
+        expectedValues[i] = "bb";
+      }
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
   public void testStringContainsTransformFunction() {
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("contains(%s, 'a')", STRING_ALPHANUM_SV_COLUMN));
