@@ -227,6 +227,8 @@ public abstract class QueryScheduler {
       if (threadCpuTimeNs > 0) {
         _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs,
             TimeUnit.NANOSECONDS);
+        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.TOTAL_THREAD_CPU_TIME_MILLIS,
+            TimeUnit.MILLISECONDS.convert(threadCpuTimeNs, TimeUnit.NANOSECONDS));
       }
       if (systemActivitiesCpuTimeNs > 0) {
         _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.SYSTEM_ACTIVITIES_CPU_TIME_NS,
