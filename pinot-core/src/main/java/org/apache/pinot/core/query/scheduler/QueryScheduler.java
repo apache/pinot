@@ -37,6 +37,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -167,6 +168,19 @@ public abstract class QueryScheduler {
       responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
 
       byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
+
+      Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
+      Long maxResponseByteLength = QueryOptionsUtils.getMaxSerializedResponseLengthPerServer(queryOptions);
+      if (maxResponseByteLength != null && responseBytes.length > maxResponseByteLength) {
+        String errorMessage = String.format("Serialized response exceeds threshold for requestId %d from broker %s",
+            queryRequest.getRequestId(), queryRequest.getBrokerId());
+        LOGGER.error(errorMessage);
+        // TODO(Vivek): Add a metric indicating the number of such exceptions.
+        instanceResponse = new InstanceResponseBlock();
+        instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, errorMessage));
+        instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+        responseBytes = serializeResponse(queryRequest, instanceResponse);
+      }
 
       // Log the statistics
       String tableNameWithType = queryRequest.getTableNameWithType();

@@ -618,6 +618,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(oneHourAgoTodayStr, expectedOneHourAgoTodayStr);
   }
 
+  @Test
+  public void testMaxSerializedResponseLengthPerServer()
+      throws Exception {
+    String queryWithOption = "SET maxSerializedResponseLengthPerServer=1000; " + SELECT_STAR_QUERY;
+    JsonNode response = postQuery(queryWithOption);
+    assert response.get("exceptions").size() > 0;
+    String exceptionStr = response.get("exceptions").get(0).get("message").toString();
+    assert exceptionStr.contains("Serialized response exceeds threshold");
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testRegexpReplace(boolean useMultiStageQueryEngine)
       throws Exception {

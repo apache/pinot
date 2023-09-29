@@ -101,6 +101,18 @@ public class QueryOptionsUtils {
     }
   }
 
+  @Nullable
+  public static Long getMaxSerializedResponseLengthPerServer(Map<String, String> queryOptions) {
+    String responseLength = queryOptions.get(QueryOptionKey.MAX_SERIALIZED_RESPONSE_LENGTH_PER_SERVER);
+    if (responseLength != null) {
+      long maxLength = Long.parseLong(responseLength);
+      Preconditions.checkState(maxLength > 0, "maxSerializedResponseLength must be positive. got %s", maxLength);
+      return maxLength;
+    }
+
+    return null;
+  }
+
   public static boolean isAndScanReorderingEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
   }

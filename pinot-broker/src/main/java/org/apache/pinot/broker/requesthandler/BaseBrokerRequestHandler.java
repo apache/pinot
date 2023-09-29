@@ -138,6 +138,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final String _brokerId;
   protected final long _brokerTimeoutMs;
   protected final int _queryResponseLimit;
+  protected final long _queryMaxSerializedResponseBytes;
   protected final QueryLogger _queryLogger;
   protected final BrokerQueryEventListener _brokerQueryEventListener;
 
@@ -170,6 +171,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+    _queryMaxSerializedResponseBytes = config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES,
+        Broker.DEFAULT_MAX_QUERY_RESPONSE_SIZE_BYTES);
     _queryLogger = new QueryLogger(config);
     boolean enableQueryCancellation =
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
@@ -177,8 +180,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerQueryEventListener = brokerQueryEventListener;
     LOGGER.info(
         "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps, "
-            + "enabling query cancellation: {}", _brokerId, _brokerTimeoutMs, _queryResponseLimit,
-        _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(), enableQueryCancellation);
+            + "enabling query cancellation: {}, max serialized response size: {}", _brokerId, _brokerTimeoutMs,
+        _queryResponseLimit, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
+        enableQueryCancellation, _queryMaxSerializedResponseBytes);
   }
 
   @Override
@@ -681,6 +685,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         exceptions.add(QueryException.getException(QueryException.BROKER_TIMEOUT_ERROR, errorMessage));
         return new BrokerResponseNative(exceptions);
       }
+
+    // Set the maximum serialized response size per server
+      int numServers = 0;
+      if (offlineRoutingTable != null) {
+        numServers += offlineRoutingTable.keySet().size();
+      }
+      if (realtimeRoutingTable != null) {
+        numServers += realtimeRoutingTable.keySet().size();
+      }
+      setServerSerializedResponseLength(numServers, offlineBrokerRequest);
+      setServerSerializedResponseLength(numServers, realtimeBrokerRequest);
 
       // Execute the query
       // TODO: Replace ServerStats with ServerRoutingStatsEntry.
@@ -1652,6 +1667,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     queryOptions.put(Broker.Request.QueryOptionKey.TIMEOUT_MS, Long.toString(remainingTimeMs));
     return remainingTimeMs;
+  }
+
+  /**
+   * Sets a query option indicating the maximum response size that can be sent from a server to the broker. This size
+   * is measured for the serialized response.
+   */
+  private void setServerSerializedResponseLength(int numServers, @Nullable BrokerRequest brokerRequest) {
+    if (brokerRequest == null) {
+      return;
+    }
+
+    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
+    Long maxLength = QueryOptionsUtils.getMaxSerializedResponseLengthPerServer(queryOptions);
+    if (maxLength == null && _queryMaxSerializedResponseBytes > 0) {
+      long maxLengthPerServer = _queryMaxSerializedResponseBytes / numServers;
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERIALIZED_RESPONSE_LENGTH_PER_SERVER,
+          Long.toString(maxLengthPerServer));
+    }
   }
 
   /**
