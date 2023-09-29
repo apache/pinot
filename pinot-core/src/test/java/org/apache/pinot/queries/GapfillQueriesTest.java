@@ -4028,6 +4028,25 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     }
   }
 
+  @Test
+  public void missingColumnFromTimeSeriesInsideGapfillSelector() {
+    try {
+      String gapfillQuery = "SELECT GapFill(DATETIMECONVERT(eventTime, '1:MILLISECONDS:EPOCH', "
+          + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', '1:HOURS'), "
+          + "    '1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS', "
+          + "    '2021-11-07 4:00:00.000',  '2021-11-07 12:00:00.000', '1:HOURS',"
+          + "     FILL(isOccupied, 'FILL_PREVIOUS_VALUE'), TIMESERIESON(levelId, lotId)) AS time_col,"
+          + "     levelId, isOccupied "
+          + "FROM parkingData "
+          + "WHERE eventTime >= 1636257600000 AND eventTime <= 1636286400000 "
+          + "LIMIT 200 ";
+
+      getBrokerResponse(gapfillQuery);
+      Assert.fail();
+    } catch (RuntimeException ex) {
+    }
+  }
+
   @AfterClass
   public void tearDown()
       throws IOException {

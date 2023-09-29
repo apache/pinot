@@ -86,6 +86,10 @@ public class GapfillProcessor extends BaseGapfillProcessor {
 
     // The first one argument of timeSeries is time column. The left ones are defining entity.
     for (ExpressionContext entityColum : _timeSeries) {
+      if (indexes.containsKey(entityColum.getIdentifier())) {
+        throw new RuntimeException(
+                String.format("column (%s) inside timeSeries is not inside the gapfill selector.", entityColum));
+      }
       int index = indexes.get(entityColum.getIdentifier());
       _isGroupBySelections[index] = true;
     }
