@@ -38,6 +38,11 @@ import org.apache.pinot.spi.data.Schema;
  * @param <IC> the {@link IndexCreator} subclass that should be used to create indexes of this type.
  */
 public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC extends IndexCreator> {
+  enum IndexBuildLifecycle {
+    DURING_SEGMENT_CREATION,
+    POST_SEGMENT_CREATION,
+    CUSTOM
+  }
 
   /**
    * The unique id that identifies this index type.
@@ -126,5 +131,9 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
   @Nullable
   default MutableIndex createMutableIndex(MutableIndexContext context, C config) {
     return null;
+  }
+
+  default IndexBuildLifecycle getIndexBuildLifecycle() {
+    return IndexBuildLifecycle.DURING_SEGMENT_CREATION;
   }
 }
