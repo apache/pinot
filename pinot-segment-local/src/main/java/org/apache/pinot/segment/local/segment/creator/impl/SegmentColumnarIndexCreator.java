@@ -94,7 +94,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   /**
    * Contains, indexed by column name, the creator associated with each index type.
    *
-   * Indexes that {@link #hasSpecialLifecycle(IndexType) have a special lyfecycle} are not included here.
+   * Indexes whose build lifecycle is not DURING_SEGMENT_CREATION are not included here.
    */
   private Map<String, Map<IndexType<?, ?, ?>, IndexCreator>> _creatorsByColAndIndex = new HashMap<>();
   private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
@@ -195,7 +195,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
           Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
       for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
-        if (index.hasSpecialLifecycle()) {
+        if (index.getIndexBuildLifecycle() != IndexType.IndexBuildLifecycle.DURING_SEGMENT_CREATION) {
           continue;
         }
         tryCreateIndexCreator(creatorsByIndex, index, context, config);

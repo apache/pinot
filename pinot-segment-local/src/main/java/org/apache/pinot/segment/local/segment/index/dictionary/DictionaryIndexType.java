@@ -101,11 +101,6 @@ public class DictionaryIndexType
   }
 
   @Override
-  public boolean hasSpecialLifecycle() {
-    return true;
-  }
-
-  @Override
   public Map<String, DictionaryIndexConfig> fromIndexLoadingConfig(
       IndexLoadingConfig indexLoadingConfig) {
     Map<String, DictionaryIndexConfig> result = new HashMap<>();
@@ -453,5 +448,9 @@ public class DictionaryIndexType
         IndexUtil.buildAllocationContext(segmentName, column, V1Constants.Dict.FILE_EXTENSION);
     return MutableDictionaryFactory.getMutableDictionary(storedType, context.isOffHeap(), context.getMemoryManager(),
         dictionaryColumnSize, Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
+  }
+
+  public IndexBuildLifecycle getIndexBuildLifecycle() {
+    return IndexBuildLifecycle.CUSTOM;
   }
 }

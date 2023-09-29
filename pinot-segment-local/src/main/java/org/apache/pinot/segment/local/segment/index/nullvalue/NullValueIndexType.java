@@ -71,11 +71,6 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   }
 
   @Override
-  public boolean hasSpecialLifecycle() {
-    return true;
-  }
-
-  @Override
   public String getPrettyName() {
     return INDEX_DISPLAY_NAME;
   }
@@ -134,5 +129,9 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+  }
+
+  public IndexBuildLifecycle getIndexBuildLifecycle() {
+    return IndexBuildLifecycle.CUSTOM;
   }
 }

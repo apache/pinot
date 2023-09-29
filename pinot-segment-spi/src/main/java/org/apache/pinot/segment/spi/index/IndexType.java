@@ -38,6 +38,11 @@ import org.apache.pinot.spi.data.Schema;
  * @param <IC> the {@link IndexCreator} subclass that should be used to create indexes of this type.
  */
 public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC extends IndexCreator> {
+  enum IndexBuildLifecycle {
+    DURING_SEGMENT_CREATION,
+    POST_SEGMENT_CREATION,
+    CUSTOM
+  }
 
   /**
    * The unique id that identifies this index type.
@@ -78,15 +83,6 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    */
   IC createIndexCreator(IndexCreationContext context, C indexConfig)
       throws Exception;
-
-
-  /**
-   * Returns true if the given index type has their own construction lifecycle and therefore should not be instantiated
-   * in the general index loop and shouldn't be notified of each new column.
-   */
-  default boolean hasSpecialLifecycle() {
-    return false;
-  }
 
   /**
    * Returns the {@link IndexReaderFactory} that should be used to return readers for this type.
@@ -135,5 +131,9 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
   @Nullable
   default MutableIndex createMutableIndex(MutableIndexContext context, C config) {
     return null;
+  }
+
+  default IndexBuildLifecycle getIndexBuildLifecycle() {
+    return IndexBuildLifecycle.DURING_SEGMENT_CREATION;
   }
 }
