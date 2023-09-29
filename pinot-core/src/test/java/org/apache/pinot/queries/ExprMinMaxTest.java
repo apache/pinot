@@ -57,7 +57,7 @@ import static org.testng.Assert.fail;
 
 
 /**
- * Queries test for argMin/argMax functions.
+ * Queries test for exprmin/exprmax functions.
  */
 public class ExprMinMaxTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ExprMinMaxTest");
@@ -202,7 +202,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     query = "SELECT expr_max(mvDoubleColumn, jsonColumn) FROM testTable";
     brokerResponse = getBrokerResponse(query);
     Assert.assertTrue(brokerResponse.getProcessingExceptions().get(0).getMessage().contains(
-        "Cannot compute ArgMinMax measuring on non-comparable type: JSON"
+        "Cannot compute exprminMax measuring on non-comparable type: JSON"
     ));
   }
 
@@ -533,7 +533,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     assertEquals(rows.get(4)[2], new Object[]{27});
 
     //  TODO: The following query works because whenever we find an empty array in the result, we use null
-    //        (see ArgMinMaxProjectionValSetWrapper). Ideally, we should be able to serialize empty array.
+    //        (see exprminMaxProjectionValSetWrapper). Ideally, we should be able to serialize empty array.
     //        requires fix for empty int arrays ser/de in DataBlock
     query =
         "SELECT stringColumn, expr_min(VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27), intColumn), "

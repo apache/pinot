@@ -23,7 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -73,9 +73,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -119,7 +119,7 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
   }
 
-  private void setupLatestIngestionTimestamp(LLRealtimeSegmentDataManager segmentDataManager,
+  private void setupLatestIngestionTimestamp(RealtimeSegmentDataManager segmentDataManager,
       long latestIngestionTimestamp) {
     MutableSegment mockSegment = mock(MutableSegment.class);
     SegmentMetadata mockSegmentMetdata = mock(SegmentMetadata.class);
@@ -148,9 +148,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -212,9 +212,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -285,9 +285,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -334,9 +334,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -392,9 +392,9 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
 
     // setup SegmentDataManagers
-    LLRealtimeSegmentDataManager segMngrA0 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrA1 = mock(LLRealtimeSegmentDataManager.class);
-    LLRealtimeSegmentDataManager segMngrB0 = mock(LLRealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);

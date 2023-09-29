@@ -16,19 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager.realtime;
+package org.apache.pinot.spi.eventlistener.query;
 
-import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.RequestContext;
 
 
-/**
- * For committing realtime segments.
- */
-public interface SegmentCommitter {
-  /**
-   * Commits a realtime segment to persistent store
-   * @param segmentBuildDescriptor object that describes segment to be committed
-   * @return
-   */
-  SegmentCompletionProtocol.Response commit(RealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor);
+public class NoOpBrokerQueryEventListener implements BrokerQueryEventListener {
+
+  @Override
+  public void init(PinotConfiguration eventListenerConfiguration) {
+    // Not implemented method
+  }
+
+  @Override
+  public void onQueryCompletion(RequestContext requestContext) {
+    // Not implemented method
+  }
 }

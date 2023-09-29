@@ -25,9 +25,9 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVFo
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -79,19 +79,31 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
   public static ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
       boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
-    if (isSingleValue) {
-      if (storedType.isFixedWidth()) {
-        return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION
-            ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
-            : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
-      } else {
-        return version == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkSVForwardIndexReaderV4(dataBuffer,
-            storedType) : new VarByteChunkSVForwardIndexReader(dataBuffer, storedType);
-      }
+    if (isSingleValue && storedType.isFixedWidth()) {
+      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION
+          ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
+          : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
+    }
+
+    if (version == VarByteChunkForwardIndexWriterV4.VERSION) {
+      // V4 reader is common for sv var byte, mv fixed byte and mv var byte
+      return new VarByteChunkForwardIndexReaderV4(dataBuffer, storedType, isSingleValue);
     } else {
-      // TODO: Support V4 MV reader
-      return storedType.isFixedWidth() ? new FixedByteChunkMVForwardIndexReader(dataBuffer, storedType)
-          : new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
+      return createNonV4RawIndexReader(dataBuffer, storedType, isSingleValue);
+    }
+  }
+
+  private static ForwardIndexReader createNonV4RawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
+      boolean isSingleValue) {
+    // Only reach here if SV + raw + var byte + non v4 or MV + non v4
+    if (isSingleValue) {
+      return new VarByteChunkSVForwardIndexReader(dataBuffer, storedType);
+    } else {
+      if (storedType.isFixedWidth()) {
+        return new FixedByteChunkMVForwardIndexReader(dataBuffer, storedType);
+      } else {
+        return new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
+      }
     }
   }
 }

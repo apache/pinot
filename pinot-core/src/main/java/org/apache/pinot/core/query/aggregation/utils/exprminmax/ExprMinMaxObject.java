@@ -149,17 +149,17 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
    * = 0: new key is the same as the current extremum
    * < 0: current key is still the extremum
    */
-  public int compareAndSetKey(List<ExprMinMaxMeasuringValSetWrapper> argMinMaxWrapperValSets, int offset,
+  public int compareAndSetKey(List<ExprMinMaxMeasuringValSetWrapper> exprMinMaxWrapperValSets, int offset,
       boolean isMax) {
     Preconditions.checkState(_mutable, "Cannot compare and set key after the object is serialized");
     if (!_isNull) {
       for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
-        ExprMinMaxMeasuringValSetWrapper argMinMaxWrapperValSet = argMinMaxWrapperValSets.get(i);
-        int result = argMinMaxWrapperValSet.compare(offset, _extremumMeasuringKeys[i]);
+        ExprMinMaxMeasuringValSetWrapper exprMinMaxWrapperValSet = exprMinMaxWrapperValSets.get(i);
+        int result = exprMinMaxWrapperValSet.compare(offset, _extremumMeasuringKeys[i]);
         if (result != 0) {
           if (isMax ? result < 0 : result > 0) {
             for (int j = 0; j < _sizeOfExtremumMeasuringKeys; j++) {
-              _extremumMeasuringKeys[j] = argMinMaxWrapperValSets.get(j).getComparable(offset);
+              _extremumMeasuringKeys[j] = exprMinMaxWrapperValSets.get(j).getComparable(offset);
             }
             return 1;
           }
@@ -170,7 +170,7 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
       _isNull = false;
       _extremumMeasuringKeys = new Comparable[_sizeOfExtremumMeasuringKeys];
       for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
-        _extremumMeasuringKeys[i] = argMinMaxWrapperValSets.get(i).getComparable(offset);
+        _extremumMeasuringKeys[i] = exprMinMaxWrapperValSets.get(i).getComparable(offset);
       }
     }
     return 0;
@@ -278,7 +278,7 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
   }
 
   /**
-   * Merge two ArgMinMaxObjects
+   * Merge two exprminMaxObjects
    */
   public ExprMinMaxObject merge(ExprMinMaxObject other, boolean isMax) {
     if (_isNull && other._isNull) {

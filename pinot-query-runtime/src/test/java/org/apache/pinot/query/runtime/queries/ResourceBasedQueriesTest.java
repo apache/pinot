@@ -71,9 +71,11 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
   private static final Random RANDOM = new Random(42);
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
+  private static final String IGNORE_FILTER_PROPERTY = "pinot.runIgnored";
   private static final int NUM_PARTITIONS = 4;
 
   private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
+  private boolean _isRunIgnored;
   private TimeZone _currentSystemTimeZone;
 
   @BeforeClass
@@ -81,6 +83,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       throws Exception {
     // Save the original default timezone
     _currentSystemTimeZone = TimeZone.getDefault();
+
+    String runIgnoredProp = System.getProperty(IGNORE_FILTER_PROPERTY);
+    _isRunIgnored = runIgnoredProp != null;
 
     // Change the default timezone
     TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"));
@@ -245,7 +250,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
-  public void testQueryTestCasesWithH2(String testCaseName, String sql, String h2Sql, String expect,
+  public void testQueryTestCasesWithH2(String testCaseName, boolean isIgnored, String sql, String h2Sql, String expect,
       boolean keepOutputRowOrder)
       throws Exception {
     // query pinot
@@ -259,15 +264,15 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
-  public void testQueryTestCasesWithOutput(String testCaseName, String sql, String h2Sql, List<Object[]> expectedRows,
-      String expect, boolean keepOutputRowOrder)
+  public void testQueryTestCasesWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
+      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
       throws Exception {
     runQuery(sql, expect, null).ifPresent(rows -> compareRowEquals(rows, expectedRows, keepOutputRowOrder));
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
-  public void testQueryTestCasesWithMetadata(String testCaseName, String sql, String h2Sql, String expect,
-      int numSegments)
+  public void testQueryTestCasesWithMetadata(String testCaseName, boolean isIgnored, String sql, String h2Sql,
+      String expect, int numSegments)
       throws Exception {
     Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap = new HashMap<>();
     runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(rows -> {
@@ -358,7 +363,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
-        if (queryCase._ignored) {
+        if (queryCase._ignored && !_isRunIgnored) {
           continue;
         }
 
@@ -372,7 +377,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             expectedRows.add(objs.toArray());
           }
           Object[] testEntry = new Object[]{
-              testCaseName, sql, h2Sql, expectedRows, queryCase._expectedException, queryCase._keepOutputRowOrder
+              testCaseName, queryCase._ignored, sql, h2Sql, expectedRows, queryCase._expectedException,
+              queryCase._keepOutputRowOrder
           };
           providerContent.add(testEntry);
         }
@@ -402,7 +408,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
 
-        if (queryCase._ignored) {
+        if (queryCase._ignored && !_isRunIgnored) {
           continue;
         }
 
@@ -418,7 +424,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             throw new RuntimeException("Unable to test metadata without expected num segments configuration!");
           }
 
-          Object[] testEntry = new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, segmentCount};
+          Object[] testEntry = new Object[]{
+              testCaseName, queryCase._ignored, sql, h2Sql, queryCase._expectedException, segmentCount
+          };
           providerContent.add(testEntry);
         }
       }
@@ -439,15 +447,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       String testCaseName = testCaseEntry.getKey();
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
-        if (queryCase._ignored) {
+        if (queryCase._ignored && !_isRunIgnored) {
           continue;
         }
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
               : replaceTableName(testCaseName, queryCase._sql);
-          Object[] testEntry =
-              new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, queryCase._keepOutputRowOrder};
+          Object[] testEntry = new Object[]{
+              testCaseName, queryCase._ignored, sql, h2Sql, queryCase._expectedException, queryCase._keepOutputRowOrder
+          };
           providerContent.add(testEntry);
         }
       }
@@ -476,11 +485,11 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     }
 
     // get filter if set
-    String property = System.getProperty(FILE_FILTER_PROPERTY);
+    String fileFilterProp = System.getProperty(FILE_FILTER_PROPERTY);
 
     // Load each test file.
     for (String testCaseName : testFilenames) {
-      if (property != null && !testCaseName.toLowerCase().contains(property.toLowerCase())) {
+      if (fileFilterProp != null && !testCaseName.toLowerCase().contains(fileFilterProp.toLowerCase())) {
         continue;
       }
 

@@ -136,7 +136,7 @@ public class ObjectSerDeUtils {
     CovarianceTuple(32),
     VarianceTuple(33),
     PinotFourthMoment(34),
-    ArgMinMaxObject(35),
+    ExprMinMaxObject(35),
     KllDataSketch(36),
     IntegerTupleSketch(37),
     FrequentStringsSketch(38),
@@ -233,7 +233,7 @@ public class ObjectSerDeUtils {
       } else if (value instanceof org.apache.datasketches.tuple.Sketch) {
         return ObjectType.IntegerTupleSketch;
       } else if (value instanceof ExprMinMaxObject) {
-        return ObjectType.ArgMinMaxObject;
+        return ObjectType.ExprMinMaxObject;
       } else if (value instanceof ItemsSketch) {
         return ObjectType.FrequentStringsSketch;
       } else if (value instanceof LongsSketch) {
