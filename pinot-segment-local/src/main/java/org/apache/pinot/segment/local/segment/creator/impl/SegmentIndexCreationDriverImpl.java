@@ -344,14 +344,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           new IndexLoadingConfig(null, _config.getTableConfig(), _config.getSchema());
 
       try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
-          .load(segmentOutputDir.toURI(), segmentLoaderContext)) {
+          .load(segmentOutputDir.toURI(), segmentLoaderContext);
+          SegmentDirectory.Writer segmentWriter = segmentDirectory.createWriter()){
         for (IndexType indexType : postSegCreationIndexes) {
           IndexHandler handler =
               indexType.createIndexHandler(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(),
                   _config.getSchema(), _config.getTableConfig());
-          if (handler.needUpdateIndices(segmentDirectory.createReader())) {
-            handler.updateIndices(segmentDirectory.createWriter());
-          }
+          handler.updateIndices(segmentWriter);
         }
       }
     }
