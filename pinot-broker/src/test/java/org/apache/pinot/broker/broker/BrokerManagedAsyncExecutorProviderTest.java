@@ -89,14 +89,15 @@ public class BrokerManagedAsyncExecutorProviderTest {
 
     ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) executorService;
 
-    assertEquals(1, threadPoolExecutor.getCorePoolSize());
-    assertEquals(1, threadPoolExecutor.getMaximumPoolSize());
+    assertEquals(threadPoolExecutor.getCorePoolSize(), 1);
+    assertEquals(threadPoolExecutor.getMaximumPoolSize(), 1);
 
     BlockingQueue<Runnable> blockingQueue = threadPoolExecutor.getQueue();
     assertNotNull(blockingQueue);
     assertTrue(blockingQueue instanceof LinkedBlockingQueue);
-    assertEquals(0, blockingQueue.size());
-    assertEquals(Integer.MAX_VALUE, blockingQueue.remainingCapacity());
+    assertEquals(blockingQueue.size(), 0);
+    assertEquals(blockingQueue.remainingCapacity(), Integer.MAX_VALUE);
+
 
     // verify that the executor has the expected properties when queue size is 1
     provider = new BrokerManagedAsyncExecutorProvider(1, 1, 1, _brokerMetrics);
@@ -106,14 +107,14 @@ public class BrokerManagedAsyncExecutorProviderTest {
 
     threadPoolExecutor = (ThreadPoolExecutor) executorService;
 
-    assertEquals(1, threadPoolExecutor.getCorePoolSize());
-    assertEquals(1, threadPoolExecutor.getMaximumPoolSize());
+    assertEquals(threadPoolExecutor.getCorePoolSize(), 1);
+    assertEquals(threadPoolExecutor.getMaximumPoolSize(), 1);
 
     blockingQueue = threadPoolExecutor.getQueue();
     assertNotNull(blockingQueue);
     assertTrue(blockingQueue instanceof ArrayBlockingQueue);
-    assertEquals(0, blockingQueue.size());
-    assertEquals(1, blockingQueue.remainingCapacity());
+    assertEquals(blockingQueue.size(), 0);
+    assertEquals(blockingQueue.remainingCapacity(), 1);
 
     RejectedExecutionHandler rejectedExecutionHandler = threadPoolExecutor.getRejectedExecutionHandler();
     assertNotNull(rejectedExecutionHandler);
