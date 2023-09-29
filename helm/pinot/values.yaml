@@ -112,7 +112,7 @@ controller:
 
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-controller.log"
 
-  log4j2ConfFile: /opt/pinot/conf/log4j2.xml
+  log4j2ConfFile: /opt/pinot/etc/config/pinot-controller-log4j2.xml
   pluginsDir: /opt/pinot/plugins
 
   service:
@@ -204,7 +204,7 @@ broker:
 
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-broker.log"
 
-  log4j2ConfFile: /opt/pinot/conf/log4j2.xml
+  log4j2ConfFile: /opt/pinot/etc/config/pinot-broker-log4j2.xml
   pluginsDir: /opt/pinot/plugins
 
   routingTable:
@@ -328,7 +328,7 @@ server:
 
   jvmOpts: "-Xms512M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-server.log"
 
-  log4j2ConfFile: /opt/pinot/conf/log4j2.xml
+  log4j2ConfFile: /opt/pinot/etc/config/pinot-server-log4j2.xml
   pluginsDir: /opt/pinot/plugins
 
   service:
@@ -411,7 +411,7 @@ minion:
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
 
-  log4j2ConfFile: /opt/pinot/conf/log4j2.xml
+  log4j2ConfFile: /opt/pinot/etc/config/pinot-minion-log4j2.xml
   pluginsDir: /opt/pinot/plugins
 
   persistence:
@@ -498,7 +498,7 @@ minionStateless:
   dataDir: /var/pinot/minion/data
   jvmOpts: "-XX:ActiveProcessorCount=2 -Xms256M -Xmx1G -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/opt/pinot/gc-pinot-minion.log"
 
-  log4j2ConfFile: /opt/pinot/conf/log4j2.xml
+  log4j2ConfFile: /opt/pinot/etc/config/pinot-minion-log4j2.xml
   pluginsDir: /opt/pinot/plugins
 
   persistence:
