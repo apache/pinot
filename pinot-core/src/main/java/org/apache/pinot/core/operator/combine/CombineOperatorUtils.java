@@ -48,15 +48,13 @@ public class CombineOperatorUtils {
       if (executionStatistics.getNumDocsScanned() > 0) {
         numSegmentsMatched++;
       }
-      // TODO: Check all operators and properly implement the getIndexSegment and remove this exception handling
-      try {
-        if (operator.getIndexSegment() instanceof MutableSegment) {
-          numConsumingSegmentsProcessed += 1;
-          if (executionStatistics.getNumDocsScanned() > 0) {
-            numConsumingSegmentsMatched++;
-          }
+
+      // TODO: Check all operators and properly implement the getIndexSegment.
+      if (operator.getIndexSegment() != null && operator.getIndexSegment() instanceof MutableSegment) {
+        numConsumingSegmentsProcessed += 1;
+        if (executionStatistics.getNumDocsScanned() > 0) {
+          numConsumingSegmentsMatched++;
         }
-      } catch (UnsupportedOperationException ignored) {
       }
 
       numDocsScanned += executionStatistics.getNumDocsScanned();

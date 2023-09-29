@@ -72,7 +72,7 @@ public interface Operator<T extends Block> {
    * Returns the index segment associated with the operator.
    */
   default IndexSegment getIndexSegment() {
-    throw new UnsupportedOperationException();
+    return null;
   }
 
   /**
