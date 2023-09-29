@@ -236,7 +236,8 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.VECTOR_DIMS, VectorDimsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VECTOR_NORM, VectorNormTransformFunction.class);
 
-    Map<String, Class<? extends TransformFunction>> registry = new HashMap<>(typeToImplementation.size());
+    Map<String, Class<? extends TransformFunction>> registry
+        = new HashMap<>(HashUtil.getHashMapCapacity(typeToImplementation.size()));
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {
       for (String alias : entry.getKey().getAlternativeNames()) {
         registry.put(canonicalize(alias), entry.getValue());

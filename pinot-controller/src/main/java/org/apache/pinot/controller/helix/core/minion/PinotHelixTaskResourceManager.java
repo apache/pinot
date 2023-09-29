@@ -55,6 +55,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.common.MinionConstants;
@@ -551,7 +552,7 @@ public class PinotHelixTaskResourceManager {
       return Collections.emptyMap();
     }
     Map<String, TaskConfig> helixTaskConfigs = jobConfig.getTaskConfigMap();
-    Map<String, PinotTaskConfig> taskConfigs = new HashMap<>(helixTaskConfigs.size());
+    Map<String, PinotTaskConfig> taskConfigs = new HashMap<>(HashUtil.getHashMapCapacity(helixTaskConfigs.size()));
     if (StringUtils.isEmpty(subtaskNames)) {
       helixTaskConfigs.forEach((sub, cfg) -> taskConfigs.put(sub, PinotTaskConfig.fromHelixTaskConfig(cfg)));
       return taskConfigs;
