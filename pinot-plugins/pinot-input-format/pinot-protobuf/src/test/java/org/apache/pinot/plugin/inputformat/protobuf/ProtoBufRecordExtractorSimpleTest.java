@@ -4,6 +4,7 @@ import com.google.protobuf.DescriptorProtos;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Message;
+import java.util.Locale;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.testng.Assert;
@@ -38,6 +39,7 @@ public class ProtoBufRecordExtractorSimpleTest {
             .build();
     DescriptorProtos.FileDescriptorProto build = DescriptorProtos.FileDescriptorProto.newBuilder()
         .setName("withOptional")
+        .setSyntax(Descriptors.FileDescriptor.Syntax.PROTO3.name().toLowerCase(Locale.US))
         .addMessageType(DescriptorProtos.DescriptorProto.newBuilder()
             .setName("myMessage")
             .addField(myOptionalInt)
@@ -45,6 +47,7 @@ public class ProtoBufRecordExtractorSimpleTest {
         ).build();
 
     _fileDescriptor = Descriptors.FileDescriptor.buildFrom(build, new Descriptors.FileDescriptor[] {});
+    _fileDescriptor.getSyntax();
     _messageDescriptor = _fileDescriptor.findMessageTypeByName("myMessage");
     _optionalDescriptor = _messageDescriptor.findFieldByName("myOptionalInt");
     _nonOptionalDescriptor = _messageDescriptor.findFieldByName("myNonOptionalInt");
