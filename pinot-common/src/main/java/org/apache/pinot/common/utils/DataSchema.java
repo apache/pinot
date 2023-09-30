@@ -297,7 +297,6 @@ public class DataSchema {
         case TIMESTAMP:
         case TIMESTAMP_ARRAY:
           return DataType.TIMESTAMP;
-        case OBJECT:
         case STRING:
         case STRING_ARRAY:
           return DataType.STRING;

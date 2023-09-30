@@ -26,7 +26,6 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -248,7 +247,6 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     assertTrue(transformFunction instanceof CaseTransformFunction);
     assertEquals(transformFunction.getName(), "case");
     String[] expectedValues = new String[NUM_ROWS];
-    RoaringBitmap bitmap = new RoaringBitmap();
     for (int i = 0; i < NUM_ROWS; i++) {
       if (isNullRow(i)) {
         expectedValues[i] = "aaa";
@@ -256,7 +254,7 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
         expectedValues[i] = "bbb";
       }
     }
-    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap, true);
+    testTransformFunction(transformFunction, expectedValues);
   }
 
   private int[] getExpectedIntResults(String column, TransformFunctionType type) {
