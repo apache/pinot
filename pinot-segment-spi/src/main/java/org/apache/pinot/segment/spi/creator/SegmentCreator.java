@@ -23,7 +23,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -54,6 +56,9 @@ public interface SegmentCreator extends Closeable, Serializable {
    */
   void indexRow(GenericRow row)
       throws IOException;
+
+  void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment colReader)
+          throws IOException;
 
   /**
    * Sets the name of the segment.

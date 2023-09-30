@@ -40,6 +40,8 @@ import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVe
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
@@ -306,6 +308,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     long startNS = System.nanoTime();
 
+    // TODO(ERICH): Get a measure of the ratio of columns to indexes (how many indexes per column are there)
     for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
       String columnName = byColEntry.getKey();
 
@@ -335,6 +338,39 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
       }
     }
+
+    _docIdCounter++;
+    _durationNS += System.nanoTime() - startNS;
+  }
+
+  @Override
+  public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
+          throws IOException {
+    long startNS = System.nanoTime();
+    Map<IndexType<?,?,?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
+
+    // TODO(ERICH): Get a measure of the ratio of columns to indexes (how many indexes per column are there)
+    // Iterate over each value in the column
+    PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName);
+    for(int docId : sortedDocIds) {
+      //String columnName = byColEntry.getKey();
+
+      Object columnValueToIndex = colReader.getValue(docId);
+      if (columnValueToIndex == null) {
+        throw new RuntimeException("Null value for column:" + columnName);
+      }
+
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+
+      if (fieldSpec.isSingleValueField()) {
+        indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+      } else {
+        indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+      }
+    }
+
+    // TODO(ERICH): Null handling is skipped here
 
     _docIdCounter++;
     _durationNS += System.nanoTime() - startNS;
