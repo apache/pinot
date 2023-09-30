@@ -23,11 +23,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.UUID;
+import java.util.*;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -41,6 +37,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
@@ -221,10 +218,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         long recordReadStopTime = System.currentTimeMillis();
         long indexStopTime;
         reuse.clear();
+
+        // TODO(ERICH): time how long transformation takes
         try {
           GenericRow decodedRow = _recordReader.next(reuse);
           recordReadStartTime = System.currentTimeMillis();
+
+          // Add row to indexes
           _transformPipeline.processRow(decodedRow, reusedResult);
+
           recordReadStopTime = System.currentTimeMillis();
           _totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
         } catch (Exception e) {
@@ -257,6 +259,49 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     LOGGER.info("Finished records indexing in IndexCreator!");
+
+    handlePostCreation();
+  }
+
+  public void buildByColumn(IndexSegment indexSegment)
+          throws Exception {
+    // Count the number of documents and gather per-column statistics
+    LOGGER.debug("Start building StatsCollector!");
+    buildIndexCreationInfo();
+    LOGGER.info("Finished building StatsCollector!");
+    LOGGER.info("Collected stats for {} documents", _totalDocs);
+
+    int incompleteRowsFound = 0;
+    try {
+      // Initialize the index creation using the per-column statistics information
+      // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
+      //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
+      _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir);
+
+      // Build the index
+      // _recordReader.rewind();  TODO(ERICH): why does the reader need to be rewound? was is iterated before?
+      LOGGER.info("Start building IndexCreator By Column!");
+
+      TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
+      int[] sortedDocIds = ((PinotSegmentRecordReader)_recordReader).getSortedDocIds();
+      for (String col : columns) {
+        // TODO(ERICH): remove transform step to simplify code
+
+        _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
+      }
+    } catch (Exception e) {
+      _indexCreator.close();
+      throw e;
+    } finally {
+      _recordReader.close();
+    }
+
+    if (incompleteRowsFound > 0) {
+      LOGGER.warn("Incomplete data found for {} records. This can be due to error during reader or transformations",
+              incompleteRowsFound);
+    }
+
+    LOGGER.info("Finished records indexing by column in IndexCreator!");
 
     handlePostCreation();
   }
