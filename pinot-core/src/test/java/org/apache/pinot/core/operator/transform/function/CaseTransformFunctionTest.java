@@ -26,6 +26,7 @@ import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -195,6 +196,75 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
           getExpectedStringResults(STRING_SV_COLUMN, functionType));
     }
   }
+  @Test
+  public void testCaseTransformationWithNullColumn() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(
+            String.format("CASE WHEN %s IS NULL THEN 'aaa' ELSE 'bbb' END", STRING_ALPHANUM_NULL_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.getNullHandlingEnabled(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "case");
+    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+
+    CaseTransformFunction castTransformFunction = (CaseTransformFunction) transformFunction;
+    Assert.assertFalse(castTransformFunction.isNullLiteralTransformation(castTransformFunction._arguments.get(2)));
+
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        expectedValues[i] = "aaa";
+      } else {
+        expectedValues[i] = "bbb";
+      }
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+  @Test
+  public void testCaseTransformationWithNullThenClause() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(
+            String.format("CASE WHEN %s IS NULL THEN NULL ELSE 'bbb' END", STRING_ALPHANUM_NULL_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.getNullHandlingEnabled(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "case");
+    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+    String[] expectedValues = new String[NUM_ROWS];
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        bitmap.add(i);
+      } else {
+        expectedValues[i] = "bbb";
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+  }
+
+  @Test
+  public void testCaseTransformationWithNullElseClause() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(
+            String.format("CASE WHEN %s IS NULL THEN 'aaa' END", STRING_ALPHANUM_NULL_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.getNullHandlingEnabled(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), "case");
+    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+
+    CaseTransformFunction castTransformFunction = (CaseTransformFunction) transformFunction;
+    Assert.assertTrue(castTransformFunction.isNullLiteralTransformation(castTransformFunction._arguments.get(2)));
+
+    String[] expectedValues = new String[NUM_ROWS];
+    RoaringBitmap bitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        expectedValues[i] = "aaa";
+      } else {
+        bitmap.add(i);
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+  }
+
 
   private void testCaseQueryWithIntResults(String predicate, int[] expectedValues) {
     ExpressionContext expression =
