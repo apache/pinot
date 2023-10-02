@@ -138,7 +138,8 @@ abstract class BaseGapfillProcessor {
       if (columnNameToAliasMap.containsKey(dataSchema.getColumnNames()[i])) {
         dataSchema.getColumnNames()[i] = columnNameToAliasMap.get(dataSchema.getColumnNames()[i]);
       } else if (columnNameToAliasMap.containsKey(caseInsensitiveTypeString(dataSchema.getColumnNames()[i]))) {
-        dataSchema.getColumnNames()[i] = columnNameToAliasMap.get(caseInsensitiveTypeString(dataSchema.getColumnNames()[i]));
+        dataSchema.getColumnNames()[i] =
+                columnNameToAliasMap.get(caseInsensitiveTypeString(dataSchema.getColumnNames()[i]));
       }
     }
   }

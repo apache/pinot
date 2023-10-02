@@ -4072,7 +4072,7 @@ public class GapfillQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void GapfillTestAggregateUpperCaseDataType() {
+  public void gapfillTestAggregateUpperCaseDataType() {
     DateTimeFormatSpec dateTimeFormatter =
             new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
