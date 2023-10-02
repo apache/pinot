@@ -40,7 +40,7 @@ public class SimpleSegmentNameGeneratorTest {
     SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, null);
     assertEquals(segmentNameGenerator.toString(),
         "SimpleSegmentNameGenerator: tableName=testTable, appendUUIDToSegmentName=false, "
-            + "omitTimestampsInSegmentName=false");
+            + "excludeTimestampsInSegmentName=false");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "testTable");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
         "testTable_1234_5678");
@@ -54,7 +54,7 @@ public class SimpleSegmentNameGeneratorTest {
     SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_POSTFIX);
     assertEquals(segmentNameGenerator.toString(),
         "SimpleSegmentNameGenerator: tableName=testTable, segmentNamePostfix=postfix, appendUUIDToSegmentName=false, "
-            + "omitTimestampsInSegmentName=false");
+            + "excludeTimestampsInSegmentName=false");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "testTable_postfix");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
         "testTable_1234_5678_postfix");
@@ -88,12 +88,12 @@ public class SimpleSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testWithOmitTimestampsInSegmentName() {
+  public void testWithExcludeTimestampsInSegmentName() {
     SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, null, false, true);
     segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE);
     assertEquals(segmentNameGenerator.toString(),
         "SimpleSegmentNameGenerator: tableName=testTable, appendUUIDToSegmentName=false, "
-            + "omitTimestampsInSegmentName=true");
+            + "excludeTimestampsInSegmentName=true");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "testTable");
     assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE),
         "testTable");
