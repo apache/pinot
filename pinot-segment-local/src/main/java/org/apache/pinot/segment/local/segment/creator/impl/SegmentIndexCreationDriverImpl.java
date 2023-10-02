@@ -297,7 +297,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir);
 
       // Build the index
-      // _recordReader.rewind();  TODO(ERICH): why does the reader need to be rewound? was is iterated before?
+      _recordReader.rewind();  TODO(ERICH): why does the reader need to be rewound? was is iterated before?
       LOGGER.info("Start building IndexCreator By Column!");
 
       TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
