@@ -220,11 +220,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         long indexStopTime;
         reuse.clear();
 
-        // TODO(ERICH): time how long transformation takes
         try {
           GenericRow decodedRow = _recordReader.next(reuse);
           recordReadStartTime = System.nanoTime();
 
+          // TODO(ERICH): time how long transformation takes.  From Jackie: this is leftover from when offline ingestion passed through this function.
+          // Should not be needed anymore.
           // Add row to indexes
           _transformPipeline.processRow(decodedRow, reusedResult);
 
