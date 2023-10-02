@@ -46,7 +46,7 @@ public class InIdSetTransformFunction extends BaseTransformFunction {
 
   @Override
   public String getName() {
-    return TransformFunctionType.INIDSET.getName();
+    return TransformFunctionType.IN_ID_SET.getName();
   }
 
   @Override
