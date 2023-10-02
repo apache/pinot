@@ -23,6 +23,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -134,6 +137,8 @@ abstract class BaseGapfillProcessor {
     for (int i = 0; i < dataSchema.getColumnNames().length; i++) {
       if (columnNameToAliasMap.containsKey(dataSchema.getColumnNames()[i])) {
         dataSchema.getColumnNames()[i] = columnNameToAliasMap.get(dataSchema.getColumnNames()[i]);
+      } else if (columnNameToAliasMap.containsKey(caseInsensitiveTypeString(dataSchema.getColumnNames()[i]))) {
+        dataSchema.getColumnNames()[i] = columnNameToAliasMap.get(caseInsensitiveTypeString(dataSchema.getColumnNames()[i]));
       }
     }
   }
@@ -225,5 +230,17 @@ abstract class BaseGapfillProcessor {
   protected List<Object[]> gapFillAndAggregate(List<Object[]> rows, DataSchema dataSchema,
       DataSchema resultTableSchema) {
     throw new UnsupportedOperationException("Not supported");
+  }
+
+  protected String caseInsensitiveTypeString(String columnName) {
+    String dataTypePattern = "(BOOLEAN|INT|LONG|FLOAT|DOUBLE|STRING)";
+    Matcher matcher = Pattern.compile(dataTypePattern, Pattern.CASE_INSENSITIVE).matcher(columnName);
+    StringBuffer result = new StringBuffer();
+    while (matcher.find()) {
+      String dataType = matcher.group().toLowerCase();
+      matcher.appendReplacement(result, dataType);
+    }
+    matcher.appendTail(result);
+    return result.toString();
   }
 }
