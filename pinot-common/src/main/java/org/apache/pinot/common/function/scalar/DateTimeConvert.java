@@ -34,7 +34,7 @@ public class DateTimeConvert {
   private DateTimeFormatSpec _outputFormatSpec;
   private DateTimeGranularitySpec _granularitySpec;
 
-  @ScalarFunction
+  @ScalarFunction(names = {"dateTimeConvert", "date_time_convert"})
   public String dateTimeConvert(String timeValueStr, String inputFormatStr, String outputFormatStr,
       String outputGranularityStr) {
     if (_inputFormatSpec == null) {
