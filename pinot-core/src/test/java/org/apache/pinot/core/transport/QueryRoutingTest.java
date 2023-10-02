@@ -38,6 +38,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -77,9 +78,16 @@ public class QueryRoutingTest {
     _requestCount = 0;
   }
 
+  @AfterMethod
+  void deregisterServerMetrics() {
+    ServerMetrics.deregister();
+  }
+
   private QueryServer getQueryServer(int responseDelayMs, byte[] responseBytes) {
+    ServerMetrics serverMetrics = mock(ServerMetrics.class);
     InstanceRequestHandler handler = new InstanceRequestHandler("server01", new PinotConfiguration(),
-        mockQueryScheduler(responseDelayMs, responseBytes), mock(ServerMetrics.class), mock(AccessControl.class));
+        mockQueryScheduler(responseDelayMs, responseBytes), serverMetrics, mock(AccessControl.class));
+    ServerMetrics.register(serverMetrics);
     return new QueryServer(TEST_PORT, null, handler);
   }
 
