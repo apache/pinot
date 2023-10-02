@@ -50,7 +50,7 @@ public class CombineOperatorUtils {
       }
 
       // TODO: Check all operators and properly implement the getIndexSegment.
-      if (operator.getIndexSegment() != null && operator.getIndexSegment() instanceof MutableSegment) {
+      if (operator.getIndexSegment() instanceof MutableSegment) {
         numConsumingSegmentsProcessed += 1;
         if (executionStatistics.getNumDocsScanned() > 0) {
           numConsumingSegmentsMatched++;
