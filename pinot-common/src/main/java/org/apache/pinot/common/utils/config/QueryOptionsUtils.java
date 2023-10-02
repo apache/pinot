@@ -102,12 +102,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static Long getMaxSerializedResponseLengthPerServer(Map<String, String> queryOptions) {
-    String responseLength = queryOptions.get(QueryOptionKey.MAX_SERIALIZED_RESPONSE_LENGTH_PER_SERVER);
-    if (responseLength != null) {
-      long maxLength = Long.parseLong(responseLength);
-      Preconditions.checkState(maxLength > 0, "maxSerializedResponseLength must be positive. got %s", maxLength);
-      return maxLength;
+  public static Long getMaxServerResponseSizeBytes(Map<String, String> queryOptions) {
+    String responseSize = queryOptions.get(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES);
+    if (responseSize != null) {
+      long maxSize = Long.parseLong(responseSize);
+      Preconditions.checkState(maxSize > 0, "maxServerResponseSize must be positive. got %s", maxSize);
+      return maxSize;
     }
 
     return null;

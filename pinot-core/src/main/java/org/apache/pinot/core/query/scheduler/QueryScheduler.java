@@ -170,14 +170,18 @@ public abstract class QueryScheduler {
       byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
 
       Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
-      Long maxResponseByteLength = QueryOptionsUtils.getMaxSerializedResponseLengthPerServer(queryOptions);
-      if (maxResponseByteLength != null && responseBytes.length > maxResponseByteLength) {
-        String errorMessage = String.format("Serialized response exceeds threshold for requestId %d from broker %s",
-            queryRequest.getRequestId(), queryRequest.getBrokerId());
-        LOGGER.error(errorMessage);
-        // TODO(Vivek): Add a metric indicating the number of such exceptions.
+      Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
+
+      // TODO: Perform this check sooner during the serialization of DataTable.
+      if (maxResponseSizeBytes != null && responseBytes.length > maxResponseSizeBytes) {
+        String errMsg = String.format("Serialized query response size %d exceeds threshold for requestId %d from "
+            + "broker %s", responseBytes.length, queryRequest.getRequestId(), queryRequest.getBrokerId());
+        LOGGER.error(errMsg);
+        _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(),
+            ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
+
         instanceResponse = new InstanceResponseBlock();
-        instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, errorMessage));
+        instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR, errMsg));
         instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
         responseBytes = serializeResponse(queryRequest, instanceResponse);
       }

@@ -621,11 +621,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testMaxSerializedResponseLengthPerServer()
       throws Exception {
-    String queryWithOption = "SET maxSerializedResponseLengthPerServer=1000; " + SELECT_STAR_QUERY;
+    String queryWithOption = "SET maxServerResponseSizeBytes=1000; " + SELECT_STAR_QUERY;
     JsonNode response = postQuery(queryWithOption);
     assert response.get("exceptions").size() > 0;
-    String exceptionStr = response.get("exceptions").get(0).get("message").toString();
-    assert exceptionStr.contains("Serialized response exceeds threshold");
+    int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
+    assertEquals(errorCode, 503);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
