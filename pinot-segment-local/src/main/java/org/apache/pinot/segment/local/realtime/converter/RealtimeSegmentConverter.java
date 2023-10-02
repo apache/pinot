@@ -119,6 +119,7 @@ public class RealtimeSegmentConverter {
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
       driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline());
       driver.build();
+      //driver.buildByColumn(_realtimeSegmentImpl);
     }
 
     if (segmentPartitionConfig != null) {
