@@ -87,7 +87,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private int _totalDocs = 0;
   private File _tempIndexDir;
   private String _segmentName;
-  private long _totalRecordReadTime = 0;
+  private long _totalRecordReadTimeNS = 0;
   private long _totalIndexTime = 0;
   private long _totalStatsCollectorTime = 0;
   private boolean _continueOnError;
@@ -213,22 +213,23 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
       TransformPipeline.Result reusedResult = new TransformPipeline.Result();
+      long totalTransformerTimeNS = 0;
       while (_recordReader.hasNext()) {
-        long recordReadStartTime = System.currentTimeMillis();
-        long recordReadStopTime = System.currentTimeMillis();
+        long recordReadStartTime = System.nanoTime();
+        long recordReadStopTime = System.nanoTime();
         long indexStopTime;
         reuse.clear();
 
         // TODO(ERICH): time how long transformation takes
         try {
           GenericRow decodedRow = _recordReader.next(reuse);
-          recordReadStartTime = System.currentTimeMillis();
+          recordReadStartTime = System.nanoTime();
 
           // Add row to indexes
           _transformPipeline.processRow(decodedRow, reusedResult);
 
-          recordReadStopTime = System.currentTimeMillis();
-          _totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+          recordReadStopTime = System.nanoTime();
+          _totalRecordReadTimeNS += (recordReadStopTime - recordReadStartTime);
         } catch (Exception e) {
           if (!_continueOnError) {
             throw new RuntimeException("Error occurred while reading row during indexing", e);
@@ -376,7 +377,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
 
-    LOGGER.info("Driver, record read time : {}", _totalRecordReadTime);
+    LOGGER.info("Driver, record read time (NS) : {}", _totalRecordReadTimeNS);
     LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", _totalIndexTime);
   }
