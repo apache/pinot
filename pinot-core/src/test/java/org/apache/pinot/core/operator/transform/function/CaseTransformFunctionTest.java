@@ -196,6 +196,7 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
           getExpectedStringResults(STRING_SV_COLUMN, functionType));
     }
   }
+
   @Test
   public void testCaseTransformationWithNullColumn() {
     ExpressionContext expression =
@@ -206,9 +207,6 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertEquals(transformFunction.getName(), "case");
     Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
 
-    CaseTransformFunction castTransformFunction = (CaseTransformFunction) transformFunction;
-    Assert.assertFalse(castTransformFunction.isNullLiteralTransformation(castTransformFunction._arguments.get(2)));
-
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       if (isNullRow(i)) {
@@ -217,8 +215,9 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
         expectedValues[i] = "bbb";
       }
     }
-    testTransformFunction(transformFunction, expectedValues);
+    testTransformFunctionWithNull(transformFunction, expectedValues, new RoaringBitmap());
   }
+
   @Test
   public void testCaseTransformationWithNullThenClause() {
     ExpressionContext expression =
@@ -249,9 +248,6 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
     Assert.assertEquals(transformFunction.getName(), "case");
     Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
-
-    CaseTransformFunction castTransformFunction = (CaseTransformFunction) transformFunction;
-    Assert.assertTrue(castTransformFunction.isNullLiteralTransformation(castTransformFunction._arguments.get(2)));
 
     String[] expectedValues = new String[NUM_ROWS];
     RoaringBitmap bitmap = new RoaringBitmap();

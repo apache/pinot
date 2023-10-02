@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -229,8 +228,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     return _resultMetadata;
   }
 
-  @VisibleForTesting
-  boolean isNullLiteralTransformation(TransformFunction function) {
+  private boolean isNullLiteralTransformation(TransformFunction function) {
     if (function instanceof LiteralTransformFunction) {
       LiteralTransformFunction literalFunction = (LiteralTransformFunction) function;
       return literalFunction.isNull();
