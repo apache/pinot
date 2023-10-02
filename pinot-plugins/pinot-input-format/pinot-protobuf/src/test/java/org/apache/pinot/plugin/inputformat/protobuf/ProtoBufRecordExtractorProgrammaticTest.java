@@ -30,7 +30,7 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 
-public class ProtoBufRecordExtractorSimpleTest {
+public class ProtoBufRecordExtractorProgrammaticTest {
 
   private Descriptors.FileDescriptor _fileDescriptor;
   private Descriptors.Descriptor _messageDescriptor;
