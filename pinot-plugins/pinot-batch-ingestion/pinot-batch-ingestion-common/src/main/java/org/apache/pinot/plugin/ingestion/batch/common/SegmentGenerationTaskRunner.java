@@ -65,7 +65,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
   public static final String DEPRECATED_USE_LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
   public static final String USE_GLOBAL_DIRECTORY_SEQUENCE_ID = "use.global.directory.sequence.id";
   public static final String APPEND_UUID_TO_SEGMENT_NAME = "append.uuid.to.segment.name";
-  public static final String EXCLUDE_TIMESTAMPS_IN_SEGMENT_NAME = "exclude.timestamps.in.segment.name";
+  public static final String EXCLUDE_TIME_IN_SEGMENT_NAME = BatchConfigProperties.EXCLUDE_TIME_IN_SEGMENT_NAME;
 
   private final SegmentGenerationTaskSpec _taskSpec;
 
@@ -135,15 +135,15 @@ public class SegmentGenerationTaskRunner implements Serializable {
 
     boolean appendUUIDToSegmentName =
         Boolean.parseBoolean(segmentNameGeneratorConfigs.get(APPEND_UUID_TO_SEGMENT_NAME));
-    boolean excludeTimestampsInSegmentName =
-        Boolean.parseBoolean(segmentNameGeneratorConfigs.get(EXCLUDE_TIMESTAMPS_IN_SEGMENT_NAME));
+    boolean excludeTimeInSegmentName =
+        Boolean.parseBoolean(segmentNameGeneratorConfigs.get(EXCLUDE_TIME_IN_SEGMENT_NAME));
 
     switch (segmentNameGeneratorType) {
       case BatchConfigProperties.SegmentNameGeneratorType.FIXED:
         return new FixedSegmentNameGenerator(segmentNameGeneratorConfigs.get(SEGMENT_NAME));
       case BatchConfigProperties.SegmentNameGeneratorType.SIMPLE:
         return new SimpleSegmentNameGenerator(tableName, segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX),
-            appendUUIDToSegmentName, excludeTimestampsInSegmentName);
+            appendUUIDToSegmentName, excludeTimeInSegmentName);
       case BatchConfigProperties.SegmentNameGeneratorType.NORMALIZED_DATE:
         SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
         DateTimeFormatSpec dateTimeFormatSpec = null;
