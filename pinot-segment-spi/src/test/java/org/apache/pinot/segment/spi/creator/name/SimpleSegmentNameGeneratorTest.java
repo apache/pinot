@@ -88,7 +88,7 @@ public class SimpleSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testWithexcludeTimeInSegmentName() {
+  public void testWithExcludeTimeInSegmentName() {
     SegmentNameGenerator segmentNameGenerator = new SimpleSegmentNameGenerator(TABLE_NAME, null, false, true);
     segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, MIN_TIME_VALUE, MAX_TIME_VALUE);
     assertEquals(segmentNameGenerator.toString(),

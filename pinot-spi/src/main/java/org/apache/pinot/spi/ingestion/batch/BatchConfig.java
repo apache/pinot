@@ -51,7 +51,7 @@ public class BatchConfig {
   private final String _segmentNamePostfix;
   private final boolean _excludeSequenceId;
   private final boolean _appendUUIDToSegmentName;
-  private final boolean _excludeTimeFromSegmentName;
+  private final boolean _excludeTimeInSegmentName;
   private final String _sequenceId;
 
   private final String _pushMode;
@@ -100,7 +100,7 @@ public class BatchConfig {
     _sequenceId = batchConfigsMap.get(BatchConfigProperties.SEQUENCE_ID);
     _appendUUIDToSegmentName =
         Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME));
-    _excludeTimeFromSegmentName =
+    _excludeTimeInSegmentName =
         Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.EXCLUDE_TIME_IN_SEGMENT_NAME));
 
     _pushMode = IngestionConfigUtils.getPushMode(batchConfigsMap);
@@ -193,8 +193,8 @@ public class BatchConfig {
     return _appendUUIDToSegmentName;
   }
 
-  public boolean isExcludeTimeFromSegmentName() {
-    return _excludeTimeFromSegmentName;
+  public boolean isExcludeTimeInSegmentName() {
+    return _excludeTimeInSegmentName;
   }
 
   public String getPushMode() {
