@@ -578,7 +578,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       Preconditions.checkState(result instanceof IdSet, "Got unexpected result type: %s, expecting IdSet",
           result != null ? result.getClass().getSimpleName() : null);
       // Rewrite the expression
-      function.setFunctionName(TransformFunctionType.INIDSET.name());
+      function.setFunctionName(TransformFunctionType.IN_ID_SET.name());
       arguments.set(1,
           ExpressionContext.forLiteralContext(FieldSpec.DataType.STRING, ((IdSet) result).toBase64String()));
     } else {
