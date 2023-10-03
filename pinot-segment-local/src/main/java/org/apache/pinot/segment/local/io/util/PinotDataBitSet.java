@@ -218,7 +218,8 @@ public final class PinotDataBitSet implements Closeable {
     _dataBuffer.putByte(byteOffset, (byte) (_dataBuffer.getByte(byteOffset) & (0xFF7F >>> bitOffsetInByte)));
   }
 
-  public int getNextSetBitOffsetRanges(int bitOffset, long baseOffset, List<ForwardIndexReader.ValueRange> ranges) {
+  public int getNextSetBitOffsetRecordRanges(int bitOffset, long baseOffset,
+      List<ForwardIndexReader.ValueRange> ranges) {
     long startOffset = baseOffset + (bitOffset / Byte.SIZE);
     int size = Byte.BYTES;
     int byteOffset = bitOffset / Byte.SIZE;

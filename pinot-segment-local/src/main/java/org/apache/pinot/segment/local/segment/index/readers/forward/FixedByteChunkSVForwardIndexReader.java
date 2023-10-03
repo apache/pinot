@@ -100,7 +100,7 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkForwardIn
   public List<ValueRange> getDocIdRange(int docId, ChunkReaderContext context, @Nullable List<ValueRange> ranges) {
     if (!_isCompressed) {
       // If uncompressed, should use fixed offset
-      throw new IllegalStateException("Cannot get docId range for uncompressed forward index reader");
+      throw new IllegalStateException("Operation not supported since the forward index is fixed length type");
     }
 
     if (ranges == null) {

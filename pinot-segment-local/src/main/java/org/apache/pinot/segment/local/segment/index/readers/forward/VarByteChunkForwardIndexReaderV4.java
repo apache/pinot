@@ -101,6 +101,14 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
+  public ReaderContext createContext() {
+    return _chunkCompressionType == ChunkCompressionType.PASS_THROUGH ? new UncompressedReaderContext(_metadata,
+        _chunks, _chunksStartOffset)
+        : new CompressedReaderContext(_metadata, _chunks, _chunksStartOffset, _chunkDecompressor, _chunkCompressionType,
+            _targetDecompressedChunkSize);
+  }
+
+  @Override
   public BigDecimal getBigDecimal(int docId, ReaderContext context) {
     return BigDecimalUtils.deserialize(context.getValue(docId));
   }
@@ -113,15 +121,6 @@ public class VarByteChunkForwardIndexReaderV4
   @Override
   public byte[] getBytes(int docId, ReaderContext context) {
     return context.getValue(docId);
-  }
-
-  @Nullable
-  @Override
-  public ReaderContext createContext() {
-    return _chunkCompressionType == ChunkCompressionType.PASS_THROUGH ? new UncompressedReaderContext(_metadata,
-        _chunks, _chunksStartOffset)
-        : new CompressedReaderContext(_metadata, _chunks, _chunksStartOffset, _chunkDecompressor, _chunkCompressionType,
-            _targetDecompressedChunkSize);
   }
 
   @Override
@@ -316,7 +315,7 @@ public class VarByteChunkForwardIndexReaderV4
       if (docId >= _docIdOffset && docId < _nextDocIdOffset) {
         ranges.addAll(_ranges);
       } else {
-        recordRangesForDocIdUncompressed(docId, ranges);
+        initAndRecordRangesForDocId(docId, ranges);
       }
     }
 
@@ -353,9 +352,6 @@ public class VarByteChunkForwardIndexReaderV4
 
     protected abstract byte[] processChunkAndReadFirstValue(int docId, long offset, long limit)
         throws IOException;
-
-    protected abstract void recordRangesForChunk(int docId, long offset, long limit,
-        List<ValueRange> ranges);
     protected abstract byte[] readSmallUncompressedValue(int docId);
 
     private byte[] decompressAndRead(int docId)
@@ -376,7 +372,7 @@ public class VarByteChunkForwardIndexReaderV4
       return processChunkAndReadFirstValue(docId, offset, limit);
     }
 
-    private void recordRangesForDocIdUncompressed(int docId, List<ValueRange> ranges) {
+    private void initAndRecordRangesForDocId(int docId, List<ValueRange> ranges) {
       // We'd practically end up reading entire metadata buffer
       _ranges = new ArrayList<>();
       _ranges.add(ValueRange.newByteRange(0, (int) _metadata.size()));
@@ -393,7 +389,7 @@ public class VarByteChunkForwardIndexReaderV4
         _nextDocIdOffset = Integer.MAX_VALUE;
         limit = _chunks.size();
       }
-      recordRangesForChunk(docId, offset, limit, _ranges);
+      _ranges.add(ValueRange.newByteRange(_chunkStartOffset + offset, (int) (limit - offset)));
       ranges.addAll(_ranges);
     }
   }
@@ -416,12 +412,6 @@ public class VarByteChunkForwardIndexReaderV4
       }
       _numDocsInCurrentChunk = _chunk.getInt(0);
       return readSmallUncompressedValue(docId);
-    }
-
-    @Override
-    protected void recordRangesForChunk(int docId, long offset, long limit,
-        List<ValueRange> ranges) {
-      ranges.add(ValueRange.newByteRange(_chunkStartOffset + offset, (int) (limit - offset)));
     }
 
     private byte[] readHugeValue() {
@@ -474,12 +464,6 @@ public class VarByteChunkForwardIndexReaderV4
       }
       // huge value, no benefit from buffering, return the whole thing
       return readHugeCompressedValue(compressed, _chunkDecompressor.decompressedLength(compressed));
-    }
-
-    @Override
-    protected void recordRangesForChunk(int docId, long offset, long limit,
-        List<ValueRange> ranges) {
-      ranges.add(ValueRange.newByteRange(_chunkStartOffset + offset, (int) (limit - offset)));
     }
 
     @Override

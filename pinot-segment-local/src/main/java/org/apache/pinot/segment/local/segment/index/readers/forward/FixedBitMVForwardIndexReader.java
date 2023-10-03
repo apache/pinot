@@ -259,7 +259,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     if (docId == _numDocs - 1) {
       endIndex = _numValues;
     } else {
-      endIndex = _bitmapReader.getNextSetBitOffsetRanges(startIndex + 1, _bitmapReaderStartOffset, ranges);
+      endIndex = _bitmapReader.getNextSetBitOffsetRecordRanges(startIndex + 1, _bitmapReaderStartOffset, ranges);
     }
     int numValues = endIndex - startIndex;
     long startBitOffset = (long) startIndex * _numBitsPerValue;
@@ -282,12 +282,12 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
 
   @Override
   public long getBaseOffset() {
-    throw new UnsupportedOperationException("Unsupported");
+    throw new IllegalStateException("Operation not supported since the forward index is not fixed length type");
   }
 
   @Override
   public int getDocLength() {
-    throw new UnsupportedOperationException("Unsupported");
+    throw new IllegalStateException("Operation not supported since the forward index is not fixed length type");
   }
 
   public static class Context implements ForwardIndexReaderContext {

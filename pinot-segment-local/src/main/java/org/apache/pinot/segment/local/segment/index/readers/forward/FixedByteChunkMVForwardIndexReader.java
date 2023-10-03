@@ -157,7 +157,6 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
    */
   private void sliceBytesCompressedAndRecordRanges(int docId, ChunkReaderContext context,
       List<ValueRange> ranges) {
-    int chunkRowId = docId % _numDocsPerChunk;
     recordDocIdRanges(docId, context, ranges);
   }
 
@@ -301,11 +300,11 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
 
   @Override
   public long getBaseOffset() {
-    throw new UnsupportedOperationException("Unsupported");
+    throw new IllegalStateException("Operation not supported since the forward index is not fixed length type");
   }
 
   @Override
   public int getDocLength() {
-    throw new UnsupportedOperationException("Unsupported");
+    throw new IllegalStateException("Operation not supported since the forward index is not fixed length type");
   }
 }

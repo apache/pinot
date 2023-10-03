@@ -955,29 +955,42 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     }
   }
 
+  /**
+   * An interface that enables the caller to get byte ranges accessed while reading a given docId.
+   * This can be used to eventually allow prefetching of exact byte ranges during query processing,
+   * if the docIds to be fetched are known beforehand.
+   *
+   * This interface will be implemented by all the forward index readers.
+   */
   interface ValueRangeProvider<T extends ForwardIndexReaderContext> {
     /**
-     * Returns the range of document ids for the given value.
-     *
+     * Returns a list of {@link ValueRange} that represents all the distinct
+     * buffer byte ranges (absolute offset, sizeInBytes) that are accessed when reading the given (@param docId}
      * @param docId to find the range for
-     * @return Range of document ids for the given value
+     * @return List of {@link ValueRange} that are accessed while reading the given docId
      */
     List<ValueRange> getDocIdRange(int docId, T context, @Nullable List<ValueRange> ranges);
 
     /**
-     * Returns whether the forward index is fixed type.
-     * @return true if fixed length type, false otherwise
+     * Returns whether the forward index is of fixed length type, and therefore the docId -> byte range mapping is fixed
+     * @return true if SV + fixed length + uncompressed, false otherwise
      */
     boolean isFixedLengthType();
 
     /**
-     * Returns the base offset for the forward index if it's fixed type
+     * Returns the base offset of raw data start within the fwd index buffer, if it's of fixed length type
      * @return base offset if fixed length type
      */
     long getBaseOffset();
 
+    /**
+     * Returns the length of each entry in the forward index, if it's of fixed length type
+     */
     int getDocLength();
 
+    /**
+     * Returns whether the length of each entry in the forward index is in bits, if it's of fixed length type
+     */
     default boolean isDocLengthInBits() {
       return false;
     }

@@ -345,7 +345,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
       try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
           .load(segmentOutputDir.toURI(), segmentLoaderContext);
-          SegmentDirectory.Writer segmentWriter = segmentDirectory.createWriter()){
+          SegmentDirectory.Writer segmentWriter = segmentDirectory.createWriter()) {
         for (IndexType indexType : postSegCreationIndexes) {
           IndexHandler handler =
               indexType.createIndexHandler(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(),
