@@ -943,7 +943,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       final long buildTimeMillis = now() - lockAcquireTimeMillis;
       final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
       _segmentLogger
-          .info("Successfully built segment in {} ms, after lockWaitTime {} ms", buildTimeMillis, waitTimeMillis);
+          .info("Successfully built segment in {} ms, after lockWaitTime {} ms, Column Major: {}, Total Docs: {}",
+                  buildTimeMillis,
+                  waitTimeMillis,
+                  converter.isColumnMajorEnabled(),
+                  converter.getTotalDocCount());
 
       File dataDir = new File(_resourceDataDir);
       File indexDir = new File(dataDir, _segmentNameStr);
