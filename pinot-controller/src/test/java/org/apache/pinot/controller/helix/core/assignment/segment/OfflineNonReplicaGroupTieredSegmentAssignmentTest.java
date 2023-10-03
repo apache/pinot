@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
@@ -212,7 +213,10 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
   @Test
   public void testBootstrapTable() {
     Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
-    for (String segmentName : SEGMENTS) {
+    // The list of segments are segment_0, segment_1, ... segment_10, ...; but TreeMap sorts segments as segment_0,
+    // segment_1, segment_10, ... segment_2, ... So to make bootstrap generate same assignment as assigning each
+    // segment separately, we need to process the segments in the same order.
+    for (String segmentName : new TreeSet<>(SEGMENTS)) {
       List<String> instancesAssigned =
           _segmentAssignment.assignSegment(segmentName, currentAssignment, _instancePartitionsMap);
       currentAssignment.put(segmentName,

@@ -53,9 +53,10 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     Set<String> tables = getTenantTables(config.getTenantName());
     tables.forEach(table -> {
       try {
-        config.setJobId(createUniqueRebalanceJobIdentifier());
-        config.setDryRun(true);
-        rebalanceResult.put(table, _pinotHelixResourceManager.rebalanceTable(table, config, false));
+        RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
+        rebalanceConfig.setJobId(createUniqueRebalanceJobIdentifier());
+        rebalanceConfig.setDryRun(true);
+        rebalanceResult.put(table, _pinotHelixResourceManager.rebalanceTable(table, rebalanceConfig, false));
       } catch (TableNotFoundException exception) {
         rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
             null, null, null));
@@ -129,21 +130,23 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
             if (table == null) {
               break;
             }
-            config.setDryRun(false);
-            config.setJobId(rebalanceResult.get(table).getJobId());
-            rebalanceTable(table, config, observer);
+            RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
+            rebalanceConfig.setDryRun(false);
+            rebalanceConfig.setJobId(rebalanceResult.get(table).getJobId());
+            rebalanceTable(table, rebalanceConfig, observer);
           }
           // Last parallel thread to finish the table rebalance job will pick up the
           // sequential table rebalance execution
           if (activeThreads.decrementAndGet() == 0) {
-            config.setDryRun(false);
+            RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
+            rebalanceConfig.setDryRun(false);
             while (true) {
               String table = sequentialQueue.pollFirst();
               if (table == null) {
                 break;
               }
-              config.setJobId(rebalanceResult.get(table).getJobId());
-              rebalanceTable(table, config, observer);
+              rebalanceConfig.setJobId(rebalanceResult.get(table).getJobId());
+              rebalanceTable(table, rebalanceConfig, observer);
             }
             observer.onSuccess(String.format("Successfully rebalanced tenant %s.", config.getTenantName()));
           }

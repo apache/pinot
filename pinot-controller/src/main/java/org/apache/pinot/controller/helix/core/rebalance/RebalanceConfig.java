@@ -150,7 +150,23 @@ public class RebalanceConfig {
     _jobId = jobId;
   }
 
-  // Helper method to deprecate the use of Configuration to keep rebalance configs.
+  public static RebalanceConfig copy(RebalanceConfig cfg) {
+    RebalanceConfig rc = new RebalanceConfig();
+    rc._dryRun = cfg._dryRun;
+    rc._reassignInstances = cfg._reassignInstances;
+    rc._includeConsuming = cfg._includeConsuming;
+    rc._bootstrap = cfg._bootstrap;
+    rc._downtime = cfg._downtime;
+    rc._minAvailableReplicas = cfg._minAvailableReplicas;
+    rc._bestEfforts = cfg._bestEfforts;
+    rc._externalViewCheckIntervalInMs = cfg._externalViewCheckIntervalInMs;
+    rc._externalViewStabilizationTimeoutInMs = cfg._externalViewStabilizationTimeoutInMs;
+    rc._updateTargetTier = cfg._updateTargetTier;
+    rc._jobId = cfg._jobId;
+    return rc;
+  }
+
+  // Helper method to help deprecate the use of Configuration to keep rebalance configs.
   public static RebalanceConfig fromConfiguration(Configuration cfg) {
     RebalanceConfig rc = new RebalanceConfig();
     rc.setDryRun(cfg.getBoolean(RebalanceConfigConstants.DRY_RUN, RebalanceConfigConstants.DEFAULT_DRY_RUN));
