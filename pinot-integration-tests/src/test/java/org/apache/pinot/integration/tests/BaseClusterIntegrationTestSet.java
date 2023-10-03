@@ -645,11 +645,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws IOException {
     String response =
         sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload), null);
+    response = StringEscapeUtils.unescapeJava(response);
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
-    System.out.println("Printing response: ");
-    System.out.println(response);
     JsonNode tableLevelDetails =
-        JsonUtils.stringToJsonNode(StringEscapeUtils.unescapeJava(response)).get(tableNameWithType);
+        JsonUtils.stringToJsonNode(response.substring(response.indexOf(":") + 2, response.length()-2)).get(tableNameWithType);
     String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
     assertEquals(isZKWriteSuccess, "SUCCESS");
     String jobId = tableLevelDetails.get("reloadJobId").asText();
