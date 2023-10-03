@@ -19,7 +19,7 @@
 
 -->
 <!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
-<suite name="integration-suite-1">
+<suite name="integration-suite-1" parallel="none">
   <test name="integration-suite-1">
     <groups>
       <run>

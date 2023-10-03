@@ -73,8 +73,8 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration combine.children="override">
-              <forkCount>1</forkCount>
-              <reuseForks>false</reuseForks>
+              <forkCount>0</forkCount>
+              <parallel>none</parallel>
               <skipTests>false</skipTests>
               <suiteXmlFiles>
                 <suiteXmlFile>src/test/integration-test-suite-1.xml</suiteXmlFile>
@@ -96,8 +96,8 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration combine.children="override">
-              <forkCount>1</forkCount>
-              <reuseForks>false</reuseForks>
+              <parallel>none</parallel>
+              <forkCount>0</forkCount>
               <skipTests>false</skipTests>
               <suiteXmlFiles>
                 <suiteXmlFile>src/test/integration-test-suite-2.xml</suiteXmlFile>

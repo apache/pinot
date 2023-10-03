@@ -97,14 +97,20 @@ public abstract class ClusterTest extends ControllerTest {
   protected List<BaseBrokerStarter> _brokerStarters;
   protected List<BaseServerStarter> _serverStarters;
   protected List<Integer> _brokerPorts;
+  protected List<Integer> _serverPorts;
   protected BaseMinionStarter _minionStarter;
 
   private String _brokerBaseApiUrl;
+  private String _serverBaseApiUrl;
 
   private boolean _useMultiStageQueryEngine = false;
 
   protected String getBrokerBaseApiUrl() {
     return _brokerBaseApiUrl;
+  }
+
+  protected String getServerBaseApiUrl() {
+    return _serverBaseApiUrl;
   }
 
   protected boolean useMultiStageQueryEngine() {
@@ -213,9 +219,12 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + serverId);
     serverConf.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
         Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + serverId);
-    serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, Server.DEFAULT_ADMIN_API_PORT - serverId);
-    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT + serverId);
-    serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT,
+        NetUtils.findOpenPort(Server.DEFAULT_ADMIN_API_PORT + RANDOM.nextInt(10000) + serverId));
+    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT,
+        NetUtils.findOpenPort(Helix.DEFAULT_SERVER_NETTY_PORT + RANDOM.nextInt(10000) + serverId));
+    serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT,
+        NetUtils.findOpenPort(Server.DEFAULT_GRPC_PORT + RANDOM.nextInt(10000) + serverId));
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
@@ -232,9 +241,13 @@ public abstract class ClusterTest extends ControllerTest {
       throws Exception {
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
     _serverStarters = new ArrayList<>(numServers);
+    _serverPorts = new ArrayList<>();
     for (int i = 0; i < numServers; i++) {
-      _serverStarters.add(startOneServer(i));
+      BaseServerStarter serverStarter = startOneServer(i);
+      _serverStarters.add(serverStarter);
+      _serverPorts.add(serverStarter.getAdminHttpPort());
     }
+    _serverBaseApiUrl = "http://localhost:" + _serverPorts.get(0);
   }
 
   protected BaseServerStarter startOneServer(int serverId)

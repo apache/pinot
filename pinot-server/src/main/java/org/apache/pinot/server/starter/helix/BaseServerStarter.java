@@ -131,6 +131,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected List<ListenerConfig> _listenerConfigs;
   protected String _hostname;
   protected int _port;
+  protected int _adminHttpPort = -1;
+  protected int _adminHttpsPort = -1;
   protected String _instanceId;
   protected HelixConfigScope _instanceConfigScope;
   protected HelixManager _helixManager;
@@ -162,6 +164,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
       _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _hostname);
     }
     _port = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
+
+    for (ListenerConfig listenerConfig : _listenerConfigs) {
+      String protocol = listenerConfig.getProtocol();
+      if (CommonConstants.HTTP_PROTOCOL.equals(protocol)) {
+        _adminHttpPort = listenerConfig.getPort();
+      } else if (CommonConstants.HTTPS_PROTOCOL.equals(protocol)) {
+        _adminHttpsPort = listenerConfig.getPort();
+      }
+    }
 
     _instanceId = _serverConf.getProperty(Server.CONFIG_OF_INSTANCE_ID);
     if (_instanceId != null) {
@@ -900,5 +911,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     PinotConfiguration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
     PinotCrypterFactory.init(pinotCrypterConfig);
+  }
+
+  public int getPort() {
+    return _port;
+  }
+
+  public int getAdminHttpPort() {
+    return _adminHttpPort;
+  }
+
+  public int getAdminHttpsPort() {
+    return _adminHttpsPort;
   }
 }
