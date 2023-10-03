@@ -62,6 +62,7 @@ public class BatchConfigProperties {
   public static final String FAIL_ON_EMPTY_SEGMENT = "fail.on.empty.segment";
   public static final String AUTH_TOKEN = "authToken";
   public static final String APPEND_UUID_TO_SEGMENT_NAME = "append.uuid.to.segment.name";
+  public static final String EXCLUDE_TIME_IN_SEGMENT_NAME = "exclude.time.in.segment.name";
 
   public static final String OUTPUT_SEGMENT_DIR_URI = "output.segment.dir.uri";
 
