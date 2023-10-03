@@ -54,6 +54,7 @@ public class RealtimeSegmentConverter {
   private final String _segmentName;
   private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
   private final boolean _nullHandlingEnabled;
+  private boolean _enableColumnMajor;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
@@ -70,6 +71,18 @@ public class RealtimeSegmentConverter {
     _tableConfig = tableConfig;
     _segmentName = segmentName;
     _nullHandlingEnabled = nullHandlingEnabled;
+
+    // Check if column major mode should be enabled
+    try{
+      String str = _tableConfig.getIndexingConfig().getStreamConfigs().get("realtime.segment.flush.enable_column_major");
+      if(str != null) {
+        _enableColumnMajor = Boolean.parseBoolean(str);
+      } else{
+        _enableColumnMajor = false;
+      }
+    } catch (Exception ex) {
+      _enableColumnMajor = false;
+    }
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
@@ -118,8 +131,12 @@ public class RealtimeSegmentConverter {
       RealtimeSegmentSegmentCreationDataSource dataSource =
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
       driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline());
-      driver.build();
-      //driver.buildByColumn(_realtimeSegmentImpl);
+
+      if(!_enableColumnMajor){
+        driver.build();
+      } else {
+        driver.buildByColumn(_realtimeSegmentImpl);
+      }
     }
 
     if (segmentPartitionConfig != null) {

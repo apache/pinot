@@ -152,6 +152,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
       TransformPipeline transformPipeline)
       throws Exception {
+    if (config.getTableName().contains("rippling")) {
+      LOGGER.info("Building Rippling Segment");
+    }
     _config = config;
     _recordReader = dataSource.getRecordReader();
     _dataSchema = config.getSchema();

@@ -81,6 +81,7 @@ public class StreamConfigProperties {
    */
   public static final String DEPRECATED_SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.size";
   public static final String SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.rows";
+  public static final String SEGMENT_FLUSH_ENABLE_COLUMN_MAJOR = "realtime.segment.flush.enable_column_major";
 
   /**
    * @deprecated because the property key is confusing (desired size is not indicative of segment size).

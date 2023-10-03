@@ -66,8 +66,6 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -78,9 +76,7 @@ public class SegmentGeneratorConfig implements Serializable {
     EPOCH, SIMPLE_DATE
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
   public static final String GENERATE_INV_BEFORE_PUSH_DEPREC_PROP = "generate.inverted.index.before.push";
-
   private final TableConfig _tableConfig;
   // NOTE: Use TreeMap to guarantee the order. The custom properties will be written into the segment metadata.
   private final TreeMap<String, String> _customProperties = new TreeMap<>();
@@ -97,6 +93,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private String _segmentNamePrefix = null;
   private String _segmentNamePostfix = null;
   private String _segmentTimeColumnName = null;
+  private boolean _segmentEnableColumnMajor = false;
   private FieldSpec.DataType _segmentTimeColumnDataType = null;
   private TimeUnit _segmentTimeUnit = null;
   private String _segmentCreationTime = null;
@@ -461,6 +458,10 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public void setTimeColumnName(String timeColumnName) {
     _segmentTimeColumnName = timeColumnName;
+  }
+
+  public void setEnableColumnMajor(boolean enable) {
+    _segmentEnableColumnMajor = enable;
   }
 
   public int getSequenceId() {

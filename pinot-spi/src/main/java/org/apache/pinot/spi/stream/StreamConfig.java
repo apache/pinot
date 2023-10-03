@@ -65,6 +65,7 @@ public class StreamConfig {
   private final long _idleTimeoutMillis;
 
   private final int _flushThresholdRows;
+  private final boolean _flushEnableColumnMajor;
   private final long _flushThresholdTimeMillis;
   private final long _flushThresholdSegmentSizeBytes;
   private final int _flushAutotuneInitialRows; // initial num rows to use for SegmentSizeBasedFlushThresholdUpdater
@@ -171,6 +172,7 @@ public class StreamConfig {
     _idleTimeoutMillis = idleTimeoutMillis;
 
     _flushThresholdRows = extractFlushThresholdRows(streamConfigMap);
+    _flushEnableColumnMajor = extractFlushEnableColumnMajorMode(streamConfigMap);
     _flushThresholdTimeMillis = extractFlushThresholdTimeMillis(streamConfigMap);
     _flushThresholdSegmentSizeBytes = extractFlushThresholdSegmentSize(streamConfigMap);
     _serverUploadToDeepStore = Boolean.parseBoolean(
@@ -239,6 +241,23 @@ public class StreamConfig {
     } else {
       return DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES;
     }
+  }
+
+  private boolean extractFlushEnableColumnMajorMode(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.SEGMENT_FLUSH_ENABLE_COLUMN_MAJOR;
+    String enableColumnMajorStr = streamConfigMap.get(key);
+    boolean enableColumnMajor = false;
+
+    if (enableColumnMajorStr != null) {
+      try {
+        enableColumnMajor = Boolean.parseBoolean(enableColumnMajorStr);
+      } catch (Exception e) {
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", key, enableColumnMajorStr,
+                false);
+      }
+    }
+
+    return enableColumnMajor;
   }
 
   protected int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
