@@ -55,6 +55,7 @@ public class RealtimeSegmentConverter {
   private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
   private final boolean _nullHandlingEnabled;
   private boolean _enableColumnMajor;
+  private int _totalDocs = 0;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
@@ -137,6 +138,8 @@ public class RealtimeSegmentConverter {
       } else {
         driver.buildByColumn(_realtimeSegmentImpl);
       }
+
+      _totalDocs = driver.getSegmentStats().getTotalDocCount();
     }
 
     if (segmentPartitionConfig != null) {
@@ -171,5 +174,13 @@ public class RealtimeSegmentConverter {
       }
     }
     return newSchema;
+  }
+
+  public boolean isColumnMajorEnabled() {
+    return _enableColumnMajor;
+  }
+
+  public int getTotalDocCount() {
+    return _totalDocs;
   }
 }
