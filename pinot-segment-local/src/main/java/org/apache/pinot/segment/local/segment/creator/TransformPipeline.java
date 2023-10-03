@@ -39,6 +39,10 @@ public class TransformPipeline {
   private final RecordTransformer _recordTransformer;
   private final ComplexTypeTransformer _complexTypeTransformer;
 
+  public String describe() {
+    return String.format("Record Transformer: {}, ComplexType Transformer: {}", _recordTransformer, _complexTypeTransformer);
+  }
+
   /**
    * Constructs a transform pipeline with customized RecordTransformer and customized ComplexTypeTransformer
    * @param recordTransformer the customized record transformer
