@@ -16,9 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix.core.rebalance.tenant;
+package org.apache.pinot.controller.helix.core.rebalance;
 
+public class RebalanceJobConstants {
+  private RebalanceJobConstants() {
+  }
 
-public interface TenantRebalancer {
-  TenantRebalanceResult rebalance(TenantRebalanceConfig context);
+  // Progress status of the rebalance operartion
+  public static final String JOB_STATS_KEY_REBALANCE_PROGRESS = "REBALANCE_PROGRESS_STATS";
 }

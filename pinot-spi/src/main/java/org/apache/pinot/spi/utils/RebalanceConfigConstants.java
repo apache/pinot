@@ -19,17 +19,12 @@
 package org.apache.pinot.spi.utils;
 
 /**
- * Constants for rebalance config properties
+ * Defaults for rebalance configs are defined here. But use RebalanceConfig to define the configs, and deprecate
+ * config names defined here.
  */
 public class RebalanceConfigConstants {
   private RebalanceConfigConstants() {
   }
-
-  // Unique Id for rebalance
-  public static final String JOB_ID = "jobId";
-
-  // Progress of the Rebalance operartion
-  public static final String REBALANCE_PROGRESS_STATS = "REBALANCE_PROGRESS_STATS";
 
   // Whether to rebalance table in dry-run mode
   public static final String DRY_RUN = "dryRun";

@@ -29,13 +29,13 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
@@ -93,7 +93,7 @@ public class TenantRebalancerTest extends ControllerTest {
         _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME_B).getRecord().getMapFields();
 
     // rebalance the tables on test tenant
-    TenantRebalanceContext context = new TenantRebalanceContext();
+    TenantRebalanceConfig context = new TenantRebalanceConfig();
     context.setTenantName(TENANT_NAME);
     context.setVerboseResult(true);
     TenantRebalanceResult result = tenantRebalancer.rebalance(context);
@@ -148,7 +148,7 @@ public class TenantRebalancerTest extends ControllerTest {
     if (controllerJobZKMetadata == null) {
       return null;
     }
-    return JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceConfigConstants.REBALANCE_PROGRESS_STATS),
+    return JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceJobConstants.JOB_STATS_KEY_REBALANCE_PROGRESS),
         TenantRebalanceProgressStats.class);
   }
 

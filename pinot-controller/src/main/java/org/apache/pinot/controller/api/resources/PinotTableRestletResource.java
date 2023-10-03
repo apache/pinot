@@ -64,8 +64,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -94,6 +92,8 @@ import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
@@ -114,7 +114,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.zookeeper.data.Stat;
@@ -621,20 +620,18 @@ public class PinotTableRestletResource {
 
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
 
-    Configuration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, reassignInstances);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, includeConsuming);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.BOOTSTRAP, bootstrap);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, downtime);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, minAvailableReplicas);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, bestEfforts);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-        externalViewCheckIntervalInMs);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-        externalViewStabilizationTimeoutInMs);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.UPDATE_TARGET_TIER, updateTargetTier);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.JOB_ID, TableRebalancer.createUniqueRebalanceJobIdentifier());
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(dryRun);
+    rebalanceConfig.setReassignInstances(reassignInstances);
+    rebalanceConfig.setIncludeConsuming(includeConsuming);
+    rebalanceConfig.setBootstrap(bootstrap);
+    rebalanceConfig.setDowntime(downtime);
+    rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
+    rebalanceConfig.setBestEfforts(bestEfforts);
+    rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
+    rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
+    rebalanceConfig.setUpdateTargetTier(updateTargetTier);
+    rebalanceConfig.setJobId(TableRebalancer.createUniqueRebalanceJobIdentifier());
 
     try {
       if (dryRun || downtime) {
@@ -642,13 +639,13 @@ public class PinotTableRestletResource {
         return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, false);
       } else {
         // Make a dry-run first to get the target assignment
-        rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, true);
+        rebalanceConfig.setDryRun(true);
         RebalanceResult dryRunResult =
             _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, false);
 
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
-          rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, false);
+          rebalanceConfig.setDryRun(false);
           _executorService.submit(() -> {
             try {
               _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, true);
@@ -745,12 +742,11 @@ public class PinotTableRestletResource {
           Response.Status.NOT_FOUND);
     }
     TableRebalanceProgressStats tableRebalanceProgressStats =
-        JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceConfigConstants.REBALANCE_PROGRESS_STATS),
+        JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceJobConstants.JOB_STATS_KEY_REBALANCE_PROGRESS),
             TableRebalanceProgressStats.class);
     long timeSinceStartInSecs = 0L;
-    if (!tableRebalanceProgressStats.getStatus().equals(RebalanceResult.Status.DONE)) {
-      timeSinceStartInSecs =
-          (System.currentTimeMillis() - tableRebalanceProgressStats.getStartTimeMs()) / 1000;
+    if (!RebalanceResult.Status.DONE.toString().equals(tableRebalanceProgressStats.getStatus())) {
+      timeSinceStartInSecs = (System.currentTimeMillis() - tableRebalanceProgressStats.getStartTimeMs()) / 1000;
     }
 
     ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse = new ServerRebalanceJobStatusResponse();

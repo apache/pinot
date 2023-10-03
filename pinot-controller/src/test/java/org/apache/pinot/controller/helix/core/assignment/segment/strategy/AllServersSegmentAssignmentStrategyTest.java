@@ -35,6 +35,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.OfflineSegmentA
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -124,7 +125,7 @@ public class AllServersSegmentAssignmentStrategyTest {
     when(dataAccessor.getChildValues(builder.instanceConfigs(), true)).thenReturn(instanceConfigList);
 
     Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, null);
+        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new RebalanceConfig());
     assertEquals(newAssignment.get(SEGMENT_NAME).size(), NUM_INSTANCES - 1);
   }
 

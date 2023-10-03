@@ -58,7 +58,8 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceContext;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
@@ -70,7 +71,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -584,7 +584,7 @@ public class PinotTenantRestletResource {
   @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
   public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
-      @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceContext context) {
+      @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceConfig context) {
     context.setTenantName(tenantName);
     return _tenantRebalancer.rebalance(context);
   }
@@ -607,7 +607,7 @@ public class PinotTenantRestletResource {
           Response.Status.NOT_FOUND);
     }
     TenantRebalanceProgressStats tenantRebalanceProgressStats =
-        JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceConfigConstants.REBALANCE_PROGRESS_STATS),
+        JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceJobConstants.JOB_STATS_KEY_REBALANCE_PROGRESS),
             TenantRebalanceProgressStats.class);
     long timeSinceStartInSecs = tenantRebalanceProgressStats.getTimeToFinishInSeconds();
     if (tenantRebalanceProgressStats.getCompletionStatusMsg() == null) {

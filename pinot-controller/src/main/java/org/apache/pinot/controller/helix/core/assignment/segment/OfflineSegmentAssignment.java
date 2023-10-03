@@ -30,8 +30,8 @@ import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.AllServersSegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 
 
 /**
@@ -58,10 +58,19 @@ public class OfflineSegmentAssignment extends BaseSegmentAssignment {
     return instancesAssigned;
   }
 
+  @Deprecated
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
       @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config) {
+    return rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers, tierInstancePartitionsMap,
+        RebalanceConfig.fromConfiguration(config));
+  }
+
+  @Override
+  public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, RebalanceConfig config) {
     InstancePartitions offlineInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
     Preconditions
         .checkState(offlineInstancePartitions != null, "Failed to find OFFLINE instance partitions for table: %s",
@@ -78,9 +87,7 @@ public class OfflineSegmentAssignment extends BaseSegmentAssignment {
       return segmentAssignmentStrategy
           .reassignSegments(currentAssignment, offlineInstancePartitions, InstancePartitionsType.OFFLINE);
     }
-    boolean bootstrap =
-        config.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
-
+    boolean bootstrap = config.isBootstrap();
     // Rebalance tiers first
     Pair<List<Map<String, Map<String, String>>>, Map<String, Map<String, String>>> pair =
         rebalanceTiers(currentAssignment, sortedTiers, tierInstancePartitionsMap, bootstrap,

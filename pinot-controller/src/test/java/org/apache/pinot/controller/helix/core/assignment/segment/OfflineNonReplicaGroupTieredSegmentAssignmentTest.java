@@ -25,20 +25,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -165,7 +163,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     // On rebalancing, segments move to tiers
     Map<String, Map<String, String>> newAssignment =
         _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
-            _tierInstancePartitionsMap, new BaseConfiguration());
+            _tierInstancePartitionsMap, new RebalanceConfig());
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
 
     // segments 0-49 remain unchanged
@@ -205,7 +203,7 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
 
     // rebalance without tierInstancePartitions resets the assignment
     Map<String, Map<String, String>> resetAssignment =
-        _segmentAssignment.rebalanceTable(newAssignment, _instancePartitionsMap, null, null, new BaseConfiguration());
+        _segmentAssignment.rebalanceTable(newAssignment, _instancePartitionsMap, null, null, new RebalanceConfig());
     for (String segment : SEGMENTS) {
       Assert.assertTrue(INSTANCES.containsAll(resetAssignment.get(segment).keySet()));
     }
@@ -222,11 +220,11 @@ public class OfflineNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     // Bootstrap table should reassign all segments
-    Configuration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setBootstrap(true);
     Map<String, Map<String, String>> newAssignment =
         _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
-            _tierInstancePartitionsMap, new BaseConfiguration());
+            _tierInstancePartitionsMap, rebalanceConfig);
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
 
     // segments 0-49 remain unchanged

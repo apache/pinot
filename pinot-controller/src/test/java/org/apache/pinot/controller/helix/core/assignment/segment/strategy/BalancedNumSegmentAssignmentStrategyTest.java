@@ -24,19 +24,17 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.controller.helix.core.assignment.segment.OfflineSegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -129,8 +127,8 @@ public class BalancedNumSegmentAssignmentStrategyTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(_segmentAssignment
-            .rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new BaseConfiguration()),
+    assertEquals(
+        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new RebalanceConfig()),
         currentAssignment);
   }
 
@@ -145,8 +143,8 @@ public class BalancedNumSegmentAssignmentStrategyTest {
     }
 
     // Bootstrap table should reassign all segments based on their alphabetical order
-    Configuration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setBootstrap(true);
     Map<String, Map<String, String>> newAssignment =
         _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, rebalanceConfig);
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
