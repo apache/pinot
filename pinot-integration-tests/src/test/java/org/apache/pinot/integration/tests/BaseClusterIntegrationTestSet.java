@@ -646,6 +646,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String response =
         sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload), null);
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+    System.out.println("Printing response: ");
+    System.out.println(response);
     JsonNode tableLevelDetails =
         JsonUtils.stringToJsonNode(StringEscapeUtils.unescapeJava(response)).get(tableNameWithType);
     String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
