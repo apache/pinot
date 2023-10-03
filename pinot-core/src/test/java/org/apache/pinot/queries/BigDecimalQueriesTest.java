@@ -138,9 +138,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
   @Test
   public void testQueriesWithDictColumn()
       throws Exception {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     setUp(tableConfig);
     testQueries();
   }
@@ -150,10 +148,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       throws Exception {
     List<String> noDictionaryColumns = new ArrayList<String>();
     noDictionaryColumns.add(BIG_DECIMAL_COLUMN);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .setNoDictionaryColumns(noDictionaryColumns)
-        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(noDictionaryColumns).build();
     setUp(tableConfig);
     testQueries();
   }
@@ -174,7 +170,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         Object[] row = rows.get(i);
         assertEquals(row.length, 1);
         if (row[0] != null) {
-          assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)));
+          assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).toPlainString());
         }
       }
     }
@@ -204,7 +200,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           if (k >= NUM_RECORDS) {
             assertNull(values[0]);
           } else {
-            assertEquals(values[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - 1 - k)));
+            assertEquals(values[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - 1 - k)).toPlainString());
           }
         }
         k++;
@@ -228,7 +224,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         if (i % 4 == 3) {
           i++;
         }
-        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)));
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).toPlainString());
         i++;
       }
       // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
@@ -236,8 +232,8 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     }
     {
       int limit = 40;
-      String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT %d",
-          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, limit);
+      String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT %d", BIG_DECIMAL_COLUMN,
+          BIG_DECIMAL_COLUMN, limit);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -255,7 +251,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         if (i % 4 == 3) {
           i++;
         }
-        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)));
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(i)).toPlainString());
         i++;
         index++;
       }
@@ -285,13 +281,14 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       assertEquals((long) rows.get(0)[0], 3 * NUM_RECORDS);
     }
     {
-      String query = String.format("SELECT %s FROM testTable GROUP BY %s ORDER BY %s DESC",
-          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN);
+      String query =
+          String.format("SELECT %s FROM testTable GROUP BY %s ORDER BY %s DESC", BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN,
+              BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema, new DataSchema(new String[]{BIG_DECIMAL_COLUMN},
-          new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
+      assertEquals(dataSchema,
+          new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 10);
       // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
@@ -304,7 +301,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         }
         Object[] row = rows.get(index);
         assertEquals(row.length, 1);
-        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)));
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)).toPlainString());
         index++;
         i++;
       }
@@ -329,7 +326,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           // Null values are inserted at: index % 4 == 3. All null values are grouped into a single null.
           i++;
         }
-        assertEquals(row[1], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)));
+        assertEquals(row[1], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(NUM_RECORDS - i - 1)).toPlainString());
         i++;
       }
     }
@@ -346,8 +343,9 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     {
       // Note: defining decimal literals within quotes preserves precision.
       BigDecimal lowerLimit = BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69));
-      String query = String.format("SELECT %s FROM testTable WHERE %s > '%s' LIMIT 30",
-          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, lowerLimit);
+      String query =
+          String.format("SELECT %s FROM testTable WHERE %s > '%s' LIMIT 30", BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN,
+              lowerLimit);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -363,14 +361,14 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           // Null values are inserted at: index % 4 == 3.
           i++;
         }
-        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69 + i + 1)));
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69 + i + 1)).toPlainString());
         i++;
       }
     }
     {
       // Note: defining decimal literals within quotes preserves precision.
-      String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'",
-          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)));
+      String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'", BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN,
+          BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
@@ -381,31 +379,17 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       for (int i = 0; i < 4; i++) {
         Object[] row = rows.get(i);
         assertEquals(row.length, 1);
-        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)));
+        assertEquals(row[0], BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)).toPlainString());
       }
     }
     {
-      // This returns currently 25 rows instead of a single row!
-//      int limit = 25;
-//      String query = String.format(
-//          "SELECT SUMPRECISION(%s) AS sum FROM (SELECT %s FROM testTable ORDER BY %s LIMIT %d)",
-//          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, limit);
-//      BrokerResponseNative brokerResponse = getBrokerResponse(query);
-//      ResultTable resultTable = brokerResponse.getResultTable();
-//      DataSchema dataSchema = resultTable.getDataSchema();
-//      assertEquals(dataSchema, new DataSchema(new String[]{"sum"}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-//      List<Object[]> rows = resultTable.getRows();
-//      assertEquals(rows.size(), 1);
-    }
-    {
-      String query = String.format(
-          "SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue < %s ORDER BY maxValue",
-          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(5)));
+      String query =
+          String.format("SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue < %s ORDER BY maxValue",
+              BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(5)));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema,
-          new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
+      assertEquals(dataSchema, new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
       List<Object[]> rows = resultTable.getRows();
       // The default null ordering is: 'NULLS LAST'. This is why the number of returned value is 4 and not 5.
       assertEquals(rows.size(), 4);
@@ -423,14 +407,13 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     }
     {
       int lowerLimit = 991;
-      String query = String.format(
-          "SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue > %s ORDER BY maxValue",
-          BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(lowerLimit)));
+      String query =
+          String.format("SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue > %s ORDER BY maxValue",
+              BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(lowerLimit)));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
       ResultTable resultTable = brokerResponse.getResultTable();
       DataSchema dataSchema = resultTable.getDataSchema();
-      assertEquals(dataSchema,
-          new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
+      assertEquals(dataSchema, new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
       List<Object[]> rows = resultTable.getRows();
       assertEquals(rows.size(), 6);
       int i = lowerLimit;

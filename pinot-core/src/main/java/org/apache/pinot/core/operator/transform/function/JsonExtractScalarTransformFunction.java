@@ -83,6 +83,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there are exactly 3 or 4 arguments
     if (arguments.size() < 3 || arguments.size() > 4) {
       throw new IllegalArgumentException(

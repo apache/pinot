@@ -98,7 +98,6 @@ public class TableCacheTest {
     // Add a table config
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSchemaName(SCHEMA_NAME).build();
-    TEST_INSTANCE.waitForEVToDisappear(tableConfig.getTableName());
     TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
     // Wait for at most 10 seconds for the callback to add the table config to the cache
     TestUtils.waitForCondition(
@@ -181,6 +180,10 @@ public class TableCacheTest {
     assertEquals(tableCache.getSchema(SCHEMA_NAME), expectedSchema);
     assertEquals(tableCache.getColumnNameMap(SCHEMA_NAME), expectedColumnMap);
 
+    // Wait for external view to appear before deleting the table to prevent external view being created after the
+    // waitForEVToDisappear() call
+    TEST_INSTANCE.waitForEVToAppear(OFFLINE_TABLE_NAME);
+
     // Remove the table config
     TEST_INSTANCE.getHelixResourceManager().deleteOfflineTable(RAW_TABLE_NAME);
     // Wait for at most 10 seconds for the callback to remove the table config from the cache
@@ -210,6 +213,9 @@ public class TableCacheTest {
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));
     assertEquals(schemaChangeListener._schemaList.size(), 0);
     assertEquals(tableConfigChangeListener._tableConfigList.size(), 0);
+
+    // Wait for external view to disappear to ensure a clean start for the next test
+    TEST_INSTANCE.waitForEVToDisappear(OFFLINE_TABLE_NAME);
   }
 
   @DataProvider(name = "testTableCacheDataProvider")

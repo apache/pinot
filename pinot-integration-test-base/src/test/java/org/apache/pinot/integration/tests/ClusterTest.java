@@ -326,6 +326,14 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Upload all segments inside the given directory to the cluster.
    */
+  protected void uploadSegments(String tableName, List<File> tarDirs)
+      throws Exception {
+    uploadSegments(tableName, TableType.OFFLINE, tarDirs);
+  }
+
+  /**
+   * Upload all segments inside the given directory to the cluster.
+   */
   protected void uploadSegments(String tableName, TableType tableType, File tarDir)
       throws Exception {
     uploadSegments(tableName, tableType, Collections.singletonList(tarDir));
@@ -545,7 +553,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   @DataProvider(name = "systemColumns")
   public Object[][] systemColumns() {
-    return new Object[][] {
+    return new Object[][]{
         {"$docId"},
         {"$hostName"},
         {"$segmentName"}

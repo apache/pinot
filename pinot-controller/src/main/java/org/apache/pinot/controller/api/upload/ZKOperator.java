@@ -212,9 +212,20 @@ public class ZKOperator {
           segmentZKMetadata.setCustomMap(segmentMetadata.getCustomMap());
         }
         if (!segmentZKMetadata.getDownloadUrl().equals(segmentDownloadURIStr)) {
+          // For offline ingestion, it is quite common that the download.uri would change but the crc would be the same.
+          // E.g. a user re-runs the job which process the same data and segments are stored/pushed from a different
+          // path from the Deepstore. Read more: https://github.com/apache/pinot/issues/11535
           LOGGER.info("Updating segment download url from: {} to: {} even though crc is the same",
-                  segmentZKMetadata.getDownloadUrl(), segmentDownloadURIStr);
+              segmentZKMetadata.getDownloadUrl(), segmentDownloadURIStr);
           segmentZKMetadata.setDownloadUrl(segmentDownloadURIStr);
+          // When download URI changes, we also need to copy the segment to the final location if existed.
+          // This typically means users changed the push type from METADATA to SEGMENT or SEGMENT to METADATA.
+          // Note that switching push type from SEGMENT to METADATA may lead orphan segments in the controller
+          // managed directory. Read more: https://github.com/apache/pinot/pull/11720
+          if (finalSegmentLocationURI != null) {
+            copySegmentToDeepStore(tableNameWithType, segmentName, uploadType, segmentFile, sourceDownloadURIStr,
+                finalSegmentLocationURI);
+          }
         }
         if (!_pinotHelixResourceManager.updateZkMetadata(tableNameWithType, segmentZKMetadata, expectedVersion)) {
           throw new RuntimeException(

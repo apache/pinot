@@ -1251,7 +1251,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(((Long) row[1]).intValue(), intValue);
         assertEquals(((Float) row[2]).intValue(), intValue);
         assertEquals(((Double) row[3]).intValue(), intValue);
-        assertEquals(((BigDecimal) row[4]).intValue(), intValue);
+        assertEquals(Integer.parseInt((String) row[4]), intValue);
         assertEquals(Integer.parseInt((String) row[5]), intValue);
         assertEquals(new String(BytesUtils.toBytes((String) row[6]), UTF_8).trim(), row[5]);
         actualValues.add(intValue);
@@ -1319,7 +1319,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       for (Object[] row : rows) {
         int intValue = ((Long) row[0]).intValue();
         List<Integer> actualValueList =
-            Arrays.asList(intValue, ((BigDecimal) row[1]).intValue(), ((Float) row[2]).intValue(),
+            Arrays.asList(intValue, Integer.parseInt((String) row[1]), ((Float) row[2]).intValue(),
                 Integer.parseInt((String) row[3]));
         assertEquals((int) actualValueList.get(1), intValue);
         List<Integer> expectedMVValues = new ArrayList<>(2);
@@ -1522,7 +1522,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       for (Object[] row : rows) {
         int intValue = ((Long) row[0]).intValue();
         List<Integer> actualValueList =
-            Arrays.asList(intValue, ((BigDecimal) row[1]).intValue(), ((Float) row[2]).intValue(),
+            Arrays.asList(intValue, Integer.parseInt((String) row[1]), ((Float) row[2]).intValue(),
                 Integer.parseInt((String) row[3]));
         assertEquals((int) actualValueList.get(1), intValue);
         List<Integer> expectedMVValues = new ArrayList<>(2);

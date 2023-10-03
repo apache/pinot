@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,12 +36,12 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -57,6 +56,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -254,9 +254,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       boolean keepOutputRowOrder)
       throws Exception {
     // query pinot
-    runQuery(sql, expect, null).ifPresent(rows -> {
+    runQuery(sql, expect, null).ifPresent(resultTable -> {
       try {
-        compareRowEquals(rows, queryH2(h2Sql), keepOutputRowOrder);
+        compareRowEquals(resultTable, queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
       }
@@ -267,7 +267,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void testQueryTestCasesWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
       List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
       throws Exception {
-    runQuery(sql, expect, null).ifPresent(rows -> compareRowEquals(rows, expectedRows, keepOutputRowOrder));
+    runQuery(sql, expect, null).ifPresent(
+        resultTable -> compareRowEquals(resultTable, expectedRows, keepOutputRowOrder));
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
@@ -275,7 +276,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       String expect, int numSegments)
       throws Exception {
     Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap = new HashMap<>();
-    runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(rows -> {
+    runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(resultTable -> {
       BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
       executionStatsAggregatorMap.get(0).setStats(brokerResponseNative);
       Assert.assertFalse(executionStatsAggregatorMap.isEmpty());
@@ -325,17 +326,15 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     });
   }
 
-  private Optional<List<Object[]>> runQuery(String sql, final String except,
-      Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
+  private Optional<ResultTable> runQuery(String sql, final String except,
+      Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap)
+      throws Exception {
     try {
       // query pinot
-      List<Object[]> resultRows = queryRunner(sql, executionStatsAggregatorMap);
-
-      Assert.assertNull(except,
-          "Expected error with message '" + except + "'. But instead rows were returned: " + resultRows.stream()
-              .map(Arrays::toString).collect(Collectors.joining(",\n")));
-
-      return Optional.of(resultRows);
+      ResultTable resultTable = queryRunner(sql, executionStatsAggregatorMap);
+      Assert.assertNull(except, "Expected error with message '" + except + "'. But instead rows were returned: "
+          + JsonUtils.objectToPrettyString(resultTable));
+      return Optional.of(resultTable);
     } catch (Exception e) {
       if (except == null) {
         throw e;
