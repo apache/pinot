@@ -356,22 +356,39 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     // TODO(ERICH): Get a measure of the ratio of columns to indexes (how many indexes per column are there)
     // Iterate over each value in the column
+    int numDocs = segment.getSegmentMetadata().getTotalDocs();
     PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName);
-    for(int docId : sortedDocIds) {
-      //String columnName = byColEntry.getKey();
+    if(sortedDocIds != null) {
+      for (int docId : sortedDocIds) {
+        Object columnValueToIndex = colReader.getValue(docId);
+        if (columnValueToIndex == null) {
+          throw new RuntimeException("Null value for column:" + columnName);
+        }
 
-      Object columnValueToIndex = colReader.getValue(docId);
-      if (columnValueToIndex == null) {
-        throw new RuntimeException("Null value for column:" + columnName);
+        FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+        SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+
+        if (fieldSpec.isSingleValueField()) {
+          indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+        } else {
+          indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+        }
       }
+    } else {
+      for (int docId = 0; docId < numDocs; docId++) {
+        Object columnValueToIndex = colReader.getValue(docId);
+        if (columnValueToIndex == null) {
+          throw new RuntimeException("Null value for column:" + columnName);
+        }
 
-      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+        FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+        SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
 
-      if (fieldSpec.isSingleValueField()) {
-        indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
-      } else {
-        indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+        if (fieldSpec.isSingleValueField()) {
+          indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+        } else {
+          indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+        }
       }
     }
 

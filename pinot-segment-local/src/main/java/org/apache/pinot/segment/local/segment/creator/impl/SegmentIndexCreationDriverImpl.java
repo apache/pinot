@@ -161,6 +161,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       Preconditions.checkState(_recordReader.hasNext(), "No record in data source");
     }
     _transformPipeline = transformPipeline;
+    LOGGER.info("Segment Builder Transform Pipeline: {}", _transformPipeline.describe());
     // Use the same transform pipeline if the data source is backed by a record reader
     if (dataSource instanceof RecordReaderSegmentCreationDataSource) {
       ((RecordReaderSegmentCreationDataSource) dataSource).setTransformPipeline(transformPipeline);
@@ -213,7 +214,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
       TransformPipeline.Result reusedResult = new TransformPipeline.Result();
-      long totalTransformerTimeNS = 0;
       while (_recordReader.hasNext()) {
         long recordReadStartTime = System.nanoTime();
         long recordReadStopTime = System.nanoTime();
@@ -285,10 +285,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("Start building IndexCreator By Column!");
 
       TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
+      // If this is null, then I need to use another method to iterate through the column
       int[] sortedDocIds = ((PinotSegmentRecordReader)_recordReader).getSortedDocIds();
       for (String col : columns) {
-        // TODO(ERICH): remove transform step to simplify code
-
         _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
       }
     } catch (Exception e) {

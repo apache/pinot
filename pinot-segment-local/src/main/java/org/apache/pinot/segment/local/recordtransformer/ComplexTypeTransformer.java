@@ -452,4 +452,8 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private String concat(String left, String right) {
     return String.join(_delimiter, left, right);
   }
+
+  public String describe() {
+    return "Complex Type Transformer";
+  }
 }
