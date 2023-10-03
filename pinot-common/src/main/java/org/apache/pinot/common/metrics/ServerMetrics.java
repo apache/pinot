@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
@@ -40,6 +41,11 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
    */
   public static boolean register(ServerMetrics serverMetrics) {
     return SERVER_METRICS_INSTANCE.compareAndSet(null, serverMetrics);
+  }
+
+  @VisibleForTesting
+  public static void deregister() {
+    SERVER_METRICS_INSTANCE.set(null);
   }
 
   /**

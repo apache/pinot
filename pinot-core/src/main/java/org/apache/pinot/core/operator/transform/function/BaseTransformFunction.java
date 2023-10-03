@@ -781,10 +781,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    // TODO: _arguments shouldn't be null if all the transform functions call the init().
-    if (_arguments == null) {
-      return null;
-    }
     RoaringBitmap bitmap = new RoaringBitmap();
     for (TransformFunction arg : _arguments) {
       RoaringBitmap argBitmap = arg.getNullBitmap(valueBlock);

@@ -46,6 +46,7 @@ public class ExtractTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     if (arguments.size() != 2) {
       throw new IllegalArgumentException("Exactly 2 arguments are required for EXTRACT transform function");
     }
