@@ -41,6 +41,7 @@ import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 
@@ -66,6 +67,12 @@ public class RexExpressionUtils {
 
   public static RexExpression.Literal fromRexLiteral(RexLiteral rexLiteral) {
     ColumnDataType dataType = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
+    // Calcite may parse the string literal to OBJECT type, e.g. TIMEUNIT.HOUR/YEAR etc.
+    // Here we convert it to back to STRING type, so there shouldn't be any unexpected RexExpression.Literal.
+    if (dataType == ColumnDataType.OBJECT) {
+      dataType = ColumnDataType.STRING;
+      return new RexExpression.Literal(dataType, rexLiteral.getValue().toString());
+    }
     return new RexExpression.Literal(dataType, convertValue(dataType, rexLiteral.getValue()));
   }
 
@@ -90,7 +97,7 @@ public class RexExpressionUtils {
       case STRING:
         return ((NlsString) value).getValue();
       case BYTES:
-        return ((ByteString) value).getBytes();
+        return new ByteArray(((ByteString) value).getBytes());
       default:
         return value;
     }

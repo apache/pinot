@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.proto.Plan;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -129,10 +130,13 @@ public class ProtoSerializationUtils {
     return Plan.LiteralField.newBuilder().setStringField(val).build();
   }
 
-  private static Plan.LiteralField bytesField(ByteString val) {
-    return Plan.LiteralField.newBuilder().setBytesField(val).build();
+  private static Plan.LiteralField bytesField(ByteArray val) {
+    return Plan.LiteralField.newBuilder().setBytesField(ByteString.copyFrom(val.getBytes())).build();
   }
 
+  /**
+   * Serialize an internal data type value
+   */
   private static Plan.MemberVariableField serializeMemberVariable(Object fieldObject) {
     Plan.MemberVariableField.Builder builder = Plan.MemberVariableField.newBuilder();
     if (fieldObject instanceof Boolean) {
@@ -148,9 +152,11 @@ public class ProtoSerializationUtils {
     } else if (fieldObject instanceof String) {
       builder.setLiteralField(stringField((String) fieldObject));
     } else if (fieldObject instanceof byte[]) {
-      builder.setLiteralField(bytesField(ByteString.copyFrom((byte[]) fieldObject)));
+      throw new IllegalStateException("byte[] is not supported, use ByteArray instead");
     } else if (fieldObject instanceof GregorianCalendar) {
-      builder.setLiteralField(longField(((GregorianCalendar) fieldObject).getTimeInMillis()));
+      throw new IllegalStateException("GregorianCalendar is not supported, use long instead");
+    } else if (fieldObject instanceof ByteArray) {
+      builder.setLiteralField(bytesField((ByteArray) fieldObject));
     } else if (fieldObject instanceof List) {
       builder.setListField(serializeListMemberVariable(fieldObject));
     } else if (fieldObject instanceof Map) {
@@ -215,10 +221,11 @@ public class ProtoSerializationUtils {
       case STRINGFIELD:
         return literalField.getStringField();
       case BYTESFIELD:
-        return literalField.getBytesField();
+        return new ByteArray(literalField.getBytesField().toByteArray());
       case LITERALFIELD_NOT_SET:
-      default:
         return null;
+      default:
+        throw new IllegalStateException("Unknown LiteralField type: " + literalField.getLiteralFieldCase());
     }
   }
 

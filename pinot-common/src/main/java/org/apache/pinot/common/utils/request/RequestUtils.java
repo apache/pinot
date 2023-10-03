@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
-import com.google.protobuf.ByteString;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,6 +38,7 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.FilterKind;
@@ -175,6 +175,11 @@ public class RequestUtils {
     return expression;
   }
 
+  /**
+   * TODO: We should use {@link #getLiteralExpression(ByteArray)} instead of this method to handle binary.
+   *
+   */
+  @Deprecated
   public static Expression getLiteralExpression(byte[] value) {
     Expression expression = createNewLiteralExpression();
     // TODO(After 1.0.0): This is for backward-compatibility, we can set the binary value directly instead of
@@ -183,9 +188,9 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getLiteralExpression(ByteString value) {
+  public static Expression getLiteralExpression(ByteArray value) {
     Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setBinaryValue(value.toByteArray());
+    expression.getLiteral().setBinaryValue(value.getBytes());
     return expression;
   }
 
@@ -201,6 +206,9 @@ public class RequestUtils {
     return expression;
   }
 
+  /**
+   * The input object should only be internal data type representation.
+   */
   public static Expression getLiteralExpression(Object object) {
     if (object == null) {
       return getNullLiteralExpression();
@@ -218,16 +226,20 @@ public class RequestUtils {
     if (object instanceof Double) {
       return RequestUtils.getLiteralExpression(((Double) object).doubleValue());
     }
+    // byte[] is not an internal data type, put it here for backward compatibility, we should use ByteArray instead.
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
     }
-    if (object instanceof ByteString) {
-      return RequestUtils.getLiteralExpression((ByteString) object);
+    if (object instanceof ByteArray) {
+      return RequestUtils.getLiteralExpression((ByteArray) object);
     }
     if (object instanceof Boolean) {
       return RequestUtils.getLiteralExpression(((Boolean) object).booleanValue());
     }
-    return RequestUtils.getLiteralExpression(object.toString());
+    if (object instanceof String) {
+      return RequestUtils.getLiteralExpression((String) object);
+    }
+    throw new UnsupportedOperationException("Unsupported data type: " + object.getClass() + " with value: " + object);
   }
 
   public static Expression getFunctionExpression(String canonicalName) {
