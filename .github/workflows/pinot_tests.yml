@@ -79,17 +79,17 @@ jobs:
         testset: [ 1, 2 ]
         java: [ 11, 17 ]
         distribution: [ "corretto" ]
-        prioritize_bytebuffer: [false, true]
+        skip_bytebuffer: [false, true]
         include:
           - java: 21
             testset: 1
             distribution: "corretto"
-            prioritize_bytebuffer: false
+            skip_bytebuffer: true
           - java: 21
             testset: 2
             distribution: "corretto"
-            prioritize_bytebuffer: false
-    name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with bytebuffers:${{matrix.prioritize_bytebuffer}}
+            skip_bytebuffer: true
+    name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with skip bytebuffers:${{matrix.skip_bytebuffer}}
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
@@ -126,7 +126,7 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: false
           RUN_TEST_SET: ${{ matrix.testset }}
-          PINOT_OFFHEAP_PRIORITIZE_BYTEBUFFER: ${{ matrix.prioritize_bytebuffer }}
+          PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
@@ -158,17 +158,17 @@ jobs:
         testset: [ 1, 2 ]
         java: [ 11, 17 ]
         distribution: [ "corretto" ]
-        prioritize_bytebuffer: [false, true]
+        skip_bytebuffer: [false, true]
         include:
           - java: 21
             testset: 1
             distribution: "corretto"
-            prioritize_bytebuffer: false
+            skip_bytebuffer: true
           - java: 21
             testset: 2
             distribution: "corretto"
-            prioritize_bytebuffer: false
-    name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with bytebuffers:${{matrix.prioritize_bytebuffer}}
+            skip_bytebuffer: true
+    name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with skip bytebuffers:${{matrix.skip_bytebuffer}}
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
@@ -204,7 +204,7 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: true
           RUN_TEST_SET: ${{ matrix.testset }}
-          PINOT_OFFHEAP_PRIORITIZE_BYTEBUFFER: ${{ matrix.prioritize_bytebuffer }}
+          PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
@@ -316,12 +316,12 @@ jobs:
       matrix:
         java: [ 11, 17 ]
         distribution: [ "corretto" ]
-        prioritize_bytebuffer: [false, true]
+        skip_bytebuffer: [false, true]
         include:
           - java: 21
             distribution: "corretto"
-            prioritize_bytebuffer: false
-    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }} with bytebuffers:${{matrix.prioritize_bytebuffer}}
+            skip_bytebuffer: false
+    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }} with skip bytebuffers:${{matrix.skip_bytebuffer}}
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}
@@ -342,5 +342,5 @@ jobs:
             ${{ runner.os }}-maven-
       - name: Quickstart on JDK ${{ matrix.java }}
         env:
-          PINOT_OFFHEAP_PRIORITIZE_BYTEBUFFER: ${{ matrix.prioritize_bytebuffer }}
+          PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
         run: .github/workflows/scripts/.pinot_quickstart.sh
