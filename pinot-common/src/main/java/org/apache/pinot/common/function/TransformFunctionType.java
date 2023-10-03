@@ -73,7 +73,7 @@ public enum TransformFunctionType {
   NOT_EQUALS("not_equals", "notEquals"),
   GREATER_THAN("greater_than", "greaterThan"),
   GREATER_THAN_OR_EQUAL("greater_than_or_equal", "greaterThanOrEqual"),
-  LESS_THAN("less_than"),
+  LESS_THAN("less_than", "lessThan"),
   LESS_THAN_OR_EQUAL("less_than_or_equal", "lessThanOrEqual"),
   IN("in"),
   NOT_IN("not_in"),
