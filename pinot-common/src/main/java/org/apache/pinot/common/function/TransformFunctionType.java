@@ -69,12 +69,13 @@ public enum TransformFunctionType {
   GREATEST("greatest"),
 
   // predicate functions
+  // there's no need to register these functions b/c Calcite parser doesn't allow explicit function parsing
   EQUALS("equals"),
-  NOT_EQUALS("not_equals", "notEquals"),
-  GREATER_THAN("greater_than", "greaterThan"),
-  GREATER_THAN_OR_EQUAL("greater_than_or_equal", "greaterThanOrEqual"),
-  LESS_THAN("less_than", "lessThan"),
-  LESS_THAN_OR_EQUAL("less_than_or_equal", "lessThanOrEqual"),
+  NOT_EQUALS("not_equals"),
+  GREATER_THAN("greater_than"),
+  GREATER_THAN_OR_EQUAL("greater_than_or_equal"),
+  LESS_THAN("less_than"),
+  LESS_THAN_OR_EQUAL("less_than_or_equal"),
   IN("in"),
   NOT_IN("not_in"),
 
