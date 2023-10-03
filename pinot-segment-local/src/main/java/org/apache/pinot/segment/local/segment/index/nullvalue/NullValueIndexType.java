@@ -131,7 +131,7 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
   }
 
-  public IndexBuildLifecycle getIndexBuildLifecycle() {
-    return IndexBuildLifecycle.CUSTOM;
+  public BuildLifecycle getIndexBuildLifecycle() {
+    return BuildLifecycle.CUSTOM;
   }
 }

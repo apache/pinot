@@ -450,7 +450,7 @@ public class DictionaryIndexType
         dictionaryColumnSize, Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
   }
 
-  public IndexBuildLifecycle getIndexBuildLifecycle() {
-    return IndexBuildLifecycle.CUSTOM;
+  public BuildLifecycle getIndexBuildLifecycle() {
+    return BuildLifecycle.CUSTOM;
   }
 }

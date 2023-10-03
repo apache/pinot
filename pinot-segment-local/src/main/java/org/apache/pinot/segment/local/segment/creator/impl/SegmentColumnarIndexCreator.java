@@ -195,7 +195,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
           Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
       for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
-        if (index.getIndexBuildLifecycle() != IndexType.IndexBuildLifecycle.DURING_SEGMENT_CREATION) {
+        if (index.getIndexBuildLifecycle() != IndexType.BuildLifecycle.DURING_SEGMENT_CREATION) {
           continue;
         }
         tryCreateIndexCreator(creatorsByIndex, index, context, config);
