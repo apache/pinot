@@ -102,8 +102,8 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public ReaderContext createContext() {
-    return _chunkCompressionType == ChunkCompressionType.PASS_THROUGH ? new UncompressedReaderContext(_metadata,
-        _chunks, _chunksStartOffset)
+    return _chunkCompressionType == ChunkCompressionType.PASS_THROUGH ? new UncompressedReaderContext(_chunks,
+        _metadata, _chunksStartOffset)
         : new CompressedReaderContext(_metadata, _chunks, _chunksStartOffset, _chunkDecompressor, _chunkCompressionType,
             _targetDecompressedChunkSize);
   }
