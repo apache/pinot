@@ -28,7 +28,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.CustomObject;
-import org.apache.pinot.common.datatable.DataTableImplV3;
 import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -42,7 +41,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Base data block mostly replicating implementation of {@link DataTableImplV3}.
+ * Base data block with the following layout
  *
  * +-----------------------------------------------+
  * | 13 integers of header:                        |
