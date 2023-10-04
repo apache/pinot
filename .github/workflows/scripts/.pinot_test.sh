@@ -32,13 +32,13 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   cd pinot-integration-tests || exit 1
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn test \
-        -P github-actions,custom-cluster-integration-test-suite || exit 1
+        -P github-actions,custom-cluster-integration-test-suite -fn || exit 1
     mvn test \
-        -P github-actions,integration-tests-set-1 && exit 0 || exit 1
+        -P github-actions,integration-tests-set-1 -fn && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
     mvn test \
-        -P github-actions,integration-tests-set-2 && exit 0 || exit 1
+        -P github-actions,integration-tests-set-2 -fn && exit 0 || exit 1
   fi
 else
   # Unit Tests
@@ -63,7 +63,7 @@ else
         -pl 'pinot-core' \
         -pl 'pinot-query-planner' \
         -pl 'pinot-query-runtime' \
-        -P github-actions,no-integration-tests && exit 0 || exit 1
+        -P github-actions,no-integration-tests  -fn  && exit 0 || exit 1
   fi
   if [ "$RUN_TEST_SET" == "2" ]; then
     mvn clean install -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -T 16 || exit 1
@@ -76,7 +76,7 @@ else
         -pl '!pinot-query-planner' \
         -pl '!pinot-query-runtime' \
         -P github-actions,no-integration-tests \
-        -Dspotless.skip -Dcheckstyle.skip -Denforcer.skip -Dlicense.skip \
+        -Dspotless.skip -Dcheckstyle.skip -Denforcer.skip -Dlicense.skip -fn \
          && exit 0 || exit 1
   fi
 fi
