@@ -104,7 +104,7 @@
       },
       {
         "description": "test explicit escape column name used after the with table and sub query",
-        "sql": "WITH \"table\" AS (SELECT * FROM {tbl3} WHERE \"dash-column\" != 'foo') SELECT \"table\".\"dash-column\", COUNT(*) FROM {tbl3} AS tbl LEFT JOIN \"table\" ON tbl.\"dot.column\" = \"table\".\"dot.column\" GROUP BY 1 ORDER BY SUM(\"table\".\"dot.column\")",
+        "sql": "WITH \"t-a-b-l-e\" AS (SELECT * FROM {tbl3} WHERE \"dash-column\" != 'foo') SELECT \"t-a-b-l-e\".\"dash-column\", COUNT(*) FROM {tbl3} AS tbl LEFT JOIN \"t-a-b-l-e\" ON tbl.\"dot.column\" = \"t-a-b-l-e\".\"dot.column\" GROUP BY 1 ORDER BY SUM(\"t-a-b-l-e\".\"dot.column\")",
         "outputs": [
           ["bar", 1],
           [null, 1]
