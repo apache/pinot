@@ -47,6 +47,7 @@ public class StarTreeV2Constants {
     public static final String TOTAL_DOCS = "total.docs";
     public static final String DIMENSIONS_SPLIT_ORDER = "split.order";
     public static final String FUNCTION_COLUMN_PAIRS = "function.column.pairs";
+    public static final String FUNCTION_COLUMN_PAIRS_CONFIG = "function.column.pairs.config";
     public static final String MAX_LEAF_RECORDS = "max.leaf.records";
     public static final String SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS = "skip.star.node.creation";
 

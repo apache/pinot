@@ -92,6 +92,7 @@ public class StarTreeIndexSeparator implements Closeable {
           Lists.newArrayList(
               metadata.getStringArray(StarTreeV2Constants.MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)),
           Lists.newArrayList(metadata.getStringArray(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS)),
+          metadata.getProperties(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG),
           metadata.getInt(StarTreeV2Constants.MetadataKey.MAX_LEAF_RECORDS))));
     }
     return builderConfigList;

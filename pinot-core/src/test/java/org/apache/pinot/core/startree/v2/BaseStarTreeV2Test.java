@@ -166,7 +166,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList(DIMENSION_D1, DIMENSION_D2), null,
         Collections.singletonList(
             new AggregationFunctionColumnPair(_valueAggregator.getAggregationType(), METRIC).toColumnName()),
-        MAX_LEAF_RECORDS);
+        null, MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
     MultipleTreesBuilder.BuildMode buildMode =

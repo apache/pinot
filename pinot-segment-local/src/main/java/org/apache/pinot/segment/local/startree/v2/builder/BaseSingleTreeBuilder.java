@@ -473,13 +473,17 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       String metric = _metrics[i];
       ValueAggregator valueAggregator = _valueAggregators[i];
       DataType valueType = valueAggregator.getAggregatedValueType();
+      ChunkCompressionType compressionType = _builderConfig.getFunctionColumnPairsConfig().get(metric);
+      if (compressionType == null) {
+        compressionType = ChunkCompressionType.PASS_THROUGH;
+      }
       if (valueType == BYTES) {
         metricIndexCreators[i] =
-            new SingleValueVarByteRawIndexCreator(_outputDir, ChunkCompressionType.PASS_THROUGH, metric, _numDocs,
+            new SingleValueVarByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs,
                 BYTES, valueAggregator.getMaxAggregatedValueByteSize());
       } else {
         metricIndexCreators[i] =
-            new SingleValueFixedByteRawIndexCreator(_outputDir, ChunkCompressionType.PASS_THROUGH, metric, _numDocs,
+            new SingleValueFixedByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs,
                 valueType);
       }
     }

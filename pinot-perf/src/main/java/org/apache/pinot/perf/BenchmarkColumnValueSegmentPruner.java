@@ -190,6 +190,7 @@ public class BenchmarkColumnValueSegmentPruner {
         .setStarTreeIndexConfigs(Collections.singletonList(new StarTreeIndexConfig(
             Arrays.asList(SORTED_COL_NAME, INT_COL_NAME), null, Collections.singletonList(
                 new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
+            null,
             Integer.MAX_VALUE)))
         .build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)

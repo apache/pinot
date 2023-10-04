@@ -29,6 +29,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -47,6 +48,7 @@ import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -955,6 +957,16 @@ public final class TableConfigUtils {
           } catch (Exception e) {
             throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                 + "in the form <Aggregation function>__<Column name>");
+          }
+          Properties functionColumnPairsConfig = starTreeIndexConfig.getFunctionColumnPairsConfig();
+          if (functionColumnPairsConfig != null && functionColumnPairsConfig.containsKey(functionColumnPair)) {
+            String chunkCompressionTypeValue = functionColumnPairsConfig.get(functionColumnPair).toString();
+            try {
+              ChunkCompressionType.valueOf(chunkCompressionTypeValue);
+            } catch (Exception e) {
+              throw new IllegalStateException("Invalid functionColumnPairsConfig : " + chunkCompressionTypeValue
+                      + ". Must be one of " + Arrays.toString(ChunkCompressionType.values()) + ".");
+            }
           }
           String columnName = columnPair.getColumn();
           if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
