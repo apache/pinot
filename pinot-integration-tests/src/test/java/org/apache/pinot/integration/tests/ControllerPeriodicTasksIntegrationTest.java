@@ -183,14 +183,21 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     String disabledTable = "disabledTable";
     String tableWithOfflineSegment = "tableWithOfflineSegment";
 
+    Schema schema = createSchema();
     _currentTable = emptyTable;
+    schema.setSchemaName(_currentTable);
+    addSchema(schema);
     addTableConfig(createOfflineTableConfig());
 
     _currentTable = disabledTable;
+    schema.setSchemaName(_currentTable);
+    addSchema(schema);
     addTableConfig(createOfflineTableConfig());
     _helixAdmin.enableResource(getHelixClusterName(), TableNameBuilder.OFFLINE.tableNameWithType(disabledTable), false);
 
     _currentTable = tableWithOfflineSegment;
+    schema.setSchemaName(_currentTable);
+    addSchema(schema);
     addTableConfig(createOfflineTableConfig());
     uploadSegments(_currentTable, _tarDir);
     // Turn one replica of a segment OFFLINE
@@ -247,6 +254,9 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     dropOfflineTable(emptyTable);
     dropOfflineTable(disabledTable);
     dropOfflineTable(tableWithOfflineSegment);
+    deleteSchema(emptyTable);
+    deleteSchema(disabledTable);
+    deleteSchema(tableWithOfflineSegment);
   }
 
   private boolean checkSegmentStatusCheckerMetrics(ControllerMetrics controllerMetrics, String tableNameWithType,

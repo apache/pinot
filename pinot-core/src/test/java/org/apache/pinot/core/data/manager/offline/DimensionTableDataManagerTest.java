@@ -112,7 +112,7 @@ public class DimensionTableDataManagerTest {
 
   private TableConfig getTableConfig(boolean disablePreload) {
     DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload);
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName("dimBaseballTeams").setSchemaName("dimBaseballTeams")
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("dimBaseballTeams")
         .setDimensionTableConfig(dimensionTableConfig).build();
   }
 

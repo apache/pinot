@@ -77,6 +77,8 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
 
     resetBrokerTags();
     resetServerTags();
+
+    addDummySchema(RAW_TABLE_NAME);
   }
 
   private void untagBrokers() {
@@ -129,6 +131,7 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
     TierConfig tierConfig =
         new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Collections.singletonList("testSegment"),
             TierFactory.PINOT_SERVER_STORAGE_TYPE, coldOfflineServerTag, null, null);
+    addDummySchema(RAW_TABLE_NAME);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setTierConfigList(Collections.singletonList(tierConfig)).setServerTenant(SERVER_TENANT_NAME).build();

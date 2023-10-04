@@ -62,11 +62,6 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
   }
 
   @Override
-  protected String getSchemaName() {
-    return "upsertSchema";
-  }
-
-  @Override
   protected String getAvroTarFileName() {
     return "upsert_compaction_test.tar.gz";
   }

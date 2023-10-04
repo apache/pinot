@@ -82,7 +82,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     addSchema(schema);
 
     Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    TableConfig tableConfig = createCSVUpsertTableConfig(getTableName(), getSchemaName(), getKafkaTopic(),
+    TableConfig tableConfig = createCSVUpsertTableConfig(getTableName(), getKafkaTopic(),
         getNumKafkaPartitions(), csvDecoderProperties, null, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
 
@@ -110,11 +110,6 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   @Override
   protected String getSchemaFileName() {
     return "upsert_table_test.schema";
-  }
-
-  @Override
-  protected String getSchemaName() {
-    return "playerScores";
   }
 
   @Nullable
@@ -146,6 +141,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     Assert.assertNotNull(inputStream);
     return Schema.fromInputStream(inputStream);
   }
+
   private long queryCountStarWithoutUpsert(String tableName) {
     return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)")
         .getResultSet(0).getLong(0);
@@ -182,7 +178,10 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     // SETUP
     // Create table with delete Record column
     Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    TableConfig tableConfig = createCSVUpsertTableConfig(tableName, getSchemaName(), kafkaTopicName,
+    Schema upsertSchema = createSchema();
+    upsertSchema.setSchemaName(tableName);
+    addSchema(upsertSchema);
+    TableConfig tableConfig = createCSVUpsertTableConfig(tableName, kafkaTopicName,
         getNumKafkaPartitions(), csvDecoderProperties, upsertConfig, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
 
@@ -245,7 +244,6 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       }
     }, 100L, 600_000L, "Failed to load all upsert records for testDeleteWithFullUpsert");
 
-
     // Validate: pk is queryable and all columns are overwritten with new value
     rs = getPinotConnection()
         .execute("SELECT playerId, name, game FROM " + tableName + " WHERE playerId = 100").getResultSet(0);
@@ -277,7 +275,6 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
   protected void testDeleteWithPartialUpsert(String kafkaTopicName, String tableName, UpsertConfig upsertConfig)
       throws Exception {
-    final String partialUpsertSchemaName = "playerScoresPartialUpsert";
     final String inputDataTarFile = "gameScores_partial_upsert_csv.tar.gz";
 
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
@@ -288,7 +285,10 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Create table with delete Record column
     Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    TableConfig tableConfig = createCSVUpsertTableConfig(tableName, partialUpsertSchemaName, kafkaTopicName,
+    Schema partialUpsertSchema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
+    partialUpsertSchema.setSchemaName(tableName);
+    addSchema(partialUpsertSchema);
+    TableConfig tableConfig = createCSVUpsertTableConfig(tableName, kafkaTopicName,
         getNumKafkaPartitions(), csvDecoderProperties, upsertConfig, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
 

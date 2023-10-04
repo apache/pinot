@@ -51,7 +51,9 @@ public class ValidationManagerStatelessTest extends ControllerTest {
     startController();
     addFakeBrokerInstancesToAutoJoinHelixCluster(2, true);
     addFakeServerInstancesToAutoJoinHelixCluster(2, true);
-
+    // Create a schema
+    addDummySchema(TEST_TABLE_NAME);
+    // Create a table
     _offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setNumReplicas(2).build();
     _helixResourceManager.addTable(_offlineTableConfig);
@@ -72,6 +74,7 @@ public class ValidationManagerStatelessTest extends ControllerTest {
     _helixResourceManager.rebuildBrokerResourceFromHelixTags(partitionName);
 
     // Add another table that needs to be rebuilt
+    addDummySchema(TEST_TABLE_TWO);
     TableConfig offlineTableConfigTwo = new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_TWO).build();
     _helixResourceManager.addTable(offlineTableConfigTwo);
     String partitionNameTwo = offlineTableConfigTwo.getTableName();

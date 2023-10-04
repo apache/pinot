@@ -441,8 +441,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testUploadSegmentRefreshOnly()
       throws Exception {
+    Schema schema = createSchema();
+    schema.setSchemaName(SEGMENT_UPLOAD_TEST_TABLE);
+    addSchema(schema);
     TableConfig segmentUploadTestTableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(SEGMENT_UPLOAD_TEST_TABLE).setSchemaName(getSchemaName())
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(SEGMENT_UPLOAD_TEST_TABLE)
             .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
             .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
             .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
@@ -1432,7 +1435,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
 
     // Need to first delete then add the schema because removing columns is backward-incompatible change
-    deleteSchema(getSchemaName());
+    deleteSchema(getTableName());
     Schema schema = createSchema();
     schema.removeField("AirlineID");
     schema.removeField("ArrTime");
