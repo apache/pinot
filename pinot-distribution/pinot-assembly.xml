@@ -94,10 +94,10 @@
     </file>
     <file>
       <source>
-        ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-3.2/target/pinot-batch-ingestion-spark-3.2-${project.version}-shaded.jar
+        ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-3/target/pinot-batch-ingestion-spark-3-${project.version}-shaded.jar
       </source>
       <destName>
-        plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-3.2/pinot-batch-ingestion-spark-3.2-${project.version}-shaded.jar
+        plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-3/pinot-batch-ingestion-spark-3-${project.version}-shaded.jar
       </destName>
     </file>
     <!-- End Include Pinot Batch Ingestion Plugins-->

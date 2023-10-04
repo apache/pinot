@@ -30,8 +30,8 @@
     <relativePath>..</relativePath>
   </parent>
 
-  <artifactId>pinot-batch-ingestion-spark-3.2</artifactId>
-  <name>Pinot Batch Ingestion for Spark 3.2</name>
+  <artifactId>pinot-batch-ingestion-spark-3</artifactId>
+  <name>Pinot Batch Ingestion for Spark 3</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
