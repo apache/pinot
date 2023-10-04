@@ -584,9 +584,9 @@ public class PinotTenantRestletResource {
   @ApiOperation(value = "Rebalances all the tables that are part of the tenant")
   public TenantRebalanceResult rebalance(
       @ApiParam(value = "Name of the tenant whose table are to be rebalanced", required = true)
-      @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceConfig context) {
-    context.setTenantName(tenantName);
-    return _tenantRebalancer.rebalance(context);
+      @PathParam("tenantName") String tenantName, @ApiParam(required = true) TenantRebalanceConfig config) {
+    config.setTenantName(tenantName);
+    return _tenantRebalancer.rebalance(config);
   }
 
   @GET

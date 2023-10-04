@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -65,17 +63,7 @@ public interface SegmentAssignment {
    * @param config Configuration for the rebalance
    * @return Rebalanced assignment for the segments
    */
-  @Deprecated
   Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config);
-
-  /**
-   * Same as above but the use of specific class for rebalance configs.
-   */
-  default Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, RebalanceConfig config) {
-    return Collections.emptyMap();
-  }
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, RebalanceConfig config);
 }

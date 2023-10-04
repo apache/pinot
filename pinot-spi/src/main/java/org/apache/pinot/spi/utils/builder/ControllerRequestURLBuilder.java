@@ -28,7 +28,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.StringUtil;
 
 
@@ -199,29 +198,26 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableRebalance(String tableName, String tableType) {
-    return forTableRebalance(tableName, tableType, RebalanceConfigConstants.DEFAULT_DRY_RUN,
-        RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING,
-        RebalanceConfigConstants.DEFAULT_DOWNTIME,
-        RebalanceConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME);
+    return forTableRebalance(tableName, tableType, false, false, false, false, 1);
   }
 
   public String forTableRebalance(String tableName, String tableType, boolean dryRun, boolean reassignInstances,
       boolean includeConsuming, boolean downtime, int minAvailableReplicas) {
     StringBuilder stringBuilder =
         new StringBuilder(StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance?type=" + tableType));
-    if (dryRun != RebalanceConfigConstants.DEFAULT_DRY_RUN) {
+    if (dryRun) {
       stringBuilder.append("&dryRun=").append(dryRun);
     }
-    if (reassignInstances != RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES) {
+    if (reassignInstances) {
       stringBuilder.append("&reassignInstances=").append(reassignInstances);
     }
-    if (includeConsuming != RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING) {
+    if (includeConsuming) {
       stringBuilder.append("&includeConsuming=").append(includeConsuming);
     }
-    if (downtime != RebalanceConfigConstants.DEFAULT_DOWNTIME) {
+    if (downtime) {
       stringBuilder.append("&downtime=").append(downtime);
     }
-    if (minAvailableReplicas != RebalanceConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME) {
+    if (minAvailableReplicas != 1) {
       stringBuilder.append("&minAvailableReplicas=").append(minAvailableReplicas);
     }
     return stringBuilder.toString();

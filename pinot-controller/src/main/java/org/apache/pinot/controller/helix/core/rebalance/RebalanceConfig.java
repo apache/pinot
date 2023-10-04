@@ -21,40 +21,61 @@ package org.apache.pinot.controller.helix.core.rebalance;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 
 
 @ApiModel
 public class RebalanceConfig {
+  // Whether to rebalance table in dry-run mode
   @JsonProperty("dryRun")
   @ApiModelProperty(example = "false")
   private boolean _dryRun = false;
+
+  // Whether to reassign instances before reassigning segments
   @JsonProperty("reassignInstances")
   @ApiModelProperty(example = "false")
   private boolean _reassignInstances = false;
+
+  // Whether to reassign CONSUMING segments
   @JsonProperty("includeConsuming")
   @ApiModelProperty(example = "false")
   private boolean _includeConsuming = false;
+
+  // Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all segments in a
+  // round-robin fashion as if adding new segments to an empty table)
   @JsonProperty("bootstrap")
   @ApiModelProperty(example = "false")
   private boolean _bootstrap = false;
+
+  // Whether to allow downtime for the rebalance
   @JsonProperty("downtime")
   @ApiModelProperty(example = "false")
   private boolean _downtime = false;
+
+  // For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas
+  // allowed to be unavailable if value is negative
   @JsonProperty("minAvailableReplicas")
   @ApiModelProperty(example = "1")
   private int _minAvailableReplicas = 1;
+
+  // Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved)
+  // When using best-efforts to rebalance, the following scenarios won't fail the rebalance (will log warnings instead):
+  // - Segment falls into ERROR state in ExternalView -> count ERROR state as good state
+  // - ExternalView has not converged within the maximum wait time -> continue to the next stage
   @JsonProperty("bestEfforts")
   @ApiModelProperty(example = "false")
   private boolean _bestEfforts = false;
+
+  // The check on external view can be very costly when the table has very large ideal and external states, i.e. when
+  // having a huge number of segments. These two configs help reduce the cpu load on controllers, e.g. by doing the
+  // check less frequently and bail out sooner to rebalance at best effort if configured so.
   @JsonProperty("externalViewCheckIntervalInMs")
   @ApiModelProperty(example = "1000")
   private long _externalViewCheckIntervalInMs = 1000L;
+
   @JsonProperty("externalViewStabilizationTimeoutInMs")
   @ApiModelProperty(example = "3600000")
   private long _externalViewStabilizationTimeoutInMs = 3600000L;
+
   @JsonProperty("updateTargetTier")
   @ApiModelProperty(example = "false")
   private boolean _updateTargetTier = false;
@@ -163,31 +184,6 @@ public class RebalanceConfig {
     rc._externalViewStabilizationTimeoutInMs = cfg._externalViewStabilizationTimeoutInMs;
     rc._updateTargetTier = cfg._updateTargetTier;
     rc._jobId = cfg._jobId;
-    return rc;
-  }
-
-  // Helper method to help deprecate the use of Configuration to keep rebalance configs.
-  public static RebalanceConfig fromConfiguration(Configuration cfg) {
-    RebalanceConfig rc = new RebalanceConfig();
-    rc.setDryRun(cfg.getBoolean(RebalanceConfigConstants.DRY_RUN, RebalanceConfigConstants.DEFAULT_DRY_RUN));
-    rc.setReassignInstances(cfg.getBoolean(RebalanceConfigConstants.REASSIGN_INSTANCES,
-        RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES));
-    rc.setIncludeConsuming(
-        cfg.getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING, RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING));
-    rc.setBootstrap(cfg.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP));
-    rc.setDowntime(cfg.getBoolean(RebalanceConfigConstants.DOWNTIME, RebalanceConfigConstants.DEFAULT_DOWNTIME));
-    rc.setMinAvailableReplicas(cfg.getInt(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME,
-        RebalanceConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME));
-    rc.setBestEfforts(
-        cfg.getBoolean(RebalanceConfigConstants.BEST_EFFORTS, RebalanceConfigConstants.DEFAULT_BEST_EFFORTS));
-    rc.setExternalViewCheckIntervalInMs(cfg.getLong(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-        RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS));
-    rc.setExternalViewStabilizationTimeoutInMs(
-        cfg.getLong(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-            RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS));
-    rc.setUpdateTargetTier(cfg.getBoolean(RebalanceConfigConstants.UPDATE_TARGET_TIER,
-        RebalanceConfigConstants.DEFAULT_UPDATE_TARGET_TIER));
-    rc.setJobId(cfg.getString(CommonConstants.ControllerJob.JOB_ID, null));
     return rc;
   }
 }

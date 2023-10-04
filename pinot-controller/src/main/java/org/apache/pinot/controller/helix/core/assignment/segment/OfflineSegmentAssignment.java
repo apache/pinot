@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
@@ -56,15 +55,6 @@ public class OfflineSegmentAssignment extends BaseSegmentAssignment {
     _logger.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
         _tableNameWithType);
     return instancesAssigned;
-  }
-
-  @Deprecated
-  @Override
-  public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config) {
-    return rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers, tierInstancePartitionsMap,
-        RebalanceConfig.fromConfiguration(config));
   }
 
   @Override
