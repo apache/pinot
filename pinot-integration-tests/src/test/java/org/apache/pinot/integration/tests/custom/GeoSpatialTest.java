@@ -447,4 +447,29 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
             + "05e89a7503b81b64042bddabe27179cc05e89a85caafbc24042be215336deb9c05e899ba1b196104042be385c67dfe3";
     Assert.assertEquals(actualResult, expectedResult);
   }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testStPointWithLiteralWithV2(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query =
+        String.format("Select "
+                + "ST_Point(1,2) "
+                + "FROM %s a "
+                + "JOIN %s b "
+                + "ON a.wkt1=b.wkt1 "
+                + "LIMIT 10",
+            getTableName(),
+            getTableName());
+    JsonNode pinotResponse = postQuery(query);
+    JsonNode rows = pinotResponse.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode record = rows.get(i);
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(1, 2));
+      byte[] expectedValue = GeometrySerializer.serialize(point);
+      byte[] actualValue = BytesUtils.toBytes(record.get(0).asText());
+      assertEquals(actualValue, expectedValue);
+    }
+  }
 }
