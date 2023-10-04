@@ -67,6 +67,7 @@ import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
@@ -698,7 +699,7 @@ public class ObjectSerDeUtils {
     @Override
     public HashMap<Object, Object> deserialize(ByteBuffer byteBuffer) {
       int size = byteBuffer.getInt();
-      HashMap<Object, Object> map = new HashMap<>(size);
+      HashMap<Object, Object> map = new HashMap<>(HashUtil.getHashMapCapacity(size));
       if (size == 0) {
         return map;
       }

@@ -32,6 +32,7 @@ import org.apache.pinot.common.datatable.DataTableImplV3;
 import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -559,7 +560,7 @@ public abstract class BaseDataBlock implements DataBlock {
   private Map<Integer, String> deserializeExceptions(ByteBuffer buffer)
       throws IOException {
     int numExceptions = buffer.getInt();
-    Map<Integer, String> exceptions = new HashMap<>(numExceptions);
+    Map<Integer, String> exceptions = new HashMap<>(HashUtil.getHashMapCapacity(numExceptions));
     for (int i = 0; i < numExceptions; i++) {
       int errCode = buffer.getInt();
       String errMessage = DataTableUtils.decodeString(buffer);
