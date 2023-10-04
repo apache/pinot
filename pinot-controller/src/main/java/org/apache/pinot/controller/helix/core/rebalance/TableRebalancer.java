@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
@@ -46,7 +47,9 @@ import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
@@ -137,6 +140,24 @@ public class TableRebalancer {
   }
 
   public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
+      @Nullable String rebalanceJobId) {
+    long startTime = System.currentTimeMillis();
+    String tableNameWithType = tableConfig.getTableName();
+    try {
+      RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId);
+      if (_controllerMetrics != null && result.getStatus() == RebalanceResult.Status.FAILED) {
+        _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.TABLE_REBALANCE_FAILURE, 1L);
+      }
+      return result;
+    } finally {
+      if (_controllerMetrics != null) {
+        _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS,
+            System.currentTimeMillis() - startTime, TimeUnit.MILLISECONDS);
+      }
+    }
+  }
+
+  private RebalanceResult doRebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
       @Nullable String rebalanceJobId) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();

@@ -615,11 +615,14 @@ public class PinotTableRestletResource {
   @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
       @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
       @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs,
+      @ApiParam(value = "How often to make a status update (i.e. heartbeat)") @DefaultValue("300000")
+      @QueryParam("heartbeatIntervalInMs") long heartbeatIntervalInMs,
+      @ApiParam(value = "How long to wait for next status update (i.e. heartbeat) before the job is considered failed")
+      @DefaultValue("3600000") @QueryParam("heartbeatTimeoutInMs") long heartbeatTimeoutInMs,
+      @ApiParam(value = "Max times to retry the rebalance job") @DefaultValue("3") @QueryParam("maxRetry") int maxRetry,
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
       @QueryParam("updateTargetTier") boolean updateTargetTier) {
-
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
-
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
     rebalanceConfig.setReassignInstances(reassignInstances);
@@ -630,6 +633,11 @@ public class PinotTableRestletResource {
     rebalanceConfig.setBestEfforts(bestEfforts);
     rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
+    heartbeatIntervalInMs = Math.max(externalViewCheckIntervalInMs, heartbeatIntervalInMs);
+    rebalanceConfig.setHeartbeatIntervalInMs(heartbeatIntervalInMs);
+    heartbeatTimeoutInMs = Math.max(heartbeatTimeoutInMs, 3 * heartbeatIntervalInMs);
+    rebalanceConfig.setHeartbeatTimeoutInMs(heartbeatTimeoutInMs);
+    rebalanceConfig.setMaxRetry(maxRetry);
     rebalanceConfig.setUpdateTargetTier(updateTargetTier);
     String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
 

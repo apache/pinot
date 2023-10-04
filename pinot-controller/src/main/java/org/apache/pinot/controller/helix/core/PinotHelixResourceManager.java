@@ -48,7 +48,9 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.BadRequestException;
@@ -146,6 +148,7 @@ import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceRetryConfig;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
@@ -2080,27 +2083,53 @@ public class PinotHelixResourceManager {
   }
 
   public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobResourcePath) {
+    return addControllerJobToZK(jobId, jobMetadata, jobResourcePath, prev -> true);
+  }
+
+  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobResourcePath,
+      Predicate<Map<String, String>> prevJobMetadataChecker) {
     Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS) != null,
         "Submission Time in JobMetadata record not set. Cannot expire these records");
     Stat stat = new Stat();
-    ZNRecord tableJobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
-    if (tableJobsZnRecord != null) {
-      Map<String, Map<String, String>> tasks = tableJobsZnRecord.getMapFields();
-      tasks.put(jobId, jobMetadata);
-      if (tasks.size() > CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK) {
-        tasks = tasks.entrySet().stream().sorted((v1, v2) -> Long.compare(
+    ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
+    if (jobsZnRecord != null) {
+      Map<String, Map<String, String>> jobMetadataMap = jobsZnRecord.getMapFields();
+      Map<String, String> prevJobMetadata = jobMetadataMap.get(jobId);
+      if (!prevJobMetadataChecker.test(prevJobMetadata)) {
+        return false;
+      }
+      jobMetadataMap.put(jobId, jobMetadata);
+      if (jobMetadataMap.size() > CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK) {
+        jobMetadataMap = jobMetadataMap.entrySet().stream().sorted((v1, v2) -> Long.compare(
                 Long.parseLong(v2.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)),
                 Long.parseLong(v1.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS))))
             .collect(Collectors.toList()).subList(0, CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK)
             .stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       }
-      tableJobsZnRecord.setMapFields(tasks);
-      return _propertyStore.set(jobResourcePath, tableJobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
+      jobsZnRecord.setMapFields(jobMetadataMap);
+      return _propertyStore.set(jobResourcePath, jobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
     } else {
-      tableJobsZnRecord = new ZNRecord(jobResourcePath);
-      tableJobsZnRecord.setMapField(jobId, jobMetadata);
-      return _propertyStore.set(jobResourcePath, tableJobsZnRecord, AccessOption.PERSISTENT);
+      jobsZnRecord = new ZNRecord(jobResourcePath);
+      jobsZnRecord.setMapField(jobId, jobMetadata);
+      return _propertyStore.set(jobResourcePath, jobsZnRecord, AccessOption.PERSISTENT);
     }
+  }
+
+  public boolean updateAllJobsForTable(String tableNameWithType, String jobResourcePath,
+      Consumer<Map<String, String>> updater) {
+    Stat stat = new Stat();
+    ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
+    if (jobsZnRecord == null) {
+      return true;
+    }
+    Map<String, Map<String, String>> jobMetadataMap = jobsZnRecord.getMapFields();
+    for (Map<String, String> jobMetadata : jobMetadataMap.values()) {
+      if (jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE).equals(tableNameWithType)) {
+        updater.accept(jobMetadata);
+      }
+    }
+    jobsZnRecord.setMapFields(jobMetadataMap);
+    return _propertyStore.set(jobResourcePath, jobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
   }
 
   @VisibleForTesting
@@ -3130,12 +3159,19 @@ public class PinotHelixResourceManager {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
     Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig");
-    if (rebalanceConfig.isUpdateTargetTier()) {
-      updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
-    }
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
     if (trackRebalanceProgress) {
-      zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId, this);
+      zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId,
+          TableRebalanceRetryConfig.forInitialRun(rebalanceJobId, rebalanceConfig), this);
+    }
+    return rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig,
+        zkBasedTableRebalanceObserver);
+  }
+
+  public RebalanceResult rebalanceTable(String tableNameWithType, TableConfig tableConfig, String rebalanceJobId,
+      RebalanceConfig rebalanceConfig, @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver) {
+    if (rebalanceConfig.isUpdateTargetTier()) {
+      updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
     }
     TableRebalancer tableRebalancer =
         new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics);

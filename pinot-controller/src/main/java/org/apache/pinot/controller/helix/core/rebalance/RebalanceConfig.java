@@ -84,6 +84,20 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _updateTargetTier = false;
 
+  // Update job status every this interval as heartbeat, to indicate the job is still actively running.
+  @JsonProperty("heartbeatIntervalInMs")
+  @ApiModelProperty(example = "300000")
+  private long _heartbeatIntervalInMs = 300000L;
+
+  // The job is considered as failed if not updating its status by this timeout, even though it's IN_PROGRESS status.
+  @JsonProperty("heartbeatTimeoutInMs")
+  @ApiModelProperty(example = "3600000")
+  private long _heartbeatTimeoutInMs = 3600000L;
+
+  @JsonProperty("maxRetry")
+  @ApiModelProperty(example = "3")
+  private int _maxRetry = 3;
+
   public boolean isDryRun() {
     return _dryRun;
   }
@@ -164,6 +178,41 @@ public class RebalanceConfig {
     _updateTargetTier = updateTargetTier;
   }
 
+  public long getHeartbeatIntervalInMs() {
+    return _heartbeatIntervalInMs;
+  }
+
+  public void setHeartbeatIntervalInMs(long heartbeatIntervalInMs) {
+    _heartbeatIntervalInMs = heartbeatIntervalInMs;
+  }
+
+  public long getHeartbeatTimeoutInMs() {
+    return _heartbeatTimeoutInMs;
+  }
+
+  public void setHeartbeatTimeoutInMs(long heartbeatTimeoutInMs) {
+    _heartbeatTimeoutInMs = heartbeatTimeoutInMs;
+  }
+
+  public int getMaxRetry() {
+    return _maxRetry;
+  }
+
+  public void setMaxRetry(int maxRetry) {
+    _maxRetry = maxRetry;
+  }
+
+  @Override
+  public String toString() {
+    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", _reassignInstances=" + _reassignInstances
+        + ", _includeConsuming=" + _includeConsuming + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime
+        + ", _minAvailableReplicas=" + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts
+        + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
+        + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier="
+        + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs="
+        + _heartbeatTimeoutInMs + ", _maxRetry=" + _maxRetry + '}';
+  }
+
   public static RebalanceConfig copy(RebalanceConfig cfg) {
     RebalanceConfig rc = new RebalanceConfig();
     rc._dryRun = cfg._dryRun;
@@ -176,6 +225,9 @@ public class RebalanceConfig {
     rc._externalViewCheckIntervalInMs = cfg._externalViewCheckIntervalInMs;
     rc._externalViewStabilizationTimeoutInMs = cfg._externalViewStabilizationTimeoutInMs;
     rc._updateTargetTier = cfg._updateTargetTier;
+    rc._heartbeatIntervalInMs = cfg._heartbeatIntervalInMs;
+    rc._heartbeatTimeoutInMs = cfg._heartbeatTimeoutInMs;
+    rc._maxRetry = cfg._maxRetry;
     return rc;
   }
 }

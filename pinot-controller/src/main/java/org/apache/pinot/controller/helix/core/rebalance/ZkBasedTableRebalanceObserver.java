@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * <code>ZkBasedTableRebalanceObserver</code> observes rebalance progress and tracks rebalance status,
  * stats in Zookeeper. This will be used to show the progress of rebalance to users via rebalanceStatus API.
@@ -39,12 +41,14 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private final String _tableNameWithType;
   private final String _rebalanceJobId;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
-  private TableRebalanceProgressStats _tableRebalanceProgressStats;
+  private final TableRebalanceProgressStats _tableRebalanceProgressStats;
+  private final TableRebalanceRetryConfig _tableRebalanceJobRetryConfig;
+  private long _lastUpdateTimeMs;
   // Keep track of number of updates. Useful during debugging.
   private int _numUpdatesToZk;
 
   public ZkBasedTableRebalanceObserver(String tableNameWithType, String rebalanceJobId,
-      PinotHelixResourceManager pinotHelixResourceManager) {
+      TableRebalanceRetryConfig tableRebalanceJobRetryConfig, PinotHelixResourceManager pinotHelixResourceManager) {
     Preconditions.checkState(tableNameWithType != null, "Table name cannot be null");
     Preconditions.checkState(rebalanceJobId != null, "rebalanceId cannot be null");
     Preconditions.checkState(pinotHelixResourceManager != null, "PinotHelixManager cannot be null");
@@ -52,16 +56,19 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     _rebalanceJobId = rebalanceJobId;
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _tableRebalanceProgressStats = new TableRebalanceProgressStats();
+    _tableRebalanceJobRetryConfig = tableRebalanceJobRetryConfig;
     _numUpdatesToZk = 0;
   }
 
   @Override
   public void onTrigger(Trigger trigger, Map<String, Map<String, String>> currentState,
       Map<String, Map<String, String>> targetState) {
+    boolean updatedStatsInZk = false;
     switch (trigger) {
       case START_TRIGGER:
         updateOnStart(currentState, targetState);
         trackStatsInZk();
+        updatedStatsInZk = true;
         break;
       // Write to Zk if there's change since previous stats computation
       case IDEAL_STATE_CHANGE_TRIGGER:
@@ -71,6 +78,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
             latest)) {
           _tableRebalanceProgressStats.setCurrentToTargetConvergence(latest);
           trackStatsInZk();
+          updatedStatsInZk = true;
         }
         break;
       case EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER:
@@ -79,16 +87,27 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
             _tableRebalanceProgressStats.getExternalViewToIdealStateConvergence(), latest)) {
           _tableRebalanceProgressStats.setExternalViewToIdealStateConvergence(latest);
           trackStatsInZk();
+          updatedStatsInZk = true;
         }
         break;
       default:
         throw new IllegalArgumentException("Unimplemented trigger: " + trigger);
     }
+    // The onTrigger method is mainly driven by the while loop of waiting for external view to converge to ideal
+    // state. That while loop wait for at least externalViewCheckIntervalInMs. So the real interval to send out
+    // heartbeat is the max(heartbeat_interval, externalViewCheckIntervalInMs);
+    long heartbeatIntervalInMs = _tableRebalanceJobRetryConfig.getConfig().getHeartbeatIntervalInMs();
+    if (!updatedStatsInZk && System.currentTimeMillis() - _lastUpdateTimeMs > heartbeatIntervalInMs) {
+      LOGGER.debug("Update status of rebalance job: {} for table: {} after {}ms as heartbeat", _rebalanceJobId,
+          _tableNameWithType, heartbeatIntervalInMs);
+      trackStatsInZk();
+    }
   }
 
   private void updateOnStart(Map<String, Map<String, String>> currentState,
       Map<String, Map<String, String>> targetState) {
-    Preconditions.checkState(_tableRebalanceProgressStats.getStatus() != RebalanceResult.Status.IN_PROGRESS.toString(),
+    Preconditions.checkState(
+        !RebalanceResult.Status.IN_PROGRESS.toString().equals(_tableRebalanceProgressStats.getStatus()),
         "Rebalance Observer onStart called multiple times");
     _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.IN_PROGRESS.toString());
     _tableRebalanceProgressStats.setInitialToTargetStateConvergence(
@@ -98,10 +117,9 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   @Override
   public void onSuccess(String msg) {
-    Preconditions.checkState(_tableRebalanceProgressStats.getStatus() != RebalanceResult.Status.DONE.toString(),
+    Preconditions.checkState(!RebalanceResult.Status.DONE.toString().equals(_tableRebalanceProgressStats.getStatus()),
         "Table Rebalance already completed");
-    long timeToFinishInSeconds =
-         (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000L;
+    long timeToFinishInSeconds = (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000L;
     _tableRebalanceProgressStats.setCompletionStatusMsg(msg);
     _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
     _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.DONE.toString());
@@ -114,8 +132,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   @Override
   public void onError(String errorMsg) {
-    long timeToFinishInSeconds =
-        (long) (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000;
+    long timeToFinishInSeconds = (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000;
     _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
     _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.FAILED.toString());
     _tableRebalanceProgressStats.setCompletionStatusMsg(errorMsg);
@@ -126,30 +143,74 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     return _numUpdatesToZk;
   }
 
+  @VisibleForTesting
+  TableRebalanceRetryConfig getTableRebalanceJobRetryConfig() {
+    return _tableRebalanceJobRetryConfig;
+  }
+
   private void trackStatsInZk() {
+    Map<String, String> jobMetadata =
+        createJobMetadata(_tableNameWithType, _rebalanceJobId, _tableRebalanceProgressStats,
+            _tableRebalanceJobRetryConfig);
+    _pinotHelixResourceManager.addControllerJobToZK(_rebalanceJobId, jobMetadata,
+        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE),
+        prevJobMetadata -> {
+          // Abort the job when we're sure it has failed, otherwise continue to update the statue.
+          if (prevJobMetadata == null) {
+            return true;
+          }
+          String prevStatsInStr = prevJobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
+          TableRebalanceProgressStats prevStats;
+          try {
+            prevStats = JsonUtils.stringToObject(prevStatsInStr, TableRebalanceProgressStats.class);
+          } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+          }
+          boolean jobFailed =
+              prevStats != null && RebalanceResult.Status.FAILED.toString().equals(prevStats.getStatus());
+          Preconditions.checkState(!jobFailed, "Rebalance job: %s for table: %s has failed. Skip update status",
+              _rebalanceJobId, _tableNameWithType);
+          return true;
+        });
+    _numUpdatesToZk++;
+    _lastUpdateTimeMs = System.currentTimeMillis();
+    LOGGER.debug("Made {} ZK updates for rebalance job: {} of table: {}", _numUpdatesToZk, _rebalanceJobId,
+        _tableNameWithType);
+  }
+
+  @VisibleForTesting
+  static Map<String, String> createJobMetadata(String tableNameWithType, String jobId,
+      TableRebalanceProgressStats tableRebalanceProgressStats,
+      TableRebalanceRetryConfig tableRebalanceJobRetryConfig) {
     Map<String, String> jobMetadata = new HashMap<>();
-    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, _tableNameWithType);
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, _rebalanceJobId);
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
     jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name());
     try {
       jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
-          JsonUtils.objectToString(_tableRebalanceProgressStats));
+          JsonUtils.objectToString(tableRebalanceProgressStats));
     } catch (JsonProcessingException e) {
-      LOGGER.error("Error serialising rebalance stats to JSON for persisting to ZK {}", _rebalanceJobId, e);
+      LOGGER.error("Error serialising stats for rebalance job: {} of table: {} to keep in ZK", jobId, tableNameWithType,
+          e);
     }
-    _pinotHelixResourceManager.addControllerJobToZK(_rebalanceJobId, jobMetadata,
-        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE));
-    _numUpdatesToZk++;
-    LOGGER.debug("Number of updates to Zk: {} for rebalanceJob: {}  ", _numUpdatesToZk, _rebalanceJobId);
+    try {
+      jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_RETRY_CONFIG,
+          JsonUtils.objectToString(tableRebalanceJobRetryConfig));
+    } catch (JsonProcessingException e) {
+      LOGGER.error("Error serialising retry configs for rebalance job: {} of table: {} to keep in ZK", jobId,
+          tableNameWithType, e);
+    }
+    return jobMetadata;
   }
 
   /**
-   * Takes in targetState and sourceState and computes stats based on the comparison
-   * between sourceState and targetState.This captures how far the source state is from
-   * the target state. Example - if there are 4 segments and 16 replicas in the source state
-   * not matching the target state, _segmentsToRebalance is 4 and _replicasToRebalance is 16.
-   * @param targetState- The state that we want to get to
+   * Takes in targetState and sourceState and computes stats based on the comparison between sourceState and
+   * targetState.This captures how far the source state is from the target state. Example - if there are 4 segments and
+   * 16 replicas in the source state not matching the target state, _segmentsToRebalance is 4 and _replicasToRebalance
+   * is 16.
+   *
+   * @param targetState - The state that we want to get to
    * @param sourceState - A given state that needs to converge to targetState
    * @return RebalanceStats
    */
