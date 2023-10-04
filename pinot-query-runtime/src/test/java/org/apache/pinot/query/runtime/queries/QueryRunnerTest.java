@@ -122,8 +122,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.start();
 
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
-    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
     server1.start();
+    // Start server1 to ensure the next server will have a different port.
+    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
     // this is only use for test identifier purpose.

@@ -41,6 +41,7 @@ import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 
@@ -90,7 +91,7 @@ public class RexExpressionUtils {
       case STRING:
         return ((NlsString) value).getValue();
       case BYTES:
-        return ((ByteString) value).getBytes();
+        return new ByteArray(((ByteString) value).getBytes());
       default:
         return value;
     }
