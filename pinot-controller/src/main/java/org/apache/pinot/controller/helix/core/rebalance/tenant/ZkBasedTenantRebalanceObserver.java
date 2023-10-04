@@ -103,7 +103,8 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
     jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TENANT_REBALANCE.name());
     try {
-      jobMetadata.put(RebalanceJobConstants.JOB_STATS_KEY_REBALANCE_PROGRESS, JsonUtils.objectToString(_progressStats));
+      jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+          JsonUtils.objectToString(_progressStats));
     } catch (JsonProcessingException e) {
       LOGGER.error("Error serialising rebalance stats to JSON for persisting to ZK {}", _jobId, e);
     }

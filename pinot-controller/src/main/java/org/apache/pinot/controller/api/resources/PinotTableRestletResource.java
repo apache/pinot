@@ -741,9 +741,9 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
           Response.Status.NOT_FOUND);
     }
-    TableRebalanceProgressStats tableRebalanceProgressStats =
-        JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceJobConstants.JOB_STATS_KEY_REBALANCE_PROGRESS),
-            TableRebalanceProgressStats.class);
+    TableRebalanceProgressStats tableRebalanceProgressStats = JsonUtils.stringToObject(
+        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
+        TableRebalanceProgressStats.class);
     long timeSinceStartInSecs = 0L;
     if (!RebalanceResult.Status.DONE.toString().equals(tableRebalanceProgressStats.getStatus())) {
       timeSinceStartInSecs = (System.currentTimeMillis() - tableRebalanceProgressStats.getStartTimeMs()) / 1000;

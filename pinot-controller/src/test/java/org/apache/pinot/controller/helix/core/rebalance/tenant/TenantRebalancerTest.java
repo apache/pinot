@@ -93,10 +93,10 @@ public class TenantRebalancerTest extends ControllerTest {
         _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME_B).getRecord().getMapFields();
 
     // rebalance the tables on test tenant
-    TenantRebalanceConfig context = new TenantRebalanceConfig();
-    context.setTenantName(TENANT_NAME);
-    context.setVerboseResult(true);
-    TenantRebalanceResult result = tenantRebalancer.rebalance(context);
+    TenantRebalanceConfig config = new TenantRebalanceConfig();
+    config.setTenantName(TENANT_NAME);
+    config.setVerboseResult(true);
+    TenantRebalanceResult result = tenantRebalancer.rebalance(config);
     RebalanceResult rebalanceResult = result.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B);
     Map<String, Map<String, String>> rebalancedAssignment = rebalanceResult.getSegmentAssignment();
     // assignment should not change, with a NO_OP status as no now server is added to test tenant
@@ -104,8 +104,8 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(oldSegmentAssignment, rebalancedAssignment);
 
     // rebalance the tables on default tenant
-    context.setTenantName(DEFAULT_TENANT_NAME);
-    result = tenantRebalancer.rebalance(context);
+    config.setTenantName(DEFAULT_TENANT_NAME);
+    result = tenantRebalancer.rebalance(config);
     // rebalancing default tenant should distribute the segment of table A over 6 servers
     rebalanceResult = result.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_A);
     InstancePartitions partitions = rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE);
@@ -148,7 +148,8 @@ public class TenantRebalancerTest extends ControllerTest {
     if (controllerJobZKMetadata == null) {
       return null;
     }
-    return JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceJobConstants.JOB_STATS_KEY_REBALANCE_PROGRESS),
+    return JsonUtils.stringToObject(
+        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
         TenantRebalanceProgressStats.class);
   }
 

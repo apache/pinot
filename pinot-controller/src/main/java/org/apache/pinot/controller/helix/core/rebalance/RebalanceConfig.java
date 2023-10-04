@@ -25,6 +25,10 @@ import io.swagger.annotations.ApiModelProperty;
 
 @ApiModel
 public class RebalanceConfig {
+  public static final int DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME = 1;
+  public static final long DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS = 1000L; // 1 second
+  public static final long DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS = 3600000L; // 1 hour
+
   // Whether to rebalance table in dry-run mode
   @JsonProperty("dryRun")
   @ApiModelProperty(example = "false")
@@ -55,7 +59,7 @@ public class RebalanceConfig {
   // allowed to be unavailable if value is negative
   @JsonProperty("minAvailableReplicas")
   @ApiModelProperty(example = "1")
-  private int _minAvailableReplicas = 1;
+  private int _minAvailableReplicas = DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME;
 
   // Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved)
   // When using best-efforts to rebalance, the following scenarios won't fail the rebalance (will log warnings instead):
@@ -70,11 +74,11 @@ public class RebalanceConfig {
   // check less frequently and bail out sooner to rebalance at best effort if configured so.
   @JsonProperty("externalViewCheckIntervalInMs")
   @ApiModelProperty(example = "1000")
-  private long _externalViewCheckIntervalInMs = 1000L;
+  private long _externalViewCheckIntervalInMs = DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS;
 
   @JsonProperty("externalViewStabilizationTimeoutInMs")
   @ApiModelProperty(example = "3600000")
-  private long _externalViewStabilizationTimeoutInMs = 3600000L;
+  private long _externalViewStabilizationTimeoutInMs = DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS;
 
   @JsonProperty("updateTargetTier")
   @ApiModelProperty(example = "false")
