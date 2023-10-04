@@ -48,6 +48,7 @@ public abstract class DateTimeTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(!arguments.isEmpty() && arguments.size() <= 2, "%s takes one or two arguments", _name);
     _timestampsFunction = arguments.get(0);
     if (arguments.size() == 2) {

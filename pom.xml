@@ -121,7 +121,7 @@
       See also: the surefire plugin section and the profiles section.-->
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
-    <avro.version>1.9.2</avro.version>
+    <avro.version>1.10.2</avro.version>
     <parquet.version>1.12.3</parquet.version>
     <helix.version>1.0.4</helix.version>
     <zkclient.version>0.7</zkclient.version>
@@ -148,7 +148,7 @@
     <commons-net.version>3.1</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
-    <snappy-java.version>1.1.10.1</snappy-java.version>
+    <snappy-java.version>1.1.10.4</snappy-java.version>
     <zstd-jni.version>1.5.2-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <log4j.version>2.17.1</log4j.version>
@@ -162,9 +162,11 @@
     <stax2-api.version>4.1</stax2-api.version>
     <aws.sdk.version>2.20.94</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
+    <testng.version>7.8.0</testng.version>
+
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
-    <protobuf.version>3.22.0</protobuf.version>
+    <protobuf.version>3.24.3</protobuf.version>
     <grpc.version>1.53.0</grpc.version>
     <confluent.version>5.5.3</confluent.version>
 
@@ -174,9 +176,9 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
-    <surefire.version>3.0.0-M5</surefire.version>
     <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
     <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
+    <surefire.version>3.1.2</surefire.version>
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.18</scala.version>
@@ -186,6 +188,20 @@
   </properties>
 
   <profiles>
+    <profile>
+      <id>not-java-21</id>
+      <activation>
+        <jdk>!21</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.diffplug.spotless</groupId>
+            <artifactId>spotless-maven-plugin</artifactId>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>github-actions</id>
       <activation>
@@ -402,7 +418,7 @@
       <dependency>
         <groupId>org.testng</groupId>
         <artifactId>testng</artifactId>
-        <version>6.11</version>
+        <version>${testng.version}</version>
       </dependency>
       <dependency>
         <groupId>org.roaringbitmap</groupId>
@@ -716,10 +732,6 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.yetus</groupId>
             <artifactId>audience-annotations</artifactId>
           </exclusion>
@@ -807,10 +819,6 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -891,12 +899,6 @@
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
         <version>1.5.9</version>
-        <exclusions>
-          <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -949,16 +951,8 @@
         <version>${calcite.version}</version>
         <exclusions>
           <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.calcite.avatica</groupId>
             <artifactId>avatica-metrics</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.apache.httpcomponents</groupId>
@@ -1341,6 +1335,31 @@
     </extensions>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <groupId>com.diffplug.spotless</groupId>
+          <artifactId>spotless-maven-plugin</artifactId>
+          <version>2.28.0</version>
+          <executions>
+            <execution>
+              <phase>verify</phase>
+              <goals>
+                <goal>check</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <java>
+              <includes>
+                <include>src/main/java/**/*.java</include>
+                <include>src/test/java/**/*.java</include>
+              </includes>
+              <importOrder>
+                <order>,\#</order>
+              </importOrder>
+              <removeUnusedImports/>
+            </java>
+          </configuration>
+        </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>appassembler-maven-plugin</artifactId>
@@ -1732,31 +1751,6 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
         <version>2.7.1</version>
-      </plugin>
-      <plugin>
-        <groupId>com.diffplug.spotless</groupId>
-        <artifactId>spotless-maven-plugin</artifactId>
-        <version>2.28.0</version>
-        <executions>
-          <execution>
-            <phase>verify</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <java>
-            <includes>
-              <include>src/main/java/**/*.java</include>
-              <include>src/test/java/**/*.java</include>
-            </includes>
-            <importOrder>
-              <order>,\#</order>
-            </importOrder>
-            <removeUnusedImports/>
-          </java>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>com.mycila</groupId>

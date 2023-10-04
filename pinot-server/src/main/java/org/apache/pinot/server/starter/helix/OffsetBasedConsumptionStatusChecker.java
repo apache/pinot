@@ -21,7 +21,7 @@ package org.apache.pinot.server.starter.helix;
 
 import java.util.Set;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
@@ -39,7 +39,7 @@ public class OffsetBasedConsumptionStatusChecker extends IngestionBasedConsumpti
   }
 
   @Override
-  protected boolean isSegmentCaughtUp(String segmentName, LLRealtimeSegmentDataManager rtSegmentDataManager) {
+  protected boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager) {
     StreamPartitionMsgOffset latestIngestedOffset = rtSegmentDataManager.getCurrentOffset();
     StreamPartitionMsgOffset latestStreamOffset = rtSegmentDataManager.getLatestStreamOffsetAtStartupTime();
     if (latestStreamOffset == null || latestIngestedOffset == null) {

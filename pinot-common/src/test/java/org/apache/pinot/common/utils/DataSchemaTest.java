@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.sql.Timestamp;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -178,5 +181,12 @@ public class DataSchemaTest {
     Assert.assertEquals(fromDataType(FieldSpec.DataType.BOOLEAN, false), BOOLEAN_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.TIMESTAMP, false), TIMESTAMP_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.BYTES, false), BYTES_ARRAY);
+
+    BigDecimal bigDecimalValue = new BigDecimal("1.2345678901234567890123456789");
+    Assert.assertEquals(BIG_DECIMAL.format(bigDecimalValue), bigDecimalValue.toPlainString());
+    Timestamp timestampValue = new Timestamp(1234567890123L);
+    Assert.assertEquals(TIMESTAMP.format(timestampValue), timestampValue.toString());
+    byte[] bytesValue = {12, 34, 56};
+    Assert.assertEquals(BYTES.format(bytesValue), BytesUtils.toHexString(bytesValue));
   }
 }

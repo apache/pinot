@@ -23,7 +23,6 @@ import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -69,18 +68,13 @@ import static org.testng.Assert.assertTrue;
 public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest
     extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
-  private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
-      "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
-  private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS = Collections.singletonList("DivActualElapsedTime");
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final int NUM_INVALID_RECORDS = 5;
 
   private final boolean _isDirectAlloc = RANDOM.nextBoolean();
   private final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
-  private final boolean _enableSplitCommit = RANDOM.nextBoolean();
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
-  private final long _startTime = System.currentTimeMillis();
   private SchemaRegistryStarter.KafkaSchemaRegistryInstance _schemaRegistry;
 
   @Override
@@ -203,10 +197,6 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegr
     if (_isConsumerDirConfigured) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
     }
-    if (_enableSplitCommit) {
-      configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
-      configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, true);
-    }
   }
 
   @Override
@@ -293,9 +283,8 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegr
   public void setUp()
       throws Exception {
     System.out.println(format(
-        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, "
-            + "enableLeadControllerResource: %s", RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured,
-        _enableSplitCommit, _enableLeadControllerResource));
+        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
+        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
 
     // Remove the consumer directory
     FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));

@@ -77,8 +77,8 @@ import static org.mockito.Mockito.when;
 
 
 // TODO Re-write this test using the stream abstraction
-public class LLRealtimeSegmentDataManagerTest {
-  private static final String SEGMENT_DIR = "/tmp/" + LLRealtimeSegmentDataManagerTest.class.getSimpleName();
+public class RealtimeSegmentDataManagerTest {
+  private static final String SEGMENT_DIR = "/tmp/" + RealtimeSegmentDataManagerTest.class.getSimpleName();
   private static final File SEGMENT_DIR_FILE = new File(SEGMENT_DIR);
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
@@ -120,12 +120,12 @@ public class LLRealtimeSegmentDataManagerTest {
     return segmentZKMetadata;
   }
 
-  private FakeLLRealtimeSegmentDataManager createFakeSegmentManager()
+  private FakeRealtimeSegmentDataManager createFakeSegmentManager()
       throws Exception {
     return createFakeSegmentManager(false, new TimeSupplier(), null, null, null);
   }
 
-  private FakeLLRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
+  private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
       throws Exception {
     SegmentZKMetadata segmentZKMetadata = createZkMetadata();
@@ -148,7 +148,7 @@ public class LLRealtimeSegmentDataManagerTest {
     _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));
     Schema schema = Fixtures.createSchema();
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-    return new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager, SEGMENT_DIR, schema,
+    return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager, SEGMENT_DIR, schema,
         llcSegmentName, _partitionGroupIdToSemaphoreMap, serverMetrics, timeSupplier);
   }
 
@@ -169,8 +169,8 @@ public class LLRealtimeSegmentDataManagerTest {
   @Test
   public void testHolding()
       throws Exception {
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
@@ -191,7 +191,7 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildSegmentCalled);
     Assert.assertFalse(segmentDataManager._commitSegmentCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.HOLDING);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.HOLDING);
     segmentDataManager.destroy();
   }
 
@@ -199,8 +199,8 @@ public class LLRealtimeSegmentDataManagerTest {
   @Test
   public void testCommitAfterHold()
       throws Exception {
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
@@ -223,15 +223,15 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
-        LLRealtimeSegmentDataManager.State.COMMITTED);
+        RealtimeSegmentDataManager.State.COMMITTED);
     segmentDataManager.destroy();
   }
 
   @Test
   public void testSegmentBuildException()
       throws Exception {
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
@@ -243,7 +243,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     consumer.run();
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.ERROR);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.ERROR);
     segmentDataManager.destroy();
   }
 
@@ -251,8 +251,8 @@ public class LLRealtimeSegmentDataManagerTest {
   @Test
   public void testCommitAfterCatchup()
       throws Exception {
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset firstOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     final LongMsgOffset catchupOffset = new LongMsgOffset(firstOffset.getOffset() + 10);
     // We should consume initially...
@@ -287,7 +287,7 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
-        LLRealtimeSegmentDataManager.State.COMMITTED);
+        RealtimeSegmentDataManager.State.COMMITTED);
     segmentDataManager.destroy();
   }
 
@@ -297,9 +297,9 @@ public class LLRealtimeSegmentDataManagerTest {
     tableConfig.getIndexingConfig().getStreamConfigs()
         .put(StreamConfigProperties.constructStreamProperty(
             StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA, "fakeStream"), "2d");
-    FakeLLRealtimeSegmentDataManager segmentDataManager =
+    FakeRealtimeSegmentDataManager segmentDataManager =
         createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset firstOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     final LongMsgOffset catchupOffset = new LongMsgOffset(firstOffset.getOffset() + 10);
     // We should consume initially...
@@ -334,7 +334,7 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
-        LLRealtimeSegmentDataManager.State.COMMITTED);
+        RealtimeSegmentDataManager.State.COMMITTED);
     segmentDataManager.destroy();
   }
 
@@ -344,9 +344,9 @@ public class LLRealtimeSegmentDataManagerTest {
     tableConfig.getIndexingConfig().getStreamConfigs()
         .put(StreamConfigProperties.constructStreamProperty(
             StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA, "fakeStream"), Instant.now().toString());
-    FakeLLRealtimeSegmentDataManager segmentDataManager =
+    FakeRealtimeSegmentDataManager segmentDataManager =
         createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset firstOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     final LongMsgOffset catchupOffset = new LongMsgOffset(firstOffset.getOffset() + 10);
     // We should consume initially...
@@ -381,15 +381,15 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
-        LLRealtimeSegmentDataManager.State.COMMITTED);
+        RealtimeSegmentDataManager.State.COMMITTED);
     segmentDataManager.destroy();
   }
 
   @Test
   public void testDiscarded()
       throws Exception {
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response discardResponse = new SegmentCompletionProtocol.Response(
@@ -406,15 +406,15 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._commitSegmentCalled);
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
-        LLRealtimeSegmentDataManager.State.DISCARDED);
+        RealtimeSegmentDataManager.State.DISCARDED);
     segmentDataManager.destroy();
   }
 
   @Test
   public void testRetained()
       throws Exception {
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     segmentDataManager._consumeOffsets.add(endOffset);
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
@@ -431,15 +431,15 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._commitSegmentCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.RETAINED);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.RETAINED);
     segmentDataManager.destroy();
   }
 
   @Test
   public void testNotLeader()
       throws Exception {
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
@@ -459,15 +459,15 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildSegmentCalled);
     Assert.assertFalse(segmentDataManager._commitSegmentCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.HOLDING);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.HOLDING);
     segmentDataManager.destroy();
   }
 
   @Test
   public void testConsumingException()
       throws Exception {
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
 
     segmentDataManager._throwExceptionFromConsume = true;
     segmentDataManager._postConsumeStoppedCalled = false;
@@ -489,9 +489,9 @@ public class LLRealtimeSegmentDataManagerTest {
     metadata.setEndOffset(finalOffset.toString());
 
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._stopWaitTimeMs = 0;
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.COMMITTED);
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.COMMITTED);
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
@@ -499,9 +499,9 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._stopWaitTimeMs = 0;
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.RETAINED);
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.RETAINED);
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
@@ -509,9 +509,9 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._stopWaitTimeMs = 0;
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.DISCARDED);
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.DISCARDED);
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
@@ -519,9 +519,9 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._stopWaitTimeMs = 0;
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.ERROR);
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.ERROR);
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
@@ -530,9 +530,9 @@ public class LLRealtimeSegmentDataManagerTest {
 
     // If holding, but we have overshot the expected final offset, the download and replace
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._stopWaitTimeMs = 0;
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.HOLDING);
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
       segmentDataManager.setCurrentOffset(finalOffsetValue + 1);
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
@@ -542,9 +542,9 @@ public class LLRealtimeSegmentDataManagerTest {
 
     // If catching up, but we have overshot the expected final offset, the download and replace
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._stopWaitTimeMs = 0;
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager.setCurrentOffset(finalOffsetValue + 1);
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
@@ -554,9 +554,9 @@ public class LLRealtimeSegmentDataManagerTest {
 
     // If catching up, but we did not get to the final offset, then download and replace
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._stopWaitTimeMs = 0;
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(new LongMsgOffset(finalOffsetValue - 1));
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
@@ -566,9 +566,9 @@ public class LLRealtimeSegmentDataManagerTest {
 
     // But then if we get to the exact offset, we get to build and replace, not download
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._stopWaitTimeMs = 0;
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       segmentDataManager._consumeOffsets.add(finalOffset);
       segmentDataManager.goOnlineFromConsuming(metadata);
       Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
@@ -582,8 +582,8 @@ public class LLRealtimeSegmentDataManagerTest {
       throws Exception {
     // test reaching max row limit
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       segmentDataManager.setNumRowsIndexed(Fixtures.MAX_ROWS_IN_SEGMENT - 1);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
@@ -594,8 +594,8 @@ public class LLRealtimeSegmentDataManagerTest {
     }
     // test reaching max time limit
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       // We should still get false because there is no messages fetched
       segmentDataManager._timeSupplier.add(Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS + 1);
@@ -609,8 +609,8 @@ public class LLRealtimeSegmentDataManagerTest {
     }
     // In catching up state, test reaching final offset
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       final long finalOffset = START_OFFSET_VALUE + 100;
       segmentDataManager.setFinalOffset(finalOffset);
       segmentDataManager.setCurrentOffset(finalOffset - 1);
@@ -621,9 +621,9 @@ public class LLRealtimeSegmentDataManagerTest {
     }
     // In catching up state, test reaching final offset ignoring time
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._timeSupplier.add(Fixtures.MAX_TIME_FOR_SEGMENT_CLOSE_MS);
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CATCHING_UP);
       final long finalOffset = START_OFFSET_VALUE + 100;
       segmentDataManager.setFinalOffset(finalOffset);
       segmentDataManager.setCurrentOffset(finalOffset - 1);
@@ -635,9 +635,9 @@ public class LLRealtimeSegmentDataManagerTest {
     // When we go from consuming to online state, time and final offset matter.
     // Case 1. We have reached final offset.
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._timeSupplier.add(1);
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CONSUMING_TO_ONLINE);
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CONSUMING_TO_ONLINE);
       segmentDataManager.setConsumeEndTime(segmentDataManager._timeSupplier.get() + 10);
       final long finalOffset = START_OFFSET_VALUE + 100;
       segmentDataManager.setFinalOffset(finalOffset);
@@ -649,8 +649,8 @@ public class LLRealtimeSegmentDataManagerTest {
     }
     // Case 2. We have reached time limit.
     {
-      FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-      segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CONSUMING_TO_ONLINE);
+      FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.CONSUMING_TO_ONLINE);
       final long endTime = segmentDataManager._timeSupplier.get() + 10;
       segmentDataManager.setConsumeEndTime(endTime);
       final long finalOffset = START_OFFSET_VALUE + 100;
@@ -664,9 +664,9 @@ public class LLRealtimeSegmentDataManagerTest {
     }
   }
 
-  private void setHasMessagesFetched(FakeLLRealtimeSegmentDataManager segmentDataManager, boolean hasMessagesFetched)
+  private void setHasMessagesFetched(FakeRealtimeSegmentDataManager segmentDataManager, boolean hasMessagesFetched)
       throws Exception {
-    Field field = LLRealtimeSegmentDataManager.class.getDeclaredField("_hasMessagesFetched");
+    Field field = RealtimeSegmentDataManager.class.getDeclaredField("_hasMessagesFetched");
     field.setAccessible(true);
     field.set(segmentDataManager, hasMessagesFetched);
   }
@@ -675,7 +675,7 @@ public class LLRealtimeSegmentDataManagerTest {
   @Test
   public void testReuseOfBuiltSegment()
       throws Exception {
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
 
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
     params.withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -712,7 +712,7 @@ public class LLRealtimeSegmentDataManagerTest {
   @Test
   public void testFileRemovedDuringOnlineTransition()
       throws Exception {
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
 
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
     params.withStatus(SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
@@ -735,7 +735,7 @@ public class LLRealtimeSegmentDataManagerTest {
     SegmentZKMetadata metadata = new SegmentZKMetadata(SEGMENT_NAME_STR);
     metadata.setEndOffset(new LongMsgOffset(finalOffset).toString());
     segmentDataManager._stopWaitTimeMs = 0;
-    segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.HOLDING);
+    segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
     segmentDataManager.goOnlineFromConsuming(metadata);
     Assert.assertFalse(segmentTarFile.exists());
     segmentDataManager.destroy();
@@ -745,13 +745,13 @@ public class LLRealtimeSegmentDataManagerTest {
   public void testOnlyOneSegmentHoldingTheSemaphoreForParticularPartition()
       throws Exception {
     long timeout = 10_000L;
-    FakeLLRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
+    FakeRealtimeSegmentDataManager firstSegmentDataManager = createFakeSegmentManager();
     Assert.assertTrue(firstSegmentDataManager.getAcquiredConsumerSemaphore().get());
     Semaphore firstSemaphore = firstSegmentDataManager.getPartitionGroupConsumerSemaphore();
     Assert.assertEquals(firstSemaphore.availablePermits(), 0);
     Assert.assertFalse(firstSemaphore.hasQueuedThreads());
 
-    AtomicReference<FakeLLRealtimeSegmentDataManager> secondSegmentDataManager = new AtomicReference<>(null);
+    AtomicReference<FakeRealtimeSegmentDataManager> secondSegmentDataManager = new AtomicReference<>(null);
 
     // Construct the second segment manager, which will be blocked on the semaphore.
     Thread constructSecondSegmentManager = new Thread(() -> {
@@ -837,13 +837,13 @@ public class LLRealtimeSegmentDataManagerTest {
         return now + TimeUnit.MINUTES.toMillis(segmentTimeThresholdMins + 1);
       }
     };
-    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
+    FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
         String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2),
         segmentTimeThresholdMins + "m", null);
     segmentDataManager._stubConsumeLoop = false;
-    segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+    segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset =
         new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
     segmentDataManager._consumeOffsets.add(endOffset);
@@ -876,13 +876,13 @@ public class LLRealtimeSegmentDataManagerTest {
       throws Exception {
     final int segmentTimeThresholdMins = 10;
     TimeSupplier timeSupplier = new TimeSupplier();
-    FakeLLRealtimeSegmentDataManager segmentDataManager =
+    FakeRealtimeSegmentDataManager segmentDataManager =
         createFakeSegmentManager(true, timeSupplier, String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS),
             segmentTimeThresholdMins + "m", null);
     segmentDataManager._stubConsumeLoop = false;
-    segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+    segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
-    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset endOffset =
         new LongMsgOffset(START_OFFSET_VALUE + FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS);
     segmentDataManager._consumeOffsets.add(endOffset);
@@ -928,7 +928,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
   }
 
-  public static class FakeLLRealtimeSegmentDataManager extends LLRealtimeSegmentDataManager {
+  public static class FakeRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     public Field _state;
     public Field _shouldStop;
@@ -953,13 +953,12 @@ public class LLRealtimeSegmentDataManagerTest {
       when(dataManagerConfig.getReadMode()).thenReturn(null);
       when(dataManagerConfig.getAvgMultiValueCount()).thenReturn(null);
       when(dataManagerConfig.getSegmentFormatVersion()).thenReturn(null);
-      when(dataManagerConfig.isEnableSplitCommit()).thenReturn(false);
       when(dataManagerConfig.isRealtimeOffHeapAllocation()).thenReturn(false);
       when(dataManagerConfig.getConfig()).thenReturn(new PinotConfiguration());
       return dataManagerConfig;
     }
 
-    public FakeLLRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
+    public FakeRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
         RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
         LLCSegmentName llcSegmentName, Map<Integer, Semaphore> semaphoreMap, ServerMetrics serverMetrics,
         TimeSupplier timeSupplier)
@@ -967,14 +966,14 @@ public class LLRealtimeSegmentDataManagerTest {
       super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(makeInstanceDataManagerConfig(), tableConfig), schema, llcSegmentName,
           semaphoreMap.get(llcSegmentName.getPartitionGroupId()), serverMetrics, null, null, () -> true);
-      _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
+      _state = RealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
-      _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
+      _shouldStop = RealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
       _shouldStop.setAccessible(true);
-      _stopReason = LLRealtimeSegmentDataManager.class.getDeclaredField("_stopReason");
+      _stopReason = RealtimeSegmentDataManager.class.getDeclaredField("_stopReason");
       _stopReason.setAccessible(true);
       _semaphoreMap = semaphoreMap;
-      _streamMsgOffsetFactory = LLRealtimeSegmentDataManager.class.getDeclaredField("_streamPartitionMsgOffsetFactory");
+      _streamMsgOffsetFactory = RealtimeSegmentDataManager.class.getDeclaredField("_streamPartitionMsgOffsetFactory");
       _streamMsgOffsetFactory.setAccessible(true);
       _streamMsgOffsetFactory.set(this, new LongMsgOffsetFactory());
       _timeSupplier = timeSupplier;
@@ -999,7 +998,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     public boolean invokeCommit() {
-      return super.commitSegment("dummyUrl", false);
+      return super.commitSegment("dummyUrl");
     }
 
     private void terminateLoopIfNecessary() {
@@ -1039,9 +1038,8 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected SegmentCompletionProtocol.Response commit(String controllerVipUrl, boolean isSplitCommit) {
-      SegmentCompletionProtocol.Response response = _responses.remove();
-      return response;
+    protected SegmentCompletionProtocol.Response commit(String controllerVipUrl) {
+      return _responses.remove();
     }
 
     @Override
@@ -1051,9 +1049,9 @@ public class LLRealtimeSegmentDataManagerTest {
 
     // TODO: Some of the tests rely on specific number of calls to the `now()` method in the SegmentDataManager.
     // This is not a good coding practice and makes the code very fragile. This needs to be fixed.
-    // Invoking now() in any part of LLRealtimeSegmentDataManager code will break the following tests:
-    // 1. LLRealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReached
-    // 2. LLRealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndTimeThresholdIsReached
+    // Invoking now() in any part of RealtimeSegmentDataManager code will break the following tests:
+    // 1. RealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndRowCountThresholdIsReached
+    // 2. RealtimeSegmentDataManagerTest.testShouldNotSkipUnfilteredMessagesIfNotIndexedAndTimeThresholdIsReached
     @Override
     protected long now() {
       // now() is called in the constructor before _timeSupplier is set
@@ -1093,7 +1091,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean commitSegment(String controllerVipUrl, boolean isSplitCommit) {
+    protected boolean commitSegment(String controllerVipUrl) {
       _commitSegmentCalled = true;
       return true;
     }
@@ -1131,7 +1129,7 @@ public class LLRealtimeSegmentDataManagerTest {
     public boolean invokeEndCriteriaReached() {
       Method endCriteriaReached = null;
       try {
-        endCriteriaReached = LLRealtimeSegmentDataManager.class.getDeclaredMethod("endCriteriaReached");
+        endCriteriaReached = RealtimeSegmentDataManager.class.getDeclaredMethod("endCriteriaReached");
         endCriteriaReached.setAccessible(true);
         Boolean result = (Boolean) endCriteriaReached.invoke(this);
         return result;
@@ -1151,7 +1149,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     private void setLong(long value, String fieldName) {
       try {
-        Field field = LLRealtimeSegmentDataManager.class.getDeclaredField(fieldName);
+        Field field = RealtimeSegmentDataManager.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.setLong(this, value);
       } catch (NoSuchFieldException e) {
@@ -1163,7 +1161,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     private void setOffset(long value, String fieldName) {
       try {
-        Field field = LLRealtimeSegmentDataManager.class.getDeclaredField(fieldName);
+        Field field = RealtimeSegmentDataManager.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         StreamPartitionMsgOffset offset = (StreamPartitionMsgOffset) field.get(this);
 //        if (offset == null) {
@@ -1180,7 +1178,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     private void setInt(int value, String fieldName) {
       try {
-        Field field = LLRealtimeSegmentDataManager.class.getDeclaredField(fieldName);
+        Field field = RealtimeSegmentDataManager.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.setInt(this, value);
       } catch (NoSuchFieldException e) {

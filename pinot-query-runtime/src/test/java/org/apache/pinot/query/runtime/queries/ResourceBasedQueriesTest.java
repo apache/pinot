@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,12 +36,12 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -57,6 +56,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -71,9 +71,11 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
   private static final Random RANDOM = new Random(42);
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
+  private static final String IGNORE_FILTER_PROPERTY = "pinot.runIgnored";
   private static final int NUM_PARTITIONS = 4;
 
   private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
+  private boolean _isRunIgnored;
   private TimeZone _currentSystemTimeZone;
 
   @BeforeClass
@@ -81,6 +83,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       throws Exception {
     // Save the original default timezone
     _currentSystemTimeZone = TimeZone.getDefault();
+
+    String runIgnoredProp = System.getProperty(IGNORE_FILTER_PROPERTY);
+    _isRunIgnored = runIgnoredProp != null;
 
     // Change the default timezone
     TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"));
@@ -245,13 +250,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
-  public void testQueryTestCasesWithH2(String testCaseName, String sql, String h2Sql, String expect,
+  public void testQueryTestCasesWithH2(String testCaseName, boolean isIgnored, String sql, String h2Sql, String expect,
       boolean keepOutputRowOrder)
       throws Exception {
     // query pinot
-    runQuery(sql, expect, null).ifPresent(rows -> {
+    runQuery(sql, expect, null).ifPresent(resultTable -> {
       try {
-        compareRowEquals(rows, queryH2(h2Sql), keepOutputRowOrder);
+        compareRowEquals(resultTable, queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
       }
@@ -259,18 +264,19 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
-  public void testQueryTestCasesWithOutput(String testCaseName, String sql, String h2Sql, List<Object[]> expectedRows,
-      String expect, boolean keepOutputRowOrder)
+  public void testQueryTestCasesWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
+      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
       throws Exception {
-    runQuery(sql, expect, null).ifPresent(rows -> compareRowEquals(rows, expectedRows, keepOutputRowOrder));
+    runQuery(sql, expect, null).ifPresent(
+        resultTable -> compareRowEquals(resultTable, expectedRows, keepOutputRowOrder));
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
-  public void testQueryTestCasesWithMetadata(String testCaseName, String sql, String h2Sql, String expect,
-      int numSegments)
+  public void testQueryTestCasesWithMetadata(String testCaseName, boolean isIgnored, String sql, String h2Sql,
+      String expect, int numSegments)
       throws Exception {
     Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap = new HashMap<>();
-    runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(rows -> {
+    runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(resultTable -> {
       BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
       executionStatsAggregatorMap.get(0).setStats(brokerResponseNative);
       Assert.assertFalse(executionStatsAggregatorMap.isEmpty());
@@ -320,17 +326,15 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     });
   }
 
-  private Optional<List<Object[]>> runQuery(String sql, final String except,
-      Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
+  private Optional<ResultTable> runQuery(String sql, final String except,
+      Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap)
+      throws Exception {
     try {
       // query pinot
-      List<Object[]> resultRows = queryRunner(sql, executionStatsAggregatorMap);
-
-      Assert.assertNull(except,
-          "Expected error with message '" + except + "'. But instead rows were returned: " + resultRows.stream()
-              .map(Arrays::toString).collect(Collectors.joining(",\n")));
-
-      return Optional.of(resultRows);
+      ResultTable resultTable = queryRunner(sql, executionStatsAggregatorMap);
+      Assert.assertNull(except, "Expected error with message '" + except + "'. But instead rows were returned: "
+          + JsonUtils.objectToPrettyString(resultTable));
+      return Optional.of(resultTable);
     } catch (Exception e) {
       if (except == null) {
         throw e;
@@ -358,7 +362,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
-        if (queryCase._ignored) {
+        if (queryCase._ignored && !_isRunIgnored) {
           continue;
         }
 
@@ -372,7 +376,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             expectedRows.add(objs.toArray());
           }
           Object[] testEntry = new Object[]{
-              testCaseName, sql, h2Sql, expectedRows, queryCase._expectedException, queryCase._keepOutputRowOrder
+              testCaseName, queryCase._ignored, sql, h2Sql, expectedRows, queryCase._expectedException,
+              queryCase._keepOutputRowOrder
           };
           providerContent.add(testEntry);
         }
@@ -402,7 +407,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
 
-        if (queryCase._ignored) {
+        if (queryCase._ignored && !_isRunIgnored) {
           continue;
         }
 
@@ -418,7 +423,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             throw new RuntimeException("Unable to test metadata without expected num segments configuration!");
           }
 
-          Object[] testEntry = new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, segmentCount};
+          Object[] testEntry = new Object[]{
+              testCaseName, queryCase._ignored, sql, h2Sql, queryCase._expectedException, segmentCount
+          };
           providerContent.add(testEntry);
         }
       }
@@ -439,15 +446,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       String testCaseName = testCaseEntry.getKey();
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
-        if (queryCase._ignored) {
+        if (queryCase._ignored && !_isRunIgnored) {
           continue;
         }
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
               : replaceTableName(testCaseName, queryCase._sql);
-          Object[] testEntry =
-              new Object[]{testCaseName, sql, h2Sql, queryCase._expectedException, queryCase._keepOutputRowOrder};
+          Object[] testEntry = new Object[]{
+              testCaseName, queryCase._ignored, sql, h2Sql, queryCase._expectedException, queryCase._keepOutputRowOrder
+          };
           providerContent.add(testEntry);
         }
       }
@@ -476,11 +484,11 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     }
 
     // get filter if set
-    String property = System.getProperty(FILE_FILTER_PROPERTY);
+    String fileFilterProp = System.getProperty(FILE_FILTER_PROPERTY);
 
     // Load each test file.
     for (String testCaseName : testFilenames) {
-      if (property != null && !testCaseName.toLowerCase().contains(property.toLowerCase())) {
+      if (fileFilterProp != null && !testCaseName.toLowerCase().contains(fileFilterProp.toLowerCase())) {
         continue;
       }
 

@@ -449,10 +449,13 @@ public class DataSchema {
     }
 
     /**
-     * Formats the value to human-readable format based on the type to be used in the query response.
+     * Formats the value based on the type to be used in the JSON query response. For BIG_DECIMAL, even though JSON can
+     * serialize BigDecimal, it is best practice to convert it to String to avoid precision loss during deserialization.
      */
     public Serializable format(Object value) {
       switch (this) {
+        case BIG_DECIMAL:
+          return ((BigDecimal) value).toPlainString();
         case TIMESTAMP:
           assert value instanceof Timestamp;
           return value.toString();
@@ -479,7 +482,7 @@ public class DataSchema {
         case DOUBLE:
           return ((Number) value).doubleValue();
         case BIG_DECIMAL:
-          return (BigDecimal) value;
+          return ((BigDecimal) value).toPlainString();
         case BOOLEAN:
           return ((int) value) == 1;
         case TIMESTAMP:

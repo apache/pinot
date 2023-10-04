@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import io.netty.buffer.PooledByteBufAllocatorMetric;
 import org.apache.pinot.common.Utils;
 
 
@@ -46,6 +47,26 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   DEDUP_PRIMARY_KEYS_COUNT("dedupPrimaryKeysCount", false),
   CONSUMPTION_QUOTA_UTILIZATION("ratio", false),
   JVM_HEAP_USED_BYTES("bytes", true),
+  NETTY_POOLED_USED_DIRECT_MEMORY("bytes", true),
+  NETTY_POOLED_USED_HEAP_MEMORY("bytes", true),
+  NETTY_POOLED_ARENAS_DIRECT("arenas", true),
+  NETTY_POOLED_ARENAS_HEAP("arenas", true),
+
+  /**
+   * The size of the small cache.
+   * See {@link PooledByteBufAllocatorMetric#smallCacheSize()}
+   */
+  NETTY_POOLED_CACHE_SIZE_SMALL("bytes", true),
+  /**
+   * The size of the normal cache.
+   * See {@link PooledByteBufAllocatorMetric#normalCacheSize()}
+   */
+  NETTY_POOLED_CACHE_SIZE_NORMAL("bytes", true),
+  /**
+   * The cache size used by the allocator for normal arenas
+   */
+  NETTY_POOLED_THREADLOCALCACHE("bytes", true),
+  NETTY_POOLED_CHUNK_SIZE("bytes", true),
   // Ingestion delay metrics
   REALTIME_INGESTION_DELAY_MS("milliseconds", false),
   END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false),

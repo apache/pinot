@@ -267,7 +267,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   /*
-   * Method used by LLRealtimeSegmentManagers to update their partition delays
+   * Method used by RealtimeSegmentManagers to update their partition delays
    *
    * @param ingestionTimeMs Ingestion delay being reported.
    * @param partitionGroupId Partition ID for which delay is being updated.
@@ -406,7 +406,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         return;
       } else {
         // For LLC and uploaded segments, delete the local copy and download a new copy
-        _logger.error("Failed to load LLC segment: {}, downloading a new copy", segmentName);
+        _logger.info("Unable to load local LLC segment: {}, downloading a new copy", segmentName);
         FileUtils.deleteQuietly(segmentDir);
       }
       // Local segment doesn't exist or cannot load, download a new copy
@@ -436,12 +436,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
             : null;
-    LLRealtimeSegmentDataManager llRealtimeSegmentDataManager =
-        new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
+    RealtimeSegmentDataManager realtimeSegmentDataManager =
+        new RealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
             indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
             partitionDedupMetadataManager, _isTableReadyToConsumeData);
-    llRealtimeSegmentDataManager.startConsumption();
-    segmentDataManager = llRealtimeSegmentDataManager;
+    realtimeSegmentDataManager.startConsumption();
+    segmentDataManager = realtimeSegmentDataManager;
 
     _logger.info("Initialized RealtimeSegmentDataManager - " + segmentName);
     registerSegment(segmentName, segmentDataManager);

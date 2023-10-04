@@ -79,6 +79,8 @@ union Literal {
   // Set to true when the literal value is a null.
   9: optional bool nullValue;
   10: optional binary bigDecimalValue;
+  // Use i32 to represent float since there is no native float type
+  11: optional i32 floatValue;
 }
 
 struct Identifier {

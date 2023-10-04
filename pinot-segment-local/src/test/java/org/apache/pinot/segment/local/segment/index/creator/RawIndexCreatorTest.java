@@ -29,14 +29,16 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -63,7 +65,6 @@ import org.testng.annotations.Test;
  * Class for testing Raw index creators.
  */
 public class RawIndexCreatorTest {
-
   private static final int NUM_ROWS = 10009;
   private static final int MAX_STRING_LENGTH = 101;
 
@@ -168,8 +169,9 @@ public class RawIndexCreatorTest {
   public void testStringRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
-    try (VarByteChunkSVForwardIndexReader rawIndexReader = new VarByteChunkSVForwardIndexReader(indexBuffer,
-        DataType.STRING); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+    try (
+        ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.createRawIndexReader(indexBuffer, DataType.STRING,
+            true); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
         GenericRow expectedRow = _recordReader.next();

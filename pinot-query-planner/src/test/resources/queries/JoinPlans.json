@@ -224,7 +224,7 @@
       },
       {
         "description": "Semi join with IN clause",
-        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'hash_table') */ col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], col2=[$1])",
@@ -239,7 +239,7 @@
       },
       {
         "description": "Semi join with multiple IN clause",
-        "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col2 = 'test' AND col3 IN (SELECT col3 FROM b WHERE col1='foo') AND col3 IN (SELECT col3 FROM b WHERE col1='bar') AND col3 IN (SELECT col3 FROM b WHERE col1='foobar')",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(join_strategy = 'hash_table') */ col1, col2 FROM a WHERE col2 = 'test' AND col3 IN (SELECT col3 FROM b WHERE col1='foo') AND col3 IN (SELECT col3 FROM b WHERE col1='bar') AND col3 IN (SELECT col3 FROM b WHERE col1='foobar')",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], col2=[$1])",
