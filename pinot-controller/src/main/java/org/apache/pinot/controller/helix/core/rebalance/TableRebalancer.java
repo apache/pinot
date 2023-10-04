@@ -33,7 +33,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.AccessOption;
@@ -64,7 +63,6 @@ import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,40 +136,27 @@ public class TableRebalancer {
     return UUID.randomUUID().toString();
   }
 
-  public RebalanceResult rebalance(TableConfig tableConfig, Configuration rebalanceConfig) {
+  public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
-    String rebalanceJobId = rebalanceConfig.getString(RebalanceConfigConstants.JOB_ID);
+    String rebalanceJobId = rebalanceConfig.getJobId();
     if (rebalanceJobId == null) {
       // If not passed along, create one.
       // TODO - Add rebalanceJobId to all log messages for easy tracking.
       rebalanceJobId = createUniqueRebalanceJobIdentifier();
     }
-
-    boolean dryRun =
-        rebalanceConfig.getBoolean(RebalanceConfigConstants.DRY_RUN, RebalanceConfigConstants.DEFAULT_DRY_RUN);
-    boolean reassignInstances = rebalanceConfig.getBoolean(RebalanceConfigConstants.REASSIGN_INSTANCES,
-        RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES);
-    boolean includeConsuming = rebalanceConfig.getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING,
-        RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING);
-    boolean bootstrap =
-        rebalanceConfig.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
-    boolean downtime =
-        rebalanceConfig.getBoolean(RebalanceConfigConstants.DOWNTIME, RebalanceConfigConstants.DEFAULT_DOWNTIME);
-    int minReplicasToKeepUpForNoDowntime =
-        rebalanceConfig.getInt(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME,
-            RebalanceConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME);
+    boolean dryRun = rebalanceConfig.isDryRun();
+    boolean reassignInstances = rebalanceConfig.isReassignInstances();
+    boolean includeConsuming = rebalanceConfig.isIncludeConsuming();
+    boolean bootstrap = rebalanceConfig.isBootstrap();
+    boolean downtime = rebalanceConfig.isDowntime();
+    int minReplicasToKeepUpForNoDowntime = rebalanceConfig.getMinAvailableReplicas();
+    boolean bestEfforts = rebalanceConfig.isBestEfforts();
+    long externalViewCheckIntervalInMs = rebalanceConfig.getExternalViewCheckIntervalInMs();
+    long externalViewStabilizationTimeoutInMs = rebalanceConfig.getExternalViewStabilizationTimeoutInMs();
     boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null
         && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
         tableConfig.getRoutingConfig().getInstanceSelectorType());
-    boolean bestEfforts = rebalanceConfig.getBoolean(RebalanceConfigConstants.BEST_EFFORTS,
-        RebalanceConfigConstants.DEFAULT_BEST_EFFORTS);
-    long externalViewCheckIntervalInMs =
-        rebalanceConfig.getLong(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-            RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS);
-    long externalViewStabilizationTimeoutInMs =
-        rebalanceConfig.getLong(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-            RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
     LOGGER.info(
         "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, bootstrap: {}, "
             + "downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, bestEfforts: {}, "

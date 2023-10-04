@@ -27,7 +27,6 @@ import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,7 +133,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
     jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.TABLE_REBALANCE.name());
     try {
-      jobMetadata.put(RebalanceConfigConstants.REBALANCE_PROGRESS_STATS,
+      jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
           JsonUtils.objectToString(_tableRebalanceProgressStats));
     } catch (JsonProcessingException e) {
       LOGGER.error("Error serialising rebalance stats to JSON for persisting to ZK {}", _rebalanceJobId, e);

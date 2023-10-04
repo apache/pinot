@@ -23,15 +23,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.annotations.ApiModelProperty;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceContext;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 
 
-public class TenantRebalanceContext extends RebalanceContext {
+public class TenantRebalanceConfig extends RebalanceConfig {
   @JsonIgnore
   private String _tenantName;
   @JsonProperty("degreeOfParallelism")
   @ApiModelProperty(example = "1")
-  private Integer _degreeOfParallelism = 1;
+  private int _degreeOfParallelism = 1;
   @JsonProperty("parallelWhitelist")
   private Set<String> _parallelWhitelist = new HashSet<>();
   @JsonProperty("parallelBlacklist")

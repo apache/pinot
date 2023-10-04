@@ -56,7 +56,6 @@ import javax.ws.rs.ClientErrorException;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -144,6 +143,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
@@ -175,7 +175,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -3081,21 +3080,20 @@ public class PinotHelixResourceManager {
    * Entry point for table Rebalacing.
    * @param tableNameWithType
    * @param rebalanceConfig
-   * @param trackRebalanceProgress - Do we want to track rebalance progress stats
+   * @param trackRebalanceProgress whether to track rebalance progress stats
    * @return RebalanceResult
    * @throws TableNotFoundException
    */
-  public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig,
+  public RebalanceResult rebalanceTable(String tableNameWithType, RebalanceConfig rebalanceConfig,
       boolean trackRebalanceProgress)
       throws TableNotFoundException {
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
-    String rebalanceJobId = rebalanceConfig.getString(RebalanceConfigConstants.JOB_ID);
-    Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig ");
-    if (rebalanceConfig.getBoolean(RebalanceConfigConstants.UPDATE_TARGET_TIER,
-        RebalanceConfigConstants.DEFAULT_UPDATE_TARGET_TIER)) {
+    String rebalanceJobId = rebalanceConfig.getJobId();
+    Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig");
+    if (rebalanceConfig.isUpdateTargetTier()) {
       updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
     }
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
