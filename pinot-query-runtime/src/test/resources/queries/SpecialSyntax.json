@@ -22,6 +22,16 @@
           ["foo", "bob", 3],
           ["alice", "alice", 4]
         ]
+      },
+      "tbl3" : {
+        "schema": [
+          {"name": "dash-column", "type": "STRING"},
+          {"name": "dot.column", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", 1],
+          ["bar", 2]
+        ]
       }
     },
     "queries": [
@@ -76,6 +86,28 @@
         "sql": "SELECT sUm(col3), AvG(col3), MAX(pluS(CAST(col3 AS DOUBLE), CAST(10 AS DOUBLE))) FROM {tbl1}",
         "outputs": [
           [3, 1.5, 12.0]
+        ]
+      },
+      {
+        "description": "test explicit escape column name ",
+        "sql": "SELECT \"dash-column\", \"dot.column\" FROM {tbl3} WHERE \"dot.column\" > 1",
+        "outputs": [
+          ["bar", 2]
+        ]
+      },
+      {
+        "description": "test explicit escape column name with all possible single-table select syntax",
+        "sql": "SELECT \"dash-column\", COUNT(*) FROM {tbl3} WHERE \"dash-column\" != 'foo' GROUP BY \"dash-column\" HAVING SUM(\"dot.column\") > 1 ORDER BY 2",
+        "outputs": [
+          ["bar", 1]
+        ]
+      },
+      {
+        "description": "test explicit escape column name used after the with table and sub query",
+        "sql": "WITH \"table\" AS (SELECT * FROM {tbl3} WHERE \"dash-column\" != 'foo') SELECT \"table\".\"dash-column\", COUNT(*) FROM {tbl3} AS tbl LEFT JOIN \"table\" ON tbl.\"dot.column\" = \"table\".\"dot.column\" GROUP BY 1 ORDER BY SUM(\"table\".\"dot.column\")",
+        "outputs": [
+          ["bar", 1],
+          [null, 1]
         ]
       }
     ]
