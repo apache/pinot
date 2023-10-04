@@ -77,9 +77,9 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17 ]
+        java: [ 11, 21 ]
         distribution: [ "corretto" ]
-        skip_bytebuffer: [false, true]
+        skip_bytebuffer: [false]
         include:
           - java: 21
             testset: 1
@@ -156,9 +156,9 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17 ]
+        java: [ 11, 21 ]
         distribution: [ "corretto" ]
-        skip_bytebuffer: [false, true]
+        skip_bytebuffer: [false]
         include:
           - java: 21
             testset: 1
@@ -314,13 +314,13 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        java: [ 11, 17 ]
+        java: [ 11, 21 ]
         distribution: [ "corretto" ]
-        skip_bytebuffer: [false, true]
+        skip_bytebuffer: [false]
         include:
           - java: 21
             distribution: "corretto"
-            skip_bytebuffer: false
+            skip_bytebuffer: true
     name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }} with skip bytebuffers:${{matrix.skip_bytebuffer}}
     steps:
       - uses: actions/checkout@v3
