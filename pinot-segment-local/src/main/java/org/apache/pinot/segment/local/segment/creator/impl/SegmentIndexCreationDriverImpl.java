@@ -381,7 +381,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-
   private void buildStarTreeV2IfNecessary(File indexDir)
       throws Exception {
     List<StarTreeIndexConfig> starTreeIndexConfigs = _config.getStarTreeIndexConfigs();
