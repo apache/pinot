@@ -324,9 +324,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (_totalDocs > 0) {
       buildStarTreeV2IfNecessary(segmentOutputDir);
     }
+    updatePostSegmentCreationIndexes(segmentOutputDir);
 
     Set<IndexType> postSegCreationIndexes = IndexService.getInstance().getAllIndexes().stream()
-        .filter(indexType -> indexType.getIndexBuildLifecycle() == IndexType.IndexBuildLifecycle.POST_SEGMENT_CREATION)
+        .filter(indexType -> indexType.getIndexBuildLifecycle() == IndexType.BuildLifecycle.POST_SEGMENT_CREATION)
         .collect(Collectors.toSet());
 
     if (postSegCreationIndexes.size() > 0) {
@@ -376,6 +377,38 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Driver, record read time : {}", _totalRecordReadTime);
     LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", _totalIndexTime);
+  }
+
+  private void updatePostSegmentCreationIndexes(File indexDir) throws Exception {
+    Set<IndexType> postSegCreationIndexes = IndexService.getInstance().getAllIndexes().stream()
+        .filter(indexType -> indexType.getIndexBuildLifecycle() == IndexType.BuildLifecycle.POST_SEGMENT_CREATION)
+        .collect(Collectors.toSet());
+
+    if (postSegCreationIndexes.size() > 0) {
+      // Build other indexes
+      Map<String, Object> props = new HashMap<>();
+      props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap);
+      PinotConfiguration segmentDirectoryConfigs = new PinotConfiguration(props);
+
+      SegmentDirectoryLoaderContext segmentLoaderContext =
+          new SegmentDirectoryLoaderContext.Builder().setTableConfig(_config.getTableConfig())
+              .setSchema(_config.getSchema()).setSegmentName(_segmentName)
+              .setSegmentDirectoryConfigs(segmentDirectoryConfigs).build();
+
+      IndexLoadingConfig indexLoadingConfig =
+          new IndexLoadingConfig(null, _config.getTableConfig(), _config.getSchema());
+
+      try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+          .load(indexDir.toURI(), segmentLoaderContext);
+          SegmentDirectory.Writer segmentWriter = segmentDirectory.createWriter()) {
+        for (IndexType indexType : postSegCreationIndexes) {
+          IndexHandler handler =
+              indexType.createIndexHandler(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(),
+                  _config.getSchema(), _config.getTableConfig());
+          handler.updateIndices(segmentWriter);
+        }
+      }
+    }
   }
 
   private void buildStarTreeV2IfNecessary(File indexDir)

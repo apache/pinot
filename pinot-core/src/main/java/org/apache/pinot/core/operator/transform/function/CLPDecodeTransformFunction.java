@@ -71,7 +71,7 @@ public class CLPDecodeTransformFunction extends BaseTransformFunction {
 
   @Override
   public String getName() {
-    return TransformFunctionType.CLPDECODE.getName();
+    return TransformFunctionType.CLP_DECODE.getName();
   }
 
   @Override

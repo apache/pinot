@@ -60,7 +60,7 @@ public class CLPDecodeRewriter implements QueryRewriter {
   public static final String ENCODED_VARS_COLUMN_SUFFIX = "_encodedVars";
 
   private static final String _CLPDECODE_LOWERCASE_TRANSFORM_NAME =
-      TransformFunctionType.CLPDECODE.getName().toLowerCase();
+      TransformFunctionType.CLP_DECODE.getName().toLowerCase();
 
   @Override
   public PinotQuery rewrite(PinotQuery pinotQuery) {

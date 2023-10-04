@@ -53,10 +53,6 @@
           <artifactId>guava</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>com.google.protobuf</groupId>
-          <artifactId>protobuf-java</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>com.google.j2objc</groupId>
           <artifactId>j2objc-annotations</artifactId>
         </exclusion>
@@ -87,22 +83,12 @@
       <groupId>com.google.api.grpc</groupId>
       <artifactId>proto-google-common-protos</artifactId>
       <version>1.18.1</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.protobuf</groupId>
-          <artifactId>protobuf-java</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.api.grpc</groupId>
       <artifactId>proto-google-iam-v1</artifactId>
       <version>1.0.0</version>
       <exclusions>
-        <exclusion>
-          <groupId>com.google.protobuf</groupId>
-          <artifactId>protobuf-java</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>com.google.api.grpc</groupId>
           <artifactId>proto-google-common-protos</artifactId>

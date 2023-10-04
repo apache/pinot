@@ -38,10 +38,11 @@ import org.apache.pinot.spi.data.Schema;
  * @param <IC> the {@link IndexCreator} subclass that should be used to create indexes of this type.
  */
 public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC extends IndexCreator> {
-  enum IndexBuildLifecycle {
-    DURING_SEGMENT_CREATION,
-    POST_SEGMENT_CREATION,
-    CUSTOM
+  /**
+   * Returns the {@link BuildLifecycle} for this index type. This is used to determine when the index should be built.
+   */
+  default BuildLifecycle getIndexBuildLifecycle() {
+    return BuildLifecycle.DURING_SEGMENT_CREATION;
   }
 
   /**
@@ -133,7 +134,22 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
     return null;
   }
 
-  default IndexBuildLifecycle getIndexBuildLifecycle() {
-    return IndexBuildLifecycle.DURING_SEGMENT_CREATION;
+  enum BuildLifecycle {
+    /**
+     * The index will be built during segment creation, using the {@link IndexCreator#add} call for each of the column
+     * values being added.
+     */
+    DURING_SEGMENT_CREATION,
+
+    /**
+     * The index will be build post the segment file has been created, using the {@link IndexHandler#updateIndices} call
+     * This is useful for indexes that may need the entire prebuilt segment to be available before they can be built.
+     */
+    POST_SEGMENT_CREATION,
+
+    /**
+     * The index's built lifecycle is managed in a custom manner.
+     */
+    CUSTOM
   }
 }
