@@ -179,6 +179,12 @@
     <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
     <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
     <surefire.version>3.1.2</surefire.version>
+
+    <!-- Configuration for Scala -->
+    <scala.version>2.12.18</scala.version>
+    <scala.compat.version>2.12</scala.compat.version>
+
+    <flink.version>1.12.0</flink.version>
   </properties>
 
   <profiles>
@@ -239,6 +245,17 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+
+    <profile>
+      <id>scala-2.13</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <scala.version>2.13.3</scala.version>
+        <scala.compat.version>2.13</scala.compat.version>
+      </properties>
     </profile>
   </profiles>
   <dependencyManagement>
@@ -1287,6 +1304,24 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
+      <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-library</artifactId>
+        <version>${scala.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-clients_${scala.compat.version}</artifactId>
+        <version>${flink.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
+        <version>${flink.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>
@@ -1533,6 +1568,63 @@
             <target>${jdk.version}</target>
             <fork>true</fork>
             <encoding>${project.build.sourceEncoding}</encoding>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>net.alchim31.maven</groupId>
+          <artifactId>scala-maven-plugin</artifactId>
+          <version>3.2.2</version>
+          <executions>
+            <execution>
+              <id>add-source</id>
+              <phase>generate-sources</phase>
+              <goals>
+                <goal>add-source</goal>
+              </goals>
+              <configuration>
+                <sourceDir>src/main/java</sourceDir>
+              </configuration>
+            </execution>
+            <execution>
+              <id>scala-compile-first</id>
+              <phase>process-resources</phase>
+              <goals>
+                <goal>compile</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>scala-test-compile-first</id>
+              <phase>process-test-resources</phase>
+              <goals>
+                <goal>testCompile</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>attach-scaladocs</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>doc-jar</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <scalaVersion>${scala.version}</scalaVersion>
+            <args>
+              <arg>-unchecked</arg>
+              <arg>-deprecation</arg>
+              <arg>-feature</arg>
+            </args>
+            <jvmArgs>
+              <jvmArg>-Xms1024m</jvmArg>
+              <jvmArg>-Xmx1024m</jvmArg>
+            </jvmArgs>
+            <javacArgs>
+              <javacArg>-source</javacArg>
+              <javacArg>${jdk.version}</javacArg>
+              <javacArg>-target</javacArg>
+              <javacArg>${jdk.version}</javacArg>
+              <javacArg>-Xlint:all,-serial,-path</javacArg>
+            </javacArgs>
           </configuration>
         </plugin>
       </plugins>
