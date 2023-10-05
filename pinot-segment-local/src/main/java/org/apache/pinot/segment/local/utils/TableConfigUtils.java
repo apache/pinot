@@ -110,7 +110,7 @@ public final class TableConfigUtils {
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
   private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
-      EnumSet.of(SUM, MIN, MAX, COUNT, DISTINCTCOUNTHLL, SUMPRECISION);
+      EnumSet.of(SUM, MIN, MAX, COUNT, DISTINCTCOUNTHLL, SUMPRECISION, DISTINCTCOUNTHLLPLUS);
 
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
@@ -432,6 +432,30 @@ public final class TableConfigUtils {
               Preconditions.checkState(dataType == DataType.BYTES,
                   "Result type for DISTINCT_COUNT_HLL must be BYTES: %s", aggregationConfig);
             }
+          } else if (functionType == DISTINCTCOUNTHLLPLUS) {
+            Preconditions.checkState(numArguments >= 1 && numArguments <= 3,
+                "DISTINCT_COUNT_HLL_PLUS can have at most three arguments: %s", aggregationConfig);
+            if (numArguments == 2) {
+              ExpressionContext secondArgument = arguments.get(1);
+              Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+                  "Second argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
+              String literal = secondArgument.getLiteral().getStringValue();
+              Preconditions.checkState(StringUtils.isNumeric(literal),
+                  "Second argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
+            }
+            if (numArguments == 3) {
+              ExpressionContext thirdArgument = arguments.get(2);
+              Preconditions.checkState(thirdArgument.getType() == ExpressionContext.Type.LITERAL,
+                  "Third argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
+              String literal = thirdArgument.getLiteral().getStringValue();
+              Preconditions.checkState(StringUtils.isNumeric(literal),
+                  "Third argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
+            }
+            if (fieldSpec != null) {
+              DataType dataType = fieldSpec.getDataType();
+              Preconditions.checkState(dataType == DataType.BYTES,
+                  "Result type for DISTINCT_COUNT_HLL_PLUS must be BYTES: %s", aggregationConfig);
+            }
           } else if (functionType == SUMPRECISION) {
             Preconditions.checkState(numArguments >= 2 && numArguments <= 3,
                 "SUM_PRECISION must specify precision (required), scale (optional): %s", aggregationConfig);
@@ -552,7 +576,7 @@ public final class TableConfigUtils {
   public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
       EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
           DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
-          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH);
+          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTRAWHLLPLUS);
 
   @VisibleForTesting
   static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {

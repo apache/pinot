@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.forward.mutable;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
@@ -123,6 +124,7 @@ public class FixedByteSVMutableForwardIndexTest {
     r = new Random(seed);
     for (int div = 1; div <= rows / 2; div++) {
       testBytes(r, rows, div);
+      testBytesHLLPlus(r, rows, div);
     }
   }
 
@@ -177,6 +179,65 @@ public class FixedByteSVMutableForwardIndexTest {
 
     // Ensure that rows not written default to an empty byte array.
     byte[] emptyBytes = new byte[hllLog2M12Size];
+    start = rows * 2;
+    for (int i = 0; i < 2 * rows; i++) {
+      byte[] bytes = readerWriter.getBytes(start + i);
+      Assert.assertEquals(bytes, emptyBytes);
+    }
+    readerWriter.close();
+  }
+
+  private void testBytesHLLPlus(final Random random, final int rows, final int div)
+      throws IOException {
+    int hllPlusSize = 2741;
+    int p = 12;
+
+    FixedByteSVMutableForwardIndex readerWriter;
+    readerWriter =
+        new FixedByteSVMutableForwardIndex(false, DataType.BYTES, hllPlusSize, rows / div, _memoryManager, "Long");
+    byte[][] data = new byte[rows][];
+
+    for (int i = 0; i < rows; i++) {
+      HyperLogLogPlus hllPlus = new HyperLogLogPlus(p);
+      hllPlus.offer(random.nextLong());
+      data[i] = hllPlus.getBytes();
+      Assert.assertEquals(data[i].length, hllPlusSize);
+      readerWriter.setBytes(i, data[i]);
+      Assert.assertEquals(readerWriter.getBytes(i).length, data[i].length);
+      Assert.assertEquals(readerWriter.getBytes(i), data[i]);
+    }
+    for (int i = 0; i < rows; i++) {
+      Assert.assertEquals(readerWriter.getBytes(i), data[i]);
+    }
+
+    // Test mutability by overwriting randomly selected rows.
+    for (int i = 0; i < rows; i++) {
+      if (random.nextFloat() >= 0.5) {
+        HyperLogLogPlus hllPlus = new HyperLogLogPlus(p);
+        hllPlus.offer(random.nextLong());
+        data[i] = hllPlus.getBytes();
+        readerWriter.setBytes(i, data[i]);
+      }
+    }
+    for (int i = 0; i < rows; i++) {
+      Assert.assertEquals(readerWriter.getBytes(i), data[i]);
+    }
+
+    // Write to a large enough row index to ensure multiple chunks are correctly allocated.
+    int start = rows * 4;
+    for (int i = 0; i < rows; i++) {
+      HyperLogLogPlus hllPlus = new HyperLogLogPlus(p);
+      hllPlus.offer(random.nextLong());
+      data[i] = hllPlus.getBytes();
+      readerWriter.setBytes(start + i, data[i]);
+    }
+
+    for (int i = 0; i < rows; i++) {
+      Assert.assertEquals(readerWriter.getBytes(start + i), data[i]);
+    }
+
+    // Ensure that rows not written default to an empty byte array.
+    byte[] emptyBytes = new byte[hllPlusSize];
     start = rows * 2;
     for (int i = 0; i < 2 * rows; i++) {
       byte[] bytes = readerWriter.getBytes(start + i);
