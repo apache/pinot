@@ -100,18 +100,18 @@ rules:
   labels:
     table: "$1"
     taskType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.([^\\.]*?)\\.(\\w+).tableRebalanceExecutionTimeMs\"><>(\\w+)"
-  name: "pinot_controller_tableRebalanceExecutionTimeMs_$3"
-  cache: true
-  labels:
-    table: "$1"
-    result: "$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.([^\\.]*?)\\.(\\w+).cronSchedulerJobExecutionTimeMs\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerJobExecutionTimeMs_$3"
   cache: true
   labels:
     table: "$1"
     taskType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.([^\\.]*?)\\.(\\w+).tableRebalanceExecutionTimeMs\"><>(\\w+)"
+  name: "pinot_controller_tableRebalanceExecutionTimeMs_$3"
+  cache: true
+  labels:
+    table: "$1"
+    result: "$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.taskStatus.([^\\.]*?)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_taskStatus_$3"
   cache: true

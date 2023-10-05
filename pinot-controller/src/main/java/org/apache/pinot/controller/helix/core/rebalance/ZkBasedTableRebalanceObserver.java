@@ -163,13 +163,13 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           TableRebalanceProgressStats prevStats;
           try {
             prevStats = JsonUtils.stringToObject(prevStatsInStr, TableRebalanceProgressStats.class);
-          } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+          } catch (JsonProcessingException ignore) {
+            return true;
           }
           boolean jobFailed =
               prevStats != null && RebalanceResult.Status.FAILED.toString().equals(prevStats.getStatus());
-          Preconditions.checkState(!jobFailed, "Rebalance job: %s for table: %s has failed. Skip update status",
-              _rebalanceJobId, _tableNameWithType);
+          Preconditions.checkState(!jobFailed, "Rebalance job: %s for table: %s has failed. Abort", _rebalanceJobId,
+              _tableNameWithType);
           return true;
         });
     _numUpdatesToZk++;
@@ -180,8 +180,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   @VisibleForTesting
   static Map<String, String> createJobMetadata(String tableNameWithType, String jobId,
-      TableRebalanceProgressStats tableRebalanceProgressStats,
-      TableRebalanceRetryConfig tableRebalanceJobRetryConfig) {
+      TableRebalanceProgressStats tableRebalanceProgressStats, TableRebalanceRetryConfig tableRebalanceJobRetryConfig) {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
