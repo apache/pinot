@@ -357,7 +357,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     // Set timeout as 5ms so that query will timeout
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(5L, null, null, null));
+    tableConfig.setQueryConfig(new QueryConfig(5L, null, null, null, null));
     updateTableConfig(tableConfig);
 
     // Wait for at most 1 minute for broker to receive and process the table config refresh message
@@ -626,6 +626,44 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assert response.get("exceptions").size() > 0;
     int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
     assertEquals(errorCode, 503);
+  }
+
+  @Test
+  public void testMaxQueryResponseSizeBytesTableConfig() throws Exception {
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, 1000L));
+    updateTableConfig(tableConfig);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        // Server should return an exception
+        JsonNode response = postQuery(SELECT_STAR_QUERY);
+        assert response.get("exceptions").size() > 0;
+        int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
+        if (errorCode == 503) {
+          return true;
+        }
+        return false;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000L, "Failed to execute query");
+
+    tableConfig.setQueryConfig(null);
+    updateTableConfig(tableConfig);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        // Server should not return an exception
+        JsonNode response = postQuery(SELECT_STAR_QUERY);
+        if (response.get("exceptions").size() == 0) {
+          return true;
+        }
+        return false;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 60_000L, "Failed to execute query");
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -1360,7 +1398,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String groovyQuery = "SELECT GROOVY('{\"returnType\":\"STRING\",\"isSingleValue\":true}', "
         + "'arg0 + arg1', FlightNum, Origin) FROM mytable";
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQueryConfig(new QueryConfig(null, false, null, null));
+    tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {
@@ -1604,7 +1642,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Add expression override
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setQueryConfig(new QueryConfig(null, null, null,
-        Collections.singletonMap("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch")));
+        Collections.singletonMap("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {

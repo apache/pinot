@@ -138,7 +138,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final String _brokerId;
   protected final long _brokerTimeoutMs;
   protected final int _queryResponseLimit;
-  protected final long _maxQueryResponseSizeBytes;
   protected final QueryLogger _queryLogger;
   protected final BrokerQueryEventListener _brokerQueryEventListener;
 
@@ -171,8 +170,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
-    _maxQueryResponseSizeBytes = config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES,
-        Broker.DEFAULT_MAX_QUERY_RESPONSE_SIZE_BYTES);
     _queryLogger = new QueryLogger(config);
     boolean enableQueryCancellation =
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
@@ -180,9 +177,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerQueryEventListener = brokerQueryEventListener;
     LOGGER.info(
         "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps, "
-            + "enabling query cancellation: {}, max serialized response size: {}", _brokerId, _brokerTimeoutMs,
-        _queryResponseLimit, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
-        enableQueryCancellation, _maxQueryResponseSizeBytes);
+            + "enabling query cancellation: {}", _brokerId, _brokerTimeoutMs, _queryResponseLimit,
+        _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(), enableQueryCancellation);
   }
 
   @Override
@@ -694,8 +690,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (realtimeRoutingTable != null) {
         numServers += realtimeRoutingTable.keySet().size();
       }
-      setMaxServerResponseSizeBytes(numServers, offlineBrokerRequest);
-      setMaxServerResponseSizeBytes(numServers, realtimeBrokerRequest);
+
+      if (offlineBrokerRequest != null) {
+        setMaxServerResponseSizeBytes(numServers, offlineBrokerRequest.getPinotQuery().getQueryOptions(),
+            offlineTableConfig);
+      }
+      if (realtimeBrokerRequest != null) {
+        setMaxServerResponseSizeBytes(numServers, realtimeBrokerRequest.getPinotQuery().getQueryOptions(),
+            realtimeTableConfig);
+      }
 
       // Execute the query
       // TODO: Replace ServerStats with ServerRoutingStatsEntry.
@@ -1673,17 +1676,36 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Sets a query option indicating the maximum response size that can be sent from a server to the broker. This size
    * is measured for the serialized response.
    */
-  private void setMaxServerResponseSizeBytes(int numServers, @Nullable BrokerRequest brokerRequest) {
-    if (brokerRequest == null || numServers == 0 || _maxQueryResponseSizeBytes <= 0) {
+  private void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
+      TableConfig tableConfig) {
+    if (numServers == 0) {
       return;
     }
 
-    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
-    Long maxSize = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
-    if (maxSize == null) {
-      long maxLengthPerServer = _maxQueryResponseSizeBytes / numServers;
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, Long.toString(maxLengthPerServer));
+    // The overriding order for setting maxQueryResponseSizeBytes is: queryOption > tableConfig > BrokerInstanceConfig
+    if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
+      // QueryOption is set. Nothing more to do.
+      return;
     }
+
+    Preconditions.checkState(tableConfig != null);
+    QueryConfig queryConfig = tableConfig.getQueryConfig();
+
+    Long maxQueryResponseSize;
+    if (queryConfig != null && queryConfig.getMaxQueryResponseSizeBytes() != null) {
+      maxQueryResponseSize = queryConfig.getMaxQueryResponseSizeBytes();
+      Long maxServerResponseSize = maxQueryResponseSize / numServers;
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxServerResponseSize));
+    } else {
+      maxQueryResponseSize = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES,
+          Broker.DEFAULT_MAX_QUERY_RESPONSE_SIZE_BYTES);
+      Long maxServerResponseSize = maxQueryResponseSize / numServers;
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxServerResponseSize));
+    }
+    _brokerMetrics.addMeteredTableValue(tableConfig.getTableName(), BrokerMeter.MAX_QUERY_RESPONSE_SIZE,
+        maxQueryResponseSize);
   }
 
   /**

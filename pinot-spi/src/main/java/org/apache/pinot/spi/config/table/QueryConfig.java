@@ -49,16 +49,26 @@ public class QueryConfig extends BaseJsonConfig {
   // the expressions within the query to the desired ones (e.g. override transform function to derived column).
   private final Map<String, String> _expressionOverrideMap;
 
+  // Indicates the maximum response size that can be returned for a query. On the broker side, this value is used to
+  // compute the per-server response size budget. If the server serialized response exceeds the assigned budget, the
+  // query is failed with an error.
+  private final Long _maxQueryResponseSizeBytes;
+
   @JsonCreator
   public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs,
       @JsonProperty("disableGroovy") @Nullable Boolean disableGroovy,
       @JsonProperty("useApproximateFunction") @Nullable Boolean useApproximateFunction,
-      @JsonProperty("expressionOverrideMap") @Nullable Map<String, String> expressionOverrideMap) {
+      @JsonProperty("expressionOverrideMap") @Nullable Map<String, String> expressionOverrideMap,
+      @JsonProperty("maxQueryResponseSizeBytes") @Nullable Long maxQueryResponseSizeBytes) {
     Preconditions.checkArgument(timeoutMs == null || timeoutMs > 0, "Invalid 'timeoutMs': %s", timeoutMs);
+    Preconditions.checkArgument(maxQueryResponseSizeBytes == null || maxQueryResponseSizeBytes > 0,
+        "Invalid 'maxQueryResponseSizeBytes': %s", maxQueryResponseSizeBytes);
+
     _timeoutMs = timeoutMs;
     _disableGroovy = disableGroovy;
     _useApproximateFunction = useApproximateFunction;
     _expressionOverrideMap = expressionOverrideMap;
+    _maxQueryResponseSizeBytes = maxQueryResponseSizeBytes;
   }
 
   @Nullable
@@ -83,5 +93,11 @@ public class QueryConfig extends BaseJsonConfig {
   @JsonProperty("expressionOverrideMap")
   public Map<String, String> getExpressionOverrideMap() {
     return _expressionOverrideMap;
+  }
+
+  @Nullable
+  @JsonProperty("maxQueryResponseSizeBytes")
+  public Long getMaxQueryResponseSizeBytes() {
+    return _maxQueryResponseSizeBytes;
   }
 }
