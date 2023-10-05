@@ -355,6 +355,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     try(PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
       NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
       if (sortedDocIds != null) {
+        // TODO(ERICH): Don't duplicate the logic in these for loops!
+        // Can I use streams (use something like IntStreamRange) to create the sequence of docIds?
         for (int docId : sortedDocIds) {
           Object columnValueToIndex = colReader.getValue(docId);
           if (columnValueToIndex == null) {
@@ -370,6 +372,19 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
           } else {
             indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+          }
+
+          if(_nullHandlingEnabled) {
+            /*
+            handling null values
+            In row oriented:
+              - this.indexRow iterates over each column and checks if it isNullValue.  If it is then it sets the null value vector for that doc id
+              - This null value comes from the GenericRow that is created by PinotSegmentRecordReader
+              - PinotSegmentRecordReader:L224 is where we figure out the null value stuff
+              - PSegRecReader calls PinotSegmentColumnReader.isNull on the doc id to determine if the value for that column of that docId is null
+              - if it returns true and we are NOT skipping null values we put the default null value into that field of the GenericRow
+             */
+            nullVec.setNull(docId);
           }
         }
       } else {
