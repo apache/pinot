@@ -358,6 +358,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     // Iterate over each value in the column
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
     try(PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
+      NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
       if (sortedDocIds != null) {
         for (int docId : sortedDocIds) {
           Object columnValueToIndex = colReader.getValue(docId);
@@ -393,19 +394,19 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           } else {
             indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
           }
-        }
-      }
-    }
 
-    // TODO(ERICH): Null handling is skipped here
-    if (_nullHandlingEnabled) {
-      _nullValueVectorCreatorMap.get(columnName).setNull(_docIdCounter);
-
-      for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
-        String columnName = entry.getKey();
-        // If row has null value for given column name, add to null value vector
-        if (row.isNullValue(columnName)) {
-          _nullValueVectorCreatorMap.get(columnName).setNull(_docIdCounter);
+          if(_nullHandlingEnabled) {
+            /*
+            handling null values
+            In row oriented:
+              - this.indexRow iterates over each column and checks if it isNullValue.  If it is then it sets the null value vector for that doc id
+              - This null value comes from the GenericRow that is created by PinotSegmentRecordReader
+              - PinotSegmentRecordReader:L224 is where we figure out the null value stuff
+              - PSegRecReader calls PinotSegmentColumnReader.isNull on the doc id to determine if the value for that column of that docId is null
+              - if it returns true and we are NOT skipping null values we put the default null value into that field of the GenericRow
+             */
+            nullVec.setNull(docId);
+          }
         }
       }
     }
