@@ -88,7 +88,9 @@ public class RealtimeSegmentConverter {
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
       throws Exception {
+    // TODO(ERICH): set the use column major flag in this ctor
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
+
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. We don't want the realtime consumption to stop (if an exception
