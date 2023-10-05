@@ -76,10 +76,8 @@ public class StarTreeV2BuilderConfig {
               .fromColumnName(functionColumnPair);
       functionColumnPairs.add(aggregationFunctionColumnPair);
       Properties propertiesFunctionColumnPairsConfig = indexConfig.getFunctionColumnPairsConfig();
-      if (
-              propertiesFunctionColumnPairsConfig != null
-                      && propertiesFunctionColumnPairsConfig.containsKey(functionColumnPair)
-      ) {
+      if (propertiesFunctionColumnPairsConfig != null && propertiesFunctionColumnPairsConfig.containsKey(
+          functionColumnPair)) {
         String chunkCompressionTypeValue = propertiesFunctionColumnPairsConfig.get(functionColumnPair).toString();
         functionColumnPairsConfig.put(
                 aggregationFunctionColumnPair.toColumnName(),
