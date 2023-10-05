@@ -25,6 +25,7 @@ import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -137,7 +138,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   }
 
   protected void recordChunkRanges(int chunkId, ChunkReaderContext context, List<ValueRange> ranges) {
-    List<ValueRange> chunkRanges = context.getRanges();
+    List<ValueRange> chunkRanges = new ArrayList<>();
     int chunkSize;
     long chunkPosition = getChunkPositionAndRecordRanges(chunkId, chunkRanges);
 
@@ -150,6 +151,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     }
     chunkRanges.add(ValueRange.newByteRange(chunkPosition, chunkSize));
     context.setChunkId(chunkId);
+    context.setRanges(chunkRanges);
     ranges.addAll(chunkRanges);
   }
 
