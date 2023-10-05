@@ -27,20 +27,19 @@ public class TableRebalanceRetryConfig {
   private RebalanceConfig _config;
 
   public static TableRebalanceRetryConfig forInitialRun(String originalJobId, RebalanceConfig config) {
-    return new TableRebalanceRetryConfig(originalJobId, config, 0);
+    TableRebalanceRetryConfig rc = new TableRebalanceRetryConfig();
+    rc.setOriginalJobId(originalJobId);
+    rc.setConfig(config);
+    rc.setRetryNum(0);
+    return rc;
   }
 
   public static TableRebalanceRetryConfig forRetryRun(String originalJobId, RebalanceConfig config, int retryNum) {
-    return new TableRebalanceRetryConfig(originalJobId, config, retryNum);
-  }
-
-  public TableRebalanceRetryConfig() {
-  }
-
-  private TableRebalanceRetryConfig(String originalJobId, RebalanceConfig config, int retryNum) {
-    _originalJobId = originalJobId;
-    _config = config;
-    _retryNum = retryNum;
+    TableRebalanceRetryConfig rc = new TableRebalanceRetryConfig();
+    rc.setOriginalJobId(originalJobId);
+    rc.setConfig(config);
+    rc.setRetryNum(retryNum);
+    return rc;
   }
 
   public int getRetryNum() {

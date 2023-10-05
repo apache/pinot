@@ -19,12 +19,15 @@
 package org.apache.pinot.controller.api.resources;
 
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceRetryConfig;
 
 
 public class ServerRebalanceJobStatusResponse {
   private long _timeElapsedSinceStartInSeconds;
 
   private TableRebalanceProgressStats _tableRebalanceProgressStats;
+
+  private TableRebalanceRetryConfig _tableRebalanceRetryConfig;
 
   public void setTimeElapsedSinceStartInSeconds(Long timeElapsedSinceStart) {
     _timeElapsedSinceStartInSeconds = timeElapsedSinceStart;
@@ -40,5 +43,13 @@ public class ServerRebalanceJobStatusResponse {
 
   public long getTimeElapsedSinceStartInSeconds() {
     return _timeElapsedSinceStartInSeconds;
+  }
+
+  public TableRebalanceRetryConfig getTableRebalanceRetryConfig() {
+    return _tableRebalanceRetryConfig;
+  }
+
+  public void setTableRebalanceRetryConfig(TableRebalanceRetryConfig tableRebalanceRetryConfig) {
+    _tableRebalanceRetryConfig = tableRebalanceRetryConfig;
   }
 }

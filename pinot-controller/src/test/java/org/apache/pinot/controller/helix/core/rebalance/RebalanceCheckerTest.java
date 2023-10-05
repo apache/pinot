@@ -61,6 +61,22 @@ import static org.testng.Assert.assertTrue;
 public class RebalanceCheckerTest {
 
   @Test
+  public void testGetRetryDelayInMs() {
+    assertEquals(RebalanceChecker.getRetryDelayInMs(0, 0), 0);
+    assertEquals(RebalanceChecker.getRetryDelayInMs(0, 1), 0);
+    assertEquals(RebalanceChecker.getRetryDelayInMs(0, 2), 0);
+
+    for (long initDelayMs : new long[]{1, 30000, 3600000}) {
+      long delayMs = RebalanceChecker.getRetryDelayInMs(initDelayMs, 0);
+      assertTrue(delayMs >= initDelayMs && delayMs < initDelayMs * 2);
+      delayMs = RebalanceChecker.getRetryDelayInMs(initDelayMs, 1);
+      assertTrue(delayMs >= initDelayMs * 2 && delayMs < initDelayMs * 4);
+      delayMs = RebalanceChecker.getRetryDelayInMs(initDelayMs, 2);
+      assertTrue(delayMs >= initDelayMs * 4 && delayMs < initDelayMs * 8);
+    }
+  }
+
+  @Test
   public void testGetCandidateJobs()
       throws Exception {
     String tableName = "table01";
@@ -149,30 +165,30 @@ public class RebalanceCheckerTest {
         Pair.of(createDummyRetryJobCfg("job1_1", "job1", 1), 20L),
         Pair.of(createDummyRetryJobCfg("job1_2", "job1", 2), 1020L)));
     jobs.put("job2", ImmutableSet.of(Pair.of(createDummyRetryJobCfg("job2", "job2", 0), 1000L)));
-    TableRebalanceRetryConfig job = RebalanceChecker.getLatestJob(jobs);
-    assertNotNull(job);
-    assertEquals(job.getConfig().getJobId(), "job1_2");
+    Pair<TableRebalanceRetryConfig, Long> jobTime = RebalanceChecker.getLatestJob(jobs);
+    assertNotNull(jobTime);
+    assertEquals(jobTime.getLeft().getConfig().getJobId(), "job1_2");
 
     // The most recent job run is job1_3, but reached 3 maxRetry.
     jobs.put("job1", ImmutableSet.of(Pair.of(createDummyRetryJobCfg("job1", "job1", 0), 10L),
         Pair.of(createDummyRetryJobCfg("job1_1", "job1", 1), 20L),
         Pair.of(createDummyRetryJobCfg("job1_2", "job1", 2), 1020L),
         Pair.of(createDummyRetryJobCfg("job1_3", "job1", 3), 2020L)));
-    job = RebalanceChecker.getLatestJob(jobs);
-    assertNotNull(job);
-    assertEquals(job.getConfig().getJobId(), "job2");
+    jobTime = RebalanceChecker.getLatestJob(jobs);
+    assertNotNull(jobTime);
+    assertEquals(jobTime.getLeft().getConfig().getJobId(), "job2");
 
     // Add job3 that's started more recently.
     jobs.put("job3", ImmutableSet.of(Pair.of(createDummyRetryJobCfg("job3", "job3", 0), 3000L)));
-    job = RebalanceChecker.getLatestJob(jobs);
-    assertNotNull(job);
-    assertEquals(job.getConfig().getJobId(), "job3");
+    jobTime = RebalanceChecker.getLatestJob(jobs);
+    assertNotNull(jobTime);
+    assertEquals(jobTime.getLeft().getConfig().getJobId(), "job3");
 
     // Remove job2 and job3, and we'd have no job to retry then.
     jobs.remove("job2");
     jobs.remove("job3");
-    job = RebalanceChecker.getLatestJob(jobs);
-    assertNull(job);
+    jobTime = RebalanceChecker.getLatestJob(jobs);
+    assertNull(jobTime);
   }
 
   @Test
@@ -246,6 +262,52 @@ public class RebalanceCheckerTest {
     retryCfg = observer.getTableRebalanceJobRetryConfig();
     assertEquals(retryCfg.getOriginalJobId(), "job3");
     assertEquals(retryCfg.getRetryNum(), 1);
+  }
+
+  @Test
+  public void testRetryRebalanceWithBackoff()
+      throws Exception {
+    String tableName = "table01";
+    LeadControllerManager leadController = mock(LeadControllerManager.class);
+    ControllerMetrics metrics = mock(ControllerMetrics.class);
+    ExecutorService exec = Executors.newCachedThreadPool();
+    ControllerConf cfg = new ControllerConf();
+    cfg.setRebalanceCheckerCheckOnly(false);
+
+    Map<String, Map<String, String>> allJobMetadata = new HashMap<>();
+    // Original job run as job1, and all its retry jobs failed too.
+    RebalanceConfig jobCfg = new RebalanceConfig();
+    jobCfg.setJobId("job1");
+    jobCfg.setMaxRetry(3);
+    long nowMs = System.currentTimeMillis();
+    TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
+    stats.setStatus("FAILED");
+    stats.setStartTimeMs(nowMs);
+    TableRebalanceRetryConfig retryCfg = TableRebalanceRetryConfig.forInitialRun("job1", jobCfg);
+    Map<String, String> jobMetadata =
+        ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, retryCfg);
+    allJobMetadata.put("job1", jobMetadata);
+
+    PinotHelixResourceManager helixManager = mock(PinotHelixResourceManager.class);
+    when(helixManager.getAllJobsForTable(tableName,
+        Collections.singleton(ControllerJobType.TABLE_REBALANCE))).thenReturn(allJobMetadata);
+    TableConfig tableConfig = mock(TableConfig.class);
+    RebalanceChecker checker = new RebalanceChecker(helixManager, leadController, cfg, metrics, exec);
+    checker.retryRebalanceTable(tableName, tableConfig);
+    // Retry for job1 is delayed with 5min backoff.
+    ArgumentCaptor<ZkBasedTableRebalanceObserver> observerCaptor =
+        ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
+    verify(helixManager, times(0)).rebalanceTable(eq(tableName), any(), anyString(), any(), observerCaptor.capture());
+
+    // Set initial delay to 0 to disable retry backoff.
+    jobCfg.setRetryInitialDelayInMs(0);
+    jobMetadata =
+        ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, retryCfg);
+    allJobMetadata.put("job1", jobMetadata);
+    checker.retryRebalanceTable(tableName, tableConfig);
+    // Retry for job1 is delayed with 5min backoff.
+    observerCaptor = ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
+    verify(helixManager, times(1)).rebalanceTable(eq(tableName), any(), anyString(), any(), observerCaptor.capture());
   }
 
   @Test

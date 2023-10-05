@@ -96,6 +96,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceRetryConfig;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
@@ -620,6 +621,8 @@ public class PinotTableRestletResource {
       @ApiParam(value = "How long to wait for next status update (i.e. heartbeat) before the job is considered failed")
       @DefaultValue("3600000") @QueryParam("heartbeatTimeoutInMs") long heartbeatTimeoutInMs,
       @ApiParam(value = "Max times to retry the rebalance job") @DefaultValue("3") @QueryParam("maxRetry") int maxRetry,
+      @ApiParam(value = "Initial delay to exponentially backoff retry") @DefaultValue("300000")
+      @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
       @QueryParam("updateTargetTier") boolean updateTargetTier) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
@@ -638,6 +641,7 @@ public class PinotTableRestletResource {
     heartbeatTimeoutInMs = Math.max(heartbeatTimeoutInMs, 3 * heartbeatIntervalInMs);
     rebalanceConfig.setHeartbeatTimeoutInMs(heartbeatTimeoutInMs);
     rebalanceConfig.setMaxRetry(maxRetry);
+    rebalanceConfig.setRetryInitialDelayInMs(retryInitialDelayInMs);
     rebalanceConfig.setUpdateTargetTier(updateTargetTier);
     String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
 
@@ -749,17 +753,25 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
           Response.Status.NOT_FOUND);
     }
+    ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse = new ServerRebalanceJobStatusResponse();
     TableRebalanceProgressStats tableRebalanceProgressStats = JsonUtils.stringToObject(
         controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
         TableRebalanceProgressStats.class);
+    serverRebalanceJobStatusResponse.setTableRebalanceProgressStats(tableRebalanceProgressStats);
+
     long timeSinceStartInSecs = 0L;
     if (!RebalanceResult.Status.DONE.toString().equals(tableRebalanceProgressStats.getStatus())) {
       timeSinceStartInSecs = (System.currentTimeMillis() - tableRebalanceProgressStats.getStartTimeMs()) / 1000;
     }
-
-    ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse = new ServerRebalanceJobStatusResponse();
-    serverRebalanceJobStatusResponse.setTableRebalanceProgressStats(tableRebalanceProgressStats);
     serverRebalanceJobStatusResponse.setTimeElapsedSinceStartInSeconds(timeSinceStartInSecs);
+
+    String retryConfigInStr =
+        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_RETRY_CONFIG);
+    if (StringUtils.isNotEmpty(retryConfigInStr)) {
+      TableRebalanceRetryConfig tableRebalanceRetryConfig =
+          JsonUtils.stringToObject(retryConfigInStr, TableRebalanceRetryConfig.class);
+      serverRebalanceJobStatusResponse.setTableRebalanceRetryConfig(tableRebalanceRetryConfig);
+    }
     return serverRebalanceJobStatusResponse;
   }
 

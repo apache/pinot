@@ -61,9 +61,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR("LLCSegmentDeepStoreUploadRetryError", false),
   SEGMENT_MISSING_DEEP_STORE_LINK("RealtimeSegmentMissingDeepStoreLink", false),
   DELETED_TMP_SEGMENT_COUNT("DeletedTmpSegmentCount", false),
-  TABLE_REBALANCE_FAILURE("TableRebalanceFailure", false),
   TABLE_REBALANCE_FAILURE_DETECTED("TableRebalanceFailureDetected", false),
   TABLE_REBALANCE_RETRY("TableRebalanceRetry", false),
+  TABLE_REBALANCE_RETRY_TOO_MANY_TIMES("TableRebalanceRetryTooManyTimes", false),
   NUMBER_ADHOC_TASKS_SUBMITTED("adhocTasks", false);
 
 

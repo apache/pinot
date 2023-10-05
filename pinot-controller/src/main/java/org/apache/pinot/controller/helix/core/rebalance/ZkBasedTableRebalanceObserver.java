@@ -155,7 +155,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     _pinotHelixResourceManager.addControllerJobToZK(_rebalanceJobId, jobMetadata,
         ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE),
         prevJobMetadata -> {
-          // Abort the job when we're sure it has failed, otherwise continue to update the statue.
+          // Abort the job when we're sure it has failed, otherwise continue to update the status.
           if (prevJobMetadata == null) {
             return true;
           }

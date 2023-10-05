@@ -98,6 +98,10 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "3")
   private int _maxRetry = 3;
 
+  @JsonProperty("retryInitialDelayInMs")
+  @ApiModelProperty(example = "300000")
+  private long _retryInitialDelayInMs = 300000L;
+
   public boolean isDryRun() {
     return _dryRun;
   }
@@ -202,6 +206,14 @@ public class RebalanceConfig {
     _maxRetry = maxRetry;
   }
 
+  public long getRetryInitialDelayInMs() {
+    return _retryInitialDelayInMs;
+  }
+
+  public void setRetryInitialDelayInMs(long retryInitialDelayInMs) {
+    _retryInitialDelayInMs = retryInitialDelayInMs;
+  }
+
   @Override
   public String toString() {
     return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", _reassignInstances=" + _reassignInstances
@@ -210,7 +222,8 @@ public class RebalanceConfig {
         + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
         + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier="
         + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs="
-        + _heartbeatTimeoutInMs + ", _maxRetry=" + _maxRetry + '}';
+        + _heartbeatTimeoutInMs + ", _maxRetry=" + _maxRetry + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs
+        + '}';
   }
 
   public static RebalanceConfig copy(RebalanceConfig cfg) {
@@ -228,6 +241,7 @@ public class RebalanceConfig {
     rc._heartbeatIntervalInMs = cfg._heartbeatIntervalInMs;
     rc._heartbeatTimeoutInMs = cfg._heartbeatTimeoutInMs;
     rc._maxRetry = cfg._maxRetry;
+    rc._retryInitialDelayInMs = cfg._retryInitialDelayInMs;
     return rc;
   }
 }

@@ -47,7 +47,6 @@ import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
-import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
@@ -143,16 +142,16 @@ public class TableRebalancer {
       @Nullable String rebalanceJobId) {
     long startTime = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
+    String status = "ABORTED";
     try {
       RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId);
-      if (_controllerMetrics != null && result.getStatus() == RebalanceResult.Status.FAILED) {
-        _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.TABLE_REBALANCE_FAILURE, 1L);
-      }
+      status = result.getStatus().toString();
       return result;
     } finally {
       if (_controllerMetrics != null) {
-        _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS,
-            System.currentTimeMillis() - startTime, TimeUnit.MILLISECONDS);
+        _controllerMetrics.addTimedTableValue(String.format("%s.%s", tableNameWithType, status),
+            ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS, System.currentTimeMillis() - startTime,
+            TimeUnit.MILLISECONDS);
       }
     }
   }
