@@ -1256,10 +1256,10 @@
         </exclusions>
       </dependency>
       <dependency>
-        <!-- Older versions fail with Java >= 16 -->
+        <!-- starting from 1.18.30, JDK21 is supported -->
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
-        <version>1.18.28</version>
+        <version>1.18.30</version>
       </dependency>
 
       <dependency>
