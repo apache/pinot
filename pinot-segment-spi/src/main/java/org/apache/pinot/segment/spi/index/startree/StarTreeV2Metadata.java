@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.index.startree;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
@@ -33,6 +34,8 @@ public class StarTreeV2Metadata {
   private final int _numDocs;
   private final List<String> _dimensionsSplitOrder;
   private final Set<AggregationFunctionColumnPair> _functionColumnPairs;
+
+  private final Properties _functionColumnPairsConfig;
 
   // The following properties are useful for generating the builder config
   private final int _maxLeafRecords;
@@ -48,6 +51,7 @@ public class StarTreeV2Metadata {
     _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
     _skipStarNodeCreationForDimensions = new HashSet<>(
         Arrays.asList(metadataProperties.getStringArray(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)));
+    _functionColumnPairsConfig = metadataProperties.getProperties(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG);
   }
 
   public int getNumDocs() {
@@ -64,6 +68,10 @@ public class StarTreeV2Metadata {
 
   public boolean containsFunctionColumnPair(AggregationFunctionColumnPair functionColumnPair) {
     return _functionColumnPairs.contains(functionColumnPair);
+  }
+
+  public Properties getFunctionColumnPairsConfig() {
+    return _functionColumnPairsConfig;
   }
 
   public int getMaxLeafRecords() {

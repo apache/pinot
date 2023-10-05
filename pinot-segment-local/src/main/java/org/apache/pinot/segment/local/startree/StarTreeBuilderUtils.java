@@ -250,6 +250,9 @@ public class StarTreeBuilderUtils {
       if (builderConfig.getMaxLeafRecords() != metadata.getMaxLeafRecords()) {
         return true;
       }
+      if (!builderConfig.getFunctionColumnPairsConfig().equals(metadata.getFunctionColumnPairsConfig())) {
+        return true;
+      }
     }
     return false;
   }

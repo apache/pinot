@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
@@ -32,7 +31,6 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -52,7 +50,7 @@ public class StarTreeV2BuilderConfig {
   private final List<String> _dimensionsSplitOrder;
   private final Set<String> _skipStarNodeCreationForDimensions;
   private final Set<AggregationFunctionColumnPair> _functionColumnPairs;
-  private final HashMap<String, ChunkCompressionType> _functionColumnPairsConfig;
+  private final Properties _functionColumnPairsConfig;
   private final int _maxLeafRecords;
 
   public static StarTreeV2BuilderConfig fromIndexConfig(StarTreeIndexConfig indexConfig) {
@@ -70,22 +68,11 @@ public class StarTreeV2BuilderConfig {
     }
 
     Set<AggregationFunctionColumnPair> functionColumnPairs = new TreeSet<>();
-    HashMap<String, ChunkCompressionType> functionColumnPairsConfig = new HashMap<>();
     for (String functionColumnPair : indexConfig.getFunctionColumnPairs()) {
       AggregationFunctionColumnPair aggregationFunctionColumnPair = AggregationFunctionColumnPair
               .fromColumnName(functionColumnPair);
       functionColumnPairs.add(aggregationFunctionColumnPair);
-      Properties propertiesFunctionColumnPairsConfig = indexConfig.getFunctionColumnPairsConfig();
-      if (propertiesFunctionColumnPairsConfig != null && propertiesFunctionColumnPairsConfig.containsKey(
-          functionColumnPair)) {
-        String chunkCompressionTypeValue = propertiesFunctionColumnPairsConfig.get(functionColumnPair).toString();
-        functionColumnPairsConfig.put(
-                aggregationFunctionColumnPair.toColumnName(),
-                ChunkCompressionType.valueOf(chunkCompressionTypeValue)
-        );
-      }
     }
-
 
     int maxLeafRecords = indexConfig.getMaxLeafRecords();
     if (maxLeafRecords <= 0) {
@@ -93,7 +80,7 @@ public class StarTreeV2BuilderConfig {
     }
 
     return new StarTreeV2BuilderConfig(dimensionsSplitOrder, skipStarNodeCreationForDimensions, functionColumnPairs,
-            maxLeafRecords, functionColumnPairsConfig);
+            maxLeafRecords, indexConfig.getFunctionColumnPairsConfig());
   }
 
   /**
@@ -177,7 +164,7 @@ public class StarTreeV2BuilderConfig {
           Set<String> skipStarNodeCreationForDimensions,
           Set<AggregationFunctionColumnPair> functionColumnPairs,
           int maxLeafRecords,
-          HashMap<String, ChunkCompressionType> functionColumnPairsConfig) {
+          Properties functionColumnPairsConfig) {
     _dimensionsSplitOrder = dimensionsSplitOrder;
     _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
     _functionColumnPairs = functionColumnPairs;
@@ -185,7 +172,7 @@ public class StarTreeV2BuilderConfig {
     _functionColumnPairsConfig = functionColumnPairsConfig;
   }
 
-  public HashMap<String, ChunkCompressionType> getFunctionColumnPairsConfig() {
+  public Properties getFunctionColumnPairsConfig() {
     return _functionColumnPairsConfig;
   }
 

@@ -211,6 +211,8 @@ public class MultipleTreesBuilder implements Closeable {
     metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, totalDocs);
     metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, builderConfig.getDimensionsSplitOrder());
     metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, builderConfig.getFunctionColumnPairs());
+    metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG,
+        builderConfig.getFunctionColumnPairsConfig());
     metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, builderConfig.getMaxLeafRecords());
     metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
         builderConfig.getSkipStarNodeCreationForDimensions());

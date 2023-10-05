@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -473,9 +474,11 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       String metric = _metrics[i];
       ValueAggregator valueAggregator = _valueAggregators[i];
       DataType valueType = valueAggregator.getAggregatedValueType();
-      ChunkCompressionType compressionType = _builderConfig.getFunctionColumnPairsConfig().get(metric);
-      if (compressionType == null) {
-        compressionType = ChunkCompressionType.PASS_THROUGH;
+
+      ChunkCompressionType compressionType = ChunkCompressionType.PASS_THROUGH;
+      Properties functionColumnPairsConfig = _builderConfig.getFunctionColumnPairsConfig();
+      if (functionColumnPairsConfig != null) {
+        compressionType = ChunkCompressionType.valueOf((String) functionColumnPairsConfig.get(metric));
       }
       if (valueType == BYTES) {
         metricIndexCreators[i] =
@@ -533,6 +536,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
     _metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _metrics);
     _metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
+    _metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG,
+        _builderConfig.getFunctionColumnPairsConfig());
     _metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
         _builderConfig.getSkipStarNodeCreationForDimensions());
   }
