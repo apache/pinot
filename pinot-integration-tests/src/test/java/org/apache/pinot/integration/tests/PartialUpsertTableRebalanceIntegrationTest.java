@@ -28,8 +28,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
@@ -41,6 +39,7 @@ import org.apache.pinot.controller.api.resources.PauseStatus;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
@@ -49,7 +48,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -91,7 +89,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     startKafka();
 
     _resourceManager = getControllerStarter().getHelixResourceManager();
-    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager(), null);
+    _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager());
 
     createSchemaAndTable();
   }
@@ -104,10 +102,10 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     verifyIdealState(5, NUM_SERVERS);
 
     // setup the rebalance config
-    Configuration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, false);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, 0);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, true);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(false);
+    rebalanceConfig.setMinAvailableReplicas(0);
+    rebalanceConfig.setIncludeConsuming(true);
 
     // Add a new server
     BaseServerStarter serverStarter1 = startOneServer(1234);
@@ -146,8 +144,9 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     _resourceManager.updateInstanceTags(serverStarter1.getInstanceId(), "", false);
     _resourceManager.updateInstanceTags(serverStarter2.getInstanceId(), "", false);
 
-    rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, true);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, true);
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setDowntime(true);
+
 
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig);
 
@@ -316,11 +315,6 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   @Override
   protected String getSchemaFileName() {
     return "upsert_upload_segment_test.schema";
-  }
-
-  @Override
-  protected String getSchemaName() {
-    return "upsertSchema";
   }
 
   @Override
