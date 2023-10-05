@@ -25,8 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -39,6 +37,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentTestUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -46,7 +45,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.BeforeClass;
@@ -260,10 +258,9 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(_segmentAssignmentWithoutPartition
-            .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null, null,
-                new BaseConfiguration()),
-        currentAssignment);
+    assertEquals(
+        _segmentAssignmentWithoutPartition.rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition,
+            null, null, new RebalanceConfig()), currentAssignment);
   }
 
   @Test
@@ -288,10 +285,9 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
     Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
     assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
-    assertEquals(_segmentAssignmentWithPartition
-            .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null, null,
-                new BaseConfiguration()),
-        currentAssignment);
+    assertEquals(
+        _segmentAssignmentWithPartition.rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null,
+            null, new RebalanceConfig()), currentAssignment);
   }
 
   @Test
@@ -305,10 +301,11 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
     }
 
     // Bootstrap table should reassign all segments based on their alphabetical order
-    Configuration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
-    Map<String, Map<String, String>> newAssignment = _segmentAssignmentWithoutPartition
-        .rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition, null, null, rebalanceConfig);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setBootstrap(true);
+    Map<String, Map<String, String>> newAssignment =
+        _segmentAssignmentWithoutPartition.rebalanceTable(currentAssignment, _instancePartitionsMapWithoutPartition,
+            null, null, rebalanceConfig);
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     List<String> sortedSegments = new ArrayList<>(SEGMENTS);
     sortedSegments.sort(null);
@@ -328,10 +325,11 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
     }
 
     // Bootstrap table should reassign all segments based on their alphabetical order within the partition
-    Configuration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
-    Map<String, Map<String, String>> newAssignment = _segmentAssignmentWithPartition
-        .rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null, null, rebalanceConfig);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setBootstrap(true);
+    Map<String, Map<String, String>> newAssignment =
+        _segmentAssignmentWithPartition.rebalanceTable(currentAssignment, _instancePartitionsMapWithPartition, null,
+            null, rebalanceConfig);
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     int numSegmentsPerPartition = NUM_SEGMENTS / NUM_PARTITIONS;
     String[][] partitionIdToSegmentsMap = new String[NUM_PARTITIONS][numSegmentsPerPartition];
@@ -363,9 +361,9 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
     SEGMENTS.forEach(segName -> unbalancedAssignment.put(segName, ImmutableMap
         .of(instance0, SegmentStateModel.ONLINE, instance1, SegmentStateModel.ONLINE, instance2,
             SegmentStateModel.ONLINE)));
-    Map<String, Map<String, String>> balancedAssignment = _segmentAssignmentWithPartition
-        .rebalanceTable(unbalancedAssignment, _instancePartitionsMapWithoutPartition, null, null,
-            new BaseConfiguration());
+    Map<String, Map<String, String>> balancedAssignment =
+        _segmentAssignmentWithPartition.rebalanceTable(unbalancedAssignment, _instancePartitionsMapWithoutPartition,
+            null, null, new RebalanceConfig());
     int[] actualNumSegmentsAssignedPerInstance =
         SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(balancedAssignment, INSTANCES);
     int[] expectedNumSegmentsAssignedPerInstance = new int[NUM_INSTANCES];
@@ -451,13 +449,13 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
 
     // Current assignment should already be balanced
     assertEquals(
-        segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, null, null, new BaseConfiguration()),
+        segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, null, null, new RebalanceConfig()),
         currentAssignment);
 
     // Test bootstrap
     // Bootstrap table should reassign all segments based on their alphabetical order within the partition
-    Configuration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setBootstrap(true);
     Map<String, Map<String, String>> newAssignment =
         segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, null, null, rebalanceConfig);
     assertEquals(newAssignment.size(), NUM_SEGMENTS);

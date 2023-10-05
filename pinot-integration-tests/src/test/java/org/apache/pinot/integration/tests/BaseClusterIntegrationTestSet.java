@@ -673,12 +673,12 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   /**
    * TODO: Support removing new added columns for MutableSegment and remove the new added columns before running the
-   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns()}.
+   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns(boolean)}.
    */
   public void testReload(boolean includeOfflineTable)
       throws Exception {
     String rawTableName = getTableName();
-    Schema schema = getSchema();
+    Schema schema = getSchema(getTableName());
 
     String selectStarQuery = "SELECT * FROM " + rawTableName;
     JsonNode queryResponse = postQuery(selectStarQuery);

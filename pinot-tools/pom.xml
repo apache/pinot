@@ -33,7 +33,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <scala.version>2.12</scala.version>
     <spark.version>3.2.1</spark.version>
     <airlift.version>0.16</airlift.version>
   </properties>
@@ -286,7 +285,7 @@
     -->
     <dependency>
       <groupId>org.apache.spark</groupId>
-      <artifactId>spark-launcher_${scala.version}</artifactId>
+      <artifactId>spark-launcher_${scala.compat.version}</artifactId>
       <version>${spark.version}</version>
       <exclusions>
         <exclusion>

@@ -255,7 +255,7 @@ public class RealtimeTableDataManagerTest {
   private static TableConfig setupTableConfig(ZkHelixPropertyStore propertyStore)
       throws Exception {
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setSchemaName(TABLE_NAME).build();
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
     ZNRecord tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
     when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(TABLE_NAME_WITH_TYPE), null,
         AccessOption.PERSISTENT)).thenReturn(tableConfigZNRecord);

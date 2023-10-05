@@ -28,6 +28,8 @@ import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -58,7 +60,14 @@ public class ValidationManagerTest {
   public void setUp()
       throws Exception {
     TEST_INSTANCE.setupSharedStateAndValidate();
-
+    // Create a schema
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(TEST_TABLE_NAME)
+        .addSingleValueDimension("dim1", FieldSpec.DataType.STRING)
+        .addMetric("metric1", FieldSpec.DataType.INT)
+        .build();
+    TEST_INSTANCE.getHelixResourceManager().addSchema(schema, true, true);
+    // Create a table
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setNumReplicas(2).build();
     TEST_INSTANCE.getHelixResourceManager().addTable(offlineTableConfig);

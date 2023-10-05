@@ -34,8 +34,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <scala.version>2.12</scala.version>
-    <flink.version>1.12.0</flink.version>
   </properties>
 
   <dependencies>
@@ -53,8 +51,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-streaming-java_${scala.version}</artifactId>
-      <version>${flink.version}</version>
+      <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -85,8 +82,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-clients_${scala.version}</artifactId>
-      <version>${flink.version}</version>
+      <artifactId>flink-clients_${scala.compat.version}</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

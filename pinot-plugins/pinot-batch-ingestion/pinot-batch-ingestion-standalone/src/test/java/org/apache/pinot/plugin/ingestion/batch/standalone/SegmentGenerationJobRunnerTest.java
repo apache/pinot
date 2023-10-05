@@ -251,7 +251,6 @@ public class SegmentGenerationJobRunnerTest {
     File tableConfigFile = new File(testDir, "tableConfig");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("myTable")
-        .setSchemaName(schemaName)
         .setNumReplicas(1)
         .build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
@@ -263,7 +262,7 @@ public class SegmentGenerationJobRunnerTest {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY", true));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("myTable").setSchemaName(schemaName)
+        .setTableName("myTable")
         .setNumReplicas(1)
         .setIngestionConfig(ingestionConfig)
         .build();

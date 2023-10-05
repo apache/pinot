@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.HashUtil;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -130,7 +131,7 @@ public class DataTableImplV2 extends BaseDataTable {
   private Map<String, String> deserializeMetadata(ByteBuffer buffer)
       throws IOException {
     int numEntries = buffer.getInt();
-    Map<String, String> metadata = new HashMap<>(numEntries);
+    Map<String, String> metadata = new HashMap<>(HashUtil.getHashMapCapacity(numEntries));
 
     for (int i = 0; i < numEntries; i++) {
       String key = DataTableUtils.decodeString(buffer);

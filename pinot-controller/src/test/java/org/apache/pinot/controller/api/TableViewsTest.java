@@ -53,6 +53,7 @@ public class TableViewsTest extends ControllerTest {
     DEFAULT_INSTANCE.setupSharedStateAndValidate();
 
     // Create the offline table and add one segment
+    DEFAULT_INSTANCE.addDummySchema(OFFLINE_TABLE_NAME);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setNumReplicas(2).build();
     assertEquals(DEFAULT_INSTANCE.getHelixManager().getInstanceType(), InstanceType.CONTROLLER);
@@ -62,12 +63,12 @@ public class TableViewsTest extends ControllerTest {
             SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME), "downloadUrl");
 
     // Create the hybrid table
+    DEFAULT_INSTANCE.addDummySchema(HYBRID_TABLE_NAME);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME)
         .setNumReplicas(DEFAULT_MIN_NUM_REPLICAS).build();
     DEFAULT_INSTANCE.getHelixResourceManager().addTable(tableConfig);
 
     // add schema for realtime table
-    DEFAULT_INSTANCE.addDummySchema(HYBRID_TABLE_NAME);
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(4);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(HYBRID_TABLE_NAME)
         .setNumReplicas(DEFAULT_MIN_NUM_REPLICAS).setStreamConfigs(streamConfig.getStreamConfigsMap()).build();

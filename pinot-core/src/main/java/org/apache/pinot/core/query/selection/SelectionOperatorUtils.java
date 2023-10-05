@@ -37,6 +37,7 @@ import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
@@ -496,7 +497,7 @@ public class SelectionOperatorUtils {
     Map<String, Integer> columnNameToIndexMap = null;
     if (dataSchema.getColumnNames().length != selectionColumns.size()) {
       // Create updated data schema since one column can be selected multiple times.
-      columnNameToIndexMap = new HashMap<>(dataSchema.getColumnNames().length);
+      columnNameToIndexMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSchema.getColumnNames().length));
       String[] columnNames = dataSchema.getColumnNames();
       ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
       for (int i = 0; i < columnNames.length; i++) {

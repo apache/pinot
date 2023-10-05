@@ -24,18 +24,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -227,13 +226,12 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     Map<InstancePartitionsType, InstancePartitions> noRelocationInstancePartitionsMap =
         ImmutableMap.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, null, null,
-        new BaseConfiguration()), currentAssignment);
+        new RebalanceConfig()), currentAssignment);
 
     // Rebalance with COMPLETED instance partitions should relocate all COMPLETED (ONLINE) segments to the COMPLETED
     // instances
     Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null,
-            new BaseConfiguration());
+        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new RebalanceConfig());
     assertEquals(newAssignment.size(), NUM_SEGMENTS + numUploadedSegments + 1);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       if (segmentId < NUM_SEGMENTS - NUM_PARTITIONS) {
@@ -270,8 +268,8 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     assertEquals(totalNumSegmentsAssigned, expectedTotalNumSegmentsAssigned);
 
     // Rebalance with COMPLETED instance partitions including CONSUMING segments should give the same assignment
-    BaseConfiguration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.setProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, true);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setIncludeConsuming(true);
     assertEquals(
         _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, rebalanceConfig),
         newAssignment);
@@ -279,11 +277,11 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
     // Rebalance without COMPLETED instance partitions again should change the segment assignment back
     currentAssignment.put(offlineSegmentName, offlineSegmentInstanceStateMap);
     assertEquals(_segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, null, null,
-        new BaseConfiguration()), currentAssignment);
+        new RebalanceConfig()), currentAssignment);
 
     // Bootstrap table without COMPLETED instance partitions should be the same as regular rebalance
-    rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setBootstrap(true);
     assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, null, null,
         rebalanceConfig), currentAssignment);
     assertEquals(_segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, null, null,

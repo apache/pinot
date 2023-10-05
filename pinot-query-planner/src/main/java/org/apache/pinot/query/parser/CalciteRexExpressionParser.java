@@ -35,6 +35,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.slf4j.Logger;
@@ -186,10 +187,27 @@ public class CalciteRexExpressionParser {
       case INPUT_REF:
         return inputRefToIdentifier((RexExpression.InputRef) rexNode, pinotQuery);
       case LITERAL:
-        return RequestUtils.getLiteralExpression(((RexExpression.Literal) rexNode).getValue());
+        return compileLiteralExpression(((RexExpression.Literal) rexNode).getValue());
       default:
         return compileFunctionExpression((RexExpression.FunctionCall) rexNode, pinotQuery);
     }
+  }
+
+  /**
+   * Copy and modify from {@link RequestUtils#getLiteralExpression(Object)}.
+   *
+   */
+  private static Expression compileLiteralExpression(Object object) {
+    if (object instanceof ByteArray) {
+      return getLiteralExpression((ByteArray) object);
+    }
+    return RequestUtils.getLiteralExpression(object);
+  }
+
+  private static Expression getLiteralExpression(ByteArray object) {
+    Expression expression = RequestUtils.createNewLiteralExpression();
+    expression.getLiteral().setBinaryValue(object.getBytes());
+    return expression;
   }
 
   private static Expression inputRefToIdentifier(RexExpression.InputRef inputRef, PinotQuery pinotQuery) {

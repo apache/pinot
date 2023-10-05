@@ -82,6 +82,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.quartz.CronScheduleBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -143,6 +144,7 @@ public final class TableConfigUtils {
 
     // skip all validation if skip type ALL is selected.
     if (!skipTypes.contains(ValidationType.ALL)) {
+      validateTableSchemaConfig(tableConfig);
       validateValidationConfig(tableConfig, schema);
 
       StreamConfig streamConfig = null;
@@ -199,6 +201,20 @@ public final class TableConfigUtils {
     }
     if (StringUtils.containsWhitespace(tableName)) {
       throw new IllegalStateException("Table name: '" + tableName + "' containing space is not allowed");
+    }
+  }
+
+  /**
+   * Validates the table name with the following rule:
+   * - Schema name should either be null or match the raw table name
+   */
+  private static void validateTableSchemaConfig(TableConfig tableConfig) {
+    // Ensure that table is not created if schema is not present
+    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+    String schemaName = tableConfig.getValidationConfig().getSchemaName();
+    if (schemaName != null && !schemaName.equals(rawTableName)) {
+      throw new IllegalStateException(
+          "Schema name: " + schemaName + " does not match table name: " + rawTableName);
     }
   }
 
