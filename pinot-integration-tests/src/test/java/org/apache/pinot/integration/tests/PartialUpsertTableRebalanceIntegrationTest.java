@@ -45,6 +45,7 @@ import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -300,6 +301,10 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     addSchema(_schema);
     _tableConfig = createUpsertTableConfig(_avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
     _tableConfig.getValidationConfig().setDeletedSegmentsRetentionPeriod(null);
+    _tableConfig.getUpsertConfig().setMode(UpsertConfig.Mode.PARTIAL);
+    _tableConfig.getUpsertConfig().setPartialUpsertStrategies(new HashMap<>());
+    _tableConfig.getUpsertConfig().setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
+    _tableConfig.getIndexingConfig().setNullHandlingEnabled(true);
 
     addTableConfig(_tableConfig);
   }
