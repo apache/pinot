@@ -39,10 +39,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertSame;
@@ -183,6 +180,22 @@ public class MailboxSendOperatorTest {
     Map<String, OperatorStats> resultMetadata = blocks.get(2).getResultMetadata();
     assertEquals(resultMetadata.size(), 1);
     assertTrue(resultMetadata.containsKey(mailboxSendOperator.getOperatorId()));
+  }
+
+  @Test
+  public void shouldEarlyTerminateWhenUpstreamIndicates()
+      throws Exception {
+    // Given:
+    TransferableBlock dataBlock =
+        OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
+    when(_sourceOperator.nextBlock()).thenReturn(dataBlock);
+    doReturn(true).when(_exchange).send(any());
+
+    // When:
+    TransferableBlock block = getMailboxSendOperator().nextBlock();
+
+    // Then:
+    verify(_sourceOperator).setEarlyTerminate();
   }
 
   private MailboxSendOperator getMailboxSendOperator() {

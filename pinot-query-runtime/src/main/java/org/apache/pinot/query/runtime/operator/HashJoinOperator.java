@@ -218,7 +218,8 @@ public class HashJoinOperator extends MultiStageOperator {
         _resourceLimitExceededException =
             new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
         _resourceLimitExceededException.setMessage(
-            "Cannot build in memory hash table for join operator, reach number of rows limit: " + _maxRowsInHashTable);
+            "Exception occurred when building in-memory hash table for join operator, reach number of rows limit: "
+                + _maxRowsInHashTable);
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
           throw _resourceLimitExceededException;
         } else {
@@ -239,8 +240,10 @@ public class HashJoinOperator extends MultiStageOperator {
       }
       _currentRowsInHashTable += container.size();
       if (_currentRowsInHashTable == _maxRowsInHashTable) {
-        // Early terminate right table operator.
-        _rightTableOperator.close();
+        // setting only the rightTableOperator to be early terminated.
+        _rightTableOperator.setEarlyTerminate();
+        // pulling one extra early termination message from rightTable.
+        rightBlock = _rightTableOperator.nextBlock();
         break;
       }
       rightBlock = _rightTableOperator.nextBlock();

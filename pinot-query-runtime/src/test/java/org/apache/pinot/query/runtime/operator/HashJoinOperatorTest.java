@@ -646,6 +646,7 @@ public class HashJoinOperatorTest {
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
+    Mockito.verify(_rightOperator).setEarlyTerminate();
     Assert.assertFalse(result.isErrorBlock());
     Assert.assertEquals(result.getNumRows(), 1);
     Assert.assertTrue(result.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)

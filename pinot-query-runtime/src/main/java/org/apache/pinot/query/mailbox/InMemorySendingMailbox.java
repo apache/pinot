@@ -21,6 +21,7 @@ package org.apache.pinot.query.mailbox;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +34,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
   private final long _deadlineMs;
 
   private ReceivingMailbox _receivingMailbox;
-  private volatile boolean _isTerminated;
+  private volatile boolean _isEarlyTerminated;
 
   public InMemorySendingMailbox(String id, MailboxService mailboxService, long deadlineMs) {
     _id = id;
@@ -44,7 +45,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
   @Override
   public void send(TransferableBlock block)
       throws TimeoutException {
-    if (_isTerminated) {
+    if (_isEarlyTerminated && !block.isEndOfStreamBlock()) {
       return;
     }
     if (_receivingMailbox == null) {
@@ -55,13 +56,15 @@ public class InMemorySendingMailbox implements SendingMailbox {
     switch (status) {
       case SUCCESS:
         break;
+      case CANCELLED:
+        throw new EarlyTerminationException(String.format("Mailbox: %s already cancelled from upstream", _id));
       case ERROR:
         throw new RuntimeException(String.format("Mailbox: %s already errored out (received error block before)", _id));
       case TIMEOUT:
         throw new TimeoutException(
             String.format("Timed out adding block into mailbox: %s with timeout: %dms", _id, timeoutMs));
       case EARLY_TERMINATED:
-        _isTerminated = true;
+        _isEarlyTerminated = true;
         break;
       default:
         throw new IllegalStateException("Unsupported mailbox status: " + status);
@@ -74,7 +77,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
 
   @Override
   public void cancel(Throwable t) {
-    if (_isTerminated) {
+    if (_isEarlyTerminated) {
       return;
     }
     LOGGER.debug("Cancelling mailbox: {}", _id);
@@ -86,7 +89,13 @@ public class InMemorySendingMailbox implements SendingMailbox {
   }
 
   @Override
+  public boolean isEarlyTerminated() {
+    return _isEarlyTerminated;
+  }
+
+  @Override
   public boolean isTerminated() {
-    return _isTerminated;
+    // in-mem sending mailbox will never have a broken channel.
+    return false;
   }
 }

@@ -28,7 +28,6 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 
 
 /**
@@ -68,25 +67,29 @@ public abstract class BlockExchange {
     _splitter = splitter;
   }
 
-  public void send(TransferableBlock block)
+  /**
+   * API to send a block to the destination mailboxes.
+   * @param block the block to be transferred
+   * @return true if any of the upstream mailboxes requested EOS (e.g. early termination)
+   * @throws Exception when sending stream unexpectedly closed.
+   */
+  public boolean send(TransferableBlock block)
       throws Exception {
     boolean isEarlyTerminated = true;
     for (SendingMailbox sendingMailbox : _sendingMailboxes) {
-      if (!sendingMailbox.isTerminated()) {
+      if (!sendingMailbox.isEarlyTerminated()) {
         isEarlyTerminated = false;
         break;
       }
-    }
-    if (isEarlyTerminated) {
-      throw new EarlyTerminationException();
     }
     if (block.isEndOfStreamBlock()) {
       for (SendingMailbox sendingMailbox : _sendingMailboxes) {
         sendBlock(sendingMailbox, block);
       }
-    } else {
+    } else if (!isEarlyTerminated) {
       route(_sendingMailboxes, block);
     }
+    return isEarlyTerminated;
   }
 
   protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block)

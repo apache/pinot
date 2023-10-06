@@ -56,26 +56,26 @@ public class MailboxSendOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
 
-  private final MultiStageOperator _sourceOperator;
+  private final MultiStageOperator _upstreamOperator;
   private final BlockExchange _exchange;
   private final List<RexExpression> _collationKeys;
   private final List<RelFieldCollation.Direction> _collationDirections;
   private final boolean _isSortOnSender;
 
-  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
+  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
       RelDistribution.Type distributionType, @Nullable List<Integer> distributionKeys,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender, int receiverStageId) {
-    this(context, sourceOperator, getBlockExchange(context, distributionType, distributionKeys, receiverStageId),
+    this(context, upstreamOperator, getBlockExchange(context, distributionType, distributionKeys, receiverStageId),
         collationKeys, collationDirections, isSortOnSender);
   }
 
   @VisibleForTesting
-  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator, BlockExchange exchange,
+  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, BlockExchange exchange,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender) {
     super(context);
-    _sourceOperator = sourceOperator;
+    _upstreamOperator = upstreamOperator;
     _exchange = exchange;
     _collationKeys = collationKeys;
     _collationDirections = collationDirections;
@@ -105,7 +105,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return Collections.singletonList(_sourceOperator);
+    return Collections.singletonList(_upstreamOperator);
   }
 
   @Nullable
@@ -117,19 +117,22 @@ public class MailboxSendOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      TransferableBlock block = _sourceOperator.nextBlock();
+      TransferableBlock block = _upstreamOperator.nextBlock();
+      boolean isEarlyTerminated;
       if (block.isSuccessfulEndOfStreamBlock()) {
         // Stats need to be populated here because the block is being sent to the mailbox
         // and the receiving opChain will not be able to access the stats from the previous opChain
         TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
             OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
-        sendTransferableBlock(eosBlockWithStats);
+        isEarlyTerminated = sendTransferableBlock(eosBlockWithStats);
       } else {
-        sendTransferableBlock(block);
+        isEarlyTerminated = sendTransferableBlock(block);
+      }
+      if (isEarlyTerminated) {
+        setEarlyTerminate();
       }
       return block;
     } catch (EarlyTerminationException e) {
-      // TODO: Query stats are not sent when opChain is early terminated
       LOGGER.debug("Early terminating opChain: {}", _context.getId());
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } catch (TimeoutException e) {
@@ -147,12 +150,12 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
-  private void sendTransferableBlock(TransferableBlock block)
+  private boolean sendTransferableBlock(TransferableBlock block)
       throws Exception {
-    _exchange.send(block);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
+    return _exchange.send(block);
   }
 
   /**

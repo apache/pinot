@@ -124,19 +124,23 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       if (exceptions != null) {
         return TransferableBlockUtils.getErrorTransferableBlock(exceptions);
       }
-      if (resultsBlock != LAST_RESULTS_BLOCK) {
+      if (_isEarlyTerminated || resultsBlock == LAST_RESULTS_BLOCK) {
+        return constructMetadataBlock();
+      } else {
         // Regular data block
         return composeTransferableBlock(resultsBlock, _dataSchema);
-      } else {
-        // All data blocks have been returned. Record the stats and return EOS.
-        Map<String, String> executionStats = _executionStats;
-        OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, getOperatorId());
-        operatorStats.recordExecutionStats(executionStats);
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
+  }
+
+  private TransferableBlock constructMetadataBlock() {
+    // All data blocks have been returned. Record the stats and return EOS.
+    Map<String, String> executionStats = _executionStats;
+    OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, getOperatorId());
+    operatorStats.recordExecutionStats(executionStats);
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
   }
 
   private Future<Void> startExecution() {

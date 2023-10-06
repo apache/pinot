@@ -34,12 +34,19 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
 
   private final AtomicInteger _bufferSize = new AtomicInteger(DEFAULT_MAILBOX_QUEUE_CAPACITY);
+  private final AtomicBoolean _isEarlyTerminated = new AtomicBoolean();
   private final AtomicBoolean _finished = new AtomicBoolean();
 
   @Override
   public void onNext(MailboxStatus mailboxStatus) {
-    // when received a mailbox status from the receiving end, sending end update the known buffer size available
-    // so we can make better throughput send judgement. here is a simple example.
+    // when receiving mailbox receives a data block it will return an updated info of the receiving end status including
+    //   1. the buffer size available, for back-pressure handling
+    //   2. status whether there's no need to send any additional data block b/c it considered itself finished.
+    // -- handle early-terminate EOS request.
+    if (mailboxStatus.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE)) {
+      _isEarlyTerminated.set(true);
+    }
+    // -- handling buffer size back-pressure
     // TODO: this feedback info is not used to throttle the send speed. it is currently being discarded.
     if (mailboxStatus.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY)) {
       _bufferSize.set(
@@ -47,6 +54,10 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
     } else {
       _bufferSize.set(DEFAULT_MAILBOX_QUEUE_CAPACITY); // DEFAULT_AVAILABILITY;
     }
+  }
+
+  public boolean isEarlyTerminated() {
+    return _isEarlyTerminated.get();
   }
 
   public int getBufferSize() {
