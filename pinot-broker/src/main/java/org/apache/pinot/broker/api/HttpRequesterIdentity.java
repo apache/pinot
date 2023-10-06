@@ -21,6 +21,8 @@ package org.apache.pinot.broker.api;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.util.Map;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.Request;
 
@@ -28,6 +30,8 @@ import org.glassfish.grizzly.http.server.Request;
 /**
  * Identity container for HTTP requests with (optional) authorization headers
  */
+@Getter
+@Setter
 public class HttpRequesterIdentity extends RequesterIdentity {
   private Multimap<String, String> _httpHeaders;
   private String _endpointUrl;
@@ -40,22 +44,6 @@ public class HttpRequesterIdentity extends RequesterIdentity {
     identity.setHttpHeaders(headers);
     identity.setEndpointUrl(request.getRequestURL().toString());
     return identity;
-  }
-
-  public Multimap<String, String> getHttpHeaders() {
-    return _httpHeaders;
-  }
-
-  public void setHttpHeaders(Multimap<String, String> httpHeaders) {
-    _httpHeaders = httpHeaders;
-  }
-
-  public String getEndpointUrl() {
-    return _endpointUrl;
-  }
-
-  public void setEndpointUrl(String endpointUrl) {
-    _endpointUrl = endpointUrl;
   }
 
   /**

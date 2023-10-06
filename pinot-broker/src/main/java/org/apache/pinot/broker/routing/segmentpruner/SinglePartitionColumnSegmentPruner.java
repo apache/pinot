@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import lombok.AllArgsConstructor;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -40,15 +41,11 @@ import org.apache.pinot.sql.FilterKind;
  * The {@code SinglePartitionColumnSegmentPruner} prunes segments based on their partition metadata stored in ZK. The
  * pruner supports queries with filter (or nested filter) of EQUALITY and IN predicates.
  */
+@AllArgsConstructor
 public class SinglePartitionColumnSegmentPruner implements SegmentPruner {
   private final String _tableNameWithType;
   private final String _partitionColumn;
   private final Map<String, SegmentPartitionInfo> _partitionInfoMap = new ConcurrentHashMap<>();
-
-  public SinglePartitionColumnSegmentPruner(String tableNameWithType, String partitionColumn) {
-    _tableNameWithType = tableNameWithType;
-    _partitionColumn = partitionColumn;
-  }
 
   @Override
   public void init(IdealState idealState, ExternalView externalView, List<String> onlineSegments,

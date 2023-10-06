@@ -22,6 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
@@ -74,48 +77,27 @@ public interface InstanceSelector {
    */
   Set<String> getServingInstances();
 
+  @AllArgsConstructor
   class SelectionResult {
+    /**
+     * the map from segment to selected server instance hosting the segment.
+     */
+    @Getter
     private final Map<String, String> _segmentToInstanceMap;
+    /**
+     * the unavailable segments (no enabled instance or all enabled instances are in ERROR state).
+     */
+    @Getter
     private final List<String> _unavailableSegments;
+    /**
+     * the number of segments pruned by the broker
+     */
+    @Getter
+    @Setter
     private int _numPrunedSegments;
 
     public SelectionResult(Map<String, String> segmentToInstanceMap, List<String> unavailableSegments) {
       this(segmentToInstanceMap, unavailableSegments, 0);
-    }
-
-    public SelectionResult(Map<String, String> segmentToInstanceMap, List<String> unavailableSegments,
-        int numPrunedSegments) {
-      _segmentToInstanceMap = segmentToInstanceMap;
-      _unavailableSegments = unavailableSegments;
-      _numPrunedSegments = numPrunedSegments;
-    }
-
-    /**
-     * Returns the map from segment to selected server instance hosting the segment.
-     */
-    public Map<String, String> getSegmentToInstanceMap() {
-      return _segmentToInstanceMap;
-    }
-
-    /**
-     * Returns the unavailable segments (no enabled instance or all enabled instances are in ERROR state).
-     */
-    public List<String> getUnavailableSegments() {
-      return _unavailableSegments;
-    }
-
-    /**
-     * Returns the number of segments pruned by the broker
-     */
-    public int getNumPrunedSegments() {
-      return _numPrunedSegments;
-    }
-
-    /**
-     * Sets the number of segments pruned by the broker
-     */
-    public void setNumPrunedSegments(int numPrunedSegments) {
-      _numPrunedSegments = numPrunedSegments;
     }
   }
 }

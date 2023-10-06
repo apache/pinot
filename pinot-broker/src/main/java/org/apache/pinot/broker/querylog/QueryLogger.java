@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.broker.querylog;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.RateLimiter;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BaseBrokerRequestHandler;
@@ -41,13 +43,15 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker;
  * fashion. Query logging can be useful to capture production traffic to assist with
  * debugging or regression testing.
  */
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
 @SuppressWarnings("UnstableApiUsage")
 public class QueryLogger {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryLogger.class);
 
-  private final int _maxQueryLengthToLog;
   private final RateLimiter _logRateLimiter;
+  @Getter
+  private final int _maxQueryLengthToLog;
   private final boolean _enableIpLogging;
   private final Logger _logger;
   private final RateLimiter _droppedLogRateLimiter;
@@ -61,16 +65,6 @@ public class QueryLogger {
             Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING), LOGGER, RateLimiter.create(1)
         // log once a second for dropped log count
     );
-  }
-
-  @VisibleForTesting
-  QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, Logger logger,
-      RateLimiter droppedLogRateLimiter) {
-    _logRateLimiter = logRateLimiter;
-    _maxQueryLengthToLog = maxQueryLengthToLog;
-    _enableIpLogging = enableIpLogging;
-    _logger = logger;
-    _droppedLogRateLimiter = droppedLogRateLimiter;
   }
 
   public void log(QueryLogParams params) {
@@ -100,10 +94,6 @@ public class QueryLogger {
             _droppedLogRateLimiter.getRate());
       }
     }
-  }
-
-  public int getMaxQueryLengthToLog() {
-    return _maxQueryLengthToLog;
   }
 
   public double getLogRateLimit() {

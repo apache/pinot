@@ -19,26 +19,17 @@
 package org.apache.pinot.broker.routing.instanceselector;
 
 import javax.annotation.concurrent.Immutable;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 
 /**
  * Represents an instance candidate for a segment.
  */
 @Immutable
+@AllArgsConstructor
+@Getter
 public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
-
-  public SegmentInstanceCandidate(String instance, boolean online) {
-    _instance = instance;
-    _online = online;
-  }
-
-  public String getInstance() {
-    return _instance;
-  }
-
-  public boolean isOnline() {
-    return _online;
-  }
 }

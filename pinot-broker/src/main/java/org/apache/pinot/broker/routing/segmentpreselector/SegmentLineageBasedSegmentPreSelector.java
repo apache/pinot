@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing.segmentpreselector;
 
 import java.util.Set;
+import lombok.AllArgsConstructor;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.lineage.SegmentLineage;
@@ -32,14 +33,10 @@ import org.apache.pinot.common.lineage.SegmentLineageUtils;
  * This pre-selector reads the segment lineage metadata and filters out either merged segments or original segments
  * to make sure that the final segments contain no duplicate data.
  */
+@AllArgsConstructor
 public class SegmentLineageBasedSegmentPreSelector implements SegmentPreSelector {
   private final String _tableNameWithType;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-
-  public SegmentLineageBasedSegmentPreSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    _tableNameWithType = tableNameWithType;
-    _propertyStore = propertyStore;
-  }
 
   @Override
   public Set<String> preSelect(Set<String> onlineSegments) {

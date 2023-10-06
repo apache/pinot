@@ -19,64 +19,26 @@
 package org.apache.pinot.broker.queryquota;
 
 import com.google.common.util.concurrent.RateLimiter;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
-
+@AllArgsConstructor
 public class QueryQuotaEntity {
-
+  @Getter
+  @Setter
   private RateLimiter _rateLimiter;
+  @Getter
   private HitCounter _qpsTracker;
+  @Getter
   private MaxHitRateTracker _maxQpsTracker;
+  @Getter
+  @Setter
   private int _numOnlineBrokers;
+  @Getter
+  @Setter
   private double _overallRate;
+  @Getter
+  @Setter
   private int _tableConfigStatVersion;
-
-  public QueryQuotaEntity(RateLimiter rateLimiter, HitCounter qpsTracker, MaxHitRateTracker maxQpsTracker,
-      int numOnlineBrokers, double overallRate, int tableConfigStatVersion) {
-    _rateLimiter = rateLimiter;
-    _qpsTracker = qpsTracker;
-    _maxQpsTracker = maxQpsTracker;
-    _numOnlineBrokers = numOnlineBrokers;
-    _overallRate = overallRate;
-    _tableConfigStatVersion = tableConfigStatVersion;
-  }
-
-  public void setRateLimiter(RateLimiter rateLimiter) {
-    _rateLimiter = rateLimiter;
-  }
-
-  public RateLimiter getRateLimiter() {
-    return _rateLimiter;
-  }
-
-  public HitCounter getQpsTracker() {
-    return _qpsTracker;
-  }
-
-  public MaxHitRateTracker getMaxQpsTracker() {
-    return _maxQpsTracker;
-  }
-
-  public int getNumOnlineBrokers() {
-    return _numOnlineBrokers;
-  }
-
-  public void setNumOnlineBrokers(int numOnlineBrokers) {
-    _numOnlineBrokers = numOnlineBrokers;
-  }
-
-  public double getOverallRate() {
-    return _overallRate;
-  }
-
-  public void setOverallRate(double overallRate) {
-    _overallRate = overallRate;
-  }
-
-  public int getTableConfigStatVersion() {
-    return _tableConfigStatVersion;
-  }
-
-  public void setTableConfigStatVersion(int tableConfigStatVersion) {
-    _tableConfigStatVersion = tableConfigStatVersion;
-  }
 }

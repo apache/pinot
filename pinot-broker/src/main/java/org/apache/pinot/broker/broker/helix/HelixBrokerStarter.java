@@ -21,6 +21,7 @@ package org.apache.pinot.broker.broker.helix;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import lombok.NoArgsConstructor;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -30,12 +31,9 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
  * Startable implementation for Pinot broker.
  * Contains methods to start and stop a Pinot broker
  */
+@NoArgsConstructor
 @SuppressWarnings("unused")
 public class HelixBrokerStarter extends BaseBrokerStarter {
-
-  public HelixBrokerStarter() {
-  }
-
   @Deprecated
   public HelixBrokerStarter(PinotConfiguration brokerConf, String clusterName, String zkServer)
       throws Exception {

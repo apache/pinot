@@ -20,12 +20,15 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import java.util.List;
 import javax.annotation.concurrent.Immutable;
-
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 /**
  * Contains the push time and candidate instances for a new segment.
  */
 @Immutable
+@AllArgsConstructor
+@Getter
 public class NewSegmentState {
   // Segment creation time. This could be
   // 1) From ZK if we first see this segment via init call.
@@ -35,17 +38,4 @@ public class NewSegmentState {
   // List of SegmentInstanceCandidate: which contains instance name and online flags.
   // The candidates have to be in instance sorted order.
   private final List<SegmentInstanceCandidate> _candidates;
-
-  public NewSegmentState(long creationTimeMs, List<SegmentInstanceCandidate> candidates) {
-    _creationTimeMs = creationTimeMs;
-    _candidates = candidates;
-  }
-
-  public long getCreationTimeMs() {
-    return _creationTimeMs;
-  }
-
-  public List<SegmentInstanceCandidate> getCandidates() {
-    return _candidates;
-  }
 }

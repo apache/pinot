@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.Getter;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
@@ -100,24 +101,34 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _clusterName;
   protected String _zkServers;
   protected String _hostname;
+  @Getter
   protected int _port;
   protected int _tlsPort;
+  @Getter
   protected String _instanceId;
+  @Getter
   private volatile boolean _isStarting = false;
+  @Getter
   private volatile boolean _isShuttingDown = false;
   protected final List<ClusterChangeHandler> _idealStateChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _externalViewChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _instanceConfigChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _liveInstanceChangeHandlers = new ArrayList<>();
   // Spectator Helix manager handles the custom change listeners, properties read/write
+  @Getter
   protected HelixManager _spectatorHelixManager;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected HelixDataAccessor _helixDataAccessor;
+  @Getter
   protected PinotMetricsRegistry _metricsRegistry;
+  @Getter
   protected BrokerMetrics _brokerMetrics;
+  @Getter
   protected BrokerRoutingManager _routingManager;
+  @Getter
   protected AccessControlFactory _accessControlFactory;
+  @Getter
   protected BrokerRequestHandler _brokerRequestHandler;
   protected SqlQueryExecutor _sqlQueryExecutor;
   protected BrokerAdminApiApplication _brokerAdminApplication;
@@ -178,10 +189,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Helix.CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
-  public int getPort() {
-    return _port;
-  }
-
   /**
    * Adds an ideal state change handler to handle Helix ideal state change callbacks.
    * <p>NOTE: all change handlers will be run in a single thread, so any slow change handler can block other change
@@ -221,11 +228,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   @Override
   public ServiceRole getServiceRole() {
     return ServiceRole.BROKER;
-  }
-
-  @Override
-  public String getInstanceId() {
-    return _instanceId;
   }
 
   @Override
@@ -559,37 +561,5 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Shutdown Broker Metrics Registry");
     _metricsRegistry.shutdown();
     LOGGER.info("Finish shutting down Pinot broker for {}", _instanceId);
-  }
-
-  public boolean isStarting() {
-    return _isStarting;
-  }
-
-  public boolean isShuttingDown() {
-    return _isShuttingDown;
-  }
-
-  public HelixManager getSpectatorHelixManager() {
-    return _spectatorHelixManager;
-  }
-
-  public PinotMetricsRegistry getMetricsRegistry() {
-    return _metricsRegistry;
-  }
-
-  public BrokerMetrics getBrokerMetrics() {
-    return _brokerMetrics;
-  }
-
-  public BrokerRoutingManager getRoutingManager() {
-    return _routingManager;
-  }
-
-  public AccessControlFactory getAccessControlFactory() {
-    return _accessControlFactory;
-  }
-
-  public BrokerRequestHandler getBrokerRequestHandler() {
-    return _brokerRequestHandler;
   }
 }

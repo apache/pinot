@@ -19,30 +19,14 @@
 package org.apache.pinot.broker.routing.segmentpartition;
 
 import java.util.Set;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 
-
+@AllArgsConstructor
+@Getter
 public class SegmentPartitionInfo {
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
   private final Set<Integer> _partitions;
-
-  public SegmentPartitionInfo(String partitionColumn, PartitionFunction partitionFunction,
-      Set<Integer> partitions) {
-    _partitionColumn = partitionColumn;
-    _partitionFunction = partitionFunction;
-    _partitions = partitions;
-  }
-
-  public String getPartitionColumn() {
-    return _partitionColumn;
-  }
-
-  public PartitionFunction getPartitionFunction() {
-    return _partitionFunction;
-  }
-
-  public Set<Integer> getPartitions() {
-    return _partitions;
-  }
 }

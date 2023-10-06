@@ -41,6 +41,8 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.HttpDelete;
@@ -1756,16 +1758,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Helper class to pass the per server statistics.
    */
+  @Getter
+  @Setter
   public static class ServerStats {
     private String _serverStats;
-
-    public String getServerStats() {
-      return _serverStats;
-    }
-
-    public void setServerStats(String serverStats) {
-      _serverStats = serverStats;
-    }
   }
 
   /**

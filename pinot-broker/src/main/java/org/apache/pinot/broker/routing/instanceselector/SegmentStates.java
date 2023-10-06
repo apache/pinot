@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 
 /**
@@ -36,28 +38,18 @@ import javax.annotation.concurrent.Immutable;
  * We don't report new segments as unavailable segments because it is valid for new segments to be offline.
  */
 @Immutable
+@AllArgsConstructor
 public class SegmentStates {
   private final Map<String, List<SegmentInstanceCandidate>> _instanceCandidatesMap;
-  private final Set<String> _servingInstances;
-  private final Set<String> _unavailableSegments;
 
-  public SegmentStates(Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap, Set<String> servingInstances,
-      Set<String> unavailableSegments) {
-    _instanceCandidatesMap = instanceCandidatesMap;
-    _servingInstances = servingInstances;
-    _unavailableSegments = unavailableSegments;
-  }
+  @Getter
+  private final Set<String> _servingInstances;
+
+  @Getter
+  private final Set<String> _unavailableSegments;
 
   @Nullable
   public List<SegmentInstanceCandidate> getCandidates(String segment) {
     return _instanceCandidatesMap.get(segment);
-  }
-
-  public Set<String> getServingInstances() {
-    return _servingInstances;
-  }
-
-  public Set<String> getUnavailableSegments() {
-    return _unavailableSegments;
   }
 }

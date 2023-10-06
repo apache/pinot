@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import lombok.AllArgsConstructor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.Message;
@@ -40,9 +41,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.BROKER_RESOURCE_I
 /**
  * Broker Resource layer state model to take over how to operate on:
  * Adding an external view to routing table.
- *
- *
  */
+@AllArgsConstructor
 public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerResourceOnlineOfflineStateModelFactory.class);
 
@@ -50,15 +50,6 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
   private final HelixDataAccessor _helixDataAccessor;
   private final BrokerRoutingManager _routingManager;
   private final HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
-
-  public BrokerResourceOnlineOfflineStateModelFactory(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      HelixDataAccessor helixDataAccessor, BrokerRoutingManager routingManager,
-      HelixExternalViewBasedQueryQuotaManager queryQuotaManager) {
-    _helixDataAccessor = helixDataAccessor;
-    _propertyStore = propertyStore;
-    _routingManager = routingManager;
-    _queryQuotaManager = queryQuotaManager;
-  }
 
   public static String getStateModelDef() {
     return "BrokerResourceOnlineOfflineStateModel";

@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
+import lombok.NoArgsConstructor;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -46,16 +47,13 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  *     pinot.broker.access.control.principals.user456.tables=stuff,lessImportantStuff
  * </pre>
  */
+@NoArgsConstructor
 public class BasicAuthAccessControlFactory extends AccessControlFactory {
   private static final String PREFIX = "principals";
 
   private static final String HEADER_AUTHORIZATION = "authorization";
 
   private AccessControl _accessControl;
-
-  public BasicAuthAccessControlFactory() {
-    // left blank
-  }
 
   @Override
   public void init(PinotConfiguration configuration) {

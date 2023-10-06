@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import lombok.AllArgsConstructor;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
@@ -39,17 +40,12 @@ import org.slf4j.LoggerFactory;
  *   <li>Refresh segment message: Refresh the routing properties for a given segment</li>
  * </ul>
  */
+@AllArgsConstructor
 public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerUserDefinedMessageHandlerFactory.class);
 
   private final BrokerRoutingManager _routingManager;
   private final HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
-
-  public BrokerUserDefinedMessageHandlerFactory(BrokerRoutingManager routingManager,
-      HelixExternalViewBasedQueryQuotaManager queryQuotaManager) {
-    _routingManager = routingManager;
-    _queryQuotaManager = queryQuotaManager;
-  }
 
   @Override
   public MessageHandler createHandler(Message message, NotificationContext context) {

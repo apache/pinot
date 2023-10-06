@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotAuthorizedException;
+import lombok.NoArgsConstructor;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.api.AccessControl;
@@ -50,14 +51,11 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * Users Configuration store in Helix Zookeeper and encrypted user password via Bcrypt Encryption Algorithm.
  *
  */
+@NoArgsConstructor
 public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
   private static final String HEADER_AUTHORIZATION = "authorization";
 
   private AccessControl _accessControl;
-
-  public ZkBasicAuthAccessControlFactory() {
-    // left blank
-  }
 
   @Override
   public void init(PinotConfiguration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {

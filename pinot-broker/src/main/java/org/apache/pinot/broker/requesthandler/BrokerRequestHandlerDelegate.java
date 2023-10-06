@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
+import lombok.AllArgsConstructor;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.exception.QueryException;
@@ -44,21 +45,15 @@ import org.slf4j.LoggerFactory;
  *
  * {@see: @CommonConstant
  */
+@AllArgsConstructor
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandlerDelegate.class);
 
+  private final String _brokerId;
   private final BrokerRequestHandler _singleStageBrokerRequestHandler;
+  @Nullable
   private final BrokerRequestHandler _multiStageBrokerRequestHandler;
   private final BrokerMetrics _brokerMetrics;
-  private final String _brokerId;
-
-  public BrokerRequestHandlerDelegate(String brokerId, BrokerRequestHandler singleStageBrokerRequestHandler,
-      @Nullable BrokerRequestHandler multiStageBrokerRequestHandler, BrokerMetrics brokerMetrics) {
-    _brokerId = brokerId;
-    _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
-    _multiStageBrokerRequestHandler = multiStageBrokerRequestHandler;
-    _brokerMetrics = brokerMetrics;
-  }
 
   @Override
   public void start() {
