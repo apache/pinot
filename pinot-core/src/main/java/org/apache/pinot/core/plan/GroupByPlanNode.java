@@ -82,6 +82,7 @@ public class GroupByPlanNode implements PlanNode {
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
     if (canOptimize(filterOperator, groupByExpressions, aggregationFunctions)) {
+      // TODO: Should we do a check here for dictionary length?
       Map<String, DataSource> dataSourceMap = new HashMap<>(1);
       String columName = groupByExpressions[0].getIdentifier();
       dataSourceMap.put(columName, _indexSegment.getDataSource(columName));

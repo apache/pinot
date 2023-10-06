@@ -42,6 +42,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.aggregation.groupby.InvertedGroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -79,8 +80,8 @@ public class IndexedGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numResultColumns];
     for (int i = 0; i < numGroupByExpressions; i++) {
       columnNames[i] = _groupByExpressions[i].getIdentifier();
-      // TODO: Remove hardcoded type
-      columnDataTypes[i] = DataSchema.ColumnDataType.STRING;
+      DataSourceMetadata columnMetadata = dataSourceMap.get(columnNames[i]).getDataSourceMetadata();
+      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(columnMetadata.getDataType(), columnMetadata.isSingleValue());
     }
     // Extract column names and data types for aggregation functions
     for (int i = 0; i < numAggregationFunctions; i++) {
