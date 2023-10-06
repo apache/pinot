@@ -21,11 +21,14 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -79,8 +82,20 @@ public class StarTreeV2BuilderConfig {
       maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
     }
 
+    Properties functionColumnPairsConfig = indexConfig.getFunctionColumnPairsConfig();
+    if (functionColumnPairsConfig == null) {
+      functionColumnPairsConfig = new Properties();
+    } else {
+      // Keys to lowercase
+      Map<String, String> lowerFunctionColumnPairsConfig = new HashMap<>(functionColumnPairsConfig
+          .entrySet().stream().collect(Collectors
+              .toMap(entry -> ((String) entry.getKey()).toLowerCase(), entry -> (String) entry.getValue())));
+      functionColumnPairsConfig = new Properties();
+      functionColumnPairsConfig.putAll(lowerFunctionColumnPairsConfig);
+    }
+
     return new StarTreeV2BuilderConfig(dimensionsSplitOrder, skipStarNodeCreationForDimensions, functionColumnPairs,
-            maxLeafRecords, indexConfig.getFunctionColumnPairsConfig());
+            maxLeafRecords, functionColumnPairsConfig);
   }
 
   /**

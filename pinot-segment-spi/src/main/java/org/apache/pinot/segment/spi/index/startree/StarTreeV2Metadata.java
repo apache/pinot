@@ -51,7 +51,12 @@ public class StarTreeV2Metadata {
     _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
     _skipStarNodeCreationForDimensions = new HashSet<>(
         Arrays.asList(metadataProperties.getStringArray(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)));
-    _functionColumnPairsConfig = metadataProperties.getProperties(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG);
+
+    if (!metadataProperties.getProperty(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG).equals("{}")) {
+      _functionColumnPairsConfig = metadataProperties.getProperties(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG);
+    } else {
+      _functionColumnPairsConfig = new Properties();
+    }
   }
 
   public int getNumDocs() {

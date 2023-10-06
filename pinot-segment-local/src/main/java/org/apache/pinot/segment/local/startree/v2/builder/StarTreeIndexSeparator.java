@@ -30,6 +30,7 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -87,12 +88,17 @@ public class StarTreeIndexSeparator implements Closeable {
     List<StarTreeV2BuilderConfig> builderConfigList = new ArrayList<>(_indexMapList.size());
     for (int i = 0; i < _indexMapList.size(); i++) {
       Configuration metadata = metadataProperties.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i));
+      Properties functionColumnPairsConfig = new Properties();
+      if (!metadata.getProperty(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG).equals("{}")) {
+        functionColumnPairsConfig = metadataProperties
+            .getProperties(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG);
+      }
       builderConfigList.add(i, StarTreeV2BuilderConfig.fromIndexConfig(new StarTreeIndexConfig(
           Lists.newArrayList(metadata.getStringArray(StarTreeV2Constants.MetadataKey.DIMENSIONS_SPLIT_ORDER)),
           Lists.newArrayList(
               metadata.getStringArray(StarTreeV2Constants.MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)),
           Lists.newArrayList(metadata.getStringArray(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS)),
-          metadata.getProperties(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG),
+          functionColumnPairsConfig,
           metadata.getInt(StarTreeV2Constants.MetadataKey.MAX_LEAF_RECORDS))));
     }
     return builderConfigList;

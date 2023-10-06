@@ -28,7 +28,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -476,9 +475,10 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       DataType valueType = valueAggregator.getAggregatedValueType();
 
       ChunkCompressionType compressionType = ChunkCompressionType.PASS_THROUGH;
-      Properties functionColumnPairsConfig = _builderConfig.getFunctionColumnPairsConfig();
-      if (functionColumnPairsConfig != null) {
-        compressionType = ChunkCompressionType.valueOf((String) functionColumnPairsConfig.get(metric));
+      String functionColumnPairConfig = (String) _builderConfig.getFunctionColumnPairsConfig()
+          .get(metric.toLowerCase());
+      if (functionColumnPairConfig != null) {
+        compressionType = ChunkCompressionType.valueOf(functionColumnPairConfig);
       }
       if (valueType == BYTES) {
         metricIndexCreators[i] =
