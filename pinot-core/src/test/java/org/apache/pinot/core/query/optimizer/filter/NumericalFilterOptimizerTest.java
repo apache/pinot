@@ -97,7 +97,7 @@ public class NumericalFilterOptimizerTest {
     // Test float column equals valid long value.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn = 5"),
         "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:IDENTIFIER, "
-            + "identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:5.0>)"
+            + "identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal intValue:5>)"
             + "]))");
 
     // Test float column equals invalid long value.
@@ -111,13 +111,13 @@ public class NumericalFilterOptimizerTest {
     // Test float column not equals valid long value
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE floatColumn != 5"),
         "Expression(type:FUNCTION, functionCall:Function(operator:NOT_EQUALS, operands:[Expression(type:IDENTIFIER, "
-            + "identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:5.0>)"
+            + "identifier:Identifier(name:floatColumn)), Expression(type:LITERAL, literal:<Literal intValue:5>)"
             + "]))");
 
     // test double column equals valid long value.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn = 5"),
         "Expression(type:FUNCTION, functionCall:Function(operator:EQUALS, operands:[Expression(type:IDENTIFIER, "
-            + "identifier:Identifier(name:doubleColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:5.0>)"
+            + "identifier:Identifier(name:doubleColumn)), Expression(type:LITERAL, literal:<Literal intValue:5>)"
             + "]))");
 
     // Test double column equals invalid long value.
@@ -131,7 +131,7 @@ public class NumericalFilterOptimizerTest {
     // Test double column not equals invalid long value.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn != 5"),
         "Expression(type:FUNCTION, functionCall:Function(operator:NOT_EQUALS, operands:[Expression(type:IDENTIFIER, "
-            + "identifier:Identifier(name:doubleColumn)), Expression(type:LITERAL, literal:<Literal doubleValue:5.0>)"
+            + "identifier:Identifier(name:doubleColumn)), Expression(type:LITERAL, literal:<Literal intValue:5>)"
             + "]))");
   }
 

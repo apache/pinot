@@ -32,9 +32,9 @@ public class OrdinalsUpdater implements QueryRewriter {
   public PinotQuery rewrite(PinotQuery pinotQuery) {
     // handle GROUP BY clause
     for (int i = 0; i < pinotQuery.getGroupByListSize(); i++) {
-      final Expression groupByExpr = pinotQuery.getGroupByList().get(i);
-      if (groupByExpr.isSetLiteral() && groupByExpr.getLiteral().isSetLongValue()) {
-        final int ordinal = (int) groupByExpr.getLiteral().getLongValue();
+      Expression groupByExpr = pinotQuery.getGroupByList().get(i);
+      if (groupByExpr.isSetLiteral() && groupByExpr.getLiteral().isSetIntValue()) {
+        int ordinal = groupByExpr.getLiteral().getIntValue();
         pinotQuery.getGroupByList().set(i, getExpressionFromOrdinal(pinotQuery.getSelectList(), ordinal));
       }
     }
@@ -43,8 +43,8 @@ public class OrdinalsUpdater implements QueryRewriter {
     for (int i = 0; i < pinotQuery.getOrderByListSize(); i++) {
       Expression orderByExpr = CalciteSqlParser.removeOrderByFunctions(pinotQuery.getOrderByList().get(i));
       Boolean isNullsLast = CalciteSqlParser.isNullsLast(pinotQuery.getOrderByList().get(i));
-      if (orderByExpr.isSetLiteral() && orderByExpr.getLiteral().isSetLongValue()) {
-        final int ordinal = (int) orderByExpr.getLiteral().getLongValue();
+      if (orderByExpr.isSetLiteral() && orderByExpr.getLiteral().isSetIntValue()) {
+        int ordinal = orderByExpr.getLiteral().getIntValue();
         Function functionToSet = pinotQuery.getOrderByList().get(i).getFunctionCall();
         if (isNullsLast != null) {
           functionToSet = functionToSet.getOperands().get(0).getFunctionCall();

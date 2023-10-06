@@ -27,10 +27,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -101,27 +100,16 @@ public class ExprMinMaxRewriter implements QueryRewriter {
       HashMap<List<Expression>, Set<Expression>> exprMinMaxFunctionMap,
       HashMap<List<Expression>, Integer> exprMinMaxFunctionIDMap) {
     for (Map.Entry<List<Expression>, Set<Expression>> entry : exprMinMaxFunctionMap.entrySet()) {
-      Literal functionID = new Literal();
-      functionID.setLongValue(exprMinMaxFunctionIDMap.get(entry.getKey()));
-      Literal numMeasuringColumns = new Literal();
-      numMeasuringColumns.setLongValue(entry.getKey().size());
-
-      Function parentFunction = new Function(isMax ? EXPR_MAX_PARENT : EXPR_MIN_PARENT);
-      Expression expr1 = new Expression(ExpressionType.LITERAL);
-      expr1.setLiteral(functionID);
-      parentFunction.addToOperands(expr1);
-      Expression expr2 = new Expression(ExpressionType.LITERAL);
-      expr2.setLiteral(numMeasuringColumns);
-      parentFunction.addToOperands(expr2);
-      for (Expression expression : entry.getKey()) {
-        parentFunction.addToOperands(expression);
-      }
-      for (Expression expression : entry.getValue()) {
-        parentFunction.addToOperands(expression);
-      }
-      Expression funcExpr = new Expression(ExpressionType.FUNCTION);
-      funcExpr.setFunctionCall(parentFunction);
-      selectList.add(funcExpr);
+      List<Expression> measuringColumns = entry.getKey();
+      Set<Expression> projectionColumns = entry.getValue();
+      Expression functionExpression = RequestUtils.getFunctionExpression(isMax ? EXPR_MAX_PARENT : EXPR_MIN_PARENT);
+      List<Expression> operands = new ArrayList<>(2 + measuringColumns.size() + projectionColumns.size());
+      operands.add(RequestUtils.getLiteralExpression((int) exprMinMaxFunctionIDMap.get(measuringColumns)));
+      operands.add(RequestUtils.getLiteralExpression(measuringColumns.size()));
+      operands.addAll(measuringColumns);
+      operands.addAll(projectionColumns);
+      functionExpression.getFunctionCall().setOperands(operands);
+      selectList.add(functionExpression);
     }
   }
 
@@ -189,11 +177,7 @@ public class ExprMinMaxRewriter implements QueryRewriter {
 
     List<Expression> operands = function.getOperands();
     operands.add(0, exprMinMaxProjectionExpression);
-    Literal functionID = new Literal();
-    functionID.setLongValue(id);
-    Expression literalExpr = new Expression(ExpressionType.LITERAL);
-    literalExpr.setLiteral(functionID);
-    operands.add(0, literalExpr);
+    operands.add(0, RequestUtils.getLiteralExpression(id));
 
     return added.get();
   }
