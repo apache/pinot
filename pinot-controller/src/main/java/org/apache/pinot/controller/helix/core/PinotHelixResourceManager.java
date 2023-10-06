@@ -88,7 +88,6 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -2008,19 +2007,24 @@ public class PinotHelixResourceManager {
     for (ControllerJobType jobType : jobTypes) {
       String jobsResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
       try {
+        if (!_propertyStore.exists(jobsResourcePath, -1)) {
+          continue;
+        }
         ZNRecord znRecord = _propertyStore.get(jobsResourcePath, null, -1);
-        if (znRecord != null) {
-          Map<String, Map<String, String>> tableJobsRecord = znRecord.getMapFields();
-          for (Map.Entry<String, Map<String, String>> tableEntry : tableJobsRecord.entrySet()) {
-            if (tableEntry.getValue().get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType.name())
-                && tableEntry.getValue().get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)
-                .equals(tableNameWithType)) {
-              controllerJobs.put(tableEntry.getKey(), tableEntry.getValue());
-            }
+        if (znRecord == null) {
+          continue;
+        }
+        Map<String, Map<String, String>> tableJobsRecord = znRecord.getMapFields();
+        for (Map.Entry<String, Map<String, String>> tableEntry : tableJobsRecord.entrySet()) {
+          if (tableEntry.getValue().get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType.name())
+              && tableEntry.getValue().get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)
+              .equals(tableNameWithType)) {
+            controllerJobs.put(tableEntry.getKey(), tableEntry.getValue());
           }
         }
-      } catch (ZkNoNodeException e) {
-        LOGGER.warn("Could not find controller job node for table : {} jobType: {}", tableNameWithType, jobType, e);
+      } catch (Exception e) {
+        LOGGER.warn("Could not find controller job node for table: {} jobType: {} at path: {}", tableNameWithType,
+            jobType, jobsResourcePath, e);
       }
     }
     return controllerJobs;
