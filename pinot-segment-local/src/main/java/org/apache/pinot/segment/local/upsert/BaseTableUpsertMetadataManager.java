@@ -69,6 +69,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected PartialUpsertHandler _partialUpsertHandler;
   protected boolean _enableSnapshot;
   protected double _metadataTTL;
+  protected boolean _enableMetadataTTLForDeletedRecord;
   protected File _tableIndexDir;
   protected ServerMetrics _serverMetrics;
   protected HelixManager _helixManager;
@@ -111,6 +112,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();
     _metadataTTL = upsertConfig.getMetadataTTL();
+    _enableMetadataTTLForDeletedRecord = upsertConfig.isEnabledMetadataTTLForDeletedRecord();
     _tableIndexDir = tableDataManager.getTableDataDir();
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;

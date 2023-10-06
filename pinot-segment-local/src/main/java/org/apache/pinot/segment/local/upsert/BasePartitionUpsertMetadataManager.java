@@ -68,6 +68,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
   protected final double _metadataTTL;
+  protected final boolean _enableMetadataTTLForDeletedRecord;
   protected final File _tableIndexDir;
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
@@ -95,7 +96,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics, boolean enableMetadataTTLForDeletedRecord) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
@@ -105,10 +106,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _partialUpsertHandler = partialUpsertHandler;
     _enableSnapshot = enableSnapshot;
     _metadataTTL = metadataTTL;
+    _enableMetadataTTLForDeletedRecord = enableMetadataTTLForDeletedRecord;
     _tableIndexDir = tableIndexDir;
     _snapshotLock = enableSnapshot ? new ReentrantReadWriteLock() : null;
     _serverMetrics = serverMetrics;
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
+    // we can use _enableMetadataTTLForDeletedRecord in this if-clause but we never persistWatermark in case of
+    // _enableMetadataTTLForDeletedRecord = true so _largestSeenComparisonValue = Double.MIN_VALUE
     if (metadataTTL > 0) {
       _largestSeenComparisonValue = loadWatermark();
     } else {
@@ -129,20 +133,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
-        "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
-        _tableNameWithType);
+        "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(),
+        segmentName, _tableNameWithType);
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
 
     // Skip adding segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
-    if (_largestSeenComparisonValue > 0) {
+    // if _enableMetadataTTLForDeletedRecord is true then update _largestSeenComparisonValue to max comparison value
+    // and do not skip adding segment
+    if (_largestSeenComparisonValue > 0 || _enableMetadataTTLForDeletedRecord) {
       Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");
-      // TODO: Support deletion for TTL. Need to construct queryableDocIds when adding segments out of TTL.
-      Preconditions.checkState(_deleteRecordColumn == null, "Upsert TTL doesn't work with record deletion");
+      Preconditions.checkState(_deleteRecordColumn == null || _enableMetadataTTLForDeletedRecord,
+          "Upsert TTL doesn't work with record deletion without enableMetadataTTLForDeletedRecord flag");
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-      if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+      if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL
+          && !_enableMetadataTTLForDeletedRecord) {
         _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
         MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
         if (validDocIdsSnapshot != null) {
@@ -152,6 +159,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
               segmentName);
         }
         return;
+      }
+      // if _enableMetadataTTLForDeletedRecord is enabled then read _largestSeenComparisonValue from segment max value
+      if (_enableMetadataTTLForDeletedRecord) {
+        _largestSeenComparisonValue = Math.max(_largestSeenComparisonValue, maxComparisonValue.doubleValue());
       }
     }
 
@@ -459,7 +470,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     // Skip removing segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
-    if (_largestSeenComparisonValue > 0) {
+    if (_largestSeenComparisonValue > 0 && !_enableMetadataTTLForDeletedRecord) {
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
       if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {

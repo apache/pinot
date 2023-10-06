@@ -57,6 +57,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Boolean column to indicate whether a records should be deleted")
   private String _deleteRecordColumn;
 
+  @JsonPropertyDescription("Boolean value to enable metadata tll for only deleted record columns")
+  private boolean _enableMetadataTTLForDeletedRecord;
+
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
 
@@ -108,6 +111,10 @@ public class UpsertConfig extends BaseJsonConfig {
   @Nullable
   public String getDeleteRecordColumn() {
     return _deleteRecordColumn;
+  }
+
+  public boolean isEnabledMetadataTTLForDeletedRecord() {
+    return _enableMetadataTTLForDeletedRecord;
   }
 
   public boolean isEnableSnapshot() {
@@ -180,6 +187,10 @@ public class UpsertConfig extends BaseJsonConfig {
     if (deleteRecordColumn != null) {
       _deleteRecordColumn = deleteRecordColumn;
     }
+  }
+
+  public void setEnableMetadataTTLForDeletedRecord(boolean enableMetadataTTLForDeletedRecord) {
+    _enableMetadataTTLForDeletedRecord = enableMetadataTTLForDeletedRecord;
   }
 
   public void setEnableSnapshot(boolean enableSnapshot) {
