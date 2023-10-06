@@ -43,8 +43,8 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
 
   @Getter
   private final PinotConnection _connection;
-  private final PinotControllerTransport _controllerTransport;
   private final String _controllerURL;
+  private final PinotControllerTransport _controllerTransport;
 
   public PinotConnectionMetaData(PinotConnection connection) {
     this(connection, null, null);
