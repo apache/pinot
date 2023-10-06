@@ -25,7 +25,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 /**
  * Reader for json index.
  */
-public interface JsonIndexReader extends IndexReader {
+public interface JsonIndexReader extends IndexReader, DictionaryIdBasedBitmapProvider {
 
   /**
    * Returns the matching document ids for the given filter.

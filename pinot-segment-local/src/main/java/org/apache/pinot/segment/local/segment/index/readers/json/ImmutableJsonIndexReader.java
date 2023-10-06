@@ -101,6 +101,11 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     }
   }
 
+  @Override
+  public ImmutableRoaringBitmap getDocIds(int dictId) {
+    throw new UnsupportedOperationException("Not implemented yet");
+  }
+
   /**
    * Returns {@code true} if the given predicate type is exclusive for json_match calculation, {@code false} otherwise.
    */

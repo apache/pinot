@@ -43,6 +43,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -296,5 +297,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
 
   @Override
   public void close() {
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDocIds(int dictId) {
+    throw new UnsupportedOperationException();
   }
 }
