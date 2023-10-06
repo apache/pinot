@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import lombok.Getter;
 
 
 /**
@@ -29,7 +30,9 @@ import javax.annotation.Nullable;
  */
 public class ResultSetGroup {
   private final List<ResultSet> _resultSets;
+  @Getter
   private final ExecutionStats _executionStats;
+  @Getter
   private final List<PinotClientException> _exceptions;
 
   ResultSetGroup(BrokerResponse brokerResponse) {
@@ -88,14 +91,6 @@ public class ResultSetGroup {
    */
   public ResultSet getResultSet(int index) {
     return _resultSets.get(index);
-  }
-
-  public ExecutionStats getExecutionStats() {
-    return _executionStats;
-  }
-
-  public List<PinotClientException> getExceptions() {
-    return _exceptions;
   }
 
   @Override

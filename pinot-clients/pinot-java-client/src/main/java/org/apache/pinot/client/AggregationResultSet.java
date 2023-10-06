@@ -19,6 +19,7 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.AllArgsConstructor;
 
 
 /**
@@ -26,12 +27,9 @@ import com.fasterxml.jackson.databind.JsonNode;
  * of per aggregation
  * function in the query.
  */
+@AllArgsConstructor
 class AggregationResultSet extends AbstractResultSet {
   private final JsonNode _jsonObject;
-
-  public AggregationResultSet(JsonNode jsonObject) {
-    _jsonObject = jsonObject;
-  }
 
   @Override
   public int getRowCount() {

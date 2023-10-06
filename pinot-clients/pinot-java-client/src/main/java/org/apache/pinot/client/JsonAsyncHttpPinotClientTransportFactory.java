@@ -22,6 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import javax.net.ssl.SSLContext;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -36,8 +38,14 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
   private static final String DEFAULT_BROKER_HANDSHAKE_TIMEOUT_MS = "2000";
   private static final String DEFAULT_BROKER_TLS_V10_ENABLED = "false";
 
+  @Getter
+  @Setter
   private Map<String, String> _headers = new HashMap<>();
+  @Getter
+  @Setter
   private String _scheme = CommonConstants.HTTP_PROTOCOL;
+  @Getter
+  @Setter
   private SSLContext _sslContext = null;
   private boolean _tlsV10Enabled = false;
   private int _readTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
@@ -54,30 +62,6 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
     TlsProtocols tlsProtocols = TlsProtocols.defaultProtocols(_tlsV10Enabled);
     return new JsonAsyncHttpPinotClientTransport(_headers, _scheme, _extraOptionString, _useMultiStageEngine,
         _sslContext, connectionTimeouts, tlsProtocols, _appId);
-  }
-
-  public Map<String, String> getHeaders() {
-    return _headers;
-  }
-
-  public void setHeaders(Map<String, String> headers) {
-    _headers = headers;
-  }
-
-  public String getScheme() {
-    return _scheme;
-  }
-
-  public void setScheme(String scheme) {
-    _scheme = scheme;
-  }
-
-  public SSLContext getSslContext() {
-    return _sslContext;
-  }
-
-  public void setSslContext(SSLContext sslContext) {
-    _sslContext = sslContext;
   }
 
   public JsonAsyncHttpPinotClientTransportFactory withConnectionProperties(Properties properties) {

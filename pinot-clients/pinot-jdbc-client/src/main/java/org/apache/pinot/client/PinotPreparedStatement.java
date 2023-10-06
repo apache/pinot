@@ -25,6 +25,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.client.base.AbstractBasePreparedStatement;
 import org.apache.pinot.client.utils.DateTimeUtils;
@@ -34,13 +36,18 @@ import org.apache.pinot.client.utils.DriverUtils;
 public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   private static final String LIMIT_STATEMENT = "LIMIT";
 
+  @Getter
   private PinotConnection _connection;
   private org.apache.pinot.client.Connection _session;
   private ResultSetGroup _resultSetGroup;
   private PreparedStatement _preparedStatement;
   private String _query;
+  @Getter
   private boolean _closed;
+  @Getter
   private ResultSet _resultSet;
+  @Getter
+  @Setter
   private int _maxRows = Integer.MAX_VALUE;
 
   public PinotPreparedStatement(PinotConnection connection, String query) {
@@ -233,12 +240,6 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   }
 
   @Override
-  public ResultSet getResultSet()
-      throws SQLException {
-    return _resultSet;
-  }
-
-  @Override
   public void close()
       throws SQLException {
     _preparedStatement = null;
@@ -264,23 +265,5 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
   public void setFetchSize(int rows)
       throws SQLException {
     _maxRows = rows;
-  }
-
-  @Override
-  public int getMaxRows()
-      throws SQLException {
-    return _maxRows;
-  }
-
-  @Override
-  public void setMaxRows(int max)
-      throws SQLException {
-    _maxRows = max;
-  }
-
-  @Override
-  public boolean isClosed()
-      throws SQLException {
-    return _closed;
   }
 }

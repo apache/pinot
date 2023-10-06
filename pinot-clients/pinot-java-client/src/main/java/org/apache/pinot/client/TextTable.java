@@ -20,19 +20,18 @@ package org.apache.pinot.client;
 
 import java.util.LinkedList;
 import java.util.List;
+import lombok.NoArgsConstructor;
 
 
 /**
  * Utility class to format tabular data. Useful to display on console for debugging
  */
+@NoArgsConstructor
 public class TextTable {
   private final static char PAD_CHAR = ' ';
 
   private final List<String[]> _rows = new LinkedList<>();
   private String[] _headerColumnNames;
-
-  public TextTable() {
-  }
 
   public void addHeader(String... headerColumnNames) {
     _headerColumnNames = headerColumnNames;

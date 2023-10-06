@@ -19,12 +19,13 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.apache.pinot.client.base.AbstractBaseConnectionMetaData;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.response.SchemaResponse;
@@ -36,23 +37,17 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.client.utils.Constants.*;
 
-
+@AllArgsConstructor
 public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotConnectionMetaData.class);
 
+  @Getter
   private final PinotConnection _connection;
   private final PinotControllerTransport _controllerTransport;
   private final String _controllerURL;
 
   public PinotConnectionMetaData(PinotConnection connection) {
     this(connection, null, null);
-  }
-
-  public PinotConnectionMetaData(PinotConnection connection, String controllerURL,
-      PinotControllerTransport controllerTransport) {
-    _connection = connection;
-    _controllerURL = controllerURL;
-    _controllerTransport = controllerTransport;
   }
 
   @Override
@@ -192,11 +187,5 @@ public class PinotConnectionMetaData extends AbstractBaseConnectionMetaData {
         -1, ordinalPosition, "NO", null, null, null, -1, "NO", "NO"
     };
     pinotMeta.addRow(Arrays.asList(row));
-  }
-
-  @Override
-  public Connection getConnection()
-      throws SQLException {
-    return _connection;
   }
 }

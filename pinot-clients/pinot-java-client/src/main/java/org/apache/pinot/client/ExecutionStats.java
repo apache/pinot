@@ -21,6 +21,8 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 
 
 /**
@@ -30,6 +32,7 @@ import java.util.Map;
  * <p>Please note that objects of this class will hold a reference to the given JsonNode object
  * and that will only be released when the object is GC'ed.</p>
  */
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
 public class ExecutionStats {
 
   private static final String NUM_SERVERS_QUERIED = "numServersQueried";
@@ -48,10 +51,6 @@ public class ExecutionStats {
   private static final String TIME_USED_MS = "timeUsedMs";
 
   private final JsonNode _brokerResponse;
-
-  ExecutionStats(JsonNode brokerResponse) {
-    _brokerResponse = brokerResponse;
-  }
 
   public static ExecutionStats fromJson(JsonNode json) {
     return new ExecutionStats(json);

@@ -34,6 +34,8 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.pinot.client.utils.BrokerSelectorUtils;
 import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -53,26 +55,12 @@ import org.asynchttpclient.Response;
  */
 public class BrokerCache {
 
+  @Getter
+  @Setter
   @JsonIgnoreProperties(ignoreUnknown = true)
   private static class BrokerInstance {
     private String _host;
     private Integer _port;
-
-    public String getHost() {
-      return _host;
-    }
-
-    public void setHost(String host) {
-      _host = host;
-    }
-
-    public Integer getPort() {
-      return _port;
-    }
-
-    public void setPort(Integer port) {
-      _port = port;
-    }
   }
 
   private static final TypeReference<Map<String, List<BrokerInstance>>> RESPONSE_TYPE_REF =

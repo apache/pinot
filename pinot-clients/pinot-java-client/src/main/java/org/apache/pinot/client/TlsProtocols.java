@@ -21,16 +21,16 @@ package org.apache.pinot.client;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+
 
 /**
  * TLS Protocols enabled for AsyncHttpClient
  */
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class TlsProtocols {
     private final List<String> _enabledProtocols;
-
-    private TlsProtocols(List<String> enabledProtocols) {
-        _enabledProtocols = enabledProtocols;
-    }
 
     public List<String> getEnabledProtocols() {
         if (_enabledProtocols != null) {

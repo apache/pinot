@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import lombok.Getter;
 import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
@@ -44,10 +45,13 @@ public class PinotConnection extends AbstractBaseConnection {
     QueryOptionKey.ENABLE_NULL_HANDLING,
     QueryOptionKey.USE_MULTISTAGE_ENGINE
   };
+  @Getter
   private org.apache.pinot.client.Connection _session;
+  @Getter
   private boolean _closed;
   private String _controllerURL;
   private PinotControllerTransport _controllerTransport;
+  @Getter
   private final Map<String, Object> _queryOptions = new HashMap<String, Object>();
 
   public static final String BROKER_LIST = "brokers";
@@ -111,14 +115,6 @@ public class PinotConnection extends AbstractBaseConnection {
     return value;
   }
 
-  public org.apache.pinot.client.Connection getSession() {
-    return _session;
-  }
-
-  public Map<String, Object> getQueryOptions() {
-    return _queryOptions;
-  }
-
   private List<String> getBrokerList(String controllerURL, String tenant) {
     ControllerTenantBrokerResponse controllerTenantBrokerResponse =
         _controllerTransport.getBrokersFromController(controllerURL, tenant);
@@ -157,12 +153,6 @@ public class PinotConnection extends AbstractBaseConnection {
       throws SQLException {
     validateState();
     return new PinotPreparedStatement(this, sql);
-  }
-
-  @Override
-  public boolean isClosed()
-      throws SQLException {
-    return _closed;
   }
 
   @Override

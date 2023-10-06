@@ -21,6 +21,8 @@ package org.apache.pinot.client;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.pinot.client.base.AbstractBaseStatement;
 import org.apache.pinot.client.utils.DriverUtils;
 
@@ -30,8 +32,12 @@ public class PinotStatement extends AbstractBaseStatement {
 
   private final PinotConnection _connection;
   private final org.apache.pinot.client.Connection _session;
+  @Getter
   private boolean _closed;
+  @Getter
   private ResultSet _resultSet;
+  @Getter
+  @Setter
   private int _maxRows = 1000000;
 
   public PinotStatement(PinotConnection connection) {
@@ -102,12 +108,6 @@ public class PinotStatement extends AbstractBaseStatement {
   }
 
   @Override
-  public ResultSet getResultSet()
-      throws SQLException {
-    return _resultSet;
-  }
-
-  @Override
   public Connection getConnection()
       throws SQLException {
     validateState();
@@ -124,23 +124,5 @@ public class PinotStatement extends AbstractBaseStatement {
   public void setFetchSize(int rows)
       throws SQLException {
     _maxRows = rows;
-  }
-
-  @Override
-  public int getMaxRows()
-      throws SQLException {
-    return _maxRows;
-  }
-
-  @Override
-  public void setMaxRows(int max)
-      throws SQLException {
-    _maxRows = max;
-  }
-
-  @Override
-  public boolean isClosed()
-      throws SQLException {
-    return _closed;
   }
 }

@@ -19,11 +19,16 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 
 /**
  * Reimplementation of BrokerResponse from pinot-common, so that pinot-api does not depend on pinot-common.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@Getter
 public class BrokerResponse {
   private String _requestId;
   private String _brokerId;
@@ -32,9 +37,6 @@ public class BrokerResponse {
   private JsonNode _resultTable;
   private JsonNode _exceptions;
   private ExecutionStats _executionStats;
-
-  private BrokerResponse() {
-  }
 
   private BrokerResponse(JsonNode brokerResponse) {
     _requestId = brokerResponse.get("requestId") != null ? brokerResponse.get("requestId").asText() : "unknown";
@@ -50,22 +52,6 @@ public class BrokerResponse {
     return _exceptions != null && !_exceptions.isEmpty();
   }
 
-  public JsonNode getExceptions() {
-    return _exceptions;
-  }
-
-  public JsonNode getAggregationResults() {
-    return _aggregationResults;
-  }
-
-  public JsonNode getSelectionResults() {
-    return _selectionResults;
-  }
-
-  public JsonNode getResultTable() {
-    return _resultTable;
-  }
-
   public int getAggregationResultsSize() {
     if (_aggregationResults == null) {
       return 0;
@@ -74,23 +60,11 @@ public class BrokerResponse {
     }
   }
 
-  public ExecutionStats getExecutionStats() {
-    return _executionStats;
-  }
-
   public static BrokerResponse fromJson(JsonNode json) {
     return new BrokerResponse(json);
   }
 
   public static BrokerResponse empty() {
     return new BrokerResponse();
-  }
-
-  public String getRequestId() {
-    return _requestId;
-  }
-
-  public String getBrokerId() {
-    return _brokerId;
   }
 }

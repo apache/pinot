@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
 import java.net.URI;
 import java.sql.Connection;
@@ -34,6 +33,8 @@ import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
@@ -43,6 +44,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.LoggerFactory;
 
 
+@NoArgsConstructor
+@AllArgsConstructor
 public class PinotDriver implements Driver {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(PinotDriver.class);
   private static final String URI_SCHEME = "pinot";
@@ -52,13 +55,6 @@ public class PinotDriver implements Driver {
   public static final String INFO_HEADERS = "headers";
 
   private SSLContext _sslContext = null;
-
-  public PinotDriver() { }
-
-  @VisibleForTesting
-  public PinotDriver(SSLContext sslContext) {
-    _sslContext = sslContext;
-  }
 
   /**
    * Created connection to Pinot Controller from provided properties.

@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
+import lombok.AllArgsConstructor;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -45,6 +46,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Reads brokers external view from Zookeeper
  */
+@AllArgsConstructor
 public class ExternalViewReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExternalViewReader.class);
   private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;
@@ -61,10 +63,6 @@ public class ExternalViewReader {
 
   @VisibleForTesting
   boolean _preferTlsPort;
-  public ExternalViewReader(ZkClient zkClient, boolean preferTlsPort) {
-    _preferTlsPort = preferTlsPort;
-    _zkClient = zkClient;
-  }
   public ExternalViewReader(ZkClient zkClient) {
     this(zkClient, false);
   }
