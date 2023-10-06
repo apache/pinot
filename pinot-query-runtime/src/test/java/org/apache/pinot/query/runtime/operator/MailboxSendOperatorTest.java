@@ -183,7 +183,7 @@ public class MailboxSendOperatorTest {
   }
 
   @Test
-  public void shouldEarlyTerminateWhenUpstreamIndicates()
+  public void shouldEarlyTerminateWhenUpstreamWhenIndicated()
       throws Exception {
     // Given:
     TransferableBlock dataBlock =
