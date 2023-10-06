@@ -359,6 +359,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Can I use streams (use something like IntStreamRange) to create the sequence of docIds?
         for (int docId : sortedDocIds) {
           Object columnValueToIndex = colReader.getValue(docId);
+
+          // TODO(Erich): is this really needed?  I guess this would mean that the doc does not exist in the column?
+          // TODO(Erich): is it an invariant that every docId will have a value in every column? So a missing DocId is a fault
           if (columnValueToIndex == null) {
             throw new RuntimeException("Null value for column:" + columnName);
           }
@@ -368,12 +371,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
           SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
 
+          // TODO(ERICH): does this need to be done here? Isn't it done at ingestion time?
           if (fieldSpec.isSingleValueField()) {
             indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
           } else {
             indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
           }
 
+          // TODO(ERICH): Can we get rid of this if and use bitwise operations?
           if(_nullHandlingEnabled) {
             /*
             handling null values
@@ -384,7 +389,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               - PSegRecReader calls PinotSegmentColumnReader.isNull on the doc id to determine if the value for that column of that docId is null
               - if it returns true and we are NOT skipping null values we put the default null value into that field of the GenericRow
              */
-            nullVec.setNull(docId);
+            if(colReader.isNull(docId)){
+              nullVec.setNull(docId);
+            }
           }
         }
       } else {
@@ -415,7 +422,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               - PSegRecReader calls PinotSegmentColumnReader.isNull on the doc id to determine if the value for that column of that docId is null
               - if it returns true and we are NOT skipping null values we put the default null value into that field of the GenericRow
              */
-            nullVec.setNull(docId);
+            //TODO(Erich): do we need to check the Skip Null Values flag here?  Yes, it's done in PinotRecordReader
+            if(colReader.isNull(docId)){
+              nullVec.setNull(docId);
+            }
           }
         }
       }
