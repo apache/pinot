@@ -116,15 +116,22 @@ public class RequestUtils {
     Expression expression = new Expression(ExpressionType.LITERAL);
     Literal literal = new Literal();
     if (node instanceof SqlNumericLiteral) {
-      // TODO: support different integer and floating point type.
-      // Mitigate calcite NPE bug, we need to check if SqlNumericLiteral.getScale() is null before calling
-      // SqlNumericLiteral.isInteger(). TODO: Undo this fix once a Calcite release that contains CALCITE-4199 is
-      // available and Pinot has been upgraded to use such a release.
+      BigDecimal bigDecimalValue = node.bigDecimalValue();
+      assert bigDecimalValue != null;
       SqlNumericLiteral sqlNumericLiteral = (SqlNumericLiteral) node;
-      if (sqlNumericLiteral.getScale() != null && sqlNumericLiteral.isInteger()) {
-        literal.setLongValue(node.bigDecimalValue().longValue());
+      if (sqlNumericLiteral.isExact() && sqlNumericLiteral.isInteger()) {
+        long longValue = bigDecimalValue.longValue();
+        /* TODO: Uncomment this after releasing 1.1 because server side int support is added after releasing 1.0
+        if (longValue <= Integer.MAX_VALUE && longValue >= Integer.MIN_VALUE) {
+          literal.setIntValue((int) longValue);
+        } else {
+          literal.setLongValue(longValue);
+        }
+         */
+        literal.setLongValue(longValue);
       } else {
-        literal.setDoubleValue(node.bigDecimalValue().doubleValue());
+        // TODO: Support exact decimal value
+        literal.setDoubleValue(bigDecimalValue.doubleValue());
       }
     } else {
       switch (node.getTypeName()) {
@@ -156,11 +163,27 @@ public class RequestUtils {
     return expression;
   }
 
+  /* TODO: Uncomment this after releasing 1.1 because server side int support is added after releasing 1.0
+  public static Expression getLiteralExpression(int value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setIntValue(value);
+    return expression;
+  }
+   */
+
   public static Expression getLiteralExpression(long value) {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setLongValue(value);
     return expression;
   }
+
+  /* TODO: Uncomment this after releasing 1.1 because float is added after releasing 1.0
+  public static Expression getLiteralExpression(float value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setFloatValue(Float.floatToRawIntBits(value));
+    return expression;
+  }
+   */
 
   public static Expression getLiteralExpression(double value) {
     Expression expression = createNewLiteralExpression();
@@ -198,6 +221,14 @@ public class RequestUtils {
     if (object == null) {
       return getNullLiteralExpression();
     }
+    /* TODO: Uncomment this after releasing 1.1 because server side int support is added after releasing 1.0
+    if (object instanceof Integer) {
+      return RequestUtils.getLiteralExpression((int) object);
+    }
+    if (object instanceof Long) {
+      return RequestUtils.getLiteralExpression((long) object);
+    }
+     */
     if (object instanceof Integer || object instanceof Long) {
       return RequestUtils.getLiteralExpression(((Number) object).longValue());
     }
@@ -206,16 +237,17 @@ public class RequestUtils {
       // or ((Float) object).doubleValue() because the latter two will return slightly different values
       // For example, if object is 0.06f, Double.parseDouble(object.toString()) will return 0.06, while
       // ((Number) object).doubleValue() or ((Float) object).doubleValue() will return 0.05999999865889549
+      // TODO: Switch to RequestUtils.getLiteralExpression(float value) after releasing 1.1
       return RequestUtils.getLiteralExpression(Double.parseDouble(object.toString()));
     }
     if (object instanceof Double) {
-      return RequestUtils.getLiteralExpression(((Double) object).doubleValue());
+      return RequestUtils.getLiteralExpression((double) object);
     }
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
     }
     if (object instanceof Boolean) {
-      return RequestUtils.getLiteralExpression(((Boolean) object).booleanValue());
+      return RequestUtils.getLiteralExpression((boolean) object);
     }
     return RequestUtils.getLiteralExpression(object.toString());
   }
@@ -264,6 +296,11 @@ public class RequestUtils {
       return expression.getIdentifier().getName();
     }
     if (expression.getLiteral() != null) {
+      /* TODO: Uncomment this after releasing 1.1 because server side int support is added after releasing 1.0
+      if (expression.getLiteral().isSetIntValue()) {
+        return Integer.toString(expression.getLiteral().getIntValue());
+      )
+       */
       if (expression.getLiteral().isSetLongValue()) {
         return Long.toString(expression.getLiteral().getLongValue());
       }

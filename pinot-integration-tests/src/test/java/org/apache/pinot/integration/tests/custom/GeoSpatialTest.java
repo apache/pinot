@@ -304,11 +304,11 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
     {
       String query =
           String.format("Select "
-                  + "ST_Point(a.st_x, a.st_y, -1), "
+                  + "ST_Point(a.st_x, a.st_y, 0), "
                   + "ST_Point(a.st_x, a.st_y, 1), "
                   + "b.st_point, "
                   + "b.st_point_1, "
-                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, -1), b.st_point), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, 0), b.st_point), "
                   + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, 1), b.st_point_1) "
                   + "FROM %s a "
                   + "JOIN %s b "

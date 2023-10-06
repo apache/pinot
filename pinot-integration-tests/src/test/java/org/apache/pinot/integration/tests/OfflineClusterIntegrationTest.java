@@ -998,6 +998,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFunctionWithLiteral(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    testQuery("SELECT SUM(10) FROM mytable");
+    testQuery("SELECT ArrDelay + 10 FROM mytable");
+    testQuery("SELECT ArrDelay + '10' FROM mytable");
+    testQuery("SELECT SUM(ArrDelay + 10) FROM mytable");
+    testQuery("SELECT SUM(ArrDelay + '10') FROM mytable");
+  }
+
   @Test
   public void testLiteralOnlyFuncV1()
       throws Exception {
@@ -1818,7 +1830,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(), "[\"min(div(DaysSinceEpoch,'2'))\"]");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"min(div(DaysSinceEpoch,2))\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\"]");
     rows = resultTable.get("rows");
     assertEquals(rows.size(), 1);

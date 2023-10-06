@@ -84,7 +84,7 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     query = "SELECT VALUEIN(column7, 363, 469, 246, 100000), COUNTMV(column6) FROM testTable"
         + " GROUP BY VALUEIN(column7, 363, 469, 246, 100000) ORDER BY COUNTMV(column6)";
     brokerResponse = getBrokerResponse(query);
-    expectedDataSchema = new DataSchema(new String[]{"valuein(column7,'363','469','246','100000')", "countmv(column6)"},
+    expectedDataSchema = new DataSchema(new String[]{"valuein(column7,363,469,246,100000)", "countmv(column6)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG});
     expectedResultTable = new ResultTable(expectedDataSchema,
         Arrays.asList(new Object[]{246, 24300L}, new Object[]{469, 33576L}, new Object[]{363, 35436L}));

@@ -226,7 +226,7 @@ public class InterSegmentGroupBySingleValueQueriesTest extends BaseSingleValueQu
     // group by UDF order by UDF
     query = "SELECT sub(column1, 100000), COUNT(*) FROM testTable"
         + " GROUP BY sub(column1, 100000) ORDER BY sub(column1, 100000) LIMIT 3";
-    dataSchema = new DataSchema(new String[]{"sub(column1,'100000')", "count(*)"},
+    dataSchema = new DataSchema(new String[]{"sub(column1,100000)", "count(*)"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.LONG});
     results = Arrays.asList(new Object[]{140528.0, 28L}, new Object[]{194355.0, 12L}, new Object[]{532157.0, 12L});
     entries.add(new Object[]{query, 120000L, new ResultTable(dataSchema, results)});
@@ -235,7 +235,7 @@ public class InterSegmentGroupBySingleValueQueriesTest extends BaseSingleValueQu
     query =
         "SELECT sub(column1, 100000), COUNT(*) FROM testTable GROUP BY sub(column1, 100000) ORDER BY SUB(   column1, "
             + "100000\t) LIMIT 3";
-    dataSchema = new DataSchema(new String[]{"sub(column1,'100000')", "count(*)"},
+    dataSchema = new DataSchema(new String[]{"sub(column1,100000)", "count(*)"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.LONG});
     results = Arrays.asList(new Object[]{140528.0, 28L}, new Object[]{194355.0, 12L}, new Object[]{532157.0, 12L});
     entries.add(new Object[]{query, 120000L, new ResultTable(dataSchema, results)});

@@ -36,7 +36,6 @@ import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Geometry;
 import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -70,10 +69,10 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
       _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
-      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(1).getLiteral().getStringValue()));
+      _geometry = GeometrySerializer.deserialize(arguments.get(1).getLiteral().getBytesValue());
     } else {
       _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
-      _geometry = GeometrySerializer.deserialize(BytesUtils.toBytes(arguments.get(0).getLiteral().getStringValue()));
+      _geometry = GeometrySerializer.deserialize(arguments.get(0).getLiteral().getBytesValue());
     }
     // must be some h3 index
     assert _h3IndexReader != null : "the column must have H3 index setup.";

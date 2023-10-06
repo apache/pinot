@@ -18,20 +18,16 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -42,14 +38,7 @@ import org.roaringbitmap.RoaringBitmap;
 public class LiteralTransformFunction implements TransformFunction {
   public static final String FUNCTION_NAME = "literal";
 
-  private final Object _literal;
-  private final DataType _dataType;
-  private final int _intLiteral;
-  private final long _longLiteral;
-  private final float _floatLiteral;
-  private final double _doubleLiteral;
-  private final BigDecimal _bigDecimalLiteral;
-  private final byte[] _bytesLiteral;
+  private final LiteralContext _literalContext;
 
   // literals may be shared but values are intentionally not volatile as assignment races are benign
   private int[] _intResult;
@@ -61,47 +50,43 @@ public class LiteralTransformFunction implements TransformFunction {
   private byte[][] _bytesResult;
 
   public LiteralTransformFunction(LiteralContext literalContext) {
-    Preconditions.checkNotNull(literalContext);
-    _literal = literalContext.getValue();
-    _dataType = literalContext.getType();
-    _bigDecimalLiteral = literalContext.getBigDecimalValue();
-    _intLiteral = _bigDecimalLiteral.intValue();
-    _longLiteral = _bigDecimalLiteral.longValue();
-    _floatLiteral = _bigDecimalLiteral.floatValue();
-    _doubleLiteral = _bigDecimalLiteral.doubleValue();
-    _bytesLiteral = (_dataType == DataType.BYTES) ? (byte[]) _literal : null;
+    _literalContext = literalContext;
   }
 
   public boolean getBooleanLiteral() {
-    return BooleanUtils.toBoolean(_literal);
+    return _literalContext.getBooleanValue();
   }
 
   public int getIntLiteral() {
-    return _intLiteral;
+    return _literalContext.getIntValue();
   }
 
   public long getLongLiteral() {
-    return _longLiteral;
+    return _literalContext.getLongValue();
   }
 
   public float getFloatLiteral() {
-    return _floatLiteral;
+    return _literalContext.getFloatValue();
   }
 
   public double getDoubleLiteral() {
-    return _doubleLiteral;
+    return _literalContext.getDoubleValue();
   }
 
   public BigDecimal getBigDecimalLiteral() {
-    return _bigDecimalLiteral;
+    return _literalContext.getBigDecimalValue();
   }
 
   public String getStringLiteral() {
-    return String.valueOf(_literal);
+    return _literalContext.getStringValue();
   }
 
   public byte[] getBytesLiteral() {
-    return (_bytesLiteral != null) ? _bytesLiteral : BytesUtils.toBytes(getStringLiteral());
+    return _literalContext.getBytesValue();
+  }
+
+  public boolean isNull() {
+    return _literalContext.isNull();
   }
 
   @Override
@@ -115,7 +100,7 @@ public class LiteralTransformFunction implements TransformFunction {
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return new TransformResultMetadata(_dataType, true, false);
+    return new TransformResultMetadata(_literalContext.getType(), true, false);
   }
 
   @Override
@@ -138,13 +123,10 @@ public class LiteralTransformFunction implements TransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] intResult = _intResult;
     if (intResult == null || intResult.length < numDocs) {
+      int intValue = getIntLiteral();
       intResult = new int[numDocs];
-      if (_dataType != DataType.BOOLEAN) {
-        if (_intLiteral != 0) {
-          Arrays.fill(intResult, _intLiteral);
-        }
-      } else {
-        Arrays.fill(intResult, _intLiteral);
+      if (intValue != 0) {
+        Arrays.fill(intResult, intValue);
       }
       _intResult = intResult;
     }
@@ -156,13 +138,10 @@ public class LiteralTransformFunction implements TransformFunction {
     int numDocs = valueBlock.getNumDocs();
     long[] longResult = _longResult;
     if (longResult == null || longResult.length < numDocs) {
+      long longValue = getLongLiteral();
       longResult = new long[numDocs];
-      if (_dataType != DataType.TIMESTAMP) {
-        if (_longLiteral != 0) {
-          Arrays.fill(longResult, _longLiteral);
-        }
-      } else {
-        Arrays.fill(longResult, Timestamp.valueOf(getStringLiteral()).getTime());
+      if (longValue != 0) {
+        Arrays.fill(longResult, longValue);
       }
       _longResult = longResult;
     }
@@ -174,9 +153,10 @@ public class LiteralTransformFunction implements TransformFunction {
     int numDocs = valueBlock.getNumDocs();
     float[] floatResult = _floatResult;
     if (floatResult == null || floatResult.length < numDocs) {
+      float floatValue = getFloatLiteral();
       floatResult = new float[numDocs];
-      if (_floatLiteral != 0F) {
-        Arrays.fill(floatResult, _floatLiteral);
+      if (floatValue != 0) {
+        Arrays.fill(floatResult, floatValue);
       }
       _floatResult = floatResult;
     }
@@ -188,9 +168,10 @@ public class LiteralTransformFunction implements TransformFunction {
     int numDocs = valueBlock.getNumDocs();
     double[] doubleResult = _doubleResult;
     if (doubleResult == null || doubleResult.length < numDocs) {
+      double doubleValue = getDoubleLiteral();
       doubleResult = new double[numDocs];
-      if (_doubleLiteral != 0) {
-        Arrays.fill(doubleResult, _doubleLiteral);
+      if (doubleValue != 0) {
+        Arrays.fill(doubleResult, doubleValue);
       }
       _doubleResult = doubleResult;
     }
@@ -203,7 +184,7 @@ public class LiteralTransformFunction implements TransformFunction {
     BigDecimal[] bigDecimalResult = _bigDecimalResult;
     if (bigDecimalResult == null || bigDecimalResult.length < numDocs) {
       bigDecimalResult = new BigDecimal[numDocs];
-      Arrays.fill(bigDecimalResult, _bigDecimalLiteral);
+      Arrays.fill(bigDecimalResult, getBigDecimalLiteral());
       _bigDecimalResult = bigDecimalResult;
     }
     return bigDecimalResult;
@@ -227,7 +208,6 @@ public class LiteralTransformFunction implements TransformFunction {
     byte[][] bytesResult = _bytesResult;
     if (bytesResult == null || bytesResult.length < numDocs) {
       bytesResult = new byte[numDocs][];
-      // TODO: Handle null literal
       Arrays.fill(bytesResult, getBytesLiteral());
       _bytesResult = bytesResult;
     }
@@ -264,19 +244,15 @@ public class LiteralTransformFunction implements TransformFunction {
     throw new UnsupportedOperationException();
   }
 
+  @Nullable
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    // Treat all unknown type values as null regardless of the value.
-    if (_dataType != DataType.UNKNOWN) {
+    if (!isNull()) {
       return null;
     }
     int length = valueBlock.getNumDocs();
     RoaringBitmap bitmap = new RoaringBitmap();
     bitmap.add(0L, length);
     return bitmap;
-  }
-
-  public boolean isNull() {
-    return _dataType == DataType.UNKNOWN;
   }
 }

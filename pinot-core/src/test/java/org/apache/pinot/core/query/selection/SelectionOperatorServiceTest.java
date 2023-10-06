@@ -96,9 +96,9 @@ public class SelectionOperatorServiceTest {
         "SELECT add(foo, 1), foo, sub(bar, 2 ), bar, foo, foobar, bar FROM testTable");
     List<ExpressionContext> expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 5);
-    assertEquals(expressions.get(0).toString(), "add(foo,'1')");
+    assertEquals(expressions.get(0).toString(), "add(foo,1)");
     assertEquals(expressions.get(1).toString(), "foo");
-    assertEquals(expressions.get(2).toString(), "sub(bar,'2')");
+    assertEquals(expressions.get(2).toString(), "sub(bar,2)");
     assertEquals(expressions.get(3).toString(), "bar");
     assertEquals(expressions.get(4).toString(), "foobar");
 
@@ -117,8 +117,8 @@ public class SelectionOperatorServiceTest {
     expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 5);
     assertEquals(expressions.get(0).toString(), "foo");
-    assertEquals(expressions.get(1).toString(), "sub(bar,'2')");
-    assertEquals(expressions.get(2).toString(), "add(foo,'1')");
+    assertEquals(expressions.get(1).toString(), "sub(bar,2)");
+    assertEquals(expressions.get(2).toString(), "add(foo,1)");
     assertEquals(expressions.get(3).toString(), "bar");
     assertEquals(expressions.get(4).toString(), "foobar");
 
@@ -128,7 +128,7 @@ public class SelectionOperatorServiceTest {
     expressions = SelectionOperatorUtils.extractExpressions(queryContext, indexSegment);
     assertEquals(expressions.size(), 4);
     assertEquals(expressions.get(0).toString(), "foo");
-    assertEquals(expressions.get(1).toString(), "sub(bar,'2')");
+    assertEquals(expressions.get(1).toString(), "sub(bar,2)");
     assertEquals(expressions.get(2).toString(), "bar");
     assertEquals(expressions.get(3).toString(), "foobar");
   }
@@ -140,10 +140,10 @@ public class SelectionOperatorServiceTest {
     List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(
         QueryContextConverterUtils.getQueryContext("SELECT add(foo, 1), sub(bar, 2), foobar FROM testTable"),
         dataSchema);
-    assertEquals(selectionColumns, Arrays.asList("add(foo,'1')", "sub(bar,'2')", "foobar"));
+    assertEquals(selectionColumns, Arrays.asList("add(foo,1)", "sub(bar,2)", "foobar"));
 
     // 'SELECT *' should return columns (no transform expressions) in alphabetical order
-    when(dataSchema.getColumnNames()).thenReturn(new String[]{"add(foo,'1')", "sub(bar,'2')", "foo", "bar", "foobar"});
+    when(dataSchema.getColumnNames()).thenReturn(new String[]{"add(foo,1)", "sub(bar,2)", "foo", "bar", "foobar"});
     selectionColumns = SelectionOperatorUtils.getSelectionColumns(
         QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable ORDER BY add(foo, 1), sub(bar, 2), foo"),
         dataSchema);

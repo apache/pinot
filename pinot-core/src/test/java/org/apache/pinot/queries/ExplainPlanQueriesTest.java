@@ -568,8 +568,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result1.add(new Object[]{"SELECT(selectList:case(less_than(noIndexCol1,'10'),'less','more'))", 3, 2});
-    result1.add(new Object[]{"TRANSFORM(case(less_than(noIndexCol1,'10'),'less','more'))", 4, 3});
+    result1.add(new Object[]{"SELECT(selectList:case(less_than(noIndexCol1,10),'less','more'))", 3, 2});
+    result1.add(new Object[]{"TRANSFORM(case(less_than(noIndexCol1,10),'less','more'))", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
@@ -602,8 +602,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result1.add(new Object[]{"SELECT(selectList:case(less_than(noIndexCol1,'10'),'less','more'))", 3, 2});
-    result1.add(new Object[]{"TRANSFORM(case(less_than(noIndexCol1,'10'),'less','more'))", 4, 3});
+    result1.add(new Object[]{"SELECT(selectList:case(less_than(noIndexCol1,10),'less','more'))", 3, 2});
+    result1.add(new Object[]{"TRANSFORM(case(less_than(noIndexCol1,10),'less','more'))", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
@@ -633,13 +633,13 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         + "ORDER BY 1";
     List<Object[]> result1 = new ArrayList<>();
     result1.add(
-        new Object[]{"BROKER_REDUCE(sort:[case(less_than(noIndexCol1,'10'),'less','more') ASC],limit:10)", 1, 0});
+        new Object[]{"BROKER_REDUCE(sort:[case(less_than(noIndexCol1,10),'less','more') ASC],limit:10)", 1, 0});
     result1.add(new Object[]{"COMBINE_SELECT_ORDERBY", 2, 1});
     result1.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result1.add(new Object[]{"SELECT_ORDERBY(selectList:case(less_than(noIndexCol1,'10'),'less','more'))", 3, 2});
-    result1.add(new Object[]{"TRANSFORM(case(less_than(noIndexCol1,'10'),'less','more'))", 4, 3});
+    result1.add(new Object[]{"SELECT_ORDERBY(selectList:case(less_than(noIndexCol1,10),'less','more'))", 3, 2});
+    result1.add(new Object[]{"TRANSFORM(case(less_than(noIndexCol1,10),'less','more'))", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
@@ -668,13 +668,13 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         + "'more' END  FROM testTable ORDER BY 1";
     List<Object[]> result1 = new ArrayList<>();
     result1.add(
-        new Object[]{"BROKER_REDUCE(sort:[case(less_than(noIndexCol1,'10'),'less','more') ASC],limit:10)", 1, 0});
+        new Object[]{"BROKER_REDUCE(sort:[case(less_than(noIndexCol1,10),'less','more') ASC],limit:10)", 1, 0});
     result1.add(new Object[]{"COMBINE_SELECT_ORDERBY", 2, 1});
     result1.add(new Object[]{
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
-    result1.add(new Object[]{"SELECT_ORDERBY(selectList:case(less_than(noIndexCol1,'10'),'less','more'))", 3, 2});
-    result1.add(new Object[]{"TRANSFORM(case(less_than(noIndexCol1,'10'),'less','more'))", 4, 3});
+    result1.add(new Object[]{"SELECT_ORDERBY(selectList:case(less_than(noIndexCol1,10),'less','more'))", 3, 2});
+    result1.add(new Object[]{"TRANSFORM(case(less_than(noIndexCol1,10),'less','more'))", 4, 3});
     result1.add(new Object[]{"PROJECT(noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
@@ -735,7 +735,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "FILTER_EXPRESSION(operator:RANGE,predicate:div(noIndexCol1,noIndexCol2) BETWEEN '10' AND '20')", 7, 6
     });
     result2.add(
-        new Object[]{"FILTER_EXPRESSION(operator:RANGE,predicate:times(invertedIndexCol1,'5') < '1000')", 8, 6});
+        new Object[]{"FILTER_EXPRESSION(operator:RANGE,predicate:times(invertedIndexCol1,5) < '1000')", 8, 6});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
 
     // All segments have a match for noIndexCol2 'between 2 and 101'
@@ -857,7 +857,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "FILTER_EXPRESSION(operator:RANGE,predicate:div(noIndexCol1,noIndexCol2) BETWEEN '10' AND '20')", 7, 6
     });
     result2.add(
-        new Object[]{"FILTER_EXPRESSION(operator:RANGE,predicate:times(invertedIndexCol1,'5') < '1000')", 8, 6});
+        new Object[]{"FILTER_EXPRESSION(operator:RANGE,predicate:times(invertedIndexCol1,5) < '1000')", 8, 6});
     check(query2, new ResultTable(DATA_SCHEMA, result2));
 
     // All segments have a match for noIndexCol2 'between 2 and 101'

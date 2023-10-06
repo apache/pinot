@@ -255,7 +255,8 @@ public class ServerPlanRequestUtils {
         }
         Arrays.sort(arrFloat);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          expressions.add(RequestUtils.getLiteralExpression(arrFloat[rowIdx]));
+          // TODO: Create float literal when it is supported
+          expressions.add(RequestUtils.getLiteralExpression(Double.parseDouble(Float.toString(arrFloat[rowIdx]))));
         }
         break;
       case DOUBLE:

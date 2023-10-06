@@ -38,6 +38,7 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.babel.SqlBabelParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -459,8 +460,14 @@ public class SqlResultComparator {
     JsonNode expectedColumnDataTypes =
         expected.get(FIELD_RESULT_TABLE).get(FIELD_DATA_SCHEMA).get(FIELD_COLUMN_DATA_TYPES);
 
-    String actualDataSchemaStr = actualColumnNames.toString() + actualColumnDataTypes.toString();
-    String expectedDataSchemaStr = expectedColumnNames.toString() + expectedColumnDataTypes.toString();
+    // https://github.com/apache/pinot/pull/11749 changes the literal string to reflect the actual data type, which can
+    // cause different column name (e.g "add(col,1)" vs "add(col,'1')"). We allow this change, so removing the single
+    // quotes during the check.
+    // TODO: Remove this special handling after the base version includes the change.
+    String actualDataSchemaStr =
+        StringUtils.remove(actualColumnNames.toString(), '\'') + actualColumnDataTypes.toString();
+    String expectedDataSchemaStr =
+        StringUtils.remove(expectedColumnNames.toString(), '\'') + expectedColumnDataTypes.toString();
     if (!actualDataSchemaStr.equals(expectedDataSchemaStr)) {
       LOGGER.error("The dataSchema don't match! Actual: {}, Expected: {}", actualDataSchemaStr, expectedDataSchemaStr);
       return false;

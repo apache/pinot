@@ -556,14 +556,14 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     Object groupByExplainPlan = brokerResponse.getResultTable().getRows().get(3)[0];
     Assert.assertTrue(groupByExplainPlan
-        .toString().contains("child_exprMin('0', mvIntColumn, mvIntColumn, intColumn)"));
+        .toString().contains("child_exprMin(0, mvIntColumn, mvIntColumn, intColumn)"));
     Assert.assertTrue(groupByExplainPlan
         .toString()
-        .contains("child_exprMin('1', mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
+        .contains("child_exprMin(1, mvStringColumn, mvStringColumn, intColumn, doubleColumn)"));
     Assert.assertTrue(groupByExplainPlan
-        .toString().contains("parent_exprMin('0', '1', intColumn, mvIntColumn)"));
+        .toString().contains("parent_exprMin(0, 1, intColumn, mvIntColumn)"));
     Assert.assertTrue(groupByExplainPlan
-        .toString().contains("parent_exprMin('1', '2', intColumn, doubleColumn, mvStringColumn)"));
+        .toString().contains("parent_exprMin(1, 2, intColumn, doubleColumn, mvStringColumn)"));
   }
 
   @Test

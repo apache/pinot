@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
@@ -39,8 +38,6 @@ import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -69,19 +66,12 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     // TODO: handle nested geography/geometry conversion functions
     List<ExpressionContext> arguments = predicate.getLhs().getFunction().getArguments();
     Coordinate coordinate;
-    LiteralContext literal;
     if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER) {
       _h3IndexReader = segment.getDataSource(arguments.get(0).getIdentifier()).getH3Index();
-      literal = arguments.get(1).getLiteral();
+      coordinate = GeometrySerializer.deserialize(arguments.get(1).getLiteral().getBytesValue()).getCoordinate();
     } else {
       _h3IndexReader = segment.getDataSource(arguments.get(1).getIdentifier()).getH3Index();
-      literal = arguments.get(0).getLiteral();
-    }
-    if (literal.getType() == FieldSpec.DataType.BYTES) {
-      coordinate = GeometrySerializer.deserialize((byte[]) literal.getValue()).getCoordinate();
-    } else {
-      coordinate = GeometrySerializer.deserialize(BytesUtils.toBytes(literal.getStringValue()))
-          .getCoordinate();
+      coordinate = GeometrySerializer.deserialize(arguments.get(0).getLiteral().getBytesValue()).getCoordinate();
     }
     assert _h3IndexReader != null;
     int resolution = _h3IndexReader.getH3IndexResolution().getLowestResolution();
