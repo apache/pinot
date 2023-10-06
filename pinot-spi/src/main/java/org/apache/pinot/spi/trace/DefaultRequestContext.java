@@ -185,6 +185,11 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public void setTableName(String tableName) {
+    _tableNames.add(tableName);
+  }
+
+  @Override
   public void setTableNames(List<String> tableNames) {
     _tableNames.addAll(tableNames);
   }
@@ -252,6 +257,14 @@ public class DefaultRequestContext implements RequestScope {
   @Override
   public String getQuery() {
     return _query;
+  }
+
+  @Override
+  public String getTableName() {
+    if (_tableNames.size() == 0) {
+      return DEFAULT_TABLE_NAME;
+    }
+    return _tableNames.get(0);
   }
 
   @Override

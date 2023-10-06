@@ -67,6 +67,8 @@ public interface RequestContext {
 
   void setQuery(String pql);
 
+  void setTableName(String tableName);
+
   void setTableNames(List<String> tableNames);
 
   void setQueryProcessingTime(long processingTimeMillis);
@@ -94,6 +96,8 @@ public interface RequestContext {
   int getErrorCode();
 
   String getQuery();
+
+  String getTableName();
 
   List<String> getTableNames();
 

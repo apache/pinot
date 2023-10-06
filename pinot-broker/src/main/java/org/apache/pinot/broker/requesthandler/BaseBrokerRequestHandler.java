@@ -366,7 +366,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String tableName = getActualTableName(dataSource.getTableName(), _tableCache);
       dataSource.setTableName(tableName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-      requestContext.setTableNames(Collections.singletonList(rawTableName));
+      requestContext.setTableName(rawTableName);
 
       try {
         boolean isCaseInsensitive = _tableCache.isIgnoreCase();
