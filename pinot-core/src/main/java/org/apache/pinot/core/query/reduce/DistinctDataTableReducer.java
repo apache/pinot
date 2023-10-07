@@ -109,25 +109,28 @@ public class DistinctDataTableReducer implements DataTableReducer {
       }
     }
 
+    // Recompute the column names from the query context because the string representation of expression can change,
+    // which will cause mismatch between the column names sent from server and order-by expressions from the broker.
+    List<ExpressionContext> selectExpressions = _queryContext.getSelectExpressions();
+    int numSelectExpressions = selectExpressions.size();
+    String[] columnNames = new String[numSelectExpressions];
+    for (int i = 0; i < numSelectExpressions; i++) {
+      columnNames[i] = selectExpressions.get(i).toString();
+    }
+
     if (nonEmptyDistinctTables.isEmpty()) {
       // All the DistinctTables are empty, construct an empty response
       // TODO: This returns schema with all STRING data types.
       //       There's no way currently to get the data types of the distinct columns for empty results
-      List<ExpressionContext> expressions = _queryContext.getSelectExpressions();
-      int numExpressions = expressions.size();
-      String[] columns = new String[numExpressions];
-      for (int i = 0; i < numExpressions; i++) {
-        columns[i] = expressions.get(i).toString();
-      }
-      ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
+      ColumnDataType[] columnDataTypes = new ColumnDataType[numSelectExpressions];
       Arrays.fill(columnDataTypes, ColumnDataType.STRING);
       brokerResponseNative.setResultTable(
-          new ResultTable(new DataSchema(columns, columnDataTypes), Collections.emptyList()));
+          new ResultTable(new DataSchema(columnNames, columnDataTypes), Collections.emptyList()));
     } else {
       // Construct a main DistinctTable and merge all non-empty DistinctTables into it
-      DistinctTable mainDistinctTable =
-          new DistinctTable(nonEmptyDistinctTables.get(0).getDataSchema(), _queryContext.getOrderByExpressions(),
-              _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
+      DistinctTable mainDistinctTable = new DistinctTable(
+          new DataSchema(columnNames, nonEmptyDistinctTables.get(0).getDataSchema().getColumnDataTypes()),
+          _queryContext.getOrderByExpressions(), _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
       for (DistinctTable distinctTable : nonEmptyDistinctTables) {
         mainDistinctTable.mergeTable(distinctTable);
       }

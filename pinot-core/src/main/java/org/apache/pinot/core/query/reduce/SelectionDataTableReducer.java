@@ -62,8 +62,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       // For empty data table map, construct empty result using the cached data schema for selection query
-      List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(_queryContext, dataSchema);
-      DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(dataSchema, selectionColumns);
+      DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(_queryContext, dataSchema);
       brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
       return;
     }

@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.selection;
 
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -58,7 +57,6 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class SelectionOperatorService {
   private final QueryContext _queryContext;
-  private final List<String> _selectionColumns;
   private final DataSchema _dataSchema;
   private final int _offset;
   private final int _numRowsToKeep;
@@ -72,7 +70,6 @@ public class SelectionOperatorService {
    */
   public SelectionOperatorService(QueryContext queryContext, DataSchema dataSchema) {
     _queryContext = queryContext;
-    _selectionColumns = SelectionOperatorUtils.getSelectionColumns(queryContext, dataSchema);
     _dataSchema = dataSchema;
     // Select rows from offset to offset + limit.
     _offset = queryContext.getOffset();
@@ -133,7 +130,7 @@ public class SelectionOperatorService {
    * <p>Should be called after method "reduceWithOrdering()".
    */
   public ResultTable renderResultTableWithOrdering() {
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(_selectionColumns, _dataSchema);
+    int[] columnIndices = SelectionOperatorUtils.getResultTableColumnIndices(_queryContext, _dataSchema);
     int numColumns = columnIndices.length;
     DataSchema resultDataSchema = SelectionOperatorUtils.getSchemaForProjection(_dataSchema, columnIndices);
 

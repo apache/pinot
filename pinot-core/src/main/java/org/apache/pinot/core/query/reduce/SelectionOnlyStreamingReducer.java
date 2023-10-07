@@ -95,7 +95,7 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
           SelectionOperatorUtils.renderResultTableWithoutOrdering(_rows, _dataSchema, selectionColumns));
     } else {
       // For empty data table map, construct empty result using the cached data schema for selection query
-      DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(_dataSchema, selectionColumns);
+      DataSchema selectionDataSchema = SelectionOperatorUtils.getResultTableDataSchema(_queryContext, _dataSchema);
       brokerResponseNative.setResultTable(new ResultTable(selectionDataSchema, Collections.emptyList()));
     }
     return brokerResponseNative;

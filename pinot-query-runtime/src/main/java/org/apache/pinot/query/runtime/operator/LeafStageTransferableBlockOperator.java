@@ -284,10 +284,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeSelectTransferableBlock(SelectionResultsBlock resultsBlock,
       DataSchema desiredDataSchema) {
-    DataSchema resultSchema = resultsBlock.getDataSchema();
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(resultsBlock.getQueryContext(), resultSchema);
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
+    int[] columnIndices = SelectionOperatorUtils.getResultTableColumnIndices(resultsBlock.getQueryContext(),
+        resultsBlock.getDataSchema());
     if (!inOrder(columnIndices)) {
       return composeColumnIndexedTransferableBlock(resultsBlock, desiredDataSchema, columnIndices);
     } else {
