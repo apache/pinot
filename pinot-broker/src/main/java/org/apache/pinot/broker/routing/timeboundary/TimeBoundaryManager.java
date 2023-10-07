@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import lombok.Getter;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -68,8 +67,6 @@ public class TimeBoundaryManager {
   private final Map<String, Long> _endTimeMsMap = new HashMap<>();
 
   private long _explicitlySetTimeBoundaryMs = INVALID_TIME_MS;
-  @Getter
-  @Nullable
   private volatile TimeBoundaryInfo _timeBoundaryInfo;
 
   public TimeBoundaryManager(TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -238,5 +235,10 @@ public class TimeBoundaryManager {
     _endTimeMsMap.put(segment, extractEndTimeMsFromSegmentZKMetadataZNRecord(segment,
         _propertyStore.get(_segmentZKMetadataPathPrefix + segment, null, AccessOption.PERSISTENT)));
     updateTimeBoundaryInfo(getMaxEndTimeMs());
+  }
+
+  @Nullable
+  public TimeBoundaryInfo getTimeBoundaryInfo() {
+    return _timeBoundaryInfo;
   }
 }

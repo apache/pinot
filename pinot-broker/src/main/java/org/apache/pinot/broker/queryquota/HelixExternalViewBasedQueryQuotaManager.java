@@ -25,7 +25,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import lombok.Getter;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixManager;
@@ -65,7 +64,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
 
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  @Getter
   private volatile boolean _queryRateLimitDisabled;
 
   public HelixExternalViewBasedQueryQuotaManager(BrokerMetrics brokerMetrics, String instanceId) {
@@ -466,6 +464,10 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
       _queryRateLimitDisabled = false;
     }
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.QUERY_RATE_LIMIT_DISABLED, _queryRateLimitDisabled ? 1L : 0L);
+  }
+
+  public boolean isQueryRateLimitDisabled() {
+    return _queryRateLimitDisabled;
   }
 
   /**

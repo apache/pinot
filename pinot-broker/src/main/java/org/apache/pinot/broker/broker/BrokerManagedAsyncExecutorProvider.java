@@ -25,8 +25,6 @@ import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import javax.ws.rs.ServiceUnavailableException;
 import javax.ws.rs.core.Response;
-import lombok.AccessLevel;
-import lombok.Getter;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.glassfish.jersey.server.ManagedAsyncExecutor;
@@ -46,9 +44,7 @@ public class BrokerManagedAsyncExecutorProvider extends ThreadPoolExecutorProvid
 
   private final BrokerMetrics _brokerMetrics;
 
-  @Getter(value = AccessLevel.PROTECTED)
   private final int _maximumPoolSize;
-  @Getter(value = AccessLevel.PROTECTED)
   private final int _corePoolSize;
   private final int _queueSize;
 
@@ -59,6 +55,16 @@ public class BrokerManagedAsyncExecutorProvider extends ThreadPoolExecutorProvid
     _maximumPoolSize = maximumPoolSize;
     _queueSize = queueSize;
     _brokerMetrics = brokerMetrics;
+  }
+
+  @Override
+  protected int getMaximumPoolSize() {
+    return _maximumPoolSize;
+  }
+
+  @Override
+  protected int getCorePoolSize() {
+    return _corePoolSize;
   }
 
   @Override

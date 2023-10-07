@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nullable;
-import lombok.Getter;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -38,11 +37,6 @@ public class Connection {
   public static final String FAIL_ON_EXCEPTIONS = "failOnExceptions";
   private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
 
-  /**
-   * Provides access to the underlying transport mechanism for this connection.
-   * There may be client metrics useful for monitoring and other observability goals.
-   */
-  @Getter
   private final PinotClientTransport<?> _transport;
   private final BrokerSelector _brokerSelector;
   private final boolean _failOnExceptions;
@@ -175,5 +169,15 @@ public class Connection {
       throws PinotClientException {
     _transport.close();
     _brokerSelector.close();
+  }
+
+  /**
+   * Provides access to the underlying transport mechanism for this connection.
+   * There may be client metrics useful for monitoring and other observability goals.
+   *
+   * @return pinot client transport.
+   */
+  public PinotClientTransport<?> getTransport() {
+    return _transport;
   }
 }

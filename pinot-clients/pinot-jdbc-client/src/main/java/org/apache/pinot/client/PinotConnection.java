@@ -47,7 +47,6 @@ public class PinotConnection extends AbstractBaseConnection {
   };
   @Getter
   private org.apache.pinot.client.Connection _session;
-  @Getter
   private boolean _closed;
   private String _controllerURL;
   private PinotControllerTransport _controllerTransport;
@@ -153,6 +152,12 @@ public class PinotConnection extends AbstractBaseConnection {
       throws SQLException {
     validateState();
     return new PinotPreparedStatement(this, sql);
+  }
+
+  @Override
+  public boolean isClosed()
+      throws SQLException {
+    return _closed;
   }
 
   @Override

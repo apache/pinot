@@ -28,7 +28,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Getter;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -68,7 +67,6 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private final Map<String, SegmentInfo> _segmentInfoMap = new HashMap<>();
 
   // computed value based on status change.
-  @Getter
   private transient TablePartitionInfo _tablePartitionInfo;
 
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
@@ -283,6 +281,10 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       segmentInfo._creationTimeMs = pushTimeMs;
     }
     computeTablePartitionInfo();
+  }
+
+  public TablePartitionInfo getTablePartitionInfo() {
+    return _tablePartitionInfo;
   }
 
   @AllArgsConstructor(access = AccessLevel.PACKAGE)

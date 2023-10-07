@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BaseBrokerRequestHandler;
@@ -50,7 +49,6 @@ public class QueryLogger {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryLogger.class);
 
   private final RateLimiter _logRateLimiter;
-  @Getter
   private final int _maxQueryLengthToLog;
   private final boolean _enableIpLogging;
   private final Logger _logger;
@@ -94,6 +92,10 @@ public class QueryLogger {
             _droppedLogRateLimiter.getRate());
       }
     }
+  }
+
+  public int getMaxQueryLengthToLog() {
+    return _maxQueryLengthToLog;
   }
 
   public double getLogRateLimit() {

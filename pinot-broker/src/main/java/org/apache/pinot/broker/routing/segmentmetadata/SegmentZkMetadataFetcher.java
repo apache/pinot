@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import lombok.Getter;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -39,7 +38,6 @@ public class SegmentZkMetadataFetcher {
   private final String _tableNameWithType;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String _segmentZKMetadataPathPrefix;
-  @Getter
   private final List<SegmentZkMetadataFetchListener> _listeners;
   private final Set<String> _onlineSegmentsCached;
 
@@ -61,6 +59,10 @@ public class SegmentZkMetadataFetcher {
       throw new RuntimeException(
           "Segment ZK metadata fetcher has already been initialized! Unable to register more listeners.");
     }
+  }
+
+  public List<SegmentZkMetadataFetchListener> getListeners() {
+    return _listeners;
   }
 
   public void init(IdealState idealState, ExternalView externalView, Set<String> onlineSegments) {

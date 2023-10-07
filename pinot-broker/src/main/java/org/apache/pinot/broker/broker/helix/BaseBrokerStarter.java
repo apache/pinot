@@ -104,7 +104,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   @Getter
   protected int _port;
   protected int _tlsPort;
-  @Getter
   protected String _instanceId;
   @Getter
   private volatile boolean _isStarting = false;
@@ -228,6 +227,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   @Override
   public ServiceRole getServiceRole() {
     return ServiceRole.BROKER;
+  }
+
+  @Override
+  public String getInstanceId() {
+    return _instanceId;
   }
 
   @Override
