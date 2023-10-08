@@ -27,12 +27,14 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.InvertedIndexDataFetcher;
+import org.apache.pinot.core.common.inverted.InvertedDataFetcher;
+import org.apache.pinot.core.common.inverted.InvertedDataFetcherFactory;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
@@ -49,25 +51,28 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 /**
  * todo
  */
-public class IndexedGroupByOperator extends BaseOperator<GroupByResultsBlock> {
-  private static final String EXPLAIN_NAME = "INDEXED_GROUP_BY";
+public class DictionaryBasedGroupByOperator extends BaseOperator<GroupByResultsBlock> {
+  private static final String EXPLAIN_NAME = "DICT_BASED_GROUP_BY";
 
   private final QueryContext _queryContext;
   private final BaseFilterOperator _filterOperator;
-  private final InvertedIndexDataFetcher _invertedIndexDataFetcher;
+  private final InvertedDataFetcher _invertedDataFetcher;
   private final String _columnName;
   private final DataSchema _dataSchema;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
 
-  public IndexedGroupByOperator(QueryContext queryContext, ExpressionContext[] groupByExpressions,
-      BaseFilterOperator filterOperator, Map<String, DataSource> dataSourceMap) {
-    Preconditions.checkArgument(filterOperator instanceof MatchAllFilterOperator, "Don't support filters yet");
-    // Preconditions.checkArgument(filterOperator.canProduceBitmaps());
+  public DictionaryBasedGroupByOperator(QueryContext queryContext, ExpressionContext[] groupByExpressions,
+      BaseFilterOperator filterOperator, @Nullable TransformFunction transformFunction,
+      Map<String, DataSource> dataSourceMap, String tableColumnName) {
+    Preconditions.checkArgument(
+        filterOperator.canProduceBitmaps() || filterOperator instanceof MatchAllFilterOperator,
+        "For inverted group-by, filters should be able to produce bitmaps");
     _queryContext = queryContext;
     _filterOperator = filterOperator;
-    _invertedIndexDataFetcher = new InvertedIndexDataFetcher(dataSourceMap);
-    _columnName = groupByExpressions[0].getIdentifier();
+    _columnName = tableColumnName;
+    _invertedDataFetcher = InvertedDataFetcherFactory.get(
+        _columnName, dataSourceMap.get(_columnName), transformFunction);
 
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _groupByExpressions = groupByExpressions;
@@ -79,9 +84,16 @@ public class IndexedGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     String[] columnNames = new String[numResultColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numResultColumns];
     for (int i = 0; i < numGroupByExpressions; i++) {
-      columnNames[i] = _groupByExpressions[i].getIdentifier();
-      DataSourceMetadata columnMetadata = dataSourceMap.get(columnNames[i]).getDataSourceMetadata();
-      columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(columnMetadata.getDataType(), columnMetadata.isSingleValue());
+      if (transformFunction != null) {
+        columnNames[i] = String.format("%s(%s)", transformFunction.getName(), _columnName);
+        columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(
+            transformFunction.getResultMetadata().getDataType(), true);
+      } else {
+        columnNames[i] = _groupByExpressions[i].getIdentifier();
+        DataSourceMetadata columnMetadata = dataSourceMap.get(columnNames[i]).getDataSourceMetadata();
+        columnDataTypes[i] = DataSchema.ColumnDataType.fromDataType(columnMetadata.getDataType(),
+            columnMetadata.isSingleValue());
+      }
     }
     // Extract column names and data types for aggregation functions
     for (int i = 0; i < numAggregationFunctions; i++) {
@@ -103,18 +115,23 @@ public class IndexedGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   @Override
   protected GroupByResultsBlock getNextBlock() {
-    // - [x] Get values from dictionary
-    // - [x] Get docIds for each dictId from inverted index
-    // - [x] GroupKeyGenerator returns an iterator for group-keys
-    // - [x] GroupResultHolder stores results
-    // - [x] Create AggregationGroupByResult
-    // - [x] Create GroupByResultsBlock
-    Object[] values = _invertedIndexDataFetcher.getValues(_columnName);
+    Object[] values = _invertedDataFetcher.getValues();
     GroupKeyGenerator groupKeyGenerator = new InvertedGroupKeyGenerator(values);
     GroupByResultHolder groupByResultHolder = new DoubleGroupByResultHolder(values.length, values.length, 0);
     for (int dictId = 0; dictId < values.length; dictId++) {
-      ImmutableRoaringBitmap bitmap = _invertedIndexDataFetcher.getDocIds(_columnName, dictId);
-      groupByResultHolder.setValueForKey(dictId, (double) bitmap.getCardinality());
+      ImmutableRoaringBitmap bitmap = null;
+      if (_invertedDataFetcher.supportsDictId()) {
+        bitmap = _invertedDataFetcher.getDocIds(dictId);
+      } else {
+        bitmap = _invertedDataFetcher.getDocIds(values[dictId]);
+      }
+      if (!(_filterOperator instanceof MatchAllFilterOperator)) {
+        ImmutableRoaringBitmap filterBitmap = _filterOperator.getBitmaps().reduce();
+        groupByResultHolder.setValueForKey(dictId,
+            (double) ImmutableRoaringBitmap.andCardinality(bitmap, filterBitmap));
+      } else {
+        groupByResultHolder.setValueForKey(dictId, (double) bitmap.getCardinality());
+      }
     }
     AggregationGroupByResult groupByResult = new AggregationGroupByResult(
         groupKeyGenerator, _aggregationFunctions, new GroupByResultHolder[]{groupByResultHolder});

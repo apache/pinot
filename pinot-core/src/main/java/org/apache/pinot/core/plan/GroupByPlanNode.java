@@ -29,9 +29,11 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
+import org.apache.pinot.core.operator.query.DictionaryBasedGroupByOperator;
 import org.apache.pinot.core.operator.query.FilteredGroupByOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.operator.query.IndexedGroupByOperator;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
@@ -82,11 +84,35 @@ public class GroupByPlanNode implements PlanNode {
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
     if (canOptimize(filterOperator, groupByExpressions, aggregationFunctions)) {
-      // TODO: Should we do a check here for dictionary length?
-      Map<String, DataSource> dataSourceMap = new HashMap<>(1);
-      String columName = groupByExpressions[0].getIdentifier();
-      dataSourceMap.put(columName, _indexSegment.getDataSource(columName));
-      return new IndexedGroupByOperator(_queryContext, groupByExpressions, filterOperator, dataSourceMap);
+      if (groupByExpressions[0].getType() == ExpressionContext.Type.IDENTIFIER) {
+        // TODO: Should we do a check here for dictionary length?
+        String columName = groupByExpressions[0].getIdentifier();
+        Map<String, DataSource> dataSourceMap = new HashMap<>(1);
+        dataSourceMap.put(columName, _indexSegment.getDataSource(columName));
+        return new DictionaryBasedGroupByOperator(
+            _queryContext, groupByExpressions, filterOperator, null, dataSourceMap, columName);
+      } else if (groupByExpressions[0].getType() == ExpressionContext.Type.FUNCTION) {
+        List<ExpressionContext> arguments = groupByExpressions[0].getFunction().getArguments();
+        String columName = null;
+        boolean canOptimizeTransform = false;
+        for (ExpressionContext arg : arguments) {
+          if (arg.getType() == ExpressionContext.Type.IDENTIFIER) {
+            if (columName == null) {
+              columName = arg.getIdentifier();
+              canOptimizeTransform = true;
+            } else {
+              canOptimizeTransform = false;
+            }
+          }
+        }
+        if (canOptimizeTransform) {
+          Map<String, DataSource> dataSourceMap = new HashMap<>(1);
+          dataSourceMap.put(columName, _indexSegment.getDataSource(columName));
+          TransformFunction transformFunction = TransformFunctionFactory.get(groupByExpressions[0], dataSourceMap);
+          return new DictionaryBasedGroupByOperator(
+              _queryContext, groupByExpressions, filterOperator, transformFunction, dataSourceMap, columName);
+        }
+      }
     }
 
     // Use star-tree to solve the query if possible
@@ -122,12 +148,10 @@ public class GroupByPlanNode implements PlanNode {
 
   private boolean canOptimize(BaseFilterOperator filterOperator, ExpressionContext[] groupByExpressions,
       AggregationFunction[] aggregationFunctions) {
-    if (filterOperator instanceof MatchAllFilterOperator) {
+    if (filterOperator instanceof MatchAllFilterOperator || filterOperator.canProduceBitmaps()) {
       if (groupByExpressions != null && groupByExpressions.length == 1) {
-        if (groupByExpressions[0].getType() == ExpressionContext.Type.IDENTIFIER) {
-          if (aggregationFunctions != null && aggregationFunctions.length == 1) {
-            return aggregationFunctions[0] instanceof CountAggregationFunction;
-          }
+        if (aggregationFunctions != null && aggregationFunctions.length == 1) {
+          return aggregationFunctions[0] instanceof CountAggregationFunction;
         }
       }
     }

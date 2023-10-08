@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers.json;
 import com.google.common.base.Preconditions;
 import java.nio.ByteOrder;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -32,6 +33,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -101,9 +103,21 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     }
   }
 
-  @Override
   public ImmutableRoaringBitmap getDocIds(int dictId) {
-    throw new UnsupportedOperationException("Not implemented yet");
+    ImmutableRoaringBitmap flattenedDocIds = _invertedIndex.getDocIds(dictId);
+    MutableRoaringBitmap result = new MutableRoaringBitmap();
+    flattenedDocIds.stream().forEach(f -> result.add(getDocId(f)));
+    return result;
+  }
+
+  public Pair<Object[], Integer> getValues(String key) {
+    int startIndex = _dictionary.indexOf(key + JsonIndexCreator.KEY_VALUE_SEPARATOR);
+    int endIndex = _dictionary.indexOf(key + JsonIndexCreator.TERM_CHAR);
+    Object[] result = new Object[endIndex - startIndex];
+    for (int index = startIndex, i = 0; index < endIndex; index++, i++) {
+      result[i] = _dictionary.get(index).substring(key.length() + 1);
+    }
+    return Pair.of(result, startIndex);
   }
 
   /**

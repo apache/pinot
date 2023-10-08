@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -35,7 +36,6 @@ import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -52,7 +52,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public class MutableJsonIndexImpl implements MutableJsonIndex {
   private final JsonIndexConfig _jsonIndexConfig;
-  private final Map<String, RoaringBitmap> _postingListMap;
+  private final Map<String, RoaringBitmap> _keyMap;
+  private final Map<String, Map<String, RoaringBitmap>> _postingListMap;
   private final IntList _docIdMapping;
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
@@ -63,6 +64,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   public MutableJsonIndexImpl(JsonIndexConfig jsonIndexConfig) {
     _jsonIndexConfig = jsonIndexConfig;
     _postingListMap = new HashMap<>();
+    _keyMap = new HashMap<>();
     _docIdMapping = new IntArrayList();
 
     ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
@@ -106,9 +108,9 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       for (Map.Entry<String, String> entry : record.entrySet()) {
         // Put both key and key-value into the posting list. Key is useful for checking if a key exists in the json.
         String key = entry.getKey();
-        _postingListMap.computeIfAbsent(key, k -> new RoaringBitmap()).add(_nextFlattenedDocId);
-        String keyValue = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + entry.getValue();
-        _postingListMap.computeIfAbsent(keyValue, k -> new RoaringBitmap()).add(_nextFlattenedDocId);
+        _postingListMap.computeIfAbsent(key, k -> new HashMap<>())
+            .computeIfAbsent(entry.getValue(), v -> new RoaringBitmap()).add(_nextFlattenedDocId);
+        _keyMap.computeIfAbsent(key, k -> new RoaringBitmap()).add(_nextFlattenedDocId);
       }
       _nextFlattenedDocId++;
     }
@@ -229,8 +231,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       if (!arrayIndex.equals(JsonUtils.WILDCARD)) {
         // "[0]"=1 -> ".$index"='0' && "."='1'
         // ".foo[1].bar"='abc' -> ".foo.$index"=1 && ".foo..bar"='abc'
-        String searchKey = leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
-        RoaringBitmap docIds = _postingListMap.get(searchKey);
+        String searchKey = leftPart + JsonUtils.ARRAY_INDEX_KEY;
+        RoaringBitmap docIds = extractDocIds(searchKey, arrayIndex);
         if (docIds != null) {
           if (matchingDocIds == null) {
             matchingDocIds = docIds.clone();
@@ -249,8 +251,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     if (predicateType == Predicate.Type.EQ || predicateType == Predicate.Type.NOT_EQ) {
       String value = predicateType == Predicate.Type.EQ ? ((EqPredicate) predicate).getValue()
           : ((NotEqPredicate) predicate).getValue();
-      String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;
-      RoaringBitmap matchingDocIdsForKeyValuePair = _postingListMap.get(keyValuePair);
+      RoaringBitmap matchingDocIdsForKeyValuePair = extractDocIds(key, value);
       if (matchingDocIdsForKeyValuePair != null) {
         if (matchingDocIds == null) {
           return matchingDocIdsForKeyValuePair.clone();
@@ -267,7 +268,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       RoaringBitmap matchingDocIdsForKeyValuePairs = new RoaringBitmap();
       for (String value : values) {
         String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;
-        RoaringBitmap matchingDocIdsForKeyValuePair = _postingListMap.get(keyValuePair);
+        RoaringBitmap matchingDocIdsForKeyValuePair = extractDocIds(key, value);
         if (matchingDocIdsForKeyValuePair != null) {
           matchingDocIdsForKeyValuePairs.or(matchingDocIdsForKeyValuePair);
         }
@@ -279,7 +280,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         return matchingDocIds;
       }
     } else if (predicateType == Predicate.Type.IS_NOT_NULL || predicateType == Predicate.Type.IS_NULL) {
-      RoaringBitmap matchingDocIdsForKey = _postingListMap.get(key);
+      RoaringBitmap matchingDocIdsForKey = _keyMap.get(key);
       if (matchingDocIdsForKey != null) {
         if (matchingDocIds == null) {
           return matchingDocIdsForKey.clone();
@@ -299,8 +300,37 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   public void close() {
   }
 
-  @Override
-  public ImmutableRoaringBitmap getDocIds(int dictId) {
-    throw new UnsupportedOperationException();
+  public ImmutableRoaringBitmap getDocIds(String key, String value) {
+    _readLock.lock();
+    try {
+      RoaringBitmap flattenedDocIds = _postingListMap.get(key).get(value);
+      MutableRoaringBitmap result = new MutableRoaringBitmap();
+      flattenedDocIds.stream().map(_docIdMapping::getInt).forEach(result::add);
+      return result;
+    } finally {
+      _readLock.unlock();
+    }
+  }
+
+  public Object[] getValues(String key) {
+    _readLock.lock();
+    try {
+      Map<String, RoaringBitmap> valueMap = _postingListMap.get(key);
+      if (valueMap != null) {
+        return valueMap.keySet().toArray(new String[0]);
+      }
+      return new Object[0];
+    } finally {
+      _readLock.unlock();
+    }
+  }
+
+  @Nullable
+  private RoaringBitmap extractDocIds(String key, String value) {
+    Map<String, RoaringBitmap> valueMap = _postingListMap.get(key);
+    if (valueMap != null) {
+      return valueMap.get(value);
+    }
+    return null;
   }
 }

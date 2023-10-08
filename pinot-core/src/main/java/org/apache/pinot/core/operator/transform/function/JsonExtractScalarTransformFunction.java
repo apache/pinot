@@ -137,6 +137,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
     return transformTransformedValuesToIntValuesSV(valueBlock);
   }
 
+  public String getJsonPathString() {
+    return _jsonPathString;
+  }
+
   private int[] transformTransformedValuesToIntValuesSV(ValueBlock valueBlock) {
     // operating on the output of another transform so can't pass the evaluation down to the storage
     ensureJsonPathCompiled();
