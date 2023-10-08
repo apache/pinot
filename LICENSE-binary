@@ -404,7 +404,7 @@ org.apache.flink:flink-shaded-netty:4.1.49.Final-12.0
 org.apache.flink:flink-shaded-zookeeper-3:3.4.14-12.0
 org.apache.flink:flink-streaming-java_2.12:1.12.0
 org.apache.flink:force-shading:1.12.0
-org.apache.helix:helix-core:1.3.1
+org.apache.helix:helix-common:1.3.1
 org.apache.helix:helix-core:1.3.1
 org.apache.helix:metadata-store-directory-common:1.3.1
 org.apache.helix:metrics-common:1.3.1
