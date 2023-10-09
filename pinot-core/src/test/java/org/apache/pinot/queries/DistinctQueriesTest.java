@@ -1433,9 +1433,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     {
       ResultTable resultTable = getBrokerResponse(queries[7]).getResultTable();
 
-      // Check data schema, where data type should be STRING for all columns
+      // Check data schema
+      // NOTE: Segment pruner is not wired up in QueriesTest, and the correct column data types should be returned.
       DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "longMVColumn"},
-          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
+          new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.LONG});
       assertEquals(resultTable.getDataSchema(), expectedDataSchema);
 
       // Check values, where no record should be returned
@@ -1589,9 +1590,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     {
       ResultTable resultTable = getBrokerResponse(queries[13]).getResultTable();
 
-      // Check data schema, where data type should be STRING for all columns
+      // Check data schema
+      // NOTE: Segment pruner is not wired up in QueriesTest, and the correct column data types should be returned.
       DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "rawLongMVColumn"},
-          new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.STRING});
+          new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.LONG});
       assertEquals(resultTable.getDataSchema(), expectedDataSchema);
 
       // Check values, where no record should be returned

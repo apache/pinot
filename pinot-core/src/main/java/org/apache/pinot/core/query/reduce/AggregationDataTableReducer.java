@@ -23,10 +23,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -47,9 +45,12 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class AggregationDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
+  private final AggregationFunction[] _aggregationFunctions;
 
-  AggregationDataTableReducer(QueryContext queryContext) {
+  public AggregationDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
+    _aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert _aggregationFunctions != null;
   }
 
   /**
@@ -59,11 +60,11 @@ public class AggregationDataTableReducer implements DataTableReducer {
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
-    assert dataSchema != null;
+    dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForAggregation(_queryContext, dataSchema);
 
     if (dataTableMap.isEmpty()) {
       DataSchema resultTableSchema =
-          new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema()).getResultDataSchema();
+          new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema)).getResultDataSchema();
       brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
       return;
     }
@@ -78,9 +79,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
 
   private void reduceWithIntermediateResult(DataSchema dataSchema, Collection<DataTable> dataTables,
       BrokerResponseNative brokerResponseNative) {
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null;
-    int numAggregationFunctions = aggregationFunctions.length;
+    int numAggregationFunctions = _aggregationFunctions.length;
     Object[] intermediateResults = new Object[numAggregationFunctions];
     for (DataTable dataTable : dataTables) {
       for (int i = 0; i < numAggregationFunctions; i++) {
@@ -100,25 +99,23 @@ public class AggregationDataTableReducer implements DataTableReducer {
         if (mergedIntermediateResult == null) {
           intermediateResults[i] = intermediateResultToMerge;
         } else {
-          intermediateResults[i] = aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
+          intermediateResults[i] = _aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
         }
         Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
       }
     }
     Object[] finalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunction aggregationFunction = aggregationFunctions[i];
+      AggregationFunction aggregationFunction = _aggregationFunctions[i];
       Comparable result = aggregationFunction.extractFinalResult(intermediateResults[i]);
       finalResults[i] = result == null ? null : aggregationFunction.getFinalResultColumnType().convert(result);
     }
-    brokerResponseNative.setResultTable(reduceToResultTable(finalResults));
+    brokerResponseNative.setResultTable(reduceToResultTable(getPrePostAggregationDataSchema(dataSchema), finalResults));
   }
 
   private void reduceWithFinalResult(DataSchema dataSchema, DataTable dataTable,
       BrokerResponseNative brokerResponseNative) {
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null;
-    int numAggregationFunctions = aggregationFunctions.length;
+    int numAggregationFunctions = _aggregationFunctions.length;
     Object[] finalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
@@ -133,24 +130,23 @@ public class AggregationDataTableReducer implements DataTableReducer {
         finalResults[i] = AggregationFunctionUtils.getConvertedFinalResult(dataTable, columnDataType, 0, i);
       }
     }
-    brokerResponseNative.setResultTable(reduceToResultTable(finalResults));
+    brokerResponseNative.setResultTable(reduceToResultTable(dataSchema, finalResults));
   }
 
   /**
    * Sets aggregation results into ResultsTable
    */
-  private ResultTable reduceToResultTable(Object[] finalResults) {
-    PostAggregationHandler postAggregationHandler =
-        new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema());
-    DataSchema dataSchema = postAggregationHandler.getResultDataSchema();
+  private ResultTable reduceToResultTable(DataSchema dataSchema, Object[] finalResults) {
+    PostAggregationHandler postAggregationHandler = new PostAggregationHandler(_queryContext, dataSchema);
+    DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
     Object[] row = postAggregationHandler.getResult(finalResults);
 
     RewriterResult resultRewriterResult =
-        ResultRewriteUtils.rewriteResult(dataSchema, Collections.singletonList(row));
-    dataSchema = resultRewriterResult.getDataSchema();
+        ResultRewriteUtils.rewriteResult(resultDataSchema, Collections.singletonList(row));
+    resultDataSchema = resultRewriterResult.getDataSchema();
     List<Object[]> rows = resultRewriterResult.getRows();
 
-    ColumnDataType[] columnDataTypes = dataSchema.getColumnDataTypes();
+    ColumnDataType[] columnDataTypes = resultDataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
     for (Object[] rewrittenRow : rows) {
       for (int j = 0; j < numColumns; j++) {
@@ -158,25 +154,18 @@ public class AggregationDataTableReducer implements DataTableReducer {
       }
     }
 
-    return new ResultTable(dataSchema, rows);
+    return new ResultTable(resultDataSchema, rows);
   }
 
   /**
    * Constructs the DataSchema for the rows before the post-aggregation (SQL mode).
    */
-  private DataSchema getPrePostAggregationDataSchema() {
-    List<Pair<AggregationFunction, FilterContext>> filteredAggregationFunctions =
-        _queryContext.getFilteredAggregationFunctions();
-    assert filteredAggregationFunctions != null;
-    int numColumns = filteredAggregationFunctions.size();
-    String[] columnNames = new String[numColumns];
-    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
-      AggregationFunction aggregationFunction = pair.getLeft();
-      columnNames[i] = AggregationFunctionUtils.getResultColumnName(aggregationFunction, pair.getRight());
-      columnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
+  private DataSchema getPrePostAggregationDataSchema(DataSchema dataSchema) {
+    int numAggregationFunctions = _aggregationFunctions.length;
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      columnDataTypes[i] = _aggregationFunctions[i].getFinalResultColumnType();
     }
-    return new DataSchema(columnNames, columnDataTypes);
+    return new DataSchema(dataSchema.getColumnNames(), columnDataTypes);
   }
 }

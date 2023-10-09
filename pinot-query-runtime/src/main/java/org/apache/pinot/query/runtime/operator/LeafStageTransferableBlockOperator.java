@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,6 +36,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -45,7 +47,7 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
@@ -281,18 +283,33 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   /**
    * For selection, we need to check if the columns are in order. If not, we need to re-arrange the columns.
    */
-  @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeSelectTransferableBlock(SelectionResultsBlock resultsBlock,
       DataSchema desiredDataSchema) {
-    DataSchema resultSchema = resultsBlock.getDataSchema();
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(resultsBlock.getQueryContext(), resultSchema);
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
+    int[] columnIndices = getColumnIndices(resultsBlock);
     if (!inOrder(columnIndices)) {
       return composeColumnIndexedTransferableBlock(resultsBlock, desiredDataSchema, columnIndices);
     } else {
       return composeDirectTransferableBlock(resultsBlock, desiredDataSchema);
     }
+  }
+
+  private static int[] getColumnIndices(SelectionResultsBlock resultsBlock) {
+    DataSchema dataSchema = resultsBlock.getDataSchema();
+    assert dataSchema != null;
+    String[] columnNames = dataSchema.getColumnNames();
+    Object2IntOpenHashMap<String> columnIndexMap = new Object2IntOpenHashMap<>(columnNames.length);
+    for (int i = 0; i < columnNames.length; i++) {
+      columnIndexMap.put(columnNames[i], i);
+    }
+    QueryContext queryContext = resultsBlock.getQueryContext();
+    assert queryContext != null;
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    int numSelectExpressions = selectExpressions.size();
+    int[] columnIndices = new int[numSelectExpressions];
+    for (int i = 0; i < numSelectExpressions; i++) {
+      columnIndices[i] = columnIndexMap.getInt(selectExpressions.get(i).toString());
+    }
+    return columnIndices;
   }
 
   private static boolean inOrder(int[] columnIndices) {
