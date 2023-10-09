@@ -116,7 +116,8 @@ public class PeerServerSegmentFinder {
     }
   }
 
-  private static int getServerAdminPort(HelixAdmin helixAdmin, String clusterName, String instanceId, String downloadScheme) {
+  private static int getServerAdminPort(HelixAdmin helixAdmin, String clusterName, String instanceId,
+                                        String downloadScheme) {
     try {
       return Integer.parseInt(HelixHelper.getInstanceConfigsMapFor(instanceId, clusterName, helixAdmin)
           .get(getServerAdminPortKey(downloadScheme)));
