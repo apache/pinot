@@ -61,7 +61,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
-import org.apache.pinot.segment.local.data.manager.ReadOnlyTableDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerDelegate;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
@@ -106,7 +106,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ExecutorService _segmentRefreshExecutor;
   private ExecutorService _segmentPreloadExecutor;
   private ScheduledExecutorService _tableRefreshExecutor;
-  private ConcurrentHashMap<String, String> _readOnlyTables = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, String> _ongoingTableDataManagerReloads = new ConcurrentHashMap<>();
 
   @Override
   public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
@@ -216,7 +216,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     if (_segmentPreloadExecutor != null) {
       _segmentPreloadExecutor.shutdownNow();
     }
-    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+    for (String tableNameWithType : _tableDataManagerMap.keySet()) {
+      // do not shut down during an ongoing reload of this table data manager
+      TableDataManager tableDataManager = getTableDataManager(tableNameWithType);
       tableDataManager.shutDown();
     }
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
@@ -281,7 +283,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void deleteTable(String tableNameWithType)
       throws Exception {
-    TableDataManager tableDataManager = _tableDataManagerMap.compute(tableNameWithType, (k, v) -> v);
+    TableDataManager tableDataManager = getTableDataManager(tableNameWithType);
     if (tableDataManager == null) {
       LOGGER.warn("Failed to find table data manager for table: {}, skip deleting the table", tableNameWithType);
       return;
@@ -566,7 +568,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         ZKMetadataProvider.getTableConfigWithZNRecord(_propertyStore, tableNameWithType);
     TableConfig tableConfig = tableConfigInfo.getLeft();
     try {
-      _readOnlyTables.put(tableNameWithType, "reloadTable");
+      _ongoingTableDataManagerReloads.put(tableNameWithType, "reloadTable");
       AtomicReference<TableDataManager> toBeShutdown = new AtomicReference<>();
       _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, tdm) -> {
         // create only if a table data manager doesn't exist
@@ -607,7 +609,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
             + " seconds");
       }
     } finally {
-      _readOnlyTables.remove(tableNameWithType);
+      _ongoingTableDataManagerReloads.remove(tableNameWithType);
+      synchronized (_ongoingTableDataManagerReloads) {
+        _ongoingTableDataManagerReloads.notifyAll();
+      }
     }
   }
 
@@ -619,10 +624,22 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Nullable
   @Override
   public TableDataManager getTableDataManager(String tableNameWithType) {
-    if (_readOnlyTables.contains(tableNameWithType)) {
-      return new ReadOnlyTableDataManager(_tableDataManagerMap.get(tableNameWithType), _readOnlyTables.get(tableNameWithType));
-    }
-    return _tableDataManagerMap.get(tableNameWithType);
+    Supplier<TableDataManager> waitUntilOngoingWriteCompletesTDM = (com.google.common.base.Supplier<TableDataManager>) () -> {
+      if (!_ongoingTableDataManagerReloads.contains(tableNameWithType)) {
+        return _tableDataManagerMap.get(tableNameWithType);
+      }
+      synchronized (_ongoingTableDataManagerReloads) {
+        while (_ongoingTableDataManagerReloads.containsKey(tableNameWithType)) {
+          try {
+            _ongoingTableDataManagerReloads.wait();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        }
+      }
+      return _tableDataManagerMap.get(tableNameWithType);
+    };
+    return new TableDataManagerDelegate(waitUntilOngoingWriteCompletesTDM);
   }
 
   @Nullable

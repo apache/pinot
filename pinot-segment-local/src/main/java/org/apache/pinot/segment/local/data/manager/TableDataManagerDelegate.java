@@ -5,6 +5,7 @@ import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
@@ -23,14 +24,16 @@ import org.apache.pinot.spi.data.Schema;
 /**
  * A read-only wrapper for an existing table data manager
  */
-public class ReadOnlyTableDataManager implements TableDataManager {
+public class TableDataManagerDelegate implements TableDataManager {
   // underlying table data manager
-  private final TableDataManager _tableDataManager;
-  private final String readOnlyReason;
+  private final Supplier<TableDataManager> _getTableDataManager;
 
-  public ReadOnlyTableDataManager(TableDataManager tableDataManager, String readOnlyReason) {
-    this._tableDataManager = tableDataManager;
-    this.readOnlyReason = readOnlyReason;
+  private TableDataManager getTableDataManager() {
+    return _getTableDataManager.get();
+  }
+
+  public TableDataManagerDelegate(Supplier<TableDataManager> getTableDataManager) {
+    this._getTableDataManager = getTableDataManager;
   }
 
   @Override
@@ -39,130 +42,131 @@ public class ReadOnlyTableDataManager implements TableDataManager {
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
       TableDataManagerParams tableDataManagerParams) {
-    _tableDataManager.init(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager,
+    getTableDataManager().init(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager,
         segmentPreloadExecutor, errorCache, tableDataManagerParams);
   }
 
   @Override
   public void start() {
-    _tableDataManager.start();
+    getTableDataManager().start();
   }
 
   @Override
   public void shutDown() {
-    throw new ReadOnlyTableDataManagerException(readOnlyReason, "shutDown");
+    getTableDataManager().shutDown();
   }
 
   @Override
   public boolean isShutDown() {
-    return _tableDataManager.isShutDown();
+    return getTableDataManager().isShutDown();
   }
 
   @Override
   public void addSegment(ImmutableSegment immutableSegment) {
-    throw new ReadOnlyTableDataManagerException(readOnlyReason, "addSegment");
+    getTableDataManager().addSegment(immutableSegment);
   }
 
   @Override
   public void addSegment(File indexDir, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    throw new ReadOnlyTableDataManagerException(readOnlyReason, "addSegment");
+    getTableDataManager().addSegment(indexDir, indexLoadingConfig);
   }
 
   @Override
   public void addSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata)
       throws Exception {
-    throw new ReadOnlyTableDataManagerException(readOnlyReason, "addSegment");
+    getTableDataManager().addSegment(segmentName, indexLoadingConfig, zkMetadata);
   }
 
   @Override
   public void reloadSegment(String segmentName, IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata zkMetadata,
       SegmentMetadata localMetadata, @Nullable Schema schema, boolean forceDownload)
       throws Exception {
-    throw new ReadOnlyTableDataManagerException(readOnlyReason, "reloadSegment");
+    getTableDataManager().reloadSegment(segmentName, indexLoadingConfig, zkMetadata,
+        localMetadata, schema, forceDownload);
   }
 
   @Override
   public void addOrReplaceSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
       SegmentZKMetadata zkMetadata, @Nullable SegmentMetadata localMetadata)
       throws Exception {
-    throw new ReadOnlyTableDataManagerException(readOnlyReason, "addOrReplaceSegment");
+    getTableDataManager().addOrReplaceSegment(segmentName, indexLoadingConfig, zkMetadata, localMetadata);
   }
 
   @Override
   public void removeSegment(String segmentName) {
-    throw new ReadOnlyTableDataManagerException(readOnlyReason, "removeSegment");
+    getTableDataManager().removeSegment(segmentName);
   }
 
   @Override
   public boolean tryLoadExistingSegment(String segmentName, IndexLoadingConfig indexLoadingConfig,
       SegmentZKMetadata zkMetadata) {
-    throw new ReadOnlyTableDataManagerException(readOnlyReason, "tryLoadExistingSegment");
+    return getTableDataManager().tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata);
   }
 
   @Override
   public File getSegmentDataDir(String segmentName, @Nullable String segmentTier, TableConfig tableConfig) {
-    return _tableDataManager.getSegmentDataDir(segmentTier, segmentTier, tableConfig);
+    return getTableDataManager().getSegmentDataDir(segmentTier, segmentTier, tableConfig);
   }
 
   @Override
   public boolean isSegmentDeletedRecently(String segmentName) {
-    return _tableDataManager.isSegmentDeletedRecently(segmentName);
+    return getTableDataManager().isSegmentDeletedRecently(segmentName);
   }
 
   @Override
   public List<SegmentDataManager> acquireAllSegments() {
-    return _tableDataManager.acquireAllSegments();
+    return getTableDataManager().acquireAllSegments();
   }
 
   @Override
   public List<SegmentDataManager> acquireSegments(List<String> segmentNames, List<String> missingSegments) {
-    return _tableDataManager.acquireSegments(segmentNames, missingSegments);
+    return getTableDataManager().acquireSegments(segmentNames, missingSegments);
   }
 
   @Nullable
   @Override
   public SegmentDataManager acquireSegment(String segmentName) {
-    return _tableDataManager.acquireSegment(segmentName);
+    return getTableDataManager().acquireSegment(segmentName);
   }
 
   @Override
   public void releaseSegment(SegmentDataManager segmentDataManager) {
-    _tableDataManager.releaseSegment(segmentDataManager);
+    getTableDataManager().releaseSegment(segmentDataManager);
   }
 
   @Override
   public int getNumSegments() {
-    return _tableDataManager.getNumSegments();
+    return getTableDataManager().getNumSegments();
   }
 
   @Override
   public String getTableName() {
-    return _tableDataManager.getTableName();
+    return getTableDataManager().getTableName();
   }
 
   @Override
   public File getTableDataDir() {
-    return _tableDataManager.getTableDataDir();
+    return getTableDataManager().getTableDataDir();
   }
 
   @Override
   public TableDataManagerConfig getTableDataManagerConfig() {
-    return _tableDataManager.getTableDataManagerConfig();
+    return getTableDataManager().getTableDataManagerConfig();
   }
 
   @Override
   public void addSegmentError(String segmentName, SegmentErrorInfo segmentErrorInfo) {
-    _tableDataManager.addSegmentError(segmentName, segmentErrorInfo);
+    getTableDataManager().addSegmentError(segmentName, segmentErrorInfo);
   }
 
   @Override
   public Map<String, SegmentErrorInfo> getSegmentErrors() {
-    return _tableDataManager.getSegmentErrors();
+    return getTableDataManager().getSegmentErrors();
   }
 
   @Override
   public long getLoadTimeMs() {
-    return _tableDataManager.getLoadTimeMs();
+    return getTableDataManager().getLoadTimeMs();
   }
 }
