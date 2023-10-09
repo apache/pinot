@@ -136,7 +136,7 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
         Map<Integer, Set<String>> replicaGroupIdToExistingInstancesMap = new TreeMap<>();
         // Step 1: find out the replica groups and their existing instances,
         //   so that these instances can be filtered out and won't be chosen for the other replica group.
-        for (int replicaGroupId = 0; replicaGroupId < numCommonReplicaGroups; replicaGroupId++) {
+        for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
           Integer pool = replicaGroupIdToPoolMap.get(replicaGroupId);
           if (pool == null) {
             // Skip the replica group if it's no longer needed.
@@ -149,6 +149,9 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
 
           for (int partitionId = 0; partitionId < existingNumPartitions; partitionId++) {
             List<String> existingInstances = _existingInstancePartitions.getInstances(partitionId, replicaGroupId);
+            if (existingInstances == null) {
+              continue;
+            }
             replicaGroupIdToExistingInstancesMap.computeIfAbsent(replicaGroupId, k -> new HashSet<>())
                 .addAll(existingInstances);
           }
