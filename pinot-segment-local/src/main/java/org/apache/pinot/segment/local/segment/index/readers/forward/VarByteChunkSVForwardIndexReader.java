@@ -153,19 +153,6 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     return bytes;
   }
 
-  private void recordDocIdRanges(int docId, List<ValueRange> ranges) {
-    int chunkId = docId / _numDocsPerChunk;
-    int chunkRowId = docId % _numDocsPerChunk;
-
-    // These offsets are offset in the data buffer
-    long chunkStartOffset = getChunkPositionAndRecordRanges(chunkId, ranges);
-    ranges.add(ValueRange.newByteRange(chunkStartOffset + chunkRowId * ROW_OFFSET_SIZE, Integer.BYTES));
-    long valueStartOffset = chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + chunkRowId * ROW_OFFSET_SIZE);
-    long valueEndOffset = getValueEndOffsetAndRecordRanges(chunkId, chunkRowId, chunkStartOffset, ranges);
-
-    ranges.add(ValueRange.newByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
-  }
-
   /**
    * Helper method to compute the end offset of the value in the chunk buffer.
    */
@@ -212,40 +199,12 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     }
   }
 
-  private long getValueEndOffsetAndRecordRanges(int chunkId, int chunkRowId, long chunkStartOffset,
-      List<ValueRange> ranges) {
-    if (chunkId == _numChunks - 1) {
-      // Last chunk
-      if (chunkRowId == _numDocsPerChunk - 1) {
-        // Last row in the last chunk
-        return _dataBuffer.size();
-      } else {
-        ranges.add(ValueRange.newByteRange(chunkStartOffset + (chunkRowId + 1) * ROW_OFFSET_SIZE, Integer.BYTES));
-        int valueEndOffsetInChunk = _dataBuffer.getInt(chunkStartOffset + (chunkRowId + 1) * ROW_OFFSET_SIZE);
-        if (valueEndOffsetInChunk == 0) {
-          // Last row in the last chunk (chunk is incomplete, which stores 0 as the offset for the absent rows)
-          return _dataBuffer.size();
-        } else {
-          return chunkStartOffset + valueEndOffsetInChunk;
-        }
-      }
-    } else {
-      if (chunkRowId == _numDocsPerChunk - 1) {
-        // Last row in the chunk
-        return getChunkPositionAndRecordRanges(chunkId + 1, ranges);
-      } else {
-        ranges.add(ValueRange.newByteRange(chunkStartOffset + (chunkRowId + 1) * ROW_OFFSET_SIZE, Integer.BYTES));
-        return chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (chunkRowId + 1) * ROW_OFFSET_SIZE);
-      }
-    }
-  }
-
   @Override
   public void recordDocIdByteRanges(int docId, ChunkReaderContext context, List<ValueRange> ranges) {
     if (_isCompressed) {
       recordDocIdRanges(docId, context, ranges);
     } else {
-      recordDocIdRanges(docId, ranges);
+      recordDocIdRanges(docId, ROW_OFFSET_SIZE, ranges);
     }
   }
 

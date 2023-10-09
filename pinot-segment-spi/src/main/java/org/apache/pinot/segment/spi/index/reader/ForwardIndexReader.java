@@ -919,12 +919,15 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * This class represents the buffer byte ranges accessed while reading a given docId.
+   * See {@link ValueRangeProvider} for more details.
+   */
   @AllArgsConstructor
   @Getter
   class ValueRange {
     private final long _offset;
     private final int _size;
-    // To tell if size uses bit or byte as unit, for fwd index reader reading values of fixed bits.
     private final boolean _isSizeOfBit;
 
     public static ValueRange newByteRange(long offset, int sizeInBytes) {

@@ -118,11 +118,19 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
 
   @Override
   public long getBaseOffset() {
-    return _rawDataStart;
+    if (isFixedLengthType()) {
+      return _rawDataStart;
+    } else {
+      throw new UnsupportedOperationException("Forward index is not fixed length type");
+    }
   }
 
   @Override
   public int getDocLength() {
-    return _storedType.size();
+    if (isFixedLengthType()) {
+      return _storedType.size();
+    } else {
+      throw new UnsupportedOperationException("Forward index is not fixed length type");
+    }
   }
 }
