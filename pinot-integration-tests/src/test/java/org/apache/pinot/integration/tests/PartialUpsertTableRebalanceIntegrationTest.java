@@ -262,14 +262,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       String instanceId = instanceIdAndState.getKey();
       int partitionId = getSegmentPartitionId(segmentName);
       uniqueServers.add(instanceId);
-      serverForPartition.compute(partitionId, (key, value) -> {
-        if (value == null) {
-          return instanceId;
-        } else {
-          assertEquals(instanceId, value);
-          return value;
-        }
-      });
+      String prevInstance = serverForPartition.computeIfAbsent(partitionId, k -> instanceId);
+      assertEquals(instanceId, prevInstance);
     }
 
     assertEquals(uniqueServers.size(), numInstancesExpected);
@@ -393,7 +387,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forControllerJobStatus(reloadJobId);
+        String requestUrl = getControllerRequestURLBuilder().forSegmentReloadStatus(reloadJobId);
         try {
           SimpleHttpResponse httpResponse =
               HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(requestUrl).toURI(), null));
