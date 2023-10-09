@@ -102,6 +102,26 @@ public class FixedByteChunkSVForwardIndexTest {
         Assert.assertEquals(fourByteOffsetReader.getInt(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getInt(i, eightByteOffsetReaderContext), expected[i]);
       }
+
+      ForwardIndexReader.ValueRangeProvider fourBytesValueRangeProvider =
+          (ForwardIndexReader.ValueRangeProvider) fourByteOffsetReader;
+      ForwardIndexReader.ValueRangeProvider eightBytesValueRangeProvider =
+          (ForwardIndexReader.ValueRangeProvider) eightByteOffsetReader;
+
+      // Validate value range provider behaviour
+      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+        // For pass through compression, the value range provider should return the same buffer for all the values
+        Assert.assertTrue(fourBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertEquals(fourBytesValueRangeProvider.getDocLength(), Integer.BYTES);
+        Assert.assertFalse(fourBytesValueRangeProvider.isDocLengthInBits());
+
+        Assert.assertTrue(eightBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertEquals(eightBytesValueRangeProvider.getDocLength(), Integer.BYTES);
+        Assert.assertFalse(eightBytesValueRangeProvider.isDocLengthInBits());
+      } else {
+        Assert.assertFalse(fourBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertFalse(eightBytesValueRangeProvider.isFixedLengthType());
+      }
     }
 
     FileUtils.deleteQuietly(outFileFourByte);
@@ -149,6 +169,26 @@ public class FixedByteChunkSVForwardIndexTest {
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getLong(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getLong(i, eightByteOffsetReaderContext), expected[i]);
+      }
+
+      ForwardIndexReader.ValueRangeProvider fourBytesValueRangeProvider =
+          (ForwardIndexReader.ValueRangeProvider) fourByteOffsetReader;
+      ForwardIndexReader.ValueRangeProvider eightBytesValueRangeProvider =
+          (ForwardIndexReader.ValueRangeProvider) eightByteOffsetReader;
+
+      // Validate value range provider behaviour
+      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+        // For pass through compression, the value range provider should return the same buffer for all the values
+        Assert.assertTrue(fourBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertEquals(fourBytesValueRangeProvider.getDocLength(), Long.BYTES);
+        Assert.assertFalse(fourBytesValueRangeProvider.isDocLengthInBits());
+
+        Assert.assertTrue(eightBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertEquals(eightBytesValueRangeProvider.getDocLength(), Long.BYTES);
+        Assert.assertFalse(eightBytesValueRangeProvider.isDocLengthInBits());
+      } else {
+        Assert.assertFalse(fourBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertFalse(eightBytesValueRangeProvider.isFixedLengthType());
       }
     }
 
@@ -198,6 +238,26 @@ public class FixedByteChunkSVForwardIndexTest {
         Assert.assertEquals(fourByteOffsetReader.getFloat(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getFloat(i, eightByteOffsetReaderContext), expected[i]);
       }
+
+      ForwardIndexReader.ValueRangeProvider fourBytesValueRangeProvider =
+          (ForwardIndexReader.ValueRangeProvider) fourByteOffsetReader;
+      ForwardIndexReader.ValueRangeProvider eightBytesValueRangeProvider =
+          (ForwardIndexReader.ValueRangeProvider) eightByteOffsetReader;
+
+      // Validate value range provider behaviour
+      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+        // For pass through compression, the value range provider should return the same buffer for all the values
+        Assert.assertTrue(fourBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertEquals(fourBytesValueRangeProvider.getDocLength(), Float.BYTES);
+        Assert.assertFalse(fourBytesValueRangeProvider.isDocLengthInBits());
+
+        Assert.assertTrue(eightBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertEquals(eightBytesValueRangeProvider.getDocLength(), Float.BYTES);
+        Assert.assertFalse(eightBytesValueRangeProvider.isDocLengthInBits());
+      } else {
+        Assert.assertFalse(fourBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertFalse(eightBytesValueRangeProvider.isFixedLengthType());
+      }
     }
 
     FileUtils.deleteQuietly(outFileFourByte);
@@ -245,6 +305,26 @@ public class FixedByteChunkSVForwardIndexTest {
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getDouble(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getDouble(i, eightByteOffsetReaderContext), expected[i]);
+      }
+
+      ForwardIndexReader.ValueRangeProvider fourBytesValueRangeProvider =
+          (ForwardIndexReader.ValueRangeProvider) fourByteOffsetReader;
+      ForwardIndexReader.ValueRangeProvider eightBytesValueRangeProvider =
+          (ForwardIndexReader.ValueRangeProvider) eightByteOffsetReader;
+
+      // Validate value range provider behaviour
+      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+        // For pass through compression, the value range provider should return the same buffer for all the values
+        Assert.assertTrue(fourBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertEquals(fourBytesValueRangeProvider.getDocLength(), Double.BYTES);
+        Assert.assertFalse(fourBytesValueRangeProvider.isDocLengthInBits());
+
+        Assert.assertTrue(eightBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertEquals(eightBytesValueRangeProvider.getDocLength(), Double.BYTES);
+        Assert.assertFalse(eightBytesValueRangeProvider.isDocLengthInBits());
+      } else {
+        Assert.assertFalse(fourBytesValueRangeProvider.isFixedLengthType());
+        Assert.assertFalse(eightBytesValueRangeProvider.isFixedLengthType());
       }
     }
 

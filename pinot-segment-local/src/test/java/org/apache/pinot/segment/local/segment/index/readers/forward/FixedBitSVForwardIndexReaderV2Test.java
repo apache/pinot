@@ -20,10 +20,13 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSetV2;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -105,6 +108,25 @@ public class FixedBitSVForwardIndexReaderV2Test {
         reader.readDictIds(_lastSequentialDocIds, NUM_DOC_IDS, dictIdBuffer, null);
         for (int i = 0; i < NUM_DOC_IDS; i++) {
           Assert.assertEquals(dictIdBuffer[i], values[_lastSequentialDocIds[i]]);
+        }
+      }
+
+      // Value range test
+      try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+          FixedBitSVForwardIndexReader reader = new FixedBitSVForwardIndexReader(dataBuffer, NUM_VALUES,
+              numBits)) {
+        ForwardIndexReader.ValueRangeProvider<ForwardIndexReaderContext> valueRangeProvider = reader;
+        Assert.assertTrue(valueRangeProvider.isFixedLengthType());
+        Assert.assertEquals(valueRangeProvider.getBaseOffset(), 0);
+        Assert.assertEquals(valueRangeProvider.getDocLength(), numBits);
+        Assert.assertTrue(valueRangeProvider.isDocLengthInBits());
+
+        try {
+          valueRangeProvider.recordDocIdByteRanges(0, null, new ArrayList<>());
+          Assert.fail("Should have failed to record byte ranges");
+        } catch (UnsupportedOperationException e) {
+          // expected
+          Assert.assertEquals(e.getMessage(), "Forward index is fixed length type");
         }
       }
     }

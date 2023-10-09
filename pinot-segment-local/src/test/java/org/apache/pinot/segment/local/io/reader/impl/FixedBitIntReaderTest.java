@@ -78,6 +78,23 @@ public class FixedBitIntReaderTest {
           assertEquals(out[i], values[i]);
         }
       }
+
+      // Validate value range behaviour
+      try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
+        FixedBitIntReader intReader = FixedBitIntReader.getReader(dataBuffer, numBits);
+        for (int i = 0; i < NUM_VALUES; i++) {
+          assertEquals(intReader.read(i), values[i]);
+        }
+        for (int i = 0; i < NUM_VALUES - 2; i++) {
+          assertEquals(intReader.readUnchecked(i), values[i]);
+        }
+        int[] out = new int[64];
+        intReader.read32(0, out, 0);
+        intReader.read32(32, out, 32);
+        for (int i = 0; i < 64; i++) {
+          assertEquals(out[i], values[i]);
+        }
+      }
     }
   }
 }
