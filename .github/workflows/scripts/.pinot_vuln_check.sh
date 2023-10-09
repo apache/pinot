@@ -30,8 +30,6 @@ fi
 
 cd ${DOCKER_FILE_BASE_DIR}
 
-docker image ls
-
 docker build \
     --no-cache \
     --file Dockerfile \
