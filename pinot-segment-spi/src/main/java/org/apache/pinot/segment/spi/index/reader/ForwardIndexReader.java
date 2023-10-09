@@ -942,6 +942,18 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     public String toString() {
       return "Range{" + "_offset=" + _offset + ", _size=" + _size + ", _isSizeOfBit=" + _isSizeOfBit + '}';
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ValueRange)) {
+        return false;
+      }
+      ValueRange that = (ValueRange) o;
+      return _offset == that._offset && _size == that._size && _isSizeOfBit == that._isSizeOfBit;
+    }
   }
 
   /**
