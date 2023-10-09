@@ -98,7 +98,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   @Override
   public void onSuccess(String msg) {
-    Preconditions.checkState(_tableRebalanceProgressStats.getStatus() != RebalanceResult.Status.DONE.toString(),
+    Preconditions.checkState(
+        !_tableRebalanceProgressStats.getStatus().equals(RebalanceResult.Status.DONE.toString()),
         "Table Rebalance already completed");
     long timeToFinishInSeconds =
          (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000L;

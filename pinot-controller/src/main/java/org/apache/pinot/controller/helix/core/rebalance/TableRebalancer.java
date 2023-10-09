@@ -241,13 +241,19 @@ public class TableRebalancer {
           tierToInstancePartitionsMap, null);
     }
 
+    // Record the beginning of rebalance
+    _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, currentAssignment,
+        targetAssignment);
+
     boolean segmentAssignmentUnchanged = currentAssignment.equals(targetAssignment);
     LOGGER.info("For rebalanceId: {}, instancePartitionsUnchanged: {}, tierInstancePartitionsUnchanged: {}, "
             + "segmentAssignmentUnchanged: {} for table: {}", rebalanceJobId, instancePartitionsUnchanged,
         tierInstancePartitionsUnchanged, segmentAssignmentUnchanged, tableNameWithType);
 
     if (segmentAssignmentUnchanged) {
-      LOGGER.info("Table: {} is already balanced", tableNameWithType);
+      String msg = String.format("Table: %s is already balanced", tableNameWithType);
+      LOGGER.info(msg);
+      _tableRebalanceObserver.onSuccess(msg);
       if (instancePartitionsUnchanged && tierInstancePartitionsUnchanged) {
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.NO_OP, "Table is already balanced",
             instancePartitionsMap, tierToInstancePartitionsMap, targetAssignment);
@@ -264,6 +270,7 @@ public class TableRebalancer {
       }
     }
 
+    // dryRun does not track status, so we do not update _tableRebalanceObserver
     if (dryRun) {
       LOGGER.info("For rebalanceId: {}, rebalancing table: {} in dry-run mode, returning the target assignment",
           rebalanceJobId, tableNameWithType);
@@ -271,6 +278,7 @@ public class TableRebalancer {
           tierToInstancePartitionsMap, targetAssignment);
     }
 
+    // downtime does not track status, so we do not update _tableRebalanceObserver
     if (downtime) {
       LOGGER.info("For rebalanceId: {}, rebalancing table: {} with downtime", rebalanceJobId, tableNameWithType);
 
@@ -300,10 +308,6 @@ public class TableRebalancer {
             targetAssignment);
       }
     }
-
-    // Record the beginning of rebalance
-    _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.START_TRIGGER, currentAssignment,
-        targetAssignment);
 
     // Calculate the min available replicas for no-downtime rebalance
     // NOTE: The calculation is based on the number of replicas of the target assignment. In case of increasing the
