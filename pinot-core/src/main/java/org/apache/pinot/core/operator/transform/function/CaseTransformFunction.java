@@ -27,12 +27,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -42,17 +45,18 @@ import org.roaringbitmap.RoaringBitmap;
  * The SQL Syntax is: CASE WHEN condition1 THEN result1 WHEN condition2 THEN result2 WHEN conditionN THEN resultN ELSE
  * result END;
  * <p>
- * Usage: case(${WHEN_STATEMENT_1}, ..., ${WHEN_STATEMENT_N}, ${THEN_EXPRESSION_1}, ..., ${THEN_EXPRESSION_N},
+ * Usage: case(${WHEN_STATEMENT_1}, ${THEN_EXPRESSION_1}, ..., ${WHEN_STATEMENT_N}, ${THEN_EXPRESSION_N}, ...,
  * ${ELSE_EXPRESSION})
  * <p>
  * There are 2 * N + 1 arguments:
- * <code>WHEN_STATEMENT_$i</code> is a <code>BinaryOperatorTransformFunction</code> represents
- * <code>condition$i</code>
+ * <code>WHEN_STATEMENT_$i</code> is a <code>BinaryOperatorTransformFunction</code> represents <code>condition$i</code>
  * <code>THEN_EXPRESSION_$i</code> is a <code>TransformFunction</code> represents <code>result$i</code>
  * <code>ELSE_EXPRESSION</code> is a <code>TransformFunction</code> represents <code>result</code>
  * <p>
  * ELSE_EXPRESSION can be omitted. When none of when statements is evaluated to be true, and there is no else
  * expression, we output null. Note that when statement is considered as false if it is evaluated to be null.
+ * <p>
+ * PostgreSQL documentation: <a href="https://www.postgresql.org/docs/current/typeconv-union-case.html">CASE</a>
  */
 public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEnabledTransformFunction {
   public static final String FUNCTION_NAME = "case";
@@ -60,9 +64,9 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
   private List<TransformFunction> _whenStatements = new ArrayList<>();
   private List<TransformFunction> _thenStatements = new ArrayList<>();
   private TransformFunction _elseStatement;
+  private TransformResultMetadata _resultMetadata;
 
   private boolean[] _computeThenStatements;
-  private TransformResultMetadata _resultMetadata;
   private int[] _selectedResults;
 
   @Override
@@ -82,158 +86,143 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     int numWhenStatements = arguments.size() / 2;
     _whenStatements = new ArrayList<>(numWhenStatements);
     _thenStatements = new ArrayList<>(numWhenStatements);
-    constructStatementList(arguments);
-    _computeThenStatements = new boolean[_thenStatements.size()];
-    _resultMetadata = calculateResultMetadata();
-  }
-
-  private void constructStatementList(List<TransformFunction> arguments) {
-    int numWhenStatements = arguments.size() / 2;
-    // alternating WHEN and THEN clause, last one ELSE
+    // Alternating WHEN and THEN clause, last one ELSE
     for (int i = 0; i < numWhenStatements; i++) {
       _whenStatements.add(arguments.get(i * 2));
       _thenStatements.add(arguments.get(i * 2 + 1));
     }
-    if (arguments.size() % 2 != 0 && !isNullLiteralTransformation(arguments.get(arguments.size() - 1))) {
+    if (arguments.size() % 2 != 0 && !isNullLiteral(arguments.get(arguments.size() - 1))) {
       _elseStatement = arguments.get(arguments.size() - 1);
+    }
+    _resultMetadata = new TransformResultMetadata(calculateResultType(), true, false);
+    _computeThenStatements = new boolean[numWhenStatements];
+  }
+
+  private boolean isNullLiteral(TransformFunction function) {
+    return function instanceof LiteralTransformFunction && ((LiteralTransformFunction) function).isNull();
+  }
+
+  private DataType calculateResultType() {
+    MutablePair<DataType, List<String>> typeAndUnresolvedLiterals =
+        new MutablePair<>(DataType.UNKNOWN, new ArrayList<>());
+    for (TransformFunction thenStatement : _thenStatements) {
+      upcast(typeAndUnresolvedLiterals, thenStatement);
+    }
+    if (_elseStatement != null) {
+      upcast(typeAndUnresolvedLiterals, _elseStatement);
+    }
+    DataType dataType = typeAndUnresolvedLiterals.getLeft();
+    // If all inputs are of type UNKNOWN, resolve as type STRING
+    return dataType != DataType.UNKNOWN ? dataType : DataType.STRING;
+  }
+
+  private void upcast(MutablePair<DataType, List<String>> currentTypeAndUnresolvedLiterals,
+      TransformFunction newFunction) {
+    TransformResultMetadata newMetadata = newFunction.getResultMetadata();
+    Preconditions.checkArgument(newMetadata.isSingleValue(), "Unsupported multi-value expression in THEN/ELSE clause");
+    DataType newType = newMetadata.getDataType();
+    if (newType == DataType.UNKNOWN) {
+      return;
+    }
+    DataType currentType = currentTypeAndUnresolvedLiterals.getLeft();
+    if (currentType == newType) {
+      return;
+    }
+    List<String> unresolvedLiterals = currentTypeAndUnresolvedLiterals.getRight();
+    // Treat string literals as UNKNOWN type. Resolve them when we get a non-UNKNOWN type.
+    boolean isNewFunctionStringLiteral = newFunction instanceof LiteralTransformFunction && newType == DataType.STRING;
+    if (currentType == DataType.UNKNOWN) {
+      if (isNewFunctionStringLiteral) {
+        unresolvedLiterals.add(((LiteralTransformFunction) newFunction).getStringLiteral());
+      } else {
+        currentTypeAndUnresolvedLiterals.setLeft(newType);
+        for (String unresolvedLiteral : unresolvedLiterals) {
+          checkLiteral(newType, unresolvedLiteral);
+        }
+        unresolvedLiterals.clear();
+      }
+    } else {
+      assert unresolvedLiterals.isEmpty();
+      if (isNewFunctionStringLiteral) {
+        checkLiteral(currentType, ((LiteralTransformFunction) newFunction).getStringLiteral());
+      } else {
+        // Only allow upcast from numeric to numeric: INT -> LONG -> FLOAT -> DOUBLE -> BIG_DECIMAL
+        Preconditions.checkArgument(currentType.isNumeric() && newType.isNumeric(), "Cannot upcast from %s to %s",
+            currentType, newType);
+        if (newType.ordinal() > currentType.ordinal()) {
+          currentTypeAndUnresolvedLiterals.setLeft(newType);
+        }
+      }
     }
   }
 
-  private TransformResultMetadata calculateResultMetadata() {
-    DataType dataType;
-    if (_elseStatement == null) {
-      dataType = DataType.UNKNOWN;
-    } else {
-      TransformResultMetadata elseStatementResultMetadata = _elseStatement.getResultMetadata();
-      dataType = elseStatementResultMetadata.getDataType();
-      Preconditions.checkState(elseStatementResultMetadata.isSingleValue(),
-          "Unsupported multi-value expression in the ELSE clause");
+  private void checkLiteral(DataType dataType, String literal) {
+    switch (dataType) {
+      case INT:
+        try {
+          Integer.parseInt(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for INT");
+        }
+        break;
+      case LONG:
+        try {
+          Long.parseLong(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for LONG");
+        }
+        break;
+      case FLOAT:
+        try {
+          Float.parseFloat(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for FLOAT");
+        }
+        break;
+      case DOUBLE:
+        try {
+          Double.parseDouble(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for DOUBLE");
+        }
+        break;
+      case BIG_DECIMAL:
+        try {
+          new BigDecimal(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for BIG_DECIMAL");
+        }
+        break;
+      case BOOLEAN:
+        Preconditions.checkArgument(
+            literal.equalsIgnoreCase("true") || literal.equalsIgnoreCase("false") || literal.equals("1")
+                || literal.equals("0"), "Invalid literal: %s for BOOLEAN", literal);
+        break;
+      case TIMESTAMP:
+        try {
+          TimestampUtils.toTimestamp(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for TIMESTAMP");
+        }
+        break;
+      case STRING:
+      case JSON:
+        break;
+      case BYTES:
+        try {
+          BytesUtils.toBytes(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for BYTES");
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unsupported data type: " + dataType);
     }
-    int numThenStatements = _thenStatements.size();
-    for (int i = 0; i < numThenStatements; i++) {
-      TransformFunction thenStatement = _thenStatements.get(i);
-      TransformResultMetadata thenStatementResultMetadata = thenStatement.getResultMetadata();
-      if (!thenStatementResultMetadata.isSingleValue()) {
-        throw new IllegalStateException("Unsupported multi-value expression in the THEN clause of index: " + i);
-      }
-      DataType thenStatementDataType = thenStatementResultMetadata.getDataType();
-
-      // Upcast the data type to cover all the data types in THEN and ELSE clauses if they don't match
-      // For numeric types:
-      // - INT & LONG -> LONG
-      // - INT & FLOAT/DOUBLE -> DOUBLE
-      // - LONG & FLOAT/DOUBLE -> DOUBLE (might lose precision)
-      // - FLOAT & DOUBLE -> DOUBLE
-      // - Any numeric data type with BIG_DECIMAL -> BIG_DECIMAL
-      // Use STRING to handle non-numeric types
-      // UNKNOWN data type is ignored unless all data types are unknown, we return unknown types.
-      if (thenStatementDataType == dataType) {
-        continue;
-      }
-      switch (dataType) {
-        case INT:
-          switch (thenStatementDataType) {
-            case LONG:
-              dataType = DataType.LONG;
-              break;
-            case FLOAT:
-            case DOUBLE:
-              dataType = DataType.DOUBLE;
-              break;
-            case BIG_DECIMAL:
-              dataType = DataType.BIG_DECIMAL;
-              break;
-            case UNKNOWN:
-              break;
-            default:
-              dataType = DataType.STRING;
-              break;
-          }
-          break;
-        case LONG:
-          switch (thenStatementDataType) {
-            case INT: // fall through
-            case UNKNOWN:
-              break;
-            case FLOAT:
-            case DOUBLE:
-              dataType = DataType.DOUBLE;
-              break;
-            case BIG_DECIMAL:
-              dataType = DataType.BIG_DECIMAL;
-              break;
-            default:
-              dataType = DataType.STRING;
-              break;
-          }
-          break;
-        case FLOAT:
-          switch (thenStatementDataType) {
-            case INT:
-            case LONG:
-            case DOUBLE:
-              dataType = DataType.DOUBLE;
-              break;
-            case BIG_DECIMAL:
-              dataType = DataType.BIG_DECIMAL;
-              break;
-            case UNKNOWN:
-              break;
-            default:
-              dataType = DataType.STRING;
-              break;
-          }
-          break;
-        case DOUBLE:
-          switch (thenStatementDataType) {
-            case INT:
-            case FLOAT:
-            case LONG:
-            case UNKNOWN:
-              break;
-            case BIG_DECIMAL:
-              dataType = DataType.BIG_DECIMAL;
-              break;
-            default:
-              dataType = DataType.STRING;
-              break;
-          }
-          break;
-        case BIG_DECIMAL:
-          switch (thenStatementDataType) {
-            case INT:
-            case FLOAT:
-            case LONG:
-            case DOUBLE:
-            case UNKNOWN:
-              break;
-            default:
-              dataType = DataType.STRING;
-              break;
-          }
-          break;
-        case UNKNOWN:
-          dataType = thenStatementDataType;
-          break;
-        default:
-          dataType = DataType.STRING;
-          break;
-      }
-    }
-    return new TransformResultMetadata(dataType, true, false);
   }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
     return _resultMetadata;
-  }
-
-  private boolean isNullLiteralTransformation(TransformFunction function) {
-    if (function instanceof LiteralTransformFunction) {
-      LiteralTransformFunction literalFunction = (LiteralTransformFunction) function;
-      return literalFunction.isNull();
-    }
-    return false;
   }
 
   /**
@@ -315,9 +304,9 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           _intValuesSV[docId] = NullValuePlaceHolder.INT;
         }
       } else {
-        int[] intValuesSV = _elseStatement.transformToIntValuesSV(valueBlock);
+        int[] intValues = _elseStatement.transformToIntValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _intValuesSV[docId] = intValuesSV[docId];
+          _intValuesSV[docId] = intValues[docId];
         }
       }
     }
@@ -400,9 +389,9 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           _longValuesSV[docId] = NullValuePlaceHolder.LONG;
         }
       } else {
-        long[] longValuesSV = _elseStatement.transformToLongValuesSV(valueBlock);
+        long[] longValues = _elseStatement.transformToLongValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _longValuesSV[docId] = longValuesSV[docId];
+          _longValuesSV[docId] = longValues[docId];
         }
       }
     }
@@ -485,9 +474,9 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           _floatValuesSV[docId] = NullValuePlaceHolder.FLOAT;
         }
       } else {
-        float[] floatValuesSV = _elseStatement.transformToFloatValuesSV(valueBlock);
+        float[] floatValues = _elseStatement.transformToFloatValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _floatValuesSV[docId] = floatValuesSV[docId];
+          _floatValuesSV[docId] = floatValues[docId];
         }
       }
     }
@@ -570,9 +559,9 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           _doubleValuesSV[docId] = NullValuePlaceHolder.DOUBLE;
         }
       } else {
-        float[] doubleValuesSV = _elseStatement.transformToFloatValuesSV(valueBlock);
+        double[] doubleValues = _elseStatement.transformToDoubleValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _doubleValuesSV[docId] = doubleValuesSV[docId];
+          _doubleValuesSV[docId] = doubleValues[docId];
         }
       }
     }
@@ -656,9 +645,9 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           _bigDecimalValuesSV[docId] = NullValuePlaceHolder.BIG_DECIMAL;
         }
       } else {
-        BigDecimal[] bigDecimalValuesSV = _elseStatement.transformToBigDecimalValuesSV(valueBlock);
+        BigDecimal[] bigDecimalValues = _elseStatement.transformToBigDecimalValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _bigDecimalValuesSV[docId] = bigDecimalValuesSV[docId];
+          _bigDecimalValuesSV[docId] = bigDecimalValues[docId];
         }
       }
     }
@@ -699,7 +688,7 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
     if (!unselectedDocs.isEmpty()) {
       if (_elseStatement == null) {
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-            _bigDecimalValuesSV[docId] = NullValuePlaceHolder.BIG_DECIMAL;
+          _bigDecimalValuesSV[docId] = NullValuePlaceHolder.BIG_DECIMAL;
           bitmap.add(docId);
         }
       } else {
@@ -742,9 +731,9 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           _stringValuesSV[docId] = NullValuePlaceHolder.STRING;
         }
       } else {
-        String[] stringValuesSV = _elseStatement.transformToStringValuesSV(valueBlock);
+        String[] stringValues = _elseStatement.transformToStringValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _stringValuesSV[docId] = stringValuesSV[docId];
+          _stringValuesSV[docId] = stringValues[docId];
         }
       }
     }
@@ -828,9 +817,9 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           _bytesValuesSV[docId] = NullValuePlaceHolder.BYTES;
         }
       } else {
-        byte[][] byteValuesSV = _elseStatement.transformToBytesValuesSV(valueBlock);
+        byte[][] bytesValues = _elseStatement.transformToBytesValuesSV(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _bytesValuesSV[docId] = byteValuesSV[docId];
+          _bytesValuesSV[docId] = bytesValues[docId];
         }
       }
     }
@@ -874,10 +863,10 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           bitmap.add(docId);
         }
       } else {
-        byte[][] byteValues = _elseStatement.transformToBytesValuesSV(valueBlock);
+        byte[][] bytesValues = _elseStatement.transformToBytesValuesSV(valueBlock);
         RoaringBitmap nullBitmap = _elseStatement.getNullBitmap(valueBlock);
         for (int docId = unselectedDocs.nextSetBit(0); docId >= 0; docId = unselectedDocs.nextSetBit(docId + 1)) {
-          _bytesValuesSV[docId] = byteValues[docId];
+          _bytesValuesSV[docId] = bytesValues[docId];
           if (nullBitmap != null && nullBitmap.contains(docId)) {
             bitmap.add(docId);
           }

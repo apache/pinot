@@ -493,9 +493,13 @@ public class HttpClient implements AutoCloseable {
     String reason;
     try {
       String entityStr = EntityUtils.toString(response.getEntity());
-      reason = JsonUtils.stringToObject(entityStr, SimpleHttpErrorInfo.class).getError();
+      try {
+        reason = JsonUtils.stringToObject(entityStr, SimpleHttpErrorInfo.class).getError();
+      } catch (Exception e) {
+        reason = entityStr;
+      }
     } catch (Exception e) {
-      reason = String.format("Failed to get a reason, exception: %s", e.toString());
+      reason = String.format("Failed to get a reason, exception: %s", e);
     }
     String errorMessage = String.format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s",
         statusLine.getStatusCode(), statusLine.getReasonPhrase(), reason, request.getURI());
