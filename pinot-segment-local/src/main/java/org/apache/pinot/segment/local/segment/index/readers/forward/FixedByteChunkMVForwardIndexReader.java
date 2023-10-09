@@ -300,11 +300,11 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
 
   @Override
   public long getBaseOffset() {
-    throw new IllegalStateException("Operation not supported since the forward index is not fixed length type");
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 
   @Override
   public int getDocLength() {
-    throw new IllegalStateException("Operation not supported since the forward index is not fixed length type");
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 }

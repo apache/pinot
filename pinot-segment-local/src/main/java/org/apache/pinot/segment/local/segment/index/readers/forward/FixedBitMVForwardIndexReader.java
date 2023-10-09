@@ -282,12 +282,12 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
 
   @Override
   public long getBaseOffset() {
-    throw new IllegalStateException("Operation not supported since the forward index is not fixed length type");
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 
   @Override
   public int getDocLength() {
-    throw new IllegalStateException("Operation not supported since the forward index is not fixed length type");
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 
   public static class Context implements ForwardIndexReaderContext {

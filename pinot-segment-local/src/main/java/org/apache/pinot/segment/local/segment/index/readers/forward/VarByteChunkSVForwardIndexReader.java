@@ -262,11 +262,11 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
 
   @Override
   public long getBaseOffset() {
-    throw new IllegalStateException("Operation not supported since the forward index is not of fixed length type");
+    throw new UnsupportedOperationException("Forward index is not of fixed length type");
   }
 
   @Override
   public int getDocLength() {
-    throw new IllegalStateException("Operation not supported since the forward index is not of fixed length type");
+    throw new UnsupportedOperationException("Forward index is not of fixed length type");
   }
 }

@@ -134,7 +134,7 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
       recordDocIdRanges(docId, context, ranges);
     } else {
       // If uncompressed, should use fixed offset
-      throw new IllegalStateException("Operation not supported since the forward index is of fixed length type");
+      throw new UnsupportedOperationException("Forward index is of fixed length type");
     }
 
     return ranges;

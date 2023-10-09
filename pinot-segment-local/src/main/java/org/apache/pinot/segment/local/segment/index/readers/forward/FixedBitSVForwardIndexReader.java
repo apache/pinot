@@ -77,7 +77,7 @@ public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<Fo
   @Override
   public List<ValueRange> getDocIdRange(int docId, ForwardIndexReaderContext context,
       @Nullable List<ValueRange> ranges) {
-    throw new IllegalStateException("Operation not supported since the forward index is fixed length type");
+    throw new UnsupportedOperationException("Forward index is fixed length type");
   }
 
   @Override

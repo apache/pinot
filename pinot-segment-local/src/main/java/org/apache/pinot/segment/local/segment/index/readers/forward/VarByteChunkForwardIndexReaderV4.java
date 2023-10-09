@@ -286,12 +286,12 @@ public class VarByteChunkForwardIndexReaderV4
 
   @Override
   public long getBaseOffset() {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 
   @Override
   public int getDocLength() {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 
   public static abstract class ReaderContext implements ForwardIndexReaderContext {
@@ -311,7 +311,7 @@ public class VarByteChunkForwardIndexReaderV4
       _chunkStartOffset = chunkStartOffset;
     }
 
-    public void recordRangesForDocId(int docId, List<ValueRange> ranges) {
+    private void recordRangesForDocId(int docId, List<ValueRange> ranges) {
       if (docId >= _docIdOffset && docId < _nextDocIdOffset) {
         ranges.addAll(_ranges);
       } else {
@@ -373,7 +373,7 @@ public class VarByteChunkForwardIndexReaderV4
     }
 
     private void initAndRecordRangesForDocId(int docId, List<ValueRange> ranges) {
-      // We'd practically end up reading entire metadata buffer
+      // Due to binary search on metadata buffer, it's simple to record the entire metadata buffer byte ranges
       _ranges = new ArrayList<>();
       _ranges.add(ValueRange.newByteRange(0, (int) _metadata.size()));
       long metadataEntry = chunkIndexFor(docId);
