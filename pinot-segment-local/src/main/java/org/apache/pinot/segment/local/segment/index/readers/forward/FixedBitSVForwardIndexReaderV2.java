@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.reader.impl.FixedBitIntReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -106,8 +105,7 @@ public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<
   }
 
   @Override
-  public List<ValueRange> getDocIdRange(int docId, ForwardIndexReaderContext context,
-      @Nullable List<ValueRange> ranges) {
+  public void recordDocIdByteRanges(int docId, ForwardIndexReaderContext context, List<ValueRange> ranges) {
     throw new UnsupportedOperationException("Forward index is fixed length type");
   }
 

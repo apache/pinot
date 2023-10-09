@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
@@ -292,17 +291,12 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
   }
 
   @Override
-  public List<ValueRange> getDocIdRange(int docId, ChunkReaderContext context, @Nullable List<ValueRange> ranges) {
-    if (ranges == null) {
-      ranges = new ArrayList<>();
-    }
+  public void recordDocIdByteRanges(int docId, ChunkReaderContext context, List<ValueRange> ranges) {
     if (_isCompressed) {
       recordDocIdRanges(docId, context, ranges);
     } else {
       recordDocIdRanges(docId, ranges);
     }
-
-    return ranges;
   }
 
   @Override

@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
@@ -98,46 +97,18 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
     }
   }
 
-  /**
-   * Helper method to return the chunk buffer that contains the value at the given document id.
-   * <ul>
-   *   <li> If the chunk already exists in the reader context, returns the same. </li>
-   *   <li> Otherwise, loads the chunk for the row, and sets it in the reader context. </li>
-   * </ul>
-   * @param docId Document id
-   * @param context Reader context
-   * @return Chunk for the row
-   */
-  protected ByteBuffer getChunkBuffer(int docId, ChunkReaderContext context) {
-    int chunkId = docId >>> _shift;
-    if (context.getChunkId() == chunkId) {
-      return context.getChunkBuffer();
-    }
-    return decompressChunk(chunkId, context);
-  }
-
-  protected void recordDocIdRanges(int docId, ChunkReaderContext context, List<ValueRange> ranges) {
-    int chunkId = docId >>> _shift;
-    if (context.getChunkId() == chunkId) {
-      ranges.addAll(context.getRanges());
-      return;
-    }
-    recordChunkRanges(chunkId, context, ranges);
+  protected int getChunkId(int docId) {
+    return docId >>> _shift;
   }
 
   @Override
-  public List<ValueRange> getDocIdRange(int docId, ChunkReaderContext context, @Nullable List<ValueRange> ranges) {
-    if (ranges == null) {
-      ranges = new ArrayList<>();
-    }
+  public void recordDocIdByteRanges(int docId, ChunkReaderContext context, List<ValueRange> ranges) {
     if (_isCompressed) {
       recordDocIdRanges(docId, context, ranges);
     } else {
       // If uncompressed, should use fixed offset
       throw new UnsupportedOperationException("Forward index is of fixed length type");
     }
-
-    return ranges;
   }
 
   @Override

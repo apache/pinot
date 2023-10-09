@@ -21,6 +21,8 @@ package org.apache.pinot.segment.spi.index.reader;
 import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -917,6 +919,8 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException();
   }
 
+  @AllArgsConstructor
+  @Getter
   class ValueRange {
     private final long _offset;
     private final int _size;
@@ -929,24 +933,6 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
 
     public static ValueRange newBitRange(long offset, int sizeInBits) {
       return new ValueRange(offset, sizeInBits, true);
-    }
-
-    private ValueRange(long offset, int size, boolean isSizeOfBit) {
-      _offset = offset;
-      _size = size;
-      _isSizeOfBit = isSizeOfBit;
-    }
-
-    public long getOffset() {
-      return _offset;
-    }
-
-    public int getSize() {
-      return _size;
-    }
-
-    public boolean isSizeOfBit() {
-      return _isSizeOfBit;
     }
 
     @Override
@@ -967,9 +953,10 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
      * Returns a list of {@link ValueRange} that represents all the distinct
      * buffer byte ranges (absolute offset, sizeInBytes) that are accessed when reading the given (@param docId}
      * @param docId to find the range for
-     * @return List of {@link ValueRange} that are accessed while reading the given docId
+     * @param context Reader context
+     * @param ranges List of {@link ValueRange} to which the applicable value ranges will be added
      */
-    List<ValueRange> getDocIdRange(int docId, T context, @Nullable List<ValueRange> ranges);
+    void recordDocIdByteRanges(int docId, T context, List<ValueRange> ranges);
 
     /**
      * Returns whether the forward index is of fixed length type, and therefore the docId -> byte range mapping is fixed

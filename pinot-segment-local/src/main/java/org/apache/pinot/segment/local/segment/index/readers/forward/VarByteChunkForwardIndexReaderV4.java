@@ -26,7 +26,6 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -271,12 +270,8 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
-  public List<ValueRange> getDocIdRange(int docId, ReaderContext context, @Nullable List<ValueRange> ranges) {
-    if (ranges == null) {
-      ranges = new ArrayList<>();
-    }
+  public void recordDocIdByteRanges(int docId, ReaderContext context, List<ValueRange> ranges) {
     context.recordRangesForDocId(docId, ranges);
-    return ranges;
   }
 
   @Override

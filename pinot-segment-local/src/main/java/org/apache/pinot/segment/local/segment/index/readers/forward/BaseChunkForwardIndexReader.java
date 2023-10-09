@@ -121,15 +121,19 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
    * @return Chunk for the row
    */
   protected ByteBuffer getChunkBuffer(int docId, ChunkReaderContext context) {
-    int chunkId = docId / _numDocsPerChunk;
+    int chunkId = getChunkId(docId);
     if (context.getChunkId() == chunkId) {
       return context.getChunkBuffer();
     }
     return decompressChunk(chunkId, context);
   }
 
+  protected int getChunkId(int docId) {
+    return docId / _numDocsPerChunk;
+  }
+
   protected void recordDocIdRanges(int docId, ChunkReaderContext context, List<ValueRange> ranges) {
-    int chunkId = docId / _numDocsPerChunk;
+    int chunkId = getChunkId(docId);
     if (context.getChunkId() == chunkId) {
       ranges.addAll(context.getRanges());
       return;

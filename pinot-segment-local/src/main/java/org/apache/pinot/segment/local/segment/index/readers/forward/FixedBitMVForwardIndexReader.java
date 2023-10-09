@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
-import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
@@ -226,10 +224,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
-  public List<ValueRange> getDocIdRange(int docId, Context context, @Nullable List<ValueRange> ranges) {
-    if (ranges == null) {
-      ranges = new ArrayList<>();
-    }
+  public void recordDocIdByteRanges(int docId, Context context, List<ValueRange> ranges) {
     int contextDocId = context._docId;
     int contextEndOffset = context._endOffset;
     int startIndex;
@@ -271,8 +266,6 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     // Update context
     context._docId = docId;
     context._endOffset = endIndex;
-
-    return ranges;
   }
 
   @Override
