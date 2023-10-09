@@ -24,8 +24,11 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
+import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -57,7 +60,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
     try {
-      return _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis)).size();
+      List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis));
+      if (CollectionUtils.isNotEmpty(partitionInfos)) {
+        return partitionInfos.size();
+      }
+      throw new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic));
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
