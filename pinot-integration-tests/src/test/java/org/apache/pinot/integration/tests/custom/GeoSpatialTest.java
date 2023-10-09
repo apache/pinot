@@ -309,7 +309,9 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
                   + "b.st_point, "
                   + "b.st_point_1, "
                   + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, -1), b.st_point), "
-                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, 1), b.st_point_1) "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, 1), b.st_point_1), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, 0), ST_Point(40, -40, 0)), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, 1), ST_Point(40, -40, 1)) "
                   + "FROM %s a "
                   + "JOIN %s b "
                   + "ON a.wkt1=b.wkt1 "
@@ -328,6 +330,17 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
             BytesUtils.toBytes(record.get(3).asText()));
         assertEquals(dist1, expectedDist1);
         assertEquals(dist2, expectedDist2);
+
+        double dist3 = record.get(6).doubleValue();
+        double dist4 = record.get(7).doubleValue();
+        Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(40, -40));
+        double expectedDist3 =
+            ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(0).asText()), GeometrySerializer.serialize(point));
+        GeometryUtils.setGeography(point);
+        double expectedDist4 =
+            ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(1).asText()), GeometrySerializer.serialize(point));
+        assertEquals(dist3, expectedDist3);
+        assertEquals(dist4, expectedDist4);
       }
     }
     {
@@ -338,7 +351,9 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
                   + "b.st_point, "
                   + "b.st_point_1, "
                   + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, false), b.st_point), "
-                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, true), b.st_point_1) "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, true), b.st_point_1), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, false), ST_Point(40, -40, false)), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, true), ST_Point(40, -40, true)) "
                   + "FROM %s a "
                   + "JOIN %s b "
                   + "ON a.wkt1=b.wkt1 "
@@ -357,6 +372,17 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
             BytesUtils.toBytes(record.get(3).asText()));
         assertEquals(dist1, expectedDist1);
         assertEquals(dist2, expectedDist2);
+
+        double dist3 = record.get(6).doubleValue();
+        double dist4 = record.get(7).doubleValue();
+        Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(40, -40));
+        double expectedDist3 =
+            ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(0).asText()), GeometrySerializer.serialize(point));
+        GeometryUtils.setGeography(point);
+        double expectedDist4 =
+            ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(1).asText()), GeometrySerializer.serialize(point));
+        assertEquals(dist3, expectedDist3);
+        assertEquals(dist4, expectedDist4);
       }
     }
   }
