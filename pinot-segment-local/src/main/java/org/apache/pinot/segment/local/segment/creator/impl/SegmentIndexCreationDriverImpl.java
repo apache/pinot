@@ -228,8 +228,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           GenericRow decodedRow = _recordReader.next(reuse);
           recordReadStartTime = System.nanoTime();
 
-          // TODO(ERICH): time how long transformation takes.  From Jackie: this is leftover from when offline
-          //  ingestion passed through this function.
           // Should not be needed anymore.
           // Add row to indexes
           _transformPipeline.processRow(decodedRow, reusedResult);
@@ -278,34 +276,28 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", _totalDocs);
 
-    int incompleteRowsFound = 0;
     try {
       // Initialize the index creation using the per-column statistics information
       // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
       //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir);
 
-      // Build the index
-      _recordReader.rewind();  // TODO(ERICH): why does the reader need to be rewound? was is iterated before?
-      LOGGER.info("Start building IndexCreator By Column!");
+      // Build the indexes
+      LOGGER.info("Start building Index by column");
 
       TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
-      // If this is null, then I need to use another method to iterate through the column
       int[] sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
       for (String col : columns) {
         _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
       }
     } catch (Exception e) {
-      _indexCreator.close();
+      _indexCreator.close(); // TODO: Why is this only closed on an exception?
       throw e;
     } finally {
       _recordReader.close();
     }
 
-    if (incompleteRowsFound > 0) {
-      LOGGER.warn("Incomplete data found for {} records. This can be due to error during reader or transformations",
-              incompleteRowsFound);
-    }
+    // TODO: Using column oriented, we can't catch incomplete records.  Does that matter?
 
     LOGGER.info("Finished records indexing by column in IndexCreator!");
 
