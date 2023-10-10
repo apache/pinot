@@ -104,6 +104,8 @@ public class CommonConstants {
 
     public static final int DEFAULT_TUPLE_SKETCH_LGK = 16;
 
+    public static final int DEFAULT_CPC_SKETCH_LGK = 11;
+
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
 

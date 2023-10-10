@@ -25,6 +25,7 @@ import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
@@ -237,7 +238,7 @@ public class CustomSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<Sketch> DATA_SKETCH_SER_DE = new ObjectSerDe<Sketch>() {
+  public static final ObjectSerDe<Sketch> DATA_SKETCH_THETA_SER_DE = new ObjectSerDe<Sketch>() {
 
     @Override
     public byte[] serialize(Sketch value) {
@@ -280,6 +281,24 @@ public class CustomSerDeUtils {
               new IntegerSummaryDeserializer());
         }
       };
+
+  public static final ObjectSerDe<CpcSketch> DATA_SKETCH_CPC_SER_DE = new ObjectSerDe<CpcSketch>() {
+
+    @Override
+    public byte[] serialize(CpcSketch value) {
+      return value.toByteArray();
+    }
+
+    @Override
+    public CpcSketch deserialize(byte[] bytes) {
+      return CpcSketch.heapify(Memory.wrap(bytes));
+    }
+
+    @Override
+    public CpcSketch deserialize(ByteBuffer byteBuffer) {
+      return CpcSketch.heapify(Memory.wrap(byteBuffer));
+    }
+  };
 
   public static final ObjectSerDe<RoaringBitmap> ROARING_BITMAP_SER_DE = new ObjectSerDe<RoaringBitmap>() {
 

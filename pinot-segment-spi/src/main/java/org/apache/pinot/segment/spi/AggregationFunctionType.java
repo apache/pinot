@@ -69,17 +69,14 @@ public enum AggregationFunctionType {
   FIRSTWITHTIME("firstWithTime", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.or(
           OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER)),
-          OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER))
-      ),
+          OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER))),
       ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  LASTWITHTIME("lastWithTime", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.or(
-          OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER)),
-          OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER))
-      ),
+  LASTWITHTIME("lastWithTime", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.or(
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER)),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER))),
       ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  MINMAXRANGE("minMaxRange", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC,
-      OperandTypes.NUMERIC, ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  MINMAXRANGE("minMaxRange", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC,
+      ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
   /**
    * for all distinct count family functions:
    * (1) distinct_count only supports single argument;
@@ -107,20 +104,19 @@ public enum AggregationFunctionType {
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
       ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
   // DEPRECATED in v2
-  @Deprecated
-  FASTHLL("fastHLL"),
-  DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", null,
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+  @Deprecated FASTHLL("fastHLL"),
+  DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", null, SqlKind.OTHER_FUNCTION,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
       ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", null,
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+  DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", null, SqlKind.OTHER_FUNCTION,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
       ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTSUM("distinctSum", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC,
-      OperandTypes.NUMERIC, ReturnTypes.AGG_SUM, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTAVG("distinctAvg", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC,
-      OperandTypes.NUMERIC, ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.OTHER)),
+  DISTINCTSUM("distinctSum", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC,
+      ReturnTypes.AGG_SUM, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  DISTINCTAVG("distinctAvg", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC,
+      ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   PERCENTILE("percentile", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.ARG0,
@@ -138,8 +134,7 @@ public enum AggregationFunctionType {
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.VARCHAR_2000,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
   // DEPRECATED in v2
-  @Deprecated
-  PERCENTILESMARTTDIGEST("percentileSmartTDigest"),
+  @Deprecated PERCENTILESMARTTDIGEST("percentileSmartTDigest"),
   PERCENTILEKLL("percentileKLL", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.ARG0,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
@@ -157,8 +152,7 @@ public enum AggregationFunctionType {
       ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   // DEPRECATED in v2
-  @Deprecated
-  IDSET("idSet"),
+  @Deprecated IDSET("idSet"),
 
   // TODO: support histogram requires solving ARRAY constructor and multi-function signature without optional ordinal
   HISTOGRAM("histogram"),
@@ -179,10 +173,10 @@ public enum AggregationFunctionType {
       OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
   STDDEVSAMP("stdDevSamp", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  SKEWNESS("skewness", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  KURTOSIS("kurtosis", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  SKEWNESS("skewness", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.NUMERIC,
+      ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  KURTOSIS("kurtosis", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.NUMERIC,
+      ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
   FOURTHMOMENT("fourthMoment"),
 
   // DataSketches Tuple Sketch support
@@ -204,8 +198,19 @@ public enum AggregationFunctionType {
       SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.BINARY, ReturnTypes.BIGINT,
       ReturnTypes.explicit(SqlTypeName.OTHER)),
 
+  // Datasketches Frequent Items support
   FREQUENTSTRINGSSKETCH("frequentStringsSketch"),
   FREQUENTLONGSSKETCH("frequentLongsSketch"),
+
+  // Datasketches CPC Sketch support
+  DISTINCTCOUNTCPCSKETCH("distinctCountCPC", ImmutableList.of("distinctCountCPCSketch"), SqlKind.OTHER_FUNCTION,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
+      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  DISTINCTCOUNTRAWCPCSKETCH("distinctCountRawCPC", ImmutableList.of("distinctCountRawCPCSketch"),
+      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
+      ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   // Geo aggregation functions
   STUNION("STUnion", ImmutableList.of("ST_UNION"), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
@@ -271,35 +276,35 @@ public enum AggregationFunctionType {
       ReturnTypes.explicit(SqlTypeName.OTHER)),
 
   // boolean aggregate functions
-  BOOLAND("boolAnd", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.BOOLEAN, ReturnTypes.BOOLEAN, ReturnTypes.explicit(SqlTypeName.INTEGER)),
-  BOOLOR("boolOr", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.BOOLEAN, ReturnTypes.BOOLEAN, ReturnTypes.explicit(SqlTypeName.INTEGER)),
+  BOOLAND("boolAnd", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.BOOLEAN,
+      ReturnTypes.BOOLEAN, ReturnTypes.explicit(SqlTypeName.INTEGER)),
+  BOOLOR("boolOr", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.BOOLEAN,
+      ReturnTypes.BOOLEAN, ReturnTypes.explicit(SqlTypeName.INTEGER)),
 
   // ExprMin and ExprMax
   // TODO: revisit support for ExprMin/Max count in V2, particularly plug query rewriter in the right place
   EXPRMIN("exprMin", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY), ordinal -> ordinal > 1),
-      ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY), ordinal -> ordinal > 1), ReturnTypes.ARG0,
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
   EXPRMAX("exprMax", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY), ordinal -> ordinal > 1),
-      ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY), ordinal -> ordinal > 1), ReturnTypes.ARG0,
+      ReturnTypes.explicit(SqlTypeName.OTHER)),
 
-  PARENTEXPRMIN(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(),
-      null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+  PARENTEXPRMIN(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(), null,
+      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.INTEGER, SqlTypeFamily.ANY), ordinal -> ordinal > 2),
       ReturnTypes.explicit(SqlTypeName.OTHER), ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PARENTEXPRMAX(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(),
-      null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+  PARENTEXPRMAX(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(), null,
+      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.INTEGER, SqlTypeFamily.ANY), ordinal -> ordinal > 2),
       ReturnTypes.explicit(SqlTypeName.OTHER), ReturnTypes.explicit(SqlTypeName.OTHER)),
 
-  CHILDEXPRMIN(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(),
-      null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+  CHILDEXPRMIN(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(), null,
+      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.INTEGER, SqlTypeFamily.ANY), ordinal -> ordinal > 3),
       ReturnTypes.ARG1, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  CHILDEXPRMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(),
-      null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+  CHILDEXPRMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(), null,
+      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.INTEGER, SqlTypeFamily.ANY), ordinal -> ordinal > 3),
       ReturnTypes.ARG1, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
@@ -307,8 +312,9 @@ public enum AggregationFunctionType {
   // TODO: revisit support for funnel count in V2
   FUNNELCOUNT("funnelCount");
 
-  private static final Set<String> NAMES = Arrays.stream(values()).flatMap(func -> Stream.of(func.name(),
-      func.getName(), func.getName().toLowerCase())).collect(Collectors.toSet());
+  private static final Set<String> NAMES =
+      Arrays.stream(values()).flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toLowerCase()))
+          .collect(Collectors.toSet());
 
   // --------------------------------------------------------------------------
   // Function signature used by Calcite.
@@ -373,8 +379,7 @@ public enum AggregationFunctionType {
 
     _returnTypeInference = finalReturnType;
     _operandTypeChecker = operandTypeChecker;
-    _intermediateReturnTypeInference = intermediateReturnType == null ? _returnTypeInference
-        : intermediateReturnType;
+    _intermediateReturnTypeInference = intermediateReturnType == null ? _returnTypeInference : intermediateReturnType;
   }
 
   public String getName() {
@@ -427,9 +432,7 @@ public enum AggregationFunctionType {
 
   public static String getUnderscoreSplitAggregationFunctionName(String functionName) {
     // Skip functions that have numbers for now and return their name as is
-    return functionName.matches(".*\\d.*")
-        ? functionName
-        : functionName.replaceAll("(.)(\\p{Upper}+|\\d+)", "$1_$2");
+    return functionName.matches(".*\\d.*") ? functionName : functionName.replaceAll("(.)(\\p{Upper}+|\\d+)", "$1_$2");
   }
 
   /**

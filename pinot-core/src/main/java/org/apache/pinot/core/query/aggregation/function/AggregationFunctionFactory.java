@@ -364,6 +364,10 @@ public class AggregationFunctionFactory {
             return new FrequentStringsSketchAggregationFunction(arguments);
           case FREQUENTLONGSSKETCH:
             return new FrequentLongsSketchAggregationFunction(arguments);
+          case DISTINCTCOUNTCPCSKETCH:
+            return new DistinctCountCPCAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWCPCSKETCH:
+            return new DistinctCountRawCPCAggregationFunction(arguments);
 
           default:
             throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);
