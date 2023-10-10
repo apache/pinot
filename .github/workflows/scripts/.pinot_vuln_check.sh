@@ -39,3 +39,5 @@ docker build \
     .
 
 docker image ls
+docker image prune --all --filter "until=1h" -f
+docker image ls
