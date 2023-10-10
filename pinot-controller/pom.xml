@@ -196,21 +196,6 @@
     </resources>
     <plugins>
       <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-      </plugin>
-
-      <plugin>
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
         <version>1.11.0</version>
@@ -261,11 +246,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <!--
-          version upgraded to 3.0.0-M5 since the earlier version (2.19) was causing test cases defined in suites to run
-          twice. See https://github.com/apache/pinot/pull/6326#issue-533412053 for more details.
-        -->
-        <version>3.0.0-M5</version>
         <configuration combine.children="override">
           <suiteXmlFiles>
             <suiteXmlFile>testng-statefull.xml</suiteXmlFile>

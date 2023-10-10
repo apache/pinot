@@ -30,8 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.InstanceType;
@@ -44,12 +42,12 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -166,15 +164,12 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     }
 
     // Allow at most one replica unavailable during relocation
-    Configuration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, -1);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-        _externalViewCheckIntervalInMs);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-        _externalViewStabilizationTimeoutInMs);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.UPDATE_TARGET_TIER,
-        TierConfigUtils.shouldRelocateToTiers(tableConfig));
-    rebalanceConfig.addProperty(RebalanceConfigConstants.JOB_ID, TableRebalancer.createUniqueRebalanceJobIdentifier());
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setMinAvailableReplicas(-1);
+    rebalanceConfig.setExternalViewCheckIntervalInMs(_externalViewCheckIntervalInMs);
+    rebalanceConfig.setExternalViewStabilizationTimeoutInMs(_externalViewStabilizationTimeoutInMs);
+    rebalanceConfig.setUpdateTargetTier(TierConfigUtils.shouldRelocateToTiers(tableConfig));
+    rebalanceConfig.setJobId(TableRebalancer.createUniqueRebalanceJobIdentifier());
 
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.

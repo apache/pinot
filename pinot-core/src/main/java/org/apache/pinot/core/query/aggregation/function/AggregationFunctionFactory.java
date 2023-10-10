@@ -298,6 +298,14 @@ public class AggregationFunctionFactory {
             return new DistinctCountHLLMVAggregationFunction(arguments);
           case DISTINCTCOUNTRAWHLLMV:
             return new DistinctCountRawHLLMVAggregationFunction(arguments);
+          case DISTINCTCOUNTHLLPLUS:
+            return new DistinctCountHLLPlusAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWHLLPLUS:
+            return new DistinctCountRawHLLPlusAggregationFunction(arguments);
+          case DISTINCTCOUNTHLLPLUSMV:
+            return new DistinctCountHLLPlusMVAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWHLLPLUSMV:
+            return new DistinctCountRawHLLPlusMVAggregationFunction(arguments);
           case DISTINCTSUMMV:
             return new DistinctSumMVAggregationFunction(arguments);
           case DISTINCTAVGMV:

@@ -19,39 +19,33 @@
 package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 
 
 /**
  * Helper class for pinot-admin tool's RebalanceTable command.
  */
 public class PinotTableRebalancer extends PinotZKChanger {
-  private final Configuration _rebalanceConfig = new BaseConfiguration();
+  private final RebalanceConfig _rebalanceConfig = new RebalanceConfig();
 
   public PinotTableRebalancer(String zkAddress, String clusterName, boolean dryRun, boolean reassignInstances,
       boolean includeConsuming, boolean bootstrap, boolean downtime, int minReplicasToKeepUpForNoDowntime,
       boolean bestEffort, long externalViewCheckIntervalInMs, long externalViewStabilizationTimeoutInMs) {
     super(zkAddress, clusterName);
-    _rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
-    _rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, reassignInstances);
-    _rebalanceConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, includeConsuming);
-    _rebalanceConfig.addProperty(RebalanceConfigConstants.BOOTSTRAP, bootstrap);
-    _rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, downtime);
-    _rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME,
-        minReplicasToKeepUpForNoDowntime);
-    _rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, bestEffort);
-    _rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-        externalViewCheckIntervalInMs);
-    _rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-        externalViewStabilizationTimeoutInMs);
-    _rebalanceConfig.addProperty(RebalanceConfigConstants.JOB_ID,
-        TableRebalancer.createUniqueRebalanceJobIdentifier());
+    _rebalanceConfig.setDryRun(dryRun);
+    _rebalanceConfig.setReassignInstances(reassignInstances);
+    _rebalanceConfig.setIncludeConsuming(includeConsuming);
+    _rebalanceConfig.setBootstrap(bootstrap);
+    _rebalanceConfig.setDowntime(downtime);
+    _rebalanceConfig.setMinAvailableReplicas(minReplicasToKeepUpForNoDowntime);
+    _rebalanceConfig.setBestEfforts(bestEffort);
+    _rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
+    _rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
+    _rebalanceConfig.setJobId(TableRebalancer.createUniqueRebalanceJobIdentifier());
   }
 
   public RebalanceResult rebalance(String tableNameWithType) {

@@ -33,7 +33,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <scala.version>2.12</scala.version>
     <spark.version>3.2.1</spark.version>
     <airlift.version>0.16</airlift.version>
   </properties>
@@ -143,7 +142,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-kafka-${kafka.version}</artifactId>
+      <artifactId>pinot-kafka-2.0</artifactId>
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
@@ -286,7 +285,7 @@
     -->
     <dependency>
       <groupId>org.apache.spark</groupId>
-      <artifactId>spark-launcher_${scala.version}</artifactId>
+      <artifactId>spark-launcher_${scala.compat.version}</artifactId>
       <version>${spark.version}</version>
       <exclusions>
         <exclusion>
@@ -567,10 +566,6 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-      </plugin>
-      <plugin>
         <artifactId>maven-resources-plugin</artifactId>
         <version>2.6</version>
         <executions>
@@ -588,7 +583,7 @@
               <resources>
                 <resource>
                   <!-- source -->
-                  <directory>src/main/resources/sample_data/kafka_${kafka.version}</directory>
+                  <directory>src/main/resources/sample_data/kafka_2.0</directory>
                 </resource>
               </resources>
             </configuration>

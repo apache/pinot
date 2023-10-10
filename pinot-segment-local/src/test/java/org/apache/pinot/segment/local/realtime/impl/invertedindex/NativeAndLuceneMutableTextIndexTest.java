@@ -34,6 +34,8 @@ public class NativeAndLuceneMutableTextIndexTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "RealTimeNativeVsLuceneTest");
   private static final String TEXT_COLUMN_NAME = "testColumnName";
   private static final String MV_TEXT_COLUMN_NAME = "testMVColumnName";
+  private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
+      RealtimeLuceneTextIndexSearcherPool.init(1);
 
   private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
   private NativeMutableTextIndex _nativeMutableTextIndex;

@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkSVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -28,7 +28,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /**
  * Chunk-based single-value raw (non-dictionary-encoded) forward index reader for values of fixed length data type (INT,
  * LONG, FLOAT, DOUBLE).
- * <p>For data layout, please refer to the documentation for {@link FixedByteChunkSVForwardIndexWriter}
+ * <p>For data layout, please refer to the documentation for {@link FixedByteChunkForwardIndexWriter}
  */
 public final class FixedByteChunkSVForwardIndexReader extends BaseChunkForwardIndexReader {
   private final int _chunkSize;

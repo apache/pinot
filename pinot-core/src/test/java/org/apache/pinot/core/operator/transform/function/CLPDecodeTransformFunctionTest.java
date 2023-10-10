@@ -161,7 +161,7 @@ public class CLPDecodeTransformFunctionTest {
   @Test
   public void testTransform() {
     ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("%s(%s,%s,%s)", TransformFunctionType.CLPDECODE.getName(), LOGTYPE_COLUMN, DICT_VARS_COLUMN,
+        String.format("%s(%s,%s,%s)", TransformFunctionType.CLP_DECODE.getName(), LOGTYPE_COLUMN, DICT_VARS_COLUMN,
             ENCODED_VARS_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CLPDecodeTransformFunction);
@@ -178,7 +178,7 @@ public class CLPDecodeTransformFunctionTest {
   public void testTransformWithDefaultValue() {
     String defaultValue = "default";
     ExpressionContext expression = RequestContextUtils.getExpression(
-        String.format("%s(%s,%s,%s,'%s')", TransformFunctionType.CLPDECODE.getName(), LOGTYPE_COLUMN, DICT_VARS_COLUMN,
+        String.format("%s(%s,%s,%s,'%s')", TransformFunctionType.CLP_DECODE.getName(), LOGTYPE_COLUMN, DICT_VARS_COLUMN,
             ENCODED_VARS_COLUMN, defaultValue));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof CLPDecodeTransformFunction);
@@ -198,7 +198,7 @@ public class CLPDecodeTransformFunctionTest {
     // 1st parameter literal
     assertThrows(BadQueryRequestException.class, () -> {
       ExpressionContext expression = RequestContextUtils.getExpression(
-          String.format("%s('%s',%s,%s,'%s')", TransformFunctionType.CLPDECODE.getName(), LOGTYPE_COLUMN,
+          String.format("%s('%s',%s,%s,'%s')", TransformFunctionType.CLP_DECODE.getName(), LOGTYPE_COLUMN,
               DICT_VARS_COLUMN, ENCODED_VARS_COLUMN, defaultValue));
       TransformFunctionFactory.get(expression, _dataSourceMap);
     });
@@ -206,7 +206,7 @@ public class CLPDecodeTransformFunctionTest {
     // 2nd parameter literal
     assertThrows(BadQueryRequestException.class, () -> {
       ExpressionContext expression = RequestContextUtils.getExpression(
-          String.format("%s(%s,'%s',%s,'%s')", TransformFunctionType.CLPDECODE.getName(), LOGTYPE_COLUMN,
+          String.format("%s(%s,'%s',%s,'%s')", TransformFunctionType.CLP_DECODE.getName(), LOGTYPE_COLUMN,
               DICT_VARS_COLUMN, ENCODED_VARS_COLUMN, defaultValue));
       TransformFunctionFactory.get(expression, _dataSourceMap);
     });
@@ -214,7 +214,7 @@ public class CLPDecodeTransformFunctionTest {
     // 3rd parameter literal
     assertThrows(BadQueryRequestException.class, () -> {
       ExpressionContext expression = RequestContextUtils.getExpression(
-          String.format("%s(%s,%s,'%s','%s')", TransformFunctionType.CLPDECODE.getName(), LOGTYPE_COLUMN,
+          String.format("%s(%s,%s,'%s','%s')", TransformFunctionType.CLP_DECODE.getName(), LOGTYPE_COLUMN,
               DICT_VARS_COLUMN, ENCODED_VARS_COLUMN, defaultValue));
       TransformFunctionFactory.get(expression, _dataSourceMap);
     });
@@ -222,7 +222,7 @@ public class CLPDecodeTransformFunctionTest {
     // 4th parameter identifier
     assertThrows(BadQueryRequestException.class, () -> {
       ExpressionContext expression = RequestContextUtils.getExpression(
-          String.format("%s(%s,%s,%s,%s)", TransformFunctionType.CLPDECODE.getName(), LOGTYPE_COLUMN,
+          String.format("%s(%s,%s,%s,%s)", TransformFunctionType.CLP_DECODE.getName(), LOGTYPE_COLUMN,
               DICT_VARS_COLUMN, ENCODED_VARS_COLUMN, defaultValue));
       TransformFunctionFactory.get(expression, _dataSourceMap);
     });
@@ -230,7 +230,7 @@ public class CLPDecodeTransformFunctionTest {
     // Missing arg
     assertThrows(BadQueryRequestException.class, () -> {
       ExpressionContext expression = RequestContextUtils.getExpression(
-          String.format("%s(%s,%s)", TransformFunctionType.CLPDECODE.getName(), LOGTYPE_COLUMN, DICT_VARS_COLUMN));
+          String.format("%s(%s,%s)", TransformFunctionType.CLP_DECODE.getName(), LOGTYPE_COLUMN, DICT_VARS_COLUMN));
       TransformFunctionFactory.get(expression, _dataSourceMap);
     });
   }

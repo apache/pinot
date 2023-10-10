@@ -21,10 +21,11 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 
@@ -39,7 +40,7 @@ public interface SegmentAssignment {
    * @param helixManager Helix manager
    * @param tableConfig Table config
    */
-  void init(HelixManager helixManager, TableConfig tableConfig);
+  void init(HelixManager helixManager, TableConfig tableConfig, @Nullable ControllerMetrics controllerMetrics);
 
   /**
    * Assigns segment to instances.
@@ -64,5 +65,5 @@ public interface SegmentAssignment {
    */
   Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
-      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, Configuration config);
+      @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, RebalanceConfig config);
 }

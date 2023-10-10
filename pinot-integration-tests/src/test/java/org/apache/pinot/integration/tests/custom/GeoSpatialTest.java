@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.pinot.core.geospatial.transform.function.ScalarFunctions;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -45,6 +46,7 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
   private static final int NUM_TOTAL_DOCS = 1000;
   private static final String DIM_NAME = "dimName";
   private static final String ST_POINT = "st_point";
+  private static final String ST_POINT_1 = "st_point_1";
 
   private static final String ST_X_NAME = "st_x";
   private static final String ST_Y_NAME = "st_y";
@@ -109,6 +111,7 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
     return new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(DIM_NAME, FieldSpec.DataType.STRING)
         .addSingleValueDimension(ST_POINT, FieldSpec.DataType.BYTES)
+        .addSingleValueDimension(ST_POINT_1, FieldSpec.DataType.BYTES)
         .addSingleValueDimension(ST_X_NAME, FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension(ST_Y_NAME, FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension(WKT_1_NAME, FieldSpec.DataType.STRING)
@@ -140,6 +143,8 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
             null, null),
         new org.apache.avro.Schema.Field(ST_POINT,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES), null, null),
+        new org.apache.avro.Schema.Field(ST_POINT_1,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES), null, null),
         new org.apache.avro.Schema.Field(WKT_1_NAME, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
             null, null),
         new org.apache.avro.Schema.Field(WKT_2_NAME, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
@@ -167,6 +172,8 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
         record.put(ST_X_NAME, point.getX());
         record.put(ST_Y_NAME, point.getY());
         record.put(ST_POINT, ByteBuffer.wrap(GeometrySerializer.serialize(point)));
+        GeometryUtils.setGeography(point);
+        record.put(ST_POINT_1, ByteBuffer.wrap(GeometrySerializer.serialize(point)));
         record.put(WKT_1_NAME, WKT_1_DATA[i % WKT_1_DATA.length]);
         record.put(WKT_2_NAME, WKT_2_DATA[i % WKT_2_DATA.length]);
         record.put(ST_WITHIN_RESULT_NAME, ST_WITHIN_RESULT[i % ST_WITHIN_RESULT.length]);
@@ -262,6 +269,125 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testStDistanceFunction(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    for (int isGeography = 0; isGeography < 2; isGeography++) {
+      String query =
+          String.format(
+              "Select ST_DISTANCE(ST_Point(st_x, st_y, %d), ST_Point(40, -40, %d)), st_x, st_y from %s",
+              isGeography, isGeography, getTableName());
+      JsonNode pinotResponse = postQuery(query);
+      JsonNode rows = pinotResponse.get("resultTable").get("rows");
+      for (int i = 0; i < rows.size(); i++) {
+        JsonNode record = rows.get(i);
+        Point point1 = GeometryUtils.GEOMETRY_FACTORY.createPoint(
+            new Coordinate(record.get(1).asDouble(), record.get(2).asDouble()));
+        Point point2 = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(40, -40));
+        if (isGeography > 0) {
+          GeometryUtils.setGeography(point1);
+          GeometryUtils.setGeography(point2);
+        }
+        double expectedValue =
+            ScalarFunctions.stDistance(GeometrySerializer.serialize(point1), GeometrySerializer.serialize(point2));
+        double actualValue = record.get(0).asDouble();
+        assertEquals(actualValue, expectedValue);
+      }
+    }
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testStPointFunctionWithV2(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    {
+      String query =
+          String.format("Select "
+                  + "ST_Point(a.st_x, a.st_y, -1), "
+                  + "ST_Point(a.st_x, a.st_y, 1), "
+                  + "b.st_point, "
+                  + "b.st_point_1, "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, -1), b.st_point), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, 1), b.st_point_1), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, 0), ST_Point(40, -40, 0)), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, 1), ST_Point(40, -40, 1)) "
+                  + "FROM %s a "
+                  + "JOIN %s b "
+                  + "ON a.wkt1=b.wkt1 "
+                  + "LIMIT 10",
+              getTableName(),
+              getTableName());
+      JsonNode pinotResponse = postQuery(query);
+      JsonNode rows = pinotResponse.get("resultTable").get("rows");
+      for (int i = 0; i < rows.size(); i++) {
+        JsonNode record = rows.get(i);
+        double dist1 = record.get(4).doubleValue();
+        double dist2 = record.get(5).doubleValue();
+        double expectedDist1 = ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(0).asText()),
+            BytesUtils.toBytes(record.get(2).asText()));
+        double expectedDist2 = ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(1).asText()),
+            BytesUtils.toBytes(record.get(3).asText()));
+        assertEquals(dist1, expectedDist1);
+        assertEquals(dist2, expectedDist2);
+
+        double dist3 = record.get(6).doubleValue();
+        double dist4 = record.get(7).doubleValue();
+        Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(40, -40));
+        double expectedDist3 =
+            ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(0).asText()), GeometrySerializer.serialize(point));
+        GeometryUtils.setGeography(point);
+        double expectedDist4 =
+            ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(1).asText()), GeometrySerializer.serialize(point));
+        assertEquals(dist3, expectedDist3);
+        assertEquals(dist4, expectedDist4);
+      }
+    }
+    {
+      String query =
+          String.format("Select "
+                  + "ST_Point(a.st_x, a.st_y, false), "
+                  + "ST_Point(a.st_x, a.st_y, true), "
+                  + "b.st_point, "
+                  + "b.st_point_1, "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, false), b.st_point), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, true), b.st_point_1), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, false), ST_Point(40, -40, false)), "
+                  + "ST_DISTANCE(ST_Point(a.st_x, a.st_y, true), ST_Point(40, -40, true)) "
+                  + "FROM %s a "
+                  + "JOIN %s b "
+                  + "ON a.wkt1=b.wkt1 "
+                  + "LIMIT 10",
+              getTableName(),
+              getTableName());
+      JsonNode pinotResponse = postQuery(query);
+      JsonNode rows = pinotResponse.get("resultTable").get("rows");
+      for (int i = 0; i < rows.size(); i++) {
+        JsonNode record = rows.get(i);
+        double dist1 = record.get(4).doubleValue();
+        double dist2 = record.get(5).doubleValue();
+        double expectedDist1 = ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(0).asText()),
+            BytesUtils.toBytes(record.get(2).asText()));
+        double expectedDist2 = ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(1).asText()),
+            BytesUtils.toBytes(record.get(3).asText()));
+        assertEquals(dist1, expectedDist1);
+        assertEquals(dist2, expectedDist2);
+
+        double dist3 = record.get(6).doubleValue();
+        double dist4 = record.get(7).doubleValue();
+        Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(40, -40));
+        double expectedDist3 =
+            ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(0).asText()), GeometrySerializer.serialize(point));
+        GeometryUtils.setGeography(point);
+        double expectedDist4 =
+            ScalarFunctions.stDistance(BytesUtils.toBytes(record.get(1).asText()), GeometrySerializer.serialize(point));
+        assertEquals(dist3, expectedDist3);
+        assertEquals(dist4, expectedDist4);
+      }
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testStWithinQuery(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -346,5 +472,30 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
             + "fc04c9c05e89538ef34d6a4042be4840e1719fc05e8956cd6c2efd4042bdf26f1dc50dc05e898e864020814042bdc1e7967cafc"
             + "05e89a7503b81b64042bddabe27179cc05e89a85caafbc24042be215336deb9c05e899ba1b196104042be385c67dfe3";
     Assert.assertEquals(actualResult, expectedResult);
+  }
+
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testStPointWithLiteralWithV2(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String query =
+        String.format("Select "
+                + "ST_Point(1,2) "
+                + "FROM %s a "
+                + "JOIN %s b "
+                + "ON a.wkt1=b.wkt1 "
+                + "LIMIT 10",
+            getTableName(),
+            getTableName());
+    JsonNode pinotResponse = postQuery(query);
+    JsonNode rows = pinotResponse.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode record = rows.get(i);
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(1, 2));
+      byte[] expectedValue = GeometrySerializer.serialize(point);
+      byte[] actualValue = BytesUtils.toBytes(record.get(0).asText());
+      assertEquals(actualValue, expectedValue);
+    }
   }
 }

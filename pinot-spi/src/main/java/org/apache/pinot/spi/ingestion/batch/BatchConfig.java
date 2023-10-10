@@ -51,6 +51,7 @@ public class BatchConfig {
   private final String _segmentNamePostfix;
   private final boolean _excludeSequenceId;
   private final boolean _appendUUIDToSegmentName;
+  private final boolean _excludeTimeInSegmentName;
   private final String _sequenceId;
 
   private final String _pushMode;
@@ -85,12 +86,12 @@ public class BatchConfig {
 
     _recordReaderClassName = batchConfigsMap.get(BatchConfigProperties.RECORD_READER_CLASS);
     _recordReaderConfigClassName = batchConfigsMap.get(BatchConfigProperties.RECORD_READER_CONFIG_CLASS);
-    _recordReaderProps = IngestionConfigUtils
-        .extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.RECORD_READER_PROP_PREFIX);
+    _recordReaderProps = IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap,
+        BatchConfigProperties.RECORD_READER_PROP_PREFIX);
 
     _segmentNameGeneratorType = IngestionConfigUtils.getSegmentNameGeneratorType(batchConfigsMap);
-    _segmentNameGeneratorConfigs = IngestionConfigUtils
-        .extractPropsMatchingPrefix(batchConfigsMap, BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX);
+    _segmentNameGeneratorConfigs = IngestionConfigUtils.extractPropsMatchingPrefix(batchConfigsMap,
+        BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX);
     Map<String, String> segmentNameGeneratorProps = IngestionConfigUtils.getSegmentNameGeneratorProps(batchConfigsMap);
     _segmentName = segmentNameGeneratorProps.get(BatchConfigProperties.SEGMENT_NAME);
     _segmentNamePrefix = segmentNameGeneratorProps.get(BatchConfigProperties.SEGMENT_NAME_PREFIX);
@@ -99,6 +100,8 @@ public class BatchConfig {
     _sequenceId = batchConfigsMap.get(BatchConfigProperties.SEQUENCE_ID);
     _appendUUIDToSegmentName =
         Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.APPEND_UUID_TO_SEGMENT_NAME));
+    _excludeTimeInSegmentName =
+        Boolean.parseBoolean(segmentNameGeneratorProps.get(BatchConfigProperties.EXCLUDE_TIME_IN_SEGMENT_NAME));
 
     _pushMode = IngestionConfigUtils.getPushMode(batchConfigsMap);
     _pushAttempts = IngestionConfigUtils.getPushAttempts(batchConfigsMap);
@@ -188,6 +191,10 @@ public class BatchConfig {
 
   public boolean isAppendUUIDToSegmentName() {
     return _appendUUIDToSegmentName;
+  }
+
+  public boolean isExcludeTimeInSegmentName() {
+    return _excludeTimeInSegmentName;
   }
 
   public String getPushMode() {

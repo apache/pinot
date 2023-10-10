@@ -33,6 +33,7 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -568,7 +569,7 @@ public class DataTableImplV4 implements DataTable {
   private Map<Integer, String> deserializeExceptions(ByteBuffer buffer)
       throws IOException {
     int numExceptions = buffer.getInt();
-    Map<Integer, String> exceptions = new HashMap<>(numExceptions);
+    Map<Integer, String> exceptions = new HashMap<>(HashUtil.getHashMapCapacity(numExceptions));
     for (int i = 0; i < numExceptions; i++) {
       int errCode = buffer.getInt();
       String errMessage = DataTableUtils.decodeString(buffer);

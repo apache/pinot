@@ -36,6 +36,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -65,6 +66,10 @@ public class SegmentLineageCleanupTest {
     controllerConf.setDeletedSegmentsRetentionInDays(0);
     _retentionManager = new RetentionManager(_resourceManager, mock(LeadControllerManager.class), controllerConf,
         mock(ControllerMetrics.class));
+
+    // Create a schema
+    TEST_INSTANCE.addDummySchema(TableNameBuilder.extractRawTableName(OFFLINE_TABLE_NAME));
+    TEST_INSTANCE.addDummySchema(TableNameBuilder.extractRawTableName(REFRESH_OFFLINE_TABLE_NAME));
 
     // Update table config
     TableConfig tableConfig =

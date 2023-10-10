@@ -55,19 +55,6 @@ public class SegmentCommitterFactoryTest {
     return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setStreamConfigs(realtimeStreamConfig);
   }
 
-  @Test (description = "if controller doesn't support split commit, it should return default segment committer")
-  public void testControllerNoSplit()
-      throws URISyntaxException {
-    TableConfig config = createRealtimeTableConfig("test").build();
-
-    SegmentCommitterFactory factory = new SegmentCommitterFactory(Mockito.mock(Logger.class),
-        Mockito.mock(ServerSegmentCompletionProtocolHandler.class), config,
-        Mockito.mock(IndexLoadingConfig.class), Mockito.mock(ServerMetrics.class));
-    SegmentCommitter committer = factory.createSegmentCommitter(false, null, null);
-    Assert.assertNotNull(committer);
-    Assert.assertTrue(committer instanceof DefaultSegmentCommitter);
-  }
-
   @Test(description = "when controller supports split commit, server should always use split segment commit")
   public void testSplitSegmentCommitterIsDefault()
       throws URISyntaxException {
@@ -78,7 +65,7 @@ public class SegmentCommitterFactoryTest {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     SegmentCommitterFactory factory = new SegmentCommitterFactory(Mockito.mock(Logger.class), protocolHandler, config,
         Mockito.mock(IndexLoadingConfig.class), Mockito.mock(ServerMetrics.class));
-    SegmentCommitter committer = factory.createSegmentCommitter(true, requestParams, controllerVipUrl);
+    SegmentCommitter committer = factory.createSegmentCommitter(requestParams, controllerVipUrl);
     Assert.assertNotNull(committer);
     Assert.assertTrue(committer instanceof SplitSegmentCommitter);
   }
@@ -101,7 +88,7 @@ public class SegmentCommitterFactoryTest {
 
     SegmentCommitterFactory factory = new SegmentCommitterFactory(Mockito.mock(Logger.class), protocolHandler, config,
         indexLoadingConfig, Mockito.mock(ServerMetrics.class));
-    SegmentCommitter committer = factory.createSegmentCommitter(true, requestParams, controllerVipUrl);
+    SegmentCommitter committer = factory.createSegmentCommitter(requestParams, controllerVipUrl);
     Assert.assertNotNull(committer);
     Assert.assertTrue(committer instanceof SplitSegmentCommitter);
     Assert.assertTrue(((SplitSegmentCommitter) committer).getSegmentUploader() instanceof PinotFSSegmentUploader);
@@ -115,7 +102,7 @@ public class SegmentCommitterFactoryTest {
 
     factory = new SegmentCommitterFactory(Mockito.mock(Logger.class), protocolHandler, config1,
         indexLoadingConfig, Mockito.mock(ServerMetrics.class));
-    committer = factory.createSegmentCommitter(true, requestParams, controllerVipUrl);
+    committer = factory.createSegmentCommitter(requestParams, controllerVipUrl);
     Assert.assertNotNull(committer);
     Assert.assertTrue(committer instanceof SplitSegmentCommitter);
     Assert.assertTrue(((SplitSegmentCommitter) committer).getSegmentUploader() instanceof PinotFSSegmentUploader);

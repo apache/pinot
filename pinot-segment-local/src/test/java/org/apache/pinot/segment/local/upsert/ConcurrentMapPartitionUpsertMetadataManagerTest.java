@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -49,6 +52,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -59,10 +63,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class ConcurrentMapPartitionUpsertMetadataManagerTest {
@@ -81,6 +82,55 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   public void tearDown()
       throws IOException {
     FileUtils.forceDelete(INDEX_DIR);
+  }
+
+  @Test
+  public void testStartFinishOperation() {
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 0, INDEX_DIR,
+            mock(ServerMetrics.class));
+
+    // Start 2 operations
+    assertTrue(upsertMetadataManager.startOperation());
+    assertTrue(upsertMetadataManager.startOperation());
+
+    // Stop and close the metadata manager
+    AtomicBoolean stopped = new AtomicBoolean();
+    AtomicBoolean closed = new AtomicBoolean();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    executor.submit(() -> {
+      upsertMetadataManager.stop();
+      stopped.set(true);
+      try {
+        upsertMetadataManager.close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      closed.set(true);
+    });
+    executor.shutdown();
+
+    // Wait for metadata manager to be stopped
+    TestUtils.waitForCondition(aVoid -> stopped.get(), 10_000L, "Failed to stop the metadata manager");
+
+    // Metadata manager should block on close because there are 2 pending operations
+    assertFalse(closed.get());
+
+    // Starting new operation should fail because the metadata manager is already stopped
+    assertFalse(upsertMetadataManager.startOperation());
+
+    // Finish one operation
+    upsertMetadataManager.finishOperation();
+
+    // Metadata manager should still block on close because there is still 1 pending operation
+    assertFalse(closed.get());
+
+    // Finish the other operation
+    upsertMetadataManager.finishOperation();
+
+    // Metadata manager should be closed now
+    TestUtils.waitForCondition(aVoid -> closed.get(), 10_000L, "Failed to close the metadata manager");
   }
 
   @Test

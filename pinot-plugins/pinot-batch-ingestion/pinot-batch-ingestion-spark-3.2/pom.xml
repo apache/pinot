@@ -79,10 +79,6 @@
           <artifactId>slf4j-log4j12</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>com.google.protobuf</groupId>
-          <artifactId>protobuf-java</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>com.zaxxer</groupId>
           <artifactId>HikariCP-java7</artifactId>
         </exclusion>

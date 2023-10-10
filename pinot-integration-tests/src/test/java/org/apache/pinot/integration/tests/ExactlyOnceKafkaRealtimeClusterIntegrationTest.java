@@ -20,9 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.util.List;
-import java.util.Map;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.spi.utils.ReadMode;
 
 
 public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
@@ -30,20 +27,6 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
   @Override
   protected boolean useKafkaTransaction() {
     return true;
-  }
-
-  @Override
-  protected String getLoadMode() {
-    return ReadMode.mmap.name();
-  }
-
-  @Override
-  public void startController()
-      throws Exception {
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-
-    properties.put(ControllerConf.ALLOW_HLC_TABLES, false);
-    startController(properties);
   }
 
   @Override

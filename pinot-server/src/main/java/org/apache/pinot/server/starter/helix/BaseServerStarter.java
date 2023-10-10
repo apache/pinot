@@ -66,9 +66,11 @@ import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
@@ -137,6 +139,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected AdminApiApplication _adminApiApplication;
   protected ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
   protected RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
+  protected RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected volatile boolean _isServerReadyToServeQueries = false;
 
@@ -555,6 +558,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
           "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
               + "'", e);
     }
+
+    // Create a thread pool used for mutable lucene index searches, with size based on query_worker_threads config
+    LOGGER.info("Initializing lucene searcher thread pool");
+    int queryWorkerThreads =
+        _serverConf.getProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
+    _realtimeLuceneTextIndexSearcherPool = RealtimeLuceneTextIndexSearcherPool.init(queryWorkerThreads);
 
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();

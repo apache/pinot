@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.google.common.primitives.Longs;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
@@ -185,6 +186,34 @@ public class CustomSerDeUtils {
       } catch (IOException e) {
         throw new RuntimeException("Caught exception while de-serializing HyperLogLog", e);
       }
+    }
+  };
+
+  public static final ObjectSerDe<HyperLogLogPlus> HYPER_LOG_LOG_PLUS_SER_DE = new ObjectSerDe<HyperLogLogPlus>() {
+
+    @Override
+    public byte[] serialize(HyperLogLogPlus hyperLogLogPlus) {
+      try {
+        return hyperLogLogPlus.getBytes();
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+      }
+    }
+
+    @Override
+    public HyperLogLogPlus deserialize(byte[] bytes) {
+      try {
+        return HyperLogLogPlus.Builder.build(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while de-serializing HyperLogLogPlus", e);
+      }
+    }
+
+    @Override
+    public HyperLogLogPlus deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return deserialize(bytes);
     }
   };
 

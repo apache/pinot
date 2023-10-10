@@ -68,6 +68,8 @@ public class PinotHintOptions {
 
   public static class JoinHintOptions {
     public static final String JOIN_STRATEGY = "join_strategy";
+    public static final String DYNAMIC_BROADCAST_JOIN_STRATEGY = "dynamic_broadcast";
+    public static final String HASH_TABLE_JOIN_STRATEGY = "hash_table";
     /**
      * Max rows allowed to build the right table hash collection.
      */

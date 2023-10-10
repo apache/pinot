@@ -39,7 +39,6 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -207,12 +206,12 @@ public class ServerPlanRequestUtils {
    */
   static void attachDynamicFilter(PinotQuery pinotQuery, JoinNode.JoinKeys joinKeys, List<Object[]> dataContainer,
       DataSchema dataSchema) {
-    FieldSelectionKeySelector leftSelector = (FieldSelectionKeySelector) joinKeys.getLeftJoinKeySelector();
-    FieldSelectionKeySelector rightSelector = (FieldSelectionKeySelector) joinKeys.getRightJoinKeySelector();
+    List<Integer> leftJoinKeys = joinKeys.getLeftKeys();
+    List<Integer> rightJoinKeys = joinKeys.getRightKeys();
     List<Expression> expressions = new ArrayList<>();
-    for (int i = 0; i < leftSelector.getColumnIndices().size(); i++) {
-      Expression leftExpr = pinotQuery.getSelectList().get(leftSelector.getColumnIndices().get(i));
-      int rightIdx = rightSelector.getColumnIndices().get(i);
+    for (int i = 0; i < leftJoinKeys.size(); i++) {
+      Expression leftExpr = pinotQuery.getSelectList().get(leftJoinKeys.get(i));
+      int rightIdx = rightJoinKeys.get(i);
       Expression inFilterExpr = RequestUtils.getFunctionExpression(FilterKind.IN.name());
       List<Expression> operands = new ArrayList<>(dataContainer.size() + 1);
       operands.add(leftExpr);

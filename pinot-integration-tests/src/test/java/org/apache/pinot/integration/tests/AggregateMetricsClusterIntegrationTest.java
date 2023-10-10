@@ -58,7 +58,7 @@ public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrati
 
     // Create and upload the schema and table config with reduced number of columns and aggregate metrics on
     Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(getSchemaName()).addSingleValueDimension("Carrier", DataType.STRING)
+        new Schema.SchemaBuilder().setSchemaName(getTableName()).addSingleValueDimension("Carrier", DataType.STRING)
             .addSingleValueDimension("Origin", DataType.STRING).addMetric("AirTime", DataType.LONG)
             .addMetric("ArrDelay", DataType.DOUBLE)
             .addDateTime("DaysSinceEpoch", DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();

@@ -181,7 +181,7 @@ jobs:
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
         old_commit: [
-          "release-0.9.3", "release-0.10.0", "release-0.11.0", "release-0.12.1", "master"
+          "release-0.12.1", "release-1.0.0", "master"
         ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:

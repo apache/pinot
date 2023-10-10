@@ -87,11 +87,6 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Override
-  protected String getSchemaName() {
-    return "dedupSchema";
-  }
-
-  @Override
   protected String getAvroTarFileName() {
     return "dedupIngestionTestData.tar.gz";
   }

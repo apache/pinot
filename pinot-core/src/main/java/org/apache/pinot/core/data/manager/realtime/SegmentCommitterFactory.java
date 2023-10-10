@@ -51,26 +51,14 @@ public class SegmentCommitterFactory {
     _serverMetrics = serverMetrics;
   }
 
-  /**
-   *
-   * @param isSplitCommit Indicates if the controller has enabled split commit
-   * @param params Parameters to use in the Segment completion request
-   * @param controllerVipUrl Unused,
-   * @return
-   * @throws URISyntaxException
-   */
-  public SegmentCommitter createSegmentCommitter(boolean isSplitCommit, SegmentCompletionProtocol.Request.Params params,
+  public SegmentCommitter createSegmentCommitter(SegmentCompletionProtocol.Request.Params params,
       String controllerVipUrl)
       throws URISyntaxException {
-    if (!isSplitCommit) {
-      return new DefaultSegmentCommitter(_logger, _protocolHandler, params);
-    }
-    SegmentUploader segmentUploader;
-
     boolean uploadToFs = _streamConfig.isServerUploadToDeepStore();
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();
 
+    SegmentUploader segmentUploader;
     if (uploadToFs || peerSegmentDownloadScheme != null) {
       // TODO: peer scheme non-null check exists for backwards compatibility. remove check once users have migrated
       segmentUploader = new PinotFSSegmentUploader(segmentStoreUri,

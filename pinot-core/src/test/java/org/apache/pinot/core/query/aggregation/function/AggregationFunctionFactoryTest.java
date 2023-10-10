@@ -172,6 +172,18 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLL);
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
+    function = getFunction("DiStInCtCoUnThLlPlUs");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
+    assertTrue(aggregationFunction instanceof DistinctCountHLLPlusAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTHLLPLUS);
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("DiStInCtCoUnTrAwHlLpLuS");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
+    assertTrue(aggregationFunction instanceof DistinctCountRawHLLPlusAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUS);
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
     function = getFunction("FaStHlL");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
     assertTrue(aggregationFunction instanceof FastHLLAggregationFunction);
@@ -356,6 +368,18 @@ public class AggregationFunctionFactoryTest {
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
     assertTrue(aggregationFunction instanceof DistinctCountRawHLLMVAggregationFunction);
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLLMV);
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("DiStInCt_CoUnT_hLl_PlUs_Mv");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
+    assertTrue(aggregationFunction instanceof DistinctCountHLLPlusMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTHLLPLUSMV);
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("DiStInCtCoUnTrAwHlLpLuS_mV");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
+    assertTrue(aggregationFunction instanceof DistinctCountRawHLLPlusMVAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLLPLUSMV);
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
     function = getFunction("PeRcEnTiLe10Mv");

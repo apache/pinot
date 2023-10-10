@@ -651,7 +651,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
     assertEquals(isZKWriteSuccess, "SUCCESS");
     String jobId = tableLevelDetails.get("reloadJobId").asText();
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(jobId));
+    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forSegmentReloadStatus(jobId));
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
 
     // Validate all fields are present
@@ -663,7 +663,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   public boolean isReloadJobCompleted(String reloadJobId)
       throws Exception {
-    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forControllerJobStatus(reloadJobId));
+    String jobStatusResponse = sendGetRequest(_controllerRequestURLBuilder.forSegmentReloadStatus(reloadJobId));
     JsonNode jobStatus = JsonUtils.stringToJsonNode(jobStatusResponse);
 
     assertEquals(jobStatus.get("metadata").get("jobId").asText(), reloadJobId);
@@ -673,12 +673,12 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   /**
    * TODO: Support removing new added columns for MutableSegment and remove the new added columns before running the
-   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns()}.
+   *       next test. Use this to replace {@link OfflineClusterIntegrationTest#testDefaultColumns(boolean)}.
    */
   public void testReload(boolean includeOfflineTable)
       throws Exception {
     String rawTableName = getTableName();
-    Schema schema = getSchema();
+    Schema schema = getSchema(getTableName());
 
     String selectStarQuery = "SELECT * FROM " + rawTableName;
     JsonNode queryResponse = postQuery(selectStarQuery);

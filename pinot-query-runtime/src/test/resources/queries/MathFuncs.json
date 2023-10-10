@@ -270,8 +270,6 @@
         "sql": "SELECT intCol %  10 FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comment": "should return 0 for 0 value but we are not",
         "description": "test mod on floating point literal with columns",
         "sql": "SELECT intCol %  1.2 FROM {numTbl}"
       },
@@ -345,8 +343,6 @@
         "sql": "SELECT exp(floatCol) FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comment": "Argument cannot be literal for transform function: exp:",
         "description": "test exp on literal",
         "sql": "SELECT exp(2.0) FROM {numTbl}"
       }
@@ -387,8 +383,6 @@
         "sql": "SELECT floor(floatCol) FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comment": "Caught exception while initializing transform function: floor",
         "description": "test exp on literal",
         "sql": "SELECT floor(2.0) FROM {numTbl}"
       }
@@ -429,8 +423,6 @@
         "sql": "SELECT ceil(floatCol) FROM {numTbl}"
       },
       {
-        "ignored": true,
-        "comment": "Caught exception while initializing transform function: ceil",
         "description": "test exp on literal",
         "sql": "SELECT ceil(2.0) FROM {numTbl}"
       }

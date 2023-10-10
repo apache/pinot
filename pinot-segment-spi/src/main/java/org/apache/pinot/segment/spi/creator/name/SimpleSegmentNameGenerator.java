@@ -40,13 +40,14 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;
   private final boolean _appendUUIDToSegmentName;
+  private final boolean _excludeTimeInSegmentName;
 
   public SimpleSegmentNameGenerator(String segmentNamePrefix, @Nullable String segmentNamePostfix) {
-    this(segmentNamePrefix, segmentNamePostfix, false);
+    this(segmentNamePrefix, segmentNamePostfix, false, false);
   }
 
   public SimpleSegmentNameGenerator(String segmentNamePrefix, @Nullable String segmentNamePostfix,
-      boolean appendUUIDToSegmentName) {
+      boolean appendUUIDToSegmentName, boolean excludeTimeInSegmentName) {
     Preconditions.checkArgument(segmentNamePrefix != null, "Missing segmentNamePrefix for SimpleSegmentNameGenerator");
     SegmentNameUtils.validatePartialOrFullSegmentName(segmentNamePrefix);
     if (segmentNamePostfix != null) {
@@ -55,19 +56,25 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
     _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;
     _appendUUIDToSegmentName = appendUUIDToSegmentName;
+    _excludeTimeInSegmentName = excludeTimeInSegmentName;
   }
 
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
-    if (minTimeValue != null) {
-      SegmentNameUtils.validatePartialOrFullSegmentName(minTimeValue.toString());
-    }
-    if (maxTimeValue != null) {
-      SegmentNameUtils.validatePartialOrFullSegmentName(maxTimeValue.toString());
-    }
+    if (_excludeTimeInSegmentName) {
+      return JOINER.join(_segmentNamePrefix, _segmentNamePostfix, sequenceId >= 0 ? sequenceId : null,
+          _appendUUIDToSegmentName ? UUID.randomUUID().toString() : null);
+    } else {
+      if (minTimeValue != null) {
+        SegmentNameUtils.validatePartialOrFullSegmentName(minTimeValue.toString());
+      }
+      if (maxTimeValue != null) {
+        SegmentNameUtils.validatePartialOrFullSegmentName(maxTimeValue.toString());
+      }
 
-    return JOINER.join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix,
-        sequenceId >= 0 ? sequenceId : null, _appendUUIDToSegmentName ? UUID.randomUUID() : null);
+      return JOINER.join(_segmentNamePrefix, minTimeValue, maxTimeValue, _segmentNamePostfix,
+          sequenceId >= 0 ? sequenceId : null, _appendUUIDToSegmentName ? UUID.randomUUID().toString() : null);
+    }
   }
 
   @Override
@@ -77,6 +84,8 @@ public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
     if (_segmentNamePostfix != null) {
       stringBuilder.append(", segmentNamePostfix=").append(_segmentNamePostfix);
     }
+    stringBuilder.append(", appendUUIDToSegmentName=").append(_appendUUIDToSegmentName);
+    stringBuilder.append(", excludeTimeInSegmentName=").append(_excludeTimeInSegmentName);
     return stringBuilder.toString();
   }
 }

@@ -21,6 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -86,8 +87,10 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
@@ -113,6 +116,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
+  private static final Map<String, String> DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP =
+      ImmutableMap.<String, String>builder().put("distinctcount", "distinctcountmv")
+          .put("distinctcountbitmap", "distinctcountbitmapmv").put("distinctcounthll", "distinctcounthllmv")
+          .put("distinctcountrawhll", "distinctcountrawhllmv").put("distinctsum", "distinctsummv")
+          .put("distinctavg", "distinctavgmv").put("count", "countmv").put("min", "minmv").put("max", "maxmv")
+          .put("avg", "avgmv").put("sum", "summv").put("minmaxrange", "minmaxrangemv")
+          .put("distinctcounthllplus", "distinctcounthllplusmv")
+          .put("distinctcountrawhllplus", "distinctcountrawhllplusmv").build();
 
   protected final PinotConfiguration _config;
   protected final BrokerRoutingManager _routingManager;
@@ -128,6 +139,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final long _brokerTimeoutMs;
   protected final int _queryResponseLimit;
   protected final QueryLogger _queryLogger;
+  protected final BrokerQueryEventListener _brokerQueryEventListener;
 
   private final boolean _disableGroovy;
   private final boolean _useApproximateFunction;
@@ -138,7 +150,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics) {
+      BrokerMetrics brokerMetrics, BrokerQueryEventListener brokerQueryEventListener) {
     _brokerId = brokerId;
     _brokerIdGenerator = new BrokerRequestIdGenerator(brokerId);
     _config = config;
@@ -162,6 +174,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     boolean enableQueryCancellation =
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
     _queriesById = enableQueryCancellation ? new ConcurrentHashMap<>() : null;
+    _brokerQueryEventListener = brokerQueryEventListener;
     LOGGER.info(
         "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps, "
             + "enabling query cancellation: {}", _brokerId, _brokerTimeoutMs, _queryResponseLimit,
@@ -212,8 +225,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         // Unexpected server responses are collected and returned as exception.
         if (status != 200 && status != 404) {
           String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
-          throw new Exception(String.format("Unexpected status=%d and response='%s' from uri='%s'", status,
-              responseString, uri));
+          throw new Exception(
+              String.format("Unexpected status=%d and response='%s' from uri='%s'", status, responseString, uri));
         }
         if (serverResponses != null) {
           serverResponses.put(uri.getHost() + ":" + uri.getPort(), status);
@@ -241,19 +254,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       throws Exception {
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
+    long requestId = _brokerIdGenerator.get();
+    requestContext.setRequestId(requestId);
+
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.
     boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity);
     if (!hasAccess) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      _brokerQueryEventListener.onQueryCompletion(requestContext);
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
-    long requestId = _brokerIdGenerator.get();
-    requestContext.setRequestId(requestId);
     JsonNode sql = request.get(Broker.Request.SQL);
     if (sql == null) {
+      requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+      _brokerQueryEventListener.onQueryCompletion(requestContext);
       throw new BadQueryRequestException("Failed to find 'sql' in the request: " + request);
     }
     String query = sql.asText();
@@ -272,6 +289,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     brokerResponse.setRequestId(String.valueOf(requestId));
     brokerResponse.setBrokerId(_brokerId);
     brokerResponse.setBrokerReduceTimeMs(requestContext.getReduceTimeMillis());
+    _brokerQueryEventListener.onQueryCompletion(requestContext);
     return brokerResponse;
   }
 
@@ -378,6 +396,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           getSegmentPartitionedColumns(_tableCache, tableName));
       if (_enableDistinctCountBitmapOverride) {
         handleDistinctCountBitmapOverride(serverPinotQuery);
+      }
+
+      Schema schema = _tableCache.getSchema(rawTableName);
+      if (schema != null) {
+        handleDistinctMultiValuedOverride(serverPinotQuery, schema);
       }
 
       long compilationEndTimeNs = System.nanoTime();
@@ -489,7 +512,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       BrokerRequest offlineBrokerRequest = null;
       BrokerRequest realtimeBrokerRequest = null;
       TimeBoundaryInfo timeBoundaryInfo = null;
-      Schema schema = _tableCache.getSchema(rawTableName);
       if (offlineTableName != null && realtimeTableName != null) {
         // Time boundary info might be null when there is no segment in the offline table, query real-time side only
         timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
@@ -941,6 +963,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   /**
+   * Retrieve multivalued columns for a table.
+   * From the table Schema , we get the multi valued columns of dimension fields.
+   *
+   * @param tableSchema
+   * @param columnName
+   * @return multivalued columns of the table .
+   */
+  private static boolean isMultiValueColumn(Schema tableSchema, String columnName) {
+
+    DimensionFieldSpec dimensionFieldSpec = tableSchema.getDimensionSpec(columnName);
+    return dimensionFieldSpec != null && !dimensionFieldSpec.isSingleValueField();
+  }
+
+  /**
    * Sets the table name in the given broker request.
    * NOTE: Set table name in broker request because it is used for access control, query routing etc.
    */
@@ -1070,6 +1106,52 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
       handleDistinctCountBitmapOverride(havingExpression);
+    }
+  }
+
+  /**
+   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   */
+  @VisibleForTesting
+  static void handleDistinctMultiValuedOverride(PinotQuery pinotQuery, Schema tableSchema) {
+    for (Expression expression : pinotQuery.getSelectList()) {
+      handleDistinctMultiValuedOverride(expression, tableSchema);
+    }
+    List<Expression> orderByExpressions = pinotQuery.getOrderByList();
+    if (orderByExpressions != null) {
+      for (Expression expression : orderByExpressions) {
+        // NOTE: Order-by is always a Function with the ordering of the Expression
+        handleDistinctMultiValuedOverride(expression.getFunctionCall().getOperands().get(0), tableSchema);
+      }
+    }
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      handleDistinctMultiValuedOverride(havingExpression, tableSchema);
+    }
+  }
+
+  /**
+   * Rewrites selected 'Distinct' prefixed function to 'Distinct----MV' function for the field of multivalued type.
+   */
+  private static void handleDistinctMultiValuedOverride(Expression expression, Schema tableSchema) {
+    Function function = expression.getFunctionCall();
+    if (function == null) {
+      return;
+    }
+
+    String overrideOperator = DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
+    if (overrideOperator != null) {
+      List<Expression> operands = function.getOperands();
+      if (operands.size() >= 1 && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
+          operands.get(0).getIdentifier().getName())) {
+        // we are only checking the first operand that if its a MV column as all the overriding agg. fn.'s have
+        // first operator is column name
+        function.setOperator(overrideOperator);
+      }
+    } else {
+      for (Expression operand : function.getOperands()) {
+        handleDistinctMultiValuedOverride(operand, tableSchema);
+      }
     }
   }
 

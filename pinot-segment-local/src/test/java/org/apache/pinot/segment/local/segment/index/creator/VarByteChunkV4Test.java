@@ -30,8 +30,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
-import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReaderV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -89,7 +89,7 @@ public class VarByteChunkV4Test {
       throws IOException {
     _file = new File(TEST_DIR, "testStringSV");
     testSV(compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING, x -> x,
-        VarByteChunkSVForwardIndexWriterV4::putString, (reader, context, docId) -> reader.getString(docId, context));
+        VarByteChunkForwardIndexWriterV4::putString, (reader, context, docId) -> reader.getString(docId, context));
   }
 
   @Test(dataProvider = "params")
@@ -97,24 +97,24 @@ public class VarByteChunkV4Test {
       throws IOException {
     _file = new File(TEST_DIR, "testBytesSV");
     testSV(compressionType, longestEntry, chunkSize, FieldSpec.DataType.BYTES, x -> x.getBytes(StandardCharsets.UTF_8),
-        VarByteChunkSVForwardIndexWriterV4::putBytes, (reader, context, docId) -> reader.getBytes(docId, context));
+        VarByteChunkForwardIndexWriterV4::putBytes, (reader, context, docId) -> reader.getBytes(docId, context));
   }
 
   private <T> void testSV(ChunkCompressionType compressionType, int longestEntry, int chunkSize,
       FieldSpec.DataType dataType, Function<String, T> forwardMapper,
-      BiConsumer<VarByteChunkSVForwardIndexWriterV4, T> write,
+      BiConsumer<VarByteChunkForwardIndexWriterV4, T> write,
       Read<T> read)
       throws IOException {
     List<T> values = randomStrings(1000, longestEntry).map(forwardMapper).collect(Collectors.toList());
-    try (VarByteChunkSVForwardIndexWriterV4 writer = new VarByteChunkSVForwardIndexWriterV4(_file, compressionType,
+    try (VarByteChunkForwardIndexWriterV4 writer = new VarByteChunkForwardIndexWriterV4(_file, compressionType,
         chunkSize)) {
       for (T value : values) {
         write.accept(writer, value);
       }
     }
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(_file)) {
-      try (VarByteChunkSVForwardIndexReaderV4 reader = new VarByteChunkSVForwardIndexReaderV4(buffer, dataType);
-          VarByteChunkSVForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+      try (VarByteChunkForwardIndexReaderV4 reader = new VarByteChunkForwardIndexReaderV4(buffer, dataType,
+          true); VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
         for (int i = 0; i < values.size(); i++) {
           assertEquals(read.read(reader, context, i), values.get(i));
         }
@@ -161,7 +161,7 @@ public class VarByteChunkV4Test {
 
   @FunctionalInterface
   interface Read<T> {
-    T read(VarByteChunkSVForwardIndexReaderV4 reader, VarByteChunkSVForwardIndexReaderV4.ReaderContext context,
+    T read(VarByteChunkForwardIndexReaderV4 reader, VarByteChunkForwardIndexReaderV4.ReaderContext context,
         int docId);
   }
 }

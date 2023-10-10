@@ -56,7 +56,6 @@ import javax.ws.rs.ClientErrorException;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -111,6 +110,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
@@ -143,6 +143,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
@@ -174,7 +175,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -225,6 +225,7 @@ public class PinotHelixResourceManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private HelixDataAccessor _helixDataAccessor;
   private Builder _keyBuilder;
+  private ControllerMetrics _controllerMetrics;
   private SegmentDeletionManager _segmentDeletionManager;
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
@@ -274,12 +275,13 @@ public class PinotHelixResourceManager {
    * TODO:For the <a href="https://github.com/apache/pinot/pull/10451">backwards incompatible change</a>, this is a
    * reminder to clean up old Zk nodes when the controller starts up.
    */
-  public synchronized void start(HelixManager helixZkManager) {
+  public synchronized void start(HelixManager helixZkManager, @Nullable ControllerMetrics controllerMetrics) {
     _helixZkManager = helixZkManager;
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
+    _controllerMetrics = controllerMetrics;
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore,
         _deletedSegmentsRetentionInDays);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
@@ -313,7 +315,7 @@ public class PinotHelixResourceManager {
     Map<String, String> configs = _helixAdmin.getConfig(helixConfigScope,
         Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY));
     boolean caseInsensitive = Boolean.parseBoolean(configs.getOrDefault(Helix.ENABLE_CASE_INSENSITIVE_KEY,
-            Boolean.toString(Helix.DEFAULT_ENABLE_CASE_INSENSITIVE)));
+        Boolean.toString(Helix.DEFAULT_ENABLE_CASE_INSENSITIVE)));
     _tableCache = new TableCache(_propertyStore, caseInsensitive);
   }
 
@@ -1553,6 +1555,10 @@ public class PinotHelixResourceManager {
         PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableNameWithType, tableConfig.getReplication(),
             _enableBatchMessageMode);
     TableType tableType = tableConfig.getTableType();
+    // Ensure that table is not created if schema is not present
+    if (ZKMetadataProvider.getSchema(_propertyStore, TableNameBuilder.extractRawTableName(tableNameWithType)) == null) {
+      throw new InvalidTableConfigException("No schema defined for table: " + tableNameWithType);
+    }
     if (tableType == TableType.OFFLINE) {
       try {
         // Add table config
@@ -1568,18 +1574,6 @@ public class PinotHelixResourceManager {
       }
     } else {
       Preconditions.checkState(tableType == TableType.REALTIME, "Invalid table type: %s", tableType);
-
-      // Ensure that realtime table is not created if schema is not present
-      Schema schema =
-          ZKMetadataProvider.getSchema(_propertyStore, TableNameBuilder.extractRawTableName(tableNameWithType));
-      if (schema == null) {
-        // Fall back to getting schema-name from table config if schema-name != table-name
-        String schemaName = tableConfig.getValidationConfig().getSchemaName();
-        if (schemaName == null || ZKMetadataProvider.getSchema(_propertyStore, schemaName) == null) {
-          throw new InvalidTableConfigException("No schema defined for realtime table: " + tableNameWithType);
-        }
-      }
-
       try {
         // Add table config
         ZKMetadataProvider.setTableConfig(_propertyStore, tableNameWithType, TableConfigUtils.toZNRecord(tableConfig));
@@ -2079,8 +2073,8 @@ public class PinotHelixResourceManager {
       tasks.put(jobId, jobMetadata);
       if (tasks.size() > CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK) {
         tasks = tasks.entrySet().stream().sorted((v1, v2) -> Long.compare(
-            Long.parseLong(v2.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)),
-            Long.parseLong(v1.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS))))
+                Long.parseLong(v2.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)),
+                Long.parseLong(v1.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS))))
             .collect(Collectors.toList()).subList(0, CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK)
             .stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       }
@@ -2142,7 +2136,8 @@ public class PinotHelixResourceManager {
         }
       }
 
-      SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
+      SegmentAssignment segmentAssignment =
+          SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
       synchronized (getTableUpdaterLock(tableNameWithType)) {
         Map<InstancePartitionsType, InstancePartitions> finalInstancePartitionsMap = instancePartitionsMap;
         HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
@@ -2153,8 +2148,7 @@ public class PinotHelixResourceManager {
                 tableNameWithType);
           } else {
             List<String> assignedInstances =
-                segmentAssignment.assignSegment(segmentName, currentAssignment,
-                    finalInstancePartitionsMap);
+                segmentAssignment.assignSegment(segmentName, currentAssignment, finalInstancePartitionsMap);
             LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
                 tableNameWithType);
             currentAssignment.put(segmentName,
@@ -3086,28 +3080,28 @@ public class PinotHelixResourceManager {
    * Entry point for table Rebalacing.
    * @param tableNameWithType
    * @param rebalanceConfig
-   * @param trackRebalanceProgress - Do we want to track rebalance progress stats
+   * @param trackRebalanceProgress whether to track rebalance progress stats
    * @return RebalanceResult
    * @throws TableNotFoundException
    */
-  public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig,
+  public RebalanceResult rebalanceTable(String tableNameWithType, RebalanceConfig rebalanceConfig,
       boolean trackRebalanceProgress)
       throws TableNotFoundException {
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
-    String rebalanceJobId = rebalanceConfig.getString(RebalanceConfigConstants.JOB_ID);
-    Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig ");
-    if (rebalanceConfig.getBoolean(RebalanceConfigConstants.UPDATE_TARGET_TIER,
-        RebalanceConfigConstants.DEFAULT_UPDATE_TARGET_TIER)) {
+    String rebalanceJobId = rebalanceConfig.getJobId();
+    Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig");
+    if (rebalanceConfig.isUpdateTargetTier()) {
       updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
     }
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
     if (trackRebalanceProgress) {
       zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId, this);
     }
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver);
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics);
     return tableRebalancer.rebalance(tableConfig, rebalanceConfig);
   }
 

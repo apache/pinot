@@ -81,7 +81,7 @@ public class PhysicalPlanVisitor implements PlanNodeVisitor<MultiStageOperator, 
   @Override
   public MultiStageOperator visitMailboxSend(MailboxSendNode node, OpChainExecutionContext context) {
     MultiStageOperator nextOperator = node.getInputs().get(0).visit(this, context);
-    return new MailboxSendOperator(context, nextOperator, node.getDistributionType(), node.getPartitionKeySelector(),
+    return new MailboxSendOperator(context, nextOperator, node.getDistributionType(), node.getDistributionKeys(),
         node.getCollationKeys(), node.getCollationDirections(), node.isSortOnSender(), node.getReceiverStageId());
   }
 

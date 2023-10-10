@@ -70,7 +70,7 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
 
   @Override
   protected List<Map<String, Object>> getInputRecords() {
-    return Arrays.asList(createRecord1(), createRecord2());
+    return Arrays.asList(createExplicitOptionalDefaultRecord(), createOptionalDefaultRecordWithNulls());
   }
 
   @Override
@@ -159,15 +159,21 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
         .setNestedStringField((String) nestedMessageFields.get(NESTED_STRING_FIELD)).build();
   }
 
-  private Map<String, Object> createRecord1() {
+  /**
+   * Test that verifies that optional fields with explicitly set default protobuf values
+   * are preserved/not treated as nulls.
+   */
+  private Map<String, Object> createExplicitOptionalDefaultRecord() {
     Map<String, Object> record = new HashMap<>();
     record.put(STRING_FIELD, "hello");
     record.put(INT_FIELD, 10);
     record.put(LONG_FIELD, 100L);
     record.put(DOUBLE_FIELD, 1.1);
     record.put(FLOAT_FIELD, 2.2f);
-    record.put(BOOL_FIELD, "false");
+    record.put(BOOL_FIELD, "true");
     record.put(BYTES_FIELD, "hello world!".getBytes(UTF_8));
+    // These optional fields are explicitly set to proto defaults and expect
+    // to see these values preserved (not treated as null).
     record.put(NULLABLE_STRING_FIELD, "");
     record.put(NULLABLE_INT_FIELD, 0);
     record.put(NULLABLE_LONG_FIELD, 0L);
@@ -188,7 +194,10 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     return record;
   }
 
-  private Map<String, Object> createRecord2() {
+  /**
+   * Test that verifies that optional fields not explicitly set are treated as nulls.
+   */
+  private Map<String, Object> createOptionalDefaultRecordWithNulls() {
     Map<String, Object> record = new HashMap<>();
     record.put(STRING_FIELD, "world");
     record.put(INT_FIELD, 20);

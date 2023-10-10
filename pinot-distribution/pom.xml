@@ -90,7 +90,7 @@
         </exclusion>
         <exclusion>
           <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-kafka-${kafka.version}</artifactId>
+          <artifactId>pinot-kafka-2.0</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.pinot</groupId>
@@ -257,10 +257,6 @@
                 </configuration>
               </execution>
             </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-enforcer-plugin</artifactId>
           </plugin>
           <!-- Create symlink "build" to the root directory (Unix only) -->
           <plugin>

@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
@@ -54,7 +55,7 @@ public class AsyncQueryResponse implements QueryResponse {
     _queryRouter = queryRouter;
     _requestId = requestId;
     int numServersQueried = serversQueried.size();
-    _responseMap = new ConcurrentHashMap<>(numServersQueried);
+    _responseMap = new ConcurrentHashMap<>(HashUtil.getHashMapCapacity(numServersQueried));
     for (ServerRoutingInstance serverRoutingInstance : serversQueried) {
       _responseMap.put(serverRoutingInstance, new ServerResponse(startTimeMs));
     }

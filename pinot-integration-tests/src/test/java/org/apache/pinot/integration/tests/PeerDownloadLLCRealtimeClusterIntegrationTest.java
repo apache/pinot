@@ -53,8 +53,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.controller.ControllerConf.ALLOW_HLC_TABLES;
-import static org.apache.pinot.controller.ControllerConf.ENABLE_SPLIT_COMMIT;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -81,7 +79,6 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
 
   private final boolean _isDirectAlloc = true; //Set as true; otherwise trigger indexing exception.
   private final boolean _isConsumerDirConfigured = true;
-  private final boolean _enableSplitCommit = true;
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
   private static File _pinotFsRootDir;
 
@@ -90,9 +87,8 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   public void setUp()
       throws Exception {
     System.out.println(String.format(
-        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableSplitCommit: %s, "
-            + "enableLeadControllerResource: %s",
-        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableSplitCommit, _enableLeadControllerResource));
+        "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
+        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
 
     _pinotFsRootDir = new File(FileUtils.getTempDirectoryPath() + File.separator + System.currentTimeMillis() + "/");
     Preconditions.checkState(_pinotFsRootDir.mkdir(), "Failed to make a dir for " + _pinotFsRootDir.getPath());
@@ -139,8 +135,6 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   public void startController()
       throws Exception {
     Map<String, Object> controllerConfig = getDefaultControllerConfiguration();
-    controllerConfig.put(ALLOW_HLC_TABLES, false);
-    controllerConfig.put(ENABLE_SPLIT_COMMIT, _enableSplitCommit);
     // Override the data dir config.
     controllerConfig.put(ControllerConf.DATA_DIR, "mockfs://" + getHelixClusterName());
     controllerConfig.put(ControllerConf.LOCAL_TEMP_DIR, FileUtils.getTempDirectory().getAbsolutePath());
@@ -170,10 +164,6 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
         .setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".protocols", "file,http");
     if (_isConsumerDirConfigured) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
-    }
-    if (_enableSplitCommit) {
-      configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
-      configuration.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, true);
     }
   }
 

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.clearspring.analytics.stream.cardinality.RegisterSet;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -66,6 +67,7 @@ import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
@@ -135,11 +137,13 @@ public class ObjectSerDeUtils {
     CovarianceTuple(32),
     VarianceTuple(33),
     PinotFourthMoment(34),
-    ArgMinMaxObject(35),
+    ExprMinMaxObject(35),
     KllDataSketch(36),
     IntegerTupleSketch(37),
     FrequentStringsSketch(38),
-    FrequentLongsSketch(39);
+    FrequentLongsSketch(39),
+    HyperLogLogPlus(40);
+
 
     private final int _value;
 
@@ -230,11 +234,13 @@ public class ObjectSerDeUtils {
       } else if (value instanceof org.apache.datasketches.tuple.Sketch) {
         return ObjectType.IntegerTupleSketch;
       } else if (value instanceof ExprMinMaxObject) {
-        return ObjectType.ArgMinMaxObject;
+        return ObjectType.ExprMinMaxObject;
       } else if (value instanceof ItemsSketch) {
         return ObjectType.FrequentStringsSketch;
       } else if (value instanceof LongsSketch) {
         return ObjectType.FrequentLongsSketch;
+      } else if (value instanceof HyperLogLogPlus) {
+        return ObjectType.HyperLogLogPlus;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -563,6 +569,34 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<HyperLogLogPlus> HYPER_LOG_LOG_PLUS_SER_DE = new ObjectSerDe<HyperLogLogPlus>() {
+
+    @Override
+    public byte[] serialize(HyperLogLogPlus hyperLogLogPlus) {
+      try {
+        return hyperLogLogPlus.getBytes();
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+      }
+    }
+
+    @Override
+    public HyperLogLogPlus deserialize(byte[] bytes) {
+      try {
+        return HyperLogLogPlus.Builder.build(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+      }
+    }
+
+    @Override
+    public HyperLogLogPlus deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return deserialize(bytes);
+    }
+  };
+
   public static final ObjectSerDe<DistinctTable> DISTINCT_TABLE_SER_DE = new ObjectSerDe<DistinctTable>() {
 
     @Override
@@ -665,7 +699,7 @@ public class ObjectSerDeUtils {
     @Override
     public HashMap<Object, Object> deserialize(ByteBuffer byteBuffer) {
       int size = byteBuffer.getInt();
-      HashMap<Object, Object> map = new HashMap<>(size);
+      HashMap<Object, Object> map = new HashMap<>(HashUtil.getHashMapCapacity(size));
       if (size == 0) {
         return map;
       }
@@ -1377,6 +1411,7 @@ public class ObjectSerDeUtils {
       DATA_SKETCH_INT_TUPLE_SER_DE,
       FREQUENT_STRINGS_SKETCH_SER_DE,
       FREQUENT_LONGS_SKETCH_SER_DE,
+      HYPER_LOG_LOG_PLUS_SER_DE,
   };
   //@formatter:on
 

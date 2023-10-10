@@ -47,8 +47,8 @@ public abstract class ParentAggregationFunction<I, F extends ParentAggregationFu
 
   // The name of the column is the prefix of the parent aggregation function + the name of the
   // aggregation function + the id of the parent aggregation function
-  // e.g. if the parent aggregation function is "argmax(0,3,a,b,c,x,y,z)", the name of the column is
-  // "pinotparentaggregationargmax0"
+  // e.g. if the parent aggregation function is "exprmax(0,3,a,b,c,x,y,z)", the name of the column is
+  // "pinotparentaggregationexprmax0"
   @Override
   public final String getResultColumnName() {
     return CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX

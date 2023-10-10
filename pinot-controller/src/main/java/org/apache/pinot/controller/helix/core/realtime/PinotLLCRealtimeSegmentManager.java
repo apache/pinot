@@ -209,10 +209,6 @@ public class PinotLLCRealtimeSegmentManager {
     return new FileUploadDownloadClient();
   }
 
-  public boolean getIsSplitCommitEnabled() {
-    return _controllerConf.getAcceptSplitCommit();
-  }
-
   /**
    * Using the ideal state and segment metadata, return a list of {@link PartitionGroupConsumptionStatus}
    * for latest segment of each partition group.
@@ -316,7 +312,8 @@ public class PinotLLCRealtimeSegmentManager {
     int numPartitionGroups = newPartitionGroupMetadataList.size();
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
-    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 
@@ -555,7 +552,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Step-3
-    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 
@@ -1054,7 +1052,8 @@ public class PinotLLCRealtimeSegmentManager {
         newPartitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
             .collect(Collectors.toSet());
 
-    SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig);
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 
@@ -1468,7 +1467,7 @@ public class PinotLLCRealtimeSegmentManager {
       return 0L;
     }
 
-    if (!getIsSplitCommitEnabled() || !isTmpSegmentAsyncDeletionEnabled()) {
+    if (!isTmpSegmentAsyncDeletionEnabled()) {
       return 0L;
     }
 

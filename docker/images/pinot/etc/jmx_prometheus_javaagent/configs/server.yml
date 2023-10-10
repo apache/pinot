@@ -17,14 +17,6 @@ rules:
   labels:
     table: "$1"
     tableType: "$2"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).realtimeRowsConsumed\"><>(\\w+)"
-  name: "pinot_server_realtimeRowsConsumed_$5"
-  cache: true
-  labels:
-    table: "$1"
-    tableType: "$2"
-    topic: "$3"
-    partition: "$4"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.helix.connected\"><>(\\w+)"
   name: "pinot_server_helix_connected_$1"
   cache: true
@@ -85,6 +77,14 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeConsumptionExceptions\"><>(\\w+)"
   name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.([^\\.]*?)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+).(invalidRealtimeRowsDropped|incompleteRealtimeRowsConsumed|rowsWithErrors|realtimeRowsConsumed)\"><>(\\w+)"
+  name: "pinot_server_$5_$6"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    topic: "$3"
+    partition: "$4"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffheapMemoryUsed.([^\\.]*?)\"><>(\\w+)"
   name: "pinot_server_realtime_offheapMemoryUsed_$2"
   cache: true
@@ -130,6 +130,20 @@ rules:
   cache: true
   labels:
     version: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertValidDocSnapshotCount.([^\\.]*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
+  name: "pinot_server_upsertValidDocSnapshotCount_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    partition: "$3"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.upsertPrimaryKeysInSnapshotCount.([^\\.]*?)_(OFFLINE|REALTIME).(\\w+)\"><>(\\w+)"
+  name: "pinot_server_upsertPrimaryKeysInSnapshotCount_$4"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
+    partition: "$3"
 
   ## Metrics that fit the catch-all patterns above should not be added to this file.
   ## In case a metric does not fit the catch-all patterns, add them before this comment
@@ -152,3 +166,4 @@ rules:
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true
+

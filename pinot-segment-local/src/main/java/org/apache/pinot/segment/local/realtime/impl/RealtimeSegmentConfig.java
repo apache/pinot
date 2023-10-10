@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -250,7 +251,7 @@ public class RealtimeSegmentConfig {
     }
 
     public Builder(Map<String, FieldIndexConfigs> indexConfigsByColName) {
-      _indexConfigByCol = new HashMap<>(indexConfigsByColName.size());
+      _indexConfigByCol = new HashMap<>(HashUtil.getHashMapCapacity(indexConfigsByColName.size()));
       for (Map.Entry<String, FieldIndexConfigs> entry : indexConfigsByColName.entrySet()) {
         _indexConfigByCol.put(entry.getKey(), new FieldIndexConfigs.Builder(entry.getValue()));
       }

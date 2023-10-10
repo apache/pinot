@@ -88,6 +88,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.UNTAGGED_SERVER_I
 import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -680,6 +681,11 @@ public class ControllerTest {
     getControllerRequestClient().deleteTable(TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
+  public void waitForEVToAppear(String tableNameWithType) {
+    TestUtils.waitForCondition(aVoid -> _helixResourceManager.getTableExternalView(tableNameWithType) != null, 60_000L,
+        "Failed to create the external view for table: " + tableNameWithType);
+  }
+
   public void waitForEVToDisappear(String tableNameWithType) {
     TestUtils.waitForCondition(aVoid -> _helixResourceManager.getTableExternalView(tableNameWithType) == null, 60_000L,
         "Failed to clean up the external view for table: " + tableNameWithType);
@@ -710,14 +716,14 @@ public class ControllerTest {
     return getControllerRequestClient().getTableSize(tableName);
   }
 
-  public void reloadOfflineTable(String tableName)
+  public String reloadOfflineTable(String tableName)
       throws IOException {
-    reloadOfflineTable(tableName, false);
+    return reloadOfflineTable(tableName, false);
   }
 
-  public void reloadOfflineTable(String tableName, boolean forceDownload)
+  public String reloadOfflineTable(String tableName, boolean forceDownload)
       throws IOException {
-    getControllerRequestClient().reloadTable(tableName, TableType.OFFLINE, forceDownload);
+    return getControllerRequestClient().reloadTable(tableName, TableType.OFFLINE, forceDownload);
   }
 
   public void reloadOfflineSegment(String tableName, String segmentName, boolean forceDownload)
@@ -725,9 +731,9 @@ public class ControllerTest {
     getControllerRequestClient().reloadSegment(tableName, segmentName, forceDownload);
   }
 
-  public void reloadRealtimeTable(String tableName)
+  public String reloadRealtimeTable(String tableName)
       throws IOException {
-    getControllerRequestClient().reloadTable(tableName, TableType.REALTIME, false);
+    return getControllerRequestClient().reloadTable(tableName, TableType.REALTIME, false);
   }
 
   public void createBrokerTenant(String tenantName, int numBrokers)
@@ -787,9 +793,10 @@ public class ControllerTest {
   }
 
   public static String sendPostRequest(String urlString)
-    throws IOException {
+      throws IOException {
     return sendPostRequest(urlString, null);
   }
+
   public static String sendPostRequest(String urlString, String payload)
       throws IOException {
     return sendPostRequest(urlString, payload, Collections.emptyMap());
@@ -1025,7 +1032,9 @@ public class ControllerTest {
         DEFAULT_NUM_SERVER_INSTANCES);
 
     // No pre-existing tables
-    assertEquals(getHelixResourceManager().getAllTables().size(), 0);
+    assertTrue(CollectionUtils.isEmpty(getHelixResourceManager().getAllTables()));
+    // No pre-existing schemas
+    assertTrue(CollectionUtils.isEmpty(getHelixResourceManager().getSchemaNames()));
   }
 
   /**

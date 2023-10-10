@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
+import com.google.common.base.Preconditions;
 import java.util.Iterator;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.query.mailbox.SendingMailbox;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
@@ -40,13 +42,15 @@ public abstract class BlockExchange {
   private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
 
-  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object[]> selector, BlockSplitter splitter) {
-    switch (exchangeType) {
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
+      @Nullable List<Integer> distributionKeys, BlockSplitter splitter) {
+    switch (distributionType) {
       case SINGLETON:
         return new SingletonExchange(sendingMailboxes, splitter);
       case HASH_DISTRIBUTED:
-        return new HashExchange(sendingMailboxes, selector, splitter);
+        Preconditions.checkArgument(distributionKeys != null,
+            "Distribution keys must be provided for hash distribution");
+        return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(distributionKeys), splitter);
       case RANDOM_DISTRIBUTED:
         return new RandomExchange(sendingMailboxes, splitter);
       case BROADCAST_DISTRIBUTED:
@@ -55,7 +59,7 @@ public abstract class BlockExchange {
       case RANGE_DISTRIBUTED:
       case ANY:
       default:
-        throw new UnsupportedOperationException("Unsupported mailbox exchange type: " + exchangeType);
+        throw new UnsupportedOperationException("Unsupported distribution type: " + distributionType);
     }
   }
 

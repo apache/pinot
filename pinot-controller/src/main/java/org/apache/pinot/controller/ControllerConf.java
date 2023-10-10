@@ -30,10 +30,10 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
@@ -264,7 +264,6 @@ public class ControllerConf extends PinotConfiguration {
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
   private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
-  public static final String ENABLE_SPLIT_COMMIT = "controller.enable.split.commit";
   private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
@@ -278,11 +277,6 @@ public class ControllerConf extends PinotConfiguration {
       "controller.realtime.segment.metadata.commit.numLocks";
   private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
-  // It is used to disable the HLC realtime segment completion and disallow HLC table in the cluster. True by default.
-  // If it's set to false, existing HLC realtime tables will stop consumption, and creation of new HLC tables will be
-  // disallowed.
-  // Please make sure there is no HLC table running in the cluster before disallowing it.
-  public static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
   public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
   // Defines the kind of storage and the underlying PinotFS implementation
@@ -292,7 +286,6 @@ public class ControllerConf extends PinotConfiguration {
   private static final int DEFAULT_MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   private static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
-  private static final boolean DEFAULT_ENABLE_SPLIT_COMMIT = true;
   private static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   private static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
@@ -344,10 +337,6 @@ public class ControllerConf extends PinotConfiguration {
     if (pinotFSFactoryClasses != null) {
       pinotFSFactoryClasses.getKeys().forEachRemaining(key -> setProperty(key, pinotFSFactoryClasses.getProperty(key)));
     }
-  }
-
-  public void setSplitCommit(boolean isSplitCommit) {
-    setProperty(ENABLE_SPLIT_COMMIT, isSplitCommit);
   }
 
   public void setQueryConsolePath(String path) {
@@ -488,10 +477,6 @@ public class ControllerConf extends PinotConfiguration {
   @Override
   public String toString() {
     return super.toString();
-  }
-
-  public boolean getAcceptSplitCommit() {
-    return getProperty(ENABLE_SPLIT_COMMIT, DEFAULT_ENABLE_SPLIT_COMMIT);
   }
 
   public String getControllerVipHost() {
@@ -977,12 +962,12 @@ public class ControllerConf extends PinotConfiguration {
 
   public long getSegmentRelocatorExternalViewCheckIntervalInMs() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-        RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS);
+        RebalanceConfig.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS);
   }
 
   public long getSegmentRelocatorExternalViewStabilizationTimeoutInMs() {
     return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-        RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
+        RebalanceConfig.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
   }
 
   public boolean isSegmentRelocatorRebalanceTablesSequentially() {

@@ -1,23 +1,39 @@
 {
   "tableName": "meetupRsvp",
   "tableType": "REALTIME",
+  "tenants": {},
   "segmentsConfig": {
     "timeColumnName": "mtime",
-    "timeType": "MILLISECONDS",
-    "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "meetupRsvp",
-    "replication": "1",
-    "replicasPerPartition": "1",
     "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "1"
+    "retentionTimeValue": "1",
+    "replication": "1"
   },
-  "tenants": {},
+  "tableIndexConfig": {},
+  "ingestionConfig": {
+    "streamIngestionConfig": {
+      "streamConfigMaps": [
+        {
+          "streamType": "kafka",
+          "stream.kafka.topic.name": "meetupRSVPEvents",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+          "stream.kafka.consumer.prop.auto.offset.reset": "largest",
+          "stream.kafka.zk.broker.url": "localhost:2191/kafka",
+          "stream.kafka.broker.list": "localhost:19092",
+          "stream.kafka.metadata.populate": "true",
+          "realtime.segment.flush.threshold.time": "12h",
+          "realtime.segment.flush.threshold.size": "10K"
+        }
+      ]
+    }
+  },
   "fieldConfigList": [
     {
       "name": "mtime",
       "encodingType": "DICTIONARY",
-      "indexTypes": ["TIMESTAMP"],
+      "indexTypes": [
+        "TIMESTAMP"
+      ],
       "timestampConfig": {
         "granularities": [
           "DAY",
@@ -27,21 +43,6 @@
       }
     }
   ],
-  "tableIndexConfig": {
-    "loadMode": "MMAP",
-    "streamConfigs": {
-      "streamType": "kafka",
-      "stream.kafka.consumer.type": "lowLevel",
-      "stream.kafka.topic.name": "meetupRSVPEvents",
-      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-      "stream.kafka.broker.list": "localhost:19092",
-      "stream.kafka.consumer.prop.auto.offset.reset": "largest",
-      "realtime.segment.flush.threshold.time": "12h",
-      "realtime.segment.flush.threshold.size": "10K",
-      "stream.kafka.metadata.populate": "true"
-    }
-  },
   "metadata": {
     "customConfigs": {}
   }

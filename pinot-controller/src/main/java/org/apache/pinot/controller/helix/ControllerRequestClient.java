@@ -175,11 +175,13 @@ public class ControllerRequestClient {
     }
   }
 
-  public void reloadTable(String tableName, TableType tableType, boolean forceDownload)
+  public String reloadTable(String tableName, TableType tableType, boolean forceDownload)
       throws IOException {
     try {
-      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
+      SimpleHttpResponse simpleHttpResponse =
+          HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(new URL(
           _controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload)).toURI(), null));
+      return simpleHttpResponse.getResponse();
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

@@ -449,4 +449,8 @@ public class DictionaryIndexType
     return MutableDictionaryFactory.getMutableDictionary(storedType, context.isOffHeap(), context.getMemoryManager(),
         dictionaryColumnSize, Math.min(estimatedCardinality, context.getCapacity()), dictionaryAllocationContext);
   }
+
+  public BuildLifecycle getIndexBuildLifecycle() {
+    return BuildLifecycle.CUSTOM;
+  }
 }

@@ -24,8 +24,6 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.serde.ProtoProperties;
 
 
@@ -94,24 +92,24 @@ public class JoinNode extends AbstractPlanNode {
 
   public static class JoinKeys {
     @ProtoProperties
-    private KeySelector<Object[], Object[]> _leftJoinKeySelector;
+    private List<Integer> _leftKeys;
     @ProtoProperties
-    private KeySelector<Object[], Object[]> _rightJoinKeySelector;
+    private List<Integer> _rightKeys;
 
     public JoinKeys() {
     }
 
-    public JoinKeys(FieldSelectionKeySelector leftKeySelector, FieldSelectionKeySelector rightKeySelector) {
-      _leftJoinKeySelector = leftKeySelector;
-      _rightJoinKeySelector = rightKeySelector;
+    public JoinKeys(List<Integer> leftKeys, List<Integer> rightKeys) {
+      _leftKeys = leftKeys;
+      _rightKeys = rightKeys;
     }
 
-    public KeySelector<Object[], Object[]> getLeftJoinKeySelector() {
-      return _leftJoinKeySelector;
+    public List<Integer> getLeftKeys() {
+      return _leftKeys;
     }
 
-    public KeySelector<Object[], Object[]> getRightJoinKeySelector() {
-      return _rightJoinKeySelector;
+    public List<Integer> getRightKeys() {
+      return _rightKeys;
     }
   }
 }

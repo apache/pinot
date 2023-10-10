@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
-import com.google.protobuf.ByteString;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
@@ -183,12 +182,6 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getLiteralExpression(ByteString value) {
-    Expression expression = createNewLiteralExpression();
-    expression.getLiteral().setBinaryValue(value.toByteArray());
-    return expression;
-  }
-
   public static Expression getLiteralExpression(BigDecimal value) {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setBigDecimalValue(BigDecimalUtils.serialize(value));
@@ -220,9 +213,6 @@ public class RequestUtils {
     }
     if (object instanceof byte[]) {
       return RequestUtils.getLiteralExpression((byte[]) object);
-    }
-    if (object instanceof ByteString) {
-      return RequestUtils.getLiteralExpression((ByteString) object);
     }
     if (object instanceof Boolean) {
       return RequestUtils.getLiteralExpression(((Boolean) object).booleanValue());
