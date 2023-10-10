@@ -57,6 +57,13 @@ public interface SegmentCreator extends Closeable, Serializable {
   void indexRow(GenericRow row)
       throws IOException;
 
+  /**
+   * Adds a column to the index.
+   *
+   * @param columnName - The name of the column being added to.
+   * @param sortedDocIds - If not null, then this provides the sorted order of documents.
+   * @param colReader - Used to get the values of the column.
+   */
   void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment colReader)
           throws IOException;
 
