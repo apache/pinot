@@ -250,7 +250,6 @@ public class PinotSegmentRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
-    LOGGER.info("(built segment) Record Reader closing. Time spent in 'next' ms: {}. Number of Defaults: {}", ((float)_timeSpentConvertingNS)/1000000.0, _numberDefaults);
     if (_columnReaderMap != null) {
       for (PinotSegmentColumnReader columnReader : _columnReaderMap.values()) {
         columnReader.close();

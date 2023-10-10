@@ -23,7 +23,12 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.*;
+import java.util.TreeMap;
+import java.util.HashSet;
+import java.util.TreeSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -161,7 +166,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       Preconditions.checkState(_recordReader.hasNext(), "No record in data source");
     }
     _transformPipeline = transformPipeline;
-    LOGGER.info("Segment Builder Transform Pipeline: {}", _transformPipeline.describe());
     // Use the same transform pipeline if the data source is backed by a record reader
     if (dataSource instanceof RecordReaderSegmentCreationDataSource) {
       ((RecordReaderSegmentCreationDataSource) dataSource).setTransformPipeline(transformPipeline);
@@ -224,7 +228,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           GenericRow decodedRow = _recordReader.next(reuse);
           recordReadStartTime = System.nanoTime();
 
-          // TODO(ERICH): time how long transformation takes.  From Jackie: this is leftover from when offline ingestion passed through this function.
+          // TODO(ERICH): time how long transformation takes.  From Jackie: this is leftover from when offline
+          //  ingestion passed through this function.
           // Should not be needed anymore.
           // Add row to indexes
           _transformPipeline.processRow(decodedRow, reusedResult);
@@ -286,7 +291,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
       TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
       // If this is null, then I need to use another method to iterate through the column
-      int[] sortedDocIds = ((PinotSegmentRecordReader)_recordReader).getSortedDocIds();
+      int[] sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
       for (String col : columns) {
         _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
       }

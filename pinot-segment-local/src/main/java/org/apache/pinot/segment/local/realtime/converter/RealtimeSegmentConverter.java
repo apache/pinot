@@ -74,11 +74,12 @@ public class RealtimeSegmentConverter {
     _nullHandlingEnabled = nullHandlingEnabled;
 
     // Check if column major mode should be enabled
-    try{
-      String str = _tableConfig.getIndexingConfig().getStreamConfigs().get("realtime.segment.flush.enable_column_major");
-      if(str != null) {
+    try {
+      String str = _tableConfig.getIndexingConfig()
+              .getStreamConfigs().get("realtime.segment.flush.enable_column_major");
+      if (str != null) {
         _enableColumnMajor = Boolean.parseBoolean(str);
-      } else{
+      } else {
         _enableColumnMajor = false;
       }
     } catch (Exception ex) {
@@ -135,7 +136,7 @@ public class RealtimeSegmentConverter {
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
       driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline());
 
-      if(!_enableColumnMajor){
+      if (!_enableColumnMajor) {
         driver.build();
       } else {
         driver.buildByColumn(_realtimeSegmentImpl);
