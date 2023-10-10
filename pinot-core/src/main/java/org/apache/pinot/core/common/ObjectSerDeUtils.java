@@ -1032,7 +1032,9 @@ public class ObjectSerDeUtils {
 
     @Override
     public CpcSketch deserialize(ByteBuffer byteBuffer) {
-      return CpcSketch.heapify(Memory.wrap(byteBuffer));
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return CpcSketch.heapify(Memory.wrap(bytes));
     }
   };
 
