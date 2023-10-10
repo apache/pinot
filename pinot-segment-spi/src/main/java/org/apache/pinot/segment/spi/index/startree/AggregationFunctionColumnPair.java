@@ -18,26 +18,60 @@
  */
 package org.apache.pinot.segment.spi.index.startree;
 
+import java.util.Arrays;
 import java.util.Comparator;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.spi.config.table.FunctionColumnPairConfig;
 
 
 public class AggregationFunctionColumnPair implements Comparable<AggregationFunctionColumnPair> {
   public static final String DELIMITER = "__";
   public static final String STAR = "*";
+
   public static final AggregationFunctionColumnPair COUNT_STAR =
       new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, STAR);
 
   private final AggregationFunctionType _functionType;
   private final String _column;
+  private final ChunkCompressionType _chunkCompressionType;
 
-  public AggregationFunctionColumnPair(AggregationFunctionType functionType, String column) {
+  public AggregationFunctionColumnPair(AggregationFunctionType functionType, String column,
+      ChunkCompressionType compressionType) {
     _functionType = functionType;
     if (functionType == AggregationFunctionType.COUNT) {
       _column = STAR;
     } else {
       _column = column;
     }
+    _chunkCompressionType = compressionType;
+  }
+
+  public AggregationFunctionColumnPair(AggregationFunctionType functionType, String column) {
+    this(functionType, column, ChunkCompressionType.PASS_THROUGH);
+  }
+
+  public static AggregationFunctionColumnPair fromConfiguration(Configuration metadataProperties) {
+    if (metadataProperties == null) {
+      return null;
+    }
+    AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(
+        metadataProperties.getString(StarTreeV2Constants.MetadataKey.FUNCTION_TYPE));
+    String columnName = metadataProperties.getString(StarTreeV2Constants.MetadataKey.COLUMN_NAME);
+    ChunkCompressionType compressionType =
+        ChunkCompressionType.valueOf(metadataProperties.getString(StarTreeV2Constants.MetadataKey.COMPRESSION_TYPE));
+    return new AggregationFunctionColumnPair(functionType, columnName, compressionType);
+  }
+
+  // Adds current object to Configuration by reference
+  public void addToConfiguration(Configuration configuration) {
+    String configPrefix = StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG + "." + this.toColumnName();
+    configuration.setProperty(configPrefix + "." + StarTreeV2Constants.MetadataKey.FUNCTION_TYPE,
+        _functionType.getName());
+    configuration.setProperty(configPrefix + "." + StarTreeV2Constants.MetadataKey.COLUMN_NAME, _column);
+    configuration.setProperty(configPrefix + "." + StarTreeV2Constants.MetadataKey.COMPRESSION_TYPE,
+        _chunkCompressionType);
   }
 
   public AggregationFunctionType getFunctionType() {
@@ -50,6 +84,10 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
 
   public String toColumnName() {
     return toColumnName(_functionType, _column);
+  }
+
+  public ChunkCompressionType getChunkCompressionType() {
+    return _chunkCompressionType;
   }
 
   public static String toColumnName(AggregationFunctionType functionType, String column) {
@@ -66,9 +104,27 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     }
   }
 
+  public static AggregationFunctionColumnPair fromFunctionColumnPairConfig(
+      FunctionColumnPairConfig functionColumnPairConfig) {
+    String chunkCompressionType = functionColumnPairConfig.getChunkCompressionType();
+    AggregationFunctionType aggregationFunctionType;
+    try {
+      ChunkCompressionType.valueOf(chunkCompressionType);
+      aggregationFunctionType =
+          AggregationFunctionType.getAggregationFunctionType(functionColumnPairConfig.getAggregationFunction());
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Invalid functionColumnPairsConfig : " + chunkCompressionType + ". Must be one of " + Arrays.toString(
+              ChunkCompressionType.values()) + ".");
+    }
+
+    return new AggregationFunctionColumnPair(aggregationFunctionType, functionColumnPairConfig.getColumnName(),
+        ChunkCompressionType.valueOf(chunkCompressionType));
+  }
+
   @Override
   public int hashCode() {
-    return 31 * _functionType.hashCode() + _column.hashCode();
+    return 31 * _functionType.hashCode() + _column.hashCode() + _chunkCompressionType.hashCode();
   }
 
   @Override
@@ -78,7 +134,8 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     }
     if (obj instanceof AggregationFunctionColumnPair) {
       AggregationFunctionColumnPair anotherPair = (AggregationFunctionColumnPair) obj;
-      return _functionType == anotherPair._functionType && _column.equals(anotherPair._column);
+      return _functionType == anotherPair._functionType && _column.equals(anotherPair._column)
+          && _chunkCompressionType.equals(anotherPair._chunkCompressionType);
     }
     return false;
   }
@@ -92,6 +149,6 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
   public int compareTo(AggregationFunctionColumnPair other) {
     return Comparator.comparing((AggregationFunctionColumnPair o) -> o._column)
         .thenComparing((AggregationFunctionColumnPair o) -> o._functionType)
-        .compare(this, other);
+        .thenComparing((AggregationFunctionColumnPair o) -> o._chunkCompressionType).compare(this, other);
   }
 }

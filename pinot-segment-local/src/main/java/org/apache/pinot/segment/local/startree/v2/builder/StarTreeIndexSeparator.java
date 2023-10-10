@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.startree.v2.builder;
 
-import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
@@ -30,7 +29,6 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -38,7 +36,7 @@ import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
-import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 
 
 /**
@@ -53,8 +51,8 @@ public class StarTreeIndexSeparator implements Closeable {
 
   public StarTreeIndexSeparator(File indexMapFile, File indexFile, PropertiesConfiguration metadataProperties)
       throws IOException {
-    _indexMapList = extractIndexMap(indexMapFile,
-        metadataProperties.getInt(StarTreeV2Constants.MetadataKey.STAR_TREE_COUNT));
+    _indexMapList =
+        extractIndexMap(indexMapFile, metadataProperties.getInt(StarTreeV2Constants.MetadataKey.STAR_TREE_COUNT));
     _indexFileChannel = new RandomAccessFile(indexFile, "r").getChannel();
     _builderConfigList = extractBuilderConfigs(metadataProperties);
     _totalDocsList = extractTotalDocsList(metadataProperties);
@@ -88,18 +86,8 @@ public class StarTreeIndexSeparator implements Closeable {
     List<StarTreeV2BuilderConfig> builderConfigList = new ArrayList<>(_indexMapList.size());
     for (int i = 0; i < _indexMapList.size(); i++) {
       Configuration metadata = metadataProperties.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i));
-      Properties functionColumnPairsConfig = new Properties();
-      if (!metadata.getProperty(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG).equals("{}")) {
-        functionColumnPairsConfig = metadataProperties
-            .getProperties(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG);
-      }
-      builderConfigList.add(i, StarTreeV2BuilderConfig.fromIndexConfig(new StarTreeIndexConfig(
-          Lists.newArrayList(metadata.getStringArray(StarTreeV2Constants.MetadataKey.DIMENSIONS_SPLIT_ORDER)),
-          Lists.newArrayList(
-              metadata.getStringArray(StarTreeV2Constants.MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)),
-          Lists.newArrayList(metadata.getStringArray(StarTreeV2Constants.MetadataKey.FUNCTION_COLUMN_PAIRS)),
-          functionColumnPairsConfig,
-          metadata.getInt(StarTreeV2Constants.MetadataKey.MAX_LEAF_RECORDS))));
+      StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadata);
+      builderConfigList.add(i, StarTreeV2BuilderConfig.fromMetadata(starTreeV2Metadata));
     }
     return builderConfigList;
   }

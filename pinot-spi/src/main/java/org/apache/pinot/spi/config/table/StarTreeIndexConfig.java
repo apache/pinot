@@ -21,8 +21,8 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
@@ -35,8 +35,8 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
   private final List<String> _skipStarNodeCreationForDimensions;
   // Function column pairs with delimiter "__", e.g. SUM__col1, MAX__col2, COUNT__*
   private final List<String> _functionColumnPairs;
-  // Compression mapping for function column pairs
-  private final Properties _functionColumnPairsConfig;
+  // Function column pairs config, currently only handling compression.
+  private final List<FunctionColumnPairConfig> _functionColumnPairConfig;
   // The upper bound of records to be scanned at the leaf node
   private final int _maxLeafRecords;
 
@@ -45,17 +45,17 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
       @JsonProperty(value = "dimensionsSplitOrder", required = true) List<String> dimensionsSplitOrder,
       @JsonProperty("skipStarNodeCreationForDimensions") @Nullable List<String> skipStarNodeCreationForDimensions,
       @JsonProperty(value = "functionColumnPairs", required = true) List<String> functionColumnPairs,
-      @JsonProperty(value = "functionColumnPairsConfig") @Nullable Properties functionColumnPairsConfig,
-      @JsonProperty("maxLeafRecords") int maxLeafRecords) {
-    Preconditions
-        .checkArgument(CollectionUtils.isNotEmpty(dimensionsSplitOrder), "'dimensionsSplitOrder' must be configured");
-    Preconditions
-        .checkArgument(CollectionUtils.isNotEmpty(functionColumnPairs), "'functionColumnPairs' must be configured");
+      @JsonProperty(value = "functionColumnPairsConfig") @Nullable
+      List<FunctionColumnPairConfig> functionColumnPairConfig, @JsonProperty("maxLeafRecords") int maxLeafRecords) {
+    Preconditions.checkArgument(CollectionUtils.isNotEmpty(dimensionsSplitOrder),
+        "'dimensionsSplitOrder' must be configured");
+    Preconditions.checkArgument(CollectionUtils.isNotEmpty(functionColumnPairs),
+        "'functionColumnPairs' must be configured");
     _dimensionsSplitOrder = dimensionsSplitOrder;
     _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
     _functionColumnPairs = functionColumnPairs;
     _maxLeafRecords = maxLeafRecords;
-    _functionColumnPairsConfig = functionColumnPairsConfig;
+    _functionColumnPairConfig = functionColumnPairConfig != null ? functionColumnPairConfig : new ArrayList<>();
   }
 
   public List<String> getDimensionsSplitOrder() {
@@ -70,9 +70,9 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
   public List<String> getFunctionColumnPairs() {
     return _functionColumnPairs;
   }
-  @Nullable
-  public Properties getFunctionColumnPairsConfig() {
-    return _functionColumnPairsConfig;
+
+  public List<FunctionColumnPairConfig> getFunctionColumnPairsConfig() {
+    return _functionColumnPairConfig;
   }
 
   public int getMaxLeafRecords() {

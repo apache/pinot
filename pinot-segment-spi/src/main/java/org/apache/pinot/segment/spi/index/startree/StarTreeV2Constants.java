@@ -50,6 +50,9 @@ public class StarTreeV2Constants {
     public static final String FUNCTION_COLUMN_PAIRS_CONFIG = "function.column.pairs.config";
     public static final String MAX_LEAF_RECORDS = "max.leaf.records";
     public static final String SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS = "skip.star.node.creation";
+    public static final String FUNCTION_TYPE = "function_type";
+    public static final String COLUMN_NAME = "column_name";
+    public static final String COMPRESSION_TYPE = "compression_type";
 
     public static String getStarTreePrefix(int index) {
       return STAR_TREE_PREFIX + index;

@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -79,6 +80,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   final ValueAggregator[] _valueAggregators;
   // Readers and data types for column in function-column pair
   final PinotSegmentColumnReader[] _metricReaders;
+
+  final ChunkCompressionType[] _chunkCompressionType;
 
   final int _maxLeafRecords;
 
@@ -138,6 +141,13 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _functionColumnPairs = new AggregationFunctionColumnPair[_numMetrics];
     _valueAggregators = new ValueAggregator[_numMetrics];
     _metricReaders = new PinotSegmentColumnReader[_numMetrics];
+    _chunkCompressionType = new ChunkCompressionType[_numMetrics];
+
+    // From functionColumnPairsConfig extracting compression type. Consider switching to this instead of
+    // functionColumnPairs for star-tree config.
+    Map<String, AggregationFunctionColumnPair> functionColumnPairMap =
+        _builderConfig.getFunctionColumnPairsConfig().stream()
+            .collect(Collectors.toMap(AggregationFunctionColumnPair::toColumnName, v -> v));
 
     int index = 0;
     for (AggregationFunctionColumnPair functionColumnPair : functionColumnPairs) {
@@ -147,6 +157,10 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       _valueAggregators[index] =
           ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.emptyList());
 
+      // Merging compression type to get default value
+      AggregationFunctionColumnPair functionColumnPairConfig = functionColumnPairMap.get(_metrics[index]);
+      _chunkCompressionType[index] = functionColumnPairConfig == null ? functionColumnPair.getChunkCompressionType()
+          : functionColumnPairConfig.getChunkCompressionType();
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
         String column = functionColumnPair.getColumn();
@@ -473,21 +487,14 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       String metric = _metrics[i];
       ValueAggregator valueAggregator = _valueAggregators[i];
       DataType valueType = valueAggregator.getAggregatedValueType();
-
-      ChunkCompressionType compressionType = ChunkCompressionType.PASS_THROUGH;
-      String functionColumnPairConfig = (String) _builderConfig.getFunctionColumnPairsConfig()
-          .get(metric.toLowerCase());
-      if (functionColumnPairConfig != null) {
-        compressionType = ChunkCompressionType.valueOf(functionColumnPairConfig);
-      }
+      ChunkCompressionType compressionType = _chunkCompressionType[i];
       if (valueType == BYTES) {
         metricIndexCreators[i] =
-            new SingleValueVarByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs,
-                BYTES, valueAggregator.getMaxAggregatedValueByteSize());
+            new SingleValueVarByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, BYTES,
+                valueAggregator.getMaxAggregatedValueByteSize());
       } else {
         metricIndexCreators[i] =
-            new SingleValueFixedByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs,
-                valueType);
+            new SingleValueFixedByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, valueType);
       }
     }
 
@@ -536,8 +543,9 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
     _metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _metrics);
     _metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
-    _metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG,
-        _builderConfig.getFunctionColumnPairsConfig());
+    for (AggregationFunctionColumnPair functionColumnPair : _builderConfig.getFunctionColumnPairsConfig()) {
+      functionColumnPair.addToConfiguration(_metadataProperties);
+    }
     _metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
         _builderConfig.getSkipStarNodeCreationForDimensions());
   }

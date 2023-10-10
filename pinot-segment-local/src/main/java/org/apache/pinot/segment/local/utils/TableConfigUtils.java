@@ -29,7 +29,6 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -48,11 +47,11 @@ import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FunctionColumnPairConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -588,8 +587,8 @@ public final class TableConfigUtils {
                   throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft.toString());
                 }
               } catch (IllegalArgumentException e) {
-                String err = String.format(
-                    "Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
+                String err =
+                    String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
                 throw new IllegalStateException(err);
               }
             }
@@ -958,19 +957,19 @@ public final class TableConfigUtils {
             throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                 + "in the form <Aggregation function>__<Column name>");
           }
-          Properties functionColumnPairsConfig = starTreeIndexConfig.getFunctionColumnPairsConfig();
-          if (functionColumnPairsConfig != null && functionColumnPairsConfig.containsKey(functionColumnPair)) {
-            String chunkCompressionTypeValue = functionColumnPairsConfig.get(functionColumnPair).toString();
-            try {
-              ChunkCompressionType.valueOf(chunkCompressionTypeValue);
-            } catch (Exception e) {
-              throw new IllegalStateException("Invalid functionColumnPairsConfig : " + chunkCompressionTypeValue
-                      + ". Must be one of " + Arrays.toString(ChunkCompressionType.values()) + ".");
-            }
-          }
+
           String columnName = columnPair.getColumn();
           if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
             columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+          }
+        }
+
+        List<FunctionColumnPairConfig> functionColumnPairsConfig = starTreeIndexConfig.getFunctionColumnPairsConfig();
+        if (functionColumnPairsConfig != null) {
+          for (FunctionColumnPairConfig functionColumnPairConfig : functionColumnPairsConfig) {
+            AggregationFunctionColumnPair aggregationFunctionColumnPair =
+                AggregationFunctionColumnPair.fromFunctionColumnPairConfig(functionColumnPairConfig);
+            columnNameToConfigMap.put(aggregationFunctionColumnPair.getColumn(), STAR_TREE_CONFIG_NAME);
           }
         }
         List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();

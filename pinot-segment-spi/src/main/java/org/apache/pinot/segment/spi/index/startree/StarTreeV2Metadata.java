@@ -21,7 +21,6 @@ package org.apache.pinot.segment.spi.index.startree;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Properties;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
@@ -35,7 +34,7 @@ public class StarTreeV2Metadata {
   private final List<String> _dimensionsSplitOrder;
   private final Set<AggregationFunctionColumnPair> _functionColumnPairs;
 
-  private final Properties _functionColumnPairsConfig;
+  private final Set<AggregationFunctionColumnPair> _functionColumnPairsConfig;
 
   // The following properties are useful for generating the builder config
   private final int _maxLeafRecords;
@@ -45,18 +44,17 @@ public class StarTreeV2Metadata {
     _numDocs = metadataProperties.getInt(MetadataKey.TOTAL_DOCS);
     _dimensionsSplitOrder = Arrays.asList(metadataProperties.getStringArray(MetadataKey.DIMENSIONS_SPLIT_ORDER));
     _functionColumnPairs = new HashSet<>();
+    _functionColumnPairsConfig = new HashSet<>();
     for (String functionColumnPair : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
       _functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName(functionColumnPair));
-    }
-    _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
+      Configuration functionColPairsConfig =
+          metadataProperties.subset(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG + "." + functionColumnPair);
+      if (!functionColPairsConfig.isEmpty()) {
+        _functionColumnPairsConfig.add(AggregationFunctionColumnPair.fromConfiguration(functionColPairsConfig));
+      }
+    } _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
     _skipStarNodeCreationForDimensions = new HashSet<>(
         Arrays.asList(metadataProperties.getStringArray(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)));
-
-    if (!metadataProperties.getProperty(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG).equals("{}")) {
-      _functionColumnPairsConfig = metadataProperties.getProperties(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG);
-    } else {
-      _functionColumnPairsConfig = new Properties();
-    }
   }
 
   public int getNumDocs() {
@@ -75,7 +73,7 @@ public class StarTreeV2Metadata {
     return _functionColumnPairs.contains(functionColumnPair);
   }
 
-  public Properties getFunctionColumnPairsConfig() {
+  public Set<AggregationFunctionColumnPair> getFunctionColumnPairsConfig() {
     return _functionColumnPairsConfig;
   }
 
