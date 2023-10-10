@@ -286,6 +286,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       LOGGER.info("Start building Index by column");
 
       TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
+
+      // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
+      //    removed from this code.
       int[] sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
       for (String col : columns) {
         _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
