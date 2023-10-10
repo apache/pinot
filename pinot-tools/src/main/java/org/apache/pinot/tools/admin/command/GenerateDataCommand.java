@@ -151,7 +151,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       gen.generateAvro(_numRecords, _numFiles);
     } else if (FORMAT_CSV.equalsIgnoreCase(_format)) {
       gen.generateCsv(_numRecords, _numFiles);
-    } else if(FORMAT_JSON.equalsIgnoreCase(_format)) {
+    } else if (FORMAT_JSON.equalsIgnoreCase(_format)) {
       gen.generateJson(_numRecords, _numFiles);
     } else {
       throw new IllegalArgumentException(String.format("Invalid output format '%s'", _format));
