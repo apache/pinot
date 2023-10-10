@@ -20,7 +20,9 @@ package org.apache.pinot.segment.local.segment.index.readers.json;
 
 import com.google.common.base.Preconditions;
 import java.nio.ByteOrder;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -38,6 +40,8 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -74,6 +78,67 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         dataBuffer.view(dictionaryEndOffset, invertedIndexEndOffset, ByteOrder.BIG_ENDIAN), _dictionary.length());
     long docIdMappingEndOffset = invertedIndexEndOffset + docIdMappingLength;
     _docIdMapping = dataBuffer.view(invertedIndexEndOffset, docIdMappingEndOffset, ByteOrder.LITTLE_ENDIAN);
+  }
+
+  @Override
+  public String[] getValuesForKeyAndDocs(String key, int[] docIds, Map<Object, RoaringBitmap> cache) {
+    RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
+    int[] dictIds = getDictIdsForKey(key);
+    Map<Integer, String> docIdToValues = new HashMap<>(docIds.length);
+
+    if (cache.isEmpty()) {
+      for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
+        // get docIds from posting list, convert these to the actual docIds
+        ImmutableRoaringBitmap flattenedDocIds = _invertedIndex.getDocIds(dictId);
+        PeekableIntIterator it = flattenedDocIds.getIntIterator();
+        MutableRoaringBitmap realDocIds = new MutableRoaringBitmap();
+        while (it.hasNext()) {
+          realDocIds.add(getDocId(it.next()));
+        }
+        cache.put(dictId, realDocIds.toRoaringBitmap());
+      }
+    }
+
+    for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
+      RoaringBitmap intersection = RoaringBitmap.and(cache.get(dictId), docIdMask);
+      if (intersection.isEmpty()) {
+        continue;
+      }
+      // dictionary value lookup, stripping the path prefix
+      String val = _dictionary.getStringValue(dictId).substring(key.length() + 1);
+      for (int docId : intersection) {
+        docIdToValues.put(docId, val);
+      }
+    }
+
+    String[] values = new String[docIds.length];
+    for (int i = 0; i < docIds.length; i++) {
+      values[i] = docIdToValues.get(docIds[i]);
+    }
+    return values;
+  }
+
+  /**
+   * For a JSON key path, returns an int array of [min, max] of all values of the JSON key path
+   */
+  private int[] getDictIdsForKey(String key) {
+    // json_index uses \0 as the separator (or \u0000 in unicode)
+    // therefore, use the unicode char \u0001 to get the range of dict entries that have this prefix
+
+    // get min for key
+    int indexOfMin = _dictionary.indexOf(key);
+    if (indexOfMin == -1) {
+      return new int[]{-1, -1}; // if key does not exist, immediately return
+    }
+    int indexOfMax = _dictionary.insertionIndexOf(key + "\u0001");
+
+    int minDictId = indexOfMin + 1; // skip the index of the key only
+    int maxDictId = -1 * indexOfMax - 1; // undo the binary search
+    if (indexOfMax > 0) {
+      maxDictId = indexOfMax;
+    }
+
+    return new int[]{minDictId, maxDictId};
   }
 
   @Override

@@ -42,6 +42,7 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -110,6 +111,48 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         _postingListMap.computeIfAbsent(keyValue, k -> new RoaringBitmap()).add(_nextFlattenedDocId);
       }
       _nextFlattenedDocId++;
+    }
+  }
+
+  @Override
+  public String[] getValuesForKeyAndDocs(String key, int[] docIds, Map<Object, RoaringBitmap> cache) {
+    Map<Integer, String> docIdToValues = new HashMap<>(docIds.length);
+    RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
+
+    _readLock.lock();
+    try {
+      if (cache.isEmpty()) {
+        for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
+          if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
+            continue;
+          }
+          MutableRoaringBitmap flattenedDocIds = entry.getValue().toMutableRoaringBitmap();
+          PeekableIntIterator it = flattenedDocIds.getIntIterator();
+          MutableRoaringBitmap postingList = new MutableRoaringBitmap();
+          while (it.hasNext()) {
+            postingList.add(_docIdMapping.getInt(it.next()));
+          }
+          String val = entry.getKey().substring(key.length() + 1);
+          cache.put(val, postingList.toRoaringBitmap());
+        }
+      }
+
+      for (Map.Entry<Object, RoaringBitmap> entry : cache.entrySet()) {
+        RoaringBitmap intersection = RoaringBitmap.and(entry.getValue(), docIdMask);
+        if (intersection.isEmpty()) {
+          continue;
+        }
+        for (int docId : intersection) {
+          docIdToValues.put(docId, entry.getKey().toString());
+        }
+      }
+      String[] values = new String[docIds.length];
+      for (int i = 0; i < docIds.length; i++) {
+        values[i] = docIdToValues.get(docIds[i]);
+      }
+      return values;
+    } finally {
+      _readLock.unlock();
     }
   }
 

@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -288,6 +289,118 @@ public class JsonIndexTest {
 
   private MutableRoaringBitmap getMatchingDocIds(JsonIndexReader indexReader, String filter) {
     return indexReader.getMatchingDocIds(filter);
+  }
+
+  @Test
+  public void testGetValuesForKeyAndDocs()
+      throws Exception {
+    // @formatter: off
+    // CHECKSTYLE:OFF
+    String[] records = new String[] {
+        "{\"field1\":\"value1\",\"field2\":\"value2\",\"field3\":\"value3\"}",
+        "{\"field1\":\"value2\", \"field2\":[\"value1\",\"value2\"]}",
+        "{\"field1\":\"value1\",\"field2\":\"value4\"}",
+    };
+    // CHECKSTYLE:ON
+    // @formatter: on
+
+    String colName = "col";
+    try (
+        JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, new JsonIndexConfig());
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig())) {
+      for (String record : records) {
+        offHeapIndexCreator.add(record);
+        mutableJsonIndex.add(record);
+      }
+      offHeapIndexCreator.seal();
+
+      File offHeapIndexFile = new File(INDEX_DIR, colName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+      Assert.assertTrue(offHeapIndexFile.exists());
+
+      try (PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+          ImmutableJsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer,
+              records.length)) {
+        // No filtering
+        int[] docMask = new int[]{0, 1, 2};
+
+        // Immutable index
+        Map<Object, RoaringBitmap> cache = new HashMap<>();
+        String[] values = offHeapIndexReader.getValuesForKeyAndDocs(".field1", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value1", "value2", "value1"});
+        cache.clear();
+        values = offHeapIndexReader.getValuesForKeyAndDocs(".field2", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value2", null, "value4"});
+        cache.clear();
+        values = offHeapIndexReader.getValuesForKeyAndDocs(".field3", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value3", null, null});
+        cache.clear();
+        values = offHeapIndexReader.getValuesForKeyAndDocs(".field4", docMask, cache);
+        Assert.assertEquals(values, new String[]{null, null, null});
+
+        // Mutable index
+        cache.clear();
+        values = mutableJsonIndex.getValuesForKeyAndDocs(".field1", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value1", "value2", "value1"});
+        cache.clear();
+        values = mutableJsonIndex.getValuesForKeyAndDocs(".field2", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value2", null, "value4"});
+        cache.clear();
+        values = mutableJsonIndex.getValuesForKeyAndDocs(".field3", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value3", null, null});
+        cache.clear();
+        values = mutableJsonIndex.getValuesForKeyAndDocs(".field4", docMask, cache);
+        Assert.assertEquals(values, new String[]{null, null, null});
+
+        // Some filtering
+        docMask = new int[]{1, 2};
+
+        // Immutable index
+        cache.clear();
+        values = offHeapIndexReader.getValuesForKeyAndDocs(".field1", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value2", "value1"});
+        cache.clear();
+        values = offHeapIndexReader.getValuesForKeyAndDocs(".field2", docMask, cache);
+        Assert.assertEquals(values, new String[]{null, "value4"});
+        cache.clear();
+        values = offHeapIndexReader.getValuesForKeyAndDocs(".field3", docMask, cache);
+        Assert.assertEquals(values, new String[]{null, null});
+        cache.clear();
+        values = offHeapIndexReader.getValuesForKeyAndDocs(".field4", docMask, cache);
+        Assert.assertEquals(values, new String[]{null, null});
+
+        // Mutable index
+        cache.clear();
+        values = mutableJsonIndex.getValuesForKeyAndDocs(".field1", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value2", "value1"});
+        cache.clear();
+        values = mutableJsonIndex.getValuesForKeyAndDocs(".field2", docMask, cache);
+        Assert.assertEquals(values, new String[]{null, "value4"});
+        cache.clear();
+        values = mutableJsonIndex.getValuesForKeyAndDocs(".field3", docMask, cache);
+        Assert.assertEquals(values, new String[]{null, null});
+        cache.clear();
+        values = mutableJsonIndex.getValuesForKeyAndDocs(".field4", docMask, cache);
+        Assert.assertEquals(values, new String[]{null, null});
+
+        // Immutable index, cache is not cleared and is therefore used for the second lookup
+        cache.clear();
+        docMask = new int[]{1, 2};
+        values = offHeapIndexReader.getValuesForKeyAndDocs(".field1", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value2", "value1"});
+        docMask = new int[]{0};
+        values = offHeapIndexReader.getValuesForKeyAndDocs(".field1", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value1"});
+
+        // Mutable index, cache is not cleared and is therefore used for the second lookup
+        cache.clear();
+        docMask = new int[]{1, 2};
+        values = mutableJsonIndex.getValuesForKeyAndDocs(".field1", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value2", "value1"});
+        docMask = new int[]{0};
+        values = mutableJsonIndex.getValuesForKeyAndDocs(".field1", docMask, cache);
+        Assert.assertEquals(values, new String[]{"value1"});
+      }
+    }
   }
 
   public static class ConfTest extends AbstractSerdeIndexContract {

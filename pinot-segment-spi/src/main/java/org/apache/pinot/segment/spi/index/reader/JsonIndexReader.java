@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import java.util.Map;
 import org.apache.pinot.segment.spi.index.IndexReader;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -31,4 +33,13 @@ public interface JsonIndexReader extends IndexReader {
    * Returns the matching document ids for the given filter.
    */
   MutableRoaringBitmap getMatchingDocIds(String filterString);
+
+  /**
+   * For a JSON key and array of docIds, returns the corresponding values for each docId.
+   * This method takes a map as input which is used to cache the posting list for each dictId/value. It will be
+   * populated if empty, otherwise it will be used to avoid reading and converting the posting list of flattened docs
+   *
+   * @return String[] where String[i] is the value for docIds[i]
+   */
+  String[] getValuesForKeyAndDocs(String key, int[] docIds, Map<Object, RoaringBitmap> cache);
 }
