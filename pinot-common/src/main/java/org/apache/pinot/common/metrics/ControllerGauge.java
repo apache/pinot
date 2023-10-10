@@ -134,20 +134,20 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Consumption availability lag in ms at a partition level
   MAX_RECORD_AVAILABILITY_LAG_MS("maxRecordAvailabilityLagMs", false),
 
-  // Number of table schema got fixed
-  FIXED_SCHEMA_TABLE_COUNT("FixedSchemaTableCount", true),
+  // Number of table schema got misconfigured
+  MISCONFIGURED_SCHEMA_TABLE_COUNT("misconfiguredSchemaTableCount", true),
 
   // Number of table without schema
   TABLE_WITHOUT_SCHEMA_COUNT("tableWithoutSchemaCount", true),
 
+  // Number of table schema got fixed
+  FIXED_SCHEMA_TABLE_COUNT("fixedSchemaTableCount", true),
+
   // Number of tables that we want to fix but failed to copy schema from old schema name to new schema name
-  FAILED_TO_COPY_SCHEMA("failedToCopySchema", true),
+  FAILED_TO_COPY_SCHEMA_COUNT("failedToCopySchemaCount", true),
 
   // Number of tables that we want to fix but failed to update table config
-  FAILED_TO_UPDATE_TABLE_CONFIG("failedToUpdateTableConfig", true),
-
-  // Number of table schema got misconfigured
-  MISCONFIGURED_SCHEMA_TABLE_COUNT("misconfiguredSchemaTableCount", true);
+  FAILED_TO_UPDATE_TABLE_CONFIG_COUNT("failedToUpdateTableConfigCount", true);
 
   private final String _gaugeName;
   private final String _unit;

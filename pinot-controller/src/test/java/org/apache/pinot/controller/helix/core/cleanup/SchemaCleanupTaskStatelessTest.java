@@ -125,13 +125,13 @@ public class SchemaCleanupTaskStatelessTest extends ControllerTest {
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
         ControllerGauge.MISCONFIGURED_SCHEMA_TABLE_COUNT), 3);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-        ControllerGauge.FIXED_SCHEMA_TABLE_COUNT), 3);
-    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
         ControllerGauge.TABLE_WITHOUT_SCHEMA_COUNT), 0);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-        ControllerGauge.FAILED_TO_COPY_SCHEMA), 0);
+        ControllerGauge.FIXED_SCHEMA_TABLE_COUNT), 3);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-        ControllerGauge.FAILED_TO_UPDATE_TABLE_CONFIG), 0);
+        ControllerGauge.FAILED_TO_COPY_SCHEMA_COUNT), 0);
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.FAILED_TO_UPDATE_TABLE_CONFIG_COUNT), 0);
 
     // 5. Clean up
     for (String table : getHelixResourceManager().getAllOfflineTables()) {
@@ -196,15 +196,15 @@ public class SchemaCleanupTaskStatelessTest extends ControllerTest {
     assertNull(getHelixResourceManager().getTableConfig("t3_OFFLINE").getValidationConfig().getSchemaName());
 
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-        ControllerGauge.MISCONFIGURED_SCHEMA_TABLE_COUNT), 0);
-    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-        ControllerGauge.FIXED_SCHEMA_TABLE_COUNT), 3);
+        ControllerGauge.MISCONFIGURED_SCHEMA_TABLE_COUNT), 3);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
         ControllerGauge.TABLE_WITHOUT_SCHEMA_COUNT), 0);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-        ControllerGauge.FAILED_TO_COPY_SCHEMA), 0);
+        ControllerGauge.FIXED_SCHEMA_TABLE_COUNT), 3);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-        ControllerGauge.FAILED_TO_UPDATE_TABLE_CONFIG), 0);
+        ControllerGauge.FAILED_TO_COPY_SCHEMA_COUNT), 0);
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.FAILED_TO_UPDATE_TABLE_CONFIG_COUNT), 0);
 
     // 7. Clean up
     for (String table : getHelixResourceManager().getAllOfflineTables()) {
@@ -254,13 +254,13 @@ public class SchemaCleanupTaskStatelessTest extends ControllerTest {
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
         ControllerGauge.MISCONFIGURED_SCHEMA_TABLE_COUNT), 0);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-        ControllerGauge.FIXED_SCHEMA_TABLE_COUNT), 0);
-    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
         ControllerGauge.TABLE_WITHOUT_SCHEMA_COUNT), 3);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-        ControllerGauge.FAILED_TO_COPY_SCHEMA), 0);
+        ControllerGauge.FIXED_SCHEMA_TABLE_COUNT), 0);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
-        ControllerGauge.FAILED_TO_UPDATE_TABLE_CONFIG), 0);
+        ControllerGauge.FAILED_TO_COPY_SCHEMA_COUNT), 0);
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerStarter.getControllerMetrics(),
+        ControllerGauge.FAILED_TO_UPDATE_TABLE_CONFIG_COUNT), 0);
 
     // 7. Clean up
     for (String table : getHelixResourceManager().getAllOfflineTables()) {
