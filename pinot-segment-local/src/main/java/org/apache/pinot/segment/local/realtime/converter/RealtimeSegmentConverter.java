@@ -75,6 +75,7 @@ public class RealtimeSegmentConverter {
 
     // Check if column major mode should be enabled
     try {
+      // TODO(Erich): move this so that the code does not directly reference the flag name
       String str = _tableConfig.getIndexingConfig()
               .getStreamConfigs().get("realtime.segment.flush.enable_column_major");
       if (str != null) {
