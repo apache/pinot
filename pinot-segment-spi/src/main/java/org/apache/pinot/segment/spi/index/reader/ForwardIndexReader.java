@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
@@ -924,35 +925,19 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    * See {@link ValueRangeProvider} for more details.
    */
   @AllArgsConstructor
+  @EqualsAndHashCode
   @Getter
   class ValueRange {
     private final long _offset;
-    private final int _size;
-    private final boolean _isSizeOfBit;
+    private final int _sizeInBytes;
 
     public static ValueRange newByteRange(long offset, int sizeInBytes) {
-      return new ValueRange(offset, sizeInBytes, false);
-    }
-
-    public static ValueRange newBitRange(long offset, int sizeInBits) {
-      return new ValueRange(offset, sizeInBits, true);
+      return new ValueRange(offset, sizeInBytes);
     }
 
     @Override
     public String toString() {
-      return "Range{" + "_offset=" + _offset + ", _size=" + _size + ", _isSizeOfBit=" + _isSizeOfBit + '}';
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof ValueRange)) {
-        return false;
-      }
-      ValueRange that = (ValueRange) o;
-      return _offset == that._offset && _size == that._size && _isSizeOfBit == that._isSizeOfBit;
+      return "Range{" + "_offset=" + _offset + ", _size=" + _sizeInBytes + '}';
     }
   }
 
