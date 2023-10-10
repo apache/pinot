@@ -347,88 +347,67 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
           throws IOException {
     long startNS = System.nanoTime();
-    Map<IndexType<?,?,?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
 
     // TODO(ERICH): Get a measure of the ratio of columns to indexes (how many indexes per column are there)
     // Iterate over each value in the column
-    int numDocs = segment.getSegmentMetadata().getTotalDocs();
-    try(PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
+    try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
+      int numDocs = segment.getSegmentMetadata().getTotalDocs();
+      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
       NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
       if (sortedDocIds != null) {
-        // TODO(ERICH): Don't duplicate the logic in these for loops!
-        // Can I use streams (use something like IntStreamRange) to create the sequence of docIds?
         for (int docId : sortedDocIds) {
-          Object columnValueToIndex = colReader.getValue(docId);
-
-          // TODO(Erich): is this really needed?  I guess this would mean that the doc does not exist in the column?
-          // TODO(Erich): is it an invariant that every docId will have a value in every column? So a missing DocId is a fault
-          if (columnValueToIndex == null) {
-            throw new RuntimeException("Null value for column:" + columnName);
-          }
-
-          // TODO(ERICH): pull this out of the loop because it only needs to be looked up once per column
-          // TODO(ERICH): do a performance comparison for before and after pulling this out
-          FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-          SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-
-          // TODO(ERICH): does this need to be done here? Isn't it done at ingestion time?
-          if (fieldSpec.isSingleValueField()) {
-            indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
-          } else {
-            indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
-          }
-
-          // TODO(ERICH): Can we get rid of this if and use bitwise operations?
-          if(_nullHandlingEnabled) {
-//            handling null values
-//            In row oriented:
-//              - this.indexRow iterates over each column and checks if it isNullValue.  If it is then it sets the null value vector for that doc id
-//              - This null value comes from the GenericRow that is created by PinotSegmentRecordReader
-//              - PinotSegmentRecordReader:L224 is where we figure out the null value stuff
-//              - PSegRecReader calls PinotSegmentColumnReader.isNull on the doc id to determine if the value for that column of that docId is null
-//              - if it returns true and we are NOT skipping null values we put the default null value into that field of the GenericRow
-            if(colReader.isNull(docId)){
-              nullVec.setNull(docId);
-            }
-          }
+          // TODO(Erich): should I avoid a function call in the loop like this?
+          indexColumnValue(colReader, creatorsByIndex, columnName, docId, nullVec);
         }
       } else {
         for (int docId = 0; docId < numDocs; docId++) {
-          Object columnValueToIndex = colReader.getValue(docId);
-          if (columnValueToIndex == null) {
-            throw new RuntimeException("Null value for column:" + columnName);
-          }
-
-          // TODO(ERICH): pull this out of the loop because it only needs to be looked up once per column
-          // TODO(ERICH): do a performance comparison for before and after pulling this out
-          FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-          SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-
-          if (fieldSpec.isSingleValueField()) {
-            indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
-          } else {
-            indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
-          }
-
-          if(_nullHandlingEnabled) {
-            //handling null values
-//            In row oriented:
-//              - this.indexRow iterates over each column and checks if it isNullValue.  If it is then it sets the null value vector for that doc id
-//              - This null value comes from the GenericRow that is created by PinotSegmentRecordReader
-//              - PinotSegmentRecordReader:L224 is where we figure out the null value stuff
-//              - PSegRecReader calls PinotSegmentColumnReader.isNull on the doc id to determine if the value for that column of that docId is null
-//              - if it returns true and we are NOT skipping null values we put the default null value into that field of the GenericRow
-            //TODO(Erich): do we need to check the Skip Null Values flag here?  Yes, it's done in PinotRecordReader
-            if(colReader.isNull(docId)){
-              nullVec.setNull(docId);
-            }
-          }
+          indexColumnValue(colReader, creatorsByIndex, columnName, docId, nullVec);
         }
       }
     }
 
     _docIdCounter++;
     _durationNS += System.nanoTime() - startNS;
+  }
+
+  private void indexColumnValue(PinotSegmentColumnReader colReader,
+                                Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
+                                String columnName,
+                                int docId,
+                                NullValueVectorCreator nullVec)
+  throws IOException {
+    Object columnValueToIndex = colReader.getValue(docId);
+    if (columnValueToIndex == null) {
+      throw new RuntimeException("Null value for column:" + columnName);
+    }
+
+    // TODO(ERICH): pull this out of the loop because it only needs to be looked up once per column
+    // TODO(ERICH): do a performance comparison for before and after pulling this out
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+    SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+
+    if (fieldSpec.isSingleValueField()) {
+      indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+    } else {
+      indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+    }
+
+    if (_nullHandlingEnabled) {
+      //handling null values
+//            In row oriented:
+//              - this.indexRow iterates over each column and checks if it isNullValue.  If it is then it sets the null
+//              value vector for that doc id
+//              - This null value comes from the GenericRow that is created by PinotSegmentRecordReader
+//              - PinotSegmentRecordReader:L224 is where we figure out the null value stuff
+//              - PSegRecReader calls PinotSegmentColumnReader.isNull on the doc id to determine if the value for that
+//              column of that docId is null
+//              - if it returns true and we are NOT skipping null values we put the default null value into that field
+//              of the GenericRow
+      // TODO(Erich): do we need to check the Skip Null Values flag here?  Yes, it's done in PinotRecordReader
+      if (colReader.isNull(docId)) {
+        nullVec.setNull(docId);
+      }
+    }
   }
 
   private void indexSingleValueRow(SegmentDictionaryCreator dictionaryCreator, Object value,
@@ -735,7 +714,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void close()
       throws IOException {
-    LOGGER.info("(built segment) Closing Index Creator. Time Spent Indexing (ms): {}", ((float)_durationNS)/1000000.0);
     List<IndexCreator> creators =
         _creatorsByColAndIndex.values().stream().flatMap(map -> map.values().stream()).collect(Collectors.toList());
     creators.addAll(_nullValueVectorCreatorMap.values());
