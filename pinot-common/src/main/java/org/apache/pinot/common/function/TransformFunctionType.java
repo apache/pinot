@@ -134,6 +134,10 @@ public enum TransformFunctionType {
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
           SqlTypeFamily.CHARACTER)), "date_time_convert"),
 
+  DATE_TIME_CONVERT_WINDOW_HOP("dateTimeConvertWindowHop", ReturnTypes.TO_ARRAY, OperandTypes.family(
+      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER)), "date_time_convert_window_hop"),
+
   DATE_TRUNC("dateTrunc",
       ReturnTypes.BIGINT_FORCE_NULLABLE,
       OperandTypes.family(
