@@ -24,9 +24,9 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class DistinctCountCPCAggregator implements ValueAggregator {
+public class DistinctCountCPCSketchAggregator implements ValueAggregator {
 
-  public DistinctCountCPCAggregator() {
+  public DistinctCountCPCSketchAggregator() {
   }
 
   @Override

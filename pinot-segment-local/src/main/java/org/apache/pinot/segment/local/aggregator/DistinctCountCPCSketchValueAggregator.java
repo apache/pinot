@@ -30,14 +30,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class DistinctCountCPCValueAggregator implements ValueAggregator<Object, CpcSketch> {
+public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Object, CpcSketch> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
 
   private final int _lgK;
 
   private int _maxByteSize;
 
-  public DistinctCountCPCValueAggregator(List<ExpressionContext> arguments) {
+  public DistinctCountCPCSketchValueAggregator(List<ExpressionContext> arguments) {
     // length 1 means we use the Helix default
     if (arguments.size() <= 1) {
       _lgK = CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;

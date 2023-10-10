@@ -28,11 +28,11 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 /**
  * The {@code DistinctCountRawCPCAggregationFunction} shares the same usage as the
- * {@link DistinctCountCPCAggregationFunction}, and returns the sketch as a base64 encoded string.
+ * {@link DistinctCountCPCSketchAggregationFunction}, and returns the sketch as a base64 encoded string.
  */
-public class DistinctCountRawCPCAggregationFunction extends DistinctCountCPCAggregationFunction {
+public class DistinctCountRawCPCSketchAggregationFunction extends DistinctCountCPCSketchAggregationFunction {
 
-  public DistinctCountRawCPCAggregationFunction(List<ExpressionContext> arguments) {
+  public DistinctCountRawCPCSketchAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments);
   }
 

@@ -80,7 +80,7 @@ public class ValueAggregatorFactory {
         return new IntegerTupleSketchValueAggregator(IntegerSummary.Mode.Sum);
       case DISTINCTCOUNTCPCSKETCH:
       case DISTINCTCOUNTRAWCPCSKETCH:
-        return new DistinctCountCPCValueAggregator(arguments);
+        return new DistinctCountCPCSketchValueAggregator(arguments);
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }
@@ -132,7 +132,7 @@ public class ValueAggregatorFactory {
         return IntegerTupleSketchValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTCPCSKETCH:
       case DISTINCTCOUNTRAWCPCSKETCH:
-        return DistinctCountCPCValueAggregator.AGGREGATED_VALUE_TYPE;
+        return DistinctCountCPCSketchValueAggregator.AGGREGATED_VALUE_TYPE;
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

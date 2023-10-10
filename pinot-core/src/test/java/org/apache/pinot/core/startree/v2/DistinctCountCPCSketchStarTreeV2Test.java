@@ -21,18 +21,18 @@ package org.apache.pinot.core.startree.v2;
 import java.util.Collections;
 import java.util.Random;
 import org.apache.datasketches.cpc.CpcSketch;
-import org.apache.pinot.segment.local.aggregator.DistinctCountCPCValueAggregator;
+import org.apache.pinot.segment.local.aggregator.DistinctCountCPCSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
 
 
-public class DistinctCountCPCStarTreeV2Test extends BaseStarTreeV2Test<Object, CpcSketch> {
+public class DistinctCountCPCSketchStarTreeV2Test extends BaseStarTreeV2Test<Object, CpcSketch> {
 
   @Override
   ValueAggregator<Object, CpcSketch> getValueAggregator() {
-    return new DistinctCountCPCValueAggregator(Collections.emptyList());
+    return new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
   }
 
   @Override

@@ -29,11 +29,11 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-public class DistinctCountCPCValueAggregatorTest {
+public class DistinctCountCPCSketchValueAggregatorTest {
 
   @Test
   public void initialShouldCreateSingleItemSketch() {
-    DistinctCountCPCValueAggregator agg = new DistinctCountCPCValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     assertEquals(agg.getInitialAggregatedValue("hello world").getEstimate(), 1.0);
   }
 
@@ -41,7 +41,7 @@ public class DistinctCountCPCValueAggregatorTest {
   public void initialShouldParseASketch() {
     CpcSketch input = new CpcSketch();
     IntStream.range(0, 1000).forEach(input::update);
-    DistinctCountCPCValueAggregator agg = new DistinctCountCPCValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     byte[] bytes = agg.serializeAggregatedValue(input);
     assertEquals(agg.getInitialAggregatedValue(bytes).getEstimate(), input.getEstimate());
 
@@ -55,7 +55,7 @@ public class DistinctCountCPCValueAggregatorTest {
     input1.update("hello");
     CpcSketch input2 = new CpcSketch();
     input2.update("world");
-    DistinctCountCPCValueAggregator agg = new DistinctCountCPCValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     byte[][] bytes = {agg.serializeAggregatedValue(input1), agg.serializeAggregatedValue(input2)};
     assertEquals(Math.round(agg.getInitialAggregatedValue(bytes).getEstimate()), 2);
   }
@@ -66,7 +66,7 @@ public class DistinctCountCPCValueAggregatorTest {
     IntStream.range(0, 1000).forEach(input1::update);
     CpcSketch input2 = new CpcSketch();
     IntStream.range(0, 1000).forEach(input2::update);
-    DistinctCountCPCValueAggregator agg = new DistinctCountCPCValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     CpcSketch result = agg.applyAggregatedValue(input1, input2);
 
     CpcUnion union = new CpcUnion(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
@@ -86,7 +86,7 @@ public class DistinctCountCPCValueAggregatorTest {
     IntStream.range(0, 1000).forEach(input1::update);
     CpcSketch input2 = new CpcSketch();
     IntStream.range(0, 1000).forEach(input2::update);
-    DistinctCountCPCValueAggregator agg = new DistinctCountCPCValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     byte[] result2bytes = agg.serializeAggregatedValue(input2);
     CpcSketch result = agg.applyRawValue(input1, result2bytes);
 
@@ -105,7 +105,7 @@ public class DistinctCountCPCValueAggregatorTest {
   public void applyRawValueShouldAdd() {
     CpcSketch input1 = new CpcSketch();
     input1.update("hello".hashCode());
-    DistinctCountCPCValueAggregator agg = new DistinctCountCPCValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     CpcSketch result = agg.applyRawValue(input1, "world");
 
     assertEquals(Math.round(result.getEstimate()), 2);
@@ -119,7 +119,7 @@ public class DistinctCountCPCValueAggregatorTest {
   public void applyRawValueShouldSupportMultiValue() {
     CpcSketch input1 = new CpcSketch();
     input1.update("hello");
-    DistinctCountCPCValueAggregator agg = new DistinctCountCPCValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     String[] strings = {"hello", "world", "this", "is", "some", "strings"};
     CpcSketch result = agg.applyRawValue(input1, (Object) strings);
 
@@ -132,7 +132,7 @@ public class DistinctCountCPCValueAggregatorTest {
 
   @Test
   public void getInitialValueShouldSupportDifferentTypes() {
-    DistinctCountCPCValueAggregator agg = new DistinctCountCPCValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     assertEquals(agg.getInitialAggregatedValue(12345).getEstimate(), 1.0);
     assertEquals(agg.getInitialAggregatedValue(12345L).getEstimate(), 1.0);
     assertEquals(agg.getInitialAggregatedValue(12.345f).getEstimate(), 1.0);
@@ -142,7 +142,7 @@ public class DistinctCountCPCValueAggregatorTest {
 
   @Test
   public void getInitialValueShouldSupportMultiValueTypes() {
-    DistinctCountCPCValueAggregator agg = new DistinctCountCPCValueAggregator(Collections.emptyList());
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     Integer[] ints = {12345};
     assertEquals(agg.getInitialAggregatedValue(ints).getEstimate(), 1.0);
     Long[] longs = {12345L};

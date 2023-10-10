@@ -38,10 +38,11 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class DistinctCountCPCAggregationFunction extends BaseSingleInputAggregationFunction<CpcSketch, Comparable> {
+public class DistinctCountCPCSketchAggregationFunction
+    extends BaseSingleInputAggregationFunction<CpcSketch, Comparable> {
   protected final int _lgK;
 
-  public DistinctCountCPCAggregationFunction(List<ExpressionContext> arguments) {
+  public DistinctCountCPCSketchAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
     int numExpressions = arguments.size();
     // This function expects 1 or 2 arguments.

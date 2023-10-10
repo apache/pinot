@@ -365,9 +365,9 @@ public class AggregationFunctionFactory {
           case FREQUENTLONGSSKETCH:
             return new FrequentLongsSketchAggregationFunction(arguments);
           case DISTINCTCOUNTCPCSKETCH:
-            return new DistinctCountCPCAggregationFunction(arguments);
+            return new DistinctCountCPCSketchAggregationFunction(arguments);
           case DISTINCTCOUNTRAWCPCSKETCH:
-            return new DistinctCountRawCPCAggregationFunction(arguments);
+            return new DistinctCountRawCPCSketchAggregationFunction(arguments);
 
           default:
             throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);
