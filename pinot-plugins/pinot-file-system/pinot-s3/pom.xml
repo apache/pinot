@@ -39,6 +39,7 @@
     <http.core.version>4.4.13</http.core.version>
     <s3mock.version>2.12.2</s3mock.version>
     <javax.version>3.1.0</javax.version>
+    <woodstox.version>5.3.0</woodstox.version>
     <phase.prop>package</phase.prop>
   </properties>
 
@@ -143,6 +144,11 @@
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
       <version>${javax.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.woodstox</groupId>
+      <artifactId>woodstox-core</artifactId>
+      <version>${woodstox.version}</version>
     </dependency>
   </dependencies>
   <profiles>
