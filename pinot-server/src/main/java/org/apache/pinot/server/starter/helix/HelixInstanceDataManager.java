@@ -61,10 +61,10 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerDelegate;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
+import org.apache.pinot.segment.local.data.manager.TableDataManagerDelegate;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -245,8 +245,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Added segment: {} to table: {}", segmentName, realtimeTableName);
   }
 
-  private void snapshotAndAddSegments(TableDataManager tableDataManager, TableConfig tableConfig, String realtimeTableName)
-      throws Exception {
+  private void snapshotAndAddSegments(TableDataManager tableDataManager, TableConfig tableConfig,
+      String realtimeTableName) throws Exception {
     // we need to do an atomic snapshot here and then add segments because
     // of the following race condition
     // say we have 8 kafka partitions and we are ingesting into 8 consuming segments at the moment
@@ -573,7 +573,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, tdm) -> {
         // create only if a table data manager doesn't exist
         // or the current configuration and the new configuration are different
-        if (!force && tdm.getTableDataManagerConfig().getTableConfigZNRecordVersion() == tableConfigInfo.getRight().getVersion()) {
+        int version = tableConfigInfo.getRight().getVersion();
+        if (!force && tdm.getTableDataManagerConfig().getTableConfigZNRecordVersion() == version) {
           LOGGER.info("Not reloading table as the table config is not changed");
           return tdm;
         }
@@ -624,7 +625,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Nullable
   @Override
   public TableDataManager getTableDataManager(String tableNameWithType) {
-    Supplier<TableDataManager> waitUntilOngoingWriteCompletesTDM = (com.google.common.base.Supplier<TableDataManager>) () -> {
+    Supplier<TableDataManager> waitUntilOngoingWriteCompletesTDM =
+        (com.google.common.base.Supplier<TableDataManager>) () -> {
       if (!_ongoingTableDataManagerReloads.contains(tableNameWithType)) {
         return _tableDataManagerMap.get(tableNameWithType);
       }
