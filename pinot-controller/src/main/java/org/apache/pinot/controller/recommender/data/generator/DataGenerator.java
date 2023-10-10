@@ -135,7 +135,7 @@ public class DataGenerator {
     final ObjectMapper mapper = new ObjectMapper();
     for (int i = 0; i < numFiles; i++) {
       try (FileWriter writer = new FileWriter(new File(_outDir, String.format("output_%d.json", i)))) {
-        for(int j = 0; j < numPerFiles; j++) {
+        for (int j = 0; j < numPerFiles; j++) {
           Map<String, Object> row = new HashMap<>();
           for (int k = 0; k < _genSpec.getColumns().size(); k++) {
             String key = _genSpec.getColumns().get(k);
