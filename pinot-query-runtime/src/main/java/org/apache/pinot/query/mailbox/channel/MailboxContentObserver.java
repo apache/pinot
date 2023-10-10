@@ -99,7 +99,7 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
         case EARLY_TERMINATED:
           LOGGER.debug("Mailbox: {} has been early terminated", mailboxId);
           _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
-              .putMetadata(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE, "TRUE").build());
+              .putMetadata(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE, "true").build());
           break;
         default:
           throw new IllegalStateException("Unsupported mailbox status: " + status);

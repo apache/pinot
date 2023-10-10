@@ -70,26 +70,29 @@ public abstract class BlockExchange {
   /**
    * API to send a block to the destination mailboxes.
    * @param block the block to be transferred
-   * @return true if any of the upstream mailboxes requested EOS (e.g. early termination)
+   * @return true if all the mailboxes has been early terminated.
    * @throws Exception when sending stream unexpectedly closed.
    */
   public boolean send(TransferableBlock block)
       throws Exception {
-    boolean isEarlyTerminated = true;
-    for (SendingMailbox sendingMailbox : _sendingMailboxes) {
-      if (!sendingMailbox.isEarlyTerminated()) {
-        isEarlyTerminated = false;
-        break;
-      }
-    }
     if (block.isEndOfStreamBlock()) {
       for (SendingMailbox sendingMailbox : _sendingMailboxes) {
         sendBlock(sendingMailbox, block);
       }
-    } else if (!isEarlyTerminated) {
-      route(_sendingMailboxes, block);
+      return false;
+    } else {
+      boolean isEarlyTerminated = true;
+      for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+        if (!sendingMailbox.isEarlyTerminated()) {
+          isEarlyTerminated = false;
+          break;
+        }
+      }
+      if (!isEarlyTerminated) {
+        route(_sendingMailboxes, block);
+      }
+      return isEarlyTerminated;
     }
-    return isEarlyTerminated;
   }
 
   protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block)

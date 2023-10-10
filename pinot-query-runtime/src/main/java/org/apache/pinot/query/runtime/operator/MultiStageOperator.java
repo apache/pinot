@@ -72,10 +72,10 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   // Make it protected because we should always call nextBlock()
   protected abstract TransferableBlock getNextBlock();
 
-  protected void setEarlyTerminate() {
+  protected void earlyTerminate() {
     _isEarlyTerminated = true;
-    for (MultiStageOperator upstreamOperator : getChildOperators()) {
-      upstreamOperator.setEarlyTerminate();
+    for (MultiStageOperator child : getChildOperators()) {
+      child.earlyTerminate();
     }
   }
 

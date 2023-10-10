@@ -38,7 +38,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,26 +56,26 @@ public class MailboxSendOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
 
-  private final MultiStageOperator _upstreamOperator;
+  private final MultiStageOperator _sourceOperator;
   private final BlockExchange _exchange;
   private final List<RexExpression> _collationKeys;
   private final List<RelFieldCollation.Direction> _collationDirections;
   private final boolean _isSortOnSender;
 
-  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
       RelDistribution.Type distributionType, @Nullable List<Integer> distributionKeys,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender, int receiverStageId) {
-    this(context, upstreamOperator, getBlockExchange(context, distributionType, distributionKeys, receiverStageId),
+    this(context, sourceOperator, getBlockExchange(context, distributionType, distributionKeys, receiverStageId),
         collationKeys, collationDirections, isSortOnSender);
   }
 
   @VisibleForTesting
-  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, BlockExchange exchange,
+  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator, BlockExchange exchange,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender) {
     super(context);
-    _upstreamOperator = upstreamOperator;
+    _sourceOperator = sourceOperator;
     _exchange = exchange;
     _collationKeys = collationKeys;
     _collationDirections = collationDirections;
@@ -105,7 +105,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return Collections.singletonList(_upstreamOperator);
+    return Collections.singletonList(_sourceOperator);
   }
 
   @Nullable
@@ -117,23 +117,25 @@ public class MailboxSendOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      TransferableBlock block = _upstreamOperator.nextBlock();
+      TransferableBlock block = _sourceOperator.nextBlock();
       boolean isEarlyTerminated;
       if (block.isSuccessfulEndOfStreamBlock()) {
         // Stats need to be populated here because the block is being sent to the mailbox
         // and the receiving opChain will not be able to access the stats from the previous opChain
         TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
             OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
-        isEarlyTerminated = sendTransferableBlock(eosBlockWithStats);
+        sendTransferableBlock(eosBlockWithStats);
+        // when sending an EOS block already, early termination flag is ignored even if receiver has requested it.
+        isEarlyTerminated = false;
       } else {
         isEarlyTerminated = sendTransferableBlock(block);
       }
       if (isEarlyTerminated) {
-        setEarlyTerminate();
+        earlyTerminate();
       }
       return block;
-    } catch (EarlyTerminationException e) {
-      LOGGER.debug("Early terminating opChain: {}", _context.getId());
+    } catch (QueryCancelledException e) {
+      LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } catch (TimeoutException e) {
       LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
@@ -152,10 +154,11 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   private boolean sendTransferableBlock(TransferableBlock block)
       throws Exception {
+    boolean isEarlyTerminated = _exchange.send(block);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
-    return _exchange.send(block);
+    return isEarlyTerminated;
   }
 
   /**

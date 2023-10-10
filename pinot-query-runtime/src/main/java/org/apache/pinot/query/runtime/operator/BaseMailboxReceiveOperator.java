@@ -82,7 +82,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   @Override
-  protected void setEarlyTerminate() {
+  protected void earlyTerminate() {
     _isEarlyTerminated = true;
     _multiConsumer.earlyTerminate();
   }

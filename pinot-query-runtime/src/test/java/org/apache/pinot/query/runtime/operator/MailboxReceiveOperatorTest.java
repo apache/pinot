@@ -257,7 +257,7 @@ public class MailboxReceiveOperatorTest {
       // Receive first block from server1
       assertEquals(receiveOp.nextBlock().getContainer().get(0), row1);
       // at this point operator received a signal to early terminate
-      receiveOp.setEarlyTerminate();
+      receiveOp.earlyTerminate();
       // Receive next block should be EOS even if upstream keep sending normal block.
       assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
       // Assure that early terminate signal goes into each mailbox

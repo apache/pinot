@@ -64,7 +64,7 @@ public class AggregateOperator extends MultiStageOperator {
       new CountAggregationFunction(Collections.singletonList(ExpressionContext.forIdentifier("*")), false);
   private static final ExpressionContext PLACEHOLDER_IDENTIFIER = ExpressionContext.forIdentifier("__PLACEHOLDER__");
 
-  private final MultiStageOperator _upstreamOperator;
+  private final MultiStageOperator _inputOperator;
   private final DataSchema _resultSchema;
   private final AggType _aggType;
   private final MultistageAggregationExecutor _aggregationExecutor;
@@ -72,11 +72,11 @@ public class AggregateOperator extends MultiStageOperator {
 
   private boolean _hasReturnedAggregateBlock;
 
-  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
-      DataSchema resultSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType,
-      List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+  public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator, DataSchema resultSchema,
+      List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType, List<Integer> filterArgIndices,
+      @Nullable AbstractPlanNode.NodeHint nodeHint) {
     super(context);
-    _upstreamOperator = upstreamOperator;
+    _inputOperator = inputOperator;
     _resultSchema = resultSchema;
     _aggType = aggType;
 
@@ -120,7 +120,7 @@ public class AggregateOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of(_upstreamOperator);
+    return ImmutableList.of(_inputOperator);
   }
 
   @Nullable
@@ -174,10 +174,10 @@ public class AggregateOperator extends MultiStageOperator {
    * @return the last block, which must always be either an error or the end of the stream
    */
   private TransferableBlock consumeGroupBy() {
-    TransferableBlock block = _upstreamOperator.nextBlock();
+    TransferableBlock block = _inputOperator.nextBlock();
     while (block.isDataBlock()) {
       _groupByExecutor.processBlock(block);
-      block = _upstreamOperator.nextBlock();
+      block = _inputOperator.nextBlock();
     }
     return block;
   }
@@ -187,10 +187,10 @@ public class AggregateOperator extends MultiStageOperator {
    * @return the last block, which must always be either an error or the end of the stream
    */
   private TransferableBlock consumeAggregation() {
-    TransferableBlock block = _upstreamOperator.nextBlock();
+    TransferableBlock block = _inputOperator.nextBlock();
     while (block.isDataBlock()) {
       _aggregationExecutor.processBlock(block);
-      block = _upstreamOperator.nextBlock();
+      block = _inputOperator.nextBlock();
     }
     return block;
   }

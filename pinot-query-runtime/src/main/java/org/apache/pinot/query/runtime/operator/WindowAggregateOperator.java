@@ -87,7 +87,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   // List of ranking window functions whose output depends on the ordering of input rows and not on the actual values
   private static final Set<String> RANKING_FUNCTION_NAMES = ImmutableSet.of("RANK", "DENSE_RANK");
 
-  private final MultiStageOperator _upstreamOperator;
+  private final MultiStageOperator _inputOperator;
   private final List<RexExpression> _groupSet;
   private final OrderSetInfo _orderSetInfo;
   private final WindowFrame _windowFrame;
@@ -101,17 +101,17 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private int _numRows;
   private boolean _hasReturnedWindowAggregateBlock;
 
-  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
       DataSchema resultSchema, DataSchema inputSchema) {
-    this(context, upstreamOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
+    this(context, inputOperator, groupSet, orderSet, orderSetDirection, orderSetNullDirection, aggCalls, lowerBound,
         upperBound, windowFrameType, constants, resultSchema, inputSchema, WindowAggregateAccumulator.WIN_AGG_MERGERS);
   }
 
   @VisibleForTesting
-  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+  public WindowAggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator,
       List<RexExpression> groupSet, List<RexExpression> orderSet, List<RelFieldCollation.Direction> orderSetDirection,
       List<RelFieldCollation.NullDirection> orderSetNullDirection, List<RexExpression> aggCalls, int lowerBound,
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
@@ -119,7 +119,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       Map<String, Function<ColumnDataType, AggregationUtils.Merger>> mergers) {
     super(context);
 
-    _upstreamOperator = upstreamOperator;
+    _inputOperator = inputOperator;
     _groupSet = groupSet;
     _isPartitionByOnly = isPartitionByOnlyQuery(groupSet, orderSet);
     _orderSetInfo = new OrderSetInfo(orderSet, orderSetDirection, orderSetNullDirection, _isPartitionByOnly);
@@ -152,7 +152,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return ImmutableList.of(_upstreamOperator);
+    return ImmutableList.of(_inputOperator);
   }
 
   @Nullable
@@ -278,7 +278,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
    */
   private TransferableBlock consumeInputBlocks() {
     Key emptyOrderKey = AggregationUtils.extractEmptyKey();
-    TransferableBlock block = _upstreamOperator.nextBlock();
+    TransferableBlock block = _inputOperator.nextBlock();
     while (!TransferableBlockUtils.isEndOfStream(block)) {
       List<Object[]> container = block.getContainer();
       if (_windowFrame.getWindowFrameType() == WindowNode.WindowFrameType.RANGE) {
@@ -306,7 +306,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
           _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
         }
       }
-      block = _upstreamOperator.nextBlock();
+      block = _inputOperator.nextBlock();
     }
     return block;
   }

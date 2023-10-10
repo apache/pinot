@@ -195,7 +195,7 @@ public class MailboxSendOperatorTest {
     TransferableBlock block = getMailboxSendOperator().nextBlock();
 
     // Then:
-    verify(_sourceOperator).setEarlyTerminate();
+    verify(_sourceOperator).earlyTerminate();
   }
 
   private MailboxSendOperator getMailboxSendOperator() {

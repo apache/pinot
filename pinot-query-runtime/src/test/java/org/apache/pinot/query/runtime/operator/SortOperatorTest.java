@@ -640,7 +640,7 @@ public class SortOperatorTest {
     TransferableBlock block2 = op.nextBlock(); // eos
 
     // Then:
-    Mockito.verify(_input).setEarlyTerminate();
+    Mockito.verify(_input).earlyTerminate();
     Assert.assertEquals(block.getNumRows(), 10);
     Assert.assertTrue(block2.isEndOfStreamBlock(), "expected EOS block to propagate");
   }

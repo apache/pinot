@@ -164,10 +164,8 @@ public class SortOperator extends MultiStageOperator {
               _rows.addAll(container.subList(0, _numRowsToKeep - numRows));
               LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
                   _context.getId());
-              setEarlyTerminate();
-              // acquire extra metadata block
-              block = _upstreamOperator.nextBlock();
-              break;
+              // setting operator to be early terminated and awaits EOS block next.
+              earlyTerminate();
             }
           }
         } else {

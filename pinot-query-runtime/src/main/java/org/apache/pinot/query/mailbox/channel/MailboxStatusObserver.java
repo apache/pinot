@@ -43,7 +43,8 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
     //   1. the buffer size available, for back-pressure handling
     //   2. status whether there's no need to send any additional data block b/c it considered itself finished.
     // -- handle early-terminate EOS request.
-    if (mailboxStatus.getMetadataMap().containsKey(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE)) {
+    if (Boolean.parseBoolean(
+        mailboxStatus.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE))) {
       _isEarlyTerminated.set(true);
     }
     // -- handling buffer size back-pressure
