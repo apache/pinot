@@ -129,6 +129,27 @@ public class ForwardIndexTypeTest {
     }
 
     @Test
+    public void oldConfNoDictionaryColumns()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"compressionCodec\": \"SNAPPY\"\n"
+          + " }"
+      );
+
+      assertEquals(
+          new ForwardIndexConfig.Builder()
+              .withCompressionType(ChunkCompressionType.SNAPPY)
+              .withDeriveNumDocsPerChunk(false)
+              .withRawIndexWriterVersion(2)
+              .build()
+      );
+    }
+
+    @Test
     public void oldConfEnableDict()
         throws IOException {
       addFieldIndexConfig(""
