@@ -50,7 +50,7 @@ public class ChunkReaderContext implements ForwardIndexReaderContext {
 
   @Getter
   @Setter
-  private List<ForwardIndexReader.ValueRange> _ranges;
+  private List<ForwardIndexReader.ByteRange> _ranges;
 
   public ChunkReaderContext(int maxChunkSize) {
     _chunkBuffer = ByteBuffer.allocateDirect(maxChunkSize);

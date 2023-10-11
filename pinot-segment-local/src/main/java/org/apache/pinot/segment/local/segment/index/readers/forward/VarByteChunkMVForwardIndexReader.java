@@ -23,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -33,8 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * (STRING, BYTES).
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriter}
  */
-public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader
-    implements ForwardIndexReader.ValueRangeProvider<ChunkReaderContext> {
+public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardIndexReader {
   private static final int ROW_OFFSET_SIZE = VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
 
   private final int _maxChunkSize;
@@ -247,7 +245,12 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
   }
 
   @Override
-  public void recordDocIdByteRanges(int docId, ChunkReaderContext context, List<ValueRange> ranges) {
+  public boolean isByteRangeRecordingSupported() {
+    return true;
+  }
+
+  @Override
+  public void recordDocIdByteRanges(int docId, ChunkReaderContext context, List<ByteRange> ranges) {
     if (_isCompressed) {
       recordDocIdRanges(docId, context, ranges);
     } else {
@@ -256,12 +259,12 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
   }
 
   @Override
-  public boolean isFixedLengthType() {
+  public boolean isFixedOffsetMappingType() {
     return false;
   }
 
   @Override
-  public long getBaseOffset() {
+  public long getRawDataStartOffset() {
     throw new UnsupportedOperationException("Forward index is not of fixed length type");
   }
 

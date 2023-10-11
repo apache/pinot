@@ -219,14 +219,14 @@ public final class PinotDataBitSet implements Closeable {
   }
 
   public int getNextSetBitOffsetRecordRanges(int bitOffset, long baseOffset,
-      List<ForwardIndexReader.ValueRange> ranges) {
+      List<ForwardIndexReader.ByteRange> ranges) {
     long startOffset = baseOffset + (bitOffset / Byte.SIZE);
     int size = Byte.BYTES;
     int byteOffset = bitOffset / Byte.SIZE;
     int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
     int firstByte = (_dataBuffer.getByte(byteOffset) << bitOffsetInFirstByte) & BYTE_MASK;
     if (firstByte != 0) {
-      ranges.add(ForwardIndexReader.ValueRange.newByteRange(startOffset, size));
+      ranges.add(ForwardIndexReader.ByteRange.newByteRange(startOffset, size));
       return bitOffset + FIRST_BIT_SET[firstByte];
     }
     while (true) {
@@ -234,7 +234,7 @@ public final class PinotDataBitSet implements Closeable {
       size += Byte.SIZE;
       int currentByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
       if (currentByte != 0) {
-        ranges.add(ForwardIndexReader.ValueRange.newByteRange(startOffset, size));
+        ranges.add(ForwardIndexReader.ByteRange.newByteRange(startOffset, size));
         return (byteOffset * Byte.SIZE) | FIRST_BIT_SET[currentByte];
       }
     }
@@ -257,16 +257,16 @@ public final class PinotDataBitSet implements Closeable {
   }
 
   public int getNextNthSetBitOffsetAndRecordRanges(int bitOffset, int n, long baseOffset,
-      List<ForwardIndexReader.ValueRange> ranges) {
+      List<ForwardIndexReader.ByteRange> ranges) {
     long startOffset = baseOffset + (bitOffset / Byte.SIZE);
     int size = Byte.SIZE;
     int byteOffset = bitOffset / Byte.SIZE;
     int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
-    ranges.add(ForwardIndexReader.ValueRange.newByteRange(baseOffset + byteOffset, Byte.BYTES));
+    ranges.add(ForwardIndexReader.ByteRange.newByteRange(baseOffset + byteOffset, Byte.BYTES));
     int firstByte = (_dataBuffer.getByte(byteOffset) << bitOffsetInFirstByte) & BYTE_MASK;
     int numBitsSet = NUM_BITS_SET[firstByte];
     if (numBitsSet >= n) {
-      ranges.add(ForwardIndexReader.ValueRange.newByteRange(startOffset, size));
+      ranges.add(ForwardIndexReader.ByteRange.newByteRange(startOffset, size));
       return bitOffset + NTH_BIT_SET[n - 1][firstByte];
     }
     while (true) {
@@ -276,7 +276,7 @@ public final class PinotDataBitSet implements Closeable {
       int currentByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
       numBitsSet = NUM_BITS_SET[currentByte];
       if (numBitsSet >= n) {
-        ranges.add(ForwardIndexReader.ValueRange.newByteRange(startOffset, size));
+        ranges.add(ForwardIndexReader.ByteRange.newByteRange(startOffset, size));
         return (byteOffset * Byte.SIZE) | NTH_BIT_SET[n - 1][currentByte];
       }
     }

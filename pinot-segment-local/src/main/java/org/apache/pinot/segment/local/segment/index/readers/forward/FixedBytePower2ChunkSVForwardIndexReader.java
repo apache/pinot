@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -32,8 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * LONG, FLOAT, DOUBLE).
  * <p>For data layout, please refer to the documentation for {@link FixedByteChunkForwardIndexWriter}
  */
-public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkForwardIndexReader
-    implements ForwardIndexReader.ValueRangeProvider<ChunkReaderContext> {
+public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkForwardIndexReader {
   public static final int VERSION = 4;
 
   private final int _shift;
@@ -102,7 +100,12 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
   }
 
   @Override
-  public void recordDocIdByteRanges(int docId, ChunkReaderContext context, List<ValueRange> ranges) {
+  public boolean isByteRangeRecordingSupported() {
+    return true;
+  }
+
+  @Override
+  public void recordDocIdByteRanges(int docId, ChunkReaderContext context, List<ByteRange> ranges) {
     if (_isCompressed) {
       recordDocIdRanges(docId, context, ranges);
     } else {
@@ -112,13 +115,13 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
   }
 
   @Override
-  public boolean isFixedLengthType() {
+  public boolean isFixedOffsetMappingType() {
     return !_isCompressed;
   }
 
   @Override
-  public long getBaseOffset() {
-    if (isFixedLengthType()) {
+  public long getRawDataStartOffset() {
+    if (isFixedOffsetMappingType()) {
       return _rawDataStart;
     } else {
       throw new UnsupportedOperationException("Forward index is not fixed length type");
@@ -127,7 +130,7 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
 
   @Override
   public int getDocLength() {
-    if (isFixedLengthType()) {
+    if (isFixedOffsetMappingType()) {
       return _storedType.size();
     } else {
       throw new UnsupportedOperationException("Forward index is not fixed length type");

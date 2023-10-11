@@ -25,8 +25,6 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSetV2;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -115,14 +113,13 @@ public class FixedBitSVForwardIndexReaderV2Test {
       try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
           FixedBitSVForwardIndexReader reader = new FixedBitSVForwardIndexReader(dataBuffer, NUM_VALUES,
               numBits)) {
-        ForwardIndexReader.ValueRangeProvider<ForwardIndexReaderContext> valueRangeProvider = reader;
-        Assert.assertTrue(valueRangeProvider.isFixedLengthType());
-        Assert.assertEquals(valueRangeProvider.getBaseOffset(), 0);
-        Assert.assertEquals(valueRangeProvider.getDocLength(), numBits);
-        Assert.assertTrue(valueRangeProvider.isDocLengthInBits());
+        Assert.assertTrue(reader.isFixedOffsetMappingType());
+        Assert.assertEquals(reader.getRawDataStartOffset(), 0);
+        Assert.assertEquals(reader.getDocLength(), numBits);
+        Assert.assertTrue(reader.isDocLengthInBits());
 
         try {
-          valueRangeProvider.recordDocIdByteRanges(0, null, new ArrayList<>());
+          reader.recordDocIdByteRanges(0, null, new ArrayList<>());
           Assert.fail("Should have failed to record byte ranges");
         } catch (UnsupportedOperationException e) {
           // expected

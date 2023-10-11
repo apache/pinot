@@ -132,29 +132,29 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     return docId / _numDocsPerChunk;
   }
 
-  protected void recordDocIdRanges(int docId, int rowOffsetSize, List<ValueRange> ranges) {
+  protected void recordDocIdRanges(int docId, int rowOffsetSize, List<ByteRange> ranges) {
     int chunkId = getChunkId(docId);
     int chunkRowId = docId % _numDocsPerChunk;
 
     // These offsets are offset in the data buffer
     long chunkStartOffset = getChunkPositionAndRecordRanges(chunkId, ranges);
-    ranges.add(ValueRange.newByteRange(chunkStartOffset + (long) chunkRowId * rowOffsetSize, Integer.BYTES));
+    ranges.add(new ByteRange(chunkStartOffset + (long) chunkRowId * rowOffsetSize, Integer.BYTES));
     long valueStartOffset = chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * rowOffsetSize);
     long valueEndOffset =
         getValueEndOffsetAndRecordRanges(chunkId, chunkRowId, rowOffsetSize, chunkStartOffset, ranges);
 
-    ranges.add(ValueRange.newByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
+    ranges.add(new ByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
   }
 
   private long getValueEndOffsetAndRecordRanges(int chunkId, int chunkRowId, int rowOffsetSize, long chunkStartOffset,
-      List<ValueRange> ranges) {
+      List<ByteRange> ranges) {
     if (chunkId == _numChunks - 1) {
       // Last chunk
       if (chunkRowId == _numDocsPerChunk - 1) {
         // Last row in the last chunk
         return _dataBuffer.size();
       } else {
-        ranges.add(ValueRange.newByteRange(chunkStartOffset + (long) (chunkRowId + 1) * rowOffsetSize, Integer.BYTES));
+        ranges.add(new ByteRange(chunkStartOffset + (long) (chunkRowId + 1) * rowOffsetSize, Integer.BYTES));
         int valueEndOffsetInChunk = _dataBuffer.getInt(chunkStartOffset + (long) (chunkRowId + 1) * rowOffsetSize);
         if (valueEndOffsetInChunk == 0) {
           // Last row in the last chunk (chunk is incomplete, which stores 0 as the offset for the absent rows)
@@ -168,13 +168,13 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
         // Last row in the chunk
         return getChunkPositionAndRecordRanges(chunkId + 1, ranges);
       } else {
-        ranges.add(ValueRange.newByteRange(chunkStartOffset + (long) (chunkRowId + 1) * rowOffsetSize, Integer.BYTES));
+        ranges.add(new ByteRange(chunkStartOffset + (long) (chunkRowId + 1) * rowOffsetSize, Integer.BYTES));
         return chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) (chunkRowId + 1) * rowOffsetSize);
       }
     }
   }
 
-  protected void recordDocIdRanges(int docId, ChunkReaderContext context, List<ValueRange> ranges) {
+  protected void recordDocIdRanges(int docId, ChunkReaderContext context, List<ByteRange> ranges) {
     int chunkId = getChunkId(docId);
     if (context.getChunkId() == chunkId) {
       ranges.addAll(context.getRanges());
@@ -183,8 +183,8 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     recordChunkRanges(chunkId, context, ranges);
   }
 
-  protected void recordChunkRanges(int chunkId, ChunkReaderContext context, List<ValueRange> ranges) {
-    List<ValueRange> chunkRanges = new ArrayList<>();
+  protected void recordChunkRanges(int chunkId, ChunkReaderContext context, List<ByteRange> ranges) {
+    List<ByteRange> chunkRanges = new ArrayList<>();
     int chunkSize;
     long chunkPosition = getChunkPositionAndRecordRanges(chunkId, chunkRanges);
 
@@ -195,7 +195,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
       long nextChunkOffset = getChunkPositionAndRecordRanges(chunkId + 1, chunkRanges);
       chunkSize = (int) (nextChunkOffset - chunkPosition);
     }
-    chunkRanges.add(ValueRange.newByteRange(chunkPosition, chunkSize));
+    chunkRanges.add(new ByteRange(chunkPosition, chunkSize));
     context.setChunkId(chunkId);
     context.setRanges(chunkRanges);
     ranges.addAll(chunkRanges);
@@ -239,14 +239,14 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     }
   }
 
-  protected long getChunkPositionAndRecordRanges(int chunkId, List<ValueRange> ranges) {
+  protected long getChunkPositionAndRecordRanges(int chunkId, List<ByteRange> ranges) {
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
       ranges.add(
-          ValueRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES));
+          new ByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES));
       return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
     } else {
       ranges.add(
-          ValueRange.newByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES));
+          new ByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES));
       return _dataHeader.getLong(chunkId * _headerEntryChunkOffsetSize);
     }
   }

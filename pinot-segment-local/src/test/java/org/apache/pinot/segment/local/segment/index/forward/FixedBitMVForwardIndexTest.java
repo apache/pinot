@@ -94,12 +94,11 @@ public class FixedBitMVForwardIndexTest {
       try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
           FixedBitMVForwardIndexReader reader = new FixedBitMVForwardIndexReader(dataBuffer, NUM_DOCS, totalNumValues,
               numBitsPerValue); FixedBitMVForwardIndexReader.Context readerContext = reader.createContext()) {
-        ForwardIndexReader.ValueRangeProvider<FixedBitMVForwardIndexReader.Context> valueRangeProvider = reader;
-        Assert.assertFalse(valueRangeProvider.isFixedLengthType());
-        List<ForwardIndexReader.ValueRange> rangeList = new ArrayList<>();
+        Assert.assertFalse(reader.isFixedOffsetMappingType());
+        List<ForwardIndexReader.ByteRange> rangeList = new ArrayList<>();
         for (int i = 0; i < NUM_DOCS; i++) {
           try {
-            valueRangeProvider.recordDocIdByteRanges(i, readerContext, rangeList);
+            reader.recordDocIdByteRanges(i, readerContext, rangeList);
           } catch (Exception e) {
             Assert.fail("Should not throw exception when calling recordDocIdByteRanges()", e);
           }

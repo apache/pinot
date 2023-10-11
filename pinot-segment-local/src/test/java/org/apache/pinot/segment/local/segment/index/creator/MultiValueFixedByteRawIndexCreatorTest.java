@@ -175,14 +175,10 @@ public class MultiValueFixedByteRawIndexCreatorTest {
 
     // Value range provider test
     final ForwardIndexReaderContext valueRangeContext = reader.createContext();
-    ForwardIndexReader.ValueRangeProvider<ForwardIndexReaderContext> valueRangeProvider =
-        (ForwardIndexReader.ValueRangeProvider<ForwardIndexReaderContext>) reader;
-    Assert.assertFalse(valueRangeProvider.isFixedLengthType());
-
-    List<ForwardIndexReader.ValueRange> ranges = new ArrayList<>();
+    List<ForwardIndexReader.ByteRange> ranges = new ArrayList<>();
     for (int i = 0; i < numDocs; i++) {
       try {
-        valueRangeProvider.recordDocIdByteRanges(i, valueRangeContext, ranges);
+        reader.recordDocIdByteRanges(i, valueRangeContext, ranges);
       } catch (Exception e) {
         Assert.fail("Failed to record byte ranges for docId: " + i, e);
       }

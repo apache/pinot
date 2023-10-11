@@ -46,8 +46,7 @@ import org.slf4j.LoggerFactory;
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriterV4}
  */
 public class VarByteChunkForwardIndexReaderV4
-    implements ForwardIndexReader<VarByteChunkForwardIndexReaderV4.ReaderContext>,
-               ForwardIndexReader.ValueRangeProvider<VarByteChunkForwardIndexReaderV4.ReaderContext> {
+    implements ForwardIndexReader<VarByteChunkForwardIndexReaderV4.ReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(VarByteChunkForwardIndexReaderV4.class);
   private static final int METADATA_ENTRY_SIZE = 8;
 
@@ -270,17 +269,22 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
-  public void recordDocIdByteRanges(int docId, ReaderContext context, List<ValueRange> ranges) {
+  public boolean isByteRangeRecordingSupported() {
+    return true;
+  }
+
+  @Override
+  public void recordDocIdByteRanges(int docId, ReaderContext context, List<ByteRange> ranges) {
     context.recordRangesForDocId(docId, ranges);
   }
 
   @Override
-  public boolean isFixedLengthType() {
+  public boolean isFixedOffsetMappingType() {
     return false;
   }
 
   @Override
-  public long getBaseOffset() {
+  public long getRawDataStartOffset() {
     throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 
@@ -298,7 +302,7 @@ public class VarByteChunkForwardIndexReaderV4
     protected boolean _regularChunk;
     protected int _numDocsInCurrentChunk;
     protected long _chunkStartOffset;
-    private List<ValueRange> _ranges;
+    private List<ByteRange> _ranges;
 
     protected ReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset) {
       _chunks = chunks;
@@ -306,7 +310,7 @@ public class VarByteChunkForwardIndexReaderV4
       _chunkStartOffset = chunkStartOffset;
     }
 
-    private void recordRangesForDocId(int docId, List<ValueRange> ranges) {
+    private void recordRangesForDocId(int docId, List<ByteRange> ranges) {
       if (docId >= _docIdOffset && docId < _nextDocIdOffset) {
         ranges.addAll(_ranges);
       } else {
@@ -367,10 +371,10 @@ public class VarByteChunkForwardIndexReaderV4
       return processChunkAndReadFirstValue(docId, offset, limit);
     }
 
-    private void initAndRecordRangesForDocId(int docId, List<ValueRange> ranges) {
+    private void initAndRecordRangesForDocId(int docId, List<ByteRange> ranges) {
       // Due to binary search on metadata buffer, it's simple to record the entire metadata buffer byte ranges
       _ranges = new ArrayList<>();
-      _ranges.add(ValueRange.newByteRange(0, (int) _metadata.size()));
+      _ranges.add(new ByteRange(0, (int) _metadata.size()));
       long metadataEntry = chunkIndexFor(docId);
       int info = _metadata.getInt(metadataEntry);
       _docIdOffset = info & 0x7FFFFFFF;
@@ -384,7 +388,7 @@ public class VarByteChunkForwardIndexReaderV4
         _nextDocIdOffset = Integer.MAX_VALUE;
         limit = _chunks.size();
       }
-      _ranges.add(ValueRange.newByteRange(_chunkStartOffset + offset, (int) (limit - offset)));
+      _ranges.add(new ByteRange(_chunkStartOffset + offset, (int) (limit - offset)));
       ranges.addAll(_ranges);
     }
   }
@@ -393,7 +397,7 @@ public class VarByteChunkForwardIndexReaderV4
 
     private ByteBuffer _chunk;
 
-    private List<ValueRange> _ranges;
+    private List<ByteRange> _ranges;
 
     UncompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset) {
       super(chunks, metadata, chunkStartOffset);

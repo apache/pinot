@@ -49,9 +49,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  *   </li>
  * </ul>
  */
-public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<FixedBitMVForwardIndexReader.Context>,
-                                                           ForwardIndexReader.ValueRangeProvider
-                                                               <FixedBitMVForwardIndexReader.Context> {
+public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<FixedBitMVForwardIndexReader.Context> {
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
   private final FixedByteValueReaderWriter _chunkOffsetReader;
@@ -224,7 +222,12 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
-  public void recordDocIdByteRanges(int docId, Context context, List<ValueRange> ranges) {
+  public boolean isByteRangeRecordingSupported() {
+    return true;
+  }
+
+  @Override
+  public void recordDocIdByteRanges(int docId, Context context, List<ByteRange> ranges) {
     int contextDocId = context._docId;
     int contextEndOffset = context._endOffset;
     int startIndex;
@@ -239,7 +242,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
                 _bitmapReaderStartOffset, ranges);
       } else {
         // Different chunk
-        ranges.add(ValueRange.newByteRange(chunkId, Integer.BYTES));
+        ranges.add(new ByteRange(chunkId, Integer.BYTES));
         int chunkOffset = _chunkOffsetReader.getInt(chunkId);
         int indexInChunk = docId % _numDocsPerChunk;
         if (indexInChunk == 0) {
@@ -261,7 +264,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     long byteStartOffset = (startBitOffset / Byte.SIZE);
     int size = (int) (((long) numValues * _numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
 
-    ranges.add(ForwardIndexReader.ValueRange.newByteRange(_rawDataReaderStartOffset + byteStartOffset, size));
+    ranges.add(new ByteRange(_rawDataReaderStartOffset + byteStartOffset, size));
 
     // Update context
     context._docId = docId;
@@ -269,12 +272,12 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
-  public boolean isFixedLengthType() {
+  public boolean isFixedOffsetMappingType() {
     return false;
   }
 
   @Override
-  public long getBaseOffset() {
+  public long getRawDataStartOffset() {
     throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 

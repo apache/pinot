@@ -30,9 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * Bit-compressed dictionary-encoded forward index reader for single-value columns. The values returned are dictionary
  * ids.
  */
-public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<ForwardIndexReaderContext>,
-                                                             ForwardIndexReader.ValueRangeProvider
-                                                                 <ForwardIndexReaderContext> {
+public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<ForwardIndexReaderContext> {
   private final FixedBitIntReader _reader;
   private final int _numDocs;
   private final int _numBitsPerValue;
@@ -105,17 +103,22 @@ public final class FixedBitSVForwardIndexReaderV2 implements ForwardIndexReader<
   }
 
   @Override
-  public void recordDocIdByteRanges(int docId, ForwardIndexReaderContext context, List<ValueRange> ranges) {
-    throw new UnsupportedOperationException("Forward index is fixed length type");
-  }
-
-  @Override
-  public boolean isFixedLengthType() {
+  public boolean isByteRangeRecordingSupported() {
     return true;
   }
 
   @Override
-  public long getBaseOffset() {
+  public void recordDocIdByteRanges(int docId, ForwardIndexReaderContext context, List<ByteRange> ranges) {
+    throw new UnsupportedOperationException("Forward index is fixed length type");
+  }
+
+  @Override
+  public boolean isFixedOffsetMappingType() {
+    return true;
+  }
+
+  @Override
+  public long getRawDataStartOffset() {
     return 0;
   }
 

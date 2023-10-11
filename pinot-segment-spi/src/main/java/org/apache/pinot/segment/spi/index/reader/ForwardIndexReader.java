@@ -920,66 +920,71 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException();
   }
 
+  // Functions for recording absolute buffer byte ranges accessed while reading a given docId
+
+  /**
+   * Returns whether the forward index supports recording the byte ranges accessed while reading a given docId
+   */
+  default boolean isByteRangeRecordingSupported() {
+    return false;
+  }
+
+  /**
+   * Returns a list of {@link ByteRange} that represents all the distinct
+   * buffer byte ranges (absolute offset, sizeInBytes) that are accessed when reading the given (@param docId}
+   * @param docId to find the range for
+   * @param context Reader context
+   * @param ranges List of {@link ByteRange} to which the applicable value ranges will be added
+   */
+  default void recordDocIdByteRanges(int docId, T context, List<ByteRange> ranges) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns whether the forward index is of fixed length type, and therefore the docId -> byte range mapping is fixed
+   * @return true if forward index has a fixed mapping of docId -> buffer offsets
+   * (eg: FixedBitSVForwardIndexReader, FixedByteChunkSVForwardIndexReader (if buffer is uncompressed) etc), false
+   * otherwise
+   */
+  default boolean isFixedOffsetMappingType() {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the base offset of raw data start within the fwd index buffer, if it's of fixed offset mapping type
+   * @return raw data start offset if the reader is of fixed offset mapping type
+   */
+  default long getRawDataStartOffset() {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns the length of each entry in the forward index, if it's of fixed offset mapping type
+   */
+  default int getDocLength() {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns whether the length of each entry in the forward index is in bits, if it's of fixed offset mapping type
+   */
+  default boolean isDocLengthInBits() {
+    return false;
+  }
+
   /**
    * This class represents the buffer byte ranges accessed while reading a given docId.
-   * See {@link ValueRangeProvider} for more details.
    */
   @AllArgsConstructor
   @EqualsAndHashCode
   @Getter
-  class ValueRange {
+  class ByteRange {
     private final long _offset;
     private final int _sizeInBytes;
-
-    public static ValueRange newByteRange(long offset, int sizeInBytes) {
-      return new ValueRange(offset, sizeInBytes);
-    }
 
     @Override
     public String toString() {
       return "Range{" + "_offset=" + _offset + ", _size=" + _sizeInBytes + '}';
-    }
-  }
-
-  /**
-   * An interface that enables the caller to get byte ranges accessed while reading a given docId.
-   * This can be used to eventually allow prefetching of exact byte ranges during query processing,
-   * if the docIds to be fetched are known beforehand.
-   *
-   * This interface will be implemented by all the forward index readers.
-   */
-  interface ValueRangeProvider<T extends ForwardIndexReaderContext> {
-    /**
-     * Returns a list of {@link ValueRange} that represents all the distinct
-     * buffer byte ranges (absolute offset, sizeInBytes) that are accessed when reading the given (@param docId}
-     * @param docId to find the range for
-     * @param context Reader context
-     * @param ranges List of {@link ValueRange} to which the applicable value ranges will be added
-     */
-    void recordDocIdByteRanges(int docId, T context, List<ValueRange> ranges);
-
-    /**
-     * Returns whether the forward index is of fixed length type, and therefore the docId -> byte range mapping is fixed
-     * @return true if SV + fixed length + uncompressed, false otherwise
-     */
-    boolean isFixedLengthType();
-
-    /**
-     * Returns the base offset of raw data start within the fwd index buffer, if it's of fixed length type
-     * @return base offset if fixed length type
-     */
-    long getBaseOffset();
-
-    /**
-     * Returns the length of each entry in the forward index, if it's of fixed length type
-     */
-    int getDocLength();
-
-    /**
-     * Returns whether the length of each entry in the forward index is in bits, if it's of fixed length type
-     */
-    default boolean isDocLengthInBits() {
-      return false;
     }
   }
 }
