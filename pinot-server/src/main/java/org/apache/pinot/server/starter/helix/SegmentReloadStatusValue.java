@@ -19,13 +19,23 @@
 
 package org.apache.pinot.server.starter.helix;
 
+import java.util.Collections;
+import java.util.List;
+
+
 public class SegmentReloadStatusValue {
   private final long _totalSegmentCount;
   private final long _successCount;
+  private final List<String> _pendingSegments;
 
   public SegmentReloadStatusValue(long totalSegmentCount, long successCount) {
+    this(totalSegmentCount, successCount, Collections.emptyList());
+  }
+
+  public SegmentReloadStatusValue(long totalSegmentCount, long successCount, List<String> pendingSegments) {
     _totalSegmentCount = totalSegmentCount;
     _successCount = successCount;
+    _pendingSegments = pendingSegments;
   }
 
   public long getTotalSegmentCount() {
@@ -34,5 +44,9 @@ public class SegmentReloadStatusValue {
 
   public long getSuccessCount() {
     return _successCount;
+  }
+
+  public List<String> getPendingSegments() {
+    return _pendingSegments;
   }
 }

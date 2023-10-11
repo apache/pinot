@@ -690,7 +690,6 @@ public class PinotSegmentRestletResource {
 
     ServerReloadControllerJobStatusResponse serverReloadControllerJobStatusResponse =
         new ServerReloadControllerJobStatusResponse();
-    serverReloadControllerJobStatusResponse.setSuccessCount(0);
 
     int totalSegments = 0;
     for (Map.Entry<String, List<String>> entry: serverToSegments.entrySet()) {
@@ -700,19 +699,24 @@ public class PinotSegmentRestletResource {
     serverReloadControllerJobStatusResponse.setTotalServersQueried(serverUrls.size());
     serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(serviceResponse._failedResponseCount);
 
+    // Merge all server responses.
+    List<String> pendingSegments = new ArrayList<>();
+    int successCount = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       try {
         ServerReloadControllerJobStatusResponse response =
             JsonUtils.stringToObject(responseString, ServerReloadControllerJobStatusResponse.class);
-        serverReloadControllerJobStatusResponse.setSuccessCount(
-            serverReloadControllerJobStatusResponse.getSuccessCount() + response.getSuccessCount());
+        successCount += response.getSuccessCount();
+        pendingSegments.addAll(response.getPendingSegments());
       } catch (Exception e) {
         serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(
             serverReloadControllerJobStatusResponse.getTotalServerCallsFailed() + 1
         );
       }
     }
+    serverReloadControllerJobStatusResponse.setSuccessCount(successCount);
+    serverReloadControllerJobStatusResponse.setPendingSegments(pendingSegments);
 
     // Add ZK fields
     serverReloadControllerJobStatusResponse.setMetadata(controllerJobZKMetadata);

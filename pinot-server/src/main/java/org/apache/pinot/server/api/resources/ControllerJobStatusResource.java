@@ -20,6 +20,8 @@ package org.apache.pinot.server.api.resources;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -56,15 +58,18 @@ public class ControllerJobStatusResource {
     if (segmentName == null) {
       // All segments
       List<SegmentDataManager> allSegments = tableDataManager.acquireAllSegments();
+      List<String> pendingSegmentNames = new ArrayList<>();
       try {
         long successCount = 0;
         for (SegmentDataManager segmentDataManager : allSegments) {
           if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
             successCount++;
+          } else {
+            pendingSegmentNames.add(segmentDataManager.getSegmentName());
           }
         }
         SegmentReloadStatusValue segmentReloadStatusValue =
-            new SegmentReloadStatusValue(allSegments.size(), successCount);
+            new SegmentReloadStatusValue(allSegments.size(), successCount, pendingSegmentNames);
         return JsonUtils.objectToString(segmentReloadStatusValue);
       } finally {
         for (SegmentDataManager segmentDataManager : allSegments) {
@@ -77,12 +82,13 @@ public class ControllerJobStatusResource {
         return JsonUtils.objectToString(new SegmentReloadStatusValue(0, 0));
       }
       try {
-        int successCount = 0;
+        SegmentReloadStatusValue segmentReloadStatusValue;
         if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
-          successCount = 1;
+          segmentReloadStatusValue = new SegmentReloadStatusValue(1, 1);
+        } else {
+          segmentReloadStatusValue =
+              new SegmentReloadStatusValue(1, 0, Collections.singletonList(segmentDataManager.getSegmentName()));
         }
-        SegmentReloadStatusValue segmentReloadStatusValue =
-            new SegmentReloadStatusValue(1, successCount);
         return JsonUtils.objectToString(segmentReloadStatusValue);
       } finally {
         tableDataManager.releaseSegment(segmentDataManager);

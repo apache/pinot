@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import java.util.List;
 import java.util.Map;
 
 public class ServerReloadControllerJobStatusResponse {
@@ -25,6 +26,7 @@ public class ServerReloadControllerJobStatusResponse {
   private double _estimatedTimeRemainingInMinutes;
   private int _totalSegmentCount;
   private int _successCount;
+  private List<String> _pendingSegments;
   private int _totalServersQueried;
   private int _totalServerCallsFailed;
   private Map<String, String> _metadata;
@@ -43,6 +45,14 @@ public class ServerReloadControllerJobStatusResponse {
 
   public void setSuccessCount(int successCount) {
     _successCount = successCount;
+  }
+
+  public List<String> getPendingSegments() {
+    return _pendingSegments;
+  }
+
+  public void setPendingSegments(List<String> pendingSegments) {
+    _pendingSegments = pendingSegments;
   }
 
   public double getEstimatedTimeRemainingInMinutes() {
