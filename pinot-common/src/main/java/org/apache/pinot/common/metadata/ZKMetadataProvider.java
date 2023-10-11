@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -73,10 +74,31 @@ public class ZKMetadataProvider {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
   }
 
+  @Deprecated
   public static void setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
       ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForResourceConfig(tableNameWithType), znRecord,
         AccessOption.PERSISTENT);
+  }
+
+  /**
+   * Update table config with an expected version. This is to avoid race condition for table config update issued by
+   * multiple clients, especially when update configs in a programmatic way.
+   * The typical usage is to read table config, apply some changes, then update it.
+   *
+   * @return true if update is successful.
+   */
+  public static boolean setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
+      TableConfig tableConfig, int expectVersion) {
+    ZNRecord tableConfigZNRecord;
+    try {
+      tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
+      return false;
+    }
+    return propertyStore.set(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigZNRecord,
+        expectVersion, AccessOption.PERSISTENT);
   }
 
   @Deprecated
@@ -315,6 +337,22 @@ public class ZKMetadataProvider {
   public static TableConfig getTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
     return toTableConfig(propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), null,
         AccessOption.PERSISTENT));
+  }
+
+  /**
+   * @return a pair of table config and current version from znRecord, null if table config does not exist.
+   */
+  @Nullable
+  public static ImmutablePair<TableConfig, Integer> getTableConfigWithVersion(
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+    Stat tableConfigStat = new Stat();
+    TableConfig tableConfig = toTableConfig(
+        propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigStat,
+            AccessOption.PERSISTENT));
+    if (tableConfig == null) {
+      return null;
+    }
+    return ImmutablePair.of(tableConfig, tableConfigStat.getVersion());
   }
 
   @Nullable

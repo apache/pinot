@@ -107,9 +107,9 @@ public class SchemaCleanupTaskStatelessTest extends ControllerTest {
     addTableConfig(createDummyTableConfig("t2", "t2"));
     addTableConfig(createDummyTableConfig("t3", "t3"));
 
-    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t1", "t2"));
-    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t2", "t3"));
-    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t3", "t1"));
+    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t1", "t2"), -1);
+    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t2", "t3"), -1);
+    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t3", "t1"), -1);
 
     // 3. Fix table schema
     _controllerStarter.fixSchemaNameInTableConfig();
@@ -164,9 +164,9 @@ public class SchemaCleanupTaskStatelessTest extends ControllerTest {
     addSchema(createDummySchema("t11"));
     addSchema(createDummySchema("t21"));
     addSchema(createDummySchema("t31"));
-    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t1", "t11"));
-    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t2", "t21"));
-    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t3", "t31"));
+    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t1", "t11"), -1);
+    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t2", "t21"), -1);
+    _helixResourceManager.setExistingTableConfig(createDummyTableConfig("t3", "t31"), -1);
 
     assertEquals(getHelixResourceManager().getAllTables().size(), 3);
     assertEquals(getHelixResourceManager().getSchemaNames().size(), 6);
