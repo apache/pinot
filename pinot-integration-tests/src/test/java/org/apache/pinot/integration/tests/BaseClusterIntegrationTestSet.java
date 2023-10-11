@@ -658,6 +658,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     assertEquals(jobStatus.get("metadata").get("jobId").asText(), jobId);
     assertEquals(jobStatus.get("metadata").get("jobType").asText(), "RELOAD_SEGMENT");
     assertEquals(jobStatus.get("metadata").get("tableName").asText(), tableNameWithType);
+    assertEquals(jobStatus.get("totalSegmentCount").asInt() - jobStatus.get("successCount").asInt(),
+        jobStatus.get("pendingSegments").size());
     return jobId;
   }
 
