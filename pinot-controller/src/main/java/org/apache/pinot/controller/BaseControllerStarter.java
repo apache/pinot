@@ -627,8 +627,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       }
       // Update table config to remove schema name
       tableConfig.getValidationConfig().setSchemaName(null);
-      if (ZKMetadataProvider.setTableConfig(propertyStore, tableNameWithType, tableConfig,
-          tableConfigWithVersion.getRight())) {
+      if (ZKMetadataProvider.setTableConfig(propertyStore, tableConfig, tableConfigWithVersion.getRight())) {
         LOGGER.info("Removed schema name from table config for table: {}", tableNameWithType);
         fixedSchemaTableCount.getAndIncrement();
       } else {

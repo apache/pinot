@@ -1560,33 +1560,27 @@ public class PinotHelixResourceManager {
     if (ZKMetadataProvider.getSchema(_propertyStore, TableNameBuilder.extractRawTableName(tableNameWithType)) == null) {
       throw new InvalidTableConfigException("No schema defined for table: " + tableNameWithType);
     }
-    if (tableType == TableType.OFFLINE) {
-      try {
-        // Add table config
-        ZKMetadataProvider.setTableConfig(_propertyStore, tableNameWithType, tableConfig, -1);
-        // Assign instances
-        assignInstances(tableConfig, true);
+    Preconditions.checkState(tableType == TableType.OFFLINE || tableType == TableType.REALTIME,
+        "Invalid table type: %s", tableType);
+
+    // Add table config
+    if (!ZKMetadataProvider.createTableConfig(_propertyStore, tableConfig)) {
+      throw new RuntimeException("Failed to create table config for table: " + tableNameWithType);
+    }
+    try {
+      // Assign instances
+      assignInstances(tableConfig, true);
+      if (tableType == TableType.OFFLINE) {
         // Add ideal state
         _helixAdmin.addResource(_helixClusterName, tableNameWithType, idealState);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception during offline table setup. Cleaning up table {}", tableNameWithType, e);
-        deleteOfflineTable(tableNameWithType);
-        throw e;
-      }
-    } else {
-      Preconditions.checkState(tableType == TableType.REALTIME, "Invalid table type: %s", tableType);
-      try {
-        // Add table config
-        ZKMetadataProvider.setTableConfig(_propertyStore, tableNameWithType, tableConfig, -1);
-        // Assign instances
-        assignInstances(tableConfig, true);
+      } else {
         // Add ideal state with the first CONSUMING segment
         _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception during realtime table setup. Cleaning up table {}", tableNameWithType, e);
-        deleteRealtimeTable(tableNameWithType);
-        throw e;
       }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception during offline table setup. Cleaning up table {}", tableNameWithType, e);
+      deleteTable(tableNameWithType, tableType, null);
+      throw e;
     }
 
     LOGGER.info("Updating BrokerResource for table: {}", tableNameWithType);
@@ -1788,6 +1782,14 @@ public class PinotHelixResourceManager {
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     validateTableTenantConfig(tableConfig);
+    setExistingTableConfig(tableConfig);
+  }
+
+  /**
+   * Sets the given table config into zookeeper
+   */
+  public void setExistingTableConfig(TableConfig tableConfig)
+      throws IOException {
     setExistingTableConfig(tableConfig, -1);
   }
 
@@ -1798,7 +1800,10 @@ public class PinotHelixResourceManager {
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion)
       throws IOException {
     String tableNameWithType = tableConfig.getTableName();
-    ZKMetadataProvider.setTableConfig(_propertyStore, tableNameWithType, tableConfig, expectedVersion);
+    if (!ZKMetadataProvider.setTableConfig(_propertyStore, tableConfig, expectedVersion)) {
+      throw new RuntimeException("Failed to update table config in Zookeeper for table: " + tableNameWithType + " with"
+          + " expected version: " + expectedVersion);
+    }
 
     // Update IdealState replication
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);

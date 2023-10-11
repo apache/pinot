@@ -82,14 +82,42 @@ public class ZKMetadataProvider {
   }
 
   /**
+   * Create table config, fail if existed.
+   *
+   * @return true if creation is successful.
+   */
+  public static boolean createTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
+    String tableConfigPath = constructPropertyStorePathForResourceConfig(tableNameWithType);
+    ZNRecord tableConfigZNRecord;
+    try {
+      tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
+      return false;
+    }
+    return propertyStore.create(tableConfigPath, tableConfigZNRecord, AccessOption.PERSISTENT);
+  }
+
+  /**
+   * Full override table config.
+   *
+   * @return true if update is successful.
+   */
+  public static boolean setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig) {
+    return setTableConfig(propertyStore, tableConfig, -1);
+  }
+
+  /**
    * Update table config with an expected version. This is to avoid race condition for table config update issued by
    * multiple clients, especially when update configs in a programmatic way.
    * The typical usage is to read table config, apply some changes, then update it.
    *
    * @return true if update is successful.
    */
-  public static boolean setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
-      TableConfig tableConfig, int expectVersion) {
+  public static boolean setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig,
+      int expectedVersion) {
+    String tableNameWithType = tableConfig.getTableName();
     ZNRecord tableConfigZNRecord;
     try {
       tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
@@ -98,7 +126,7 @@ public class ZKMetadataProvider {
       return false;
     }
     return propertyStore.set(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigZNRecord,
-        expectVersion, AccessOption.PERSISTENT);
+        expectedVersion, AccessOption.PERSISTENT);
   }
 
   @Deprecated
