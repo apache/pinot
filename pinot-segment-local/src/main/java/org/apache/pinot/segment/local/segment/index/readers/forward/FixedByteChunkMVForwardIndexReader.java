@@ -177,7 +177,8 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     ranges.add(new ByteRange(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE, Integer.BYTES));
     long valueStartOffset =
         chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
-    long valueEndOffset = getValueEndOffsetAndRecordRanges(chunkId, chunkRowId, chunkStartOffset, ranges);
+    long valueEndOffset =
+        getValueEndOffsetAndRecordRanges(chunkId, chunkRowId, ROW_OFFSET_SIZE, chunkStartOffset, ranges);
 
     ranges.add(new ByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
   }
@@ -211,35 +212,6 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
         return chunkBuffer.limit();
       } else {
         return valueEndOffset;
-      }
-    }
-  }
-
-  private long getValueEndOffsetAndRecordRanges(int chunkId, int chunkRowId, long chunkStartOffset,
-      List<ByteRange> ranges) {
-    if (chunkId == _numChunks - 1) {
-      // Last chunk
-      if (chunkRowId == _numDocsPerChunk - 1) {
-        // Last row in the last chunk
-        return _dataBuffer.size();
-      } else {
-        ranges.add(new ByteRange(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE, Integer.BYTES));
-        int valueEndOffsetInChunk = _dataBuffer.getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
-        if (valueEndOffsetInChunk == 0) {
-          // Last row in the last chunk (chunk is incomplete, which stores 0 as the offset for the absent rows)
-          return _dataBuffer.size();
-        } else {
-          return chunkStartOffset + valueEndOffsetInChunk;
-        }
-      }
-    } else {
-      if (chunkRowId == _numDocsPerChunk - 1) {
-        // Last row in the chunk
-        return getChunkPositionAndRecordRanges(chunkId + 1, ranges);
-      } else {
-        ranges.add(new ByteRange(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE, Integer.BYTES));
-        return chunkStartOffset + _dataBuffer
-            .getInt(chunkStartOffset + (long) (chunkRowId + 1) * ROW_OFFSET_SIZE);
       }
     }
   }

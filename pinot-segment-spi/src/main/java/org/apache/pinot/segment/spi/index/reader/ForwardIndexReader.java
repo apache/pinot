@@ -36,6 +36,7 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
  * @param <T> Type of the ReaderContext
  */
 public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends IndexReader {
+
   /**
    * Returns {@code true} if the forward index is dictionary-encoded, {@code false} if it is raw.
    */

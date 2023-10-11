@@ -226,7 +226,7 @@ public final class PinotDataBitSet implements Closeable {
     int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
     int firstByte = (_dataBuffer.getByte(byteOffset) << bitOffsetInFirstByte) & BYTE_MASK;
     if (firstByte != 0) {
-      ranges.add(ForwardIndexReader.ByteRange.newByteRange(startOffset, size));
+      ranges.add(new ForwardIndexReader.ByteRange(startOffset, size));
       return bitOffset + FIRST_BIT_SET[firstByte];
     }
     while (true) {
@@ -234,7 +234,7 @@ public final class PinotDataBitSet implements Closeable {
       size += Byte.SIZE;
       int currentByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
       if (currentByte != 0) {
-        ranges.add(ForwardIndexReader.ByteRange.newByteRange(startOffset, size));
+        ranges.add(new ForwardIndexReader.ByteRange(startOffset, size));
         return (byteOffset * Byte.SIZE) | FIRST_BIT_SET[currentByte];
       }
     }
@@ -262,11 +262,11 @@ public final class PinotDataBitSet implements Closeable {
     int size = Byte.SIZE;
     int byteOffset = bitOffset / Byte.SIZE;
     int bitOffsetInFirstByte = bitOffset % Byte.SIZE;
-    ranges.add(ForwardIndexReader.ByteRange.newByteRange(baseOffset + byteOffset, Byte.BYTES));
+    ranges.add(new ForwardIndexReader.ByteRange(baseOffset + byteOffset, Byte.BYTES));
     int firstByte = (_dataBuffer.getByte(byteOffset) << bitOffsetInFirstByte) & BYTE_MASK;
     int numBitsSet = NUM_BITS_SET[firstByte];
     if (numBitsSet >= n) {
-      ranges.add(ForwardIndexReader.ByteRange.newByteRange(startOffset, size));
+      ranges.add(new ForwardIndexReader.ByteRange(startOffset, size));
       return bitOffset + NTH_BIT_SET[n - 1][firstByte];
     }
     while (true) {
@@ -276,7 +276,7 @@ public final class PinotDataBitSet implements Closeable {
       int currentByte = _dataBuffer.getByte(byteOffset) & BYTE_MASK;
       numBitsSet = NUM_BITS_SET[currentByte];
       if (numBitsSet >= n) {
-        ranges.add(ForwardIndexReader.ByteRange.newByteRange(startOffset, size));
+        ranges.add(new ForwardIndexReader.ByteRange(startOffset, size));
         return (byteOffset * Byte.SIZE) | NTH_BIT_SET[n - 1][currentByte];
       }
     }

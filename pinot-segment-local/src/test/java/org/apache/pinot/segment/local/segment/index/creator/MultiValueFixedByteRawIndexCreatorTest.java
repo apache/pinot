@@ -173,7 +173,9 @@ public class MultiValueFixedByteRawIndexCreatorTest {
       Assert.assertEquals(inputs.get(i), extractor.extract(reader, context, i, valueBuffer));
     }
 
-    // Value range provider test
+    // Value byte range test
+    Assert.assertTrue(reader.isByteRangeRecordingSupported());
+    Assert.assertFalse(reader.isFixedOffsetMappingType());
     final ForwardIndexReaderContext valueRangeContext = reader.createContext();
     List<ForwardIndexReader.ByteRange> ranges = new ArrayList<>();
     for (int i = 0; i < numDocs; i++) {

@@ -90,10 +90,11 @@ public class FixedBitMVForwardIndexTest {
         }
       }
 
-      // Value range test
+      // Byte range test
       try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
           FixedBitMVForwardIndexReader reader = new FixedBitMVForwardIndexReader(dataBuffer, NUM_DOCS, totalNumValues,
               numBitsPerValue); FixedBitMVForwardIndexReader.Context readerContext = reader.createContext()) {
+        Assert.assertTrue(reader.isByteRangeRecordingSupported());
         Assert.assertFalse(reader.isFixedOffsetMappingType());
         List<ForwardIndexReader.ByteRange> rangeList = new ArrayList<>();
         for (int i = 0; i < NUM_DOCS; i++) {

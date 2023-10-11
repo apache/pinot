@@ -76,7 +76,7 @@ public class FixedBitSVForwardIndexReaderTest {
         }
       }
 
-      // Value range test
+      // Byte range test
       try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
           FixedBitSVForwardIndexReader reader = new FixedBitSVForwardIndexReader(dataBuffer, NUM_DOCS,
               numBitsPerValue)) {

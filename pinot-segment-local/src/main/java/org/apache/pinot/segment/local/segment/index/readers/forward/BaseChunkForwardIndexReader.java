@@ -146,7 +146,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     ranges.add(new ByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
   }
 
-  private long getValueEndOffsetAndRecordRanges(int chunkId, int chunkRowId, int rowOffsetSize, long chunkStartOffset,
+  protected long getValueEndOffsetAndRecordRanges(int chunkId, int chunkRowId, int rowOffsetSize, long chunkStartOffset,
       List<ByteRange> ranges) {
     if (chunkId == _numChunks - 1) {
       // Last chunk
