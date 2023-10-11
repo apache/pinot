@@ -132,7 +132,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     return docId / _numDocsPerChunk;
   }
 
-  protected void recordDocIdRanges(int docId, int rowOffsetSize, List<ByteRange> ranges) {
+  protected void recordDocIdRangesUncompressed(int docId, int rowOffsetSize, List<ByteRange> ranges) {
     int chunkId = getChunkId(docId);
     int chunkRowId = docId % _numDocsPerChunk;
 

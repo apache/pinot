@@ -351,6 +351,7 @@ public class VarByteChunkForwardIndexReaderV4
 
     protected abstract byte[] processChunkAndReadFirstValue(int docId, long offset, long limit)
         throws IOException;
+
     protected abstract byte[] readSmallUncompressedValue(int docId);
 
     private byte[] decompressAndRead(int docId)
@@ -396,7 +397,6 @@ public class VarByteChunkForwardIndexReaderV4
   private static final class UncompressedReaderContext extends ReaderContext {
 
     private ByteBuffer _chunk;
-
     private List<ByteRange> _ranges;
 
     UncompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset) {

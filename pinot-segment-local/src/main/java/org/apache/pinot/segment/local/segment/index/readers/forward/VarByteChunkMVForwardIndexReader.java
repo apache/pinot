@@ -254,7 +254,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     if (_isCompressed) {
       recordDocIdRanges(docId, context, ranges);
     } else {
-      recordDocIdRanges(docId, ROW_OFFSET_SIZE, ranges);
+      recordDocIdRangesUncompressed(docId, ROW_OFFSET_SIZE, ranges);
     }
   }
 

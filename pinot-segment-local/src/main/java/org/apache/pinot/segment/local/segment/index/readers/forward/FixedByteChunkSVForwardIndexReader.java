@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
@@ -104,10 +103,6 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkForwardIn
     if (!_isCompressed) {
       // If uncompressed, should use fixed offset
       throw new UnsupportedOperationException("Forward index is fixed length type");
-    }
-
-    if (ranges == null) {
-      ranges = new ArrayList<>();
     }
     recordDocIdRanges(docId, context, ranges);
   }

@@ -149,13 +149,6 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     }
   }
 
-  /**
-   * Helper method to read BYTES value from the compressed index.
-   */
-  private void sliceBytesCompressedAndRecordRanges(int docId, ChunkReaderContext context, List<ByteRange> ranges) {
-    recordDocIdRanges(docId, context, ranges);
-  }
-
   private ByteBuffer sliceBytesCompressed(int docId, ChunkReaderContext context) {
     int chunkRowId = docId % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkBuffer(docId, context);
@@ -165,22 +158,6 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     int valueEndOffset = getValueEndOffset(chunkRowId, chunkBuffer);
     // cast only for JDK8 compilation profile
     return (ByteBuffer) chunkBuffer.duplicate().position(valueStartOffset).limit(valueEndOffset);
-  }
-
-  private void sliceBytesUncompressedAndRecordRanges(int docId, List<ByteRange> ranges) {
-    int chunkId = docId / _numDocsPerChunk;
-    int chunkRowId = docId % _numDocsPerChunk;
-
-    // These offsets are offset in the data buffer
-    long chunkStartOffset = getChunkPositionAndRecordRanges(chunkId, ranges);
-
-    ranges.add(new ByteRange(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE, Integer.BYTES));
-    long valueStartOffset =
-        chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
-    long valueEndOffset =
-        getValueEndOffsetAndRecordRanges(chunkId, chunkRowId, ROW_OFFSET_SIZE, chunkStartOffset, ranges);
-
-    ranges.add(new ByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
   }
 
   /**
@@ -252,9 +229,9 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
   @Override
   public void recordDocIdByteRanges(int docId, ChunkReaderContext context, List<ByteRange> ranges) {
     if (_isCompressed) {
-      sliceBytesCompressedAndRecordRanges(docId, context, ranges);
+      recordDocIdRanges(docId, context, ranges);
     } else {
-      sliceBytesUncompressedAndRecordRanges(docId, ranges);
+      recordDocIdRangesUncompressed(docId, ROW_OFFSET_SIZE, ranges);
     }
   }
 
