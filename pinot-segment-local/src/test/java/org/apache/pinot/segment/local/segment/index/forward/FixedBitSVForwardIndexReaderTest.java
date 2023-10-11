@@ -80,7 +80,7 @@ public class FixedBitSVForwardIndexReaderTest {
       try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
           FixedBitSVForwardIndexReader reader = new FixedBitSVForwardIndexReader(dataBuffer, NUM_DOCS,
               numBitsPerValue)) {
-        Assert.assertTrue(reader.isByteRangeRecordingSupported());
+        Assert.assertTrue(reader.isBufferByteRangeInfoSupported());
         Assert.assertTrue(reader.isFixedOffsetMappingType());
         Assert.assertEquals(reader.getRawDataStartOffset(), 0);
         Assert.assertEquals(reader.getDocLength(), numBitsPerValue);

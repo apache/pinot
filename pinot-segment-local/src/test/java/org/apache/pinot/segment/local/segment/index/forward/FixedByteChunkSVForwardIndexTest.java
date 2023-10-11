@@ -104,8 +104,8 @@ public class FixedByteChunkSVForwardIndexTest {
       }
 
 
-      Assert.assertTrue(fourByteOffsetReader.isByteRangeRecordingSupported());
-      Assert.assertTrue(eightByteOffsetReader.isByteRangeRecordingSupported());
+      Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
+      Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
       // Validate byte range provider behaviour
       if (compressionType == ChunkCompressionType.PASS_THROUGH) {
         // For pass through compression, the buffer is fixed offset mapping type
@@ -170,8 +170,8 @@ public class FixedByteChunkSVForwardIndexTest {
       }
 
       // Validate byte range provider behaviour
-      Assert.assertTrue(fourByteOffsetReader.isByteRangeRecordingSupported());
-      Assert.assertTrue(eightByteOffsetReader.isByteRangeRecordingSupported());
+      Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
+      Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
       if (compressionType == ChunkCompressionType.PASS_THROUGH) {
         // For pass through compression, the buffer is fixed offset mapping type
         Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
@@ -235,8 +235,8 @@ public class FixedByteChunkSVForwardIndexTest {
       }
 
       // Validate byte range provider behaviour
-      Assert.assertTrue(fourByteOffsetReader.isByteRangeRecordingSupported());
-      Assert.assertTrue(eightByteOffsetReader.isByteRangeRecordingSupported());
+      Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
+      Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
       if (compressionType == ChunkCompressionType.PASS_THROUGH) {
         // For pass through compression, the buffer is fixed offset mapping type
         Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
@@ -300,8 +300,8 @@ public class FixedByteChunkSVForwardIndexTest {
       }
 
       // Validate byte range provider behaviour
-      Assert.assertTrue(fourByteOffsetReader.isByteRangeRecordingSupported());
-      Assert.assertTrue(eightByteOffsetReader.isByteRangeRecordingSupported());
+      Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
+      Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
       if (compressionType == ChunkCompressionType.PASS_THROUGH) {
         // For pass through compression, the buffer is fixed offset mapping type
         Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
@@ -316,8 +316,8 @@ public class FixedByteChunkSVForwardIndexTest {
         Assert.assertFalse(eightByteOffsetReader.isFixedOffsetMappingType());
       }
 
-      Assert.assertTrue(fourByteOffsetReader.isByteRangeRecordingSupported());
-      Assert.assertTrue(eightByteOffsetReader.isByteRangeRecordingSupported());
+      Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
+      Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
       if (compressionType == ChunkCompressionType.PASS_THROUGH) {
         // For pass through compression, the buffer is fixed offset mapping type
         Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());

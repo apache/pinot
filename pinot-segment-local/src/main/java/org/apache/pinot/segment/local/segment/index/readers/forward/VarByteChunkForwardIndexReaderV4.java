@@ -269,7 +269,7 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
-  public boolean isByteRangeRecordingSupported() {
+  public boolean isBufferByteRangeInfoSupported() {
     return true;
   }
 

@@ -100,7 +100,7 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
   }
 
   @Override
-  public boolean isByteRangeRecordingSupported() {
+  public boolean isBufferByteRangeInfoSupported() {
     return true;
   }
 

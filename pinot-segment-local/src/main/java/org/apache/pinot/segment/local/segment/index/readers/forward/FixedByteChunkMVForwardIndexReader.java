@@ -149,6 +149,9 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     }
   }
 
+  /**
+   * Helper method to read BYTES value from the compressed index.
+   */
   private ByteBuffer sliceBytesCompressed(int docId, ChunkReaderContext context) {
     int chunkRowId = docId % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkBuffer(docId, context);
@@ -222,7 +225,7 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
   }
 
   @Override
-  public boolean isByteRangeRecordingSupported() {
+  public boolean isBufferByteRangeInfoSupported() {
     return true;
   }
 

@@ -72,7 +72,7 @@ public final class FixedBitSVForwardIndexReader implements ForwardIndexReader<Fo
   }
 
   @Override
-  public boolean isByteRangeRecordingSupported() {
+  public boolean isBufferByteRangeInfoSupported() {
     return true;
   }
 

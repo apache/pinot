@@ -174,7 +174,7 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     }
 
     // Value byte range test
-    Assert.assertTrue(reader.isByteRangeRecordingSupported());
+    Assert.assertTrue(reader.isBufferByteRangeInfoSupported());
     Assert.assertFalse(reader.isFixedOffsetMappingType());
     final ForwardIndexReaderContext valueRangeContext = reader.createContext();
     List<ForwardIndexReader.ByteRange> ranges = new ArrayList<>();

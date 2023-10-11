@@ -222,7 +222,7 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
-  public boolean isByteRangeRecordingSupported() {
+  public boolean isBufferByteRangeInfoSupported() {
     return true;
   }
 

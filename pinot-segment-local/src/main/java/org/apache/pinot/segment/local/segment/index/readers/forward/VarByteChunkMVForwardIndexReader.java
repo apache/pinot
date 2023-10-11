@@ -245,7 +245,7 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
   }
 
   @Override
-  public boolean isByteRangeRecordingSupported() {
+  public boolean isBufferByteRangeInfoSupported() {
     return true;
   }
 

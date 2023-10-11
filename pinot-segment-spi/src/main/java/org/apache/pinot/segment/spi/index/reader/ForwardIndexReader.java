@@ -926,7 +926,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   /**
    * Returns whether the forward index supports recording the byte ranges accessed while reading a given docId
    */
-  default boolean isByteRangeRecordingSupported() {
+  default boolean isBufferByteRangeInfoSupported() {
     return false;
   }
 
