@@ -3085,13 +3085,12 @@ public class PinotHelixResourceManager {
    * @throws TableNotFoundException
    */
   public RebalanceResult rebalanceTable(String tableNameWithType, RebalanceConfig rebalanceConfig,
-      boolean trackRebalanceProgress)
+      String rebalanceJobId, boolean trackRebalanceProgress)
       throws TableNotFoundException {
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
-    String rebalanceJobId = rebalanceConfig.getJobId();
     Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig");
     if (rebalanceConfig.isUpdateTargetTier()) {
       updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
@@ -3102,7 +3101,7 @@ public class PinotHelixResourceManager {
     }
     TableRebalancer tableRebalancer =
         new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics);
-    return tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId);
   }
 
   /**

@@ -54,9 +54,10 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     tables.forEach(table -> {
       try {
         RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
-        rebalanceConfig.setJobId(createUniqueRebalanceJobIdentifier());
         rebalanceConfig.setDryRun(true);
-        rebalanceResult.put(table, _pinotHelixResourceManager.rebalanceTable(table, rebalanceConfig, false));
+        rebalanceResult.put(table,
+            _pinotHelixResourceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(),
+                false));
       } catch (TableNotFoundException exception) {
         rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
             null, null, null));
@@ -132,8 +133,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
             }
             RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
             rebalanceConfig.setDryRun(false);
-            rebalanceConfig.setJobId(rebalanceResult.get(table).getJobId());
-            rebalanceTable(table, rebalanceConfig, observer);
+            rebalanceTable(table, rebalanceConfig, rebalanceResult.get(table).getJobId(), observer);
           }
           // Last parallel thread to finish the table rebalance job will pick up the
           // sequential table rebalance execution
@@ -145,8 +145,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
               if (table == null) {
                 break;
               }
-              rebalanceConfig.setJobId(rebalanceResult.get(table).getJobId());
-              rebalanceTable(table, rebalanceConfig, observer);
+              rebalanceTable(table, rebalanceConfig, rebalanceResult.get(table).getJobId(), observer);
             }
             observer.onSuccess(String.format("Successfully rebalanced tenant %s.", config.getTenantName()));
           }
@@ -194,11 +193,11 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     return tables;
   }
 
-  private void rebalanceTable(String tableName, RebalanceConfig config,
+  private void rebalanceTable(String tableName, RebalanceConfig config, String rebalanceJobId,
       TenantRebalanceObserver observer) {
     try {
-      observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, config.getJobId());
-      RebalanceResult result = _pinotHelixResourceManager.rebalanceTable(tableName, config, true);
+      observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
+      RebalanceResult result = _pinotHelixResourceManager.rebalanceTable(tableName, config, rebalanceJobId, true);
       if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
         observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
       } else {

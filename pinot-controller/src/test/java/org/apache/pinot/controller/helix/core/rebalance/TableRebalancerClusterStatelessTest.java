@@ -97,7 +97,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
     // Rebalance should fail without creating the table
-    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
 
     // Create the table
@@ -114,7 +114,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getMapFields();
 
     // Rebalance should return NO_OP status
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
 
     // All servers should be assigned to the table
@@ -139,7 +139,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Rebalance in dry-run mode
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(true);
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
 
     // All servers should be assigned to the table
@@ -169,7 +169,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Rebalance with 3 min available replicas should fail as the table only have 3 replicas
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setMinAvailableReplicas(3);
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
 
     // IdealState should not change for FAILED rebalance
@@ -179,7 +179,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Rebalance with 2 min available replicas should succeed
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setMinAvailableReplicas(2);
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
 
     // Result should be the same as the result in dry-run mode
@@ -199,7 +199,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // No need to reassign instances because instances should be automatically assigned when updating the table config
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
 
     // There should be 3 replica-groups, each with 2 servers
@@ -246,7 +246,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     // Without instances reassignment, the rebalance should return status NO_OP, and the existing instance partitions
     // should be used
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     assertEquals(rebalanceResult.getInstanceAssignment(), instanceAssignment);
     assertEquals(rebalanceResult.getSegmentAssignment(), newSegmentAssignment);
@@ -255,7 +255,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // removed, and the default instance partitions should be used
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setReassignInstances(true);
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     assertNull(InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
         InstancePartitionsType.OFFLINE.getInstancePartitionsName(RAW_TABLE_NAME)));
@@ -283,7 +283,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     // Rebalance with downtime should succeed
     rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDowntime(true);
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
 
     // All servers with tag should be assigned to the table
@@ -347,7 +347,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         _helixResourceManager.getTableIdealState(OFFLINE_TIERED_TABLE_NAME).getRecord().getMapFields();
 
     TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
-    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     // Segment assignment should not change
     assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
@@ -363,7 +363,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, TIER_B_NAME, 3, 3, 0));
 
     // rebalance is NOOP and no change in assignment caused by new instances
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     // Segment assignment should not change
     assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
@@ -381,7 +381,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // rebalance should change assignment
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
 
     // check that segments have moved to tiers
@@ -438,7 +438,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         _helixResourceManager.getTableIdealState(OFFLINE_TIERED_TABLE_NAME).getRecord().getMapFields();
 
     TableRebalancer tableRebalancer = new TableRebalancer(_helixManager);
-    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     // Segment assignment should not change
     assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
@@ -450,7 +450,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
     _helixResourceManager.createServerTenant(new Tenant(TenantRole.SERVER, "replicaAssignment" + TIER_A_NAME, 6, 6, 0));
     // rebalance is NOOP and no change in assignment caused by new instances
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     // Segment assignment should not change
     assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
@@ -462,7 +462,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // rebalance should change assignment
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
 
     // check that segments have moved to tier a
@@ -484,7 +484,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig)));
     _helixResourceManager.updateTableConfig(tableConfig);
 
-    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig());
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
     assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
     assertTrue(rebalanceResult.getTierInstanceAssignment().containsKey(TIER_A_NAME));
 

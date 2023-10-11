@@ -84,9 +84,6 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _updateTargetTier = false;
 
-  @JsonProperty("jobId")
-  private String _jobId = null;
-
   public boolean isDryRun() {
     return _dryRun;
   }
@@ -167,14 +164,6 @@ public class RebalanceConfig {
     _updateTargetTier = updateTargetTier;
   }
 
-  public String getJobId() {
-    return _jobId;
-  }
-
-  public void setJobId(String jobId) {
-    _jobId = jobId;
-  }
-
   public static RebalanceConfig copy(RebalanceConfig cfg) {
     RebalanceConfig rc = new RebalanceConfig();
     rc._dryRun = cfg._dryRun;
@@ -187,7 +176,6 @@ public class RebalanceConfig {
     rc._externalViewCheckIntervalInMs = cfg._externalViewCheckIntervalInMs;
     rc._externalViewStabilizationTimeoutInMs = cfg._externalViewStabilizationTimeoutInMs;
     rc._updateTargetTier = cfg._updateTargetTier;
-    rc._jobId = cfg._jobId;
     return rc;
   }
 }
