@@ -30,6 +30,8 @@ fi
 
 cd ${DOCKER_FILE_BASE_DIR}
 
+docker image prune --all -f
+
 docker build \
     --no-cache \
     --file Dockerfile \
@@ -38,6 +40,4 @@ docker build \
     --tag ${DOCKER_IMAGE_NAME}:${PINOT_SHA} \
     .
 
-docker image ls
-docker image prune --all --filter "until=1h" -f
 docker image ls
