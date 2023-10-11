@@ -105,7 +105,7 @@ public class PeerServerSegmentFinder {
         _logger.info("Found ONLINE server {} for segment {}.", instanceId, segmentName);
         InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, instanceId);
         String hostName = instanceConfig.getHostName();
-        int port = getServerAdminPort(helixAdmin, clusterName, instanceId);
+        int port = getServerAdminPort(helixAdmin, clusterName, instanceId, downloadScheme);
         try {
           onlineServerURIs.add(new URI(StringUtil
               .join("/", downloadScheme + "://" + hostName + ":" + port, "segments", tableNameWithType, segmentName)));
@@ -116,13 +116,24 @@ public class PeerServerSegmentFinder {
     }
   }
 
-  private static int getServerAdminPort(HelixAdmin helixAdmin, String clusterName, String instanceId) {
+  private static int getServerAdminPort(HelixAdmin helixAdmin, String clusterName, String instanceId,
+                                        String downloadScheme) {
     try {
       return Integer.parseInt(HelixHelper.getInstanceConfigsMapFor(instanceId, clusterName, helixAdmin)
-          .get(CommonConstants.Helix.Instance.ADMIN_PORT_KEY));
+          .get(getServerAdminPortKey(downloadScheme)));
     } catch (Exception e) {
       _logger.warn("Failed to retrieve ADMIN PORT for instanceId {} in the cluster {} ", instanceId, clusterName, e);
       return CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+    }
+  }
+
+  private static String getServerAdminPortKey(String downloadScheme) {
+    switch (downloadScheme) {
+      case CommonConstants.HTTPS_PROTOCOL:
+        return CommonConstants.Helix.Instance.ADMIN_HTTPS_PORT_KEY;
+      case CommonConstants.HTTP_PROTOCOL:
+      default:
+        return CommonConstants.Helix.Instance.ADMIN_PORT_KEY;
     }
   }
 }

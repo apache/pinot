@@ -236,12 +236,16 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableName, query);
   }
 
+  public String forTableRebalanceStatus(String jobId) {
+    return StringUtil.join("/", _baseUrl, "rebalanceStatus", jobId);
+  }
+
   public String forTableReset(String tableNameWithType, @Nullable String targetInstance) {
     String query = targetInstance == null ? "reset" : String.format("reset?targetInstance=%s", targetInstance);
     return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, query);
   }
 
-  public String forControllerJobStatus(String jobId) {
+  public String forSegmentReloadStatus(String jobId) {
     return StringUtil.join("/", _baseUrl, "segments", "segmentReloadStatus", jobId);
   }
 
