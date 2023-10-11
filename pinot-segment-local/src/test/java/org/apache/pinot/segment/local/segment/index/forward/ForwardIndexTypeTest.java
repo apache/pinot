@@ -20,7 +20,9 @@
 package org.apache.pinot.segment.local.segment.index.forward;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -100,6 +102,30 @@ public class ForwardIndexTypeTest {
       );
 
       assertEquals(ForwardIndexConfig.DEFAULT);
+    }
+
+    @Test
+    public void oldConfNoDictionaryConfig()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setNoDictionaryConfig(
+          JsonUtils.stringToObject("{\"dimInt\": \"RAW\"}",
+              new TypeReference<Map<String, String>>() {
+              })
+      );
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"compressionCodec\": \"SNAPPY\"\n"
+          + " }"
+      );
+
+      assertEquals(
+          new ForwardIndexConfig.Builder()
+              .withCompressionType(ChunkCompressionType.SNAPPY)
+              .withDeriveNumDocsPerChunk(false)
+              .withRawIndexWriterVersion(2)
+              .build()
+      );
     }
 
     @Test
