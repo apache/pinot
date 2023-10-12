@@ -116,17 +116,15 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkForwardIn
   public long getRawDataStartOffset() {
     if (isFixedOffsetMappingType()) {
       return _rawDataStart;
-    } else {
-      throw new UnsupportedOperationException("Forward index is not fixed length type");
     }
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 
   @Override
   public int getDocLength() {
     if (isFixedOffsetMappingType()) {
       return _storedType.size();
-    } else {
-      throw new UnsupportedOperationException("Forward index is not fixed length type");
     }
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 }

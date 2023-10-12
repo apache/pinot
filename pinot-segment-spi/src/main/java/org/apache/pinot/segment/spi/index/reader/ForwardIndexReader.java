@@ -924,7 +924,12 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   // Functions for recording absolute buffer byte ranges accessed while reading a given docId
 
   /**
-   * Returns whether the forward index supports recording the byte ranges accessed while reading a given docId
+   * Returns whether the forward index supports recording the byte ranges accessed while reading a given docId.
+   * For readers that do support this info, caller should check if the buffer is a {@link isFixedOffsetMappingType()}.
+   * If yes, the byte range mapping for a docId can be calculated using the {@link getRawDataStartOffset()} and the
+   * {@link getDocLength()} functions.
+   * if not, caller should use the {@link recordDocIdByteRanges()} function to get the list of byte ranges accessed
+   * for a docId.
    */
   default boolean isBufferByteRangeInfoSupported() {
     return false;
