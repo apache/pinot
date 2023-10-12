@@ -203,12 +203,12 @@ public enum AggregationFunctionType {
   FREQUENTLONGSSKETCH("frequentLongsSketch"),
 
   // Datasketches CPC Sketch support
-  DISTINCTCOUNTCPCSKETCH("distinctCountCPCSketch", null, SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
+  DISTINCTCOUNTCPCSKETCH("distinctCountCPCSketch", ImmutableList.of("DISTINCT_COUNT_CPC_SKETCH"),
+      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
       ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTRAWCPCSKETCH("distinctCountRawCPCSketch", null, SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
+  DISTINCTCOUNTRAWCPCSKETCH("distinctCountRawCPCSketch", ImmutableList.of("DISTINCT_COUNT_RAW_CPC_SKETCH"),
+      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
       ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
