@@ -631,24 +631,24 @@ public class PinotTableRestletResource {
     rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
     rebalanceConfig.setUpdateTargetTier(updateTargetTier);
-    rebalanceConfig.setJobId(TableRebalancer.createUniqueRebalanceJobIdentifier());
+    String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
 
     try {
       if (dryRun || downtime) {
         // For dry-run or rebalance with downtime, directly return the rebalance result as it should return immediately
-        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, false);
+        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
       } else {
         // Make a dry-run first to get the target assignment
         rebalanceConfig.setDryRun(true);
         RebalanceResult dryRunResult =
-            _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, false);
+            _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
 
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
           rebalanceConfig.setDryRun(false);
           _executorService.submit(() -> {
             try {
-              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, true);
+              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, true);
             } catch (Throwable t) {
               LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
             }

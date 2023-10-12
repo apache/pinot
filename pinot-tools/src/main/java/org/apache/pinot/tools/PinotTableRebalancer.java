@@ -45,12 +45,12 @@ public class PinotTableRebalancer extends PinotZKChanger {
     _rebalanceConfig.setBestEfforts(bestEffort);
     _rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
     _rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
-    _rebalanceConfig.setJobId(TableRebalancer.createUniqueRebalanceJobIdentifier());
   }
 
   public RebalanceResult rebalance(String tableNameWithType) {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
-    return new TableRebalancer(_helixManager).rebalance(tableConfig, _rebalanceConfig);
+    return new TableRebalancer(_helixManager).rebalance(tableConfig, _rebalanceConfig,
+        TableRebalancer.createUniqueRebalanceJobIdentifier());
   }
 }

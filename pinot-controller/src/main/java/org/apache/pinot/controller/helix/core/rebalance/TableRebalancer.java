@@ -136,10 +136,10 @@ public class TableRebalancer {
     return UUID.randomUUID().toString();
   }
 
-  public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig) {
+  public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
+      @Nullable String rebalanceJobId) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
-    String rebalanceJobId = rebalanceConfig.getJobId();
     if (rebalanceJobId == null) {
       // If not passed along, create one.
       // TODO - Add rebalanceJobId to all log messages for easy tracking.
