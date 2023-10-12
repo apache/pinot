@@ -37,6 +37,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.when;
+
 
 public class BlockExchangeTest {
   private AutoCloseable _mocks;
@@ -97,6 +99,37 @@ public class BlockExchangeTest {
     Assert.assertEquals(captor.getValue().getContainer(), block.getContainer());
 
     Mockito.verify(_mailbox2, Mockito.never()).send(Mockito.any());
+  }
+
+  @Test
+  public void shouldSignalEarlyTerminationProperly()
+      throws Exception {
+    // Given:
+    List<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    BlockExchange exchange = new TestBlockExchange(destinations);
+    TransferableBlock block = new TransferableBlock(ImmutableList.of(new Object[]{"val"}),
+        new DataSchema(new String[]{"foo"}, new ColumnDataType[]{ColumnDataType.STRING}), DataBlock.Type.ROW);
+
+    // When send normal block and some mailbox has terminated
+    when(_mailbox1.isEarlyTerminated()).thenReturn(true);
+    boolean isEarlyTerminated = exchange.send(block);
+
+    // Then:
+    Assert.assertFalse(isEarlyTerminated);
+
+    // When send normal block and both terminated
+    when(_mailbox2.isTerminated()).thenReturn(true);
+    isEarlyTerminated = exchange.send(block);
+
+    // Then:
+    Assert.assertFalse(isEarlyTerminated);
+
+    // When send metadata block
+    when(_mailbox2.isEarlyTerminated()).thenReturn(true);
+    isEarlyTerminated = exchange.send(block);
+
+    // Then:
+    Assert.assertTrue(isEarlyTerminated);
   }
 
   @Test

@@ -60,7 +60,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public void send(TransferableBlock block)
       throws IOException {
-    if (isTerminated()) {
+    if (isTerminated() || (isEarlyTerminated() && !block.isEndOfStreamBlock())) {
       return;
     }
     if (LOGGER.isDebugEnabled()) {
@@ -102,8 +102,12 @@ public class GrpcSendingMailbox implements SendingMailbox {
   }
 
   @Override
+  public boolean isEarlyTerminated() {
+    return _statusObserver.isEarlyTerminated();
+  }
+
+  @Override
   public boolean isTerminated() {
-    // TODO: We cannot differentiate early termination vs stream error
     return _statusObserver.isFinished();
   }
 

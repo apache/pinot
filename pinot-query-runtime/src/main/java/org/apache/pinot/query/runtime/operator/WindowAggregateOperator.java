@@ -172,7 +172,6 @@ public class WindowAggregateOperator extends MultiStageOperator {
       if (!_hasReturnedWindowAggregateBlock) {
         return produceWindowAggregatedBlock();
       } else {
-        // TODO: Move to close call.
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } catch (Exception e) {

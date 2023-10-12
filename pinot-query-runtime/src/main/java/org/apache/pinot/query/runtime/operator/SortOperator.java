@@ -51,7 +51,7 @@ public class SortOperator extends MultiStageOperator {
   private final ArrayList<Object[]> _rows;
   private final int _numRowsToKeep;
 
-  private boolean _isSortedBlockConstructed;
+  private boolean _hasReturnedSortedBlock;
   private TransferableBlock _upstreamErrorBlock;
 
   public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
@@ -74,7 +74,7 @@ public class SortOperator extends MultiStageOperator {
     _offset = Math.max(offset, 0);
     _dataSchema = dataSchema;
     _upstreamErrorBlock = null;
-    _isSortedBlockConstructed = false;
+    _hasReturnedSortedBlock = false;
     // Setting numRowsToKeep as default maximum on Broker if limit not set.
     // TODO: make this default behavior configurable.
     _numRowsToKeep = _fetch > 0 ? _fetch + _offset : defaultResponseLimit;
@@ -123,8 +123,8 @@ public class SortOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
 
-    if (!_isSortedBlockConstructed) {
-      _isSortedBlockConstructed = true;
+    if (!_hasReturnedSortedBlock) {
+      _hasReturnedSortedBlock = true;
       if (_priorityQueue == null) {
         if (_rows.size() > _offset) {
           List<Object[]> row = _rows.subList(_offset, _rows.size());
@@ -150,7 +150,7 @@ public class SortOperator extends MultiStageOperator {
   }
 
   private void consumeInputBlocks() {
-    if (!_isSortedBlockConstructed) {
+    if (!_hasReturnedSortedBlock) {
       TransferableBlock block = _upstreamOperator.nextBlock();
       while (block.isDataBlock()) {
         List<Object[]> container = block.getContainer();
@@ -164,7 +164,8 @@ public class SortOperator extends MultiStageOperator {
               _rows.addAll(container.subList(0, _numRowsToKeep - numRows));
               LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
                   _context.getId());
-              break;
+              // setting operator to be early terminated and awaits EOS block next.
+              earlyTerminate();
             }
           }
         } else {
