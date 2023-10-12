@@ -19,20 +19,15 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -48,90 +43,74 @@ import org.roaringbitmap.RoaringBitmap;
 public class DistinctDataTableReducer implements DataTableReducer {
   private final QueryContext _queryContext;
 
-  DistinctDataTableReducer(QueryContext queryContext) {
+  public DistinctDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
   }
 
-  /**
-   * Reduces and sets results of distinct into ResultTable.
-   */
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
-    // DISTINCT is implemented as an aggregation function in the execution engine. Just like
-    // other aggregation functions, DISTINCT returns its result as a single object
-    // (of type DistinctTable) serialized by the server into the DataTable and deserialized
-    // by the broker from the DataTable. So there should be exactly 1 row and 1 column and that
-    // column value should be the serialized DistinctTable -- so essentially it is a DataTable
-    // inside a DataTable
+    dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForDistinct(_queryContext, dataSchema);
+    DistinctTable distinctTable =
+        new DistinctTable(dataSchema, _queryContext.getOrderByExpressions(), _queryContext.getLimit(),
+            _queryContext.isNullHandlingEnabled());
+    if (distinctTable.hasOrderBy()) {
+      addToOrderByDistinctTable(dataSchema, dataTableMap, distinctTable);
+    } else {
+      addToNonOrderByDistinctTable(dataSchema, dataTableMap, distinctTable);
+    }
+    brokerResponseNative.setResultTable(reduceToResultTable(distinctTable));
+  }
 
-    // Gather all non-empty DistinctTables
-    // TODO: until we upgrade to newer version of pinot, we have to keep both code path. remove after 0.12.0 release.
-    // This is to work with server rolling upgrade when partially returned as DistinctTable Obj and partially regular
-    // DataTable; if all returns are DataTable we can directly merge with priority queue (with dedup).
-    List<DistinctTable> nonEmptyDistinctTables = new ArrayList<>(dataTableMap.size());
+  private void addToOrderByDistinctTable(DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
+      DistinctTable distinctTable) {
     for (DataTable dataTable : dataTableMap.values()) {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
-
-      // Do not use the cached data schema because it might be either single object (legacy) or normal data table
-      dataSchema = dataTable.getDataSchema();
       int numColumns = dataSchema.size();
-      if (numColumns == 1 && dataSchema.getColumnDataType(0) == ColumnDataType.OBJECT) {
-        // DistinctTable is still being returned as a single object
-        CustomObject customObject = dataTable.getCustomObject(0, 0);
-        assert customObject != null;
-        DistinctTable distinctTable = ObjectSerDeUtils.deserialize(customObject);
-        if (!distinctTable.isEmpty()) {
-          nonEmptyDistinctTables.add(distinctTable);
+      int numRows = dataTable.getNumberOfRows();
+      if (_queryContext.isNullHandlingEnabled()) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+        for (int coldId = 0; coldId < numColumns; coldId++) {
+          nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
+        }
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          distinctTable.addWithOrderBy(new Record(
+              SelectionOperatorUtils.extractRowFromDataTableWithNullHandling(dataTable, rowId, nullBitmaps)));
         }
       } else {
-        // DistinctTable is being returned as normal data table
-        int numRows = dataTable.getNumberOfRows();
-        if (numRows > 0) {
-          List<Record> records = new ArrayList<>(numRows);
-          if (_queryContext.isNullHandlingEnabled()) {
-            RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
-            for (int coldId = 0; coldId < numColumns; coldId++) {
-              nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
-            }
-            for (int rowId = 0; rowId < numRows; rowId++) {
-              records.add(new Record(
-                  SelectionOperatorUtils.extractRowFromDataTableWithNullHandling(dataTable, rowId, nullBitmaps)));
-            }
-          } else {
-            for (int rowId = 0; rowId < numRows; rowId++) {
-              records.add(new Record(SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId)));
-            }
-          }
-          nonEmptyDistinctTables.add(new DistinctTable(dataSchema, records));
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          distinctTable.addWithOrderBy(new Record(SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId)));
         }
       }
     }
+  }
 
-    if (nonEmptyDistinctTables.isEmpty()) {
-      // All the DistinctTables are empty, construct an empty response
-      // TODO: This returns schema with all STRING data types.
-      //       There's no way currently to get the data types of the distinct columns for empty results
-      List<ExpressionContext> expressions = _queryContext.getSelectExpressions();
-      int numExpressions = expressions.size();
-      String[] columns = new String[numExpressions];
-      for (int i = 0; i < numExpressions; i++) {
-        columns[i] = expressions.get(i).toString();
+  private void addToNonOrderByDistinctTable(DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
+      DistinctTable distinctTable) {
+    for (DataTable dataTable : dataTableMap.values()) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+      int numColumns = dataSchema.size();
+      int numRows = dataTable.getNumberOfRows();
+      if (_queryContext.isNullHandlingEnabled()) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
+        for (int coldId = 0; coldId < numColumns; coldId++) {
+          nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
+        }
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          if (distinctTable.addWithoutOrderBy(new Record(
+              SelectionOperatorUtils.extractRowFromDataTableWithNullHandling(dataTable, rowId, nullBitmaps)))) {
+            return;
+          }
+        }
+      } else {
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          if (distinctTable.addWithoutOrderBy(
+              new Record(SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId)))) {
+            return;
+          }
+        }
       }
-      ColumnDataType[] columnDataTypes = new ColumnDataType[numExpressions];
-      Arrays.fill(columnDataTypes, ColumnDataType.STRING);
-      brokerResponseNative.setResultTable(
-          new ResultTable(new DataSchema(columns, columnDataTypes), Collections.emptyList()));
-    } else {
-      // Construct a main DistinctTable and merge all non-empty DistinctTables into it
-      DistinctTable mainDistinctTable =
-          new DistinctTable(nonEmptyDistinctTables.get(0).getDataSchema(), _queryContext.getOrderByExpressions(),
-              _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
-      for (DistinctTable distinctTable : nonEmptyDistinctTables) {
-        mainDistinctTable.mergeTable(distinctTable);
-      }
-      brokerResponseNative.setResultTable(reduceToResultTable(mainDistinctTable));
     }
   }
 

@@ -54,6 +54,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
   private final static String FORMAT_AVRO = "avro";
   private final static String FORMAT_CSV = "csv";
+  private final static String FORMAT_JSON = "json";
 
   @CommandLine.Option(names = {"-numRecords"}, required = true, description = "Number of records to generate.")
   private int _numRecords = 0;
@@ -79,7 +80,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   private boolean _help = false;
 
   @CommandLine.Option(names = {"-format"}, required = false, help = true,
-      description = "Output format ('AVRO' or 'CSV').")
+      description = "Output format ('AVRO' or 'CSV' or 'JSON').")
   private String _format = FORMAT_AVRO;
 
   @Override
@@ -150,6 +151,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       gen.generateAvro(_numRecords, _numFiles);
     } else if (FORMAT_CSV.equalsIgnoreCase(_format)) {
       gen.generateCsv(_numRecords, _numFiles);
+    } else if (FORMAT_JSON.equalsIgnoreCase(_format)) {
+      gen.generateJson(_numRecords, _numFiles);
     } else {
       throw new IllegalArgumentException(String.format("Invalid output format '%s'", _format));
     }

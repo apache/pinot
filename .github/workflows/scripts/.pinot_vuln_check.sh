@@ -30,6 +30,8 @@ fi
 
 cd ${DOCKER_FILE_BASE_DIR}
 
+docker image prune --all --filter "until=1h" -f
+
 docker build \
     --no-cache \
     --file Dockerfile \
