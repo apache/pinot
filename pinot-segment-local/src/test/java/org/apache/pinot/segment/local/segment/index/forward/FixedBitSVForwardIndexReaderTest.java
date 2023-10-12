@@ -21,13 +21,11 @@ package org.apache.pinot.segment.local.segment.index.forward;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVForwardIndexWriter;
-import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
+import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -36,13 +34,11 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
-
-public class FixedBitMVForwardIndexTest {
+public class FixedBitSVForwardIndexReaderTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "FixedBitMVForwardIndexTest");
   private static final File INDEX_FILE =
-      new File(TEMP_DIR, "testColumn" + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+      new File(TEMP_DIR, "testColumn" + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
   private static final int NUM_DOCS = 100;
-  private static final int MAX_NUM_VALUES_PER_MV_ENTRY = 100;
   private static final Random RANDOM = new Random();
 
   @BeforeClass
@@ -56,53 +52,46 @@ public class FixedBitMVForwardIndexTest {
       throws Exception {
     for (int numBitsPerValue = 1; numBitsPerValue <= 31; numBitsPerValue++) {
       // Generate random values
-      int[][] valuesArray = new int[NUM_DOCS][];
+      int[] valuesArray = new int[NUM_DOCS];
       int totalNumValues = 0;
       int maxValue = numBitsPerValue != 31 ? 1 << numBitsPerValue : Integer.MAX_VALUE;
       for (int i = 0; i < NUM_DOCS; i++) {
-        int numValues = RANDOM.nextInt(MAX_NUM_VALUES_PER_MV_ENTRY) + 1;
-        int[] values = new int[numValues];
-        for (int j = 0; j < numValues; j++) {
-          values[j] = RANDOM.nextInt(maxValue);
-        }
-        valuesArray[i] = values;
-        totalNumValues += numValues;
+        valuesArray[i] = RANDOM.nextInt(maxValue);
       }
 
       // Create the forward index
-      try (FixedBitMVForwardIndexWriter writer = new FixedBitMVForwardIndexWriter(INDEX_FILE, NUM_DOCS, totalNumValues,
+      try (FixedBitSVForwardIndexWriter writer = new FixedBitSVForwardIndexWriter(INDEX_FILE, NUM_DOCS,
           numBitsPerValue)) {
-        for (int[] values : valuesArray) {
-          writer.putDictIds(values);
+        for (int value : valuesArray) {
+          writer.putDictId(value);
         }
       }
 
       // Read the forward index
       try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
-          FixedBitMVForwardIndexReader reader = new FixedBitMVForwardIndexReader(dataBuffer, NUM_DOCS, totalNumValues,
-              numBitsPerValue); FixedBitMVForwardIndexReader.Context readerContext = reader.createContext()) {
-        int[] valueBuffer = new int[MAX_NUM_VALUES_PER_MV_ENTRY];
+          FixedBitSVForwardIndexReader reader = new FixedBitSVForwardIndexReader(dataBuffer, NUM_DOCS,
+              numBitsPerValue)) {
         for (int i = 0; i < NUM_DOCS; i++) {
-          int numValues = reader.getDictIdMV(i, valueBuffer, readerContext);
-          for (int j = 0; j < numValues; j++) {
-            assertEquals(valueBuffer[j], valuesArray[i][j]);
-          }
+          assertEquals(valuesArray[i], reader.getDictId(i, null));
         }
       }
 
       // Byte range test
       try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(INDEX_FILE);
-          FixedBitMVForwardIndexReader reader = new FixedBitMVForwardIndexReader(dataBuffer, NUM_DOCS, totalNumValues,
-              numBitsPerValue); FixedBitMVForwardIndexReader.Context readerContext = reader.createContext()) {
+          FixedBitSVForwardIndexReader reader = new FixedBitSVForwardIndexReader(dataBuffer, NUM_DOCS,
+              numBitsPerValue)) {
         Assert.assertTrue(reader.isBufferByteRangeInfoSupported());
-        Assert.assertFalse(reader.isFixedOffsetMappingType());
-        List<ForwardIndexReader.ByteRange> rangeList = new ArrayList<>();
-        for (int i = 0; i < NUM_DOCS; i++) {
-          try {
-            reader.recordDocIdByteRanges(i, readerContext, rangeList);
-          } catch (Exception e) {
-            Assert.fail("Should not throw exception when calling recordDocIdByteRanges()", e);
-          }
+        Assert.assertTrue(reader.isFixedOffsetMappingType());
+        Assert.assertEquals(reader.getRawDataStartOffset(), 0);
+        Assert.assertEquals(reader.getDocLength(), numBitsPerValue);
+        Assert.assertTrue(reader.isDocLengthInBits());
+
+        try {
+          reader.recordDocIdByteRanges(0, null, new ArrayList<>());
+          Assert.fail("Should have failed to record byte ranges");
+        } catch (UnsupportedOperationException e) {
+          // expected
+          Assert.assertEquals(e.getMessage(), "Forward index is fixed length type");
         }
       }
 

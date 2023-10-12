@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import java.util.List;
 import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
@@ -58,16 +59,23 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   private final int _numValues;
   private final int _numDocsPerChunk;
 
+  private final long _bitmapReaderStartOffset;
+  private final long _rawDataReaderStartOffset;
+  private final int _numBitsPerValue;
+
   public FixedBitMVForwardIndexReader(PinotDataBuffer dataBuffer, int numDocs, int numValues, int numBitsPerValue) {
     _numDocs = numDocs;
     _numValues = numValues;
     _numDocsPerChunk = (int) (Math.ceil((float) PREFERRED_NUM_VALUES_PER_CHUNK / (numValues / numDocs)));
     int numChunks = (numDocs + _numDocsPerChunk - 1) / _numDocsPerChunk;
     long endOffset = numChunks * Integer.BYTES;
+    _bitmapReaderStartOffset = endOffset;
     _chunkOffsetReader = new FixedByteValueReaderWriter(dataBuffer.view(0L, endOffset));
     int bitmapSize = (numValues + Byte.SIZE - 1) / Byte.SIZE;
     _bitmapReader = new PinotDataBitSet(dataBuffer.view(endOffset, endOffset + bitmapSize));
     endOffset += bitmapSize;
+    _rawDataReaderStartOffset = endOffset;
+    _numBitsPerValue = numBitsPerValue;
     int rawDataSize = (int) (((long) numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
     _rawDataReader =
         new FixedBitIntReaderWriter(dataBuffer.view(endOffset, endOffset + rawDataSize), numValues, numBitsPerValue);
@@ -211,6 +219,71 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
     _chunkOffsetReader.close();
     _bitmapReader.close();
     _rawDataReader.close();
+  }
+
+  @Override
+  public boolean isBufferByteRangeInfoSupported() {
+    return true;
+  }
+
+  @Override
+  public void recordDocIdByteRanges(int docId, Context context, List<ByteRange> ranges) {
+    int contextDocId = context._docId;
+    int contextEndOffset = context._endOffset;
+    int startIndex;
+    if (docId == contextDocId + 1) {
+      startIndex = contextEndOffset;
+    } else {
+      int chunkId = docId / _numDocsPerChunk;
+      if (docId > contextDocId && chunkId == contextDocId / _numDocsPerChunk) {
+        // Same chunk
+        startIndex =
+            _bitmapReader.getNextNthSetBitOffsetAndRecordRanges(contextEndOffset + 1, docId - contextDocId - 1,
+                _bitmapReaderStartOffset, ranges);
+      } else {
+        // Different chunk
+        ranges.add(new ByteRange(chunkId, Integer.BYTES));
+        int chunkOffset = _chunkOffsetReader.getInt(chunkId);
+        int indexInChunk = docId % _numDocsPerChunk;
+        if (indexInChunk == 0) {
+          startIndex = chunkOffset;
+        } else {
+          startIndex = _bitmapReader.getNextNthSetBitOffsetAndRecordRanges(chunkOffset + 1, indexInChunk,
+              _bitmapReaderStartOffset, ranges);
+        }
+      }
+    }
+    int endIndex;
+    if (docId == _numDocs - 1) {
+      endIndex = _numValues;
+    } else {
+      endIndex = _bitmapReader.getNextSetBitOffsetRecordRanges(startIndex + 1, _bitmapReaderStartOffset, ranges);
+    }
+    int numValues = endIndex - startIndex;
+    long startBitOffset = (long) startIndex * _numBitsPerValue;
+    long byteStartOffset = (startBitOffset / Byte.SIZE);
+    int size = (int) (((long) numValues * _numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE);
+
+    ranges.add(new ByteRange(_rawDataReaderStartOffset + byteStartOffset, size));
+
+    // Update context
+    context._docId = docId;
+    context._endOffset = endIndex;
+  }
+
+  @Override
+  public boolean isFixedOffsetMappingType() {
+    return false;
+  }
+
+  @Override
+  public long getRawDataStartOffset() {
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
+  }
+
+  @Override
+  public int getDocLength() {
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 
   public static class Context implements ForwardIndexReaderContext {
