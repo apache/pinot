@@ -88,7 +88,11 @@ spec:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
           periodSeconds: {{ .Values.probes.periodSeconds }}
           httpGet:
+            {{- if .Values.server.probes.livenessEndpoint }}
+            path: {{ .Values.server.probes.livenessEndpoint }}
+            {{- else }}
             path: {{ .Values.server.probes.endpoint }}
+            {{- end }}
             port: {{ .Values.server.service.adminPort }}
         {{- end }}
         {{- if .Values.server.probes.readinessEnabled }}
@@ -96,7 +100,11 @@ spec:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
           periodSeconds: {{ .Values.probes.periodSeconds }}
           httpGet:
+            {{- if .Values.server.probes.readinessEndpoint }}
+            path: {{ .Values.server.probes.readinessEndpoint }}
+            {{- else }}
             path: {{ .Values.server.probes.endpoint }}
+            {{- end }}
             port: {{ .Values.server.service.adminPort }}
         {{- end }}
         volumeMounts:
