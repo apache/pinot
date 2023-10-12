@@ -518,23 +518,23 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<PinotFourthMoment> PINOT_FOURTH_MOMENT_OBJECT_SER_DE =
-      new ObjectSerDe<PinotFourthMoment>() {
-        @Override
-        public byte[] serialize(PinotFourthMoment value) {
-          return value.serialize();
-        }
+  public static final ObjectSerDe<PinotFourthMoment> PINOT_FOURTH_MOMENT_OBJECT_SER_DE
+      = new ObjectSerDe<PinotFourthMoment>() {
+    @Override
+    public byte[] serialize(PinotFourthMoment value) {
+      return value.serialize();
+    }
 
-        @Override
-        public PinotFourthMoment deserialize(byte[] bytes) {
-          return PinotFourthMoment.fromBytes(bytes);
-        }
+    @Override
+    public PinotFourthMoment deserialize(byte[] bytes) {
+      return PinotFourthMoment.fromBytes(bytes);
+    }
 
-        @Override
-        public PinotFourthMoment deserialize(ByteBuffer byteBuffer) {
-          return PinotFourthMoment.fromBytes(byteBuffer);
-        }
-      };
+    @Override
+    public PinotFourthMoment deserialize(ByteBuffer byteBuffer) {
+      return PinotFourthMoment.fromBytes(byteBuffer);
+    }
+  };
 
   public static final ObjectSerDe<HyperLogLog> HYPER_LOG_LOG_SER_DE = new ObjectSerDe<HyperLogLog>() {
 
@@ -1319,73 +1319,76 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<ExprMinMaxObject> ARG_MIN_MAX_OBJECT_SER_DE = new ObjectSerDe<ExprMinMaxObject>() {
+  public static final ObjectSerDe<ExprMinMaxObject> ARG_MIN_MAX_OBJECT_SER_DE =
+      new ObjectSerDe<ExprMinMaxObject>() {
 
-    @Override
-    public byte[] serialize(ExprMinMaxObject value) {
-      try {
-        return value.toBytes();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
+        @Override
+        public byte[] serialize(ExprMinMaxObject value) {
+          try {
+            return value.toBytes();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
 
-    @Override
-    public ExprMinMaxObject deserialize(byte[] bytes) {
-      try {
-        return ExprMinMaxObject.fromBytes(bytes);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
+        @Override
+        public ExprMinMaxObject deserialize(byte[] bytes) {
+          try {
+            return ExprMinMaxObject.fromBytes(bytes);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
 
-    @Override
-    public ExprMinMaxObject deserialize(ByteBuffer byteBuffer) {
-      try {
-        return ExprMinMaxObject.fromByteBuffer(byteBuffer);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
-  };
+        @Override
+        public ExprMinMaxObject deserialize(ByteBuffer byteBuffer) {
+          try {
+            return ExprMinMaxObject.fromByteBuffer(byteBuffer);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      };
 
-  public static final ObjectSerDe<ItemsSketch<String>> FREQUENT_STRINGS_SKETCH_SER_DE = new ObjectSerDe<>() {
-    @Override
-    public byte[] serialize(ItemsSketch<String> sketch) {
-      return sketch.toByteArray(new ArrayOfStringsSerDe());
-    }
+  public static final ObjectSerDe<ItemsSketch<String>> FREQUENT_STRINGS_SKETCH_SER_DE =
+      new ObjectSerDe<>() {
+        @Override
+        public byte[] serialize(ItemsSketch<String> sketch) {
+          return sketch.toByteArray(new ArrayOfStringsSerDe());
+        }
 
-    @Override
-    public ItemsSketch<String> deserialize(byte[] bytes) {
-      return ItemsSketch.getInstance(Memory.wrap(bytes), new ArrayOfStringsSerDe());
-    }
+        @Override
+        public ItemsSketch<String> deserialize(byte[] bytes) {
+          return ItemsSketch.getInstance(Memory.wrap(bytes), new ArrayOfStringsSerDe());
+        }
 
-    @Override
-    public ItemsSketch<String> deserialize(ByteBuffer byteBuffer) {
-      byte[] arr = new byte[byteBuffer.remaining()];
-      byteBuffer.get(arr);
-      return ItemsSketch.getInstance(Memory.wrap(arr), new ArrayOfStringsSerDe());
-    }
-  };
+        @Override
+        public ItemsSketch<String> deserialize(ByteBuffer byteBuffer) {
+          byte[] arr = new byte[byteBuffer.remaining()];
+          byteBuffer.get(arr);
+          return ItemsSketch.getInstance(Memory.wrap(arr), new ArrayOfStringsSerDe());
+        }
+      };
 
-  public static final ObjectSerDe<LongsSketch> FREQUENT_LONGS_SKETCH_SER_DE = new ObjectSerDe<>() {
-    @Override
-    public byte[] serialize(LongsSketch sketch) {
-      return sketch.toByteArray();
-    }
+  public static final ObjectSerDe<LongsSketch> FREQUENT_LONGS_SKETCH_SER_DE =
+      new ObjectSerDe<>() {
+        @Override
+        public byte[] serialize(LongsSketch sketch) {
+          return sketch.toByteArray();
+        }
 
-    @Override
-    public LongsSketch deserialize(byte[] bytes) {
-      return LongsSketch.getInstance(Memory.wrap(bytes));
-    }
+        @Override
+        public LongsSketch deserialize(byte[] bytes) {
+          return LongsSketch.getInstance(Memory.wrap(bytes));
+        }
 
-    @Override
-    public LongsSketch deserialize(ByteBuffer byteBuffer) {
-      byte[] arr = new byte[byteBuffer.remaining()];
-      byteBuffer.get(arr);
-      return LongsSketch.getInstance(Memory.wrap(arr));
-    }
-  };
+        @Override
+        public LongsSketch deserialize(ByteBuffer byteBuffer) {
+          byte[] arr = new byte[byteBuffer.remaining()];
+          byteBuffer.get(arr);
+          return LongsSketch.getInstance(Memory.wrap(arr));
+        }
+      };
 
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
