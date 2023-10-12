@@ -898,29 +898,6 @@ const reloadStatusOp = (tableName, tableType) => {
   return reloadStatus(tableName, tableType).then((response)=>{
     return response.data;
   });
-  // const result = response.data;
-  // if (result.error) {
-  //   return {
-  //     error: result.error,
-  //   };
-  // } else {
-  //   console.error(result)
-  //   const indexStats = result["columnToIndexesCount"];
-  //   console.error(indexStats)
-  //   return {
-  //     columns: ['Field Name', 'Bloom Filter', 'Dictionary', 'Forward Index', 'Sorted', 'Inverted Index', 'JSON Index', 'Null Value Vector Reader', 'Range Index'],
-  //     records: Object.keys(indexStats).map(fieldName => [
-  //       fieldName,
-  //       indexStats[fieldName]["bloom-filter"] !== 0,
-  //       indexStats[fieldName]["dictionary"] !== 0,
-  //       indexStats[fieldName]["forward-index"] !== 0,
-  //       indexStats[fieldName]["inverted-index"] !== 0,
-  //       indexStats[fieldName]["json-index"] !== 0,
-  //       indexStats[fieldName]["null-value-vector-reader"] !== 0,
-  //       indexStats[fieldName]["range-index"] !== 0,
-  //     ])
-  //   };
-  // }
 }
 
 const deleteSegmentOp = (tableName, segmentName) => {
