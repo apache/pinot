@@ -118,20 +118,17 @@ public class MailboxSendOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock() {
     try {
       TransferableBlock block = _sourceOperator.nextBlock();
-      boolean isEarlyTerminated;
       if (block.isSuccessfulEndOfStreamBlock()) {
         // Stats need to be populated here because the block is being sent to the mailbox
         // and the receiving opChain will not be able to access the stats from the previous opChain
         TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
             OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+        // no need to check early terminate signal b/c the current block is already EOS
         sendTransferableBlock(eosBlockWithStats);
-        // when sending an EOS block already, early termination flag is ignored even if receiver has requested it.
-        isEarlyTerminated = false;
       } else {
-        isEarlyTerminated = sendTransferableBlock(block);
-      }
-      if (isEarlyTerminated) {
-        earlyTerminate();
+        if (sendTransferableBlock(block)) {
+          earlyTerminate();
+        }
       }
       return block;
     } catch (QueryCancelledException e) {

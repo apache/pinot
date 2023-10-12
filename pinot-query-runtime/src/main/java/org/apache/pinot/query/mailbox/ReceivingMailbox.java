@@ -23,7 +23,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -50,7 +49,7 @@ public class ReceivingMailbox {
   // TODO: Revisit if this is the correct way to apply back pressure
   private final BlockingQueue<TransferableBlock> _blocks = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
   private final AtomicReference<TransferableBlock> _errorBlock = new AtomicReference<>();
-  private final AtomicBoolean _isEarlyTerminated = new AtomicBoolean(false);
+  private volatile boolean _isEarlyTerminated = false;
 
   @Nullable
   private volatile Reader _reader;
@@ -98,7 +97,7 @@ public class ReceivingMailbox {
             LOGGER.debug("==[MAILBOX]== Block " + block + " ready to read from mailbox: " + _id);
           }
           notifyReader();
-          return _isEarlyTerminated.get() ? ReceivingMailboxStatus.EARLY_TERMINATED : ReceivingMailboxStatus.SUCCESS;
+          return _isEarlyTerminated ? ReceivingMailboxStatus.EARLY_TERMINATED : ReceivingMailboxStatus.SUCCESS;
         } else {
           LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
           _blocks.clear();
@@ -143,7 +142,7 @@ public class ReceivingMailbox {
    * Early terminate the mailbox, called when upstream doesn't expect any more data block.
    */
   public void earlyTerminate() {
-    _isEarlyTerminated.set(true);
+    _isEarlyTerminated = true;
   }
 
   /**

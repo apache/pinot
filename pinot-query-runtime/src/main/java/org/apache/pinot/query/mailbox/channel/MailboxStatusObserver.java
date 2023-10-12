@@ -34,8 +34,8 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
   private static final int DEFAULT_MAILBOX_QUEUE_CAPACITY = 5;
 
   private final AtomicInteger _bufferSize = new AtomicInteger(DEFAULT_MAILBOX_QUEUE_CAPACITY);
-  private final AtomicBoolean _isEarlyTerminated = new AtomicBoolean();
   private final AtomicBoolean _finished = new AtomicBoolean();
+  private volatile boolean _isEarlyTerminated;
 
   @Override
   public void onNext(MailboxStatus mailboxStatus) {
@@ -45,7 +45,7 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
     // -- handle early-terminate EOS request.
     if (Boolean.parseBoolean(
         mailboxStatus.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE))) {
-      _isEarlyTerminated.set(true);
+      _isEarlyTerminated = true;
     }
     // -- handling buffer size back-pressure
     // TODO: this feedback info is not used to throttle the send speed. it is currently being discarded.
@@ -58,7 +58,7 @@ public class MailboxStatusObserver implements StreamObserver<MailboxStatus> {
   }
 
   public boolean isEarlyTerminated() {
-    return _isEarlyTerminated.get();
+    return _isEarlyTerminated;
   }
 
   public int getBufferSize() {

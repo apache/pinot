@@ -79,7 +79,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
 
   @Override
   public void cancel(Throwable t) {
-    if (_isEarlyTerminated || _isTerminated) {
+    if (_isTerminated) {
       return;
     }
     LOGGER.debug("Cancelling mailbox: {}", _id);

@@ -72,10 +72,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   }
 
   public void earlyTerminate() {
-    earlyTerminateMailboxes();
-  }
-
-  protected void earlyTerminateMailboxes() {
     for (AsyncStream<E> mailbox : _mailboxes) {
       mailbox.earlyTerminate();
     }
