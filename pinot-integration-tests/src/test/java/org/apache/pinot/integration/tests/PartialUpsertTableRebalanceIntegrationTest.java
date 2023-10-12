@@ -113,7 +113,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     // Now we trigger a rebalance operation
     TableConfig tableConfig = _resourceManager.getTableConfig(REALTIME_TABLE_NAME);
-    RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     // Check the number of replicas after rebalancing
     int finalReplicas = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
@@ -128,7 +128,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     // Add a new server
     BaseServerStarter serverStarter2 = startOneServer(4567);
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     // Check the number of replicas after rebalancing
     finalReplicas = _resourceManager.getServerInstancesForTable(getTableName(), TableType.REALTIME).size();
@@ -148,8 +148,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setDowntime(true);
 
-
-    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig);
+    rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, NUM_SERVERS);
 
