@@ -29,6 +29,7 @@ import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.FilteredGroupByOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
+import org.apache.pinot.core.operator.query.OperatorUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -74,36 +75,10 @@ public class GroupByPlanNode implements PlanNode {
     ExpressionContext[] groupByExpressions = groupByExpressionsList.toArray(new ExpressionContext[0]);
 
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
-    BaseFilterOperator filterOperator = filterPlanNode.run();
-
-    // Use star-tree to solve the query if possible
-    List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
-    if (starTrees != null && !_queryContext.isSkipStarTree()) {
-      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
-      if (aggregationFunctionColumnPairs != null) {
-        Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
-                filterPlanNode.getPredicateEvaluators());
-        if (predicateEvaluatorsMap != null) {
-          for (StarTreeV2 starTreeV2 : starTrees) {
-            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,
-                groupByExpressions, predicateEvaluatorsMap.keySet())) {
-              BaseProjectOperator<?> projectOperator =
-                  new StarTreeProjectPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs,
-                      groupByExpressions, predicateEvaluatorsMap).run();
-              return new GroupByOperator(_queryContext, groupByExpressions, projectOperator, numTotalDocs, true);
-            }
-          }
-        }
-      }
-    }
-
-    Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressionsList);
     BaseProjectOperator<?> projectOperator =
-        new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-            filterOperator).run();
-    return new GroupByOperator(_queryContext, groupByExpressions, projectOperator, numTotalDocs, false);
+        OperatorUtils.getProjectOperator(_queryContext, _indexSegment, aggregationFunctions, filterPlanNode,
+            filterPlanNode.run(), groupByExpressionsList);
+    return new GroupByOperator(_queryContext, groupByExpressions, projectOperator, numTotalDocs,
+        projectOperator.getClass().isInstance(StarTreeProjectPlanNode.class));
   }
 }

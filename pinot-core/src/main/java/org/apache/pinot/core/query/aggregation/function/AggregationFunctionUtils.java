@@ -216,17 +216,13 @@ public class AggregationFunctionUtils {
         filterOperators.computeIfAbsent(filter, k -> {
           BaseFilterOperator combinedFilterOperator;
           BaseFilterOperator subFilterOperator = new FilterPlanNode(indexSegment, queryContext, filter).run();
-          if (mainFilterOperator.isResultMatchingAll()) {
+          if (mainFilterOperator.isResultMatchingAll() || subFilterOperator.isResultEmpty()) {
             combinedFilterOperator = subFilterOperator;
-          } else {
-            if (subFilterOperator.isResultEmpty()) {
-              combinedFilterOperator = subFilterOperator;
-            } else if (subFilterOperator.isResultMatchingAll()) {
+          } else if (subFilterOperator.isResultMatchingAll()) {
               combinedFilterOperator = mainFilterOperator;
-            } else {
-              combinedFilterOperator =
-                  new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
-            }
+          } else {
+            combinedFilterOperator =
+                new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
           }
           return Pair.of(combinedFilterOperator, new ArrayList<>());
         }).getRight().add(aggregationFunction);
@@ -236,6 +232,8 @@ public class AggregationFunctionUtils {
     }
 
     // Create the project operators
+    // TODO(egalpin): Use either StarTreeProjectPlanNode or ProjectPlanNode based on criteria such as that in GroupByPlanNode for
+    // leveraging startree index. This must be decided per filtered agg.
     List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators = new ArrayList<>();
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     for (Pair<BaseFilterOperator, List<AggregationFunction>> filterOperatorFunctionsPair : filterOperators.values()) {
@@ -246,6 +244,7 @@ public class AggregationFunctionUtils {
       } else {
         AggregationFunction[] aggregationFunctions =
             filterOperatorFunctionsPair.getRight().toArray(new AggregationFunction[0]);
+        // TODO(egalpin): add logic here to determine use of startreeProjectOperator or not
         Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
         BaseProjectOperator<?> projectOperator =
             new ProjectPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
@@ -257,6 +256,7 @@ public class AggregationFunctionUtils {
     if (!nonFilteredFunctions.isEmpty()) {
       AggregationFunction[] aggregationFunctions = nonFilteredFunctions.toArray(new AggregationFunction[0]);
       Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
+      // TODO(egalpin): add logic here to determine use of startreeProjectOperator or not
       BaseProjectOperator<?> projectOperator =
           new ProjectPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
               mainFilterOperator).run();

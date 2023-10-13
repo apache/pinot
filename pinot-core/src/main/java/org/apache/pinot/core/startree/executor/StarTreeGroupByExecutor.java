@@ -19,6 +19,7 @@
 package org.apache.pinot.core.startree.executor;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -27,6 +28,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
@@ -45,9 +47,19 @@ public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
 
   public StarTreeGroupByExecutor(QueryContext queryContext, ExpressionContext[] groupByExpressions,
       BaseProjectOperator<?> projectOperator) {
-    super(queryContext, groupByExpressions, projectOperator);
+    this(queryContext, queryContext.getAggregationFunctions(), groupByExpressions, projectOperator, null);
+  }
 
-    AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
+  public StarTreeGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
+      ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator) {
+    this(queryContext, aggregationFunctions, groupByExpressions, projectOperator, null);
+  }
+
+  public StarTreeGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
+        ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator,
+        @Nullable GroupKeyGenerator groupKeyGenerator) {
+    super(queryContext, aggregationFunctions, groupByExpressions, projectOperator, groupKeyGenerator);
+
     assert aggregationFunctions != null;
     int numAggregationFunctions = aggregationFunctions.length;
     _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];

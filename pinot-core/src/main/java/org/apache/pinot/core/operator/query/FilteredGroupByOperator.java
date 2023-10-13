@@ -103,6 +103,10 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
   }
 
+  private boolean canUseStarTree() {
+    return false;
+  }
+
   @Override
   protected GroupByResultsBlock getNextBlock() {
     // TODO(egalpin): Support Startree query resolution when possible, even with FILTER expressions
@@ -122,6 +126,11 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
       // Perform aggregation group-by on all the blocks
       DefaultGroupByExecutor groupByExecutor;
+
+      if (_useStarTree) {
+
+      }
+
       if (groupKeyGenerator == null) {
         // The group key generator should be shared across all AggregationFunctions so that agg results can be
         // aligned. Given that filtered aggregations are stored as an iterable of iterables so that all filtered aggs
