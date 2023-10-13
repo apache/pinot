@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -95,6 +96,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     _dataSchema = dataSchema;
     _queryExecutor = queryExecutor;
     _executorService = executorService;
+    _executionStats = new HashMap<>();
     Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
@@ -193,7 +195,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
                   // Collect the execution stats
                   Map<String, String> executionStats = instanceResponseBlock.getResponseMetadata();
                   synchronized (LeafStageTransferableBlockOperator.this) {
-                    if (_executionStats == null) {
+                    if (_executionStats.size() == 0) {
                       _executionStats = executionStats;
                     } else {
                       aggregateExecutionStats(_executionStats, executionStats);
