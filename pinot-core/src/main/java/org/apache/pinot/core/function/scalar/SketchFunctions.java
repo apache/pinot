@@ -395,23 +395,23 @@ public class SketchFunctions {
     return Math.round(asCpcSketch(o1).getEstimate());
   }
 
-  @ScalarFunction(names = {"cpcSketchUnion", "cpc_sketch_union"}, nullableParameters = true)
-  public static CpcSketch cpcSketchUnion(Object o1, Object o2) {
+  @ScalarFunction(names = {"cpcSketchUnion", "cpc_sketch_union"})
+  public static byte[] cpcSketchUnion(Object o1, Object o2) {
     return cpcSketchUnionVar(o1, o2);
   }
 
   @ScalarFunction(names = {"cpcSketchUnion", "cpc_sketch_union"})
-  public static CpcSketch cpcSketchUnion(Object o1, Object o2, Object o3) {
+  public static byte[] cpcSketchUnion(Object o1, Object o2, Object o3) {
     return cpcSketchUnionVar(o1, o2, o3);
   }
 
   @ScalarFunction(names = {"cpcSketchUnion", "cpc_sketch_union"})
-  public static CpcSketch cpcSketchUnion(Object o1, Object o2, Object o3, Object o4) {
+  public static byte[] cpcSketchUnion(Object o1, Object o2, Object o3, Object o4) {
     return cpcSketchUnionVar(o1, o2, o3, o4);
   }
 
   @ScalarFunction(names = {"cpcSketchUnion", "cpc_sketch_union"})
-  public static CpcSketch cpcSketchUnion(Object o1, Object o2, Object o3, Object o4, Object o5) {
+  public static byte[] cpcSketchUnion(Object o1, Object o2, Object o3, Object o4, Object o5) {
     return cpcSketchUnionVar(o1, o2, o3, o4, o5);
   }
 
@@ -449,24 +449,24 @@ public class SketchFunctions {
   }
 
   private static CpcSketch asCpcSketch(Object sketchObj) {
-    if (sketchObj instanceof String) {
-      byte[] decoded = Base64.getDecoder().decode((String) sketchObj);
-      return CpcSketch.heapify(Memory.wrap((decoded)));
-    } else if (sketchObj instanceof CpcSketch) {
+    if (sketchObj instanceof CpcSketch) {
       return (CpcSketch) sketchObj;
     } else if (sketchObj instanceof byte[]) {
       return CpcSketch.heapify(Memory.wrap((byte[]) sketchObj));
+    } else if (sketchObj instanceof String) {
+      byte[] decoded = Base64.getDecoder().decode((String) sketchObj);
+      return CpcSketch.heapify(Memory.wrap((decoded)));
     } else {
       throw new RuntimeException(
           "Exception occurred getting estimate from CPC Sketch, unsupported Object type: " + sketchObj.getClass());
     }
   }
 
-  private static CpcSketch cpcSketchUnionVar(Object... sketchObjects) {
+  private static byte[] cpcSketchUnionVar(Object... sketchObjects) {
     CpcUnion union = new CpcUnion(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
     for (Object sketchObj : sketchObjects) {
       union.update(asCpcSketch(sketchObj));
     }
-    return union.getResult();
+    return union.getResult().toByteArray();
   }
 }
