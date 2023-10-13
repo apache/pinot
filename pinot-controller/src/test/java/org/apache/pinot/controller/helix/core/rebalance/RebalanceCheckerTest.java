@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -42,6 +43,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
@@ -94,7 +96,7 @@ public class RebalanceCheckerTest {
     // 3 failed retry runs for job1
     jobMetadata = createDummyJobMetadata(tableName, "job1", 2, 1100, RebalanceResult.Status.FAILED);
     allJobMetadata.put("job1_2", jobMetadata);
-    jobMetadata = createDummyJobMetadata(tableName, "job1", 3, 1200, RebalanceResult.Status.FAILED);
+    jobMetadata = createDummyJobMetadata(tableName, "job1", 3, 1200, RebalanceResult.Status.ABORTED);
     allJobMetadata.put("job1_3", jobMetadata);
     jobMetadata = createDummyJobMetadata(tableName, "job1", 4, 1300, RebalanceResult.Status.FAILED);
     allJobMetadata.put("job1_4", jobMetadata);
@@ -137,6 +139,14 @@ public class RebalanceCheckerTest {
     assertTrue(jobs.containsKey("job1"));
     assertTrue(jobs.containsKey("job3"));
     assertEquals(jobs.get("job1").size(), 4); // four runs including job1,job1_1,job1_2,job1_3
+    assertEquals(jobs.get("job3").size(), 1); // just a single run job3
+
+    // Abort job1 and cancel its retries, then only job3 is retry candidate.
+    jobMetadata = allJobMetadata.get("job1_4");
+    abortRebalanceJob(jobMetadata, true);
+    jobs = RebalanceChecker.getCandidateJobs(tableName, allJobMetadata);
+    assertEquals(jobs.size(), 1);
+    assertTrue(jobs.containsKey("job3"));
     assertEquals(jobs.get("job3").size(), 1); // just a single run job3
 
     // Add latest job5 that's already done, thus no need to retry for table.
@@ -348,13 +358,34 @@ public class RebalanceCheckerTest {
 
   private static Map<String, String> createDummyJobMetadata(String tableName, String originalJobId, int attemptId,
       long startTimeMs, RebalanceResult.Status status) {
+    return createDummyJobMetadata(tableName, originalJobId, attemptId, startTimeMs, status, false);
+  }
+
+  private static Map<String, String> createDummyJobMetadata(String tableName, String originalJobId, int attemptId,
+      long startTimeMs, RebalanceResult.Status status, boolean cancelRetry) {
     RebalanceConfig cfg = new RebalanceConfig();
     cfg.setMaxAttempts(4);
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
     stats.setStatus(status);
     stats.setStartTimeMs(startTimeMs);
     TableRebalanceAttemptContext jobCtx = TableRebalanceAttemptContext.forRetry(originalJobId, cfg, attemptId);
+    jobCtx.setCancelRetry(cancelRetry);
     String attemptJobId = originalJobId + "_" + attemptId;
     return ZkBasedTableRebalanceObserver.createJobMetadata(tableName, attemptJobId, stats, jobCtx);
+  }
+
+  private static void abortRebalanceJob(Map<String, String> jobMetadata, boolean cancelRetry)
+      throws JsonProcessingException {
+    String jobStatsInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
+    TableRebalanceProgressStats jobStats = JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
+    jobStats.setStatus(RebalanceResult.Status.ABORTED);
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+        JsonUtils.objectToString(jobStats));
+
+    String jobCtxInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_ATTEMPT_CONTEXT);
+    TableRebalanceAttemptContext jobCtx = JsonUtils.stringToObject(jobCtxInStr, TableRebalanceAttemptContext.class);
+    jobCtx.setCancelRetry(cancelRetry);
+    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_ATTEMPT_CONTEXT,
+        JsonUtils.objectToString(jobCtx));
   }
 }

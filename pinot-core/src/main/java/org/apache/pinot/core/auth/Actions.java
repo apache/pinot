@@ -89,6 +89,7 @@ public class Actions {
 
   // Action names for table
   public static class Table {
+    public static final String ABORT_REBALANCE = "AbortRebalance";
     public static final String BUILD_ROUTING = "BuildRouting";
     public static final String CREATE_INSTANCE_PARTITIONS = "CreateInstancePartitions";
     public static final String CREATE_SCHEMA = "CreateSchema";

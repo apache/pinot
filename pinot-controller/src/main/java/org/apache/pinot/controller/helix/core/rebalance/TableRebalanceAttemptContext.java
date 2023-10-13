@@ -30,6 +30,7 @@ public class TableRebalanceAttemptContext {
   private String _originalJobId;
   private RebalanceConfig _config;
   private int _attemptId;
+  private boolean _cancelRetry;
 
   public static TableRebalanceAttemptContext forInitialAttempt(String originalJobId, RebalanceConfig config) {
     return new TableRebalanceAttemptContext(originalJobId, config, INITIAL_ATTEMPT_ID);
@@ -48,6 +49,7 @@ public class TableRebalanceAttemptContext {
     _originalJobId = originalJobId;
     _config = config;
     _attemptId = attemptId;
+    _cancelRetry = false;
   }
 
   public int getAttemptId() {
@@ -82,10 +84,18 @@ public class TableRebalanceAttemptContext {
     _config = config;
   }
 
+  public boolean getCancelRetry() {
+    return _cancelRetry;
+  }
+
+  public void setCancelRetry(boolean cancelRetry) {
+    _cancelRetry = cancelRetry;
+  }
+
   @Override
   public String toString() {
     return "TableRebalanceAttemptContext{" + "_jobId='" + _jobId + '\'' + ", _originalJobId='" + _originalJobId + '\''
-        + ", _config=" + _config + ", _attemptId=" + _attemptId + '}';
+        + ", _config=" + _config + ", _attemptId=" + _attemptId + ", _cancelRetry=" + _cancelRetry + '}';
   }
 
   @VisibleForTesting
