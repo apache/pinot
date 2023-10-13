@@ -41,10 +41,10 @@ public class TestZkBasedTableRebalanceObserver {
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     // Mocking this. We will verify using numZkUpdate stat
     when(pinotHelixResourceManager.addControllerJobToZK(any(), any(), any())).thenReturn(true);
-    TableRebalanceRetryConfig retryCfg = new TableRebalanceRetryConfig();
-    retryCfg.setConfig(new RebalanceConfig());
+    TableRebalanceAttemptContext retryCtx = new TableRebalanceAttemptContext();
+    retryCtx.setConfig(new RebalanceConfig());
     ZkBasedTableRebalanceObserver observer =
-        new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCfg, pinotHelixResourceManager);
+        new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCtx, pinotHelixResourceManager);
     Map<String, Map<String, String>> source = new TreeMap<>();
     Map<String, Map<String, String>> target = new TreeMap<>();
     target.put("segment1",

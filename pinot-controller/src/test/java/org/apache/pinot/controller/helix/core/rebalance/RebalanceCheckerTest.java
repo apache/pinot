@@ -20,13 +20,13 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -62,16 +62,16 @@ public class RebalanceCheckerTest {
 
   @Test
   public void testGetRetryDelayInMs() {
-    assertEquals(RebalanceChecker.getRetryDelayInMs(0, 0), 0);
     assertEquals(RebalanceChecker.getRetryDelayInMs(0, 1), 0);
     assertEquals(RebalanceChecker.getRetryDelayInMs(0, 2), 0);
+    assertEquals(RebalanceChecker.getRetryDelayInMs(0, 3), 0);
 
     for (long initDelayMs : new long[]{1, 30000, 3600000}) {
-      long delayMs = RebalanceChecker.getRetryDelayInMs(initDelayMs, 0);
+      long delayMs = RebalanceChecker.getRetryDelayInMs(initDelayMs, 1);
       assertTrue(delayMs >= initDelayMs && delayMs < initDelayMs * 2);
-      delayMs = RebalanceChecker.getRetryDelayInMs(initDelayMs, 1);
-      assertTrue(delayMs >= initDelayMs * 2 && delayMs < initDelayMs * 4);
       delayMs = RebalanceChecker.getRetryDelayInMs(initDelayMs, 2);
+      assertTrue(delayMs >= initDelayMs * 2 && delayMs < initDelayMs * 4);
+      delayMs = RebalanceChecker.getRetryDelayInMs(initDelayMs, 3);
       assertTrue(delayMs >= initDelayMs * 4 && delayMs < initDelayMs * 8);
     }
   }
@@ -84,58 +84,54 @@ public class RebalanceCheckerTest {
 
     // Original job run as job1, and all its retry jobs failed too.
     RebalanceConfig jobCfg = new RebalanceConfig();
-    jobCfg.setJobId("job1");
-    jobCfg.setMaxRetry(3);
+    jobCfg.setMaxAttempts(4);
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
-    stats.setStatus("FAILED");
+    stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(1000);
-    TableRebalanceRetryConfig retryCfg = TableRebalanceRetryConfig.forInitialRun("job1", jobCfg);
-    Map<String, String> jobMetadata =
-        ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, retryCfg);
+    TableRebalanceAttemptContext jobCtx = TableRebalanceAttemptContext.forInitialAttempt("job1", jobCfg);
+    Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
     allJobMetadata.put("job1", jobMetadata);
     // 3 failed retry runs for job1
-    jobMetadata = createDummyRetryJob(tableName, "job1_1", "job1", 1, 1100, "FAILED");
-    allJobMetadata.put("job1_1", jobMetadata);
-    jobMetadata = createDummyRetryJob(tableName, "job1_2", "job1", 2, 1200, "FAILED");
+    jobMetadata = createDummyJobMetadata(tableName, "job1", 2, 1100, RebalanceResult.Status.FAILED);
     allJobMetadata.put("job1_2", jobMetadata);
-    jobMetadata = createDummyRetryJob(tableName, "job1_3", "job1", 3, 1300, "FAILED");
+    jobMetadata = createDummyJobMetadata(tableName, "job1", 3, 1200, RebalanceResult.Status.FAILED);
     allJobMetadata.put("job1_3", jobMetadata);
+    jobMetadata = createDummyJobMetadata(tableName, "job1", 4, 1300, RebalanceResult.Status.FAILED);
+    allJobMetadata.put("job1_4", jobMetadata);
 
     // Original job run as job2, and its retry job job2_1 completed.
     jobCfg = new RebalanceConfig();
-    jobCfg.setJobId("job2");
-    jobCfg.setMaxRetry(3);
+    jobCfg.setMaxAttempts(4);
     stats = new TableRebalanceProgressStats();
-    stats.setStatus("FAILED");
+    stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(2000);
-    retryCfg = TableRebalanceRetryConfig.forInitialRun("job2", jobCfg);
-    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job2", stats, retryCfg);
+    jobCtx = TableRebalanceAttemptContext.forInitialAttempt("job2", jobCfg);
+    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job2", stats, jobCtx);
     allJobMetadata.put("job2", jobMetadata);
-    jobMetadata = createDummyRetryJob(tableName, "job2_1", "job2", 1, 2100, "DONE");
-    allJobMetadata.put("job2_1", jobMetadata);
+    jobMetadata = createDummyJobMetadata(tableName, "job2", 2, 2100, RebalanceResult.Status.DONE);
+    allJobMetadata.put("job2_2", jobMetadata);
 
     // Original job run as job3, and failed to send out heartbeat in time.
     jobCfg = new RebalanceConfig();
-    jobCfg.setJobId("job3");
-    jobCfg.setMaxRetry(3);
+    jobCfg.setMaxAttempts(4);
     stats = new TableRebalanceProgressStats();
-    stats.setStatus("IN_PROGRESS");
+    stats.setStatus(RebalanceResult.Status.IN_PROGRESS);
     stats.setStartTimeMs(3000);
-    retryCfg = TableRebalanceRetryConfig.forInitialRun("job3", jobCfg);
-    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job3", stats, retryCfg);
+    jobCtx = TableRebalanceAttemptContext.forInitialAttempt("job3", jobCfg);
+    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job3", stats, jobCtx);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "3000");
     allJobMetadata.put("job3", jobMetadata);
 
     // Original job run as job4, which didn't have retryJobCfg as from old version of the code.
     stats = new TableRebalanceProgressStats();
-    stats.setStatus("FAILED");
+    stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(4000);
     jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job4", stats, null);
-    jobMetadata.remove(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_RETRY_CONFIG);
+    jobMetadata.remove(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_ATTEMPT_CONTEXT);
     allJobMetadata.put("job4", jobMetadata);
 
     // Only need to retry job1 and job3, as job2 is completed and job4 is from old version of code.
-    Map<String, Set<Pair<TableRebalanceRetryConfig, Long>>> jobs =
+    Map<String, Set<Pair<TableRebalanceAttemptContext, Long>>> jobs =
         RebalanceChecker.getCandidateJobs(tableName, allJobMetadata);
     assertEquals(jobs.size(), 2);
     assertTrue(jobs.containsKey("job1"));
@@ -145,13 +141,12 @@ public class RebalanceCheckerTest {
 
     // Add latest job5 that's already done, thus no need to retry for table.
     jobCfg = new RebalanceConfig();
-    jobCfg.setJobId("job5");
-    jobCfg.setMaxRetry(3);
+    jobCfg.setMaxAttempts(4);
     stats = new TableRebalanceProgressStats();
-    stats.setStatus("DONE");
+    stats.setStatus(RebalanceResult.Status.DONE);
     stats.setStartTimeMs(5000);
-    retryCfg = TableRebalanceRetryConfig.forInitialRun("job5", jobCfg);
-    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job5", stats, retryCfg);
+    jobCtx = TableRebalanceAttemptContext.forInitialAttempt("job5", jobCfg);
+    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job5", stats, jobCtx);
     allJobMetadata.put("job5", jobMetadata);
     jobs = RebalanceChecker.getCandidateJobs(tableName, allJobMetadata);
     assertEquals(jobs.size(), 0);
@@ -159,30 +154,29 @@ public class RebalanceCheckerTest {
 
   @Test
   public void testGetLatestJob() {
-    Map<String, Set<Pair<TableRebalanceRetryConfig, Long>>> jobs = new HashMap<>();
-    // The most recent job run is job1_2, and within 3 maxRetry.
-    jobs.put("job1", ImmutableSet.of(Pair.of(createDummyRetryJobCfg("job1", "job1", 0), 10L),
-        Pair.of(createDummyRetryJobCfg("job1_1", "job1", 1), 20L),
-        Pair.of(createDummyRetryJobCfg("job1_2", "job1", 2), 1020L)));
-    jobs.put("job2", ImmutableSet.of(Pair.of(createDummyRetryJobCfg("job2", "job2", 0), 1000L)));
-    Pair<TableRebalanceRetryConfig, Long> jobTime = RebalanceChecker.getLatestJob(jobs);
+    Map<String, Set<Pair<TableRebalanceAttemptContext, Long>>> jobs = new HashMap<>();
+    // The most recent job run is job1_3, and within 3 maxAttempts.
+    jobs.put("job1",
+        ImmutableSet.of(Pair.of(createDummyJobCtx("job1", 1), 10L), Pair.of(createDummyJobCtx("job1", 2), 20L),
+            Pair.of(createDummyJobCtx("job1", 3), 1020L)));
+    jobs.put("job2", ImmutableSet.of(Pair.of(createDummyJobCtx("job2", 1), 1000L)));
+    Pair<TableRebalanceAttemptContext, Long> jobTime = RebalanceChecker.getLatestJob(jobs);
     assertNotNull(jobTime);
-    assertEquals(jobTime.getLeft().getConfig().getJobId(), "job1_2");
+    assertEquals(jobTime.getLeft().getJobId(), "job1_3");
 
-    // The most recent job run is job1_3, but reached 3 maxRetry.
-    jobs.put("job1", ImmutableSet.of(Pair.of(createDummyRetryJobCfg("job1", "job1", 0), 10L),
-        Pair.of(createDummyRetryJobCfg("job1_1", "job1", 1), 20L),
-        Pair.of(createDummyRetryJobCfg("job1_2", "job1", 2), 1020L),
-        Pair.of(createDummyRetryJobCfg("job1_3", "job1", 3), 2020L)));
+    // The most recent job run is job1_4, but reached 3 maxAttempts.
+    jobs.put("job1",
+        ImmutableSet.of(Pair.of(createDummyJobCtx("job1", 1), 10L), Pair.of(createDummyJobCtx("job1", 2), 20L),
+            Pair.of(createDummyJobCtx("job1", 3), 1020L), Pair.of(createDummyJobCtx("job1", 4), 2020L)));
     jobTime = RebalanceChecker.getLatestJob(jobs);
     assertNotNull(jobTime);
-    assertEquals(jobTime.getLeft().getConfig().getJobId(), "job2");
+    assertEquals(jobTime.getLeft().getJobId(), "job2");
 
     // Add job3 that's started more recently.
-    jobs.put("job3", ImmutableSet.of(Pair.of(createDummyRetryJobCfg("job3", "job3", 0), 3000L)));
+    jobs.put("job3", ImmutableSet.of(Pair.of(createDummyJobCtx("job3", 1), 3000L)));
     jobTime = RebalanceChecker.getLatestJob(jobs);
     assertNotNull(jobTime);
-    assertEquals(jobTime.getLeft().getConfig().getJobId(), "job3");
+    assertEquals(jobTime.getLeft().getJobId(), "job3");
 
     // Remove job2 and job3, and we'd have no job to retry then.
     jobs.remove("job2");
@@ -197,52 +191,47 @@ public class RebalanceCheckerTest {
     String tableName = "table01";
     LeadControllerManager leadController = mock(LeadControllerManager.class);
     ControllerMetrics metrics = mock(ControllerMetrics.class);
-    ExecutorService exec = Executors.newCachedThreadPool();
+    ExecutorService exec = MoreExecutors.newDirectExecutorService();
     ControllerConf cfg = new ControllerConf();
-    cfg.setRebalanceCheckerCheckOnly(false);
 
     Map<String, Map<String, String>> allJobMetadata = new HashMap<>();
     // Original job run as job1, and all its retry jobs failed too.
     RebalanceConfig jobCfg = new RebalanceConfig();
-    jobCfg.setJobId("job1");
-    jobCfg.setMaxRetry(3);
+    jobCfg.setMaxAttempts(4);
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
-    stats.setStatus("FAILED");
+    stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(1000);
-    TableRebalanceRetryConfig retryCfg = TableRebalanceRetryConfig.forInitialRun("job1", jobCfg);
-    Map<String, String> jobMetadata =
-        ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, retryCfg);
+    TableRebalanceAttemptContext jobCtx = TableRebalanceAttemptContext.forInitialAttempt("job1", jobCfg);
+    Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
     allJobMetadata.put("job1", jobMetadata);
     // 3 failed retry runs for job1
-    jobMetadata = createDummyRetryJob(tableName, "job1_1", "job1", 1, 1100, "FAILED");
-    allJobMetadata.put("job1_1", jobMetadata);
-    jobMetadata = createDummyRetryJob(tableName, "job1_2", "job1", 2, 1200, "FAILED");
+    jobMetadata = createDummyJobMetadata(tableName, "job1", 2, 1100, RebalanceResult.Status.FAILED);
     allJobMetadata.put("job1_2", jobMetadata);
-    jobMetadata = createDummyRetryJob(tableName, "job1_3", "job1", 3, 5300, "FAILED");
+    jobMetadata = createDummyJobMetadata(tableName, "job1", 3, 1200, RebalanceResult.Status.FAILED);
     allJobMetadata.put("job1_3", jobMetadata);
+    jobMetadata = createDummyJobMetadata(tableName, "job1", 4, 5300, RebalanceResult.Status.FAILED);
+    allJobMetadata.put("job1_4", jobMetadata);
 
     // Original job run as job2, and its retry job job2_1 completed.
     jobCfg = new RebalanceConfig();
-    jobCfg.setJobId("job2");
-    jobCfg.setMaxRetry(3);
+    jobCfg.setMaxAttempts(4);
     stats = new TableRebalanceProgressStats();
-    stats.setStatus("FAILED");
+    stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(2000);
-    retryCfg = TableRebalanceRetryConfig.forInitialRun("job2", jobCfg);
-    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job2", stats, retryCfg);
+    jobCtx = TableRebalanceAttemptContext.forInitialAttempt("job2", jobCfg);
+    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job2", stats, jobCtx);
     allJobMetadata.put("job2", jobMetadata);
-    jobMetadata = createDummyRetryJob(tableName, "job2_1", "job2", 1, 2100, "DONE");
-    allJobMetadata.put("job2_1", jobMetadata);
+    jobMetadata = createDummyJobMetadata(tableName, "job2", 2, 2100, RebalanceResult.Status.DONE);
+    allJobMetadata.put("job2_2", jobMetadata);
 
     // Original job run as job3, and failed to send out heartbeat in time.
     jobCfg = new RebalanceConfig();
-    jobCfg.setJobId("job3");
-    jobCfg.setMaxRetry(3);
+    jobCfg.setMaxAttempts(4);
     stats = new TableRebalanceProgressStats();
-    stats.setStatus("IN_PROGRESS");
+    stats.setStatus(RebalanceResult.Status.IN_PROGRESS);
     stats.setStartTimeMs(3000);
-    retryCfg = TableRebalanceRetryConfig.forInitialRun("job3", jobCfg);
-    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job3", stats, retryCfg);
+    jobCtx = TableRebalanceAttemptContext.forInitialAttempt("job3", jobCfg);
+    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job3", stats, jobCtx);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "3000");
     allJobMetadata.put("job3", jobMetadata);
 
@@ -251,17 +240,17 @@ public class RebalanceCheckerTest {
         Collections.singleton(ControllerJobType.TABLE_REBALANCE))).thenReturn(allJobMetadata);
     TableConfig tableConfig = mock(TableConfig.class);
     RebalanceChecker checker = new RebalanceChecker(helixManager, leadController, cfg, metrics, exec);
-    // Although job1_3 was submitted most recently but job1 had exceeded maxRetry. Chose job3 to retry, which got
+    // Although job1_3 was submitted most recently but job1 had exceeded maxAttempts. Chose job3 to retry, which got
     // stuck at in progress status.
-    checker.retryRebalanceTable(tableName, tableConfig);
-    // The new retry job is for job3 and retryNum is increased to 1.
+    checker.retryRebalanceTable(tableName, tableConfig, allJobMetadata);
+    // The new retry job is for job3 and attemptId is increased to 2.
     ArgumentCaptor<ZkBasedTableRebalanceObserver> observerCaptor =
         ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
     verify(helixManager, times(1)).rebalanceTable(eq(tableName), any(), anyString(), any(), observerCaptor.capture());
     ZkBasedTableRebalanceObserver observer = observerCaptor.getValue();
-    retryCfg = observer.getTableRebalanceJobRetryConfig();
-    assertEquals(retryCfg.getOriginalJobId(), "job3");
-    assertEquals(retryCfg.getRetryNum(), 1);
+    jobCtx = observer.getTableRebalanceAttemptContext();
+    assertEquals(jobCtx.getOriginalJobId(), "job3");
+    assertEquals(jobCtx.getAttemptId(), 2);
   }
 
   @Test
@@ -270,30 +259,25 @@ public class RebalanceCheckerTest {
     String tableName = "table01";
     LeadControllerManager leadController = mock(LeadControllerManager.class);
     ControllerMetrics metrics = mock(ControllerMetrics.class);
-    ExecutorService exec = Executors.newCachedThreadPool();
+    ExecutorService exec = MoreExecutors.newDirectExecutorService();
     ControllerConf cfg = new ControllerConf();
-    cfg.setRebalanceCheckerCheckOnly(false);
 
     Map<String, Map<String, String>> allJobMetadata = new HashMap<>();
     // Original job run as job1, and all its retry jobs failed too.
     RebalanceConfig jobCfg = new RebalanceConfig();
-    jobCfg.setJobId("job1");
-    jobCfg.setMaxRetry(3);
+    jobCfg.setMaxAttempts(4);
     long nowMs = System.currentTimeMillis();
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
-    stats.setStatus("FAILED");
+    stats.setStatus(RebalanceResult.Status.FAILED);
     stats.setStartTimeMs(nowMs);
-    TableRebalanceRetryConfig retryCfg = TableRebalanceRetryConfig.forInitialRun("job1", jobCfg);
-    Map<String, String> jobMetadata =
-        ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, retryCfg);
+    TableRebalanceAttemptContext jobCtx = TableRebalanceAttemptContext.forInitialAttempt("job1", jobCfg);
+    Map<String, String> jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
     allJobMetadata.put("job1", jobMetadata);
 
     PinotHelixResourceManager helixManager = mock(PinotHelixResourceManager.class);
-    when(helixManager.getAllJobsForTable(tableName,
-        Collections.singleton(ControllerJobType.TABLE_REBALANCE))).thenReturn(allJobMetadata);
     TableConfig tableConfig = mock(TableConfig.class);
     RebalanceChecker checker = new RebalanceChecker(helixManager, leadController, cfg, metrics, exec);
-    checker.retryRebalanceTable(tableName, tableConfig);
+    checker.retryRebalanceTable(tableName, tableConfig, allJobMetadata);
     // Retry for job1 is delayed with 5min backoff.
     ArgumentCaptor<ZkBasedTableRebalanceObserver> observerCaptor =
         ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
@@ -301,11 +285,10 @@ public class RebalanceCheckerTest {
 
     // Set initial delay to 0 to disable retry backoff.
     jobCfg.setRetryInitialDelayInMs(0);
-    jobMetadata =
-        ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, retryCfg);
+    jobMetadata = ZkBasedTableRebalanceObserver.createJobMetadata(tableName, "job1", stats, jobCtx);
     allJobMetadata.put("job1", jobMetadata);
-    checker.retryRebalanceTable(tableName, tableConfig);
-    // Retry for job1 is delayed with 5min backoff.
+    checker.retryRebalanceTable(tableName, tableConfig, allJobMetadata);
+    // Retry for job1 is delayed with 0 backoff.
     observerCaptor = ArgumentCaptor.forClass(ZkBasedTableRebalanceObserver.class);
     verify(helixManager, times(1)).rebalanceTable(eq(tableName), any(), anyString(), any(), observerCaptor.capture());
   }
@@ -352,27 +335,26 @@ public class RebalanceCheckerTest {
     assertTrue(expectedJobs02.contains("job4"));
   }
 
-  private static TableRebalanceRetryConfig createDummyRetryJobCfg(String retryJobId, String originalJobId,
-      int retryNum) {
-    TableRebalanceRetryConfig retryCfg = new TableRebalanceRetryConfig();
+  private static TableRebalanceAttemptContext createDummyJobCtx(String originalJobId, int attemptId) {
+    TableRebalanceAttemptContext jobCtx = new TableRebalanceAttemptContext();
     RebalanceConfig cfg = new RebalanceConfig();
-    cfg.setMaxRetry(3);
-    cfg.setJobId(retryJobId);
-    retryCfg.setOriginalJobId(originalJobId);
-    retryCfg.setRetryNum(retryNum);
-    retryCfg.setConfig(cfg);
-    return retryCfg;
+    cfg.setMaxAttempts(4);
+    jobCtx.setJobId(TableRebalanceAttemptContext.createAttemptJobId(originalJobId, attemptId));
+    jobCtx.setOriginalJobId(originalJobId);
+    jobCtx.setConfig(cfg);
+    jobCtx.setAttemptId(attemptId);
+    return jobCtx;
   }
 
-  private static Map<String, String> createDummyRetryJob(String tableName, String retryJobId, String originalJobId,
-      int retryNum, long startTimeMs, String status) {
+  private static Map<String, String> createDummyJobMetadata(String tableName, String originalJobId, int attemptId,
+      long startTimeMs, RebalanceResult.Status status) {
     RebalanceConfig cfg = new RebalanceConfig();
-    cfg.setJobId(retryJobId);
-    cfg.setMaxRetry(3);
+    cfg.setMaxAttempts(4);
     TableRebalanceProgressStats stats = new TableRebalanceProgressStats();
     stats.setStatus(status);
     stats.setStartTimeMs(startTimeMs);
-    TableRebalanceRetryConfig retryCfg = TableRebalanceRetryConfig.forRetryRun(originalJobId, cfg, retryNum);
-    return ZkBasedTableRebalanceObserver.createJobMetadata(tableName, retryJobId, stats, retryCfg);
+    TableRebalanceAttemptContext jobCtx = TableRebalanceAttemptContext.forRetry(originalJobId, cfg, attemptId);
+    String attemptJobId = originalJobId + "_" + attemptId;
+    return ZkBasedTableRebalanceObserver.createJobMetadata(tableName, attemptJobId, stats, jobCtx);
   }
 }

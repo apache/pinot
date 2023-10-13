@@ -147,7 +147,7 @@ import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceRetryConfig;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceAttemptContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
@@ -3188,7 +3188,7 @@ public class PinotHelixResourceManager {
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
     if (trackRebalanceProgress) {
       zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId,
-          TableRebalanceRetryConfig.forInitialRun(rebalanceJobId, rebalanceConfig), this);
+          TableRebalanceAttemptContext.forInitialAttempt(rebalanceJobId, rebalanceConfig), this);
     }
     return rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig,
         zkBasedTableRebalanceObserver);

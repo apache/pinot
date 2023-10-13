@@ -42,13 +42,14 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private final String _rebalanceJobId;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final TableRebalanceProgressStats _tableRebalanceProgressStats;
-  private final TableRebalanceRetryConfig _tableRebalanceJobRetryConfig;
+  private final TableRebalanceAttemptContext _tableRebalanceAttemptContext;
   private long _lastUpdateTimeMs;
   // Keep track of number of updates. Useful during debugging.
   private int _numUpdatesToZk;
+  private boolean _isAborted;
 
   public ZkBasedTableRebalanceObserver(String tableNameWithType, String rebalanceJobId,
-      TableRebalanceRetryConfig tableRebalanceJobRetryConfig, PinotHelixResourceManager pinotHelixResourceManager) {
+      TableRebalanceAttemptContext tableRebalanceAttemptContext, PinotHelixResourceManager pinotHelixResourceManager) {
     Preconditions.checkState(tableNameWithType != null, "Table name cannot be null");
     Preconditions.checkState(rebalanceJobId != null, "rebalanceId cannot be null");
     Preconditions.checkState(pinotHelixResourceManager != null, "PinotHelixManager cannot be null");
@@ -56,7 +57,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     _rebalanceJobId = rebalanceJobId;
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _tableRebalanceProgressStats = new TableRebalanceProgressStats();
-    _tableRebalanceJobRetryConfig = tableRebalanceJobRetryConfig;
+    _tableRebalanceAttemptContext = tableRebalanceAttemptContext;
     _numUpdatesToZk = 0;
   }
 
@@ -96,7 +97,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     // The onTrigger method is mainly driven by the while loop of waiting for external view to converge to ideal
     // state. That while loop wait for at least externalViewCheckIntervalInMs. So the real interval to send out
     // heartbeat is the max(heartbeat_interval, externalViewCheckIntervalInMs);
-    long heartbeatIntervalInMs = _tableRebalanceJobRetryConfig.getConfig().getHeartbeatIntervalInMs();
+    long heartbeatIntervalInMs = _tableRebalanceAttemptContext.getConfig().getHeartbeatIntervalInMs();
     if (!updatedStatsInZk && System.currentTimeMillis() - _lastUpdateTimeMs > heartbeatIntervalInMs) {
       LOGGER.debug("Update status of rebalance job: {} for table: {} after {}ms as heartbeat", _rebalanceJobId,
           _tableNameWithType, heartbeatIntervalInMs);
@@ -106,10 +107,9 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   private void updateOnStart(Map<String, Map<String, String>> currentState,
       Map<String, Map<String, String>> targetState) {
-    Preconditions.checkState(
-        !RebalanceResult.Status.IN_PROGRESS.toString().equals(_tableRebalanceProgressStats.getStatus()),
+    Preconditions.checkState(RebalanceResult.Status.IN_PROGRESS != _tableRebalanceProgressStats.getStatus(),
         "Rebalance Observer onStart called multiple times");
-    _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.IN_PROGRESS.toString());
+    _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.IN_PROGRESS);
     _tableRebalanceProgressStats.setInitialToTargetStateConvergence(
         getDifferenceBetweenTableRebalanceStates(targetState, currentState));
     _tableRebalanceProgressStats.setStartTimeMs(System.currentTimeMillis());
@@ -117,12 +117,12 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   @Override
   public void onSuccess(String msg) {
-    Preconditions.checkState(!RebalanceResult.Status.DONE.toString().equals(_tableRebalanceProgressStats.getStatus()),
+    Preconditions.checkState(RebalanceResult.Status.DONE != _tableRebalanceProgressStats.getStatus(),
         "Table Rebalance already completed");
     long timeToFinishInSeconds = (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000L;
     _tableRebalanceProgressStats.setCompletionStatusMsg(msg);
     _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
-    _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.DONE.toString());
+    _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.DONE);
     // Zero out the in_progress convergence stats
     TableRebalanceProgressStats.RebalanceStateStats stats = new TableRebalanceProgressStats.RebalanceStateStats();
     _tableRebalanceProgressStats.setExternalViewToIdealStateConvergence(stats);
@@ -134,9 +134,14 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   public void onError(String errorMsg) {
     long timeToFinishInSeconds = (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000;
     _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
-    _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.FAILED.toString());
+    _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.FAILED);
     _tableRebalanceProgressStats.setCompletionStatusMsg(errorMsg);
     trackStatsInZk();
+  }
+
+  @Override
+  public boolean isAborted() {
+    return _isAborted;
   }
 
   public int getNumUpdatesToZk() {
@@ -144,14 +149,14 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   }
 
   @VisibleForTesting
-  TableRebalanceRetryConfig getTableRebalanceJobRetryConfig() {
-    return _tableRebalanceJobRetryConfig;
+  TableRebalanceAttemptContext getTableRebalanceAttemptContext() {
+    return _tableRebalanceAttemptContext;
   }
 
   private void trackStatsInZk() {
     Map<String, String> jobMetadata =
         createJobMetadata(_tableNameWithType, _rebalanceJobId, _tableRebalanceProgressStats,
-            _tableRebalanceJobRetryConfig);
+            _tableRebalanceAttemptContext);
     _pinotHelixResourceManager.addControllerJobToZK(_rebalanceJobId, jobMetadata,
         ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE),
         prevJobMetadata -> {
@@ -166,11 +171,13 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           } catch (JsonProcessingException ignore) {
             return true;
           }
-          boolean jobFailed =
-              prevStats != null && RebalanceResult.Status.FAILED.toString().equals(prevStats.getStatus());
-          Preconditions.checkState(!jobFailed, "Rebalance job: %s for table: %s has failed. Abort", _rebalanceJobId,
-              _tableNameWithType);
-          return true;
+          boolean isAborted = prevStats != null && RebalanceResult.Status.FAILED == prevStats.getStatus();
+          if (!isAborted) {
+            return true;
+          }
+          LOGGER.warn("Rebalance job: {} for table: {} has been aborted", _rebalanceJobId, _tableNameWithType);
+          _isAborted = isAborted;
+          return false;
         });
     _numUpdatesToZk++;
     _lastUpdateTimeMs = System.currentTimeMillis();
@@ -180,7 +187,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   @VisibleForTesting
   static Map<String, String> createJobMetadata(String tableNameWithType, String jobId,
-      TableRebalanceProgressStats tableRebalanceProgressStats, TableRebalanceRetryConfig tableRebalanceJobRetryConfig) {
+      TableRebalanceProgressStats tableRebalanceProgressStats,
+      TableRebalanceAttemptContext tableRebalanceAttemptContext) {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
@@ -194,8 +202,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           e);
     }
     try {
-      jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_RETRY_CONFIG,
-          JsonUtils.objectToString(tableRebalanceJobRetryConfig));
+      jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_ATTEMPT_CONTEXT,
+          JsonUtils.objectToString(tableRebalanceAttemptContext));
     } catch (JsonProcessingException e) {
       LOGGER.error("Error serialising retry configs for rebalance job: {} of table: {} to keep in ZK", jobId,
           tableNameWithType, e);

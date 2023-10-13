@@ -142,14 +142,15 @@ public class TableRebalancer {
       @Nullable String rebalanceJobId) {
     long startTime = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
-    String status = "ABORTED";
+    // Use ERROR status to count the unexpected exceptions.
+    RebalanceResult.Status status = RebalanceResult.Status.ERROR;
     try {
       RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId);
-      status = result.getStatus().toString();
+      status = result.getStatus();
       return result;
     } finally {
       if (_controllerMetrics != null) {
-        _controllerMetrics.addTimedTableValue(String.format("%s.%s", tableNameWithType, status),
+        _controllerMetrics.addTimedTableValue(String.format("%s.%s", tableNameWithType, status.toString()),
             ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS, System.currentTimeMillis() - startTime,
             TimeUnit.MILLISECONDS);
       }
@@ -711,6 +712,9 @@ public class TableRebalancer {
         _tableRebalanceObserver.onTrigger(
             TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
             externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields());
+        if (_tableRebalanceObserver.isAborted()) {
+          throw new RuntimeException(String.format("Rebalance for table: %s has been aborted", tableNameWithType));
+        }
         if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
             idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)) {
           LOGGER.info("ExternalView converged for table: {}", tableNameWithType);

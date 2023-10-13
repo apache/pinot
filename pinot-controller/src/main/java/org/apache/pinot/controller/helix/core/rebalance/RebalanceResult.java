@@ -87,6 +87,6 @@ public class RebalanceResult {
   }
 
   public enum Status {
-    NO_OP, DONE, FAILED, IN_PROGRESS
+    NO_OP, DONE, FAILED, IN_PROGRESS, ERROR
   }
 }

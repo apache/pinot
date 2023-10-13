@@ -43,4 +43,6 @@ public interface TableRebalanceObserver {
   void onSuccess(String msg);
 
   void onError(String errorMsg);
+
+  boolean isAborted();
 }

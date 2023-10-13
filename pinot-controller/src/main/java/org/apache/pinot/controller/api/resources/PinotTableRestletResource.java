@@ -96,7 +96,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceRetryConfig;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceAttemptContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
@@ -620,9 +620,9 @@ public class PinotTableRestletResource {
       @QueryParam("heartbeatIntervalInMs") long heartbeatIntervalInMs,
       @ApiParam(value = "How long to wait for next status update (i.e. heartbeat) before the job is considered failed")
       @DefaultValue("3600000") @QueryParam("heartbeatTimeoutInMs") long heartbeatTimeoutInMs,
-      @ApiParam(value = "Max times to retry the rebalance job") @DefaultValue("3") @QueryParam("maxRetry") int maxRetry,
-      @ApiParam(value = "Initial delay to exponentially backoff retry") @DefaultValue("300000")
-      @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
+      @ApiParam(value = "Max number of attempts to rebalance") @DefaultValue("3") @QueryParam("maxAttempts")
+      int maxAttempts, @ApiParam(value = "Initial delay to exponentially backoff retry") @DefaultValue("300000")
+  @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
       @QueryParam("updateTargetTier") boolean updateTargetTier) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
@@ -640,7 +640,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setHeartbeatIntervalInMs(heartbeatIntervalInMs);
     heartbeatTimeoutInMs = Math.max(heartbeatTimeoutInMs, 3 * heartbeatIntervalInMs);
     rebalanceConfig.setHeartbeatTimeoutInMs(heartbeatTimeoutInMs);
-    rebalanceConfig.setMaxRetry(maxRetry);
+    rebalanceConfig.setMaxAttempts(maxAttempts);
     rebalanceConfig.setRetryInitialDelayInMs(retryInitialDelayInMs);
     rebalanceConfig.setUpdateTargetTier(updateTargetTier);
     String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
@@ -760,17 +760,17 @@ public class PinotTableRestletResource {
     serverRebalanceJobStatusResponse.setTableRebalanceProgressStats(tableRebalanceProgressStats);
 
     long timeSinceStartInSecs = 0L;
-    if (!RebalanceResult.Status.DONE.toString().equals(tableRebalanceProgressStats.getStatus())) {
+    if (RebalanceResult.Status.DONE != tableRebalanceProgressStats.getStatus()) {
       timeSinceStartInSecs = (System.currentTimeMillis() - tableRebalanceProgressStats.getStartTimeMs()) / 1000;
     }
     serverRebalanceJobStatusResponse.setTimeElapsedSinceStartInSeconds(timeSinceStartInSecs);
 
     String retryConfigInStr =
-        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_RETRY_CONFIG);
+        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_ATTEMPT_CONTEXT);
     if (StringUtils.isNotEmpty(retryConfigInStr)) {
-      TableRebalanceRetryConfig tableRebalanceRetryConfig =
-          JsonUtils.stringToObject(retryConfigInStr, TableRebalanceRetryConfig.class);
-      serverRebalanceJobStatusResponse.setTableRebalanceRetryConfig(tableRebalanceRetryConfig);
+      TableRebalanceAttemptContext tableRebalanceAttemptContext =
+          JsonUtils.stringToObject(retryConfigInStr, TableRebalanceAttemptContext.class);
+      serverRebalanceJobStatusResponse.setTableRebalanceAttemptContext(tableRebalanceAttemptContext);
     }
     return serverRebalanceJobStatusResponse;
   }

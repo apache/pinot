@@ -201,7 +201,6 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtimeSegmentRelocation.initialDelayInSeconds";
     public static final String REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.rebalanceChecker.initialDelayInSeconds";
-    public static final String REBALANCE_CHECKER_CHECK_ONLY = "controller.rebalanceChecker.checkOnly";
     public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
         "controller.segmentRelocator.initialDelayInSeconds";
     public static final String SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION =
@@ -625,14 +624,6 @@ public class ControllerConf extends PinotConfiguration {
   public long getRebalanceCheckerInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
-  }
-
-  public boolean isRebalanceCheckerCheckOnly() {
-    return getProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_CHECK_ONLY, true);
-  }
-
-  public void setRebalanceCheckerCheckOnly(boolean checkOnly) {
-    setProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_CHECK_ONLY, checkOnly);
   }
 
   public int getRealtimeConsumerMonitorRunFrequency() {

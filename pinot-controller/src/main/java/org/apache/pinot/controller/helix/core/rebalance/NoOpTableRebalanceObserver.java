@@ -36,4 +36,9 @@ public class NoOpTableRebalanceObserver implements TableRebalanceObserver {
   @Override
   public void onError(String errorMsg) {
   }
+
+  @Override
+  public boolean isAborted() {
+    return false;
+  }
 }

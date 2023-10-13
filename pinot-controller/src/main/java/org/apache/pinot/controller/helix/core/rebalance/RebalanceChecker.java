@@ -23,7 +23,9 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.lang3.RandomUtils;
@@ -31,6 +33,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -52,7 +55,6 @@ import org.slf4j.LoggerFactory;
 public class RebalanceChecker extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RebalanceChecker.class);
   private static final double RETRY_DELAY_SCALE_FACTOR = 2.0;
-  private final boolean _checkOnly;
   private final ExecutorService _executorService;
 
   public RebalanceChecker(PinotHelixResourceManager pinotHelixResourceManager,
@@ -61,34 +63,55 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     super(RebalanceChecker.class.getSimpleName(), config.getRebalanceCheckerFrequencyInSeconds(),
         config.getRebalanceCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
-    _checkOnly = config.isRebalanceCheckerCheckOnly();
     _executorService = executorService;
+  }
+
+  protected void processTables(List<String> tableNamesWithType, Properties periodicTaskProperties) {
+    int numTables = tableNamesWithType.size();
+    LOGGER.info("Processing {} tables in task: {}", numTables, _taskName);
+    int numTablesProcessed = 0;
+    for (String tableNameWithType : tableNamesWithType) {
+      if (!isStarted()) {
+        LOGGER.info("Task: {} is stopped, early terminate the task", _taskName);
+        break;
+      }
+      try {
+        processTable(tableNameWithType);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while processing table: {} in task: {}", tableNameWithType, _taskName, e);
+        _controllerMetrics.addMeteredTableValue(tableNameWithType + "." + _taskName,
+            ControllerMeter.PERIODIC_TASK_ERROR, 1L);
+      }
+      numTablesProcessed++;
+    }
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, _taskName,
+        numTablesProcessed);
+    LOGGER.info("Finish processing {}/{} tables in task: {}", numTablesProcessed, numTables, _taskName);
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
-    _executorService.submit(() -> {
-      try {
-        LOGGER.info("Start to retry rebalance for table: {}", tableNameWithType);
-        TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-        Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
-        retryRebalanceTable(tableNameWithType, tableConfig);
-      } catch (Throwable t) {
-        LOGGER.error("Failed to retry rebalance for table: {}", tableNameWithType, t);
+    try {
+      LOGGER.info("Start to retry rebalance for table: {}", tableNameWithType);
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
+      // Get all rebalance jobs as tracked in ZK for this table to check if there is any failure to retry.
+      Map<String, Map<String, String>> allJobMetadata = _pinotHelixResourceManager.getAllJobsForTable(tableNameWithType,
+          Collections.singleton(ControllerJobType.TABLE_REBALANCE));
+      if (allJobMetadata.isEmpty()) {
+        LOGGER.info("No rebalance job has been triggered for table: {}. Skip retry", tableNameWithType);
+        return;
       }
-    });
+      retryRebalanceTable(tableNameWithType, tableConfig, allJobMetadata);
+    } catch (Exception e) {
+      LOGGER.error("Failed to retry rebalance for table: {}", tableNameWithType, e);
+    }
   }
 
   @VisibleForTesting
-  void retryRebalanceTable(String tableNameWithType, TableConfig tableConfig)
+  void retryRebalanceTable(String tableNameWithType, TableConfig tableConfig,
+      Map<String, Map<String, String>> allJobMetadata)
       throws Exception {
-    // Get all rebalance jobs as tracked in ZK for this table to check if there is any failure to retry.
-    Map<String, Map<String, String>> allJobMetadata = _pinotHelixResourceManager.getAllJobsForTable(tableNameWithType,
-        Collections.singleton(ControllerJobType.TABLE_REBALANCE));
-    if (allJobMetadata.isEmpty()) {
-      LOGGER.info("No rebalance job has been triggered for table: {}. Skip retry", tableNameWithType);
-      return;
-    }
     // Skip retry for the table if rebalance job is still running or has completed, in specific:
     // 1) Skip retry if any rebalance job is actively running. Being actively running means the job is at IN_PROGRESS
     // status, and has updated its status kept in ZK within the heartbeat timeout. It's possible that more than one
@@ -101,53 +124,60 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     // 1) Firstly, group them by the original jobIds they retry for so that we can skip those exceeded maxRetry.
     // 2) For the remaining jobs, we take the one started most recently and retry it with its original configs.
     // 3) If configured, we can abort the other rebalance jobs for the table by setting their status to FAILED.
-    Map<String/*original jobId*/, Set<Pair<TableRebalanceRetryConfig/*original or retry jobId*/, Long
-        /*job startTime*/>>> candidateJobs = getCandidateJobs(tableNameWithType, allJobMetadata);
+    Map<String/*original jobId*/, Set<Pair<TableRebalanceAttemptContext/*job attempts*/, Long
+        /*startTime*/>>> candidateJobs = getCandidateJobs(tableNameWithType, allJobMetadata);
     if (candidateJobs.isEmpty()) {
       LOGGER.info("Found no failed rebalance jobs for table: {}. Skip retry", tableNameWithType);
       return;
     }
     _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.TABLE_REBALANCE_FAILURE_DETECTED, 1L);
-    if (_checkOnly) {
-      LOGGER.info("Found failed rebalance jobs: {} for table: {}, but check only", candidateJobs.keySet(),
-          tableNameWithType);
-      return;
-    }
-    Pair<TableRebalanceRetryConfig, Long> retryConfigAndStartTime = getLatestJob(candidateJobs);
-    if (retryConfigAndStartTime == null) {
+    Pair<TableRebalanceAttemptContext, Long> jobContextAndStartTime = getLatestJob(candidateJobs);
+    if (jobContextAndStartTime == null) {
       LOGGER.info("Rebalance has been retried too many times for table: {}. Skip retry", tableNameWithType);
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.TABLE_REBALANCE_RETRY_TOO_MANY_TIMES,
           1L);
       return;
     }
-    TableRebalanceRetryConfig retryConfig = retryConfigAndStartTime.getLeft();
-    RebalanceConfig rebalanceConfig = retryConfig.getConfig();
-    String prevJobId = rebalanceConfig.getJobId();
-    long jobStartTimeMs = retryConfigAndStartTime.getRight();
-    long retryDelayMs = getRetryDelayInMs(rebalanceConfig.getRetryInitialDelayInMs(), retryConfig.getRetryNum());
+    TableRebalanceAttemptContext jobCtx = jobContextAndStartTime.getLeft();
+    String prevJobId = jobCtx.getJobId();
+    RebalanceConfig rebalanceConfig = jobCtx.getConfig();
+    long jobStartTimeMs = jobContextAndStartTime.getRight();
+    long retryDelayMs = getRetryDelayInMs(rebalanceConfig.getRetryInitialDelayInMs(), jobCtx.getAttemptId());
     if (jobStartTimeMs + retryDelayMs > System.currentTimeMillis()) {
       LOGGER.info("Delay retry for failed rebalance job: {} that started at: {}, by: {}ms", prevJobId, jobStartTimeMs,
           retryDelayMs);
       return;
     }
     tryStopExistingJobs(tableNameWithType, _pinotHelixResourceManager);
-    String newJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
-    // Reset the JOB_ID of rebalanceConfig to be the new retry job ID.
-    rebalanceConfig.setJobId(newJobId);
-    ZkBasedTableRebalanceObserver observer = new ZkBasedTableRebalanceObserver(tableNameWithType, newJobId,
-        TableRebalanceRetryConfig.forRetryRun(retryConfig.getOriginalJobId(), rebalanceConfig,
-            retryConfig.getRetryNum() + 1), _pinotHelixResourceManager);
-    LOGGER.info("Retry rebalance job: {} for table: {} with new retry job: {}", prevJobId, tableNameWithType, newJobId);
+    _executorService.submit(() -> {
+      // Retry rebalance in another thread as rebalance can take time.
+      retryRebalanceTableWithContext(tableNameWithType, tableConfig, jobCtx);
+    });
+  }
+
+  private void retryRebalanceTableWithContext(String tableNameWithType, TableConfig tableConfig,
+      TableRebalanceAttemptContext jobCtx) {
+    String prevJobId = jobCtx.getJobId();
+    RebalanceConfig rebalanceConfig = jobCtx.getConfig();
+    TableRebalanceAttemptContext retryCtx =
+        TableRebalanceAttemptContext.forRetry(jobCtx.getOriginalJobId(), rebalanceConfig, jobCtx.getAttemptId() + 1);
+    String attemptJobId = retryCtx.getJobId();
+    LOGGER.info("Retry rebalance job: {} for table: {} with attempt job: {}", prevJobId, tableNameWithType,
+        attemptJobId);
     _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.TABLE_REBALANCE_RETRY, 1L);
+    ZkBasedTableRebalanceObserver observer =
+        new ZkBasedTableRebalanceObserver(tableNameWithType, attemptJobId, retryCtx, _pinotHelixResourceManager);
     RebalanceResult result =
-        _pinotHelixResourceManager.rebalanceTable(tableNameWithType, tableConfig, newJobId, rebalanceConfig, observer);
-    LOGGER.info("New retry job: {} for table: {} is done with result: {}", newJobId, tableNameWithType, result);
+        _pinotHelixResourceManager.rebalanceTable(tableNameWithType, tableConfig, attemptJobId, rebalanceConfig,
+            observer);
+    LOGGER.info("New attempt: {} for table: {} is done with result: {}", attemptJobId, tableNameWithType, result);
   }
 
   @VisibleForTesting
-  static long getRetryDelayInMs(long initDelayMs, int retryNum) {
+  static long getRetryDelayInMs(long initDelayMs, int attemptId) {
     // TODO: Just exponential backoff by factor 2 for now. Can add other retry polices as needed.
-    double minDelayMs = initDelayMs * Math.pow(RETRY_DELAY_SCALE_FACTOR, retryNum);
+    // The attemptId starts from 1, so minus one as the exponent.
+    double minDelayMs = initDelayMs * Math.pow(RETRY_DELAY_SCALE_FACTOR, attemptId - 1);
     double maxDelayMs = minDelayMs * RETRY_DELAY_SCALE_FACTOR;
     return RandomUtils.nextLong((long) minDelayMs, (long) maxDelayMs);
   }
@@ -166,7 +196,7 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       TableRebalanceProgressStats jobStats = JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
       LOGGER.info("Set status of rebalance job: {} for table: {} from: {} to: FAILED", jobId, tableNameWithType,
           jobStats.getStatus());
-      jobStats.setStatus(RebalanceResult.Status.FAILED.toString());
+      jobStats.setStatus(RebalanceResult.Status.FAILED);
       jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
           JsonUtils.objectToString(jobStats));
     } catch (Exception e) {
@@ -175,18 +205,18 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
   }
 
   @VisibleForTesting
-  static Pair<TableRebalanceRetryConfig, Long> getLatestJob(
-      Map<String, Set<Pair<TableRebalanceRetryConfig, Long>>> candidateJobs) {
-    Pair<TableRebalanceRetryConfig, Long> candidateJobRun = null;
-    for (Map.Entry<String, Set<Pair<TableRebalanceRetryConfig, Long>>> entry : candidateJobs.entrySet()) {
+  static Pair<TableRebalanceAttemptContext, Long> getLatestJob(
+      Map<String, Set<Pair<TableRebalanceAttemptContext, Long>>> candidateJobs) {
+    Pair<TableRebalanceAttemptContext, Long> candidateJobRun = null;
+    for (Map.Entry<String, Set<Pair<TableRebalanceAttemptContext, Long>>> entry : candidateJobs.entrySet()) {
       // The job configs from all retry jobs are same, as the same set of job configs is used to do retry.
       // The job metadata kept in ZK is cleaned by submission time order gradually, so we can't compare Set.size()
-      // against maxRetry, but check retryNum of each run to see if retries have exceeded limit.
-      Set<Pair<TableRebalanceRetryConfig, Long>> jobRuns = entry.getValue();
-      int maxRetry = jobRuns.iterator().next().getLeft().getConfig().getMaxRetry();
-      Pair<TableRebalanceRetryConfig, Long> latestJobRun = null;
-      for (Pair<TableRebalanceRetryConfig, Long> jobRun : jobRuns) {
-        if (jobRun.getLeft().getRetryNum() >= maxRetry) {
+      // against maxAttempts, but check retryNum of each run to see if retries have exceeded limit.
+      Set<Pair<TableRebalanceAttemptContext, Long>> jobRuns = entry.getValue();
+      int maxAttempts = jobRuns.iterator().next().getLeft().getConfig().getMaxAttempts();
+      Pair<TableRebalanceAttemptContext, Long> latestJobRun = null;
+      for (Pair<TableRebalanceAttemptContext, Long> jobRun : jobRuns) {
+        if (jobRun.getLeft().getAttemptId() >= maxAttempts) {
           latestJobRun = null;
           break;
         }
@@ -195,7 +225,7 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
         }
       }
       if (latestJobRun == null) {
-        LOGGER.info("Rebalance job: {} had exceeded maxRetry: {}. Skip retry", entry.getKey(), maxRetry);
+        LOGGER.info("Rebalance job: {} had exceeded maxAttempts: {}. Skip retry", entry.getKey(), maxAttempts);
         continue;
       }
       if (candidateJobRun == null || candidateJobRun.getRight() < latestJobRun.getRight()) {
@@ -206,11 +236,11 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
   }
 
   @VisibleForTesting
-  static Map<String, Set<Pair<TableRebalanceRetryConfig, Long>>> getCandidateJobs(String tableNameWithType,
+  static Map<String, Set<Pair<TableRebalanceAttemptContext, Long>>> getCandidateJobs(String tableNameWithType,
       Map<String, Map<String, String>> allJobMetadata)
       throws Exception {
     long nowMs = System.currentTimeMillis();
-    Map<String, Set<Pair<TableRebalanceRetryConfig, Long>>> candidates = new HashMap<>();
+    Map<String, Set<Pair<TableRebalanceAttemptContext, Long>>> candidates = new HashMap<>();
     // If the job started most recently has already completed, then skip retry for the table.
     Pair<String, Long> latestStartedJob = null;
     Pair<String, Long> latestCompletedJob = null;
@@ -226,19 +256,19 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
         LOGGER.info("Skip rebalance job: {} as it has no job progress stats", jobId);
         continue;
       }
-      String retryCfgInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_RETRY_CONFIG);
-      if (StringUtils.isEmpty(retryCfgInStr)) {
+      String jobCtxInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_ATTEMPT_CONTEXT);
+      if (StringUtils.isEmpty(jobCtxInStr)) {
         LOGGER.info("Skip rebalance job: {} as it has no job retry configs", jobId);
         continue;
       }
       TableRebalanceProgressStats jobStats = JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
-      TableRebalanceRetryConfig retryConfig = JsonUtils.stringToObject(retryCfgInStr, TableRebalanceRetryConfig.class);
+      TableRebalanceAttemptContext jobCtx = JsonUtils.stringToObject(jobCtxInStr, TableRebalanceAttemptContext.class);
       long jobStartTimeMs = jobStats.getStartTimeMs();
       if (latestStartedJob == null || latestStartedJob.getRight() < jobStartTimeMs) {
         latestStartedJob = Pair.of(jobId, jobStartTimeMs);
       }
-      String originalJobId = retryConfig.getOriginalJobId();
-      RebalanceResult.Status jobStatus = RebalanceResult.Status.valueOf(jobStats.getStatus());
+      String originalJobId = jobCtx.getOriginalJobId();
+      RebalanceResult.Status jobStatus = jobStats.getStatus();
       if (jobStatus == RebalanceResult.Status.DONE || jobStatus == RebalanceResult.Status.NO_OP) {
         LOGGER.info("Skip rebalance job: {} as it has completed with status: {}", jobId, jobStatus);
         completedOriginalJobs.put(originalJobId, jobId);
@@ -249,11 +279,11 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       }
       if (jobStatus == RebalanceResult.Status.FAILED) {
         LOGGER.info("Found failed rebalance job: {} for original job: {}", jobId, originalJobId);
-        candidates.computeIfAbsent(originalJobId, (k) -> new HashSet<>()).add(Pair.of(retryConfig, jobStartTimeMs));
+        candidates.computeIfAbsent(originalJobId, (k) -> new HashSet<>()).add(Pair.of(jobCtx, jobStartTimeMs));
         continue;
       }
       // Check if an IN_PROGRESS job is still actively running.
-      long heartbeatTimeoutMs = retryConfig.getConfig().getHeartbeatTimeoutInMs();
+      long heartbeatTimeoutMs = jobCtx.getConfig().getHeartbeatTimeoutInMs();
       if (nowMs - statsUpdatedAt < heartbeatTimeoutMs) {
         LOGGER.info("Rebalance job: {} is actively running with status updated at: {} within timeout: {}. Skip "
             + "retry for table: {}", jobId, statsUpdatedAt, heartbeatTimeoutMs, tableNameWithType);
@@ -263,7 +293,7 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       // rebalance jobs running in parallel for a table. The rebalance algorithm is idempotent, so this should be fine
       // for the correctness.
       LOGGER.info("Found stuck rebalance job: {} for original job: {}", jobId, originalJobId);
-      candidates.computeIfAbsent(originalJobId, (k) -> new HashSet<>()).add(Pair.of(retryConfig, jobStartTimeMs));
+      candidates.computeIfAbsent(originalJobId, (k) -> new HashSet<>()).add(Pair.of(jobCtx, jobStartTimeMs));
     }
     if (latestCompletedJob != null && latestCompletedJob.getLeft().equals(latestStartedJob.getLeft())) {
       LOGGER.info("Rebalance job: {} started most recently has already done. Skip retry for table: {}",
