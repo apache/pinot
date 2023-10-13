@@ -107,12 +107,12 @@ public class DistinctCountCPCSketchValueAggregatorTest {
     input1.update("hello".hashCode());
     DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     CpcSketch result = agg.applyRawValue(input1, "world");
-
     assertEquals(Math.round(result.getEstimate()), 2);
 
-    // and should update the max size
-    assertEquals(agg.getMaxAggregatedValueByteSize(), 20 // may change in future versions of datasketches
-    );
+    CpcSketch pristine = new CpcSketch();
+    pristine.update("hello");
+    pristine.update("world");
+    assertEquals(agg.getMaxAggregatedValueByteSize(), pristine.toByteArray().length);
   }
 
   @Test
@@ -121,13 +121,15 @@ public class DistinctCountCPCSketchValueAggregatorTest {
     input1.update("hello");
     DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
     String[] strings = {"hello", "world", "this", "is", "some", "strings"};
-    CpcSketch result = agg.applyRawValue(input1, (Object) strings);
+    CpcSketch result = agg.applyRawValue(input1, strings);
 
     assertEquals(Math.round(result.getEstimate()), 6);
 
-    // and should update the max size
-    assertEquals(agg.getMaxAggregatedValueByteSize(), 28 // may change in future versions of datasketches
-    );
+    CpcSketch pristine = new CpcSketch();
+    for (String value : strings) {
+      pristine.update(value);
+    }
+    assertEquals(agg.getMaxAggregatedValueByteSize(), pristine.toByteArray().length);
   }
 
   @Test

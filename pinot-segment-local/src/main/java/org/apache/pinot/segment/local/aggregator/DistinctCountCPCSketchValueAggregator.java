@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.StreamSupport;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -65,11 +63,15 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else if (rawValue instanceof byte[][]) { // Multiple Serialized Sketches
       byte[][] serializedSketches = (byte[][]) rawValue;
-      initialValue = StreamSupport.stream(Arrays.stream(serializedSketches).spliterator(), false)
-          .map(this::deserializeAggregatedValue).reduce(this::union).orElseGet(this::empty);
+      CpcUnion union = new CpcUnion(_lgK);
+      for (byte[] bytes : serializedSketches) {
+        union.update(deserializeAggregatedValue(bytes));
+      }
+      initialValue = union.getResult();
       updateMaxByteSize(initialValue);
     } else {
-      initialValue = singleItemSketch(rawValue);
+      initialValue = empty();
+      addObjectToSketch(rawValue, initialValue);
       updateMaxByteSize(initialValue);
     }
     return initialValue;
@@ -77,15 +79,16 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
 
   @Override
   public CpcSketch applyRawValue(CpcSketch value, Object rawValue) {
-    CpcSketch right;
     if (rawValue instanceof byte[]) {
-      right = deserializeAggregatedValue((byte[]) rawValue);
+      byte[] bytes = (byte[]) rawValue;
+      CpcSketch sketch = union(value, deserializeAggregatedValue(bytes));
+      updateMaxByteSize(sketch);
+      return sketch;
     } else {
-      right = singleItemSketch(rawValue);
+      addObjectToSketch(rawValue, value);
+      updateMaxByteSize(value);
+      return value;
     }
-    CpcSketch result = union(value, right);
-    updateMaxByteSize(result);
-    return result;
   }
 
   @Override
@@ -132,28 +135,23 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
     return union.getResult();
   }
 
-  /**
-   * Utility method to create a singleton CPC sketch
-   */
-  private CpcSketch singleItemSketch(Object rawValue) {
-    CpcSketch singleton = new CpcSketch(_lgK);
+  private void addObjectToSketch(Object rawValue, CpcSketch sketch) {
     if (rawValue instanceof String) {
-      singleton.update((String) rawValue);
+      sketch.update((String) rawValue);
     } else if (rawValue instanceof Integer) {
-      singleton.update((Integer) rawValue);
+      sketch.update((Integer) rawValue);
     } else if (rawValue instanceof Long) {
-      singleton.update((Long) rawValue);
+      sketch.update((Long) rawValue);
     } else if (rawValue instanceof Double) {
-      singleton.update((Double) rawValue);
+      sketch.update((Double) rawValue);
     } else if (rawValue instanceof Float) {
-      singleton.update((Float) rawValue);
+      sketch.update((Float) rawValue);
     } else if (rawValue instanceof Object[]) {
-      addObjectsToSketch((Object[]) rawValue, singleton);
+      addObjectsToSketch((Object[]) rawValue, sketch);
     } else {
       throw new IllegalStateException(
           "Unsupported data type for CPC Sketch aggregation: " + rawValue.getClass().getSimpleName());
     }
-    return singleton;
   }
 
   private void addObjectsToSketch(Object[] rawValues, CpcSketch sketch) {
