@@ -177,7 +177,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           }
           LOGGER.warn("Rebalance job: {} for table: {} has been aborted", _rebalanceJobId, _tableNameWithType);
           _isAborted = true;
-          // No need to update the job status if it's been aborted.
+          // No need to update the job status if it's been aborted, and keep the aborted status from being overwritten.
           return false;
         });
     _numUpdatesToZk++;

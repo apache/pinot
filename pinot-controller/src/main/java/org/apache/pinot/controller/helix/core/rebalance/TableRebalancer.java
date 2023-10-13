@@ -467,6 +467,9 @@ public class TableRebalancer {
 
       // Check version and update IdealState
       try {
+        if (_tableRebalanceObserver.isAborted()) {
+          throw new RuntimeException(String.format("Rebalance for table: %s has been aborted", tableNameWithType));
+        }
         Preconditions.checkState(_helixDataAccessor.getBaseDataAccessor()
                 .set(idealStatePropertyKey.getPath(), idealStateRecord, expectedVersion, AccessOption.PERSISTENT),
             "Failed to update IdealState");

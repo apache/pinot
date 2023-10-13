@@ -170,7 +170,8 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     RebalanceResult result =
         _pinotHelixResourceManager.rebalanceTable(tableNameWithType, tableConfig, attemptJobId, rebalanceConfig,
             observer);
-    LOGGER.info("New attempt: {} for table: {} is done with result: {}", attemptJobId, tableNameWithType, result);
+    LOGGER.info("New attempt: {} for table: {} is done with result status: {}", attemptJobId, tableNameWithType,
+        result.getStatus());
   }
 
   @VisibleForTesting
@@ -317,11 +318,11 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       return Collections.emptyMap();
     }
     for (String jobId : abortedOriginalJobs) {
-      LOGGER.info("Skip all jobs for original job: {} as attempts got aborted", jobId);
+      LOGGER.info("Skip original job: {} as it's aborted with retries being cancelled", jobId);
       candidates.remove(jobId);
     }
     for (Map.Entry<String, String> entry : completedOriginalJobs.entrySet()) {
-      LOGGER.info("Skip all jobs for original job: {} as it's completed by: {}", entry.getKey(), entry.getValue());
+      LOGGER.info("Skip original job: {} as it's completed by attempt: {}", entry.getKey(), entry.getValue());
       candidates.remove(entry.getKey());
     }
     return candidates;
