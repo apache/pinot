@@ -46,7 +46,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private long _lastUpdateTimeMs;
   // Keep track of number of updates. Useful during debugging.
   private int _numUpdatesToZk;
-  private boolean _isAborted;
+  private boolean _isAborted = false;
 
   public ZkBasedTableRebalanceObserver(String tableNameWithType, String rebalanceJobId,
       TableRebalanceAttemptContext tableRebalanceAttemptContext, PinotHelixResourceManager pinotHelixResourceManager) {
@@ -160,7 +160,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     _pinotHelixResourceManager.addControllerJobToZK(_rebalanceJobId, jobMetadata,
         ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE),
         prevJobMetadata -> {
-          // Abort the job when we're sure it has failed, otherwise continue to update the status.
+          // In addition to updating job progress status, the observer also checks if the job status is set to
+          // ABORTED by others. If so, we can keep this status to cancel the ongoing rebalance job.
           if (prevJobMetadata == null) {
             return true;
           }
@@ -171,12 +172,12 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           } catch (JsonProcessingException ignore) {
             return true;
           }
-          boolean isAborted = prevStats != null && RebalanceResult.Status.FAILED == prevStats.getStatus();
-          if (!isAborted) {
+          if (prevStats == null || RebalanceResult.Status.ABORTED != prevStats.getStatus()) {
             return true;
           }
           LOGGER.warn("Rebalance job: {} for table: {} has been aborted", _rebalanceJobId, _tableNameWithType);
-          _isAborted = isAborted;
+          _isAborted = true;
+          // No need to update the job status if it's been aborted.
           return false;
         });
     _numUpdatesToZk++;

@@ -95,8 +95,8 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceAttemptContext;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;

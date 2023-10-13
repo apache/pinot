@@ -142,8 +142,7 @@ public class TableRebalancer {
       @Nullable String rebalanceJobId) {
     long startTime = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
-    // Use ERROR status to count the unexpected exceptions.
-    RebalanceResult.Status status = RebalanceResult.Status.ERROR;
+    RebalanceResult.Status status = RebalanceResult.Status.UNKNOWN_ERROR;
     try {
       RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId);
       status = result.getStatus();

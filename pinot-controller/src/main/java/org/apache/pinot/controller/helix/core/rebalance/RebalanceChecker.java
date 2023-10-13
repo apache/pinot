@@ -194,9 +194,9 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     try {
       String jobStatsInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
       TableRebalanceProgressStats jobStats = JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
-      LOGGER.info("Set status of rebalance job: {} for table: {} from: {} to: FAILED", jobId, tableNameWithType,
+      LOGGER.info("Set status of rebalance job: {} for table: {} from: {} to: ABORTED", jobId, tableNameWithType,
           jobStats.getStatus());
-      jobStats.setStatus(RebalanceResult.Status.FAILED);
+      jobStats.setStatus(RebalanceResult.Status.ABORTED);
       jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
           JsonUtils.objectToString(jobStats));
     } catch (Exception e) {

@@ -87,6 +87,9 @@ public class RebalanceResult {
   }
 
   public enum Status {
-    NO_OP, DONE, FAILED, IN_PROGRESS, ERROR
+    // FAILED if the job has ended with known exceptions;
+    // ABORTED if the job is cancelled by others;
+    // UNKNOWN_ERROR if the job hits on an unexpected exception.
+    NO_OP, DONE, FAILED, IN_PROGRESS, ABORTED, UNKNOWN_ERROR
   }
 }

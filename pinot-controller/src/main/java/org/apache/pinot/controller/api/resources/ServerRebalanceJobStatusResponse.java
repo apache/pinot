@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceAttemptContext;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 
 
 public class ServerRebalanceJobStatusResponse {
