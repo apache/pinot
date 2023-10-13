@@ -2635,6 +2635,28 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Returns a map from server instance to list of online segments it serves for the given table.
+   */
+  public Map<String, List<String>> getServerToOnlineSegmentsMap(String tableNameWithType) {
+    Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
+    }
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      String segmentName = entry.getKey();
+      for (Map.Entry<String, String> e : entry.getValue().entrySet()) {
+        String server = e.getKey();
+        String status = e.getValue();
+        if (status.equals(SegmentStateModel.CONSUMING) || status.equals(SegmentStateModel.ONLINE)) {
+          serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
+        }
+      }
+    }
+    return serverToSegmentsMap;
+  }
+
+  /**
    * Returns a map from server instance to list of segments it serves for the given table.
    */
   public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {

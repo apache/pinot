@@ -665,7 +665,7 @@ public class PinotSegmentRestletResource {
         serverToSegments.put(server, segmentList);
       });
     } else {
-      serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+      serverToSegments = _pinotHelixResourceManager.getServerToOnlineSegmentsMap(tableNameWithType);
     }
 
     BiMap<String, String> serverEndPoints =
