@@ -1682,30 +1682,62 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return;
     }
 
-    // The overriding order for setting maxQueryResponseSizeBytes is: queryOption > tableConfig > BrokerInstanceConfig
+    // The overriding order of priority is:
+    // 1. QueryOption  -> maxServerResponseSizeBytes
+    // 2. QueryOption  -> maxQueryResponseSizeBytes
+    // 3. TableConfig  -> maxServerResponseSizeBytes
+    // 4. TableConfig  -> maxQueryResponseSizeBytes
+    // 5. BrokerConfig -> maxServerResponseSizeBytes
+    // 6. BrokerConfig -> maxServerResponseSizeBytes
+
+    // QueryOption
     if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
-      // QueryOption is set. Nothing more to do.
+      return;
+    }
+    if (QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions) != null) {
+      Long maxQueryResponseSize = QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions);
+      Long maxServerResponseSize = maxQueryResponseSize / numServers;
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxServerResponseSize));
       return;
     }
 
+    // TableConfig
     Preconditions.checkState(tableConfig != null);
     QueryConfig queryConfig = tableConfig.getQueryConfig();
-
-    Long maxQueryResponseSize;
+    if (queryConfig != null && queryConfig.getMaxServerResponseSizeBytes() != null) {
+      Long maxServerResponseSize = queryConfig.getMaxServerResponseSizeBytes();
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxServerResponseSize));
+      return;
+    }
     if (queryConfig != null && queryConfig.getMaxQueryResponseSizeBytes() != null) {
-      maxQueryResponseSize = queryConfig.getMaxQueryResponseSizeBytes();
+      Long maxQueryResponseSize = queryConfig.getMaxQueryResponseSizeBytes();
       Long maxServerResponseSize = maxQueryResponseSize / numServers;
       queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(maxServerResponseSize));
-    } else {
-      maxQueryResponseSize = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES,
-          Broker.DEFAULT_MAX_QUERY_RESPONSE_SIZE_BYTES);
-      Long maxServerResponseSize = maxQueryResponseSize / numServers;
+      _brokerMetrics.addMeteredTableValue(tableConfig.getTableName(), BrokerMeter.MAX_QUERY_RESPONSE_SIZE,
+          maxQueryResponseSize);
+      return;
+    }
+
+    // BrokerConfig
+    Long maxServerResponseSizeCfg = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES,
+        Broker.DEFAULT_MAX_SERVER_RESPONSE_SIZE_BYTES);
+    Long maxQueryResponseSizeCfg = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES,
+        Broker.DEFAULT_MAX_QUERY_RESPONSE_SIZE_BYTES);
+
+    if (maxServerResponseSizeCfg > 0) {
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxServerResponseSizeCfg));
+      return;
+    }
+    if (maxQueryResponseSizeCfg > 0) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MAX_QUERY_RESPONSE_SIZE, maxQueryResponseSizeCfg);
+      Long maxServerResponseSize = maxQueryResponseSizeCfg / numServers;
       queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(maxServerResponseSize));
     }
-    _brokerMetrics.addMeteredTableValue(tableConfig.getTableName(), BrokerMeter.MAX_QUERY_RESPONSE_SIZE,
-        maxQueryResponseSize);
   }
 
   /**
