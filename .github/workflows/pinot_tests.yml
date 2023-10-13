@@ -97,6 +97,21 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
+      - name: Build Project
+        env:
+          RUN_INTEGRATION_TESTS: false
+          RUN_TEST_SET: ${{ matrix.testset }}
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          MAVEN_OPTS: >
+            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+        run: .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
       - name: Unit Test
         env:
           RUN_INTEGRATION_TESTS: false
@@ -111,7 +126,7 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        run: .github/workflows/scripts/.pinot_test.sh
+        run: .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         continue-on-error: true
@@ -150,6 +165,20 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
+      - name: Build Project
+        env:
+          RUN_INTEGRATION_TESTS: true
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          MAVEN_OPTS: >
+            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+        run: .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
       - name: Integration Test
         env:
           RUN_INTEGRATION_TESTS: true
@@ -164,7 +193,7 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
-        run: .github/workflows/scripts/.pinot_test.sh
+        run: .github/workflows/scripts/pr-tests/.pinot_tests_integration.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         continue-on-error: true
@@ -172,6 +201,32 @@ jobs:
         with:
           flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
           name: codecov-integration-tests
+          fail_ci_if_error: false
+          verbose: true
+      - name: Custom Integration Test
+        if : ${{ matrix.testset == 1 }}
+        env:
+          RUN_INTEGRATION_TESTS: true
+          RUN_TEST_SET: ${{ matrix.testset }}
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          MAVEN_OPTS: >
+            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+        run: .github/workflows/scripts/pr-tests/.pinot_tests_custom_integration.sh
+      - name: Upload coverage to Codecov
+        if : ${{ matrix.testset == 1 }}
+        uses: codecov/codecov-action@v3
+        continue-on-error: true
+        timeout-minutes: 5
+        with:
+          flags: integration,custom-integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-custom-integration-tests
           fail_ci_if_error: false
           verbose: true
 
