@@ -65,13 +65,6 @@ public class BooleanUtils {
   }
 
   /**
-   * Returns the int value (1 for true, 0 for false) for the given boolean value.
-   */
-  public static int toInt(boolean booleanValue) {
-    return booleanValue ? INTERNAL_TRUE : INTERNAL_FALSE;
-  }
-
-  /**
    * Returns the boolean value for the given non-null Integer object (internal value for BOOLEAN).
    */
   public static boolean fromNonNullInternalValue(Object value) {

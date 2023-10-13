@@ -39,9 +39,9 @@ public class LiteralContext {
   private final Object _value;
 
   /**
-   * A transient field used for the type conversion, and is not included in {@link #equals} and {@link #hashCode}.
+   * This is used for type conversion, and is not included in {@link #equals} and {@link #hashCode}.
    */
-  private final transient PinotDataType _pinotDataType;
+  private final PinotDataType _pinotDataType;
 
   private Boolean _booleanValue;
   private Integer _intValue;

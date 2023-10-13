@@ -256,6 +256,9 @@ public class ServerPlanRequestUtils {
         Arrays.sort(arrFloat);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
           // TODO: Create float literal when it is supported
+          // NOTE: We cannot directly cast float to double here because we want to preserve the exact value. E.g. 0.05f
+          //       will be casted to 0.05000000074505806. Predicate evaluation uses string format to match the values,
+          //       so here we need to create the double value based on the string format of the float value.
           expressions.add(RequestUtils.getLiteralExpression(Double.parseDouble(Float.toString(arrFloat[rowIdx]))));
         }
         break;
