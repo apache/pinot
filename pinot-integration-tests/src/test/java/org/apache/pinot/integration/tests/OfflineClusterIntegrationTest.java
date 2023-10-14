@@ -998,6 +998,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFunctionWithLiteral(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    testQuery("SELECT SUM(10) FROM mytable");
+    testQuery("SELECT ArrDelay + 10 FROM mytable");
+    testQuery("SELECT ArrDelay + '10' FROM mytable");
+    testQuery("SELECT SUM(ArrDelay + 10) FROM mytable");
+    testQuery("SELECT SUM(ArrDelay + '10') FROM mytable");
+  }
+
   @Test
   public void testLiteralOnlyFuncV1()
       throws Exception {
