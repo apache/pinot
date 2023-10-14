@@ -51,11 +51,11 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.FunctionColumnPairConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -964,11 +964,15 @@ public final class TableConfigUtils {
           }
         }
 
-        List<FunctionColumnPairConfig> functionColumnPairsConfig = starTreeIndexConfig.getFunctionColumnPairsConfig();
-        if (functionColumnPairsConfig != null) {
-          for (FunctionColumnPairConfig functionColumnPairConfig : functionColumnPairsConfig) {
+        List<StarTreeAggregationConfig> starTreeAggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
+        if (starTreeAggregationConfigs != null) {
+          for (StarTreeAggregationConfig starTreeAggregationConfig : starTreeAggregationConfigs) {
             AggregationFunctionColumnPair aggregationFunctionColumnPair =
-                AggregationFunctionColumnPair.fromFunctionColumnPairConfig(functionColumnPairConfig);
+                AggregationFunctionColumnPair.fromStarTreeAggregationConfigs(starTreeAggregationConfig);
+            Preconditions.checkState(
+                !starTreeIndexConfig.getFunctionColumnPairs().contains(aggregationFunctionColumnPair.toColumnName()),
+                "Duplicate" + aggregationFunctionColumnPair.toColumnName()
+                    + "in functionColumnPair and aggregationConfigs, please remove one of the entries.");
             columnNameToConfigMap.put(aggregationFunctionColumnPair.getColumn(), STAR_TREE_CONFIG_NAME);
           }
         }

@@ -23,14 +23,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
-public class FunctionColumnPairConfig extends BaseJsonConfig {
+public class StarTreeAggregationConfig extends BaseJsonConfig {
 
   private final String _columnName;
   private final String _aggregationFunction;
   private final String _chunkCompressionType;
 
   @JsonCreator
-  public FunctionColumnPairConfig(@JsonProperty(value = "columnName", required = true) String columnName,
+  public StarTreeAggregationConfig(@JsonProperty(value = "columnName", required = true) String columnName,
       @JsonProperty(value = "aggregationFunction", required = true) String aggregationFunction,
       @JsonProperty(value = "chunkCompressionType", required = true) String chunkCompressionType) {
     _columnName = columnName;

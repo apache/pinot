@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.startree.v2.builder;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -52,13 +51,12 @@ public class StarTreeV2BuilderConfig {
   private final List<String> _dimensionsSplitOrder;
   private final Set<String> _skipStarNodeCreationForDimensions;
   private final Set<AggregationFunctionColumnPair> _functionColumnPairs;
-  private final Set<AggregationFunctionColumnPair> _functionColumnPairsConfig;
   private final int _maxLeafRecords;
 
   public static StarTreeV2BuilderConfig fromMetadata(StarTreeV2Metadata starTreeV2Metadata) {
     return new StarTreeV2BuilderConfig(starTreeV2Metadata.getDimensionsSplitOrder(),
         starTreeV2Metadata.getSkipStarNodeCreationForDimensions(), starTreeV2Metadata.getFunctionColumnPairs(),
-        starTreeV2Metadata.getMaxLeafRecords(), starTreeV2Metadata.getFunctionColumnPairsConfig());
+        starTreeV2Metadata.getMaxLeafRecords());
   }
 
   public static StarTreeV2BuilderConfig fromIndexConfig(StarTreeIndexConfig indexConfig) {
@@ -81,16 +79,19 @@ public class StarTreeV2BuilderConfig {
       functionColumnPairs.add(aggregationFunctionColumnPair);
     }
 
+    Set<AggregationFunctionColumnPair> aggregationFunctionColumnPairs =
+        indexConfig.getAggregationConfigs().stream()
+            .map(AggregationFunctionColumnPair::fromStarTreeAggregationConfigs).collect(Collectors.toSet());
+
+    functionColumnPairs.addAll(aggregationFunctionColumnPairs);
+
     int maxLeafRecords = indexConfig.getMaxLeafRecords();
     if (maxLeafRecords <= 0) {
       maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
     }
 
-    Set<AggregationFunctionColumnPair> functionColumnPairsConfig = indexConfig.getFunctionColumnPairsConfig().stream()
-        .map(AggregationFunctionColumnPair::fromFunctionColumnPairConfig).collect(Collectors.toSet());
-
     return new StarTreeV2BuilderConfig(dimensionsSplitOrder, skipStarNodeCreationForDimensions, functionColumnPairs,
-        maxLeafRecords, functionColumnPairsConfig);
+        maxLeafRecords);
   }
 
   /**
@@ -166,21 +167,15 @@ public class StarTreeV2BuilderConfig {
     }
 
     return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), functionColumnPairs,
-        DEFAULT_MAX_LEAF_RECORDS, null);
+        DEFAULT_MAX_LEAF_RECORDS);
   }
 
   private StarTreeV2BuilderConfig(List<String> dimensionsSplitOrder, Set<String> skipStarNodeCreationForDimensions,
-      Set<AggregationFunctionColumnPair> functionColumnPairs, int maxLeafRecords,
-      Set<AggregationFunctionColumnPair> functionColumnPairsConfig) {
+      Set<AggregationFunctionColumnPair> functionColumnPairs, int maxLeafRecords) {
     _dimensionsSplitOrder = dimensionsSplitOrder;
     _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
     _functionColumnPairs = functionColumnPairs;
     _maxLeafRecords = maxLeafRecords;
-    _functionColumnPairsConfig = functionColumnPairsConfig == null ? new HashSet<>() : functionColumnPairsConfig;
-  }
-
-  public Set<AggregationFunctionColumnPair> getFunctionColumnPairsConfig() {
-    return _functionColumnPairsConfig;
   }
 
   public List<String> getDimensionsSplitOrder() {
@@ -210,21 +205,19 @@ public class StarTreeV2BuilderConfig {
     StarTreeV2BuilderConfig that = (StarTreeV2BuilderConfig) o;
     return _maxLeafRecords == that._maxLeafRecords && Objects.equals(_dimensionsSplitOrder, that._dimensionsSplitOrder)
         && Objects.equals(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions)
-        && Objects.equals(_functionColumnPairs, that._functionColumnPairs) && Objects.equals(_functionColumnPairsConfig,
-        that._functionColumnPairsConfig);
+        && Objects.equals(_functionColumnPairs, that._functionColumnPairs);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(_dimensionsSplitOrder, _skipStarNodeCreationForDimensions, _functionColumnPairs,
-        _functionColumnPairsConfig, _maxLeafRecords);
+        _maxLeafRecords);
   }
 
   @Override
   public String toString() {
     return new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE).append("splitOrder", _dimensionsSplitOrder)
         .append("skipStarNodeCreation", _skipStarNodeCreationForDimensions)
-        .append("functionColumnPairs", _functionColumnPairs).append("maxLeafRecords", _maxLeafRecords)
-        .append("functionColumnPairsConfig", _functionColumnPairsConfig).toString();
+        .append("functionColumnPairs", _functionColumnPairs).append("maxLeafRecords", _maxLeafRecords).toString();
   }
 }

@@ -143,10 +143,10 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _metricReaders = new PinotSegmentColumnReader[_numMetrics];
     _chunkCompressionType = new ChunkCompressionType[_numMetrics];
 
-    // From functionColumnPairsConfig extracting compression type. Consider switching to this instead of
+    // From aggregationConfig extracting compression type. Consider switching to this instead of
     // functionColumnPairs for star-tree config.
     Map<String, AggregationFunctionColumnPair> functionColumnPairMap =
-        _builderConfig.getFunctionColumnPairsConfig().stream()
+        _builderConfig.getFunctionColumnPairs().stream()
             .collect(Collectors.toMap(AggregationFunctionColumnPair::toColumnName, v -> v));
 
     int index = 0;
@@ -543,7 +543,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
     _metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _metrics);
     _metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
-    for (AggregationFunctionColumnPair functionColumnPair : _builderConfig.getFunctionColumnPairsConfig()) {
+    for (AggregationFunctionColumnPair functionColumnPair : _builderConfig.getFunctionColumnPairs()) {
       functionColumnPair.addToConfiguration(_metadataProperties);
     }
     _metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,

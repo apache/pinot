@@ -36,26 +36,28 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
   // Function column pairs with delimiter "__", e.g. SUM__col1, MAX__col2, COUNT__*
   private final List<String> _functionColumnPairs;
   // Function column pairs config, currently only handling compression.
-  private final List<FunctionColumnPairConfig> _functionColumnPairConfig;
+  private final List<StarTreeAggregationConfig> _aggregationConfigs;
   // The upper bound of records to be scanned at the leaf node
   private final int _maxLeafRecords;
 
   @JsonCreator
   public StarTreeIndexConfig(
       @JsonProperty(value = "dimensionsSplitOrder", required = true) List<String> dimensionsSplitOrder,
-      @JsonProperty("skipStarNodeCreationForDimensions") @Nullable List<String> skipStarNodeCreationForDimensions,
-      @JsonProperty(value = "functionColumnPairs", required = true) List<String> functionColumnPairs,
-      @JsonProperty(value = "functionColumnPairsConfig") @Nullable
-      List<FunctionColumnPairConfig> functionColumnPairConfig, @JsonProperty("maxLeafRecords") int maxLeafRecords) {
+      @JsonProperty(value = "skipStarNodeCreationForDimensions") @Nullable
+      List<String> skipStarNodeCreationForDimensions,
+      @JsonProperty(value = "functionColumnPairs") @Nullable List<String> functionColumnPairs,
+      @JsonProperty(value = "aggregationConfigs") @Nullable List<StarTreeAggregationConfig> aggregationConfigs,
+      @JsonProperty(value = "maxLeafRecords") int maxLeafRecords) {
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(dimensionsSplitOrder),
         "'dimensionsSplitOrder' must be configured");
-    Preconditions.checkArgument(CollectionUtils.isNotEmpty(functionColumnPairs),
-        "'functionColumnPairs' must be configured");
     _dimensionsSplitOrder = dimensionsSplitOrder;
     _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
-    _functionColumnPairs = functionColumnPairs;
+    _functionColumnPairs = functionColumnPairs != null ? functionColumnPairs : new ArrayList<>();
     _maxLeafRecords = maxLeafRecords;
-    _functionColumnPairConfig = functionColumnPairConfig != null ? functionColumnPairConfig : new ArrayList<>();
+    _aggregationConfigs = aggregationConfigs != null ? aggregationConfigs : new ArrayList<>();
+    Preconditions.checkArgument(
+        CollectionUtils.isNotEmpty(functionColumnPairs) || CollectionUtils.isNotEmpty(aggregationConfigs),
+        "Either 'functionColumnPairs' or 'aggregationConfigs' must be configured");
   }
 
   public List<String> getDimensionsSplitOrder() {
@@ -71,8 +73,8 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
     return _functionColumnPairs;
   }
 
-  public List<FunctionColumnPairConfig> getFunctionColumnPairsConfig() {
-    return _functionColumnPairConfig;
+  public List<StarTreeAggregationConfig> getAggregationConfigs() {
+    return _aggregationConfigs;
   }
 
   public int getMaxLeafRecords() {

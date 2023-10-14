@@ -34,8 +34,6 @@ public class StarTreeV2Metadata {
   private final List<String> _dimensionsSplitOrder;
   private final Set<AggregationFunctionColumnPair> _functionColumnPairs;
 
-  private final Set<AggregationFunctionColumnPair> _functionColumnPairsConfig;
-
   // The following properties are useful for generating the builder config
   private final int _maxLeafRecords;
   private final Set<String> _skipStarNodeCreationForDimensions;
@@ -44,13 +42,12 @@ public class StarTreeV2Metadata {
     _numDocs = metadataProperties.getInt(MetadataKey.TOTAL_DOCS);
     _dimensionsSplitOrder = Arrays.asList(metadataProperties.getStringArray(MetadataKey.DIMENSIONS_SPLIT_ORDER));
     _functionColumnPairs = new HashSet<>();
-    _functionColumnPairsConfig = new HashSet<>();
     for (String functionColumnPair : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
       _functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName(functionColumnPair));
       Configuration functionColPairsConfig =
-          metadataProperties.subset(MetadataKey.FUNCTION_COLUMN_PAIRS_CONFIG + "." + functionColumnPair);
+          metadataProperties.subset(MetadataKey.AGGREGATION_CONFIG + "." + functionColumnPair);
       if (!functionColPairsConfig.isEmpty()) {
-        _functionColumnPairsConfig.add(AggregationFunctionColumnPair.fromConfiguration(functionColPairsConfig));
+        _functionColumnPairs.add(AggregationFunctionColumnPair.fromConfiguration(functionColPairsConfig));
       }
     } _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
     _skipStarNodeCreationForDimensions = new HashSet<>(
@@ -71,10 +68,6 @@ public class StarTreeV2Metadata {
 
   public boolean containsFunctionColumnPair(AggregationFunctionColumnPair functionColumnPair) {
     return _functionColumnPairs.contains(functionColumnPair);
-  }
-
-  public Set<AggregationFunctionColumnPair> getFunctionColumnPairsConfig() {
-    return _functionColumnPairsConfig;
   }
 
   public int getMaxLeafRecords() {
