@@ -23,14 +23,16 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.model.Message;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.QueryException;
@@ -605,40 +607,47 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }, 60_000L, errorMessage);
   }
 
-  public void testReset(TableType tableType)
-      throws Exception {
+  public void testReset(TableType tableType) {
     String rawTableName = getTableName();
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
 
-    // reset the table.
-    resetTable(rawTableName, tableType, null);
+    // Reset the table.
+    // NOTE: Reset table might fail if there are pending messages, so we need to retry until it succeeds.
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        resetTable(rawTableName, tableType, null);
+        return true;
+      } catch (IOException e) {
+        assertTrue(e.toString().contains("pending message"));
+        return false;
+      }
+    }, 30_000L, "Failed to reset table: " + tableNameWithType);
 
-    // wait for all live messages clear the queue.
-    List<String> instances = _helixResourceManager.getServerInstancesForTable(rawTableName, tableType);
+    // Wait for all the reset messages being processed.
+    IdealState idealState = _helixResourceManager.getTableIdealState(tableNameWithType);
+    assertNotNull(idealState, "Failed to find ideal state for table: " + tableNameWithType);
+    Set<String> instances = new HashSet<>();
+    for (Map<String, String> instanceStateMap : idealState.getRecord().getMapFields().values()) {
+      instances.addAll(instanceStateMap.keySet());
+    }
     PropertyKey.Builder keyBuilder = _helixDataAccessor.keyBuilder();
     TestUtils.waitForCondition(aVoid -> {
-      int liveMessageCount = 0;
       for (String instanceName : instances) {
-        List<Message> messages = _helixDataAccessor.getChildValues(keyBuilder.messages(instanceName), true);
-        liveMessageCount += messages.size();
-      }
-      return liveMessageCount == 0;
-    }, 30_000L, "Failed to wait for all segment reset messages clear helix state transition!");
-
-    // Check that all segment states come back to ONLINE.
-    TestUtils.waitForCondition(aVoid -> {
-      // check external view and wait for everything to come back online
-      ExternalView externalView = _helixAdmin.getResourceExternalView(getHelixClusterName(),
-          TableNameBuilder.forType(tableType).tableNameWithType(rawTableName));
-      for (Map<String, String> externalViewStateMap : externalView.getRecord().getMapFields().values()) {
-        for (String state : externalViewStateMap.values()) {
-          if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)
-              && !CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING.equals(state)) {
-            return false;
-          }
+        if (!_helixDataAccessor.getChildNames(keyBuilder.messages(instanceName)).isEmpty()) {
+          return false;
         }
       }
       return true;
-    }, 30_000L, "Failed to wait for all segments come back online");
+    }, 30_000L, "Failed to process all the reset messages");
+
+    // Wait for external view converging with ideal state.
+    TestUtils.waitForCondition(aVoid -> {
+      IdealState is = _helixResourceManager.getTableIdealState(tableNameWithType);
+      assertNotNull(is, "Failed to find ideal state for table: " + tableNameWithType);
+      ExternalView ev = _helixResourceManager.getTableExternalView(tableNameWithType);
+      assertNotNull(ev, "Failed to find external view for table: " + tableNameWithType);
+      return ev.getRecord().getMapFields().equals(is.getRecord().getMapFields());
+    }, 30_000L, "Failed to match the ideal state");
   }
 
   public String reloadTableAndValidateResponse(String tableName, TableType tableType, boolean forceDownload)
