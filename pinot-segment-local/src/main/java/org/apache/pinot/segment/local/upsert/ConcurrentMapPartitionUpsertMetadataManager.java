@@ -33,6 +33,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -50,6 +51,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 @ThreadSafe
 public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {
+
+  // Used to initialize a reference to previous row for merging in partial upsert
+  private final LazyRow _reusePreviousRow = new LazyRow();
 
   @VisibleForTesting
   final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
@@ -302,7 +306,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
             int currentDocId = recordLocation.getDocId();
             if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-              _partialUpsertHandler.merge(currentSegment, currentDocId, record);
+              _reusePreviousRow.init(currentSegment, currentDocId);
+              _partialUpsertHandler.merge(_reusePreviousRow, record);
             }
           }
           return recordLocation;
