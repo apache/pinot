@@ -489,12 +489,17 @@ public class MutableSegmentImpl implements MutableSegment {
     if (isUpsertEnabled()) {
       RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
-      updateDictionary(updatedRow);
-      addNewRow(numDocsIndexed, updatedRow);
-      // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
-      // once validated
-      canTakeMore = numDocsIndexed++ < _capacity;
-      _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+      // if record doesn't need to be dropped, then persist in segment and update metadata hashmap
+      if (!_partitionUpsertMetadataManager.shouldDropRecord(recordInfo)) {
+        updateDictionary(updatedRow);
+        addNewRow(numDocsIndexed, updatedRow);
+        // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
+        // once validated
+        canTakeMore = numDocsIndexed++ < _capacity;
+        _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+      } else {
+        canTakeMore = numDocsIndexed < _capacity;
+      }
     } else {
       // Update dictionary first
       updateDictionary(row);

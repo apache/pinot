@@ -89,7 +89,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), false);
 
     // Start 2 operations
     assertTrue(upsertMetadataManager.startOperation());
@@ -164,7 +164,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), false);
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
 
@@ -327,7 +327,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList(comparisonColumn), deleteRecordColumn, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), false);
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
 
@@ -610,7 +610,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), false);
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -690,6 +690,79 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testAddOutOfOrderRecord()
+      throws IOException {
+    verifyAddOutOfOrderRecord(HashFunction.NONE);
+    verifyAddOutOfOrderRecord(HashFunction.MD5);
+    verifyAddOutOfOrderRecord(HashFunction.MURMUR3);
+  }
+
+  private void verifyAddOutOfOrderRecord(HashFunction hashFunction)
+      throws IOException {
+    String comparisonColumn = "timeCol";
+    // here dropOutOfOrderRecord = true
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
+            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
+            mock(ServerMetrics.class), true);
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    // Add the first segment
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
+    int numRecords = 3;
+    int[] primaryKeys = new int[]{0, 1, 2};
+    int[] timestamps = new int[]{100, 120, 100};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegment(1, validDocIds1, null, getPrimaryKeyList(numRecords, primaryKeys));
+    upsertMetadataManager.addSegment(segment1, validDocIds1, null,
+        getRecordInfoList(numRecords, primaryKeys, timestamps, null).iterator());
+
+    // Update records from the second segment
+    ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment segment2 = mockMutableSegment(1, validDocIds2, null);
+
+    // new record, should return false to not drop
+    boolean shouldDropRecord =
+        upsertMetadataManager.doShouldDropRecord(new RecordInfo(makePrimaryKey(3), 0, new IntWrapper(100), false));
+    assertFalse(shouldDropRecord);
+    upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(3), 0, new IntWrapper(100), false));
+
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
+    // segment2: 3 -> {0, 100}
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment1, 2, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
+
+    // send an out-of-order event, should return true to drop event
+    shouldDropRecord =
+        upsertMetadataManager.doShouldDropRecord(new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(80), false));
+    assertTrue(shouldDropRecord);
+
+    // ordered event for an existing key
+    shouldDropRecord =
+        upsertMetadataManager.doShouldDropRecord(new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(150), false));
+    assertFalse(shouldDropRecord);
+    upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(150), false));
+
+    // segment1: 0 -> {0, 100}, 1 -> {1, 120}
+    // segment2: 3 -> {0, 100}, 2 -> {1, 150}
+    checkRecordLocation(recordLocationMap, 0, segment1, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 1, segment1, 1, 120, hashFunction);
+    checkRecordLocation(recordLocationMap, 3, segment2, 0, 100, hashFunction);
+    checkRecordLocation(recordLocationMap, 2, segment2, 1, 150, hashFunction);
+    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+    assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
+
+    // Close the metadata manager
+    upsertMetadataManager.stop();
+    upsertMetadataManager.close();
+  }
+
+  @Test
   public void testPreloadSegment() {
     verifyPreloadSegment(HashFunction.NONE);
     verifyPreloadSegment(HashFunction.MD5);
@@ -701,7 +774,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), false);
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -757,7 +830,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList(comparisonColumn), deleteColumn, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), false);
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // queryableDocIds is same as validDocIds in the absence of delete markers
@@ -858,7 +931,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 30, tableDir,
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), false);
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -919,7 +992,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 30, tableDir,
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), false);
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -985,7 +1058,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 30, tableDir,
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), false);
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -1039,7 +1112,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
             Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 10, INDEX_DIR,
-            mock(ServerMetrics.class));
+            mock(ServerMetrics.class), false);
 
     double currentTimeMs = System.currentTimeMillis();
     upsertMetadataManager.persistWatermark(currentTimeMs);

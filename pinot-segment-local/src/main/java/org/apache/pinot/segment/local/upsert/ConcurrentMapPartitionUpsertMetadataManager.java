@@ -56,9 +56,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics, boolean dropOutOfOrderRecord) {
     super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction,
-        partialUpsertHandler, enableSnapshot, metadataTTL, tableIndexDir, serverMetrics);
+        partialUpsertHandler, enableSnapshot, metadataTTL, tableIndexDir, serverMetrics, dropOutOfOrderRecord);
   }
 
   @Override
@@ -302,6 +302,29 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           return recordLocation;
         });
     return record;
+  }
+
+  protected boolean doShouldDropRecord(RecordInfo recordInfo) {
+    // if _dropOutOfOrderRecord is false, then always add row
+    if (!_dropOutOfOrderRecord) {
+      return false;
+    }
+    RecordLocation previousRecordLocation =
+        _primaryKeyToRecordLocationMap.get(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction));
+    // if previous-record not found, then we should add row so return false
+    if (previousRecordLocation == null) {
+      return false;
+    }
+
+    // if out-of-order event, update UPSERT_OUT_OF_ORDER metric here and then return true to drop record.
+    // UPSERT_OUT_OF_ORDER metric is updated only in addNewRecord call which will be skipped when
+    // _dropOutOfOrderRecord = true
+    if (recordInfo.getComparisonValue().compareTo(previousRecordLocation.getComparisonValue()) < 0) {
+      handleOutOfOrderEvent(previousRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
+      return true;
+    } else {
+      return false;
+    }
   }
 
   @VisibleForTesting

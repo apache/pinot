@@ -92,6 +92,11 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   GenericRow updateRecord(GenericRow record, RecordInfo recordInfo);
 
   /**
+   * Returns whether the record should be dropped or not.
+   */
+  boolean shouldDropRecord(RecordInfo recordInfo);
+
+  /**
    * Takes snapshot for all the tracked immutable segments when snapshot is enabled. This method should be invoked
    * before a new consuming segment starts consuming.
    */
