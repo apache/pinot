@@ -307,7 +307,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         _indexCreator.indexColumn(col, sortedDocIds, indexSegment, skip);
       }
     } catch (Exception e) {
-      _indexCreator.close(); // TODO: Why is this only closed on an exception?
+      _indexCreator.close();
       throw e;
     } finally {
       _recordReader.close();

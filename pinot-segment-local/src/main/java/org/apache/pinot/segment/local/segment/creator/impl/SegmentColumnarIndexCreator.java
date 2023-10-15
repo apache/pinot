@@ -362,13 +362,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
       NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
       if (sortedDocIds != null) {
+        int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
           // TODO(Erich): should I avoid a function call in the loop like this?
-          indexColumnValue(colReader, creatorsByIndex, columnName, docId, nullVec, skipDefaultNullValues);
+          indexColumnValue(colReader, creatorsByIndex, columnName, docId, onDiskDocId, nullVec, skipDefaultNullValues);
+          onDiskDocId += 1;
         }
       } else {
         for (int docId = 0; docId < numDocs; docId++) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, docId, nullVec, skipDefaultNullValues);
+          indexColumnValue(colReader, creatorsByIndex, columnName, docId, docId, nullVec, skipDefaultNullValues);
         }
       }
     }
@@ -380,11 +382,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private void indexColumnValue(PinotSegmentColumnReader colReader,
                                 Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
                                 String columnName,
-                                int docId,
+                                int sourceDocId,
+                                int onDiskDocId,
                                 NullValueVectorCreator nullVec,
                                 boolean skipDefaultNullValues)
   throws IOException {
-    Object columnValueToIndex = colReader.getValue(docId);
+    Object columnValueToIndex = colReader.getValue(sourceDocId);
     if (columnValueToIndex == null) {
       throw new RuntimeException("Null value for column:" + columnName);
     }
@@ -412,8 +415,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 //              - if it returns true and we are NOT skipping null values we put the default null value into that field
 //              of the GenericRow
       // TODO(Erich): do we need to check the Skip Null Values flag here?  Yes, it's done in PinotRecordReader
-      if (colReader.isNull(docId)) {
-        nullVec.setNull(docId);
+      if (colReader.isNull(sourceDocId)) {
+        nullVec.setNull(onDiskDocId);
       }
     }
   }
