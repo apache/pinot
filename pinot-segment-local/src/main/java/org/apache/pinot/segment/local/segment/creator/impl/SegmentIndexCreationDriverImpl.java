@@ -302,8 +302,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
       //    removed from this code.
       int[] sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
+      boolean skip = ((PinotSegmentRecordReader) _recordReader).getSkipDefaultNullValues();
       for (String col : columns) {
-        _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
+        _indexCreator.indexColumn(col, sortedDocIds, indexSegment, skip);
       }
     } catch (Exception e) {
       _indexCreator.close(); // TODO: Why is this only closed on an exception?

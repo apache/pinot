@@ -109,8 +109,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private long _durationNS = 0;
 
   @Override
-  public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+  public void init(
+          SegmentGeneratorConfig segmentCreationSpec,
+          SegmentIndexCreationInfo segmentIndexCreationInfo,
+          TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap,
+          Schema schema,
+          File outDir)
       throws Exception {
     _docIdCounter = 0;
     _config = segmentCreationSpec;
@@ -344,7 +348,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   @Override
-  public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
+  public void indexColumn(String columnName,
+                          @Nullable int[] sortedDocIds,
+                          IndexSegment segment,
+                          boolean skipDefaultNullValues)
           throws IOException {
     long startNS = System.nanoTime();
 
@@ -357,11 +364,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (sortedDocIds != null) {
         for (int docId : sortedDocIds) {
           // TODO(Erich): should I avoid a function call in the loop like this?
-          indexColumnValue(colReader, creatorsByIndex, columnName, docId, nullVec);
+          indexColumnValue(colReader, creatorsByIndex, columnName, docId, nullVec, skipDefaultNullValues);
         }
       } else {
         for (int docId = 0; docId < numDocs; docId++) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, docId, nullVec);
+          indexColumnValue(colReader, creatorsByIndex, columnName, docId, nullVec, skipDefaultNullValues);
         }
       }
     }
@@ -374,7 +381,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                                 Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
                                 String columnName,
                                 int docId,
-                                NullValueVectorCreator nullVec)
+                                NullValueVectorCreator nullVec,
+                                boolean skipDefaultNullValues)
   throws IOException {
     Object columnValueToIndex = colReader.getValue(docId);
     if (columnValueToIndex == null) {
@@ -392,7 +400,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
     }
 
-    if (_nullHandlingEnabled) {
+    if (_nullHandlingEnabled && !skipDefaultNullValues) {
       //handling null values
 //            In row oriented:
 //              - this.indexRow iterates over each column and checks if it isNullValue.  If it is then it sets the null
