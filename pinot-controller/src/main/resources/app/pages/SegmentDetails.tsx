@@ -235,6 +235,8 @@ const SegmentDetails = ({ match }: RouteComponentProps<Props>) => {
           <CustomizedTables
             title="Replica Set"
             data={replica}
+            addLinks
+            baseURL="/instance/"
             showSearchBox={true}
             inAccordionFormat={true}
           />
