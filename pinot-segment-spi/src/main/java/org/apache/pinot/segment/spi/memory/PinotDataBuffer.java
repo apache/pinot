@@ -68,6 +68,12 @@ public abstract class PinotDataBuffer implements Closeable {
   // With number of bytes more than this threshold, we create a ByteBuffer from the buffer and use bulk get/put method
   public static final int BULK_BYTES_PROCESSING_THRESHOLD = 10;
   private static final String SKIP_BYTEBUFFER_ENV = "PINOT_OFFHEAP_SKIP_BYTEBUFFER";
+  private static final boolean DEFAULT_PRIORITIZE_BYTE_BUFFER;
+
+  static {
+     String skipBbEnvValue = System.getenv(SKIP_BYTEBUFFER_ENV);
+     DEFAULT_PRIORITIZE_BYTE_BUFFER = !Boolean.parseBoolean(skipBbEnvValue);
+  }
 
   private static class BufferContext {
     enum Type {
@@ -153,9 +159,7 @@ public abstract class PinotDataBuffer implements Closeable {
   }
 
   public static PinotBufferFactory createDefaultFactory() {
-    String skipBbEnvValue = System.getenv(SKIP_BYTEBUFFER_ENV);
-    boolean prioritizeByteBuffer = !Boolean.parseBoolean(skipBbEnvValue);
-    return createDefaultFactory(prioritizeByteBuffer);
+    return createDefaultFactory(DEFAULT_PRIORITIZE_BYTE_BUFFER);
   }
 
   public static PinotBufferFactory createDefaultFactory(boolean prioritizeByteBuffer) {
