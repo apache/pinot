@@ -641,6 +641,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         }
         exceptions.add(QueryException.getException(QueryException.BROKER_SEGMENT_UNAVAILABLE_ERROR, errorMessage));
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
+        // If segments are unavailable, the result should be considered partial
         isPartialResult = true;
       }
 
