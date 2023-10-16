@@ -952,7 +952,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       final long buildTimeMillis = now() - lockAcquireTimeMillis;
       final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
       _segmentLogger
-          .info("Successfully built segment in {} ms, after lockWaitTime {} ms", buildTimeMillis, waitTimeMillis);
+          .info("Successfully built segment (Column Mode: {}, Docs: {}) in {} ms, after lockWaitTime {} ms",
+                  converter.isColumnMajorEnabled(),
+                  converter.getTotalDocCount(),
+                  buildTimeMillis,
+                  waitTimeMillis);
 
       File dataDir = new File(_resourceDataDir);
       File indexDir = new File(dataDir, _segmentNameStr);
