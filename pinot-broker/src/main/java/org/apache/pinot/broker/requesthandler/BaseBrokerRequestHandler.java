@@ -682,13 +682,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(exceptions);
       }
 
-    // Set the maximum serialized response size per server
+      // Set the maximum serialized response size per server
       int numServers = 0;
       if (offlineRoutingTable != null) {
-        numServers += offlineRoutingTable.keySet().size();
+        numServers += offlineRoutingTable.size();
       }
       if (realtimeRoutingTable != null) {
-        numServers += realtimeRoutingTable.keySet().size();
+        numServers += realtimeRoutingTable.size();
       }
 
       if (offlineBrokerRequest != null) {
@@ -1694,9 +1694,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
       return;
     }
-    if (QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions) != null) {
-      Long maxQueryResponseSize = QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions);
-      Long maxServerResponseSize = maxQueryResponseSize / numServers;
+    Long maxQueryResponseSizeQOption = QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions);
+    if (maxQueryResponseSizeQOption != null) {
+      Long maxServerResponseSize = maxQueryResponseSizeQOption / numServers;
       queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(maxServerResponseSize));
       return;
@@ -1716,8 +1716,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       Long maxServerResponseSize = maxQueryResponseSize / numServers;
       queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(maxServerResponseSize));
-      _brokerMetrics.addMeteredTableValue(tableConfig.getTableName(), BrokerMeter.MAX_QUERY_RESPONSE_SIZE,
-          maxQueryResponseSize);
       return;
     }
 
@@ -1733,7 +1731,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return;
     }
     if (maxQueryResponseSizeCfg > 0) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MAX_QUERY_RESPONSE_SIZE, maxQueryResponseSizeCfg);
       Long maxServerResponseSize = maxQueryResponseSizeCfg / numServers;
       queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(maxServerResponseSize));
