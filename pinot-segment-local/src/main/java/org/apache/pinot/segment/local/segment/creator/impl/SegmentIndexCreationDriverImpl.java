@@ -391,7 +391,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
 
-    LOGGER.info("Driver, record read time : {}", ((float) _totalRecordReadTimeNs)/1000000.0);
+    LOGGER.info("Driver, record read time : {}", ((float) _totalRecordReadTimeNs) / 1000000.0);
     LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", _totalIndexTime);
   }
