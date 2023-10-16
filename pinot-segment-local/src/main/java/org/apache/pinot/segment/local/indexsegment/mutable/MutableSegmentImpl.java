@@ -495,11 +495,10 @@ public class MutableSegmentImpl implements MutableSegment {
         addNewRow(numDocsIndexed, updatedRow);
         // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
         // once validated
-        canTakeMore = numDocsIndexed++ < _capacity;
+        numDocsIndexed++;
         _partitionUpsertMetadataManager.addRecord(this, recordInfo);
-      } else {
-        canTakeMore = numDocsIndexed < _capacity;
       }
+      canTakeMore = numDocsIndexed < _capacity;
     } else {
       // Update dictionary first
       updateDictionary(row);
