@@ -104,9 +104,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Schema _schema;
   private File _indexDir;
   private int _totalDocs;
-  private int _docIdCounter;
+  private int _docPosOnDisk;
   private boolean _nullHandlingEnabled;
-  private long _durationNS = 0;
 
   @Override
   public void init(
@@ -116,7 +115,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           Schema schema,
           File outDir)
       throws Exception {
-    _docIdCounter = 0;
+    _docPosOnDisk = 0;
     _config = segmentCreationSpec;
     _indexCreationInfoMap = indexCreationInfoMap;
 
@@ -338,13 +337,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         String columnName = entry.getKey();
         // If row has null value for given column name, add to null value vector
         if (row.isNullValue(columnName)) {
-          _nullValueVectorCreatorMap.get(columnName).setNull(_docIdCounter);
+          _nullValueVectorCreatorMap.get(columnName).setNull(_docPosOnDisk);
         }
       }
     }
 
-    _docIdCounter++;
-    _durationNS += System.nanoTime() - startNS;
+    _docPosOnDisk++;
   }
 
   @Override
@@ -361,29 +359,33 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       int numDocs = segment.getSegmentMetadata().getTotalDocs();
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
       NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
       if (sortedDocIds != null) {
         int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
-          // TODO(Erich): should I avoid a function call in the loop like this?
-          indexColumnValue(colReader, creatorsByIndex, columnName, docId, onDiskDocId, nullVec, skipDefaultNullValues);
+          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec,
+                  dictionaryCreator, docId, onDiskDocId, nullVec, skipDefaultNullValues);
           onDiskDocId += 1;
         }
       } else {
         for (int docId = 0; docId < numDocs; docId++) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, docId, docId, nullVec, skipDefaultNullValues);
+          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec,
+                  dictionaryCreator, docId, docId, nullVec, skipDefaultNullValues);
         }
       }
     }
 
-    _docIdCounter++;
-    _durationNS += System.nanoTime() - startNS;
+    _docPosOnDisk++;
   }
 
   private void indexColumnValue(PinotSegmentColumnReader colReader,
                                 Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
                                 String columnName,
+                                FieldSpec fieldSpec,
+                                SegmentDictionaryCreator dictionaryCreator,
                                 int sourceDocId,
-                                int onDiskDocId,
+                                int onDiskDocPos,
                                 NullValueVectorCreator nullVec,
                                 boolean skipDefaultNullValues)
   throws IOException {
@@ -394,8 +396,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     // TODO(ERICH): pull this out of the loop because it only needs to be looked up once per column
     // TODO(ERICH): do a performance comparison for before and after pulling this out
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-    SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+    //FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+    //SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
 
     if (fieldSpec.isSingleValueField()) {
       indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
@@ -414,9 +416,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 //              column of that docId is null
 //              - if it returns true and we are NOT skipping null values we put the default null value into that field
 //              of the GenericRow
-      // TODO(Erich): do we need to check the Skip Null Values flag here?  Yes, it's done in PinotRecordReader
       if (colReader.isNull(sourceDocId)) {
-        nullVec.setNull(onDiskDocId);
+        nullVec.setNull(onDiskDocPos);
       }
     }
   }
