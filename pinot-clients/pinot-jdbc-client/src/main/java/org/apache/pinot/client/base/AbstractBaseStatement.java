@@ -50,7 +50,7 @@ public abstract class AbstractBaseStatement implements Statement {
   @Override
   public void clearWarnings()
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op
   }
 
   @Override
@@ -194,7 +194,7 @@ public abstract class AbstractBaseStatement implements Statement {
   @Override
   public SQLWarning getWarnings()
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return null;
   }
 
   @Override
@@ -212,7 +212,7 @@ public abstract class AbstractBaseStatement implements Statement {
   @Override
   public void setPoolable(boolean poolable)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op;
   }
 
   @Override
@@ -230,7 +230,7 @@ public abstract class AbstractBaseStatement implements Statement {
   @Override
   public void setEscapeProcessing(boolean enable)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op
   }
 
   @Override
