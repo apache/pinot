@@ -104,7 +104,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private int _totalDocs = 0;
   private File _tempIndexDir;
   private String _segmentName;
-  private long _totalRecordReadTimeNS = 0;
+  private long _totalRecordReadTimeNs = 0;
   private long _totalIndexTime = 0;
   private long _totalStatsCollectorTime = 0;
   private boolean _continueOnError;
@@ -245,7 +245,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           _transformPipeline.processRow(decodedRow, reusedResult);
 
           recordReadStopTime = System.nanoTime();
-          _totalRecordReadTimeNS += (recordReadStopTime - recordReadStartTime);
+          _totalRecordReadTimeNs += (recordReadStopTime - recordReadStartTime);
         } catch (Exception e) {
           if (!_continueOnError) {
             throw new RuntimeException("Error occurred while reading row during indexing", e);
@@ -391,7 +391,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
 
-    LOGGER.info("Driver, record read time (NS) : {}", _totalRecordReadTimeNS);
+    LOGGER.info("Driver, record read time : {}", ((float) _totalRecordReadTimeNs)/1000000.0);
     LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", _totalIndexTime);
   }
