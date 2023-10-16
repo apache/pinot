@@ -25,5 +25,5 @@ public class RebalanceJobConstants {
   // Progress status of the rebalance operartion
   public static final String JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS = "REBALANCE_PROGRESS_STATS";
   // Configs to retry the rebalance operartion
-  public static final String JOB_METADATA_KEY_REBALANCE_ATTEMPT_CONTEXT = "REBALANCE_ATTEMPT_CONTEXT";
+  public static final String JOB_METADATA_KEY_REBALANCE_CONTEXT = "REBALANCE_CONTEXT";
 }

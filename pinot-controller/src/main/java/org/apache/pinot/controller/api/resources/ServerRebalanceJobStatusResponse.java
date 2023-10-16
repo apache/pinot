@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceAttemptContext;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 
 
@@ -27,7 +27,7 @@ public class ServerRebalanceJobStatusResponse {
 
   private TableRebalanceProgressStats _tableRebalanceProgressStats;
 
-  private TableRebalanceAttemptContext _tableRebalanceAttemptContext;
+  private TableRebalanceContext _tableRebalanceContext;
 
   public void setTimeElapsedSinceStartInSeconds(Long timeElapsedSinceStart) {
     _timeElapsedSinceStartInSeconds = timeElapsedSinceStart;
@@ -45,11 +45,11 @@ public class ServerRebalanceJobStatusResponse {
     return _timeElapsedSinceStartInSeconds;
   }
 
-  public TableRebalanceAttemptContext getTableRebalanceAttemptContext() {
-    return _tableRebalanceAttemptContext;
+  public TableRebalanceContext getTableRebalanceContext() {
+    return _tableRebalanceContext;
   }
 
-  public void setTableRebalanceAttemptContext(TableRebalanceAttemptContext tableRebalanceAttemptContext) {
-    _tableRebalanceAttemptContext = tableRebalanceAttemptContext;
+  public void setTableRebalanceContext(TableRebalanceContext tableRebalanceContext) {
+    _tableRebalanceContext = tableRebalanceContext;
   }
 }

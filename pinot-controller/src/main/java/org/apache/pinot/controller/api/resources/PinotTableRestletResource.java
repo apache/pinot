@@ -95,7 +95,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceAttemptContext;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
@@ -682,47 +682,36 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebalance")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.ABORT_REBALANCE)
-  @ApiOperation(value = "Abort all rebalance jobs for the given table, and noop if no rebalance is running", notes =
-      "Abort all rebalance jobs for the given table, and noop if no rebalance is running")
-  public List<String> abortRebalance(
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.CANCEL_REBALANCE)
+  @ApiOperation(value = "Cancel all rebalance jobs for the given table, and noop if no rebalance is running", notes =
+      "Cancel all rebalance jobs for the given table, and noop if no rebalance is running")
+  public List<String> cancelRebalance(
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
-    String zkPath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.TABLE_REBALANCE);
-    List<String> abortedJobIds = new ArrayList<>();
-    // The rebalance job updates progress status kept in ZK regularly. If it sees ABORTED status, it aborts itself.
-    boolean updated = _pinotHelixResourceManager.updateAllJobsForTable(tableNameWithType, zkPath, jobMetadata -> {
-      String jobId = jobMetadata.get(CommonConstants.ControllerJob.JOB_ID);
-      try {
-        String jobStatsInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
-        TableRebalanceProgressStats jobStats =
-            JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
-        if (jobStats.getStatus() != RebalanceResult.Status.IN_PROGRESS) {
-          return;
-        }
-        abortedJobIds.add(jobId);
-        LOGGER.info("Abort rebalance job: {} for table: {}", jobId, tableNameWithType);
-        jobStats.setStatus(RebalanceResult.Status.ABORTED);
-        jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
-            JsonUtils.objectToString(jobStats));
-
-        // Also cancel following retries for the rebalance job.
-        String jobCtxInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_ATTEMPT_CONTEXT);
-        if (StringUtils.isEmpty(jobCtxInStr)) {
-          // In case the job is submitted by older code, it may not have job ctx field.
-          return;
-        }
-        TableRebalanceAttemptContext jobCtx = JsonUtils.stringToObject(jobCtxInStr, TableRebalanceAttemptContext.class);
-        jobCtx.setCancelRetry(true);
-        jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_ATTEMPT_CONTEXT,
-            JsonUtils.objectToString(jobCtx));
-      } catch (Exception e) {
-        LOGGER.error("Failed to abort rebalance job: {} for table: {}", jobId, tableNameWithType, e);
-      }
-    });
-    LOGGER.info("Tried to abort existing jobs at best effort and done: {}", updated);
-    return abortedJobIds;
+    List<String> cancelledJobIds = new ArrayList<>();
+    boolean updated =
+        _pinotHelixResourceManager.updateJobsForTable(tableNameWithType, ControllerJobType.TABLE_REBALANCE,
+            jobMetadata -> {
+              String jobId = jobMetadata.get(CommonConstants.ControllerJob.JOB_ID);
+              try {
+                String jobStatsInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
+                TableRebalanceProgressStats jobStats =
+                    JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
+                if (jobStats.getStatus() != RebalanceResult.Status.IN_PROGRESS) {
+                  return;
+                }
+                cancelledJobIds.add(jobId);
+                LOGGER.info("Cancel rebalance job: {} for table: {}", jobId, tableNameWithType);
+                jobStats.setStatus(RebalanceResult.Status.CANCELLED);
+                jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+                    JsonUtils.objectToString(jobStats));
+              } catch (Exception e) {
+                LOGGER.error("Failed to cancel rebalance job: {} for table: {}", jobId, tableNameWithType, e);
+              }
+            });
+    LOGGER.info("Tried to cancel existing jobs at best effort and done: {}", updated);
+    return cancelledJobIds;
   }
 
   @GET
@@ -754,12 +743,10 @@ public class PinotTableRestletResource {
     }
     serverRebalanceJobStatusResponse.setTimeElapsedSinceStartInSeconds(timeSinceStartInSecs);
 
-    String retryConfigInStr =
-        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_ATTEMPT_CONTEXT);
-    if (StringUtils.isNotEmpty(retryConfigInStr)) {
-      TableRebalanceAttemptContext tableRebalanceAttemptContext =
-          JsonUtils.stringToObject(retryConfigInStr, TableRebalanceAttemptContext.class);
-      serverRebalanceJobStatusResponse.setTableRebalanceAttemptContext(tableRebalanceAttemptContext);
+    String jobCtxInStr = controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT);
+    if (StringUtils.isNotEmpty(jobCtxInStr)) {
+      TableRebalanceContext jobCtx = JsonUtils.stringToObject(jobCtxInStr, TableRebalanceContext.class);
+      serverRebalanceJobStatusResponse.setTableRebalanceContext(jobCtx);
     }
     return serverRebalanceJobStatusResponse;
   }

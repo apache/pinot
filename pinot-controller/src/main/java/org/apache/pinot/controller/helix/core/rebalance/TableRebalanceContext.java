@@ -18,38 +18,33 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
-import com.google.common.annotations.VisibleForTesting;
-
-
 /**
- * Track the job configs and attempt numbers as part of the job ZK metadata for future retry.
+ * Track the job configs and attempt numbers as part of the job ZK metadata to retry failed rebalance.
  */
-public class TableRebalanceAttemptContext {
+public class TableRebalanceContext {
   private static final int INITIAL_ATTEMPT_ID = 1;
   private String _jobId;
   private String _originalJobId;
   private RebalanceConfig _config;
   private int _attemptId;
-  private boolean _cancelRetry;
 
-  public static TableRebalanceAttemptContext forInitialAttempt(String originalJobId, RebalanceConfig config) {
-    return new TableRebalanceAttemptContext(originalJobId, config, INITIAL_ATTEMPT_ID);
+  public static TableRebalanceContext forInitialAttempt(String originalJobId, RebalanceConfig config) {
+    return new TableRebalanceContext(originalJobId, config, INITIAL_ATTEMPT_ID);
   }
 
-  public static TableRebalanceAttemptContext forRetry(String originalJobId, RebalanceConfig config, int attemptId) {
-    return new TableRebalanceAttemptContext(originalJobId, config, attemptId);
+  public static TableRebalanceContext forRetry(String originalJobId, RebalanceConfig config, int attemptId) {
+    return new TableRebalanceContext(originalJobId, config, attemptId);
   }
 
-  public TableRebalanceAttemptContext() {
+  public TableRebalanceContext() {
     // For JSON deserialization.
   }
 
-  private TableRebalanceAttemptContext(String originalJobId, RebalanceConfig config, int attemptId) {
+  private TableRebalanceContext(String originalJobId, RebalanceConfig config, int attemptId) {
     _jobId = createAttemptJobId(originalJobId, attemptId);
     _originalJobId = originalJobId;
     _config = config;
     _attemptId = attemptId;
-    _cancelRetry = false;
   }
 
   public int getAttemptId() {
@@ -84,22 +79,13 @@ public class TableRebalanceAttemptContext {
     _config = config;
   }
 
-  public boolean getCancelRetry() {
-    return _cancelRetry;
-  }
-
-  public void setCancelRetry(boolean cancelRetry) {
-    _cancelRetry = cancelRetry;
-  }
-
   @Override
   public String toString() {
-    return "TableRebalanceAttemptContext{" + "_jobId='" + _jobId + '\'' + ", _originalJobId='" + _originalJobId + '\''
-        + ", _config=" + _config + ", _attemptId=" + _attemptId + ", _cancelRetry=" + _cancelRetry + '}';
+    return "TableRebalanceContext{" + "_jobId='" + _jobId + '\'' + ", _originalJobId='" + _originalJobId + '\''
+        + ", _config=" + _config + ", _attemptId=" + _attemptId + '}';
   }
 
-  @VisibleForTesting
-  static String createAttemptJobId(String originalJobId, int attemptId) {
+  private static String createAttemptJobId(String originalJobId, int attemptId) {
     if (attemptId == INITIAL_ATTEMPT_ID) {
       return originalJobId;
     }

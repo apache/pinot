@@ -147,7 +147,7 @@ import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceAttemptContext;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
@@ -1983,7 +1983,7 @@ public class PinotHelixResourceManager {
   /**
    * Returns the ZK metdata for the given jobId and jobType
    * @param jobId the id of the job
-   * @param jobType Job Path
+   * @param jobType the type of the job to figure out where job metadata is kept in ZK
    * @return Map representing the job's ZK properties
    */
   @Nullable
@@ -2007,10 +2007,7 @@ public class PinotHelixResourceManager {
     for (ControllerJobType jobType : jobTypes) {
       String jobsResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
       try {
-        if (!_propertyStore.exists(jobsResourcePath, -1)) {
-          continue;
-        }
-        ZNRecord znRecord = _propertyStore.get(jobsResourcePath, null, -1);
+        ZNRecord znRecord = _propertyStore.get(jobsResourcePath, null, AccessOption.PERSISTENT);
         if (znRecord == null) {
           continue;
         }
@@ -2048,8 +2045,7 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numMessagesSent));
     jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentName);
-    return addControllerJobToZK(jobId, jobMetadata,
-        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.RELOAD_SEGMENT));
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
   }
 
   public boolean addNewForceCommitJob(String tableNameWithType, String jobId, long jobSubmissionTimeMs,
@@ -2062,8 +2058,7 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST,
         JsonUtils.objectToString(consumingSegmentsCommitted));
-    return addControllerJobToZK(jobId, jobMetadata,
-        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.FORCE_COMMIT));
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.FORCE_COMMIT);
   }
 
   /**
@@ -2082,33 +2077,33 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT.toString());
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
-    return addControllerJobToZK(jobId, jobMetadata,
-        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.RELOAD_SEGMENT));
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
   }
 
   /**
    * Adds a new job metadata for controller job like table rebalance or reload into ZK
    * @param jobId job's UUID
    * @param jobMetadata the job metadata
-   * @param jobResourcePath zkPath to add the new job metadata
+   * @param jobType the type of the job to figure out where job metadata is kept in ZK
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobResourcePath) {
-    return addControllerJobToZK(jobId, jobMetadata, jobResourcePath, prev -> true);
+  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, ControllerJobType jobType) {
+    return addControllerJobToZK(jobId, jobMetadata, jobType, prev -> true);
   }
 
   /**
    * Adds a new job metadata for controller job like table rebalance or reload into ZK
    * @param jobId job's UUID
    * @param jobMetadata the job metadata
-   * @param jobResourcePath zkPath to add the new job metadata
+   * @param jobType the type of the job to figure out where job metadata is kept in ZK
    * @param prevJobMetadataChecker to check the previous job metadata before adding new one
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobResourcePath,
+  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, ControllerJobType jobType,
       Predicate<Map<String, String>> prevJobMetadataChecker) {
     Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS) != null,
         "Submission Time in JobMetadata record not set. Cannot expire these records");
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
     Stat stat = new Stat();
     ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
     if (jobsZnRecord != null) {
@@ -2137,12 +2132,13 @@ public class PinotHelixResourceManager {
   /**
    * Update existing job metadata belong to the table
    * @param tableNameWithType whose job metadata to be updated
-   * @param jobResourcePath zkPath to look for the job metadata for the table
+   * @param jobType the type of the job to figure out where job metadata is kept in ZK
    * @param updater to modify the job metadata in place
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean updateAllJobsForTable(String tableNameWithType, String jobResourcePath,
+  public boolean updateJobsForTable(String tableNameWithType, ControllerJobType jobType,
       Consumer<Map<String, String>> updater) {
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
     Stat stat = new Stat();
     ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
     if (jobsZnRecord == null) {
@@ -3188,7 +3184,7 @@ public class PinotHelixResourceManager {
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
     if (trackRebalanceProgress) {
       zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId,
-          TableRebalanceAttemptContext.forInitialAttempt(rebalanceJobId, rebalanceConfig), this);
+          TableRebalanceContext.forInitialAttempt(rebalanceJobId, rebalanceConfig), this);
     }
     return rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig,
         zkBasedTableRebalanceObserver);

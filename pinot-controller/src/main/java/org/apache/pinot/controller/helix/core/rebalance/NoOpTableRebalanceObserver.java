@@ -38,7 +38,12 @@ public class NoOpTableRebalanceObserver implements TableRebalanceObserver {
   }
 
   @Override
-  public boolean isAborted() {
+  public boolean isStopped() {
     return false;
+  }
+
+  @Override
+  public RebalanceResult.Status getStopStatus() {
+    return RebalanceResult.Status.DONE;
   }
 }
